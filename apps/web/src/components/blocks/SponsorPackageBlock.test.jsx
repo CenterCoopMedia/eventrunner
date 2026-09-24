@@ -1,9 +1,14 @@
 // A sponsor package (#193): a name, the pairs it states, and what it
 // includes, sanitized. A run of packages is one ruled list.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import SponsorPackageBlock, { sponsorLimitLabel } from './SponsorPackageBlock.jsx';
 import SectionBlocks from './SectionBlocks.jsx';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 /** The <dd> after a <dt> with this text, or null. */
 const descriptionOf = (term) => {
@@ -87,5 +92,14 @@ describe('SponsorPackageBlock', () => {
     render(<SponsorPackageBlock block={PACKAGE} />);
     const heading = screen.getByRole('heading', { level: 3, name: 'Coffee break' });
     expect(heading.className).not.toMatch(/\btext-pretty\b/);
+  });
+
+  // Review round (c2, finding 6): a price is a dynamic value, and dynamic
+  // values read in tabular figures (interface guidelines, Typography).
+  it('sets the price in tabular figures', () => {
+    render(<SponsorPackageBlock block={{ ...PACKAGE, price: '3,000' }} />);
+    expect(screen.getByText('3,000')).toHaveAttribute('data-numeric');
+    const css = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
+    expect(css).toMatch(/\[data-numeric\]\s*\{\s*font-variant-numeric:\s*tabular-nums;/);
   });
 });

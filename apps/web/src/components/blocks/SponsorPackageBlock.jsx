@@ -36,7 +36,9 @@ export default function SponsorPackageBlock({ block }) {
       <h3 className="font-heading text-h3 font-semibold text-text-primary">{text(block.name)}</h3>
       {price || openTo ? (
         <dl className="definition-list mt-xs">
-          {price ? <DefinitionPair term="Price">{price}</DefinitionPair> : null}
+          {/* A price is a dynamic value, so it reads in tabular figures
+              (index.css `[data-numeric]`). */}
+          {price ? <DefinitionPair term="Price"><span data-numeric>{price}</span></DefinitionPair> : null}
           {openTo ? <DefinitionPair term="Open to">{openTo}</DefinitionPair> : null}
         </dl>
       ) : null}
