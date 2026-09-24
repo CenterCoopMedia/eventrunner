@@ -55,7 +55,6 @@ import AdminPageHeader, {
 } from '../components/adminChrome.jsx';
 
 const PAGE_SIZE = 25;
-const SOURCE_RE = /^[a-z0-9-]{1,64}$/;
 const STATUS_WORDS = Object.freeze({ sent: 'Sent', failed: 'Failed' });
 
 /** Every `source` a sender stamps on its row, in the words staff read. */
@@ -77,13 +76,20 @@ const DELIVERY_WORDS = Object.freeze({
   suppressed: { label: 'Suppressed', tone: 'caution' },
 });
 
-/** The filters the URL holds, with any value the server would refuse left out. */
+/**
+ * Whether `key` names an entry of one of the maps above. An own-key check,
+ * because a URL or a stored field can say "constructor" or "__proto__", and
+ * a plain lookup would find the object's prototype instead of nothing.
+ */
+const known = (map, key) => typeof key === 'string' && Object.hasOwn(map, key);
+
+/** The filters the URL holds: a source and a status this page offers, or nothing. */
 function readFilters(searchParams) {
   const source = searchParams.get('source') ?? '';
   const status = searchParams.get('status') ?? '';
   return {
-    source: SOURCE_RE.test(source) ? source : '',
-    status: STATUS_WORDS[status] ? status : '',
+    source: known(SOURCE_LABELS, source) ? source : '',
+    status: known(STATUS_WORDS, status) ? status : '',
   };
 }
 
@@ -150,8 +156,8 @@ export function figureSentence({ count, scanned, searched, readAt }) {
 function describeSearch({ q, source, status }) {
   const parts = [];
   if (q) parts.push(`“${q}”`);
-  if (source) parts.push(`the source ${SOURCE_LABELS[source] ?? source}`);
-  if (status) parts.push(`the status ${STATUS_WORDS[status] ?? status}`);
+  if (source) parts.push(`the source ${known(SOURCE_LABELS, source) ? SOURCE_LABELS[source] : source}`);
+  if (status) parts.push(`the status ${known(STATUS_WORDS, status) ? STATUS_WORDS[status] : status}`);
   if (parts.length <= 1) return parts.join('');
   return `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
 }
@@ -176,7 +182,7 @@ const quietWordClass = 'text-admin-ink-secondary';
 
 function SourceCell({ source }) {
   if (!source) return <span className={quietWordClass}>None</span>;
-  if (SOURCE_LABELS[source]) return SOURCE_LABELS[source];
+  if (known(SOURCE_LABELS, source)) return SOURCE_LABELS[source];
   return <span className="font-admin-data text-admin-ink-data">{source}</span>;
 }
 
@@ -186,7 +192,7 @@ function SourceCell({ source }) {
  * The reason, when the row stores one, sits under the word as text.
  */
 function StatusCell({ row }) {
-  const delivery = DELIVERY_WORDS[row.deliveryStatus];
+  const delivery = known(DELIVERY_WORDS, row.deliveryStatus) ? DELIVERY_WORDS[row.deliveryStatus] : null;
   let word;
   if (row.status === 'failed') word = <StatusBadge tone="error">Failed</StatusBadge>;
   else if (delivery) word = <StatusBadge tone={delivery.tone}>{delivery.label}</StatusBadge>;
@@ -439,10 +445,11 @@ export default function AdminEmailLog() {
 
   const denied = error?.status === 403;
   const activeFilters = [draft.source, draft.status].filter(Boolean).length;
+  // Only the sources this page names: readFilters drops any other, so the
+  // select never has to hold a value it has no option for.
   const sourceOptions = [
     { value: '', label: 'Any' },
     ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label })),
-    ...(draft.source && !SOURCE_LABELS[draft.source] ? [{ value: draft.source, label: draft.source }] : []),
   ];
 
   const rows = result?.rows ?? [];

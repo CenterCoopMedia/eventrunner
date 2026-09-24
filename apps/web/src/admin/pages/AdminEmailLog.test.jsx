@@ -206,9 +206,37 @@ describe('AdminEmailLog', () => {
     expect(screen.getByRole('group', { name: 'Filters' })).toBeInTheDocument();
   });
 
-  it('ignores a URL filter the server would refuse', async () => {
-    await renderPage('/admin/email-log?source=Not%20A%20Source&status=bounced');
-    expect(listCalls()[0]).toEqual({ limit: 25 });
+  it('ignores a URL filter the server would refuse, or one that names an object key instead of a source or a status', async () => {
+    for (const search of [
+      '?source=Not%20A%20Source&status=bounced',
+      '?status=constructor',
+      '?source=constructor',
+      '?source=__proto__&status=toString',
+      '?source=hasOwnProperty&status=valueOf',
+    ]) {
+      callMock.mockReset();
+      const { unmount } = await renderPage(`/admin/email-log${search}`);
+      expect(listCalls()[0], search).toEqual({ limit: 25 });
+      expect(screen.getByRole('combobox', { name: 'Source' })).toHaveValue('');
+      expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('');
+      expect(screen.getByRole('group', { name: 'Filters' })).toBeInTheDocument();
+      expect(screen.queryByText(/function|native code/)).toBeNull();
+      unmount();
+    }
+  });
+
+  it('shows a source or a delivery state it does not know as data, never as an object key’s value', async () => {
+    await renderPage('/admin/email-log', {
+      lists: [{
+        rows: [message({ id: 'odd', to: 'odd@example.test', source: 'constructor', deliveryStatus: 'toString' })],
+        nextCursor: null,
+        scanned: 1,
+      }],
+    });
+    const odd = rowOf('odd@example.test');
+    expect(within(odd).getByText('constructor').className).toContain('font-admin-data');
+    expect(within(odd).getByText('Sent')).toBeInTheDocument();
+    expect(odd.textContent).not.toMatch(/function|native code/);
   });
 
   it('names the query and the filters in the filtered empty state, with one action that clears and focuses the field', async () => {
