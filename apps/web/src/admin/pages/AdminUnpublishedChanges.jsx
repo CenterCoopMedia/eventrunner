@@ -85,6 +85,23 @@ function Head({ children }) {
   );
 }
 
+/**
+ * A row's name. A name cut at 80 characters keeps its whole text in reach:
+ * as the cut text's title for a pointer, and as a visually hidden copy that
+ * is what a screen reader reads (and a link's name).
+ */
+function RecordName({ row }) {
+  if (row.name === row.fullName) return row.name;
+  return (
+    <>
+      <span aria-hidden="true" title={row.fullName}>
+        {row.name}
+      </span>
+      <span className="sr-only">{row.fullName}</span>
+    </>
+  );
+}
+
 function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
   const { choice, rows } = group;
   const key = `collection:${choice.id}`;
@@ -133,10 +150,12 @@ function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
                   <td className={cell}>
                     {href ? (
                       <Link to={href} className={rowTitleLinkClass}>
-                        {row.name}
+                        <RecordName row={row} />
                       </Link>
                     ) : (
-                      <span className="text-admin-base font-bold text-admin-ink">{row.name}</span>
+                      <span className="text-admin-base font-bold text-admin-ink">
+                        <RecordName row={row} />
+                      </span>
                     )}
                     <p className={`mt-3xs break-all ${rowMetaClass}`}>{row.id}</p>
                   </td>

@@ -111,6 +111,7 @@ describe('groupPending', () => {
     expect(content.rows[0]).toEqual({
       id: 'a__b__c',
       name: 'a__b › c',
+      fullName: 'a__b › c',
       state: { id: 'draft', label: 'Draft' },
       hidden: true,
       section: 'a__b',
@@ -135,6 +136,13 @@ describe('recordNameOf', () => {
     const name = recordNameOf('cmsSchedule', { id: 's', title: 'x'.repeat(200) });
     expect(name).toHaveLength(80);
     expect(name.endsWith('…')).toBe(true);
+  });
+
+  it('keeps the whole name beside the cut one on each row', () => {
+    const title = `An update whose title runs long ${'and longer '.repeat(10)}to the end`;
+    const [, , , , updates] = groupPending({ cmsUpdates: [{ id: 'u1', title }] });
+    expect(updates.rows[0].name).toHaveLength(80);
+    expect(updates.rows[0].fullName).toBe(title);
   });
 });
 

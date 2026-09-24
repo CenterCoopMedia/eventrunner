@@ -48,6 +48,18 @@ function cut(text) {
   return text.length > NAME_LIMIT ? `${text.slice(0, NAME_LIMIT - 1)}…` : text;
 }
 
+/** A record's whole readable name, uncut: see recordNameOf. */
+function fullNameOf(collection, doc) {
+  for (const key of ['title', 'name', 'label', 'question']) {
+    const value = doc?.[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  if (collection === 'cmsContent' && typeof doc?.section === 'string' && typeof doc?.field === 'string') {
+    return `${doc.section} › ${doc.field}`;
+  }
+  return String(doc?.id ?? '');
+}
+
 /**
  * A record's readable name: its title, name, label or question; for a
  * content block, then "section › field"; else the document id. Cut at 80
@@ -58,14 +70,7 @@ function cut(text) {
  * @returns {string}
  */
 export function recordNameOf(collection, doc) {
-  for (const key of ['title', 'name', 'label', 'question']) {
-    const value = doc?.[key];
-    if (typeof value === 'string' && value.trim()) return cut(value.trim());
-  }
-  if (collection === 'cmsContent' && typeof doc?.section === 'string' && typeof doc?.field === 'string') {
-    return cut(`${doc.section} › ${doc.field}`);
-  }
-  return cut(String(doc?.id ?? ''));
+  return cut(fullNameOf(collection, doc));
 }
 
 /**
@@ -109,7 +114,8 @@ export function draftStateOf(draft) {
 /**
  * The page's rows: per collection in the admin's order, every dirty draft,
  * newest save first and then by id. Nothing is filtered, so each
- * collection's row count is its share of the shell's count.
+ * collection's row count is its share of the shell's count. `name` is cut
+ * at 80 characters for the row; `fullName` is the whole name, for readers.
  *
  * @param {Record<string, Array<object>>} docsByCollection
  * @returns {Array<{ choice: typeof COLLECTION_CHOICES[number], rows: Array<object> }>}
@@ -120,6 +126,7 @@ export function groupPending(docsByCollection) {
     const rows = docs.map((draft) => ({
       id: draft.id,
       name: recordNameOf(choice.id, draft),
+      fullName: fullNameOf(choice.id, draft),
       state: draftStateOf(draft),
       hidden: draft.visible === false,
       section: typeof draft.section === 'string' ? draft.section : null,

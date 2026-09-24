@@ -497,6 +497,26 @@ describe('the Unpublished changes page', () => {
     expect(within(updates).getByText('An update')).toBeInTheDocument();
   });
 
+  it('lets a reader read a name cut at 80 characters in full, with or without an editor link', async () => {
+    await renderAt('/admin/unpublished');
+    const long = `A long update title ${'that keeps going '.repeat(8)}until the end`;
+    const session = `A long session title ${'that keeps going '.repeat(8)}until the end`;
+    pushDrafts({
+      cmsUpdates: [{ id: 'u-long', title: long, status: 'dirty' }],
+      cmsSchedule: [{ id: 's-long', title: session, status: 'dirty' }],
+    });
+    // No editor owns updates yet, so this row has no link.
+    const updates = screen.getByRole('table', { name: /^Updates with unpublished changes/ });
+    const [row] = within(updates).getAllByRole('row').slice(1);
+    expect(within(row).queryByRole('link')).toBeNull();
+    const shown = within(row).getByText(`${long.slice(0, 79)}…`);
+    expect(shown).toHaveAttribute('title', long);
+    expect(within(row).getByText(long)).toHaveClass('sr-only');
+    // A linked row is named in full too.
+    const sessions = screen.getByRole('table', { name: /^Sessions with unpublished changes/ });
+    expect(within(sessions).getByRole('link', { name: session })).toHaveAttribute('href', '/admin/sessions/s-long');
+  });
+
   it('opens for a staff account', async () => {
     staff = true;
     await renderAt('/admin/unpublished');
