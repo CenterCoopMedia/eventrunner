@@ -116,6 +116,17 @@ describe('the record list', () => {
     expect(figure()).toHaveTextContent('3 content blocks, most recently published first.');
   });
 
+  it('marks a record whose live version is hidden, since the site shows nothing for it', () => {
+    renderPage();
+    report('cmsContent', [{ ...CONTENT_LIVE[0], visible: false }, CONTENT_LIVE[1]]);
+    report('cmsContent_drafts', []);
+    const hidden = within(table()).getByRole('link', { name: 'hero › subtitle' }).closest('tr');
+    expect(within(hidden).getByText('Live')).toBeInTheDocument();
+    expect(within(hidden).getByText('Hidden')).toBeInTheDocument();
+    const shown = within(table()).getByRole('link', { name: 'Where do I park?' }).closest('tr');
+    expect(within(shown).queryByText('Hidden')).toBeNull();
+  });
+
   it('links each name to its record’s versions, the id encoded', () => {
     renderPage();
     report('cmsContent', [{ ...CONTENT_LIVE[0], id: 'odd id' }]);

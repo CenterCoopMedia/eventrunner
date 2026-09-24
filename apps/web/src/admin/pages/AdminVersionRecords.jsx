@@ -23,6 +23,7 @@ import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
   RecordState,
+  StatusBadge,
 } from '../components/adminChrome.jsx';
 import {
   Notice,
@@ -172,7 +173,14 @@ export default function AdminVersionRecords() {
                   <span className={rowMetaClass}>{row.id}</span>
                 </div>
               ),
-              state: <RecordState state={row.state} />,
+              // A hidden live version is on no public page, so the list says
+              // so beside the state, as the Pages list does.
+              state: (
+                <div className="flex flex-wrap items-center gap-2xs">
+                  <RecordState state={row.state} />
+                  {row.live?.visible === false ? <StatusBadge tone="neutral">Hidden</StatusBadge> : null}
+                </div>
+              ),
               version:
                 typeof row.live?.revision === 'number' ? (
                   row.live.revision

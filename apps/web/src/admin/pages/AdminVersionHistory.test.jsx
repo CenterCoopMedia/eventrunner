@@ -171,6 +171,15 @@ describe('one record’s versions', () => {
     expect(screen.getByRole('link', { name: 'Back to the list' })).toHaveAttribute('href', '/admin/versions?collection=cmsContent');
   });
 
+  it('says the site shows nothing when the published version is hidden', async () => {
+    await renderPage();
+    reportRecord({ live: [{ ...LIVE, visible: false }] });
+    expect(versionItem(2)).toHaveTextContent(
+      'This is the published version, and it is hidden. The site shows nothing for this record until a shown version is published.',
+    );
+    expect(versionItem(1)).not.toHaveTextContent('published version');
+  });
+
   it('marks a record whose live and draft documents are gone as removed, and keeps its versions', async () => {
     await renderPage();
     reportRecord({ live: [], drafts: [] });

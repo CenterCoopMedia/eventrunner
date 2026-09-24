@@ -353,7 +353,11 @@ export default function AdminVersionHistory() {
                     .
                   </p>
                   {liveRevision === entry.revision ? (
-                    <p className="text-admin-sm font-semibold text-admin-ink">This is the published version.</p>
+                    <p className="text-admin-sm font-semibold text-admin-ink">
+                      {row.live.visible === false
+                        ? 'This is the published version, and it is hidden. The site shows nothing for this record until a shown version is published.'
+                        : 'This is the published version.'}
+                    </p>
                   ) : null}
                 </div>
                 <ChangeTable entry={entry} timeZone={timeZone} />
