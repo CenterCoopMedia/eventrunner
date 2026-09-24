@@ -10,8 +10,8 @@
 // scheduling and never holds a publish back.
 //
 // A RULED TABLE, DRAWN HERE. The rows are in the public feed's order
-// (pinned first, then newest first), and each row takes the proof tint,
-// which the shared admin table does not carry. The head is the galley head
+// (pinned first, then newest first), and each row that is not Live takes
+// the proof tint, which the shared admin table does not carry. The head is the galley head
 // the ticketing tables draw, sticky at the top of the table's own box, and
 // the box is a focusable region so a keyboard can scroll it both ways.
 import { useState } from 'react';
@@ -194,35 +194,44 @@ export default function AdminUpdatesList() {
               {rows.map((row) => {
                 const update = row.current ?? {};
                 const dateLabel = publishDateLabel(update.publishAt, timeZone);
+                // The proof tint is drawn on each cell, not on the row: its
+                // ground is a pseudo-element, and one on a <tr> takes a cell
+                // of its own and pushes the row one column over. Every cell
+                // holds one element, which the tint rule lifts above it.
+                const cell = `${CELL_CLASS} ${proofRowClass(row.state.id, resolvedIds.has(row.id))}`;
                 return (
                   <tr
                     key={row.id}
-                    className={`border-b-admin-hairline border-admin-rule-hairline last:border-b-0 ${proofRowClass(
-                      row.state.id,
-                      resolvedIds.has(row.id),
-                    )}`}
+                    data-record-row={row.state.id}
+                    className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0"
                   >
-                    <td className={CELL_CLASS}>
-                      <Link to={`${UPDATES_ROOT}/${encodeURIComponent(row.id)}`} className={rowTitleLinkClass}>
-                        {update.title || row.id}
-                      </Link>
-                      <p className={`mt-3xs break-all ${rowMetaClass}`}>{row.id}</p>
+                    <td className={cell}>
+                      <div>
+                        <Link to={`${UPDATES_ROOT}/${encodeURIComponent(row.id)}`} className={rowTitleLinkClass}>
+                          {update.title || row.id}
+                        </Link>
+                        <p className={`mt-3xs break-words ${rowMetaClass}`}>{row.id}</p>
+                      </div>
                     </td>
-                    <td className={CELL_CLASS}>
+                    <td className={cell}>
                       <div className="flex flex-wrap items-center gap-2xs">
                         <RecordState state={row.state} />
                         {update.visible === false ? <StatusBadge tone="neutral">Hidden</StatusBadge> : null}
                       </div>
                     </td>
-                    <td className={`${CELL_CLASS} whitespace-nowrap font-admin-data tabular-nums text-admin-ink-data`}>
+                    <td className={`${cell} whitespace-nowrap font-admin-data tabular-nums text-admin-ink-data`}>
                       {dateLabel ? (
-                        <time dateTime={toPublishDate(update.publishAt).toISOString()}>{dateLabel}</time>
+                        <time className="block" dateTime={toPublishDate(update.publishAt).toISOString()}>{dateLabel}</time>
                       ) : (
-                        'Undated'
+                        <span className="block">Undated</span>
                       )}
                     </td>
-                    <td className={`${CELL_CLASS} text-admin-ink-secondary`}>{categoryOf(update) ?? 'None'}</td>
-                    <td className={`${CELL_CLASS} text-admin-ink-secondary`}>{placementOf(update)}</td>
+                    <td className={`${cell} text-admin-ink-secondary`}>
+                      <span className="block">{categoryOf(update) ?? 'None'}</span>
+                    </td>
+                    <td className={`${cell} text-admin-ink-secondary`}>
+                      <span className="block">{placementOf(update)}</span>
+                    </td>
                   </tr>
                 );
               })}

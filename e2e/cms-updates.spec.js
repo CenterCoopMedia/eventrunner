@@ -84,6 +84,23 @@ test.describe.serial('the updates editor', () => {
     expect(draft.data()).toMatchObject({ title, status: 'dirty', pinned: false, visible: true });
     expect((await adminDb().collection('cmsUpdates').doc(updateId).get()).exists).toBe(false);
 
+    // The list shows the draft on the proof ground, each word under its own
+    // head, and Enter on its title opens the editor again.
+    await page.goto('/admin/updates');
+    const row = page.locator('tbody tr', { has: page.getByRole('link', { name: title }) });
+    await expect(row.getByRole('cell').nth(1)).toHaveText('Draft');
+    await expect(row.getByRole('cell').nth(2)).toHaveText(`October 15, ${nextYear}`);
+    await expect(row.getByRole('cell').first()).toHaveClass(/admin-proof-row/);
+    for (const [index, head] of ['Update', 'State', 'Date', 'Category', 'Placement'].entries()) {
+      const headBox = await page.getByRole('columnheader', { name: head, exact: true }).boundingBox();
+      const cellBox = await row.getByRole('cell').nth(index).boundingBox();
+      expect(Math.abs(cellBox.x - headBox.x), `${head} lines up with its head`).toBeLessThan(1);
+    }
+    await row.getByRole('link', { name: title }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/admin/updates/${updateId}$`));
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title);
+
     // A signed-out reader sees the seeded posts and not the draft.
     await publicPage.goto('/updates');
     await expect(publicPage.getByRole('link', { name: SEEDED_TITLE })).toBeVisible();

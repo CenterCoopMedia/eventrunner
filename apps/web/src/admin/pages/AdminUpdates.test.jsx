@@ -151,10 +151,21 @@ describe('the updates list', () => {
     ]);
     // Each title opens its editor.
     expect(screen.getByRole('link', { name: 'New wording' })).toHaveAttribute('href', '/admin/updates/edited');
-    // A row that is not Live sits on the proof ground; the word is beside it.
-    expect(bodyRows[0].className).toContain('admin-proof-row');
-    expect(bodyRows[1].className).not.toContain('admin-proof-row');
-    expect(bodyRows[2].className).toContain('admin-proof-row');
+    // A row that is not Live sits on the proof ground; the word is beside
+    // it. The tint is on every cell of the row and never on the <tr>: the
+    // tint's ground is a pseudo-element, and one on a table row takes a
+    // cell slot and pushes the row a column over.
+    const tinted = (tr) => within(tr).getAllByRole('cell').map((td) => td.className.includes('admin-proof-row'));
+    expect(tinted(bodyRows[0])).toEqual([true, true, true, true, true]);
+    expect(tinted(bodyRows[1])).toEqual([false, false, false, false, false]);
+    expect(tinted(bodyRows[2])).toEqual([true, true, true, true, true]);
+    for (const tr of within(table).getAllByRole('row')) expect(tr.className).not.toContain('admin-proof-row');
+    // Every tinted cell holds one element for the tint rule to lift above
+    // the ground, so no bare text is painted under it.
+    for (const td of bodyRows[2].querySelectorAll('td')) {
+      expect(td.children).toHaveLength(1);
+      expect([...td.childNodes].every((node) => node.nodeType === Node.ELEMENT_NODE)).toBe(true);
+    }
     expect(screen.getByText('3 updates')).toBeInTheDocument();
   });
 
