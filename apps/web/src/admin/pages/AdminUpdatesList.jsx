@@ -59,7 +59,10 @@ export default function AdminUpdatesList() {
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [resumeQueueId, setResumeQueueId] = useState(null);
+  // A failed run's queue and the ids it asked for. A resume is reported
+  // against those ids, never the drafts that are dirty now: a draft saved
+  // after the failure was never part of the run.
+  const [resume, setResume] = useState(null);
   // Rows that published in this session: their proof tint resolves to the
   // base ground rather than vanishing (moment 1).
   const [resolvedIds, setResolvedIds] = useState(() => new Set());
@@ -75,24 +78,24 @@ export default function AdminUpdatesList() {
     showToast(verdict.message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
-  function reportFailure(err) {
+  function reportFailure(err, ids) {
     setNotice({ tone: 'error', message: err.message });
     showToast(err.message, { tone: 'error', announce: false });
     // A part-way failure names the queue row a retry must resume from, so
     // committed chunks are not published a second time.
-    if (err?.queueId) setResumeQueueId(err.queueId);
+    if (err?.queueId) setResume({ queueId: err.queueId, ids });
   }
 
   async function publishAll() {
     if (publishing) return;
     setPublishing('all');
     setNotice(null);
-    setResumeQueueId(null);
+    setResume(null);
     const ids = dirtyIds;
     try {
       reportPublish(await call('cmsPublish', { collection: 'cmsUpdates', docIds: ids }), ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, ids);
     } finally {
       setPublishing(null);
     }
@@ -102,11 +105,11 @@ export default function AdminUpdatesList() {
     if (publishing) return;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId: resumeQueueId });
-      setResumeQueueId(null);
-      reportPublish(response, dirtyIds);
+      const response = await call('cmsPublish', { queueId: resume.queueId });
+      setResume(null);
+      reportPublish(response, resume.ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, resume.ids);
     } finally {
       setPublishing(null);
     }
@@ -126,7 +129,7 @@ export default function AdminUpdatesList() {
         identifiers={loading ? null : `${rows.length} update${rows.length === 1 ? '' : 's'}`}
         actions={
           <>
-            {resumeQueueId ? (
+            {resume ? (
               <button
                 type="button"
                 className={secondaryButtonClass}

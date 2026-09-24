@@ -185,6 +185,28 @@ describe('the updates list', () => {
     expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
   });
 
+  // Codex review on #281 found this in the organizations list, which this
+  // list shares a shape with: a resumed run is reported against the ids the
+  // failed run asked for, not the drafts that are dirty now.
+  it('reports a resumed publish against the ids the failed run asked for', async () => {
+    await renderAt('/admin/updates');
+    pushUpdates([PUBLISHED, EDITED_LIVE], [PUBLISHED_CLEAN, EDITED_DRAFT, NEVER_PUBLISHED]);
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { code: 'publish-failed', message: 'Publish failed part-way.' }, queueId: 'queue-9' }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+
+    // A third update gains a draft after the failed run.
+    pushUpdates([PUBLISHED, EDITED_LIVE], [{ ...PUBLISHED, title: 'Doors open at ten', status: 'dirty' }, EDITED_DRAFT, NEVER_PUBLISHED]);
+    fetch.mockResolvedValueOnce(response({ results: { cmsUpdates: { published: ['edited', 'fresh'], skipped: [] } } }));
+    fireEvent.click(resume);
+    expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(bodyOf(callsTo('cmsPublish')[1])).toEqual({ queueId: 'queue-9' });
+  });
+
   it('says so while updates are off, since the site does not show them', async () => {
     await renderAt('/admin/updates');
     pushConfig('features', { updates: false });
