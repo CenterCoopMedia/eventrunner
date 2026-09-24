@@ -81,8 +81,9 @@ vi.mock('firebase/firestore', () => ({
   }),
 }));
 
-// The admin endpoints the Access page calls; the shell tests below drive a
-// change to the signed-in account through them.
+// Every admin endpoint the shell's pages call goes through this mock: the
+// Access page's changes to the signed-in account, and the overview's
+// figures.
 const adminCall = vi.fn(() => Promise.resolve({}));
 vi.mock('./adminApi.js', async () => {
   const actual = await vi.importActual('./adminApi.js');
@@ -129,9 +130,8 @@ beforeEach(() => {
   pendingProbe = null;
   pendingOperatorProbe = null;
   adminCall.mockReset();
-  adminCall.mockImplementation(() => Promise.resolve({}));
+  adminCall.mockImplementation((name) => Promise.resolve(name === 'getEventStats' ? STATS : {}));
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
-  globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => STATS }));
 });
 
 describe('admin route gating', () => {
@@ -161,8 +161,8 @@ describe('admin route gating', () => {
     // from the server.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    expect(String(fetch.mock.calls[0][0])).toMatch(/\/getEventStats$/);
+    await waitFor(() => expect(adminCall).toHaveBeenCalledWith('getEventStats', {}));
+    expect(adminCall.mock.calls.filter(([name]) => name === 'getEventStats')).toHaveLength(1);
     // Every settings surface is reachable from the shell.
     for (const tab of [
       'Overview',
