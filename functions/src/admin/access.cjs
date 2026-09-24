@@ -101,7 +101,8 @@ function accountsOf(bootstrap) {
  * Apply one access change inside a transaction on config/bootstrap.
  *
  * @param {{ db: object, email: string, tier: 'operator'|'staff'|'none' }} args
- * @returns {Promise<{ ok: true, changed: boolean, previousTier: 'operator'|'staff'|null } |
+ * @returns {Promise<{ ok: true, changed: boolean, tierChanged: boolean,
+ *                     previousTier: 'operator'|'staff'|null } |
  *                    { ok: false, status: 409, code: string, message: string }>}
  */
 async function applyAccessChange({ db, email, tier }) {
@@ -132,14 +133,17 @@ async function applyAccessChange({ db, email, tier }) {
       before.length !== after.length || before.some((entry, index) => entry !== after[index]);
     // A no-op is answered, not written — but a stored list that is merely
     // mis-normalized IS a change worth writing, so the comparison is on the
-    // normalized lists against what was stored, not on the tier alone.
+    // normalized lists against what was stored, not on the tier alone. What
+    // is written is what is reported: a mixed-case entry the rules newly
+    // match once it is lowercased is an effective grant, and the caller
+    // audits and refreshes on `changed`.
     const changed = previousTier !== nextTier
       || listsChanged(Array.isArray(stored.adminEmails) ? stored.adminEmails : [], nextOperators)
       || listsChanged(Array.isArray(stored.staffEmails) ? stored.staffEmails : [], nextStaff);
     if (changed) {
       tx.set(ref, { adminEmails: nextOperators, staffEmails: nextStaff }, { merge: true });
     }
-    return { ok: true, changed: previousTier !== nextTier, previousTier };
+    return { ok: true, changed, tierChanged: previousTier !== nextTier, previousTier };
   });
 }
 
@@ -204,7 +208,13 @@ function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, now =
         actor,
         now,
         log,
-        details: { email, tier: nextTier, previousTier: result.previousTier },
+        details: {
+          email,
+          tier: nextTier,
+          previousTier: result.previousTier,
+          // The tier stood; the stored lists were rewritten normalized.
+          ...(result.tierChanged ? {} : { normalized: true }),
+        },
       });
       if (typeof refreshConfig === 'function') {
         try {

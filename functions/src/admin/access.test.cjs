@@ -236,6 +236,22 @@ test('setAdminAccess: a change that changes nothing is answered, not written and
   assert.equal(db.writes.length, 0);
 });
 
+test('setAdminAccess: a write that only tidies the stored lists is still a change — answered, written, logged as a normalization, and refreshed', async () => {
+  // Connector review: a mixed-case entry the rules newly match once it is
+  // rewritten lowercase is an effective grant, so it cannot go unaudited.
+  const { db, deps, refreshes } = world({ adminEmails: ['Ops@Example.org', OPS, SECOND_OPS], staffEmails: [' Desk@Example.org '] });
+  const res = makeRes();
+  await createSetAdminAccessHandler(deps)(req('ops', { email: STAFF, tier: 'staff' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { ok: true, email: STAFF, tier: 'staff', previousTier: 'staff', changed: true });
+  assert.deepEqual(bootstrapOf(db).adminEmails, [OPS, SECOND_OPS]);
+  assert.deepEqual(bootstrapOf(db).staffEmails, [STAFF]);
+  const logs = adminLogs(db);
+  assert.equal(logs.length, 1);
+  assert.deepEqual(logs[0].details, { email: STAFF, tier: 'staff', previousTier: 'staff', normalized: true });
+  assert.equal(refreshes.length, 1);
+});
+
 test('setAdminAccess: a stored mis-normalized list is rewritten lowercase on the next change', async () => {
   const { db, deps } = world({ adminEmails: ['Ops@Example.org'], staffEmails: [' Desk@Example.org '] });
   const res = makeRes();
@@ -262,7 +278,7 @@ test('setAdminAccess: a missing bootstrap document admits nobody, even a caller 
 test('applyAccessChange: an absent bootstrap document is written as fresh lists (the seed path, not the gate)', async () => {
   const db = makeFakeDb({});
   const result = await applyAccessChange({ db, email: SECOND_OPS, tier: 'operator' });
-  assert.deepEqual(result, { ok: true, changed: true, previousTier: null });
+  assert.deepEqual(result, { ok: true, changed: true, tierChanged: true, previousTier: null });
   assert.deepEqual(db.read('config', 'bootstrap'), { adminEmails: [SECOND_OPS], staffEmails: [] });
 });
 
