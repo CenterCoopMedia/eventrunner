@@ -23,6 +23,7 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
 }));
 
 import AdminVersionHistory from './AdminVersionHistory.jsx';
+import { unavailableButtonClass } from '../components/formControls.jsx';
 
 const DOC_PATH = 'cmsContent/hero__subtitle';
 // 2:02 PM on Sep 23, 2026 in New York.
@@ -290,6 +291,32 @@ describe('one record’s versions', () => {
     expect(historyCalls()).toHaveLength(2);
     await act(async () => older.resolve({ entries: [entry(3)], nextCursor: null }));
     expect(versionItem(3)).toBeInTheDocument();
+  });
+
+  it('refuses the pager during a refresh in words and in the disabled ink, and not while it runs itself', async () => {
+    const refreshed = deferred();
+    const older = deferred();
+    await renderPage(undefined, {
+      pages: [{ entries: [entry(5), entry(4)], nextCursor: 4 }, () => refreshed.promise, () => older.promise],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    const refused = screen.getByRole('button', { name: 'Load older versions after the refresh' });
+    expect(refused).toHaveAttribute('aria-disabled', 'true');
+    expect(refused).not.toHaveAttribute('aria-busy');
+    // The disabled ink on the alternate ground, the pointer unchanged.
+    for (const token of unavailableButtonClass.split(' ')) expect(refused.className).toContain(token);
+    expect(refused.className).not.toMatch(/aria-disabled:(cursor-not-allowed|opacity-60)/);
+    fireEvent.click(refused);
+    expect(historyCalls()).toHaveLength(2);
+
+    await act(async () => refreshed.resolve({ entries: [entry(5), entry(4)], nextCursor: 4 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Load older versions' }));
+    // Busy is its own state: the label says so, and the control keeps its own look.
+    const busy = screen.getByRole('button', { name: 'Loading…' });
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    expect(busy).not.toHaveAttribute('aria-disabled');
+    expect(busy.className).not.toContain('aria-disabled:text-admin-ink-disabled');
+    await act(async () => older.resolve({ entries: [entry(3)], nextCursor: null }));
   });
 
   it('drops an older page that a Refresh overtook, so no version shows twice', async () => {

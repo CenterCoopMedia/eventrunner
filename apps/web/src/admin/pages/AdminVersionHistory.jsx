@@ -31,7 +31,12 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
-import { Notice, Panel, secondaryButtonClass } from '../components/formControls.jsx';
+import {
+  Notice,
+  Panel,
+  secondaryButtonClass,
+  unavailableButtonClass,
+} from '../components/formControls.jsx';
 import { deadMatter } from '../recordState.js';
 import { useAdminRecords } from '../useAdminRecords.js';
 import {
@@ -195,9 +200,10 @@ export default function AdminVersionHistory() {
   }
 
   // While a first read or a refresh runs, the entries on screen are about
-  // to be replaced, so the pager refuses: paging them would drop the answer
-  // the page asked for.
-  const pagerRefused = pending !== null;
+  // to be replaced, so the pager refuses, and says why: paging them would
+  // drop the answer the page asked for. While the pager runs itself it is
+  // busy, which is its own state and keeps its own look.
+  const pagerRefused = pending === 'load' || pending === 'refresh';
 
   async function loadMore() {
     if (result?.nextCursor == null || pending !== null) return;
@@ -395,12 +401,12 @@ export default function AdminVersionHistory() {
         <div>
           <button
             type="button"
-            className={`${secondaryButtonClass} aria-disabled:cursor-not-allowed aria-disabled:opacity-60`}
+            className={pagerRefused ? `${secondaryButtonClass} ${unavailableButtonClass}` : secondaryButtonClass}
             aria-busy={pending === 'more' ? 'true' : undefined}
             aria-disabled={pagerRefused ? 'true' : undefined}
             onClick={loadMore}
           >
-            {pending === 'more' ? 'Loading…' : 'Load older versions'}
+            {pending === 'more' ? 'Loading…' : pagerRefused ? 'Load older versions after the refresh' : 'Load older versions'}
           </button>
         </div>
       ) : null}
