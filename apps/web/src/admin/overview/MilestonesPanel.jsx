@@ -18,6 +18,7 @@
 // "Today", "3 days ago"). A milestone that has passed stays on the list.
 import { useId } from 'react';
 import { formatDayDate } from '../../lib/eventTime.js';
+import { useEventClock } from '../../hooks/useEventClock.js';
 import { Panel } from '../components/formControls.jsx';
 import { Figure } from './figures.jsx';
 import { daysPhrase, daysUntil, sortMilestones } from './milestones.js';
@@ -52,9 +53,14 @@ function GoalLine({ goal, approved }) {
  * @param {unknown} props.goal config/event.registration.goal
  * @param {number|undefined} props.approved the approved count, once the figures arrive
  * @param {string} props.timezone the event's IANA timezone
- * @param {Date} [props.now]
+ * @param {Date} [props.now] a fixed time, for tests; the page passes none
  */
-export default function MilestonesPanel({ milestones, goal, approved, timezone, now = new Date() }) {
+export default function MilestonesPanel({ milestones, goal, approved, timezone, now }) {
+  // The ticking event clock (one tick a minute), so a page left open across
+  // midnight on the event's clock moves "In 1 day" to "Today" by itself
+  // (connector review of PR 272).
+  const clock = useEventClock();
+  const current = now ?? clock;
   const sorted = sortMilestones(milestones);
   const hasGoal = Number.isInteger(goal) && goal > 0;
   if (sorted.length === 0 && !hasGoal) return null;
@@ -76,7 +82,7 @@ export default function MilestonesPanel({ milestones, goal, approved, timezone, 
                 </span>
                 <span className="sr-only">, </span>
                 <span className="text-admin-sm text-admin-ink-secondary">
-                  {daysPhrase(daysUntil(milestone.date, timezone, now))}
+                  {daysPhrase(daysUntil(milestone.date, timezone, current))}
                 </span>
               </li>
             ))}
