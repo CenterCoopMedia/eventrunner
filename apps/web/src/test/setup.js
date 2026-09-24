@@ -1,6 +1,16 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
+import { PRESET_REMAPS } from 'shared/presetRemaps';
+import { presetRemapsLoaded, registerPresetRemaps } from 'shared/theme';
+
+// The preset remaps are a lazy chunk in the app (lib/presetRemaps.js) and a
+// resolver that is asked for a style's tokens or picks before they arrive
+// throws. A test is not a first paint: every test runs with the remaps
+// registered, the way a Node caller requires them once, so a component under
+// test resolves every style and the app's own loader is exercised where a
+// test asks for it.
+if (!presetRemapsLoaded()) registerPresetRemaps(PRESET_REMAPS);
 
 // Tests run credential-free (spec §8.1): no VITE_FIREBASE_* env, no network.
 // The firebase entry module and the SDK functions the providers call are
@@ -70,6 +80,26 @@ vi.mock('firebase/firestore', () => {
     where: vi.fn((...args) => ({ where: args })),
     orderBy: vi.fn((...args) => ({ orderBy: args })),
   };
+});
+
+// The admin shell counts unpublished changes on every screen (issue #196)
+// through its own seam. By default each read answers once with nothing, so
+// a shell test sees zero changes and needs no mock of its own; a test that
+// steers the count overrides this with vi.mocked(...) or its own vi.mock.
+vi.mock('@/admin/pendingChangesSource.js', () => ({
+  subscribeDirtyDrafts: vi.fn((_collection, onNext) => {
+    onNext([]);
+    return () => {};
+  }),
+  listenWithRetry: vi.fn(() => () => {}),
+}));
+// The Unpublished changes page's publish run reads, the same way.
+vi.mock('@/admin/publishRunsSource.js', () => {
+  const empty = (_count, onNext) => {
+    onNext([]);
+    return () => {};
+  };
+  return { subscribeRecentPublishRuns: vi.fn(empty), subscribeFailedPublishRuns: vi.fn(empty) };
 });
 
 // jsdom implements <dialog> as markup and nothing else: it ships the

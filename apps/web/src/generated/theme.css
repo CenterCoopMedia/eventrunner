@@ -207,6 +207,8 @@
   /* Tier 3 — section-rule contract (brief §3.1). */
   --section-rule-width: var(--rule-strong-width);
   --section-rule-gap: var(--space-sm);
+  --section-folio-display: inline;
+  --section-folio-placement: end;
 
   /* Tier 3 — page contract (brief §3.1). */
   --page-section-gap: var(--space-2xl);
@@ -271,18 +273,176 @@
   /* Tier 3 — marginalia contract (brief §3.1). */
   --marginalia-display: none;
 
+  /* Tier 3 — definition-list contract (brief §3.1). */
+  --definition-list-rule-width: var(--rule-hairline-width);
+  --definition-list-term-font: var(--font-data);
+  --definition-list-term-size: var(--text-caption);
+  --definition-list-term-style: normal;
+  --definition-list-term-transform: none;
+  --definition-list-term-tracking: 0em;
+  --definition-list-term-width: 9rem;
+  --definition-list-pad-block: var(--space-xs);
+
+  /* Tier 3 — pull-quote contract (brief §3.1). */
+  --pull-quote-rule-block-width: var(--rule-strong-width);
+  --pull-quote-rule-inline-width: 0;
+  --pull-quote-mark-display: none;
+  --pull-quote-quotes-display: inline;
+  --pull-quote-mark-font: var(--font-heading);
+  --pull-quote-align: start;
+  --pull-quote-pad-inline: 0;
+  --pull-quote-pad-block: var(--space-md);
+  --pull-quote-attribution-font: var(--font-data);
+  --pull-quote-attribution-transform: none;
+
+  /* Tier 3 — timeline contract (brief §3.1). */
+  --timeline-spine-width: var(--rule-hairline-width);
+  --timeline-tick-length: var(--space-sm);
+  --timeline-stop-size: 0;
+  --timeline-stop-ink: rgb(var(--color-accent-rgb));
+  --timeline-pad-inline: var(--space-md);
+  --timeline-date-font: var(--font-mono);
+  --timeline-date-transform: none;
+
+  /* Tier 3 — progress contract (brief §3.1). */
+  --progress-track: rgb(var(--color-surface-alt-rgb));
+  --progress-fill: rgb(var(--color-accent-rgb));
+  --progress-rule-width: var(--rule-hairline-width);
+  --progress-block-size: var(--space-xs);
+  --progress-radius: var(--radius-base);
+  --progress-label-font: var(--font-data);
+
+  /* Tier 3 — notice-bar contract (brief §3.1). */
+  --notice-bar-ground: rgb(var(--color-surface-alt-rgb));
+  --notice-bar-rule-width: var(--rule-hairline-width);
+  --notice-bar-urgent-rule-width: var(--rule-strong-width);
+  --notice-bar-font: var(--font-body);
+  --notice-bar-word-font: var(--font-data);
+  --notice-bar-word-transform: uppercase;
+  --notice-bar-pad-block: var(--space-sm);
+
+  /* Tier 3 — table contract (brief §3.1). */
+  --table-rule-width: var(--rule-hairline-width);
+  --table-head-rule-width: var(--rule-strong-width);
+  --table-column-rule-width: 0;
+  --table-head-font: var(--font-data);
+  --table-head-transform: none;
+  --table-head-tracking: 0em;
+  --table-head-ground: rgb(var(--color-surface-rgb));
+  --table-cell-pad-block: var(--space-xs);
+  --table-cell-pad-inline: var(--space-sm);
+
+  /* Tier 3 — avatar contract (brief §3.1). */
+  --avatar-ground: rgb(var(--color-surface-alt-rgb));
+  --avatar-ink: rgb(var(--color-text-secondary-rgb));
+  --avatar-frame-width: var(--rule-hairline-width);
+  --avatar-radius: var(--radius-base);
+  --avatar-font: var(--font-heading);
+
+  /* Tier 3 — dropzone contract (brief §3.1). */
+  --dropzone-rule-width: var(--rule-hairline-width);
+  --dropzone-rule-style: dashed;
+  --dropzone-drag-rule-width: var(--rule-strong-width);
+  --dropzone-ground: rgb(var(--color-surface-rgb));
+  --dropzone-pad: var(--space-lg);
+  --dropzone-radius: var(--radius-base);
+
+  /* Tier 3 — repeater contract (brief §3.1). */
+  --repeater-rule-width: var(--rule-hairline-width);
+  --repeater-row-pad-block: var(--space-sm);
+
+  /* Tier 3 — count contract (brief §3.1). */
+  --count-figure-font: var(--font-mono);
+  --count-figure-weight: var(--weight-semibold);
+  --count-label-font: var(--font-data);
+
+  /* Tier 3 — figure-sentence contract (brief §3.1). */
+  --figure-sentence-font: var(--font-body);
+  --figure-sentence-size: var(--text-body);
+  --figure-sentence-figure-font: var(--font-mono);
+  --figure-sentence-figure-weight: var(--weight-semibold);
+
+  /* Tier 3 — legend contract (brief §3.1). */
+  --legend-font: var(--font-data);
+  --legend-size: var(--text-caption);
+  --legend-transform: none;
+  --legend-tracking: 0em;
+  --legend-rule-width: 0;
+  --legend-pad-block: 0;
+
+  /* Tier 3 — state-marker contract (brief §3.1). */
+  --state-marker-font: var(--font-data);
+  --state-marker-transform: uppercase;
+  --state-marker-tracking: var(--text-folio-tracking);
+  --state-marker-rule-width: var(--rule-strong-width);
+  --state-marker-live-ink: rgb(var(--color-accent-rgb));
+  --state-marker-next-ink: rgb(var(--color-text-primary-rgb));
+  --state-marker-past-ink: rgb(var(--back-issue-ink-rgb));
+
+  /* Tier 3 — standfirst contract (brief §3.1). */
+  --standfirst-font: var(--font-body);
+  --standfirst-size: var(--text-lead);
+  --standfirst-leading: var(--text-lead-leading);
+  --standfirst-style: normal;
+  --standfirst-weight: var(--weight-regular);
+  --standfirst-ink: rgb(var(--color-text-secondary-rgb));
+  --standfirst-rule-width: 0;
+  --standfirst-pad-block-end: 0;
+
+  /* Tier 3 — byline contract (brief §3.1). */
+  --byline-font: var(--font-data);
+  --byline-size: var(--text-caption);
+  --byline-ink: rgb(var(--color-text-secondary-rgb));
+  --byline-transform: none;
+  --byline-tracking: 0em;
+  --byline-weight: var(--weight-regular);
+
+  /* Tier 3 — directory contract (brief §3.1). */
+  --directory-rule-width: var(--rule-hairline-width);
+  --directory-portrait-aspect: 1 / 1;
+  --directory-portrait-ground: rgb(var(--color-surface-alt-rgb));
+  --directory-portrait-radius: var(--radius-base);
+  --directory-entry-pad-block: var(--space-2xs);
+
+  /* Tier 3 — long-read contract (brief §3.1). */
+  --drop-cap-float: none;
+  --drop-cap-size: 1em;
+  --drop-cap-pad-inline-end: 0;
+  --drop-cap-font: var(--font-heading);
+  --drop-cap-leading: 0.8;
+  --drop-cap-weight: var(--weight-semibold);
+  --drop-cap-ink: currentColor;
+  --drop-cap-margin-block-start: 0.08em;
+  --long-read-opening-size: var(--text-body);
+  --long-read-opening-leading: var(--text-body-leading);
+
   /* Preset remaps — newsroom and its picked options. An option remaps existing tier 2 and tier 3 tokens and never adds a property name (brief §3.4), so every name here is declared above. */
   --folio-font: var(--font-data);
   --section-rule-width: var(--rule-strong-width);
+  --definition-list-term-width: 10rem;
+  --pull-quote-mark-display: block;
+  --pull-quote-quotes-display: none;
+  --pull-quote-pad-block: var(--space-lg);
+  --notice-bar-urgent-rule-width: var(--rule-nameplate-width);
+  --table-head-transform: uppercase;
+  --table-head-tracking: 0.04em;
   --hero-art-width: 56%;
   --hero-copy-pad-inline-start: var(--space-md);
   --hero-copy-border-inline-start: .35rem solid rgb(var(--color-accent-rgb));
   --hero-veil-background: linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%);
+  --standfirst-font: var(--font-heading);
+  --standfirst-weight: var(--weight-regular);
   --nameplate-align: start;
   --nameplate-rule-width: var(--rule-strong-width);
   --nameplate-meta-placement: inline;
   --session-card-lead-scale: 1;
   --session-card-rule-width: var(--rule-hairline-width);
+  --long-read-opening-size: var(--text-lead);
+  --long-read-opening-leading: var(--text-lead-leading);
+  --pull-quote-rule-block-width: var(--rule-strong-width);
+  --directory-portrait-aspect: 1 / 1;
+  --section-folio-display: inline;
+  --table-head-rule-width: var(--rule-strong-width);
 
   /* Admin identity — fixed type and shape (admin story part 6g). Never writable from config/theme: the pairing is the identity. */
   --admin-font-ui: 'Source Sans 3', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
@@ -361,6 +521,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* Light palette (brief §3.3). Every color token is defined in both mode blocks. */
@@ -413,6 +586,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* Dark palette (brief §3.3). Its own palette, never light mode reversed. */
@@ -465,6 +651,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* Theme presets (brief §3.4, §4). A theme remaps the same custom
@@ -521,6 +720,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* civic — dark. */
@@ -573,6 +785,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* newsroom — light, the active preset, with this deployment's overrides. */
@@ -625,6 +850,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* newsroom — dark, the active preset, with this deployment's overrides. */
@@ -677,6 +915,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* broadsheet — light. */
@@ -729,6 +980,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* broadsheet — dark. */
@@ -781,6 +1045,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* atlas — light. */
@@ -833,6 +1110,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* atlas — dark. */
@@ -885,6 +1175,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* field-guide — light. */
@@ -937,6 +1240,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* field-guide — dark. */
@@ -989,6 +1305,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* zine — light. */
@@ -1041,6 +1370,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* zine — dark. */
@@ -1093,6 +1435,19 @@
   --route-mark-ink-rgb: var(--color-surface-rgb);
   --callout-rgb: var(--color-text-primary-rgb);
   --marginalia-rgb: var(--color-ink-motif-rgb);
+  --definition-list-rule-rgb: var(--rule-hairline-rgb);
+  --pull-quote-rule-rgb: var(--rule-strong-rgb);
+  --timeline-spine-rgb: var(--rule-hairline-rgb);
+  --progress-rule-rgb: var(--rule-hairline-rgb);
+  --notice-bar-rule-rgb: var(--rule-strong-rgb);
+  --table-rule-rgb: var(--rule-hairline-rgb);
+  --table-head-rule-rgb: var(--rule-strong-rgb);
+  --avatar-frame-rgb: var(--rule-hairline-rgb);
+  --dropzone-rule-rgb: var(--color-border-control-rgb);
+  --repeater-rule-rgb: var(--rule-hairline-rgb);
+  --legend-rule-rgb: var(--rule-hairline-rgb);
+  --standfirst-rule-rgb: var(--rule-hairline-rgb);
+  --directory-rule-rgb: var(--rule-hairline-rgb);
 }
 
 /* Print palette (brief §2.1, §3.3). Paper has no dark mode: a reader who
@@ -1150,6 +1505,19 @@
     --route-mark-ink-rgb: var(--color-surface-rgb);
     --callout-rgb: var(--color-text-primary-rgb);
     --marginalia-rgb: var(--color-ink-motif-rgb);
+    --definition-list-rule-rgb: var(--rule-hairline-rgb);
+    --pull-quote-rule-rgb: var(--rule-strong-rgb);
+    --timeline-spine-rgb: var(--rule-hairline-rgb);
+    --progress-rule-rgb: var(--rule-hairline-rgb);
+    --notice-bar-rule-rgb: var(--rule-strong-rgb);
+    --table-rule-rgb: var(--rule-hairline-rgb);
+    --table-head-rule-rgb: var(--rule-strong-rgb);
+    --avatar-frame-rgb: var(--rule-hairline-rgb);
+    --dropzone-rule-rgb: var(--color-border-control-rgb);
+    --repeater-rule-rgb: var(--rule-hairline-rgb);
+    --legend-rule-rgb: var(--rule-hairline-rgb);
+    --standfirst-rule-rgb: var(--rule-hairline-rgb);
+    --directory-rule-rgb: var(--rule-hairline-rgb);
   }
 }
 

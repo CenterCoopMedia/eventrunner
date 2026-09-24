@@ -105,7 +105,7 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 | `npm run test -w apps/web` | `apps/web` component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator) |
 | `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |
-| `npm run test:e2e` | Playwright end-to-end suite (OTP sign-in, CMS edit → publish → public, speaker invite → accept → wizard, ticket claim → approved → bookmark) against the full Firebase emulator suite, seeded from the synthetic demo fixture — see [`e2e/`](e2e/) |
+| `npm run test:e2e` | Playwright end-to-end suite (OTP sign-in, CMS edit → publish → public, speaker invite → accept → wizard, ticket claim → approved → bookmark, browser installability of the default manifest and app icons) against the full Firebase emulator suite, seeded from the synthetic demo fixture — see [`e2e/`](e2e/) |
 | `./gitleaks detect --source .` | Secret scan (`.gitleaks.toml`) — CI downloads and checksum-verifies the gitleaks CLI directly rather than a marketplace action, so it stays credential-free on a fork PR (an org-repo license secret is not something a fork PR could ever have) |
 | `node scripts/build-pages.cjs --check` | The committed documentation site under `docs/docs/` matches a fresh render of the source Markdown — see [scripts/README.md](scripts/README.md) |
 | `node scripts/check-dco.cjs <base> <head>` | Every non-merge commit in the pull request's range carries a DCO `Signed-off-by` trailer — see [Sign your commits](#sign-your-commits-dco) |

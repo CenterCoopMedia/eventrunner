@@ -98,8 +98,8 @@ export default function Speakers() {
                     key={speaker.id}
                     className={
                       arrangement === 'grid'
-                        ? 'portrait-shelf__plate border-t-hairline border-t-rule-hairline'
-                        : 'portrait-shelf__plate border-t-hairline border-t-rule-hairline sm:grid sm:grid-cols-[14rem,1fr] sm:gap-lg'
+                        ? 'portrait-shelf__plate'
+                        : 'portrait-shelf__plate sm:grid sm:grid-cols-[14rem,1fr] sm:gap-lg'
                     }
                   >
                     {/* The portrait is decorative here: the name is right

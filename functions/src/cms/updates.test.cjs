@@ -22,8 +22,15 @@ function validUpdate(overrides = {}) {
   };
 }
 
+// The update endpoints are staff work (issue #186), and the editor that
+// calls them is a staff page (issue #190), so the bootstrap names both
+// tiers.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] };
+
 function fakeDb(seed = {}) {
-  const docs = new Map(Object.entries(seed));
+  // requireAdmin reads config/bootstrap live from this db (fails closed on
+  // an absent document), so every fake carries the admin the tests use.
+  const docs = new Map(Object.entries({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed }));
   const added = [];
   return {
     docs,
@@ -75,12 +82,16 @@ function fakeRes() {
 }
 
 const ADMIN_TOKEN = 'admin-token';
+const STAFF_TOKEN = 'staff-token';
 const NON_ADMIN_TOKEN = 'user-token';
 
 const fakeAuth = {
   async verifyIdToken(token) {
     if (token === ADMIN_TOKEN) {
       return { uid: 'admin1', email: 'admin@example.org', email_verified: true };
+    }
+    if (token === STAFF_TOKEN) {
+      return { uid: 'staff1', email: 'staff@example.org', email_verified: true };
     }
     if (token === NON_ADMIN_TOKEN) {
       return { uid: 'user1', email: 'user@example.org', email_verified: true };
@@ -91,8 +102,8 @@ const fakeAuth = {
 
 const getConfig = async () => ({ bootstrap: { adminEmails: ['admin@example.org'] } });
 
-function adminReq(body) {
-  return { method: 'POST', headers: { authorization: `Bearer ${ADMIN_TOKEN}` }, body };
+function adminReq(body, token = ADMIN_TOKEN) {
+  return { method: 'POST', headers: { authorization: `Bearer ${token}` }, body };
 }
 
 function deps(overrides = {}) {
@@ -158,7 +169,7 @@ test('cmsSaveUpdate writes the DRAFT collection only', async () => {
   // prior draft/live visibility instead of resetting a hidden update.
   assert.equal(write.visible, undefined);
   assert.deepEqual(write.actor, { uid: 'admin1', email: 'admin@example.org' });
-  assert.deepEqual(Object.keys(write.fields).sort(), ['body', 'pinned', 'publishAt', 'title']);
+  assert.deepEqual(Object.keys(write.fields).sort(), ['body', 'category', 'featured', 'pinned', 'publishAt', 'title']);
 });
 
 test('cmsSaveUpdate stores publishAt as a Date, not the raw string', async () => {
@@ -281,7 +292,9 @@ test('cmsSaveUpdate preserves validated rich media and rejects unsafe blocks', a
 test('rich updates survive draft, publish, and version history', async () => {
   const { makeFakeDb } = require('./firestoreFake.cjs');
   const store = require('./store.cjs');
-  const db = makeFakeDb();
+  // The real fake, so publishDocs runs; requireAdmin reads config/bootstrap
+  // live from it, so the admin the handler expects is seeded.
+  const db = makeFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC });
   const actor = { uid: 'admin1', email: 'admin@example.org' };
   const featuredImage = { url: 'demo/summit-gathering.webp', alt: 'Summit scene' };
   const content = [{ type: 'columns', columns: [
@@ -297,4 +310,132 @@ test('rich updates survive draft, publish, and version history', async () => {
   assert.deepEqual(db.read('cmsUpdates', 'rich-post').content, content);
   const history = db.writes.find((write) => write.path.startsWith('cmsVersionHistory/'));
   assert.deepEqual(db.read('cmsVersionHistory', history.path.split('/')[1]).fields.content, content);
+});
+
+// ------------------------------------------------ the editor's path (#190)
+
+test('a staff account saves and deletes an update; a signed-in non-admin is refused', async () => {
+  const d = deps({ db: fakeDb({ 'cmsUpdates_drafts/staff-post': { title: 't' } }) });
+  let res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'staff-post', update: validUpdate() }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(d.store.writes[0].actor, { uid: 'staff1', email: 'staff@example.org' });
+  res = fakeRes();
+  await createDeleteUpdateHandler(d)(adminReq({ id: 'staff-post' }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(d.store.deletes.length, 1);
+
+  for (const create of [createSaveUpdateHandler, createDeleteUpdateHandler]) {
+    res = fakeRes();
+    await create(d)(adminReq({ id: 'staff-post', update: validUpdate() }, NON_ADMIN_TOKEN), res);
+    assert.equal(res.statusCode, 403);
+  }
+  assert.equal(d.store.writes.length, 1);
+  assert.equal(d.store.deletes.length, 1);
+});
+
+test('a future publishAt never gates publish: the saved draft goes live at once', async () => {
+  // The editor's two calls, in order, on one database: cmsSaveUpdate, then
+  // cmsPublish for that id. The date is a year ahead; publishAt is display
+  // scheduling, and nothing in the publish path reads it.
+  const { makeFakeDb } = require('./firestoreFake.cjs');
+  const store = require('./store.cjs');
+  const { createCmsPublishHandler } = require('./publish.cjs');
+  const db = makeFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC });
+  const d = { ...deps(), db, store };
+  const nextYear = new Date(1700000000000 + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  let res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'next-year', update: validUpdate({ publishAt: nextYear }), visible: true }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsUpdates', 'next-year'), undefined, 'a save writes the draft only');
+  assert.equal(db.read('cmsUpdates_drafts', 'next-year').status, 'dirty');
+
+  res = fakeRes();
+  await createCmsPublishHandler(d)(adminReq({ collection: 'cmsUpdates', docIds: ['next-year'] }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.results.cmsUpdates.published, ['next-year']);
+  const live = db.read('cmsUpdates', 'next-year');
+  assert.equal(live.visible, true);
+  assert.equal(live.title, 'Venue change');
+  assert.equal(new Date(live.publishAt).toISOString(), nextYear);
+});
+
+// ------------------------------------------- category and featured (#191)
+
+test('validateUpdateDoc accepts a category and a featured flag, each optional', () => {
+  for (const extra of [
+    { category: 'Travel' },
+    { category: ' Travel and arrival notes ' },
+    { category: null },
+    {},
+    { featured: true },
+    { featured: false },
+    { category: 'Travel', featured: true },
+  ]) {
+    assert.deepEqual(validateUpdateDoc(validUpdate(extra)), { ok: true, errors: [] }, JSON.stringify(extra));
+  }
+});
+
+test('validateUpdateDoc refuses a malformed category or featured flag, naming the field', () => {
+  for (const category of [7, '', '   ', 'x'.repeat(25), 'Two\nlines', 'Tab\there', true, ['Travel']]) {
+    const { ok, errors } = validateUpdateDoc(validUpdate({ category }));
+    assert.equal(ok, false, JSON.stringify(category));
+    assert.deepEqual(errors, ['category: must be null or 1 to 24 characters on one line'], JSON.stringify(category));
+  }
+  for (const featured of ['yes', 1, null]) {
+    const { ok, errors } = validateUpdateDoc(validUpdate({ featured }));
+    assert.equal(ok, false, JSON.stringify(featured));
+    assert.deepEqual(errors, ['featured: must be a boolean']);
+  }
+});
+
+test('cmsSaveUpdate stores the category trimmed and the featured flag, and states both when absent', async () => {
+  const d = deps();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'u1', update: validUpdate({ category: '  Travel  ', featured: true }) }), fakeRes());
+  assert.equal(d.store.writes[0].fields.category, 'Travel');
+  assert.equal(d.store.writes[0].fields.featured, true);
+  await createSaveUpdateHandler(d)(adminReq({ id: 'u2', update: validUpdate() }), fakeRes());
+  assert.equal(d.store.writes[1].fields.category, null);
+  assert.equal(d.store.writes[1].fields.featured, false);
+  await createSaveUpdateHandler(d)(adminReq({ id: 'u3', update: validUpdate({ category: null, featured: false }) }), fakeRes());
+  assert.equal(d.store.writes[2].fields.category, null);
+  assert.equal(d.store.writes[2].fields.featured, false);
+});
+
+test('cmsSaveUpdate refuses a bad category with 400 naming the field and writes nothing', async () => {
+  const d = deps();
+  const res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'u1', update: validUpdate({ category: 'x'.repeat(25) }) }), res);
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'Invalid update: category: must be null or 1 to 24 characters on one line');
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('a category and the featured flag survive a save and a publish, into the live doc and its history', async () => {
+  const { makeFakeDb } = require('./firestoreFake.cjs');
+  const store = require('./store.cjs');
+  const { createCmsPublishHandler } = require('./publish.cjs');
+  const db = makeFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC });
+  const d = { ...deps(), db, store };
+
+  let res = fakeRes();
+  await createSaveUpdateHandler(d)(
+    adminReq({ id: 'tagged', update: validUpdate({ category: ' Travel ', featured: true }), visible: true }, STAFF_TOKEN),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsUpdates_drafts', 'tagged').category, 'Travel');
+
+  res = fakeRes();
+  await createCmsPublishHandler(d)(adminReq({ collection: 'cmsUpdates', docIds: ['tagged'] }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.results.cmsUpdates.published, ['tagged']);
+  const live = db.read('cmsUpdates', 'tagged');
+  assert.equal(live.category, 'Travel');
+  assert.equal(live.featured, true);
+  const history = db.writes.find((write) => write.path.startsWith('cmsVersionHistory/'));
+  const fields = db.read('cmsVersionHistory', history.path.split('/')[1]).fields;
+  assert.equal(fields.category, 'Travel');
+  assert.equal(fields.featured, true);
 });

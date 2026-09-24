@@ -9,8 +9,13 @@
  *                   Omitting `id` creates a new update with a random id.
  *   cmsDeleteUpdate POST { id } — remove live + draft in one batch.
  *
- * cmsUpdates content fields: { title, body, publishAt | null, pinned }.
- * `publishAt` is editorial display scheduling — it never gates the §8.4
+ * cmsUpdates content fields: { title, body, publishAt | null, pinned,
+ * category | null, featured }, plus the optional featuredImage and content.
+ * `category` is one short line the Updates page sets as a tag (shared/update
+ * validUpdateCategory), stored trimmed; `featured` puts the first featured
+ * update at the head of the page (issue #191). Both are optional on the wire
+ * and always written: an omitted category is null and an omitted featured is
+ * false. `publishAt` is editorial display scheduling — it never gates the §8.4
  * publish action, which stays an explicit admin batch. Accepted as null, an
  * ISO-8601 string, or epoch millis; stored as a Date so Firestore holds a
  * Timestamp rather than a client-formatted string.
@@ -20,7 +25,7 @@
  * logAdminAction); live cmsUpdates docs are written only by cms/publish.
  */
 
-const { validUpdateImage, validUpdateContent } = require('shared/update');
+const { validUpdateImage, validUpdateContent, validUpdateCategory, UPDATE_CATEGORY_MAX } = require('shared/update');
 const crypto = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
@@ -32,7 +37,9 @@ const UPDATES_COLLECTION = 'cmsUpdates';
 const UPDATES_DRAFTS = 'cmsUpdates_drafts';
 
 /** Keys a cmsUpdates doc may carry — anything else is rejected by name. */
-const UPDATE_KEYS = Object.freeze(['title', 'body', 'publishAt', 'pinned', 'featuredImage', 'content']);
+const UPDATE_KEYS = Object.freeze([
+  'title', 'body', 'publishAt', 'pinned', 'category', 'featured', 'featuredImage', 'content',
+]);
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -71,6 +78,10 @@ function validateUpdateDoc(doc) {
     errors.push('publishAt: must be null, an ISO-8601 string, or epoch millis');
   }
   if (typeof doc.pinned !== 'boolean') errors.push('pinned: must be a boolean');
+  if (doc.category !== undefined && doc.category !== null && !validUpdateCategory(doc.category)) {
+    errors.push(`category: must be null or 1 to ${UPDATE_CATEGORY_MAX} characters on one line`);
+  }
+  if (doc.featured !== undefined && typeof doc.featured !== 'boolean') errors.push('featured: must be a boolean');
   if (doc.featuredImage != null && !validUpdateImage(doc.featuredImage)) errors.push('featuredImage: invalid image');
   if (doc.content !== undefined && !validUpdateContent(doc.content)) errors.push('content: invalid update blocks');
   return { ok: errors.length === 0, errors };
@@ -86,7 +97,7 @@ function validateUpdateDoc(doc) {
 function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, log = console }) {
   return async function cmsSaveUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const update = req.body?.update;
@@ -108,6 +119,10 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
       body: update.body,
       publishAt: normalizePublishAt(update.publishAt),
       pinned: update.pinned,
+      // Always written, so every stored update states both: null and false
+      // rather than an absent key.
+      category: typeof update.category === 'string' ? update.category.trim() : null,
+      featured: update.featured === true,
       ...(update.featuredImage !== undefined ? { featuredImage: update.featuredImage } : {}),
       ...(update.content !== undefined ? { content: update.content } : {}),
     };
@@ -149,7 +164,7 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
 function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now, log = console }) {
   return async function cmsDeleteUpdate(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const id = req.body?.id;

@@ -78,7 +78,9 @@ describe('the density layout variant', () => {
     );
     const page = fs.readFileSync(path.resolve(here, 'SystemPage.jsx'), 'utf8');
     expect(shell).toContain('documentElement.dataset.density');
-    expect(shell).toContain('resolveShape(themeDoc).density');
+    // From the document last written whole (the overlay waits for the preset
+    // remaps, and the attributes move with it), not the raw live document.
+    expect(shell).toContain('resolveShape(appliedThemeDoc).density');
     // The page writes the density it STATES. Reading the resolved layout
     // here would make every page override the preset with `comfortable`.
     expect(page).toContain("'data-density': stated.density");

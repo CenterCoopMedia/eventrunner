@@ -16,6 +16,8 @@ import Tag from '../../../components/editorial/Tag.jsx';
 import SponsorWall from '../../../components/SponsorWall.jsx';
 import { groupByLetter } from '../../Attendees.jsx';
 import AssetImage from '../../../components/media/AssetImage.jsx';
+import Avatar from '../../../components/editorial/Avatar.jsx';
+import { profilePhotoUrl } from '../../../components/media/ProfilePhoto.jsx';
 import Figure from '../Figure.jsx';
 import SpecimenSection from '../SpecimenSection.jsx';
 import { speakers } from '@generated/scheduleData.js';
@@ -83,7 +85,7 @@ export default function DirectoriesSection({ folio }) {
           {SHELF.map((speaker) => (
             <li
               key={speaker.id}
-              className="portrait-shelf__plate border-t-hairline border-t-rule-hairline"
+              className="portrait-shelf__plate"
             >
               <div className="portrait-shelf__frame">
                 {speaker.headshotPath ? (
@@ -102,6 +104,22 @@ export default function DirectoriesSection({ folio }) {
                   ]}
                 />
               </div>
+            </li>
+          ))}
+        </ul>
+      </Figure>
+
+      <Figure
+        name="Avatar"
+        file="components/editorial/Avatar.jsx"
+        contract="avatar"
+        note="A person's picture, or their initial where there is none, in the three sizes a surface asks for. Square on the brand radius, never a circle; the initial in the heading face on the alternate ground. The attendee index and profile draw it through ProfilePhoto."
+      >
+        <ul className="flex flex-wrap items-end gap-lg">
+          {['lg', 'md', 'sm'].map((size) => (
+            <li key={size} className="flex items-end gap-sm">
+              <Avatar size={size} src={profilePhotoUrl(SHELF[0]?.headshotPath)} name={SHELF[0]?.displayName ?? 'Speaker'} />
+              <Avatar size={size} src={null} name={SHELF[1]?.displayName ?? 'Speaker'} />
             </li>
           ))}
         </ul>

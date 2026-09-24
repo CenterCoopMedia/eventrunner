@@ -3,7 +3,7 @@
 // javascript: URL in a sponsor record would execute on click. It must go
 // through the same isSafeHref allowlist the block renderers use.
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const UNSAFE_URL = 'javascript:alert(1)';
@@ -11,11 +11,16 @@ const SAFE_URL = 'https://example.org';
 
 let organizationsData;
 let pageDoc = null;
+let sectionBlocks = {};
 vi.mock('../contexts/ContentContext.jsx', () => ({
   // The page shell reads the cmsPages document for its layout and its
   // slot sections (components/SystemPage.jsx); this directory states no
   // sections, and states a layout only where a test sets one.
-  useContent: () => ({ organizationsData, getPage: () => pageDoc, getSectionBlocks: () => [] }),
+  useContent: () => ({
+    organizationsData,
+    getPage: () => pageDoc,
+    getSectionBlocks: (id) => sectionBlocks[id] ?? [],
+  }),
 }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ features: { sponsors: true } }),
@@ -130,5 +135,52 @@ describe('Sponsors', () => {
 
     renderSponsors();
     expect(screen.getByText('What they do')).toBeInTheDocument();
+  });
+
+  // Issue 192: an organization the editor publishes joins the group its
+  // tier names, by the tier's exact text.
+  it('puts a live organization in the group its tier names', () => {
+    organizationsData = [
+      { id: 'beacon-fund', name: 'Beacon Fund', tier: 'presenting', visible: true, order: 0 },
+      { id: 'e2e-org', name: 'Published Org', tier: 'supporting', visible: true, order: 6 },
+      { id: 'press-trust', name: 'Press Trust', tier: 'supporting', visible: true, order: 1 },
+      { id: 'draft-org', name: 'Hidden Org', tier: 'supporting', visible: false, order: 2 },
+    ];
+    renderSponsors();
+    const group = screen.getByRole('region', { name: 'supporting' });
+    expect(within(group).getByText('Published Org')).toBeInTheDocument();
+    expect(within(group).getByText('2 organizations')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'presenting' })).queryByText('Published Org')).toBeNull();
+    expect(screen.queryByText('Hidden Org')).toBeNull();
+    expect(within(group).getByRole('link', { name: /about Published Org/ })).toHaveAttribute('href', '/sponsors/e2e-org');
+  });
+
+  // Issue 193: the seeded Sponsorship packages section draws its packages
+  // after the wall, and nothing at all while it is empty.
+  it('draws the Sponsorship packages section after the wall once it holds a package', () => {
+    organizationsData = [{ id: 'beacon-fund', name: 'Beacon Fund', tier: 'presenting', visible: true }];
+    pageDoc = {
+      id: 'sponsors',
+      sections: [{ id: 'sponsor_packages', label: 'Sponsorship packages', allowedBlocks: ['sponsor_package', 'richtext'], maxBlocks: 6 }],
+    };
+    sectionBlocks = {};
+    const { unmount } = renderSponsors();
+    expect(screen.queryByRole('region', { name: 'Sponsorship packages' })).toBeNull();
+    unmount();
+
+    sectionBlocks = {
+      sponsor_packages: [
+        { id: 'sponsor_packages__a', blockType: 'sponsor_package', name: 'Presenting', price: 'Illustrative', limit: 1, benefits: '<p>Plenary</p>' },
+        { id: 'sponsor_packages__b', blockType: 'sponsor_package', name: 'Partner', benefits: '<p>Clinic</p>' },
+      ],
+    };
+    const { container } = renderSponsors();
+    pageDoc = null;
+    sectionBlocks = {};
+    const region = screen.getByRole('region', { name: 'Sponsorship packages' });
+    expect(within(region).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Presenting', 'Partner']);
+    // After the wall, in the page's main slot.
+    const wall = container.querySelector('.logo-wall');
+    expect(wall.compareDocumentPosition(region) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

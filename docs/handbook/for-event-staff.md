@@ -27,9 +27,21 @@ Invite by email. They accept with a login code, the same way attendees sign in. 
 
 Custom badges are off by default. If enabled in Features, attendees can write up to three badges of 24 characters each. Reserved role words and the event block list are refused. In Attendees, select the removal action beside a custom badge and confirm it. The removal is recorded in the admin log. Turning the feature off hides these badges and keeps other profile fields editable.
 
+## Attendees
+
+Approve and revoke registrations in Attendees. Select **Export** to save the rows on screen as a spreadsheet file. The file holds names, email addresses, organizations, roles, registration status, badges, past attendance, social handles, and profile visibility. Treat it as personal data. Every export is recorded in the admin log with your address.
+
+**Edit record** on a row holds what only organizers keep: the past attendance list, one edition per line. Attendees cannot change it. The same panel deletes an account. A delete takes the person out of the directory at once and removes their sign-in, saved sessions, notes, profile photo, change requests, and ticket claim. It cannot be undone. You cannot delete your own account, an admin account, or an account linked to a speaker. If a delete stops part way, select **Try the delete again**.
+
+## Change requests
+
+Change requests are off by default. An operator turns them on in Features. Then a signed-in visitor can select **Request a change** in the footer, and you can send one from the Change requests page. Every request lands in one list on that page. Move a request on with its button (**Mark in progress**, **Mark done**, **Reopen**) or select **Decline**. **Remove** deletes a request and its text for good. The admin log records every request, status change, and removal, but never the text.
+
 ## Materials
 
 Upload or link files on the session. Embargo holds them until the session ends. Prefer a real label ("Slides") over a raw URL as the link text.
+
+The Materials page lists every session's files and links in one table. Tick files and select **Download as archive** to save them as one zip file, at most 50 files and 200 MB at a time. Every archive is recorded in the admin log with your address. The **Coverage** panel names the sessions and speakers that have no materials yet, so you know whom to ask.
 
 ## Tickets
 
@@ -37,7 +49,7 @@ Your operator chose Eventbrite, a spreadsheet import, or no ticketing. Signup em
 
 ## When to email CCM instead of posting
 
-- Someone needs admin
+- Someone needs operator access (an operator can grant staff access from Settings → Access without asking)
 - Login codes are not arriving (sender domain / spam)
 - The site is down
 - You need a new day added after launch and the admin will not let you

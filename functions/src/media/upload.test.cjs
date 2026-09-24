@@ -3,13 +3,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the document the file's getConfig describes.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] };
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 const {
   createMediaUploadHandler,
   createMediaDeleteHandler,
   createSpeakerPhotoUploadHandler,
   createSpeakerPhotoDeleteHandler,
-  internals: { validateUpload, decodeUpload, safeObjectName, MAX_UPLOAD_BYTES, SPEAKER_PHOTO_MAX_BYTES },
+  internals: {
+    validateUpload, decodeUpload, safeObjectName, MAX_UPLOAD_BYTES, SPEAKER_PHOTO_MAX_BYTES,
+    isBrandingAsset, referencedByBranding,
+  },
 } = require('./upload.cjs');
 
 const ADMIN_EMAIL = 'admin@example.org';
@@ -147,7 +156,7 @@ test('mediaUpload requires an admin token', async () => {
   const res = fakeRes();
   const handler = createMediaUploadHandler(
     deps(makeFakeDb({}), fakeBucket(), {
-      getConfig: async () => ({ bootstrap: { adminEmails: ['nobody@example.org'] } }),
+      auth: { verifyIdToken: async () => ({ uid: 'x-1', email: 'nobody@example.org', email_verified: true }) },
     }),
   );
   await handler(post({ folder: 'cms-images', contentType: 'image/png', data: PNG }), res);
@@ -572,4 +581,218 @@ test('speakerPhotoDelete is POST-only', async () => {
     res,
   );
   assert.equal(res.statusCode, 405);
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+const STAFF_EMAIL = 'staff@example.org';
+const tieredBootstrap = async () => ({ bootstrap: { adminEmails: [ADMIN_EMAIL], staffEmails: [STAFF_EMAIL] } });
+
+test('mediaUpload admits a staff admin — the media library is staff work', async () => {
+  const db = makeFakeDb({});
+  const res = fakeRes();
+  await createMediaUploadHandler(
+    deps(db, fakeBucket(), {
+      auth: { verifyIdToken: async () => ({ uid: 'staff-1', email: STAFF_EMAIL, email_verified: true }) },
+      getConfig: tieredBootstrap,
+    }),
+  )(post({ folder: 'cms-images', contentType: 'image/png', data: PNG }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('media_assets', ASSET_ID).uploadedBy, STAFF_EMAIL);
+});
+
+test('speakerPhotoUpload treats a staff admin as an admin: no ownership check', async () => {
+  const bucket = fakeBucket();
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler({
+    ...speakerAuthDeps(speakerWorld(), bucket, { uid: 'staff-1', email: STAFF_EMAIL }),
+    getConfig: tieredBootstrap,
+  })(post({ speakerId: 'rae', contentType: 'image/png', data: PNG }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+// ------------------------------------------------ branding is the operator's (#186 review)
+
+const STAFF_AUTH = { verifyIdToken: async () => ({ uid: 'staff-1', email: STAFF_EMAIL, email_verified: true }) };
+const staffDeps = (db, bucket, extra = {}) => deps(db, bucket, { auth: STAFF_AUTH, getConfig: tieredBootstrap, ...extra });
+const operatorDeps = (db, bucket, extra = {}) => deps(db, bucket, { getConfig: tieredBootstrap, ...extra });
+const BRANDING_ID = 'brand-asset-1';
+const brandingRow = (extra = {}) => ({
+  path: `branding/${BRANDING_ID}/logo.png`, folder: 'branding', contentType: 'image/png', size: 5,
+  uploadedBy: ADMIN_EMAIL, createdAt: new Date(NOW), ...extra,
+});
+
+test('mediaUpload into branding is refused for staff and allowed for an operator', async () => {
+  const refused = fakeRes();
+  const db = makeFakeDb({});
+  await createMediaUploadHandler(staffDeps(db, fakeBucket()))(
+    post({ folder: 'branding', contentType: 'image/png', data: PNG }), refused,
+  );
+  assert.equal(refused.statusCode, 403);
+  assert.equal(refused.body.error.message, 'branding: operator access required');
+  assert.deepEqual(db.ids('media_assets'), []);
+
+  const allowed = fakeRes();
+  await createMediaUploadHandler(operatorDeps(db, fakeBucket()))(
+    post({ folder: 'branding', contentType: 'image/png', data: PNG }), allowed,
+  );
+  assert.equal(allowed.statusCode, 200);
+  assert.equal(allowed.body.asset.folder, 'branding');
+});
+
+test('mediaUpload into cms-images stays staff work', async () => {
+  const res = fakeRes();
+  await createMediaUploadHandler(staffDeps(makeFakeDb({}), fakeBucket()))(
+    post({ folder: 'cms-images', contentType: 'image/png', data: PNG }), res,
+  );
+  assert.equal(res.statusCode, 200);
+});
+
+test('mediaDelete of a branding-folder asset is refused for staff, force or not, and allowed for an operator', async () => {
+  for (const force of [false, true]) {
+    const db = makeFakeDb({ [`media_assets/${BRANDING_ID}`]: brandingRow() });
+    const res = fakeRes();
+    await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: BRANDING_ID, force }), res);
+    assert.equal(res.statusCode, 403, `force=${force}`);
+    assert.equal(res.body.error.message, 'branding: operator access required');
+    assert.deepEqual(db.ids('media_assets'), [BRANDING_ID]);
+  }
+  const db = makeFakeDb({ [`media_assets/${BRANDING_ID}`]: brandingRow() });
+  const bucket = fakeBucket();
+  await bucket.file(`branding/${BRANDING_ID}/logo.png`).save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createMediaDeleteHandler(operatorDeps(db, bucket))(post({ assetId: BRANDING_ID }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(db.ids('media_assets'), []);
+});
+
+test('mediaDelete reads branding off the path when the row has no folder field', async () => {
+  const { folder, ...rowWithoutFolder } = brandingRow();
+  const db = makeFakeDb({ [`media_assets/${BRANDING_ID}`]: rowWithoutFolder });
+  const res = fakeRes();
+  await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: BRANDING_ID, force: true }), res);
+  assert.equal(res.statusCode, 403);
+  assert.equal(typeof folder, 'string');
+});
+
+test('mediaDelete of an asset a theme slot references is refused for staff even with force, and allowed for an operator', async () => {
+  const path = `cms-images/${ASSET_ID}/hero.png`;
+  const seed = () => seededLibrary({ 'config/theme': { logos: { primary: path } } });
+  const refused = fakeRes();
+  const db = seed();
+  await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), refused);
+  assert.equal(refused.statusCode, 403);
+  assert.equal(refused.body.error.message, 'branding: operator access required');
+  assert.deepEqual(db.ids('media_assets'), [ASSET_ID]);
+
+  const allowed = fakeRes();
+  const db2 = seed();
+  await createMediaDeleteHandler(operatorDeps(db2, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), allowed);
+  assert.equal(allowed.statusCode, 200);
+  assert.deepEqual(allowed.body.usage, [{ docPath: 'config/theme', field: 'logos.primary' }]);
+});
+
+test('mediaDelete of an unreferenced cms-images asset stays staff work', async () => {
+  const db = seededLibrary();
+  const res = fakeRes();
+  await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: ASSET_ID }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('isBrandingAsset and referencedByBranding read the row and the scan the way the handlers do', () => {
+  assert.equal(isBrandingAsset({ folder: 'branding', path: 'x' }), true);
+  assert.equal(isBrandingAsset({ path: 'branding/a/b.png' }), true);
+  assert.equal(isBrandingAsset({ folder: 'cms-images', path: 'cms-images/a/b.png' }), false);
+  assert.equal(isBrandingAsset(undefined), false);
+  assert.equal(referencedByBranding([{ docPath: 'config/theme', field: 'logos.mark' }]), true);
+  assert.equal(referencedByBranding([{ docPath: 'config/event', field: 'seo.defaultOgImagePath' }]), true);
+  assert.equal(referencedByBranding([{ docPath: 'config/event', field: 'venue.mapPath' }]), false);
+  assert.equal(referencedByBranding([{ docPath: 'cmsPages/home', field: 'sections.0.image' }]), false);
+  assert.equal(referencedByBranding([]), false);
+});
+
+// ---------------------------------------------- round three: the social card, failed scans, failed gates
+
+test('mediaDelete of the asset config/event.seo.defaultOgImagePath names is refused for staff even with force, and allowed for an operator', async () => {
+  const path = `cms-images/${ASSET_ID}/hero.png`;
+  const seed = () => seededLibrary({ 'config/event': { seo: { defaultOgImagePath: path } } });
+  const refused = fakeRes();
+  const db = seed();
+  await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), refused);
+  assert.equal(refused.statusCode, 403);
+  assert.equal(refused.body.error.message, 'branding: operator access required');
+  assert.deepEqual(db.ids('media_assets'), [ASSET_ID]);
+
+  const allowed = fakeRes();
+  await createMediaDeleteHandler(operatorDeps(seed(), fakeBucket()))(post({ assetId: ASSET_ID, force: true }), allowed);
+  assert.equal(allowed.statusCode, 200);
+  assert.deepEqual(allowed.body.usage, [{ docPath: 'config/event', field: 'seo.defaultOgImagePath' }]);
+});
+
+test('an asset config/event names anywhere else (a page image) is not branding', async () => {
+  const path = `cms-images/${ASSET_ID}/hero.png`;
+  const db = seededLibrary({ 'config/event': { venue: { mapPath: path }, seo: { defaultOgImagePath: 'branding/og.png' } } });
+  const res = fakeRes();
+  await createMediaDeleteHandler(staffDeps(db, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+/** A library whose usage scan cannot run: cmsContent throws on read. */
+function libraryWithBrokenScan() {
+  const db = seededLibrary();
+  const realCollection = db.collection.bind(db);
+  db.collection = (name) => {
+    if (name === 'cmsContent') return { async get() { throw new Error('transport failed'); } };
+    return realCollection(name);
+  };
+  return db;
+}
+
+test('mediaDelete with force while the usage scan fails: 500 and nothing deleted for staff, 200 for an operator', async () => {
+  const staffRes = fakeRes();
+  const staffDb = libraryWithBrokenScan();
+  await createMediaDeleteHandler(staffDeps(staffDb, fakeBucket()))(post({ assetId: ASSET_ID, force: true }), staffRes);
+  assert.equal(staffRes.statusCode, 500);
+  assert.equal(staffRes.body.error.message, 'The file could not be checked for usage.');
+  assert.deepEqual(staffDb.ids('media_assets'), [ASSET_ID]);
+
+  const opsRes = fakeRes();
+  const opsDb = libraryWithBrokenScan();
+  const bucket = fakeBucket();
+  await bucket.file(`cms-images/${ASSET_ID}/hero.png`).save(Buffer.from('x'), {});
+  await createMediaDeleteHandler(operatorDeps(opsDb, bucket))(post({ assetId: ASSET_ID, force: true }), opsRes);
+  assert.equal(opsRes.statusCode, 200);
+  assert.deepEqual(opsDb.ids('media_assets'), []);
+});
+
+/** A db whose config/bootstrap read throws, for the fail-closed gates. */
+function bootstrapDownDb(seed = {}) {
+  const db = makeBareFakeDb(seed);
+  const realCollection = db.collection.bind(db);
+  db.collection = (name) => {
+    if (name === 'config') return { doc: () => ({ async get() { throw new Error('firestore down'); } }) };
+    return realCollection(name);
+  };
+  return db;
+}
+
+test('speakerPhotoUpload and speakerPhotoDelete answer 500 and write nothing when config/bootstrap cannot be read', async () => {
+  const bucket = fakeBucket();
+  const db = bootstrapDownDb({ 'speakers/rae': { firstName: 'Rae', lastName: 'Okonkwo', uid: SPEAKER_UID, status: 'accepted' } });
+  const upload = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(db, bucket))(
+    post({ speakerId: 'rae', contentType: 'image/png', data: PNG }), upload,
+  );
+  assert.equal(upload.statusCode, 500);
+  assert.equal(upload.body.error.code, 'internal');
+  assert.equal(bucket.objects.size, 0);
+
+  await bucket.file('speaker-photos/rae/old/photo.png').save(Buffer.from('x'), {});
+  const del = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(db, bucket))(
+    post({ speakerId: 'rae', path: 'speaker-photos/rae/old/photo.png' }), del,
+  );
+  assert.equal(del.statusCode, 500);
+  assert.equal(del.body.error.code, 'internal');
+  assert.deepEqual(bucket.deleted, []);
 });

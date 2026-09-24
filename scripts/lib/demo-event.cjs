@@ -214,22 +214,25 @@ const DEMO_CONTENT = Object.freeze({
   hero__subtitle: {
     value: 'Sessions and workshops for people who operate local and cooperative newsrooms.'
   },
+  // The value stays the seed's: the range from the demo's own days, in the
+  // same shape the home page shows live while the fact is still seeded
+  // (pages/Home.jsx withLiveDates), so the snapshot and the page agree.
   info__when: {
-    value: '3 days',
     label: 'When',
-    takeaway: 'The summit runs from Wednesday to Friday',
-    description: '14 to 16 October 2026, in the Eastern timezone. Doors open at 09:00 each day.',
-    source: 'Summit programme, read 1 September 2026.',
-    alt: 'The summit runs for three days, 14 to 16 October 2026.'
+    note: 'Wednesday to Friday, in the Eastern timezone. Doors open at 09:00 each day.'
   },
-  info__where_venue: {
-    text: 'Demo map anchor: The Newark Museum of Art'
-  },
-  info__where_address: {
-    text: 'Address: 49 Washington Street, Newark, NJ 07102'
+  info__where: {
+    label: 'Where',
+    value: 'The Newark Museum of Art (demo map anchor)',
+    note: '49 Washington Street, Newark, NJ 07102'
   },
   info__where_transit: {
     text: 'Transit: Plan your trip through Newark Penn Station or Newark Broad Street Station.'
+  },
+  info__who: {
+    label: 'Who',
+    value: 'Reporters, editors, and publishers from local and cooperative newsrooms',
+    note: 'Workshop places go to registered participants first.'
   },
   details__intro: {
     value: '<p>Three days to make local news work better. Compare reporting methods, build a budget, and leave with a shared project plan. The Practice and Sustainability tracks run beside shared conversations, meals, and peer clinics.</p><p>This is a fictional event. All speakers and sponsors are fictional. Newark is the real geographic setting; no museum booking or partnership is implied. Room names, capacities, walking times, and the interior plan are illustrative.</p>'
@@ -293,6 +296,14 @@ const DEMO_CONTENT = Object.freeze({
 });
 
 const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
+  // The one pull quote the home page carries, among the body copy.
+  {
+    id: 'details__quote', section: 'details', field: 'quote',
+    blockType: 'quote',
+    text: 'Decide who checks sources, who edits each version, and who makes the final call before the deadline decides for you.',
+    attribution: 'Lucia Bennett, workshop lead',
+    visible: true, order: 1, seeded: true, seededAt: DEMO_SEEDED_AT,
+  },
   {
     id: 'travel_local__map', section: 'travel_local', field: 'map',
     blockType: 'link_group', group: 'Around the venue', label: 'Open the Newark map',
@@ -1019,7 +1030,27 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
     order: 0,
     seeded: true,
     seededAt: '2026-01-01T00:00:00.000Z'
-  }
+  },
+  // The sponsors page's packages (#193), one per demo tier. The figures are
+  // made up, and the copy says so: the demo offers nothing for sale.
+  {
+    id: 'sponsor_packages__presenting', section: 'sponsor_packages', field: 'presenting',
+    blockType: 'sponsor_package', name: 'Presenting', price: 'Illustrative figure: 8,000', limit: 1,
+    benefits: '<p>Names the sponsor on the plenary sessions and the travel grants. The figures are illustrative. Nothing here is on offer.</p>',
+    visible: true, order: 0, seeded: true, seededAt: DEMO_SEEDED_AT,
+  },
+  {
+    id: 'sponsor_packages__supporting', section: 'sponsor_packages', field: 'supporting',
+    blockType: 'sponsor_package', name: 'Supporting', price: 'Illustrative figure: 3,000', limit: 3,
+    benefits: '<p>Supports speaker preparation, peer coaching, and workshop materials. The figures are illustrative. Nothing here is on offer.</p>',
+    visible: true, order: 1, seeded: true, seededAt: DEMO_SEEDED_AT,
+  },
+  {
+    id: 'sponsor_packages__partner', section: 'sponsor_packages', field: 'partner',
+    blockType: 'sponsor_package', name: 'Partner', price: 'Illustrative figure: 1,000',
+    benefits: '<p>Hosts a clinic, the partnership exchange, or the coffee breaks. The figures are illustrative. Nothing here is on offer.</p>',
+    visible: true, order: 2, seeded: true, seededAt: DEMO_SEEDED_AT,
+  },
 ]);
 
 /** Fictional sessions across the three demo days. */
@@ -1877,10 +1908,34 @@ const DEMO_ORGANIZATIONS = Object.freeze([
 ]);
 
 /**
+ * Past editions for the home page's History section (issue #194). The
+ * editions are fictional, and each one says so.
+ */
+const DEMO_TIMELINE = Object.freeze([
+  {
+    id: 'demo-edition-2024',
+    year: 2024,
+    title: 'The first meeting',
+    description: 'Local news teams met for one day to compare shared reporting projects. This edition is fictional.',
+    visible: true,
+    seeded: true
+  },
+  {
+    id: 'demo-edition-2025',
+    year: 2025,
+    title: 'Two workshop tracks',
+    description: 'The second edition tested separate practice and sustainability workshops. This edition is fictional.',
+    visible: true,
+    seeded: true
+  }
+]);
+
+/**
  * The whole demo deployment as data.
  *
  * @returns {{ config: object, pages: object[], content: object[],
- *             sessions: object[], speakers: object[], organizations: object[] }}
+ *             sessions: object[], speakers: object[], organizations: object[],
+ *             timeline: object[] }}
  * @throws when the demo answers no longer pass the real config validators —
  *   the fixture is the platform's own dogfood, so a schema change that
  *   breaks it must break here loudly, not on the demo instance.
@@ -1925,6 +1980,7 @@ function demoEvent() {
     sessions: DEMO_SESSIONS.map((s) => ({ ...s })),
     speakers: DEMO_SPEAKERS.map((s) => ({ ...s })),
     organizations: DEMO_ORGANIZATIONS.map((o) => ({ ...o })),
+    timeline: DEMO_TIMELINE.map((entry) => ({ ...entry })),
   };
 }
 
@@ -1950,6 +2006,7 @@ function demoSnapshot() {
     sessions: demo.sessions,
     speakers: demo.speakers.map((speaker) => ({ id: speaker.id, ...buildPublicSpeaker(speaker) })),
     organizations: demo.organizations,
+    timeline: demo.timeline,
   };
 }
 
@@ -1962,6 +2019,7 @@ module.exports = {
   DEMO_SESSIONS,
   DEMO_SPEAKERS,
   DEMO_ORGANIZATIONS,
+  DEMO_TIMELINE,
   DEMO_CONTENT,
   DEMO_PAGE_EXTRA_CONTENT,
 };

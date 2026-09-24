@@ -11,7 +11,14 @@ const {
   DELETE_FIELD_SENTINEL,
   internals,
 } = require('./content.cjs');
-const { makeFakeDb } = require('./firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
+const { publishDocs } = require('./store.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the document the file's getConfig describes.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] };
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 
 const NOW = 1_750_000_000_000;
 const now = () => NOW;
@@ -979,4 +986,470 @@ test('the session seam leaves every other collection alone', async () => {
     res,
   );
   assert.equal(res.statusCode, 200);
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('mutation handlers admit a staff admin — content is staff work', async () => {
+  const STAFF = { uid: 'staff-1', email: 'staff@example.org', email_verified: true };
+  const staffDeps = (db) => deps(db, {
+    auth: { async verifyIdToken(t) { if (t === 'staff-token') return STAFF; throw new Error('bad'); } },
+    getConfig: async () => ({ bootstrap: { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] } }),
+  });
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(staffDeps(db))(
+    req({ token: 'staff-token', body: { collection: 'cmsContent', section: 'hero', field: 'title', fields: { value: 'Set by staff' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsContent_drafts', 'hero__title').updatedBy, 'staff@example.org');
+});
+
+// --- the seed flag (ADR 0001 §5.4; adversarial review 2026-09-24) -----------
+
+test('an admin edit clears the seed flag, and the publish carries the cleared flag live', async () => {
+  // The merge base is the stored document, flag included; an edit that kept
+  // the flag left every edited block reading as the seed's, so init
+  // overwrote it and the home page replaced the operator's When fact.
+  const db = makeFakeDb({
+    'cmsContent/info__when': {
+      section: 'info', field: 'when', blockType: 'fact', label: 'When', value: 'October 14–16, 2026',
+      visible: true, order: 0, seeded: true, seededAt: '1970-01-01T00:00:00.000Z',
+      revision: 1, publishedBy: 'init-event-script',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'info', field: 'when', fields: { value: 'October 13–16, 2026' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsContent_drafts', 'info__when');
+  assert.equal(draft.value, 'October 13–16, 2026');
+  assert.equal('seeded' in draft, false, 'the edit clears the flag');
+  assert.equal('seededAt' in draft, false, 'and the seed stamp with it');
+  assert.equal(draft.label, 'When', 'the other fields still merge');
+
+  await publishDocs({ db, collection: 'cmsContent', docIds: ['info__when'], actor: ADMIN, now });
+  const live = db.read('cmsContent', 'info__when');
+  assert.equal('seeded' in live, false, 'the publish carries the cleared flag');
+  assert.equal(live.publishedBy, ADMIN.uid);
+});
+
+test('an admin create never seeds, whatever the payload claims', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'note', fields: { blockType: 'text', value: 'x', seeded: true, seededAt: 'T' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsContent_drafts', 'hero__note');
+  assert.equal('seeded' in draft, false);
+  assert.equal('seededAt' in draft, false);
+});
+
+test('getSiteContent states seeded only for a block the seed published, and never the publisher', async () => {
+  // A deployment from before the edit cleared the flag holds edited blocks
+  // that still carry it; the public read judges by who published.
+  const db = makeFakeDb({
+    'cmsContent/hero__title': {
+      section: 'hero', field: 'title', blockType: 'text', value: '[Replace] Event name headline.',
+      visible: true, order: 0, seeded: true, revision: 1, publishedBy: 'init-event-script',
+    },
+    'cmsContent/hero__subtitle': {
+      section: 'hero', field: 'subtitle', blockType: 'text', value: 'Our real subtitle',
+      visible: true, order: 1, seeded: true, revision: 2, publishedBy: ADMIN.uid,
+    },
+  });
+  const res = fakeRes();
+  await createGetSiteContentHandler({ db, log: { error() {} } })({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 200);
+  const byId = Object.fromEntries(res.body.content.map((doc) => [doc.id, doc]));
+  assert.equal(byId.hero__title.seeded, true);
+  assert.equal('seeded' in byId.hero__subtitle, false, 'an operator’s publish wins over the stale flag');
+  for (const doc of res.body.content) assert.equal('publishedBy' in doc, false);
+});
+
+// --- organization fields at the seam (issue #192) ---------------------------
+
+const ORG = Object.freeze({
+  name: 'Example Fund',
+  tier: 'presenting',
+  order: 0,
+  logoPath: 'cms-images/example-fund.webp',
+  url: 'https://example.org/',
+  description: 'Funds the travel grants.',
+});
+
+function createOrganization(db, docId, fields, extra = {}) {
+  const res = fakeRes();
+  return createCmsCreateContentHandler(deps(db, extra))(
+    req({ ...extra.request, body: { collection: 'cmsOrganizations', docId, fields, visible: true } }),
+    res,
+  ).then(() => res);
+}
+
+function updateOrganization(db, docId, fields) {
+  const res = fakeRes();
+  return createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsOrganizations', docId, fields } }),
+    res,
+  ).then(() => res);
+}
+
+test('an organization whose name is not text is refused at save, naming the field, and nothing is written', async () => {
+  const db = makeFakeDb();
+  const res = await createOrganization(db, 'example-fund', { ...ORG, name: 42 });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'name: must be text');
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund'), undefined);
+  assert.equal(db.ids('admin_logs').length, 0, 'a refused save writes no admin log row');
+});
+
+test('an organization update is judged on the merged record', async () => {
+  const db = makeFakeDb({ 'cmsOrganizations_drafts/example-fund': { ...ORG, status: 'dirty' } });
+  let res = await updateOrganization(db, 'example-fund', { tier: { level: 1 } });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'tier: must be text');
+
+  // A stored value the request did not send still decides the verdict.
+  const broken = makeFakeDb({ 'cmsOrganizations_drafts/example-fund': { ...ORG, name: { x: 1 }, status: 'dirty' } });
+  res = await updateOrganization(broken, 'example-fund', { description: 'New words.' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'name: must be text');
+  assert.equal(broken.read('cmsOrganizations_drafts', 'example-fund').description, ORG.description);
+});
+
+test('an organization order sent as a string, or a website that is not http(s), is refused', async () => {
+  const db = makeFakeDb();
+  let res = await createOrganization(db, 'example-fund', { ...ORG, order: '3' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'order: must be a number');
+
+  res = await createOrganization(db, 'example-fund', { ...ORG, url: 'javascript:alert(1)' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'url: must start with http:// or https://');
+
+  res = await createOrganization(db, 'example-fund', { ...ORG, name: 7, order: 'first' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'name: must be text; order: must be a number');
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund'), undefined);
+});
+
+test('a valid organization is stored trimmed, with its website in canonical form', async () => {
+  const db = makeFakeDb();
+  const res = await createOrganization(db, 'example-fund', {
+    ...ORG,
+    name: '  Example Fund ',
+    tier: ' presenting ',
+    url: ' HTTPS://Example.ORG ',
+    description: '',
+  });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsOrganizations_drafts', 'example-fund');
+  assert.equal(draft.name, 'Example Fund');
+  assert.equal(draft.tier, 'presenting');
+  assert.equal(draft.url, 'https://example.org/');
+  assert.equal(draft.description, null);
+  assert.equal(draft.status, 'dirty');
+  assert.equal(draft.visible, true);
+  assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('an editor save over a record whose profile fields a script stored badly is accepted', async () => {
+  const db = makeFakeDb({
+    'cmsOrganizations/example-fund': { ...ORG, bio: {}, supportDescription: 3, visible: true, revision: 1 },
+  });
+  const res = await updateOrganization(db, 'example-fund', { name: 'Example Fund Two' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsOrganizations_drafts', 'example-fund');
+  assert.equal(draft.name, 'Example Fund Two');
+  assert.deepEqual(draft.bio, {}, 'the stored value is kept, not rewritten');
+  // Sending the malformed field is what gets it judged.
+  const again = await updateOrganization(db, 'example-fund', { bio: {} });
+  assert.equal(again.statusCode, 400);
+  assert.equal(again.body.error.message, 'bio: must be text');
+});
+
+test('a staff admin creates an organization', async () => {
+  const STAFF = { uid: 'staff-1', email: 'staff@example.org', email_verified: true };
+  const db = makeFakeDb();
+  const res = await createOrganization(db, 'example-fund', { ...ORG }, {
+    auth: { async verifyIdToken(t) { if (t === 'staff-token') return STAFF; throw new Error('bad'); } },
+    request: { token: 'staff-token' },
+  });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund').updatedBy, 'staff@example.org');
+});
+
+test('the organization seam leaves content blocks and sessions alone', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  // A cmsContent block may carry a `name` of any shape; the seam is not its rule.
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'blurb', fields: { blockType: 'text', value: 'x', name: 42, order: '1' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(
+    internals.checkOrganizationFields({ collection: 'cmsSchedule', fields: { name: 42 }, sent: {} }),
+    { ok: true, fields: { name: 42 } },
+  );
+});
+
+// --- the page address is the document key (issue #193) ----------------------
+
+test('an organization address that is not slug-shaped is refused at save, for organizations only', async () => {
+  const db = makeFakeDb();
+  let res = await createOrganization(db, 'Bad Slug', { ...ORG });
+  assert.equal(res.statusCode, 400);
+  assert.equal(
+    res.body.error.message,
+    'slug: use lowercase letters, digits, and single hyphens, up to 80 characters',
+  );
+  res = await createOrganization(db, 'a'.repeat(81), { ...ORG });
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^slug: /);
+  assert.deepEqual(db.ids('cmsOrganizations_drafts'), []);
+  assert.equal(db.ids('admin_logs').length, 0);
+
+  // Other collections keep their own id rules.
+  res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'Bad Slug', fields: {} } }),
+    res,
+  );
+  assert.notEqual(res.statusCode, 400, JSON.stringify(res.body));
+  assert.equal(db.read('cmsSchedule_drafts', 'Bad Slug') !== undefined, true);
+});
+
+test('a second organization claiming a published address is refused at save, naming the slug', async () => {
+  const db = makeFakeDb({
+    'cmsOrganizations/example-fund': { ...ORG, visible: true, revision: 1 },
+  });
+  const res = await createOrganization(db, 'example-fund', { ...ORG, name: 'Another Fund' });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.message, 'slug: another organization already uses "example-fund"');
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund'), undefined);
+  assert.equal(db.read('cmsOrganizations', 'example-fund').name, ORG.name);
+});
+
+test('a second organization claiming an address held only by a draft is refused, and the first draft is unchanged', async () => {
+  const db = makeFakeDb();
+  const first = await createOrganization(db, 'example-fund', { ...ORG });
+  assert.equal(first.statusCode, 200, JSON.stringify(first.body));
+  const before = db.read('cmsOrganizations_drafts', 'example-fund');
+
+  const second = await createOrganization(db, 'example-fund', { ...ORG, name: 'Another Fund', tier: 'partner' });
+  assert.equal(second.statusCode, 409);
+  assert.equal(second.body.error.message, 'slug: another organization already uses "example-fund"');
+  assert.deepEqual(db.read('cmsOrganizations_drafts', 'example-fund'), before);
+  assert.equal(db.ids('admin_logs').length, 1, 'only the first create is logged');
+});
+
+test('an organization stored under an id that is not a slug stays editable', async () => {
+  const db = makeFakeDb({ 'cmsOrganizations/Legacy_Org': { ...ORG, visible: true, revision: 1 } });
+  const res = await updateOrganization(db, 'Legacy_Org', { description: 'Edited.' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsOrganizations_drafts', 'Legacy_Org').description, 'Edited.');
+});
+
+test('every other collection keeps its own already-exists words', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/s1': { title: 'x', revision: 1 } });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 's1', fields: {} } }),
+    res,
+  );
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.message, 'That document already exists; use cmsUpdateContent.');
+});
+
+// --- review round (c2, finding 1) ---------------------------------------------
+
+test('a sponsor package limit sent as the deletion sentinel leaves the stored draft without one', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/sponsor_packages__supporting': {
+      section: 'sponsor_packages', field: 'supporting', blockType: 'sponsor_package',
+      name: 'Supporting', limit: 3, benefits: '<p>Materials.</p>', status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'sponsor_packages', field: 'supporting', fields: { name: 'Supporting', limit: DELETE_FIELD_SENTINEL } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsContent_drafts', 'sponsor_packages__supporting');
+  assert.equal('limit' in draft, false);
+  assert.equal(draft.benefits, '<p>Materials.</p>');
+});
+
+// --- Codex review on #281 ------------------------------------------------------
+
+// The page draws "Open to N sponsors" only for a whole number of 1 or more,
+// so any other limit would be saved, published, and then silently not shown.
+test('a sponsor package limit that is not a whole number of 1 or more is refused at save, and nothing is written', async () => {
+  for (const limit of [-1, 0, 2.5, '3', true, Number.MAX_SAFE_INTEGER + 1]) {
+    const db = makeFakeDb();
+    const res = fakeRes();
+    await createCmsCreateContentHandler(deps(db))(
+      req({ body: { section: 'sponsor_packages', field: 'presenting', fields: { blockType: 'sponsor_package', name: 'Presenting', benefits: '<p>x</p>', limit } } }),
+      res,
+    );
+    assert.equal(res.statusCode, 400, `limit ${String(limit)}`);
+    assert.match(res.body.error.message, /^limit: must be a whole number of 1 or more/);
+    assert.equal(db.read('cmsContent_drafts', 'sponsor_packages__presenting'), undefined);
+  }
+  for (const limit of [1, 3, undefined, null]) {
+    const db = makeFakeDb();
+    const res = fakeRes();
+    const fields = { blockType: 'sponsor_package', name: 'Presenting', benefits: '<p>x</p>' };
+    if (limit !== undefined) fields.limit = limit;
+    await createCmsCreateContentHandler(deps(db))(
+      req({ body: { section: 'sponsor_packages', field: 'presenting', fields } }),
+      res,
+    );
+    assert.equal(res.statusCode, 200, `limit ${String(limit)}: ${JSON.stringify(res.body)}`);
+  }
+});
+
+test('an update that sets a bad sponsor package limit is refused, and the stored draft keeps its limit', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/sponsor_packages__supporting': {
+      section: 'sponsor_packages', field: 'supporting', blockType: 'sponsor_package',
+      name: 'Supporting', limit: 3, benefits: '<p>Materials.</p>', status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'sponsor_packages', field: 'supporting', fields: { limit: -2 } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.equal(db.read('cmsContent_drafts', 'sponsor_packages__supporting').limit, 3);
+});
+
+// --- timeline entries (issue #194) ------------------------------------------
+
+const ENTRY = Object.freeze({
+  year: 2024,
+  title: 'The first meeting',
+  description: 'Teams compared shared reporting projects.',
+});
+
+function createEntry(db, docId, fields, extra = {}) {
+  const res = fakeRes();
+  return createCmsCreateContentHandler(deps(db, extra))(
+    req({ ...extra.request, body: { collection: 'cmsTimeline', docId, fields, visible: true } }),
+    res,
+  ).then(() => res);
+}
+
+function updateEntry(db, docId, fields) {
+  const res = fakeRes();
+  return createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsTimeline', docId, fields } }),
+    res,
+  ).then(() => res);
+}
+
+test('a timeline entry whose year is not a number is refused at save, naming the field, and nothing is written', async () => {
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { ...ENTRY, year: '2024' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'year: enter a year from 1900 to 2100 as four digits');
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024'), undefined);
+  assert.equal(db.ids('admin_logs').length, 0, 'a refused save writes no admin log row');
+});
+
+test('a timeline entry refuses a key it does not store, by name', async () => {
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { ...ENTRY, colour: 'x' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'colour: unknown field');
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024'), undefined);
+});
+
+test('a timeline update is judged on the merged entry', async () => {
+  const db = makeFakeDb({
+    'cmsTimeline_drafts/edition-2024': { ...ENTRY, title: { text: 'x' }, status: 'dirty' },
+  });
+  const res = await updateEntry(db, 'edition-2024', { description: 'New words.' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'title: must be text');
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').description, ENTRY.description);
+});
+
+test('a timeline update over a stored stray key saves, and the stray key is gone', async () => {
+  const db = makeFakeDb({
+    'cmsTimeline_drafts/edition-2024': { ...ENTRY, location: 'Hall A', status: 'dirty', visible: true },
+  });
+  const res = await updateEntry(db, 'edition-2024', { title: 'The first meeting, again' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsTimeline_drafts', 'edition-2024');
+  assert.equal(draft.title, 'The first meeting, again');
+  assert.equal(Object.prototype.hasOwnProperty.call(draft, 'location'), false);
+});
+
+test('a valid timeline entry is stored trimmed, with a blank description as null', async () => {
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { year: 2024, title: '  The first meeting ', description: '  ' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body, { docPath: 'cmsTimeline_drafts/edition-2024', docId: 'edition-2024', status: 'dirty' });
+  const draft = db.read('cmsTimeline_drafts', 'edition-2024');
+  assert.equal(draft.year, 2024);
+  assert.equal(draft.title, 'The first meeting');
+  assert.equal(draft.description, null);
+  assert.equal(draft.status, 'dirty');
+  assert.equal(draft.visible, true);
+  assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('a staff admin creates a timeline entry', async () => {
+  const STAFF = { uid: 'staff-1', email: 'staff@example.org', email_verified: true };
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { ...ENTRY }, {
+    auth: { async verifyIdToken(t) { if (t === 'staff-token') return STAFF; throw new Error('bad'); } },
+    request: { token: 'staff-token' },
+  });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').updatedBy, 'staff@example.org');
+});
+
+test('the timeline seam leaves content blocks and sessions alone', async () => {
+  const db = makeFakeDb();
+  // A block or a session may carry a `year` of any shape and keys the entry
+  // does not know; the seam is not their rule.
+  let res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'era', fields: { blockType: 'text', value: 'x', year: 'then', colour: 'x' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsContent_drafts', 'hero__era').colour, 'x');
+  res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-era', fields: { title: 'x', year: 'then' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsSchedule_drafts', 'sess-era').year, 'then');
+});
+
+test('a timeline entry created, edited and published is live with its three fields', async () => {
+  const db = makeFakeDb();
+  let res = await createEntry(db, 'edition-2024', { ...ENTRY });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  res = await updateEntry(db, 'edition-2024', { title: 'The first meeting ', description: null });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  await publishDocs({ db, collection: 'cmsTimeline', docIds: ['edition-2024'], actor: ADMIN, now });
+  const live = db.read('cmsTimeline', 'edition-2024');
+  assert.equal(live.year, 2024);
+  assert.equal(live.title, 'The first meeting');
+  assert.equal(live.description, null);
+  assert.equal(live.visible, true);
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').status, 'clean');
 });

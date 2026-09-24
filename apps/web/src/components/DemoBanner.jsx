@@ -20,6 +20,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { recommendedConfiguration } from '../lib/themeRuntime.js';
+import { loadPresetRemaps } from '../lib/presetRemaps.js';
 import Rule from './editorial/Rule.jsx';
 import { quietActionClass } from './controlClasses.js';
 import {
@@ -126,6 +127,14 @@ export function DemoBannerContent({
       attemptFullscreenCall(pageDocument, pageDocument.exitFullscreen);
     }
   }, [pageDocument, restoreControls]);
+
+  // The style switch resolves each style in full, and what a style moves is
+  // a lazy chunk (lib/presetRemaps.js). Fetching it as the band mounts
+  // means the first switch lands as fast as the rest; a failed fetch is the
+  // provider's to retry when a switch asks for it.
+  useEffect(() => {
+    loadPresetRemaps().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (typeof setDemoTheme !== 'function') return;

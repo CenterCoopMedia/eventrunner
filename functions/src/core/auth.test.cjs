@@ -4,6 +4,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  ADMIN_TIERS,
+  BootstrapUnavailableError,
+  resolveAdminTier,
+  loadBootstrap,
   verifyAuthToken,
   requireAdmin,
   requireAttendeeAccess,
@@ -29,13 +33,21 @@ function fakeAuth(tokens) {
   };
 }
 
-function fakeGetConfig(adminEmails) {
-  return async () => ({ bootstrap: adminEmails === null ? null : { adminEmails } });
+function fakeGetConfig(adminEmails, staffEmails) {
+  return async () => ({
+    bootstrap: adminEmails === null ? null : { adminEmails, ...(staffEmails ? { staffEmails } : {}) },
+  });
 }
 
 const ADMIN_TOKEN = {
   uid: 'u1',
   email: 'Admin@Example.org',
+  email_verified: true,
+};
+
+const STAFF_TOKEN = {
+  uid: 'u3',
+  email: 'Staff@Example.org',
   email_verified: true,
 };
 
@@ -86,12 +98,226 @@ test('requireAdmin: unverifiable token → 401', async () => {
   assert.equal(verdict.status, 401);
 });
 
-test('requireAdmin: verified token, email on the list (case-insensitive) → ok', async () => {
+test('requireAdmin: verified token, email on the list (case-insensitive) → ok, as an operator', async () => {
   const verdict = await requireAdmin(
     { auth: fakeAuth({ good: ADMIN_TOKEN }), getConfig: fakeGetConfig(['  ADMIN@example.ORG ']) },
     reqWithAuth('Bearer good'),
   );
-  assert.deepEqual(verdict, { ok: true, uid: 'u1', email: 'admin@example.org' });
+  assert.deepEqual(verdict, { ok: true, uid: 'u1', email: 'admin@example.org', tier: 'operator' });
+});
+
+// --- the two tiers (issue #186) ----------------------------------------------
+
+test('ADMIN_TIERS lists operator first: the default an unlisted endpoint falls to', () => {
+  assert.deepEqual([...ADMIN_TIERS], ['operator', 'staff']);
+});
+
+test('resolveAdminTier: adminEmails is operator, staffEmails is staff, neither is null', () => {
+  const bootstrap = { adminEmails: ['ops@example.org'], staffEmails: ['Desk@Example.org'] };
+  assert.equal(resolveAdminTier(bootstrap, 'OPS@example.org'), 'operator');
+  assert.equal(resolveAdminTier(bootstrap, ' desk@example.org '), 'staff');
+  assert.equal(resolveAdminTier(bootstrap, 'nobody@example.org'), null);
+  assert.equal(resolveAdminTier(bootstrap, ''), null);
+  assert.equal(resolveAdminTier(bootstrap, null), null);
+});
+
+test('resolveAdminTier: an address on both lists is an operator — the wider grant wins', () => {
+  const bootstrap = { adminEmails: ['both@example.org'], staffEmails: ['both@example.org'] };
+  assert.equal(resolveAdminTier(bootstrap, 'both@example.org'), 'operator');
+});
+
+test('resolveAdminTier: a missing document, a missing staff list, or a malformed list is "not an admin", never a throw', () => {
+  assert.equal(resolveAdminTier(null, 'ops@example.org'), null);
+  assert.equal(resolveAdminTier(undefined, 'ops@example.org'), null);
+  // The pre-tier shape every existing deployment has: adminEmails only.
+  assert.equal(resolveAdminTier({ adminEmails: ['ops@example.org'] }, 'ops@example.org'), 'operator');
+  assert.equal(resolveAdminTier({ adminEmails: ['ops@example.org'] }, 'desk@example.org'), null);
+  assert.equal(resolveAdminTier({ adminEmails: [], staffEmails: 'desk@example.org' }, 'desk@example.org'), null);
+  assert.equal(resolveAdminTier({ adminEmails: [], staffEmails: [42, null] }, 'desk@example.org'), null);
+});
+
+test('requireAdmin: the default tier is operator, so a staff caller is refused by an endpoint that does not say', async () => {
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: STAFF_TOKEN }), getConfig: fakeGetConfig(['ops@example.org'], ['staff@example.org']) },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(
+    { ok: verdict.ok, status: verdict.status, code: verdict.code },
+    { ok: false, status: 403, code: 'forbidden' },
+  );
+  assert.equal(verdict.message, 'Operator access required.');
+});
+
+test('requireAdmin: tier "staff" admits a staff caller and reports the tier held', async () => {
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: STAFF_TOKEN }), getConfig: fakeGetConfig(['ops@example.org'], ['staff@example.org']) },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.deepEqual(verdict, { ok: true, uid: 'u3', email: 'staff@example.org', tier: 'staff' });
+});
+
+test('requireAdmin: tier "staff" admits an operator too, and still reports operator', async () => {
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: ADMIN_TOKEN }), getConfig: fakeGetConfig(['admin@example.org'], ['staff@example.org']) },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.deepEqual(verdict, { ok: true, uid: 'u1', email: 'admin@example.org', tier: 'operator' });
+});
+
+test('requireAdmin: tier "operator" refuses a staff caller and admits an operator', async () => {
+  const deps = {
+    auth: fakeAuth({ staff: STAFF_TOKEN, ops: ADMIN_TOKEN }),
+    getConfig: fakeGetConfig(['admin@example.org'], ['staff@example.org']),
+  };
+  const refused = await requireAdmin(deps, reqWithAuth('Bearer staff'), { tier: 'operator' });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.status, 403);
+  const admitted = await requireAdmin(deps, reqWithAuth('Bearer ops'), { tier: 'operator' });
+  assert.equal(admitted.ok, true);
+  assert.equal(admitted.tier, 'operator');
+});
+
+test('requireAdmin: a staff address is refused the same way a stranger is, with no tier oracle in the message', async () => {
+  // A stranger and an unverified staff address both read "Admin access
+  // required."; only a real staff member hitting an operator endpoint reads
+  // "Operator access required." — that caller already knows they are staff.
+  const stranger = await requireAdmin(
+    { auth: fakeAuth({ good: { uid: 'u4', email: 'x@example.org', email_verified: true } }), getConfig: fakeGetConfig(['admin@example.org'], ['staff@example.org']) },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(stranger.message, 'Admin access required.');
+  const unverified = await requireAdmin(
+    { auth: fakeAuth({ good: { ...STAFF_TOKEN, email_verified: false } }), getConfig: fakeGetConfig(['admin@example.org'], ['staff@example.org']) },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(unverified.status, 403);
+  assert.equal(unverified.message, 'Admin access required.');
+});
+
+test('requireAdmin: an unknown tier is a programming error and throws', async () => {
+  await assert.rejects(
+    () => requireAdmin(
+      { auth: fakeAuth({ good: ADMIN_TOKEN }), getConfig: fakeGetConfig(['admin@example.org']) },
+      reqWithAuth('Bearer good'),
+      { tier: 'owner' },
+    ),
+    /unknown tier "owner"/,
+  );
+});
+
+// --- the live bootstrap read (issue #187) ----------------------------------
+
+/** A db whose config/bootstrap answers as given, or throws. */
+function bootstrapDb(answer) {
+  return {
+    collection(name) {
+      assert.equal(name, 'config');
+      return {
+        doc(id) {
+          assert.equal(id, 'bootstrap');
+          return {
+            async get() {
+              if (answer instanceof Error) throw answer;
+              return { exists: answer !== null, data: () => answer ?? undefined };
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+test('loadBootstrap: the live document wins over the cached copy', async () => {
+  const live = { adminEmails: ['ops@example.org'], staffEmails: ['fresh@example.org'] };
+  const cached = async () => ({ bootstrap: { adminEmails: ['ops@example.org'] } });
+  assert.deepEqual(await loadBootstrap({ db: bootstrapDb(live), getConfig: cached }), live);
+});
+
+test('loadBootstrap: without a db the cached copy is the source', async () => {
+  const cached = async () => ({ bootstrap: { adminEmails: ['cached@example.org'] } });
+  assert.deepEqual(await loadBootstrap({ getConfig: cached }), { adminEmails: ['cached@example.org'] });
+  assert.equal(await loadBootstrap({}), null);
+});
+
+test('loadBootstrap: with a db, a failed live read is an error, never the cached copy', async () => {
+  // A cached copy can still list an address revoked a moment ago; falling
+  // back to it on a transport error would admit exactly the caller the
+  // revocation was meant to stop. Fail closed instead.
+  const cached = async () => ({ bootstrap: { adminEmails: ['cached@example.org'] } });
+  await assert.rejects(
+    () => loadBootstrap({ db: bootstrapDb(new Error('firestore down')), getConfig: cached }),
+    (err) => err instanceof BootstrapUnavailableError,
+  );
+});
+
+test('loadBootstrap: with a db, an absent document means no admins, even when the cached copy has some', async () => {
+  const cached = async () => ({ bootstrap: { adminEmails: ['cached@example.org'] } });
+  assert.equal(await loadBootstrap({ db: bootstrapDb(null), getConfig: cached }), null);
+  assert.equal(await loadBootstrap({ db: bootstrapDb(null) }), null);
+});
+
+test('requireAdmin: a failed live read answers 500 and admits nobody', async () => {
+  const cached = fakeGetConfig(['admin@example.org']);
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: ADMIN_TOKEN }), db: bootstrapDb(new Error('firestore down')), getConfig: cached },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.deepEqual(
+    { ok: verdict.ok, status: verdict.status, code: verdict.code },
+    { ok: false, status: 500, code: 'internal' },
+  );
+  assert.doesNotMatch(verdict.message, /firestore/i);
+});
+
+test('requireAdmin: an absent bootstrap document admits nobody, even a caller the cached copy still lists', async () => {
+  const cached = fakeGetConfig(['admin@example.org']);
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: ADMIN_TOKEN }), db: bootstrapDb(null), getConfig: cached },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('requireAdmin: with a db, a grant made a moment ago is honoured although the cached copy predates it', async () => {
+  // The cached copy knows nothing of the staff address; the document does.
+  const stale = fakeGetConfig(['admin@example.org']);
+  const live = bootstrapDb({ adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] });
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: STAFF_TOKEN }), db: live, getConfig: stale },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(verdict.ok, true);
+  assert.equal(verdict.tier, 'staff');
+});
+
+test('requireAdmin: with a db, a revocation made a moment ago is honoured although the cached copy still lists the address', async () => {
+  const stale = fakeGetConfig(['admin@example.org'], ['staff@example.org']);
+  const live = bootstrapDb({ adminEmails: ['admin@example.org'], staffEmails: [] });
+  const verdict = await requireAdmin(
+    { auth: fakeAuth({ good: STAFF_TOKEN }), db: live, getConfig: stale },
+    reqWithAuth('Bearer good'),
+    { tier: 'staff' },
+  );
+  assert.equal(verdict.ok, false);
+  assert.equal(verdict.status, 403);
+});
+
+test('tierSatisfies: operator satisfies both, staff satisfies staff only, null satisfies nothing', () => {
+  const { tierSatisfies } = internals;
+  assert.equal(tierSatisfies('operator', 'operator'), true);
+  assert.equal(tierSatisfies('operator', 'staff'), true);
+  assert.equal(tierSatisfies('staff', 'staff'), true);
+  assert.equal(tierSatisfies('staff', 'operator'), false);
+  assert.equal(tierSatisfies(null, 'staff'), false);
+  assert.equal(tierSatisfies(null, 'operator'), false);
 });
 
 test('requireAdmin: email_verified false → 403 even when listed', async () => {
@@ -260,7 +486,9 @@ test('requireAttendeeAccess: registrationStatus approved → ok', async () => {
     },
     reqWithAuth('Bearer good'),
   );
-  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+  // Admitted through the account document, which a write that must not
+  // outlive the account re-reads in its transaction (bookmarks.cjs).
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org', viaAccount: true });
 });
 
 test('requireAttendeeAccess: a linked speaker profile grants access even when pending', async () => {
@@ -300,7 +528,19 @@ test('requireAttendeeAccess: a bootstrap admin passes even with a pending, non-s
     },
     reqWithAuth('Bearer good'),
   );
-  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org', viaAccount: false });
+});
+
+test('requireAttendeeAccess: a staff admin passes too — attendee access is the floor under every admin', async () => {
+  const verdict = await requireAttendeeAccess(
+    {
+      auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+      db: fakeUsersDb({ u9: { registrationStatus: 'pending', speakerId: null, role: 'attendee' } }),
+      getConfig: fakeGetConfig(['ops@example.org'], ['Attendee@Example.ORG']),
+    },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org', viaAccount: false });
 });
 
 test('requireAttendeeAccess: a bootstrap admin with no users/{uid} doc at all still passes', async () => {

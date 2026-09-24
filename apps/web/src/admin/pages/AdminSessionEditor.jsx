@@ -91,6 +91,11 @@ function validateForm(form, mode) {
   return errors;
 }
 
+// Where every exit from the editor goes. The editor's route is a sibling of
+// the list under the admin layout, so a relative '..' is the admin index,
+// not the list.
+const SESSIONS_LIST = '/admin/sessions';
+
 export default function AdminSessionEditor({ mode }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -231,7 +236,7 @@ export default function AdminSessionEditor({ mode }) {
     try {
       await call('cmsDeleteContent', { collection: 'cmsSchedule', docId: sessionId });
       showToast('Session deleted.');
-      navigate('..');
+      navigate(SESSIONS_LIST);
     } catch (err) {
       setError(err);
     } finally {
@@ -412,7 +417,7 @@ export default function AdminSessionEditor({ mode }) {
       </Panel>
 
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="button" className={secondaryButtonClass} onClick={() => navigate('..')}>
+        <button type="button" className={secondaryButtonClass} onClick={() => navigate(SESSIONS_LIST)}>
           Cancel
         </button>
         {mode === 'edit' ? (

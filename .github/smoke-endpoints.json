@@ -19,6 +19,9 @@
     "updateFeatures",
     "updateTheme",
     "updateBadges",
+    "listAdminAccess",
+    "setAdminAccess",
+    "getEventStats",
     "webMcpCheckEventReadiness",
     "webMcpValidateCurrentPageDraft",
     "webMcpInspectPublishQueue",
@@ -45,6 +48,8 @@
     "validateSpeakerInvite",
     "acceptSpeakerInvite",
     "emailDeliveryWebhook",
+    "listSentEmails",
+    "getSentEmail",
     "bookmarkSession",
     "buildSchedulePdf",
     "buildMySchedulePdf",
@@ -60,6 +65,9 @@
     "deleteLiveUpdate",
     "submitFeedback",
     "updateFeedbackStatus",
+    "submitChangeRequest",
+    "updateChangeRequestStatus",
+    "deleteChangeRequest",
     "addSessionMaterialLink",
     "uploadSessionMaterial",
     "updateSessionMaterial",
@@ -68,6 +76,8 @@
     "getSessionMaterialUrl",
     "listSessionMaterials",
     "downloadSessionMaterial",
+    "listAllSessionMaterials",
+    "downloadSessionMaterialsArchive",
     "ticketingWebhook",
     "ticketingSync",
     "ticketingVerifyOrder",
@@ -76,6 +86,9 @@
     "ticketingImportCsv",
     "ticketingListTickets",
     "approveUser",
-    "revokeUser"
+    "revokeUser",
+    "exportAttendees",
+    "updateAttendee",
+    "deleteAttendee"
   ]
 }

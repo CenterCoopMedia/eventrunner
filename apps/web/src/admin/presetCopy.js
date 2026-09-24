@@ -67,6 +67,88 @@ export const PRESET_COPY = Object.freeze({
           },
         },
       },
+      longReadOpening: {
+        label: 'Long read opening',
+        prompt: 'Choose how the first paragraph of a Long read page opens.',
+        choices: {
+          'drop-cap': {
+            label: 'Drop cap',
+            why: 'Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.',
+          },
+          standfirst: {
+            label: 'Standfirst',
+            why: 'Sets the first paragraph at the lead size, as a summary of the page.',
+          },
+          plain: {
+            label: 'Plain',
+            why: 'Keeps the first paragraph at body size with no drop cap.',
+          },
+        },
+      },
+      quote: {
+        label: 'Quote device',
+        prompt: 'Choose how a quoted sentence is set.',
+        choices: {
+          'ruled-minute': {
+            label: 'Ruled minute',
+            why: 'Sets the quote between two hairlines with a strong rule at its start, like a quoted minute.',
+          },
+          'plain-rules': {
+            label: 'Plain rules',
+            why: 'Sets the quote between two hairlines with no side rule.',
+          },
+        },
+      },
+      directory: {
+        label: 'Directory style',
+        prompt: 'Choose how the speaker shelf and the attendee index are set.',
+        choices: {
+          'ruled-entries': {
+            label: 'Ruled entries',
+            why: 'Sets square portraits and rules each entry at the hairline.',
+          },
+          'portrait-plates': {
+            label: 'Portrait plates',
+            why: 'Sets taller portraits on the alternate ground and gives each index row more room.',
+          },
+        },
+      },
+      sectionBoundary: {
+        label: 'Section boundary',
+        prompt: 'Choose how a section heading is ruled and labelled.',
+        choices: {
+          'rule-and-folio': {
+            label: 'Rule and folio',
+            why: 'Draws the section rule with the folio at the far end of the heading line.',
+          },
+          'rule-only': {
+            label: 'Rule only',
+            why: 'Draws the section rule and hides the folio beside the heading.',
+          },
+          'folio-in-margin': {
+            label: 'Folio in the margin',
+            why: 'Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.',
+          },
+        },
+      },
+      tableRules: {
+        label: 'Table rules',
+        prompt: 'Choose how a table is ruled.',
+        choices: {
+          'hairline-rows': {
+            label: 'Hairline rows',
+            why: 'Rules the rows and the head at the hairline and draws no column rules.',
+          },
+          'ruled-head': {
+            label: 'Ruled head',
+            why: 'Closes the head with a strong rule and rules the rows at the hairline, with no column rules.',
+          },
+          'full-grid': {
+            label: 'Full grid',
+            why: 'Rules the rows and the columns at the hairline, with the head closed at the width the style sets.',
+          },
+        },
+      },
     },
   },
   newsroom: {
@@ -124,6 +206,92 @@ export const PRESET_COPY = Object.freeze({
           },
         },
       },
+      longReadOpening: {
+        label: 'Long read opening',
+        prompt: 'Choose how the first paragraph of a Long read page opens.',
+        choices: {
+          'drop-cap': {
+            label: 'Drop cap',
+            why: 'Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.',
+          },
+          standfirst: {
+            label: 'Standfirst',
+            why: 'Sets the first paragraph at the lead size, as a summary of the page.',
+          },
+          plain: {
+            label: 'Plain',
+            why: 'Keeps the first paragraph at body size with no drop cap.',
+          },
+        },
+      },
+      quote: {
+        label: 'Quote device',
+        prompt: 'Choose how a quoted sentence is set.',
+        choices: {
+          'ruled-with-mark': {
+            label: 'Ruled with an opening mark',
+            why: 'Sets the quote between strong rules with a large opening mark in the heading typeface.',
+          },
+          'side-rule': {
+            label: 'Side rule',
+            why: 'Sets the quote beside one strong rule with no rules above or below; the quotation marks sit inline around the sentence.',
+          },
+          'mark-only': {
+            label: 'Opening mark only',
+            why: 'Sets the quote with the large opening mark and no rules.',
+          },
+        },
+      },
+      directory: {
+        label: 'Directory style',
+        prompt: 'Choose how the speaker shelf and the attendee index are set.',
+        choices: {
+          'portrait-shelf': {
+            label: 'Portrait shelf',
+            why: 'Sets square portraits on the alternate ground, ruled at the hairline.',
+          },
+          'tall-portraits': {
+            label: 'Tall portraits',
+            why: 'Sets portraits at three by four, like a profile picture in a print feature.',
+          },
+        },
+      },
+      sectionBoundary: {
+        label: 'Section boundary',
+        prompt: 'Choose how a section heading is ruled and labelled.',
+        choices: {
+          'rule-and-folio': {
+            label: 'Rule and folio',
+            why: 'Draws the section rule with the folio at the far end of the heading line.',
+          },
+          'rule-only': {
+            label: 'Rule only',
+            why: 'Draws the section rule and hides the folio beside the heading.',
+          },
+          'folio-in-margin': {
+            label: 'Folio in the margin',
+            why: 'Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.',
+          },
+        },
+      },
+      tableRules: {
+        label: 'Table rules',
+        prompt: 'Choose how a table is ruled.',
+        choices: {
+          'hairline-rows': {
+            label: 'Hairline rows',
+            why: 'Rules the rows and the head at the hairline and draws no column rules.',
+          },
+          'ruled-head': {
+            label: 'Ruled head',
+            why: 'Closes the head with a strong rule and rules the rows at the hairline, with no column rules.',
+          },
+          'full-grid': {
+            label: 'Full grid',
+            why: 'Rules the rows and the columns at the hairline, with the head closed at the width the style sets.',
+          },
+        },
+      },
     },
   },
   broadsheet: {
@@ -178,6 +346,88 @@ export const PRESET_COPY = Object.freeze({
           'agate-block': {
             label: 'Agate block',
             why: 'Reduces type size, row leading, and vertical padding to fit more sessions on one page.',
+          },
+        },
+      },
+      longReadOpening: {
+        label: 'Long read opening',
+        prompt: 'Choose how the first paragraph of a Long read page opens.',
+        choices: {
+          'drop-cap': {
+            label: 'Drop cap',
+            why: 'Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.',
+          },
+          standfirst: {
+            label: 'Standfirst',
+            why: 'Sets the first paragraph at the lead size, as a summary of the page.',
+          },
+          plain: {
+            label: 'Plain',
+            why: 'Keeps the first paragraph at body size with no drop cap.',
+          },
+        },
+      },
+      quote: {
+        label: 'Quote device',
+        prompt: 'Choose how a quoted sentence is set.',
+        choices: {
+          'centred-mark': {
+            label: 'Centred with an opening mark',
+            why: 'Centres the quote between hairlines with a large opening mark and a small-capitals attribution.',
+          },
+          'column-rule': {
+            label: 'Column rule',
+            why: 'Sets the quote beside one hairline, like a boxed paragraph in a column, with the quotation marks inline around the sentence.',
+          },
+        },
+      },
+      directory: {
+        label: 'Directory style',
+        prompt: 'Choose how the speaker shelf and the attendee index are set.',
+        choices: {
+          'agate-directory': {
+            label: 'Agate directory',
+            why: 'Sets square portraits and tight index rows, like a newspaper directory.',
+          },
+          'plate-portraits': {
+            label: 'Plate portraits',
+            why: 'Sets tall portraits between strong rules, like a photograph page.',
+          },
+        },
+      },
+      sectionBoundary: {
+        label: 'Section boundary',
+        prompt: 'Choose how a section heading is ruled and labelled.',
+        choices: {
+          'rule-and-folio': {
+            label: 'Rule and folio',
+            why: 'Draws the section rule with the folio at the far end of the heading line.',
+          },
+          'rule-only': {
+            label: 'Rule only',
+            why: 'Draws the section rule and hides the folio beside the heading.',
+          },
+          'folio-in-margin': {
+            label: 'Folio in the margin',
+            why: 'Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.',
+          },
+        },
+      },
+      tableRules: {
+        label: 'Table rules',
+        prompt: 'Choose how a table is ruled.',
+        choices: {
+          'hairline-rows': {
+            label: 'Hairline rows',
+            why: 'Rules the rows and the head at the hairline and draws no column rules.',
+          },
+          'ruled-head': {
+            label: 'Ruled head',
+            why: 'Closes the head with a strong rule and rules the rows at the hairline, with no column rules.',
+          },
+          'full-grid': {
+            label: 'Full grid',
+            why: 'Rules the rows and the columns at the hairline, with the head closed at the width the style sets.',
           },
         },
       },
@@ -239,6 +489,84 @@ export const PRESET_COPY = Object.freeze({
           'gazetteer-list': {
             label: 'Gazetteer list',
             why: 'Removes the grid and uses a compact place index. Use it when visitors choose a location before a time.',
+          },
+        },
+      },
+      longReadOpening: {
+        label: 'Long read opening',
+        prompt: 'Choose how the first paragraph of a Long read page opens.',
+        choices: {
+          'drop-cap': {
+            label: 'Drop cap',
+            why: 'Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.',
+          },
+          standfirst: {
+            label: 'Standfirst',
+            why: 'Sets the first paragraph at the lead size, as a summary of the page.',
+          },
+          plain: {
+            label: 'Plain',
+            why: 'Keeps the first paragraph at body size with no drop cap.',
+          },
+        },
+      },
+      quote: {
+        label: 'Quote device',
+        prompt: 'Choose how a quoted sentence is set.',
+        choices: {
+          'route-line': {
+            label: 'Route line',
+            why: 'Sets the quote beside one strong rule, like a route on the map, with the attribution in the monospaced font.',
+          },
+          'boxed-sign': {
+            label: 'Boxed sign',
+            why: 'Sets the quote between strong rules above and below with the strong rule at its start, like a sign.',
+          },
+        },
+      },
+      directory: {
+        label: 'Directory style',
+        prompt: 'Choose how the speaker shelf and the attendee index are set.',
+        choices: {
+          gazetteer: {
+            label: 'Gazetteer',
+            why: 'Sets square portraits with tight index rows, like a place index.',
+          },
+          'station-index': {
+            label: 'Station index',
+            why: 'Sets tall portraits and rules each entry at the strong width, like a departure board.',
+          },
+        },
+      },
+      sectionBoundary: {
+        label: 'Section boundary',
+        prompt: 'Choose how a section heading is ruled and labelled.',
+        choices: {
+          'rule-and-folio': {
+            label: 'Rule and folio',
+            why: 'Draws the section rule with the folio at the far end of the heading line.',
+          },
+          'rule-only': {
+            label: 'Rule only',
+            why: 'Draws the section rule and hides the folio beside the heading.',
+          },
+        },
+      },
+      tableRules: {
+        label: 'Table rules',
+        prompt: 'Choose how a table is ruled.',
+        choices: {
+          'hairline-rows': {
+            label: 'Hairline rows',
+            why: 'Rules the rows and the head at the hairline and draws no column rules.',
+          },
+          'ruled-head': {
+            label: 'Ruled head',
+            why: 'Closes the head with a strong rule and rules the rows at the hairline, with no column rules.',
+          },
+          'full-grid': {
+            label: 'Full grid',
+            why: 'Rules the rows and the columns at the hairline, with the head closed at the width the style sets.',
           },
         },
       },
@@ -310,6 +638,88 @@ export const PRESET_COPY = Object.freeze({
           on: {
             label: 'On',
             why: 'Shows one thin underline or note mark. It does not underline headings.',
+          },
+        },
+      },
+      longReadOpening: {
+        label: 'Long read opening',
+        prompt: 'Choose how the first paragraph of a Long read page opens.',
+        choices: {
+          'drop-cap': {
+            label: 'Drop cap',
+            why: 'Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.',
+          },
+          standfirst: {
+            label: 'Standfirst',
+            why: 'Sets the first paragraph at the lead size, as a summary of the page.',
+          },
+          plain: {
+            label: 'Plain',
+            why: 'Keeps the first paragraph at body size with no drop cap.',
+          },
+        },
+      },
+      quote: {
+        label: 'Quote device',
+        prompt: 'Choose how a quoted sentence is set.',
+        choices: {
+          'field-note': {
+            label: 'Field note',
+            why: 'Sets the quote beside one hairline, like a note in the margin of a field book.',
+          },
+          'pressed-page': {
+            label: 'Pressed page',
+            why: 'Centres the quote between hairlines with a large opening mark, like an epigraph.',
+          },
+        },
+      },
+      directory: {
+        label: 'Directory style',
+        prompt: 'Choose how the speaker shelf and the attendee index are set.',
+        choices: {
+          'specimen-plates': {
+            label: 'Specimen plates',
+            why: 'Sets tall portraits on the page ground with square corners, like mounted plates.',
+          },
+          'field-list': {
+            label: 'Field list',
+            why: 'Sets square portraits on the alternate ground with hairline rules.',
+          },
+        },
+      },
+      sectionBoundary: {
+        label: 'Section boundary',
+        prompt: 'Choose how a section heading is ruled and labelled.',
+        choices: {
+          'rule-and-folio': {
+            label: 'Rule and folio',
+            why: 'Draws the section rule with the folio at the far end of the heading line.',
+          },
+          'rule-only': {
+            label: 'Rule only',
+            why: 'Draws the section rule and hides the folio beside the heading.',
+          },
+          'folio-in-margin': {
+            label: 'Folio in the margin',
+            why: 'Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.',
+          },
+        },
+      },
+      tableRules: {
+        label: 'Table rules',
+        prompt: 'Choose how a table is ruled.',
+        choices: {
+          'hairline-rows': {
+            label: 'Hairline rows',
+            why: 'Rules the rows and the head at the hairline and draws no column rules.',
+          },
+          'ruled-head': {
+            label: 'Ruled head',
+            why: 'Closes the head with a strong rule and rules the rows at the hairline, with no column rules.',
+          },
+          'full-grid': {
+            label: 'Full grid',
+            why: 'Rules the rows and the columns at the hairline, with the head closed at the width the style sets.',
           },
         },
       },
@@ -385,6 +795,88 @@ export const PRESET_COPY = Object.freeze({
           on: {
             label: 'On',
             why: 'Shows up to two small marks and one callout on a page. It does not mark headline words.',
+          },
+        },
+      },
+      longReadOpening: {
+        label: 'Long read opening',
+        prompt: 'Choose how the first paragraph of a Long read page opens.',
+        choices: {
+          'drop-cap': {
+            label: 'Drop cap',
+            why: 'Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.',
+          },
+          standfirst: {
+            label: 'Standfirst',
+            why: 'Sets the first paragraph at the lead size, as a summary of the page.',
+          },
+          plain: {
+            label: 'Plain',
+            why: 'Keeps the first paragraph at body size with no drop cap.',
+          },
+        },
+      },
+      quote: {
+        label: 'Quote device',
+        prompt: 'Choose how a quoted sentence is set.',
+        choices: {
+          handwritten: {
+            label: 'Handwritten',
+            why: 'Sets the quote in the script typeface at a small angle between strong rules.',
+          },
+          'toner-block': {
+            label: 'Toner block',
+            why: 'Sets the quote in the poster typeface, level, between strong rules.',
+          },
+          'cut-out': {
+            label: 'Cut-out',
+            why: 'Sets the quote in the script typeface beside one strong rule, with no rules above or below.',
+          },
+        },
+      },
+      directory: {
+        label: 'Directory style',
+        prompt: 'Choose how the speaker shelf and the attendee index are set.',
+        choices: {
+          'contact-sheet': {
+            label: 'Contact sheet',
+            why: 'Sets square portraits with square corners between strong rules.',
+          },
+          'cut-outs': {
+            label: 'Cut-outs',
+            why: 'Sets tall portraits on the page ground with square corners and hairline rules.',
+          },
+        },
+      },
+      sectionBoundary: {
+        label: 'Section boundary',
+        prompt: 'Choose how a section heading is ruled and labelled.',
+        choices: {
+          'rule-and-folio': {
+            label: 'Rule and folio',
+            why: 'Draws the section rule with the folio at the far end of the heading line.',
+          },
+          'rule-only': {
+            label: 'Rule only',
+            why: 'Draws the section rule and hides the folio beside the heading.',
+          },
+        },
+      },
+      tableRules: {
+        label: 'Table rules',
+        prompt: 'Choose how a table is ruled.',
+        choices: {
+          'hairline-rows': {
+            label: 'Hairline rows',
+            why: 'Rules the rows and the head at the hairline and draws no column rules.',
+          },
+          'ruled-head': {
+            label: 'Ruled head',
+            why: 'Closes the head with a strong rule and rules the rows at the hairline, with no column rules.',
+          },
+          'full-grid': {
+            label: 'Full grid',
+            why: 'Rules the rows and the columns at the hairline, with the head closed at the width the style sets.',
           },
         },
       },

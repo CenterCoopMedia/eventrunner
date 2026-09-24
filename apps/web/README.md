@@ -27,6 +27,7 @@ the committed **synthetic snapshot** in `src/generated/`:
 | `pagesData.js` | pages-as-data, routed at each page's own root-level `path` |
 | `scheduleData.js` | schedule days/sessions |
 | `organizationsData.js` | speakers/sponsors |
+| `timelineData.js` | past editions for the home page's History section |
 
 Four providers then overlay live Firestore data on top of that snapshot,
 outermost first:
@@ -38,7 +39,8 @@ EventConfigProvider          — subscribes to config/{event,features,theme,badg
       ContentProvider         — subscribes to published (or draft) CMS collections
         ToastProvider
           <Routes>             — Home, Schedule (/schedule, /schedule/mine,
-                                 /schedule/:sessionId), Speakers, Sponsors,
+                                 /schedule/:sessionId), Speakers, Sponsors
+                                 (/sponsors, /sponsors/:slug),
                                  /signin, /profile, /attendees,
                                  /attendees/:uid, catch-all (cmsPages)
 ```
@@ -51,6 +53,16 @@ that overrides the same custom properties `theme.css` defines, so a live
 `App.jsx` derives it from the `?preview=1` query param — convenience only;
 `firestore.rules` is the actual control on who may read `*_drafts`.
 
+Section edit links (issue #198) are convenience too.
+`components/SectionEditLink.jsx` draws "Edit section" beside each section a
+public page draws, and only while `AuthContext` reports `adminStatus` as
+`'admin'`. The link opens `/admin/content/<page>/<section>`, where
+`AdminGate`, the tier check in the admin shell, `requireAdmin` and
+`firestore.rules` decide every read and write as before. The component
+imports nothing under `src/admin`, so the public first paint carries one link
+and no editor. `scripts/ci/bundle-budget.test.cjs` fails if the first-paint
+source graph reaches a file under `src/admin`.
+
 Every subscription is fail-soft: a listener error is logged and the app
 keeps rendering the last-known (snapshot or previously-live) values rather
 than blanking the page.
@@ -61,6 +73,19 @@ query choice, not a permission: `firestore.rules` grant `attendees_only`
 profiles solely to a requester whose own `users` doc shows approved,
 speaker, or admin (spec §3.4), so a wrong guess costs a failed query, never
 a leaked profile.
+
+`AuthProvider` exposes `adminStatus` and `adminTier` (issue #186). Both come
+from rules probes, not from a readable allowlist: a `cmsContent_drafts`
+read that succeeds means admin, and an `admin_logs` read that succeeds
+means operator rather than staff. The admin shell reads the tier in one
+place: every entry in `DOCKET` (`src/admin/AdminLayout.jsx`) declares the
+tier it needs, the rail draws only the sections the signed-in tier may
+reach, and the layout refuses the route of any other (the segment is
+percent-decoded and lowercased first, the way the router matches it, and a
+path no staff section owns is the operator's). A new admin page declares
+its tier by its docket entry and nowhere else, and `TIER_SCOPE` names each
+tier's sections from the docket for every sentence that describes a tier;
+the server's `requireAdmin` tier option and the rules are the enforcement.
 
 ## Dev loop
 
@@ -206,6 +231,20 @@ font CDN is ever requested at runtime — `theme.css` and the generated
 Per-event branding overrides these once an event is seeded; until then the
 shell stays event-neutral.
 
+Two raster placeholders sit beside them: `app-icon-192.png` and
+`app-icon-512.png`, the app icons `public/manifest.webmanifest` lists. They
+are drawn from the default mark's numbers, not converted from the SVG. The
+publish and deploy scripts replace them with an uploaded square PNG icon
+when there is one (`scripts/lib/app-icons.cjs`).
+
+After a change to `mark.svg`, a unit test fails until you do these steps in
+order:
+
+1. Update `PLACEHOLDER_MARK` in `scripts/lib/app-icons.cjs` to match the new
+   `mark.svg`. If the shapes change, update `renderPlaceholderIcon` too.
+2. Run `node scripts/dev/build-app-icons.mjs`.
+3. Commit both PNGs with the change.
+
 ## Testing
 
 ```bash
@@ -238,8 +277,14 @@ attempting a network fetch.
 `node scripts/dev/login-smoke.mjs` above covers OTP sign-in on its own; the
 repo-root [`e2e/`](../../e2e/) Playwright suite (`npm run test:e2e`, spec
 §8.1, issue #38) covers that plus the other three critical journeys — admin
-CMS edit → publish → public, speaker invite → accept → wizard, ticket claim
-→ approved → bookmark — against the same emulator/dev-server combination,
+CMS edit → publish → public → version history, speaker invite → accept → wizard, ticket claim
+→ approved → bookmark — the updates editor (issues #190 and #191: an
+update written and saved as a draft in the admin stays off the public Updates
+page until the editor publishes it, and then leads the page as the featured
+update with its category tag), and the timeline journey (`e2e/cms-timeline.spec.js`:
+an entry published from the admin editor appears on an open home page with
+no reload, and with every listener held the first render of the home page
+already lists the snapshot editions) against the same emulator/dev-server combination,
 seeded from `scripts/init-event.cjs` + `scripts/seed-demo-event.cjs`. See
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full test command
 table.

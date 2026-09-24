@@ -103,6 +103,7 @@ A visitor can reach and read every page the seed creates, and the site presents 
 - [x] Add an uploaded venue map with labelled rooms (#159)
 - [x] Add search and a section index to long content pages (#160)
 - [x] Add a session recording link field (#161)
+- [x] Add raster app icons to the web manifest (#218)
 
 Follow-ups filed while the milestone ran, carried into later milestones rather
 than held against M7: #218, #219, #226, #227, #230, #231, #233, #234, #236.
@@ -121,7 +122,8 @@ pull request stacked on the wave below.
 - [x] Wave 1: the state grammar, the motion grammar and its test, eight shared
       controls, the stage and measure width system, the specimen book and its
       capture script; closed #219, #233, #236 (#254)
-- [ ] Wave 2: text, feedback and input devices; block types; option groups
+- [x] Wave 2: text, feedback and input devices; the fact and quote blocks (closed #234);
+      five option groups on every style
 - [ ] Wave 3: four illustration sets (a first pass sits on its branch)
 - [ ] Wave 4: schedule devices on the schedule (#162 to #167) and the dashboard
       shells (#168, #210)
@@ -153,32 +155,32 @@ An attendee can find a session, build a personal schedule, and take it with them
 
 An organizer can see how the event is going and act on it without leaving the admin.
 
-- [ ] Add a server side event statistics endpoint (#178)
-- [ ] Add the admin overview page (#179)
-- [ ] Add milestones and goals to the event settings (#180)
-- [ ] Add the registration funnel and content readiness panels (#181)
-- [ ] Add session popularity to the admin (#182)
-- [ ] Add the outbound email log (#183)
-- [ ] Add attendee export (#184)
-- [ ] Extend attendee administration (#185)
-- [ ] Add operator and staff admin tiers (#186)
-- [ ] Add the admin access page (#187)
-- [ ] Add the change request queue (#188)
-- [ ] Add bulk material download and coverage tracking to the materials page (#189)
+- [x] Add a server side event statistics endpoint (#178)
+- [x] Add the admin overview page (#179)
+- [x] Add milestones and goals to the event settings (#180)
+- [x] Add the registration funnel and content readiness panels (#181)
+- [x] Add session popularity to the admin (#182)
+- [x] Add the outbound email log (#183)
+- [x] Add attendee export (#184)
+- [x] Extend attendee administration (#185)
+- [x] Add operator and staff admin tiers (#186)
+- [x] Add the admin access page (#187)
+- [x] Add the change request queue (#188)
+- [x] Add bulk material download and coverage tracking to the materials page (#189)
 
 ### M10: CMS editors and publishing
 
 Every collection the site renders can be edited and published from the admin.
 
-- [ ] Add the updates editor (#190)
-- [ ] Add an update category and featured flag (#191)
-- [ ] Add the organizations editor (#192)
-- [ ] Add a sponsor detail page and package blocks (#193)
-- [ ] Add the timeline editor and the history section (#194)
-- [ ] Add the version history page (#195)
-- [ ] Add the pending changes page and banner (#196)
+- [x] Add the updates editor (#190)
+- [x] Add an update category and featured flag (#191)
+- [x] Add the organizations editor (#192)
+- [x] Add a sponsor detail page and package blocks (#193)
+- [x] Add the timeline editor and the history section (#194)
+- [x] Add the version history page (#195)
+- [x] Add the pending changes page and banner (#196)
 - [ ] Add rich text editing for rich text fields (#197)
-- [ ] Add an editor tour and section edit links (#198)
+- [x] Add an editor tour and section edit links (#198)
 
 ### M11: Communication, social, and billing
 

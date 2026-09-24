@@ -14,6 +14,7 @@ import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import UpdateContent, { UpdateImage } from '../components/UpdateContent.jsx';
 import EmptyState from '../components/EmptyState.jsx';
+import { Dateline } from '../components/editorial/Byline.jsx';
 import { publishDateLabel, toPublishDate } from '../lib/updateDates.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
@@ -33,7 +34,7 @@ function NotFoundState() {
 
 export default function UpdateDetail() {
   const { id } = useParams();
-  const { features } = useEventConfig();
+  const { features, eventConfig } = useEventConfig();
   const { updates } = useContent();
 
   if (!features.updates) {
@@ -53,7 +54,8 @@ export default function UpdateDetail() {
   const update = updates.find((u) => u.id === id && u.visible !== false);
   if (!update) return <NotFoundState />;
 
-  const dateLabel = publishDateLabel(update.publishAt);
+  // On the event's clock (design record §3.1), never the reader's.
+  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone);
   const dateInstant = toPublishDate(update.publishAt);
 
   return (
@@ -65,10 +67,10 @@ export default function UpdateDetail() {
       </p>
       <header>
         <h1 className="font-heading text-h1 font-semibold text-text-primary">{update.title}</h1>
+        {/* The dateline device: the day the update was published, under
+            the title and never above it. */}
         {dateLabel ? (
-          <p className="mt-2xs font-data text-caption text-text-secondary">
-            <time dateTime={dateInstant.toISOString()}>{dateLabel}</time>
-          </p>
+          <Dateline className="mt-2xs" dateTime={dateInstant.toISOString()} label={dateLabel} />
         ) : null}
       </header>
       {update.featuredImage ? <div className="mt-lg"><UpdateImage image={update.featuredImage} /></div> : null}

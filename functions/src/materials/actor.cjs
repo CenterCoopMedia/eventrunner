@@ -11,11 +11,12 @@
  * `requireAttendeeAccess`.
  *
  * Resolves admin status via `requireAdmin`'s verified-email-against-
- * `config/bootstrap.adminEmails` check (NOT `requireAttendeeAccess`'s
- * bootstrap-admin fallback, which needs a `users/{uid}` doc to already
- * exist) so an admin who happens not to be a registered attendee can still
- * manage materials. `speakerId` is read directly off `users/{uid}` —
- * `requireAttendeeAccess` deliberately does not expose it.
+ * `config/bootstrap` check at the staff tier — materials are staff work,
+ * so either tier counts (NOT `requireAttendeeAccess`'s bootstrap-admin
+ * fallback, which needs a `users/{uid}` doc to already exist) so an admin
+ * who happens not to be a registered attendee can still manage materials.
+ * `speakerId` is read directly off `users/{uid}` — `requireAttendeeAccess`
+ * deliberately does not expose it.
  */
 
 const { verifyAuthToken, requireAdmin } = require('../core/auth.cjs');
@@ -24,14 +25,14 @@ const { verifyAuthToken, requireAdmin } = require('../core/auth.cjs');
  * @param {{ auth: object, db: object, getConfig: () => Promise<object> }} deps
  * @param {object} req
  * @returns {Promise<{ ok: true, uid: string, isAdmin: boolean, speakerId: string|null } |
- *                    { ok: false, status: 401|403, code: string, message: string }>}
+ *                    { ok: false, status: 401|403|500, code: string, message: string }>}
  */
 async function resolveActor({ auth, db, getConfig }, req) {
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded?.uid) {
     return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
   }
-  return loadActorForUid({ auth, db, getConfig }, req, decoded.uid);
+  return loadActorForUid({ auth, db, getConfig }, req, decoded.uid, { strict: true });
 }
 
 /**
@@ -55,8 +56,12 @@ async function resolveActorOptional({ auth, db, getConfig }, req) {
   return loadActorForUid({ auth, db, getConfig }, req, decoded.uid);
 }
 
-async function loadActorForUid({ auth, db, getConfig }, req, uid) {
-  const adminVerdict = await requireAdmin({ auth, getConfig }, req);
+async function loadActorForUid({ auth, db, getConfig }, req, uid, { strict = false } = {}) {
+  const adminVerdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
+  // A failed bootstrap read (500) is surfaced on a write, where "not an
+  // admin" would be a lie; the optional read treats it as not-admin so an
+  // anonymous fetch of a past session's material still works.
+  if (!adminVerdict.ok && adminVerdict.status === 500 && strict) return adminVerdict;
   const isAdmin = adminVerdict.ok === true;
 
   const snap = await db.collection('users').doc(uid).get();

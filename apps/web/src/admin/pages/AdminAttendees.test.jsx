@@ -1,7 +1,7 @@
 // AdminAttendees — the registration tab (issue #32, spec §3.4). Mocks
 // adminApi and adminSource directly, same convention as AdminFeedback.test.jsx.
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 let rowsCallback;
 vi.mock('../adminSource.js', () => ({
@@ -16,6 +16,9 @@ vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
 
 const showToastMock = vi.fn();
 vi.mock('../../contexts/ToastContext.jsx', () => ({ useToast: () => ({ showToast: showToastMock }) }));
+
+const saveTextFileMock = vi.fn();
+vi.mock('../downloadFile.js', () => ({ saveTextFile: (...args) => saveTextFileMock(...args) }));
 
 import AdminAttendees from './AdminAttendees.jsx';
 
@@ -167,3 +170,298 @@ describe('AdminAttendees', () => {
     expect(screen.getByText('No attendees')).toBeInTheDocument();
   });
 });
+
+// Export (issue 184): the title band's one action, over the rows on screen.
+describe('AdminAttendees export', () => {
+  const three = () => [
+    row({ id: 'uid-cy', displayName: 'Cy Marsh', email: 'cy@example.com', registrationStatus: 'approved' }),
+    row(),
+    row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com', registrationStatus: 'approved' }),
+  ];
+  const exportButton = () => screen.getByRole('button', { name: /^Export \d+ attendees?$|^Exporting…$/ });
+
+  it('renders once the list has loaded, and counts the rows on screen', () => {
+    render(<AdminAttendees />);
+    expect(screen.queryByRole('button', { name: /^Export/ })).toBeNull();
+
+    pushRows(three());
+    expect(exportButton()).toHaveTextContent('Export 3 attendees');
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
+    expect(exportButton()).toHaveTextContent('Export 2 attendees');
+
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bo@' } });
+    expect(exportButton()).toHaveTextContent('Export 1 attendee');
+  });
+
+  it('is natively disabled at zero rows and says so', () => {
+    render(<AdminAttendees />);
+    pushRows([]);
+    expect(exportButton()).toHaveTextContent('Export 0 attendees');
+    expect(exportButton()).toBeDisabled();
+  });
+
+  it('sends the shown uids in screen order with the filter, and never the search text', async () => {
+    callMock.mockClear();
+    callMock.mockResolvedValueOnce({ filename: 'attendees-2026-09-23.csv', csv: 'x', rowCount: 2, skipped: 0 });
+    render(<AdminAttendees />);
+    pushRows(three());
+
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'approved' } });
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '  example  ' } });
+    fireEvent.click(exportButton());
+    await act(async () => { await Promise.resolve(); });
+
+    expect(callMock).toHaveBeenCalledTimes(1);
+    const [name, body] = callMock.mock.calls[0];
+    expect(name).toBe('exportAttendees');
+    // Sorted by name, as the page lists them.
+    expect(body).toEqual({ uids: ['uid-bo', 'uid-cy'], filter: { status: 'approved', searched: true } });
+    expect(JSON.stringify(body)).not.toContain('example');
+  });
+
+  it('reports a blank search as no search', async () => {
+    callMock.mockClear();
+    callMock.mockResolvedValueOnce({ filename: 'attendees-2026-09-23.csv', csv: 'x', rowCount: 3, skipped: 0 });
+    render(<AdminAttendees />);
+    pushRows(three());
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: '   ' } });
+    fireEvent.click(exportButton());
+    await act(async () => { await Promise.resolve(); });
+    expect(callMock.mock.calls[0][1].filter).toEqual({ status: 'all', searched: false });
+  });
+
+  it('is busy and disabled in flight, saves the file, and states the result in place', async () => {
+    callMock.mockClear();
+    saveTextFileMock.mockClear();
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    render(<AdminAttendees />);
+    pushRows(three());
+
+    fireEvent.click(exportButton());
+    const busy = screen.getByRole('button', { name: 'Exporting…' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    // A second press while the first is in flight writes no second row.
+    fireEvent.click(busy);
+    expect(callMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      finish({ filename: 'attendees-2026-09-23.csv', csv: '\uFEFF"Name"\r\n', rowCount: 3, skipped: 0 });
+    });
+
+    expect(saveTextFileMock).toHaveBeenCalledWith('attendees-2026-09-23.csv', '\uFEFF"Name"\r\n');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Exported 3 attendees to attendees-2026-09-23.csv. The export is in the admin log.',
+    );
+    expect(exportButton()).toHaveTextContent('Export 3 attendees');
+    expect(exportButton()).toBeEnabled();
+    expect(exportButton()).not.toHaveAttribute('aria-busy');
+
+    // The result stays while the list moves under it.
+    pushRows(three().slice(0, 2));
+    expect(screen.getByRole('status')).toHaveTextContent('Exported 3 attendees');
+  });
+
+  it('shows a refusal in the server’s words and saves nothing', async () => {
+    callMock.mockClear();
+    saveTextFileMock.mockClear();
+    callMock.mockRejectedValueOnce(new Error('uids: at most 10,000 attendees per export. Narrow the filter.'));
+    render(<AdminAttendees />);
+    pushRows(three());
+
+    fireEvent.click(exportButton());
+    await act(async () => { await Promise.resolve(); });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'uids: at most 10,000 attendees per export. Narrow the filter.',
+    );
+    expect(saveTextFileMock).not.toHaveBeenCalled();
+    expect(exportButton()).toBeEnabled();
+  });
+});
+
+// The organizer record (issue 185): the panel under a row, and a delete's
+// result stated at page level, where it outlives the row.
+describe('AdminAttendees record and delete', () => {
+  const INCOMPLETE = 'The account is out of the directory. Some of its data could not be cleared. Try again.';
+
+  function incompleteError() {
+    return Object.assign(new Error(INCOMPLETE), { code: 'delete-incomplete', status: 500 });
+  }
+
+  async function deleteFromPanel(name = 'Ada Lovelace') {
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit record' })[0]);
+    expect(screen.getByRole('region', { name: `Record for ${name}` })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));
+    await act(async () => { await Promise.resolve(); });
+  }
+
+  it('shows past attendance as a meta line on the row face', () => {
+    render(<AdminAttendees />);
+    pushRows([row({ pastAttendance: ['2024', '2025'] }), row({ id: 'uid-bo', displayName: 'Bo Reyes' })]);
+    const items = screen.getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Past attendance: 2024; 2025');
+    expect(items[1]).not.toHaveTextContent('Past attendance');
+  });
+
+  it('opens one record at a time', () => {
+    render(<AdminAttendees />);
+    pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+    const [adaToggle, boToggle] = screen.getAllByRole('button', { name: 'Edit record' });
+
+    fireEvent.click(adaToggle);
+    expect(adaToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('region', { name: 'Record for Ada Lovelace' })).toBeInTheDocument();
+
+    fireEvent.click(boToggle);
+    expect(adaToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(boToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('region', { name: 'Record for Ada Lovelace' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Record for Bo Reyes' })).toBeInTheDocument();
+  });
+
+  it('states a completed delete at page level and moves focus to it once the row has left', async () => {
+    callMock.mockReset();
+    callMock.mockResolvedValueOnce({ ok: true, uid: 'uid-ada', removed: {} });
+    render(<AdminAttendees />);
+    pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+    await deleteFromPanel();
+    expect(callMock).toHaveBeenCalledWith('deleteAttendee', { uid: 'uid-ada' });
+
+    // The listener drops the row.
+    pushRows([row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+    const done = screen.getByText('Deleted the account for Ada Lovelace.');
+    expect(done).toHaveAttribute('role', 'status');
+    expect(document.activeElement).toBe(done);
+    expect(screen.queryByText('Ada Lovelace')).toBeNull();
+  });
+
+  it('keeps a delete-incomplete notice and a retry after the row leaves; the retry deletes the kept uid', async () => {
+    callMock.mockReset();
+    callMock.mockRejectedValueOnce(incompleteError());
+    render(<AdminAttendees />);
+    pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+    await deleteFromPanel();
+    // The account left the directory, so the listener drops the row.
+    pushRows([row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(`Ada Lovelace: ${INCOMPLETE}`);
+    expect(document.activeElement).toBe(alert.parentElement);
+    const retry = screen.getByRole('button', { name: 'Try the delete again' });
+
+    // A retry that fails again keeps the notice and the retry.
+    callMock.mockRejectedValueOnce(incompleteError());
+    fireEvent.click(retry);
+    await act(async () => { await Promise.resolve(); });
+    expect(callMock).toHaveBeenLastCalledWith('deleteAttendee', { uid: 'uid-ada' });
+    expect(screen.getByRole('button', { name: 'Try the delete again' })).toBeInTheDocument();
+
+    // A retry that succeeds replaces it with the stated result.
+    let finish;
+    callMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try the delete again' }));
+    const busy = screen.getByRole('button', { name: 'Deleting…' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    await act(async () => { finish({ ok: true, uid: 'uid-ada', removed: {} }); });
+
+    expect(callMock).toHaveBeenCalledTimes(3);
+    expect(callMock.mock.calls.every(([name, body]) => name === 'deleteAttendee' && body.uid === 'uid-ada')).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByText('Deleted the account for Ada Lovelace.'));
+  });
+
+  it('treats a 404 on the retry as done: nothing of the account remains', async () => {
+    callMock.mockReset();
+    callMock.mockRejectedValueOnce(incompleteError());
+    render(<AdminAttendees />);
+    pushRows([row()]);
+    await deleteFromPanel();
+    pushRows([]);
+
+    callMock.mockRejectedValueOnce(Object.assign(new Error('No such account.'), { code: 'not-found', status: 404 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try the delete again' }));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(screen.getByText('Deleted the account for Ada Lovelace.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+  });
+
+  // Review finding: phase 1 deletes users/{uid} before the sweep runs, so
+  // the listener drops the row, and the panel with it, while the call is
+  // still running. A failure the server did not shape (a gateway timeout,
+  // a dropped connection) must still leave the retry on the page.
+  for (const [label, error] of [
+    ['a gateway timeout', { code: 'unknown', status: 504, message: 'Something went wrong. Try again.' }],
+    ['a dropped connection', {
+      code: 'network', status: 0, message: 'We could not reach the server. Check your connection and try again.',
+    }],
+  ]) {
+    it(`keeps the retry when the call fails with ${label} after the row has left`, async () => {
+      callMock.mockReset();
+      let fail;
+      callMock.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+      render(<AdminAttendees />);
+      pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+
+      await deleteFromPanel();
+      // Phase 1 committed: the listener drops the row while the call runs.
+      pushRows([row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+      await act(async () => { fail(Object.assign(new Error(error.message), error)); });
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Ada Lovelace');
+      expect(alert).toHaveTextContent(error.message);
+      expect(document.activeElement).toBe(alert.parentElement);
+
+      callMock.mockResolvedValueOnce({ ok: true, uid: 'uid-ada', removed: {} });
+      fireEvent.click(screen.getByRole('button', { name: 'Try the delete again' }));
+      await act(async () => { await Promise.resolve(); });
+
+      expect(callMock).toHaveBeenLastCalledWith('deleteAttendee', { uid: 'uid-ada' });
+      expect(screen.getByText('Deleted the account for Ada Lovelace.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+    });
+  }
+
+  it('states a refusal made before anything was deleted in the row’s own panel, with focus', async () => {
+    callMock.mockReset();
+    callMock.mockRejectedValueOnce(Object.assign(
+      new Error('This account is linked to a speaker. Delete the speaker record first.'),
+      { code: 'speaker-linked', status: 409 },
+    ));
+    render(<AdminAttendees />);
+    pushRows([row()]);
+
+    await deleteFromPanel();
+
+    const panel = screen.getByRole('region', { name: 'Record for Ada Lovelace' });
+    const alert = within(panel).getByRole('alert');
+    expect(alert).toHaveTextContent('This account is linked to a speaker.');
+    expect(document.activeElement).toBe(alert.parentElement);
+    expect(screen.queryByRole('button', { name: 'Try the delete again' })).toBeNull();
+  });
+
+  it('a pre-commit refusal for a row that is no longer listed still reaches the page with a retry', async () => {
+    callMock.mockReset();
+    let fail;
+    callMock.mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+    render(<AdminAttendees />);
+    pushRows([row()]);
+    await deleteFromPanel();
+    pushRows([]);
+    await act(async () => {
+      fail(Object.assign(new Error('Admin access could not be checked. Try again.'), { code: 'internal', status: 500 }));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Admin access could not be checked. Try again.');
+    expect(screen.getByRole('button', { name: 'Try the delete again' })).toBeInTheDocument();
+  });
+});
+

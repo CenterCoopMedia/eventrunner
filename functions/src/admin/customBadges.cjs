@@ -81,7 +81,7 @@ function createRemoveUserCustomBadgeHandler({ db, auth, getConfig, now = () => n
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
-    const verdict = await requireAdmin({ auth, getConfig }, req);
+    const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!verdict.ok) return sendError(res, verdict.status, verdict.code, verdict.message);
 
     const uid = readUid(req.body?.uid);

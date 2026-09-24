@@ -208,6 +208,54 @@ function rollDateForward(dateStr) {
 }
 
 /**
+ * Whether a string is a real calendar date, `YYYY-MM-DD`. The shape alone is
+ * not enough: '2026-13-01' has the shape and makes an invalid Date, which
+ * Intl throws on — and config/event is runtime data, so it may say anything.
+ *
+ * @param {unknown} date
+ * @returns {boolean}
+ */
+export function isCalendarDate(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(date)) return false;
+  const [y, m, d] = date.split('-').map(Number);
+  const instant = new Date(Date.UTC(y, m - 1, d));
+  return instant.getUTCFullYear() === y && instant.getUTCMonth() === m - 1 && instant.getUTCDate() === d;
+}
+
+/**
+ * The event's dates as one range, from config/event.days: "October 15, 2026",
+ * "October 15–17, 2026", "October 30 – November 1, 2026" or "December 31,
+ * 2026 – January 2, 2027". Null when no day carries a date.
+ *
+ * The days are calendar dates, not instants, so they are formatted as the
+ * wall dates they are (in UTC, so no zone can move them). The seed writes the
+ * same range into the home page's When fact (scripts/lib/seed.cjs
+ * eventDateRange); this is what the page shows in its place while that fact
+ * is still the seed's, so a changed date never leaves a stale fact.
+ *
+ * @param {object} eventConfig
+ * @returns {string|null}
+ */
+export function eventDateRangeLabel(eventConfig) {
+  const dates = (Array.isArray(eventConfig?.days) ? eventConfig.days : [])
+    .map((day) => day?.date)
+    .filter(isCalendarDate)
+    .sort();
+  if (dates.length === 0) return null;
+  const first = new Date(`${dates[0]}T00:00:00Z`);
+  const last = new Date(`${dates[dates.length - 1]}T00:00:00Z`);
+  const full = new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+    month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+  });
+  if (dates[0] === dates[dates.length - 1]) return full.format(first);
+  const monthDay = new Intl.DateTimeFormat(DISPLAY_LOCALE, { month: 'long', day: 'numeric', timeZone: 'UTC' });
+  const sameYear = first.getUTCFullYear() === last.getUTCFullYear();
+  const sameMonth = sameYear && first.getUTCMonth() === last.getUTCMonth();
+  if (sameMonth) return `${monthDay.format(first)}–${last.getUTCDate()}, ${last.getUTCFullYear()}`;
+  return `${(sameYear ? monthDay : full).format(first)} – ${full.format(last)}`;
+}
+
+/**
  * A configured day's date as display copy ("Thursday, October 15"),
  * evaluated on the event's wall clock. Null when unresolvable.
  */

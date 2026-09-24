@@ -22,6 +22,7 @@ import ChunkErrorBoundary from './components/ChunkErrorBoundary.jsx';
 import DeferredPage from './components/DeferredPage.jsx';
 import { clearReloadFlag } from './lib/chunkReload.js';
 import { SPECIMEN_ENABLED, SPECIMEN_PATH } from './pages/specimen/specimenRoute.js';
+import { loadPresetRemaps } from './lib/presetRemaps.js';
 
 // Code-split the admin CMS out of the public bundle (issue #95): AdminApp
 // and everything under src/admin/pages pull in the entire content-editing
@@ -29,10 +30,15 @@ import { SPECIMEN_ENABLED, SPECIMEN_PATH } from './pages/specimen/specimenRoute.
 // weight out of the chunk every visitor downloads on first paint.
 // A load that succeeds spends the one-reload budget in lib/chunkReload.js, so
 // the next deploy this tab lives through gets its own single recovery reload.
-const AdminApp = lazy(() => import('./admin/AdminApp.jsx').then((module) => {
-  clearReloadFlag();
-  return module;
-}));
+// The admin resolves styles on every branding surface — the theme editor,
+// the preview, the fallback warnings — so the preset remaps
+// (lib/presetRemaps.js) load alongside its chunk rather than inside it.
+const AdminApp = lazy(() =>
+  Promise.all([import('./admin/AdminApp.jsx'), loadPresetRemaps()]).then(([module]) => {
+    clearReloadFlag();
+    return module;
+  }),
+);
 
 function lazyPage(importer) {
   return lazy(() =>
@@ -105,7 +111,7 @@ export function AppRoutes() {
         <Route path="speakers" element={<DeferredPage component={Speakers} label="speakers" />} />
         <Route path="speakers/:slug" element={<DeferredPage component={SpeakerDetail} label="speaker" />} />
         <Route path="sponsors" element={<DeferredPage component={Sponsors} label="sponsors" />} />
-        <Route path="sponsors/:id" element={<DeferredPage component={SponsorDetail} label="sponsor" />} />
+        <Route path="sponsors/:slug" element={<DeferredPage component={SponsorDetail} label="sponsor" />} />
         <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
         <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
         <Route path="signin" element={<DeferredPage component={Login} label="sign in" />} />

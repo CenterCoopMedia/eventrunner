@@ -5,16 +5,49 @@ service cloud.firestore {
     // All writes go through the Admin SDK (callable/HTTP functions);
     // clients never write Firestore directly.
 
-    // adminEmails on config/bootstrap MUST be stored lowercase: rules can
-    // lowercase the token email (string.lower()) but cannot map over the
-    // stored list, so the lowercase-storage convention carries the other
-    // half of the case-insensitive match (server-side requireAdmin
-    // lowercases both sides).
-    function isAdmin() {
+    // TWO ADMIN TIERS (issue #186), read from the two lists on
+    // config/bootstrap. `adminEmails` is the operator tier — the name
+    // predates the split and is kept so every existing deployment keeps
+    // full access with no migration. `staffEmails` is the staff tier, and
+    // is read with a default because a deployment set up before the split
+    // has no such field: a missing list is "nobody is staff", never a rule
+    // error. An address on either list is an admin; an address on both is
+    // an operator. functions/src/core/auth.cjs resolveAdminTier is the
+    // server's copy of this predicate.
+    //
+    // Both lists MUST be stored lowercase: rules can lowercase the token
+    // email (string.lower()) but cannot map over the stored list, so the
+    // lowercase-storage convention carries the other half of the
+    // case-insensitive match (server-side requireAdmin lowercases both
+    // sides, and setAdminAccess lowercases on write).
+    //
+    // Cost: one document read per admin-gated evaluation. Firestore caches
+    // repeated get() calls of the same path within one evaluation, so
+    // `isOperator() || isStaff()` reads bootstrap once, not twice.
+    function isVerifiedSignIn() {
       return request.auth != null
-        && request.auth.token.email_verified == true
-        && get(/databases/$(database)/documents/config/bootstrap)
-             .data.adminEmails.hasAny([request.auth.token.email.lower()]);
+        && request.auth.token.email_verified == true;
+    }
+
+    function bootstrapAllowlist(field) {
+      return get(/databases/$(database)/documents/config/bootstrap)
+        .data.get(field, []);
+    }
+
+    function isOperator() {
+      return isVerifiedSignIn()
+        && bootstrapAllowlist('adminEmails').hasAny([request.auth.token.email.lower()]);
+    }
+
+    function isStaff() {
+      return isVerifiedSignIn()
+        && bootstrapAllowlist('staffEmails').hasAny([request.auth.token.email.lower()]);
+    }
+
+    // Either tier. Every content, people, and operations collection below
+    // reads on this; only the operator-tier collections say isOperator().
+    function isAdmin() {
+      return isOperator() || isStaff();
     }
 
     // config/* is public runtime configuration, EXCEPT config/bootstrap,
@@ -99,8 +132,16 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+    // admin_logs is the audit trail, and it is the OPERATOR tier's: it
+    // records who granted and revoked admin access, alongside every other
+    // admin action. That makes it the one client-readable collection the
+    // two tiers differ on, which is also how the browser learns which tier
+    // it holds — AuthContext.jsx probes this collection after the drafts
+    // probe, exactly as it learns admin-ness from cmsContent_drafts. A
+    // change to this rule changes what the docket shows; the rules tests
+    // pin both tiers on it.
     match /admin_logs/{docId} {
-      allow read: if isAdmin();
+      allow read: if isOperator();
       allow write: if false;
     }
 
@@ -403,6 +444,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Change requests (issue #188): admin-readable, either tier, for the
+    // admin page's listener; never client-written. submitChangeRequest,
+    // updateChangeRequestStatus and deleteChangeRequest write it through
+    // the Admin SDK, each with its admin_logs row. A requester cannot read
+    // their own request: only the event team reads the text.
+    match /change_requests/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // media_assets: the index of uploaded Storage objects behind the media
     // library (spec §4.1, §8.5). Admin-readable so the library can list and
     // search without a callable per keystroke; never client-written — every
@@ -451,6 +502,7 @@ service cloud.firestore {
     match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }
     match /feedback_rate_limits/{docId} { allow read, write: if false; }
+    match /change_request_rate_limits/{docId} { allow read, write: if false; }
     // Slug reservations (`speaker_slugs/{slug}` → `{ speakerId }`), the
     // deterministic-id lock that makes speaker slug uniqueness atomic
     // (functions/src/speakers/profile.cjs). Pure bookkeeping: nothing

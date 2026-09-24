@@ -8,7 +8,7 @@
 // defensively, independent of the write-boundary fix in
 // packages/shared/src/config/schema.cjs.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render as testingRender, screen } from '@testing-library/react';
+import { cleanup, render as testingRender, screen, within } from '@testing-library/react';
 
 import { MemoryRouter } from 'react-router-dom';
 const render = (ui) => testingRender(<MemoryRouter>{ui}</MemoryRouter>);
@@ -29,12 +29,16 @@ let pageDoc;
 let features;
 let organizationsData;
 let sectionBlocks;
+// The History section (issue #194) reads the past editions as
+// ContentContext serves them: prepared, oldest first.
+let timeline;
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig, theme, features }),
 }));
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
     organizationsData,
+    timeline,
     getPage: () => pageDoc,
     getSectionBlocks: (section) => {
       if (section === 'hero') return heroBlocks;
@@ -50,6 +54,43 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 }));
 
 import Home from './Home.jsx';
+import AuthContext from '../contexts/AuthContext.jsx';
+import { SEED_WHEN_PLACEHOLDER, publicContentDoc } from 'shared/seed';
+import { makeFakeDb } from '../../../../functions/src/cms/firestoreFake.cjs';
+import { createCmsUpdateContentHandler } from '../../../../functions/src/cms/content.cjs';
+import * as store from '../../../../functions/src/cms/store.cjs';
+import { seedCollection } from '../../../../scripts/lib/write.cjs';
+
+/**
+ * The home page's When fact as the public site receives it: seeded by init,
+ * then, if asked, edited through the REAL admin write path and published by
+ * an operator, and finally shaped by the same rule every public boundary
+ * applies (shared/seed publicContentDoc). A hand-written `seeded: false` is
+ * a state the CMS never wrote (adversarial review, 2026-09-24).
+ */
+async function whenFactFromTheCms({ editedTo } = {}) {
+  const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
+  const db = makeFakeDb({ 'config/bootstrap': { adminEmails: [ADMIN.email] } });
+  const now = () => 1_750_000_000_000;
+  await seedCollection({
+    db, store, collection: 'cmsContent', now,
+    docs: [{
+      id: 'info__when', section: 'info', field: 'when', blockType: 'fact', label: 'When',
+      value: 'October 14–16, 2026', visible: true, order: 0, seeded: true, seededAt: 'T0',
+    }],
+  });
+  if (editedTo) {
+    const res = { statusCode: null, body: null, set() { return this; }, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+    await createCmsUpdateContentHandler({
+      db, now, log: { warn() {}, error() {} },
+      auth: { async verifyIdToken() { return ADMIN; } },
+      getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN.email] } }),
+    })({ method: 'POST', headers: { authorization: 'Bearer t' }, body: { section: 'info', field: 'when', fields: { value: editedTo } } }, res);
+    if (res.statusCode !== 200) throw new Error(`edit failed: ${JSON.stringify(res.body)}`);
+    await store.publishDocs({ db, collection: 'cmsContent', docIds: ['info__when'], actor: ADMIN, now });
+  }
+  return { id: 'info__when', ...publicContentDoc(db.read('cmsContent', 'info__when')) };
+}
 
 const LEAD = {
   section: 'hero',
@@ -67,6 +108,7 @@ beforeEach(() => {
   features = {};
   organizationsData = [];
   sectionBlocks = {};
+  timeline = [];
 });
 
 describe('Home', () => {
@@ -253,6 +295,70 @@ describe('Home key facts', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Key facts' })).toBeInTheDocument();
     expect(screen.getByText('The event runs from Wednesday to Friday')).toBeInTheDocument();
     expect(screen.getByText('Venue: The hall')).toBeInTheDocument();
+  });
+
+  // The seeded When fact and the live Dates list beside it read the same
+  // configuration (adversarial review of the 2026-09-10 wave): while the
+  // fact is still the seed's, its value is the range config/event states
+  // now, not the range init copied in.
+  it('reads the seeded When fact’s dates from the event settings, so a moved day never goes stale', async () => {
+    eventConfig = {
+      name: 'Demo Event',
+      timezone: 'UTC',
+      days: [
+        { id: 'day-1', label: 'Day one', date: '2026-10-21', startTime: '09:00', endTime: '17:00' },
+        { id: 'day-2', label: 'Day two', date: '2026-10-22', startTime: '09:00', endTime: '17:00' },
+      ],
+    };
+    infoBlocks = [await whenFactFromTheCms()];
+    render(<Home />);
+    // The hero states the range too; the card is the <dd>.
+    expect(screen.getByText('October 21–22, 2026', { selector: 'dd' })).toBeInTheDocument();
+    expect(screen.queryByText('October 14–16, 2026')).toBeNull();
+  });
+
+  it('drops the seeded dates when the event settings list no day, as the seed would (connector review of PR 270)', async () => {
+    // A valid empty day list means the dates are not set. The seed writes
+    // its own placeholder in that case, so the card says the same thing the
+    // seed would write now, never the range init copied in.
+    eventConfig = { name: 'Demo Event', timezone: 'UTC', days: [] };
+    infoBlocks = [await whenFactFromTheCms()];
+    render(<Home />);
+    expect(screen.getByText(SEED_WHEN_PLACEHOLDER, { selector: 'dd' })).toBeInTheDocument();
+    expect(screen.queryByText('October 14–16, 2026')).toBeNull();
+  });
+
+  it('shows a When fact the operator edited and published as the operator wrote it', async () => {
+    // The edit goes through the real admin write path and the real publish,
+    // so this holds for what the CMS writes and not for a state a test
+    // invented.
+    eventConfig = {
+      name: 'Demo Event',
+      timezone: 'UTC',
+      days: [{ id: 'day-1', label: 'Day one', date: '2026-10-21', startTime: '09:00', endTime: '17:00' }],
+    };
+    infoBlocks = [await whenFactFromTheCms({ editedTo: 'The third week of October' })];
+    render(<Home />);
+    expect(screen.getByText('The third week of October').tagName).toBe('DD');
+    expect(screen.queryByText('October 21, 2026', { selector: 'dd' })).toBeNull();
+  });
+
+  it('shows an edited When fact as written on a site from before the CMS cleared the flag', () => {
+    // Such a site holds the operator's fact with `seeded: true` still on it
+    // and the operator's uid as its publisher; the public boundary judges by
+    // the publisher (shared/seed), so the page receives no flag.
+    eventConfig = {
+      name: 'Demo Event',
+      timezone: 'UTC',
+      days: [{ id: 'day-1', label: 'Day one', date: '2026-10-21', startTime: '09:00', endTime: '17:00' }],
+    };
+    const stale = {
+      id: 'info__when', section: 'info', field: 'when', blockType: 'fact', label: 'When',
+      value: 'The third week of October', visible: true, order: 0, seeded: true, revision: 3, publishedBy: 'admin1',
+    };
+    infoBlocks = [publicContentDoc(stale)];
+    render(<Home />);
+    expect(screen.getByText('The third week of October').tagName).toBe('DD');
   });
 
   it('writes no heading over a section it cannot draw', () => {
@@ -518,6 +624,228 @@ describe('Home sponsor strip', () => {
       const { unmount } = render(<Home />);
       expect(screen.queryByRole('region', { name: 'Sponsors' })).toBeNull();
       expect(screen.queryByRole('heading', { name: 'Sponsors' })).toBeNull();
+      unmount();
+    }
+  });
+});
+
+describe('Home history section', () => {
+  const history = { id: 'history', label: 'History' };
+  const other = { id: 'details', label: 'Details' };
+  const EDITIONS = [
+    { id: 'edition-2024', year: 2024, title: 'The first meeting', description: null, visible: true },
+    { id: 'edition-2025', year: 2025, title: 'Two workshop tracks', description: 'Practice and planning.', visible: true },
+  ];
+
+  /** The History section, read at once: the list is part of the first render. */
+  async function historySection() {
+    const section = screen.getByRole('region', { name: 'History' });
+    expect(section.querySelector('ol')).not.toBeNull();
+    return section;
+  }
+
+  const headings = (container) =>
+    [...container.querySelectorAll('h2')].map((el) => el.textContent.trim());
+
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    pageDoc = { id: 'home', path: '/', label: 'Home', layout: { arrangement: 'grid' }, sections: [history] };
+    timeline = EDITIONS;
+    sectionBlocks = {
+      history: [{ section: 'history', field: 'story', blockType: 'richtext', value: '<p>How it began.</p>' }],
+      details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
+    };
+  });
+
+  it('draws the whole section, heading and list, on the first render when it holds no block', () => {
+    // The seed gives the section no block, so on a new client's site the
+    // list is all the section has.
+    sectionBlocks = { ...sectionBlocks, history: [] };
+    render(<Home />);
+    const section = screen.getByRole('region', { name: 'History' });
+    expect(within(section).getByRole('heading', { level: 2, name: 'History' })).toBeInTheDocument();
+    expect([...section.querySelectorAll('ol > li h3')].map((h) => h.textContent)).toEqual([
+      'The first meeting',
+      'Two workshop tracks',
+    ]);
+  });
+
+  it('lists the editions under the section’s own label, after its blocks', async () => {
+    render(<Home />);
+    const section = await historySection();
+    expect(within(section).getByRole('heading', { level: 2, name: 'History' })).toBeInTheDocument();
+    const story = within(section).getByText('How it began.');
+    expect(story.compareDocumentPosition(section.querySelector('ol')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('draws the editions as an ordered list, oldest first, each year a <time> beside its title', async () => {
+    render(<Home />);
+    const section = await historySection();
+    const entries = [...section.querySelector('ol').children];
+    expect(entries.map((entry) => entry.tagName)).toEqual(['LI', 'LI']);
+    expect(entries.map((entry) => entry.querySelector('h3').textContent)).toEqual([
+      'The first meeting',
+      'Two workshop tracks',
+    ]);
+    const time = entries[0].querySelector('time');
+    expect(time).toHaveAttribute('dateTime', '2024');
+    expect(time.textContent).toBe('2024');
+    const heading = entries[0].querySelector('h3');
+    expect(heading.parentElement).toBe(time.closest('p').parentElement);
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('prints no number in an entry but its year: no counter, no sequence', async () => {
+    render(<Home />);
+    const section = await historySection();
+    for (const entry of section.querySelectorAll('ol > li')) {
+      const year = entry.querySelector('time').textContent;
+      expect(entry.textContent.match(/\d+/g)).toEqual([year]);
+    }
+  });
+
+  it('keeps the blocks on the stage’s columns on a grid page and on the text measure on a list page', async () => {
+    const grid = render(<Home />);
+    let section = await historySection();
+    expect(section.querySelector('ol').parentElement).not.toHaveClass('measure');
+    expect(section.querySelector('ol').parentElement).toHaveClass('mt-md');
+    grid.unmount();
+
+    pageDoc = { ...pageDoc, layout: { arrangement: 'list' } };
+    render(<Home />);
+    section = await historySection();
+    expect(section.querySelector('ol').parentElement).toHaveClass('measure');
+  });
+
+  it('moves when an operator reorders the section', async () => {
+    pageDoc = { ...pageDoc, sections: [other, history] };
+    const before = render(<Home />);
+    await historySection();
+    expect(headings(before.container)).toEqual(['Details', 'History']);
+    before.unmount();
+
+    pageDoc = { ...pageDoc, sections: [history, other] };
+    const after = render(<Home />);
+    await historySection();
+    expect(headings(after.container)).toEqual(['History', 'Details']);
+  });
+
+  it('draws nothing when an operator has deleted the section from the page', async () => {
+    pageDoc = { ...pageDoc, sections: [other] };
+    render(<Home />);
+    await screen.findByRole('region', { name: 'Details' });
+    expect(screen.queryByRole('region', { name: 'History' })).toBeNull();
+    expect(screen.queryByText('The first meeting')).toBeNull();
+  });
+});
+
+// The home page's edit links (issue #198): one per section the page draws,
+// each opening that section's blocks in the admin, and only for a signed-in
+// admin. The lead is the core, so its link sits last in the lead.
+describe('Home section edit links', () => {
+  const renderAs = (auth) =>
+    testingRender(
+      <MemoryRouter>
+        <AuthContext.Provider value={auth}>
+          <Home />
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+  const editLinks = (container) =>
+    [...container.querySelectorAll('a')].filter((link) => link.textContent === 'Edit section');
+
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    features = { sponsors: true };
+    organizationsData = [
+      { id: 'one', name: 'First Supporter', tier: 'Presenting', url: 'https://one.example.org', visible: true },
+    ];
+    heroBlocks = [
+      { section: 'hero', field: 'title', blockType: 'text', value: 'The headline' },
+      { section: 'hero', field: 'subtitle', blockType: 'text', value: 'The line under it' },
+    ];
+    infoBlocks = [{ section: 'info', field: 'where', blockType: 'fact', label: 'Where', value: 'The hall' }];
+    sectionBlocks = {
+      details: [
+        { section: 'details', field: 'one', blockType: 'text', value: 'First paragraph' },
+        { section: 'details', field: 'two', blockType: 'text', value: 'Second paragraph' },
+      ],
+    };
+    pageDoc = {
+      id: 'home',
+      path: '/',
+      label: 'Home',
+      sections: [
+        { id: 'hero', label: 'Hero' },
+        { id: 'info', label: 'Key facts' },
+        { id: 'details', label: 'Details' },
+        { id: 'empty', label: 'Nothing yet' },
+        { id: 'sponsors', label: 'Sponsors' },
+      ],
+    };
+  });
+
+  it('gives the lead, the key facts, a default section and the sponsor strip one link each, never one per block', () => {
+    const { container } = renderAs({ adminStatus: 'admin', adminTier: 'staff' });
+    // Four drawn sections and six blocks: the count is the sections'.
+    expect(editLinks(container).map((link) => link.getAttribute('href'))).toEqual([
+      '/admin/content/home/hero',
+      '/admin/content/home/info',
+      '/admin/content/home/details',
+      '/admin/content/home/sponsors',
+    ]);
+    // The lead's link is its last child, after the action row and the line.
+    const lead = screen.getByRole('heading', { level: 1, name: 'The headline' }).parentElement;
+    expect(lead.lastElementChild).toBe(screen.getByRole('link', { name: 'Edit section: Hero' }));
+    // Every other link sits in its own section's head, after the heading.
+    for (const label of ['Key facts', 'Details', 'Sponsors']) {
+      const head = screen.getByRole('heading', { level: 2, name: label }).parentElement;
+      expect(within(head).getByRole('link', { name: `Edit section: ${label}` })).toBeInTheDocument();
+    }
+    // An empty section is not drawn, so it has no link.
+    expect(screen.queryByRole('link', { name: 'Edit section: Nothing yet' })).toBeNull();
+  });
+
+  it('gives the History section its link in its own head, like every other drawn section', () => {
+    timeline = [{ id: 'edition-2024', year: 2024, title: 'The first meeting', description: null, visible: true }];
+    pageDoc = { ...pageDoc, sections: [{ id: 'history', label: 'History' }] };
+    renderAs({ adminStatus: 'admin', adminTier: 'staff' });
+    const head = screen.getByRole('heading', { level: 2, name: 'History' }).parentElement;
+    expect(within(head).getByRole('link', { name: 'Edit section: History' })).toHaveAttribute(
+      'href',
+      '/admin/content/home/history',
+    );
+  });
+
+  // Codex review on #290: a key facts section with no card still draws the
+  // row's dates, in its own place, so it keeps its one link.
+  it('keeps the key facts link after the row when the section draws dates but no card', () => {
+    eventConfig = { name: 'Demo Event', days: [{ id: 'day-1', label: 'Day one', date: '2026-10-01' }] };
+    infoBlocks = [{ section: 'info', field: 'note', blockType: 'richtext', value: '<p>Not a card.</p>' }];
+    pageDoc = { ...pageDoc, sections: [{ id: 'info', label: 'Key facts' }] };
+    renderAs({ adminStatus: 'admin', adminTier: 'staff' });
+    expect(screen.getByRole('heading', { level: 2, name: 'Dates' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
+    const link = screen.getByRole('link', { name: 'Edit section: Key facts' });
+    expect(link).toHaveAttribute('href', '/admin/content/home/info');
+    // After the row, never inside one of its cells.
+    const row = screen.getByRole('heading', { level: 2, name: 'Dates' }).closest('.stage-row');
+    expect(row.contains(link)).toBe(false);
+    expect(row.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('draws no hero link where the page states no hero section', () => {
+    pageDoc = { ...pageDoc, sections: pageDoc.sections.filter((section) => section.id !== 'hero') };
+    renderAs({ adminStatus: 'admin' });
+    expect(screen.getByRole('heading', { level: 1, name: 'The headline' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Edit section: Hero' })).toBeNull();
+  });
+
+  it('draws no link at all for a signed-out reader or a signed-in non-admin', () => {
+    for (const auth of [null, { adminStatus: 'unknown' }, { adminStatus: 'denied' }]) {
+      const { container, unmount } = renderAs(auth);
+      expect(screen.getByRole('heading', { level: 2, name: 'Details' })).toBeInTheDocument();
+      expect(editLinks(container)).toHaveLength(0);
       unmount();
     }
   });

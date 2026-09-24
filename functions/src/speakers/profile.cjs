@@ -24,7 +24,9 @@
  * fixture and the web app cannot drift from the server.
  */
 
-const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
+const {
+  BOOTSTRAP_UNAVAILABLE, BootstrapUnavailableError, loadBootstrap, requireAdmin, resolveAdminTier, verifyAuthToken,
+} = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS } = require('shared/speaker');
@@ -91,12 +93,12 @@ function newSpeakerDefaults() {
 }
 
 /** Shared admin-POST preamble. Sends the response itself on failure. */
-async function gateAdminPost({ auth, getConfig }, req, res) {
+async function gateAdminPost({ auth, db, getConfig }, req, res) {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return null;
   }
-  const verdict = await requireAdmin({ auth, getConfig }, req);
+  const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
   if (!verdict.ok) {
     sendError(res, verdict.status, verdict.code, verdict.message);
     return null;
@@ -163,6 +165,19 @@ async function applyCreateSpeaker({ db, speakerId, payload, actor, now = Date.no
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: not a valid document id' };
   } else {
     docId = speakerId;
+  }
+  // The same prefix rule the self-service path applies (isOwnHeadshotPath):
+  // an admin payload could otherwise point a speaker at a branding file or
+  // another speaker's photo, and applySpeakerPendingEdits would later treat
+  // that path as this speaker's own to delete. Checked against the id the
+  // record will actually carry — the slug when none was sent.
+  if (!isOwnHeadshotPath(docId, fields.headshotPath)) {
+    return {
+      ok: false,
+      status: 400,
+      code: 'bad-request',
+      message: `headshotPath: must be null or under speaker-photos/${docId}/`,
+    };
   }
 
   const at = new Date(now());
@@ -234,7 +249,6 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
   if (Object.keys(verdict.fields).length === 0) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speaker: no editable fields in the payload' };
   }
-
   const at = new Date(now());
   const ref = db.collection(SPEAKERS).doc(speakerId);
 
@@ -248,6 +262,22 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
       }
       const stored = snap.data();
       const patch = { ...verdict.fields };
+
+      // Same prefix rule as create and the self-service path, for the same
+      // reason — applied to a CHANGE only. A record written before the rule
+      // may hold any Storage path, and the admin editor sends the current
+      // headshotPath on every save, so the stored value is always allowed
+      // back; only a move to a path that is not this speaker's is refused.
+      if ('headshotPath' in patch && patch.headshotPath !== stored.headshotPath
+        && !isOwnHeadshotPath(speakerId, patch.headshotPath)) {
+        const err = new Error('HEADSHOT_PATH');
+        err.conflict = {
+          status: 400,
+          code: 'bad-request',
+          message: `headshotPath: must be null or under speaker-photos/${speakerId}/`,
+        };
+        throw err;
+      }
 
       // A name change with no explicit slug re-derives the slug, so the
       // public URL follows the name instead of silently keeping the old
@@ -391,26 +421,30 @@ function buildOwnSpeakerView(speaker, speakerId) {
  * path, a plain get for the read path), so this only answers "who is this
  * and are they an admin" once per request.
  *
- * @param {{ auth: object, getConfig: () => Promise<object> }} deps
+ * @param {{ auth: object, db?: object, getConfig: () => Promise<object> }} deps
  * @param {object} req
  * @returns {Promise<{ ok: true, uid: string, email: string, isAdmin: boolean } |
- *                    { ok: false, status: 401, code: string, message: string }>}
+ *                    { ok: false, status: 401|500, code: string, message: string }>}
  */
-async function gateSpeakerSelfOrAdmin({ auth, getConfig }, req) {
+async function gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req) {
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded?.uid) {
     return { ok: false, status: 401, code: 'unauthorized', message: 'Authentication required.' };
   }
+  // Either tier counts: speakers are staff work (core/auth.cjs
+  // resolveAdminTier is the one predicate both tiers are read through).
   let isAdmin = false;
   const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
   if (email && decoded.email_verified === true) {
-    const config = await getConfig();
-    const adminEmails = Array.isArray(config?.bootstrap?.adminEmails)
-      ? config.bootstrap.adminEmails
-      : [];
-    isAdmin = adminEmails.some(
-      (entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email,
-    );
+    try {
+      isAdmin = resolveAdminTier(await loadBootstrap({ db, getConfig }), email) !== null;
+    } catch (err) {
+      // Fail closed as a 500, not as "not an admin": a speaker editing
+      // their own record would still pass, and an admin would be told the
+      // check failed rather than that they are not an admin.
+      if (err instanceof BootstrapUnavailableError) return { ...BOOTSTRAP_UNAVAILABLE };
+      throw err;
+    }
   }
   return {
     ok: true,
@@ -622,7 +656,14 @@ async function applyApplySpeakerPendingEdits({ db, bucket, speakerId, actor, now
     throw err;
   }
 
-  if (bucket && newHeadshotPath !== undefined && newHeadshotPath !== oldHeadshotPath && oldHeadshotPath) {
+  // Only the speaker's OWN superseded photo is ever deleted. A stored path
+  // outside speaker-photos/{speakerId}/ — a branding file, another speaker's
+  // photo, a bundled avatar — is not this record's object whatever put it
+  // there: the admin paths refuse such a value now, and a row written
+  // before they did must not become a way to delete somebody else's file.
+  const ownOldPhoto = typeof oldHeadshotPath === 'string'
+    && oldHeadshotPath.startsWith(`speaker-photos/${speakerId}/`);
+  if (bucket && ownOldPhoto && newHeadshotPath !== undefined && newHeadshotPath !== oldHeadshotPath) {
     try {
       await bucket.file(oldHeadshotPath).delete({ ignoreNotFound: true });
     } catch (err) {
@@ -682,7 +723,7 @@ async function applyDiscardSpeakerPendingEdits({ db, speakerId }) {
 function createGetOwnSpeakerProfileHandler({ db, auth, getConfig, log = console }) {
   return async function getOwnSpeakerProfile(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await gateSpeakerSelfOrAdmin({ auth, getConfig }, req);
+    const gate = await gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     let result;
@@ -707,7 +748,7 @@ function createUpdateOwnSpeakerProfileHandler({ db, auth, getConfig, now = Date.
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const speakerId = req.body?.speakerId;
     if (!isValidDocId(speakerId)) return badRequest(res, 'speakerId: required');
-    const gate = await gateSpeakerSelfOrAdmin({ auth, getConfig }, req);
+    const gate = await gateSpeakerSelfOrAdmin({ auth, db, getConfig }, req);
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     let result;
@@ -747,7 +788,7 @@ function createUpdateOwnSpeakerProfileHandler({ db, auth, getConfig, now = Date.
  */
 function createApplySpeakerPendingEditsHandler({ db, bucket, auth, getConfig, now = Date.now, log = console }) {
   return async function applySpeakerPendingEdits(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {
@@ -777,7 +818,7 @@ function createApplySpeakerPendingEditsHandler({ db, bucket, auth, getConfig, no
  */
 function createDiscardSpeakerPendingEditsHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function discardSpeakerPendingEdits(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {
@@ -801,7 +842,7 @@ function createDiscardSpeakerPendingEditsHandler({ db, auth, getConfig, now = Da
  */
 function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function createSpeaker(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {
@@ -827,7 +868,7 @@ function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
  */
 function createUpdateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function updateSpeaker(req, res) {
-    const actor = await gateAdminPost({ auth, getConfig }, req, res);
+    const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
     let result;
     try {

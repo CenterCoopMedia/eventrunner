@@ -7,10 +7,36 @@ const { makeFakeDb } = require('../../functions/src/cms/firestoreFake.cjs');
 const store = require('../../functions/src/cms/store.cjs');
 const {
   writeConfigDocs, seedCollection, findPagePathCollisions, findPageSectionCollisions, countSeeded, readConfig,
-  removeObsoleteSeeds,
+  removeObsoleteSeeds, withholdUpgradeSeeds,
 } = require('./write.cjs');
-const { defaultPages, buildSeedContent, OBSOLETE_CONTENT_IDS } = require('./seed.cjs');
+const {
+  defaultPages, buildSeedContent, OBSOLETE_CONTENT_IDS, REPLACED_CONTENT_IDS,
+} = require('./seed.cjs');
 const { buildConfigDocs } = require('./answers.cjs');
+const { createCmsUpdateContentHandler } = require('../../functions/src/cms/content.cjs');
+
+/** The operator, as the admin gate sees them and as the publish records them. */
+const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
+
+/**
+ * An edit through the REAL admin write path (the same handler the admin
+ * calls), so these tests hold for what the CMS writes rather than for a
+ * `seeded: false` a test wrote by hand (adversarial review, 2026-09-24).
+ */
+async function adminEdit(db, { section, field, fields }, now) {
+  const res = {
+    statusCode: null, body: null,
+    set() { return this; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+  await createCmsUpdateContentHandler({
+    db, now, log: { warn() {}, error() {} },
+    auth: { async verifyIdToken() { return ADMIN; } },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN.email] } }),
+  })({ method: 'POST', headers: { authorization: 'Bearer t' }, body: { section, field, visible: true, fields } }, res);
+  assert.equal(res.statusCode, 200, `the admin edit was accepted: ${JSON.stringify(res.body)}`);
+}
 
 const TIER_A = { publicUrl: 'https://example.org', emailProvider: 'console', ticketingProvider: 'none' };
 
@@ -34,6 +60,11 @@ function docs() {
 }
 
 const now = () => 1_700_000_000_000;
+
+/** A fake project whose admin gate knows the operator. */
+function makeAdminDb() {
+  return makeFakeDb({ 'config/bootstrap': { adminEmails: [ADMIN.email] } });
+}
 
 test('seeding writes a published live doc AND a clean draft, like an admin save + publish', async () => {
   const db = makeFakeDb();
@@ -434,4 +465,230 @@ test('removeObsoleteSeeds under --dry-run reports without deleting', async () =>
 
   assert.deepEqual(result.removed, ['hero__register_cta']);
   assert.equal((await db.collection('cmsContent').doc('hero__register_cta').get()).exists, true);
+});
+
+// ------------------------------------------------------- the two tiers (#187 review)
+
+test('a re-run does not re-apply the answers file\u2019s lists: an address removed in the admin stays removed', async () => {
+  const db = makeFakeDb();
+  const config = docs();
+  await writeConfigDocs({ db, docs: config, now });
+  // An operator removed the seeded address on the Access page and granted another.
+  await db.collection('config').doc('bootstrap').set({ adminEmails: ['kept@example.org'], staffEmails: ['desk@example.org'] });
+
+  const { results } = await writeConfigDocs({
+    db, docs: config, now, bootstrapAdditions: { adminEmails: [], staffEmails: [] },
+  });
+  const row = results.find((r) => r.docId === 'bootstrap');
+  assert.equal(row.action, 'skip');
+  assert.deepEqual(row.added, { adminEmails: [], staffEmails: [] });
+  const loaded = await readConfig({ db });
+  assert.deepEqual(loaded.bootstrap.adminEmails, ['kept@example.org']);
+  assert.deepEqual(loaded.bootstrap.staffEmails, ['desk@example.org']);
+});
+
+test('on a re-run only the explicit flags add, and the result names what was added', async () => {
+  const db = makeFakeDb();
+  const config = docs();
+  await writeConfigDocs({ db, docs: config, now });
+  const { results } = await writeConfigDocs({
+    db, docs: config, now,
+    bootstrapAdditions: { adminEmails: ['Second@Example.org'], staffEmails: ['desk@example.org', 'ops@example.org'] },
+  });
+  const row = results.find((r) => r.docId === 'bootstrap');
+  assert.equal(row.action, 'overwrite');
+  // ops@ is already an operator, so it is not "added" as staff either.
+  assert.deepEqual(row.added, { adminEmails: ['second@example.org'], staffEmails: ['desk@example.org'] });
+  const loaded = await readConfig({ db });
+  assert.deepEqual(loaded.bootstrap.adminEmails, ['ops@example.org', 'second@example.org']);
+  assert.deepEqual(loaded.bootstrap.staffEmails, ['desk@example.org']);
+});
+
+test('a fresh deployment still seeds bootstrap from the answers file, additions or not', async () => {
+  const db = makeFakeDb();
+  await writeConfigDocs({ db, docs: docs(), now, bootstrapAdditions: { adminEmails: [], staffEmails: [] } });
+  const loaded = await readConfig({ db });
+  assert.deepEqual(loaded.bootstrap.adminEmails, ['ops@example.org']);
+});
+
+// THE #234 UPGRADE PATH (adversarial review of the 2026-09-10 wave). The
+// base release seeded the venue as two labelled lines under the dates card,
+// `info__where_venue` and `info__where_address`, as placeholders nothing
+// filled; this release seeds one `info__where` fact in their place and a new
+// `info__who` placeholder. A launched site has typed its venue into the two
+// lines, so they are the client's, and a re-run must neither state the venue
+// twice nor publish a fresh "[Replace]" line onto its home page.
+
+/** The base release's key facts section, as init wrote it: every block the seed's. */
+function baseReleaseKeyFacts() {
+  const seed = { visible: true, seeded: true, seededAt: 'T0' };
+  const line = (field, text, order) => ({
+    id: `info__${field}`, section: 'info', field, blockType: 'list_item', text, order, ...seed,
+  });
+  return [
+    {
+      id: 'info__when', section: 'info', field: 'when', blockType: 'stat', order: 0, ...seed,
+      value: '[Replace] When the event runs.', label: 'When',
+    },
+    line('where_venue', '[Replace] The venue’s name, labelled.', 1),
+    line('where_address', '[Replace] The venue’s street address, labelled.', 2),
+    line('where_transit', '[Replace] The nearest transit to the venue, labelled.', 3),
+  ];
+}
+
+/** This release's seed for the key facts section alone. */
+function keyFactsSeed(config) {
+  return buildSeedContent({ pages: defaultPages(), docs: config, tierA: TIER_A, seededAt: 'T1' })
+    .filter((doc) => doc.section === 'info');
+}
+
+/** One init re-run over the key facts: withhold, seed, then remove the obsolete. */
+async function upgradeKeyFacts(db, config) {
+  const upgrade = await withholdUpgradeSeeds({
+    db, collection: 'cmsContent', docs: keyFactsSeed(config), replacedBy: REPLACED_CONTENT_IDS,
+  });
+  const seeded = await seedCollection({ db, store, collection: 'cmsContent', docs: upgrade.docs, now });
+  const protectedIds = new Set(upgrade.protected);
+  const obsolete = await removeObsoleteSeeds({
+    db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS.filter((id) => !protectedIds.has(id)),
+  });
+  return { upgrade, seeded, obsolete };
+}
+
+const liveIds = async (db) => (await db.collection('cmsContent').where('section', '==', 'info').get())
+  .docs.map((doc) => doc.id).sort();
+
+test('upgrading a site whose venue lines are still the seed’s replaces them with the fact, cleanly', async () => {
+  const db = makeFakeDb();
+  const config = docs();
+  await seedCollection({ db, store, collection: 'cmsContent', docs: baseReleaseKeyFacts(), now });
+
+  const { upgrade, seeded, obsolete } = await upgradeKeyFacts(db, config);
+
+  assert.deepEqual(upgrade.withheld, [], 'nothing is the client’s, so nothing is withheld');
+  assert.deepEqual(upgrade.protected, []);
+  assert.deepEqual(seeded.created.sort(), ['info__where', 'info__who']);
+  assert.deepEqual(seeded.refreshed.sort(), ['info__when', 'info__where_transit']);
+  assert.deepEqual(obsolete.removed.sort(), ['info__where_address', 'info__where_venue']);
+  assert.deepEqual(await liveIds(db), ['info__when', 'info__where', 'info__where_transit', 'info__who']);
+  // The stat became the fact, because it was still the seed's.
+  assert.equal((await db.collection('cmsContent').doc('info__when').get()).data().blockType, 'fact');
+  // The fact is seeded from configuration: the venue's name, or the
+  // instruction to state it where the test config names none.
+  assert.equal(
+    (await db.collection('cmsContent').doc('info__where').get()).data().value,
+    config.event.venue?.name || '[Replace] The venue’s name.',
+  );
+});
+
+test('upgrading a launched site keeps the client’s venue lines and creates neither the duplicate fact nor a new placeholder', async () => {
+  const db = makeAdminDb();
+  const config = docs();
+  await seedCollection({ db, store, collection: 'cmsContent', docs: baseReleaseKeyFacts(), now });
+  // The client filled the venue line through the admin and published it;
+  // the address line beside it is still the seed's.
+  await adminEdit(db, { section: 'info', field: 'where_venue', fields: { text: 'Venue: Test Hall' } }, now);
+  await store.publishDocs({ db, collection: 'cmsContent', docIds: ['info__where_venue'], actor: ADMIN, now });
+
+  const { upgrade, seeded, obsolete } = await upgradeKeyFacts(db, config);
+
+  // The replacement waits, and it says which predecessor it is waiting on.
+  assert.deepEqual(upgrade.withheld.map((w) => w.id).sort(), ['info__where', 'info__who']);
+  assert.match(upgrade.withheld.find((w) => w.id === 'info__where').reason, /info__where_venue/);
+  assert.match(upgrade.withheld.find((w) => w.id === 'info__who').reason, /placeholder/);
+  assert.equal(seeded.created.length, 0, 'nothing new lands on a launched home page');
+  // The still-seeded address line is protected too: it is the address the
+  // withheld fact would have carried, and it stays beside the client's line.
+  assert.deepEqual(upgrade.protected.sort(), ['info__where_address', 'info__where_venue']);
+  assert.deepEqual(obsolete.removed, []);
+  assert.deepEqual(await liveIds(db), ['info__when', 'info__where_address', 'info__where_transit', 'info__where_venue']);
+  assert.equal(
+    (await db.collection('cmsContent').doc('info__where_venue').get()).data().text,
+    'Venue: Test Hall',
+  );
+  assert.equal((await db.collection('cmsContent').doc('info__where').get()).exists, false, 'the venue is stated once');
+  assert.equal((await db.collection('cmsContent_drafts').doc('info__who').get()).exists, false, 'no draft either');
+});
+
+test('withholdUpgradeSeeds reads the draft revision: an unpublished edit to a predecessor protects it', async () => {
+  const db = makeAdminDb();
+  const config = docs();
+  await seedCollection({ db, store, collection: 'cmsContent', docs: baseReleaseKeyFacts(), now });
+  // Edited in the admin, not yet published: the work exists only in the draft.
+  await adminEdit(db, { section: 'info', field: 'where_address', fields: { text: 'Address: 1 Test Way' } }, now);
+
+  const { upgrade } = await withholdUpgradeSeeds({
+    db, collection: 'cmsContent', docs: keyFactsSeed(config), replacedBy: REPLACED_CONTENT_IDS,
+  }).then((upgrade) => ({ upgrade }));
+
+  assert.match(upgrade.withheld.find((w) => w.id === 'info__where').reason, /info__where_address/);
+  assert.ok(upgrade.withheld.some((w) => w.id === 'info__who'), 'the section has an editor’s draft, so no placeholder');
+});
+
+test('withholdUpgradeSeeds passes a document the site already holds straight through', async () => {
+  // Existing documents are seedCollection's to refresh or skip under the
+  // ownership rule it has always applied; this rule is for what is new.
+  const db = makeFakeDb();
+  const config = docs();
+  await seedCollection({ db, store, collection: 'cmsContent', docs: keyFactsSeed(config), now });
+  await db.collection('cmsContent').doc('info__who').set({
+    section: 'info', field: 'who', blockType: 'fact', label: 'Who', value: 'Local newsroom staff',
+    visible: true, order: 3, seeded: false, revision: 2,
+  });
+  const upgrade = await withholdUpgradeSeeds({
+    db, collection: 'cmsContent', docs: keyFactsSeed(config), replacedBy: REPLACED_CONTENT_IDS,
+  });
+  assert.deepEqual(upgrade.withheld, []);
+  assert.equal(upgrade.docs.length, keyFactsSeed(config).length);
+});
+
+test('a fresh site gets every key fact, placeholder included', async () => {
+  const db = makeFakeDb();
+  const config = docs();
+  const { upgrade, seeded } = await upgradeKeyFacts(db, config);
+  assert.deepEqual(upgrade.withheld, []);
+  assert.deepEqual(seeded.created.sort(), ['info__when', 'info__where', 'info__where_transit', 'info__who']);
+});
+
+test('upgrading a site from before the CMS cleared the flag still keeps the client’s venue line', async () => {
+  // Such a site holds the operator's line with `seeded: true` still on it
+  // and the operator's uid as its publisher (adversarial review,
+  // 2026-09-24). Who published decides, so the line is the client's and the
+  // replacement waits.
+  const db = makeFakeDb();
+  const config = docs();
+  await seedCollection({ db, store, collection: 'cmsContent', docs: baseReleaseKeyFacts(), now });
+  await db.collection('cmsContent').doc('info__where_venue').set({
+    section: 'info', field: 'where_venue', blockType: 'list_item', text: 'Venue: Test Hall',
+    visible: true, order: 1, seeded: true, seededAt: 'T0', revision: 2, publishedBy: ADMIN.uid,
+  });
+
+  const { upgrade, seeded, obsolete } = await upgradeKeyFacts(db, config);
+
+  assert.deepEqual(upgrade.withheld.map((w) => w.id).sort(), ['info__where', 'info__who']);
+  assert.equal(seeded.created.length, 0);
+  assert.deepEqual(obsolete.removed, []);
+  assert.equal((await db.collection('cmsContent').doc('info__where_venue').get()).data().text, 'Venue: Test Hall');
+  assert.equal((await db.collection('cmsContent').doc('info__where').get()).exists, false);
+});
+
+test('a withheld replacement protects only the predecessors the site actually holds', async () => {
+  // Protecting every predecessor in the map made init print "kept" for a
+  // document that does not exist (adversarial review, 2026-09-24). Here the
+  // client has the venue line and never had the address line.
+  const db = makeAdminDb();
+  const config = docs();
+  await seedCollection({
+    db, store, collection: 'cmsContent', now,
+    docs: baseReleaseKeyFacts().filter((doc) => doc.id !== 'info__where_address'),
+  });
+  await adminEdit(db, { section: 'info', field: 'where_venue', fields: { text: 'Venue: Test Hall' } }, now);
+  await store.publishDocs({ db, collection: 'cmsContent', docIds: ['info__where_venue'], actor: ADMIN, now });
+
+  const upgrade = await withholdUpgradeSeeds({
+    db, collection: 'cmsContent', docs: keyFactsSeed(config), replacedBy: REPLACED_CONTENT_IDS,
+  });
+
+  assert.ok(upgrade.withheld.some((w) => w.id === 'info__where'));
+  assert.deepEqual(upgrade.protected, ['info__where_venue']);
 });

@@ -54,15 +54,37 @@
   "shape": { "radius": "sharp", "texture": "flat", "density": "tight" },
   "motifSet": "none",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text. The definition list sets its terms in italic. The pull quote is centred between hairlines with a large opening mark and a small-capitals attribution. The timeline spine is a column rule at the strong width, the progress bar is a hairline-thin ink bar, the notice bar sits on the page ground, and tables take the full hairline grid with small-capitals heads. The avatar and the portraits take square corners with the initial in the full ink, the legend and the byline are set in small capitals, and the standfirst is italic.",
   "tokens": {
     "--session-card-pad-block": "var(--space-sm)",
     "--folio-font": "var(--font-data)",
+    "--definition-list-term-style": "italic",
+    "--definition-list-term-width": "8rem",
+    "--pull-quote-rule-rgb": "var(--rule-hairline-rgb)",
+    "--pull-quote-rule-block-width": "var(--rule-hairline-width)",
+    "--pull-quote-mark-display": "block",
+    "--pull-quote-quotes-display": "none",
+    "--pull-quote-align": "center",
+    "--pull-quote-attribution-transform": "uppercase",
+    "--timeline-spine-width": "var(--rule-strong-width)",
+    "--progress-fill": "rgb(var(--color-text-primary-rgb))",
+    "--progress-block-size": "var(--space-3xs)",
+    "--progress-radius": "0",
+    "--notice-bar-ground": "rgb(var(--color-surface-rgb))",
+    "--table-head-transform": "uppercase",
+    "--table-head-tracking": "0.06em",
     "--hero-rule-block-start": "var(--rule-strong-width) double rgb(var(--rule-strong-rgb))",
     "--hero-art-width": "75%",
     "--hero-art-position": "85% 50%",
     "--hero-title-style": "normal",
-    "--hero-title-tracking": "-.055em"
+    "--hero-title-tracking": "-.055em",
+    "--avatar-ink": "rgb(var(--color-text-primary-rgb))",
+    "--avatar-radius": "0",
+    "--legend-transform": "uppercase",
+    "--legend-tracking": "var(--text-folio-tracking)",
+    "--standfirst-style": "italic",
+    "--byline-transform": "uppercase",
+    "--byline-tracking": "var(--text-folio-tracking)"
   },
 
   "options": {
@@ -151,6 +173,157 @@
             "--schedule-row-leading": "1.3",
             "--schedule-data-size": "var(--text-folio)",
             "--session-card-pad-block": "var(--space-xs)"
+          }
+        }
+      ]
+    },
+    "longReadOpening": {
+      "label": "Long read opening",
+      "prompt": "Choose how the first paragraph of a Long read page opens.",
+      "default": "drop-cap",
+      "choices": [
+        {
+          "id": "drop-cap",
+          "label": "Drop cap",
+          "why": "Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.",
+          "tokens": {
+            "--drop-cap-float": "left",
+            "--drop-cap-size": "3.1em",
+            "--drop-cap-pad-inline-end": "var(--space-xs)"
+          }
+        },
+        {
+          "id": "standfirst",
+          "label": "Standfirst",
+          "why": "Sets the first paragraph at the lead size, as a summary of the page.",
+          "tokens": {
+            "--long-read-opening-size": "var(--text-lead)",
+            "--long-read-opening-leading": "var(--text-lead-leading)"
+          }
+        },
+        {
+          "id": "plain",
+          "label": "Plain",
+          "why": "Keeps the first paragraph at body size with no drop cap.",
+          "tokens": {
+            "--drop-cap-float": "none"
+          }
+        }
+      ]
+    },
+    "quote": {
+      "label": "Quote device",
+      "prompt": "Choose how a quoted sentence is set.",
+      "default": "centred-mark",
+      "choices": [
+        {
+          "id": "centred-mark",
+          "label": "Centred with an opening mark",
+          "why": "Centres the quote between hairlines with a large opening mark and a small-capitals attribution.",
+          "tokens": {
+            "--pull-quote-rule-block-width": "var(--rule-hairline-width)"
+          }
+        },
+        {
+          "id": "column-rule",
+          "label": "Column rule",
+          "why": "Sets the quote beside one hairline, like a boxed paragraph in a column, with the quotation marks inline around the sentence.",
+          "tokens": {
+            "--pull-quote-rule-block-width": "0",
+            "--pull-quote-rule-inline-width": "var(--rule-hairline-width)",
+            "--pull-quote-pad-inline": "var(--space-md)",
+            "--pull-quote-mark-display": "none",
+            "--pull-quote-quotes-display": "inline",
+            "--pull-quote-align": "start"
+          }
+        }
+      ]
+    },
+    "directory": {
+      "label": "Directory style",
+      "prompt": "Choose how the speaker shelf and the attendee index are set.",
+      "default": "agate-directory",
+      "choices": [
+        {
+          "id": "agate-directory",
+          "label": "Agate directory",
+          "why": "Sets square portraits and tight index rows, like a newspaper directory.",
+          "tokens": {
+            "--directory-portrait-radius": "0",
+            "--directory-entry-pad-block": "var(--space-3xs)"
+          }
+        },
+        {
+          "id": "plate-portraits",
+          "label": "Plate portraits",
+          "why": "Sets tall portraits between strong rules, like a photograph page.",
+          "tokens": {
+            "--directory-portrait-aspect": "4 / 5",
+            "--directory-portrait-radius": "0",
+            "--directory-rule-width": "var(--rule-strong-width)"
+          }
+        }
+      ]
+    },
+    "sectionBoundary": {
+      "label": "Section boundary",
+      "prompt": "Choose how a section heading is ruled and labelled.",
+      "default": "rule-and-folio",
+      "choices": [
+        {
+          "id": "rule-and-folio",
+          "label": "Rule and folio",
+          "why": "Draws the section rule with the folio at the far end of the heading line.",
+          "tokens": {
+            "--section-folio-display": "inline"
+          }
+        },
+        {
+          "id": "rule-only",
+          "label": "Rule only",
+          "why": "Draws the section rule and hides the folio beside the heading.",
+          "tokens": {
+            "--section-folio-display": "none"
+          }
+        },
+        {
+          "id": "folio-in-margin",
+          "label": "Folio in the margin",
+          "why": "Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.",
+          "tokens": {
+            "--section-folio-placement": "margin"
+          }
+        }
+      ]
+    },
+    "tableRules": {
+      "label": "Table rules",
+      "prompt": "Choose how a table is ruled.",
+      "default": "full-grid",
+      "choices": [
+        {
+          "id": "hairline-rows",
+          "label": "Hairline rows",
+          "why": "Rules the rows and the head at the hairline and draws no column rules.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-hairline-width)"
+          }
+        },
+        {
+          "id": "ruled-head",
+          "label": "Ruled head",
+          "why": "Closes the head with a strong rule and rules the rows at the hairline, with no column rules.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-strong-width)"
+          }
+        },
+        {
+          "id": "full-grid",
+          "label": "Full grid",
+          "why": "Rules the rows and the columns at the hairline, with the head closed at the width the style sets.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-hairline-width)",
+            "--table-column-rule-width": "var(--rule-hairline-width)"
           }
         }
       ]

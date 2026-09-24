@@ -14,7 +14,7 @@
 //   3. The client's two elements are the job mark and the accent, and
 //      nothing else on this surface belongs to the client.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const configSubscriptions = new Map();
@@ -35,10 +35,13 @@ vi.mock('./adminSource.js', () => ({
     return () => {};
   },
 }));
+// The signed-in account. The tour's stored mark is per account, so the one
+// test that ends it with a refusing store signs in as its own account.
+let signedInUid = 'admin-1';
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
   onAuthStateChanged: (_auth, next) => {
-    next({ uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' });
+    next({ uid: signedInUid, email: 'admin@example.org', getIdToken: async () => 'id-token' });
     return () => {};
   },
   signInWithCustomToken: vi.fn(),
@@ -53,7 +56,10 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../App.jsx';
-import { DOCKET } from './AdminLayout.jsx';
+import { ADMIN_TIERS, DOCKET, TIER_SCOPE, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
+// Mocked for every file in src/test/setup.js; steered here for the banner.
+import { subscribeDirtyDrafts } from './pendingChangesSource.js';
+import { markTourDone, readTourDone } from './tourState.js';
 
 async function renderAdmin(path = '/admin/pages') {
   const result = render(
@@ -113,13 +119,19 @@ describe('the admin shell', () => {
     expect(html).toMatch(/font-admin-(ui|data)/);
   });
 
-  it('sets the docket as four named groups of words, not a tab row', async () => {
+  it('sets the docket as the Overview and four named groups of words, not a tab row', async () => {
     await renderAdmin();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
 
     // Group heads are folios on a hairline, not headings above a heading.
+    // The lead group (the Overview, issue #179) has no label and no folio.
     const folios = [...nav.querySelectorAll('.admin-folio')].map((el) => el.textContent);
-    expect(folios).toEqual(DOCKET.map((group) => group.label));
+    expect(folios).toEqual(DOCKET.filter((group) => group.label).map((group) => group.label));
+    expect(folios).toEqual(['Content', 'People', 'Operations', 'System']);
+    expect(DOCKET[0]).toMatchObject({ id: 'lead', label: null });
+    // The Overview is the first link on the rail.
+    expect(nav.querySelector('a')).toHaveTextContent('Overview');
+    expect(nav.querySelector('a')).toHaveAttribute('href', '/admin/overview');
     for (const group of DOCKET) {
       for (const item of group.items) {
         // Absolute, so a section reached from another section is not a dead
@@ -130,8 +142,17 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Fifteen sections, every one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(15);
+    // Eight links above the base's sixteen (the Overview, issue #179, the
+    // Email log, issue #183, Change requests, issue #188, Organizations,
+    // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
+    // issue #195, and Unpublished changes, issue #196), every one a word. No
+    // icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(24);
+    expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
+    expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
+      'href',
+      '/admin/unpublished',
+    );
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
@@ -178,6 +199,149 @@ describe('the admin shell', () => {
     expect(screen.getByText('admin@example.org').className).toContain('font-admin-data');
   });
 
+  // The tiers (issue #186): one declaration per docket item, read in two
+  // places — the rail and the route.
+  it('declares a tier on every docket item, and every tier is one the server knows', () => {
+    for (const group of DOCKET) {
+      for (const item of group.items) {
+        expect(ADMIN_TIERS, `${item.to} declares a tier`).toContain(item.tier);
+      }
+    }
+    expect(ADMIN_TIERS).toEqual(['operator', 'staff']);
+  });
+
+  it('classifies the sections: content, people and operations are staff; features, branding, access and system errors are operator', () => {
+    const byTier = (tier) =>
+      DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.to);
+    expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
+    expect(byTier('staff')).toEqual([
+      'overview',
+      'pages', 'sessions', 'organizations', 'content', 'updates', 'timeline', 'media', 'materials',
+      'versions', 'unpublished',
+      'speakers', 'attendees', 'badges',
+      'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
+      'settings',
+    ]);
+  });
+
+  it('reads a route’s tier from its docket entry, owning every path under the section', () => {
+    expect(sectionTier('/admin/branding')).toBe('operator');
+    expect(sectionTier('/admin/overview')).toBe('staff');
+    expect(sectionTier('/admin/pages')).toBe('staff');
+    // The email log is staff visible (issue #183).
+    expect(sectionTier('/admin/email-log')).toBe('staff');
+    // Change requests are staff work (issue #188). An undeclared item would
+    // fall to the operator and lock staff out of their own queue.
+    expect(sectionTier('/admin/change-requests')).toBe('staff');
+    // Version history is staff work, the record route under it too (issue #195).
+    expect(sectionTier('/admin/versions')).toBe('staff');
+    expect(sectionTier('/admin/versions/cmsContent/x')).toBe('staff');
+    // So is the list of unpublished changes (issue #196).
+    expect(sectionTier('/admin/unpublished')).toBe('staff');
+    expect(sectionTier('/admin/pages/new')).toBe('staff');
+    expect(sectionTier('/admin/sessions/abc')).toBe('staff');
+    // The organizations list and editor are content, so staff work (#192).
+    expect(sectionTier('/admin/organizations')).toBe('staff');
+    expect(sectionTier('/admin/organizations/new/organization')).toBe('staff');
+    // Updates is content work (issue #190), its editors included.
+    expect(sectionTier('/admin/updates')).toBe('staff');
+    expect(sectionTier('/admin/updates/new/update')).toBe('staff');
+    // The timeline list and editor are content, so staff work (#194).
+    expect(sectionTier('/admin/timeline')).toBe('staff');
+    expect(sectionTier('/admin/timeline/new/entry')).toBe('staff');
+    expect(sectionTier('/admin')).toBeNull();
+    expect(sectionTier('/admin/')).toBeNull();
+  });
+
+  it('normalises the segment the way the router matches it, and fails closed on a path no staff section owns', () => {
+    // React Router matches routes case-insensitively, so /admin/Branding
+    // renders the Branding page; the tier lookup must see the same section.
+    expect(sectionTier('/admin/Branding')).toBe('operator');
+    expect(sectionTier('/admin/ACCESS')).toBe('operator');
+    expect(sectionTier('/admin/%41ccess')).toBe('operator');
+    expect(sectionTier('/admin/Pages/new')).toBe('staff');
+    // An /admin path no staff-tier section owns is the operator's — the
+    // same default an undeclared docket item takes.
+    expect(sectionTier('/admin/nope')).toBe('operator');
+    expect(sectionTier('/admin/%E0%A4%A')).toBe('operator');
+    // The PREFIX matches case-insensitively and decoded too, so it is read
+    // the same way — the whole pathname is normalised, not one segment.
+    expect(sectionTier('/Admin/branding')).toBe('operator');
+    expect(sectionTier('/ADMIN/Branding')).toBe('operator');
+    expect(sectionTier('/%41dmin/%42randing')).toBe('operator');
+    expect(sectionTier('/Admin/pages')).toBe('staff');
+    expect(sectionTier('/Admin')).toBeNull();
+    // A segment that decodes to a slash, or an empty segment before more
+    // path, is nothing the docket owns: the operator's.
+    expect(sectionTier('/admin/%2Fbranding')).toBe('operator');
+    expect(sectionTier('/admin//branding')).toBe('operator');
+  });
+
+  it('names each tier’s sections once, in the rail’s own words, Event included for staff', () => {
+    const labels = (predicate) =>
+      DOCKET.flatMap((group) => group.items).filter(predicate).map((item) => item.label);
+    const staffLabels = labels((item) => item.tier === 'staff');
+    const operatorLabels = labels((item) => item.tier === 'operator');
+    expect(TIER_SCOPE.staff).toBe(
+      `${staffLabels.slice(0, -1).join(', ')} and ${staffLabels.at(-1)}`,
+    );
+    expect(TIER_SCOPE.staff).toContain('Event');
+    expect(TIER_SCOPE.operatorOnly).toBe('Features, Branding, Access and System errors');
+    expect(operatorLabels).toEqual(['Features', 'Branding', 'Access', 'System errors']);
+  });
+
+  it('lets an operator reach everything, staff reach staff only, and an undeclared tier reach nothing but operators', () => {
+    expect(tierReaches('operator', 'operator')).toBe(true);
+    expect(tierReaches('operator', 'staff')).toBe(true);
+    expect(tierReaches('staff', 'staff')).toBe(true);
+    expect(tierReaches('staff', 'operator')).toBe(false);
+    expect(tierReaches(null, 'staff')).toBe(false);
+    // A forgotten declaration closes a section, the same default the
+    // server's requireAdmin takes.
+    expect(tierReaches('staff', undefined)).toBe(false);
+    expect(tierReaches('operator', undefined)).toBe(true);
+  });
+
+  it('draws the staff docket without the operator sections and drops an emptied group', () => {
+    const staffDocket = docketForTier('staff');
+    expect(staffDocket.map((group) => group.id)).toEqual(['lead', 'content', 'people', 'operations', 'system']);
+    expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview']);
+    expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
+    expect(docketForTier('operator')).toEqual(DOCKET);
+    expect(docketForTier(null)).toEqual([]);
+  });
+
+  // The pending-changes banner (issue #196) sits above the stone, never
+  // inside it: the title band pulls itself up by the stone's top padding
+  // and would slide over anything placed before it there.
+  it('puts the unpublished changes banner first in main, outside the stone', async () => {
+    vi.mocked(subscribeDirtyDrafts).mockImplementation((collection, onNext) => {
+      onNext(
+        collection === 'cmsContent'
+          ? [{ id: 'hero__subtitle', section: 'hero', field: 'subtitle', status: 'dirty', basedOnRevision: 1 }]
+          : [],
+      );
+      return () => {};
+    });
+    try {
+      const { container } = await renderAdmin('/admin/pages');
+      const banner = await screen.findByRole('complementary', { name: 'Unpublished changes' });
+      const main = container.querySelector('main#admin-content');
+      expect(main.firstElementChild.contains(banner)).toBe(true);
+      expect(banner.closest('.admin-stone')).toBeNull();
+      expect(main.firstElementChild.nextElementSibling).toHaveClass('admin-stone');
+      expect(banner).toHaveAttribute('data-pending-total', '1');
+      expect(banner).toHaveTextContent('1 unpublished change: 1 content block.');
+      // The rail carries words only: no count joins the docket link.
+      expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveTextContent(/^Unpublished changes$/);
+    } finally {
+      vi.mocked(subscribeDirtyDrafts).mockImplementation((_collection, onNext) => {
+        onNext([]);
+        return () => {};
+      });
+    }
+  });
+
   it('holds the account controls at the control height on every pointer', async () => {
     // The two ways out sit at the foot of the rail and are used constantly.
     // A button holds the control height everywhere (2.75rem), so touch gets
@@ -189,5 +353,108 @@ describe('the admin shell', () => {
     expect(screen.getByRole('button', { name: 'Sign out' }).className).toContain(
       'min-h-admin-control',
     );
+  });
+});
+
+// The editor tour (issue #198) is shell chrome: it opens on a first visit,
+// sits inside the stone above the page, and ends from any step.
+describe('the editor tour in the shell', () => {
+  const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+  const tourPanel = () => screen.findByRole('complementary', { name: 'Admin tour' });
+  // The tour is a lazy chunk. Before asserting it is ABSENT, let that chunk
+  // load, so an open tour would have had every chance to draw.
+  const settleTourChunk = () =>
+    act(async () => {
+      await import('./components/AdminTour.jsx');
+      await Promise.resolve();
+    });
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    signedInUid = 'admin-1';
+  });
+
+  it('opens on a first visit inside the stone, above the page heading, without taking the focus', async () => {
+    const { container } = await renderAdmin('/admin/pages');
+    const tour = await tourPanel();
+    // After the unpublished changes banner's place (outside the stone) and
+    // before the page: the first thing in the stone.
+    expect(container.querySelector('.admin-stone').firstElementChild).toBe(tour);
+    const heading = within(tour).getByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
+    // An operator reaches five groups: a welcome, five steps, and the last.
+    const stepLine = within(tour).getByText('Step 1 of 7');
+    expect(heading.compareDocumentPosition(stepLine) & FOLLOWING).toBeTruthy();
+    const pageHeading = await screen.findByRole('heading', { level: 1, name: 'Pages' });
+    expect(tour.compareDocumentPosition(pageHeading) & FOLLOWING).toBeTruthy();
+    expect(heading).not.toHaveFocus();
+  });
+
+  it('stays closed for an account that has ended it in this browser', async () => {
+    markTourDone('admin-1');
+    await renderAdmin('/admin/pages');
+    await screen.findByRole('heading', { level: 1, name: 'Pages' });
+    await settleTourChunk();
+    expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+  });
+
+  it('ends from End tour: it stores the mark, closes, and gives the focus to Take the tour', async () => {
+    await renderAdmin('/admin/pages');
+    const tour = await tourPanel();
+    fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
+    expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Take the tour' })).toHaveFocus();
+    expect(readTourDone('admin-1')).toBe(true);
+  });
+
+  it('opens again at step 1 from Take the tour, with the focus on its heading, and Escape ends it', async () => {
+    markTourDone('admin-1');
+    await renderAdmin('/admin/pages');
+    const takeTour = screen.getByRole('button', { name: 'Take the tour' });
+    // First in the rail foot's button row, and a rail control like its neighbours.
+    expect(takeTour.parentElement.firstElementChild).toBe(takeTour);
+    expect(takeTour.className).toContain('min-h-admin-control');
+    fireEvent.click(takeTour);
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    fireEvent.keyDown(heading, { key: 'Escape' });
+    expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+    expect(takeTour).toHaveFocus();
+  });
+
+  it('stays on screen, at its step, while the reader opens the section it names', async () => {
+    await renderAdmin('/admin/pages');
+    const tour = await tourPanel();
+    fireEvent.click(within(tour).getByRole('button', { name: 'Next' }));
+    expect(within(tour).getByText('Step 2 of 7')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Content' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Content' })).toBeInTheDocument();
+    expect(within(await tourPanel()).getByText('Step 2 of 7')).toBeInTheDocument();
+  });
+
+  it('still ends, for the life of the tab, when the browser refuses its store', async () => {
+    signedInUid = 'admin-refused-store';
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    try {
+      const first = await renderAdmin('/admin/pages');
+      const tour = await tourPanel();
+      fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
+      expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Take the tour' })).toHaveFocus();
+      first.unmount();
+
+      // A fresh shell in the same tab (the reader went to the site and back).
+      await renderAdmin('/admin/pages');
+      await screen.findByRole('heading', { level: 1, name: 'Pages' });
+      await settleTourChunk();
+      expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
   });
 });

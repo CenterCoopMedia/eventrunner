@@ -407,7 +407,11 @@
           </code></pre>
           <p><code>init-event.cjs</code> runs from an operator&#39;s machine (or a follow-up dispatch of a future
           provisioning workflow), not from <code>deploy-client.yml</code> — it is the one-time content bootstrap, not a
-          repeatable deploy step. See <code>scripts/README.md</code>.</p>
+          repeatable deploy step. See <code>scripts/README.md</code>. <code>--admin</code> seeds the operator tier; <code>--staff</code>
+          (repeatable) seeds staff, who run content, schedule, speakers, and attendees but not branding,
+          features, access, or deployment settings. Both can be granted later from admin Settings → Access.
+          A re-run of init never removes a grant made there, and it never puts back an address removed there:
+          on a re-run the answers file&#39;s lists are not re-applied, and only <code>--admin</code> and <code>--staff</code> add.</p>
           <p><strong>Step 3 — normal dispatch</strong>, now that <code>config/event</code> exists:</p>
           <pre data-scroll-region data-scroll-label="Code example"><code>Actions tab → Deploy → Run workflow
             client: &lt;CLIENT_ENV&gt;
@@ -620,6 +624,13 @@
           demo copy), through the same builders in <code>scripts/lib/site-manifest.cjs</code> — so a client&#39;s site never
           goes without these files between its first deploy and its first content publish, whether or not the
           site publisher is enabled at all.</p>
+          <p><strong>App icons.</strong> Both paths also write two raster app icons beside the manifest,
+          <code>branding/app-icon-192.png</code> and <code>branding/app-icon-512.png</code> (#218). When the square icon slot
+          (<code>config/theme.logos.mark</code>) names an uploaded square PNG, the job reads it from
+          <code>EVENT_STORAGE_BUCKET</code> over its public download URL and resamples it. <code>branding/</code> is public read in
+          <code>storage.rules</code>, so neither the publisher nor the <code>build</code> job needs an IAM change or a credential
+          for this. Any other slot value ships the neutral placeholder icons, and the job log names the
+          reason on a line that starts <code>app icons: neutral placeholder:</code>. An icon problem never fails the job.</p>
           <p><strong>It is optional.</strong> With <code>EVENT_SITE_PUBLISHER_ENABLED</code> unset or <code>false</code>, nothing below exists, the
           <code>publisher</code> deploy job is skipped, <code>EVENT_SITE_PUBLISHER_JOB</code> is never written into the functions
           env, and <code>cmsPublish</code> skips the invoke without writing anything. That is the phase 2–4 behavior:

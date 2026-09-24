@@ -17,43 +17,79 @@ export function toPublishDate(publishAt) {
   return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-/** "October 15, 2026" display copy, or null when unresolvable. */
-export function publishDateLabel(publishAt) {
-  const date = toPublishDate(publishAt);
-  if (!date) return null;
-  return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
+/**
+ * A formatter in the event's zone, or in the reader's when none is given or
+ * the given one is not a zone the runtime knows. A dateline carries the
+ * event's clock (design record §3.1): a post published late in the evening
+ * at the venue is dated that day, not the reader's next morning.
+ */
+function formatterIn(timeZone, options) {
+  if (typeof timeZone === 'string' && timeZone) {
+    try {
+      return new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone, ...options });
+    } catch {
+      // An unknown zone: fall through to the reader's clock rather than
+      // failing the page over a date.
+    }
+  }
+  return new Intl.DateTimeFormat(DISPLAY_LOCALE, options);
 }
 
 /**
- * Sort updates pinned-first, then newest publishAt first. Updates without a
- * resolvable publishAt sort after every dated one (within the same pinned
- * bucket) rather than floating to the top as "newest".
+ * "October 15, 2026" display copy, or null when unresolvable.
+ *
+ * @param {*} publishAt
+ * @param {string} [timeZone] the event's zone (config/event.timezone)
+ */
+export function publishDateLabel(publishAt, timeZone) {
+  const date = toPublishDate(publishAt);
+  if (!date) return null;
+  return formatterIn(timeZone, { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
+}
+
+/**
+ * The feed's order for two updates: pinned first, then newest publishAt
+ * first. An update without a resolvable publishAt sorts after every dated
+ * one (within the same pinned bucket) rather than floating to the top as
+ * "newest". The admin's updates list orders its rows with this too
+ * (admin/updatesDoc.js), so the two lists agree (issue #190).
+ *
+ * @param {object} a
+ * @param {object} b
+ * @returns {number}
+ */
+export function compareUpdates(a, b) {
+  const pinDiff = (b?.pinned === true ? 1 : 0) - (a?.pinned === true ? 1 : 0);
+  if (pinDiff !== 0) return pinDiff;
+  const aDate = toPublishDate(a?.publishAt);
+  const bDate = toPublishDate(b?.publishAt);
+  if (aDate && bDate) return bDate.getTime() - aDate.getTime();
+  if (aDate) return -1;
+  if (bDate) return 1;
+  return 0;
+}
+
+/**
+ * Sort updates in the feed's order (compareUpdates).
  *
  * @param {Array<object>} updates
  * @returns {Array<object>}
  */
 export function sortUpdates(updates) {
-  return updates.slice().sort((a, b) => {
-    const pinDiff = (b?.pinned === true ? 1 : 0) - (a?.pinned === true ? 1 : 0);
-    if (pinDiff !== 0) return pinDiff;
-    const aDate = toPublishDate(a?.publishAt);
-    const bDate = toPublishDate(b?.publishAt);
-    if (aDate && bDate) return bDate.getTime() - aDate.getTime();
-    if (aDate) return -1;
-    if (bDate) return 1;
-    return 0;
-  });
+  return updates.slice().sort(compareUpdates);
 }
 
-/** "October 2026" — the standing head one month of the feed sits under. */
-export function publishMonthLabel(publishAt) {
+/**
+ * "October 2026" — the standing head one month of the feed sits under, on
+ * the event's clock when a zone is given.
+ *
+ * @param {*} publishAt
+ * @param {string} [timeZone]
+ */
+export function publishMonthLabel(publishAt, timeZone) {
   const date = toPublishDate(publishAt);
   if (!date) return null;
-  return new Intl.DateTimeFormat(DISPLAY_LOCALE, { month: 'long', year: 'numeric' }).format(date);
+  return formatterIn(timeZone, { month: 'long', year: 'numeric' }).format(date);
 }
 
 /**
@@ -64,8 +100,11 @@ export function publishMonthLabel(publishAt) {
  * August sitting above October's would put August's month head at the top
  * of the page. Pinned is not a date, so it is its own named run.
  *
- * Three kinds of run, in this order:
+ * Four kinds of run, in this order:
  *
+ *   'lead'     the first featured post in sorted order (issue #191), alone,
+ *              titled "Featured". Featured is not a date either. Only one
+ *              post leads; another featured post stays in its own place.
  *   'pinned'   the posts the operator held to the top, in their sorted
  *              order. Titled "Pinned", never a month — the whole point of
  *              the group is that it is out of time.
@@ -75,24 +114,31 @@ export function publishMonthLabel(publishAt) {
  *              a month they never had.
  *
  * Takes an ALREADY SORTED list and never re-sorts it, so a run can never
- * hold a post the sort would have put elsewhere.
+ * hold a post the sort would have put elsewhere. The lead is the one post
+ * taken out of its place, and it is left out of the runs after it, so no
+ * post is listed twice.
  *
  * @param {Array<object>} sorted output of sortUpdates
- * @returns {Array<{ kind: 'pinned'|'month'|'undated', label: string, members: object[] }>}
+ * @param {string} [timeZone] the event's zone, so a month head is the event's month
+ * @returns {Array<{ kind: 'lead'|'pinned'|'month'|'undated', label: string, members: object[] }>}
  */
-export function groupUpdates(sorted) {
+export function groupUpdates(sorted, timeZone) {
   const runs = [];
+  // Only a real `true` features a post, the value cmsSaveUpdate stores.
+  const lead = sorted.find((update) => update?.featured === true) ?? null;
+  if (lead) runs.push({ kind: 'lead', label: 'Featured', members: [lead] });
   const push = (kind, label, update) => {
     const last = runs[runs.length - 1];
     if (last && last.kind === kind && last.label === label) last.members.push(update);
     else runs.push({ kind, label, members: [update] });
   };
   for (const update of sorted) {
+    if (update === lead) continue;
     if (update?.pinned === true) {
       push('pinned', 'Pinned', update);
       continue;
     }
-    const month = publishMonthLabel(update?.publishAt);
+    const month = publishMonthLabel(update?.publishAt, timeZone);
     if (month) push('month', month, update);
     else push('undated', 'Undated', update);
   }

@@ -310,13 +310,6 @@ export function buildRuntimeThemeCss(themeDoc) {
     const stack = FONT_SETS[roles[role]];
     if (stack) rootLines.push(`  --font-${role}: ${stack};`);
   }
-  // Component-token faces beyond the four roles. Zine's --callout-font is
-  // the only one at launch: a component token, not a fifth role.
-  for (const [name, setId] of Object.entries(resolveComponentFonts(themeDoc))) {
-    const stack = FONT_SETS[setId];
-    if (stack) rootLines.push(`  ${name}: ${stack};`);
-  }
-
   // A document that names no preset overrides only what it names outright,
   // exactly as it did before presets existed: density and the motif-set
   // record are a preset's to state, so they stay out of the block unless a
@@ -344,6 +337,15 @@ export function buildRuntimeThemeCss(themeDoc) {
   // option never adds a property name (brief §3.4).
   for (const [name, value] of Object.entries(resolvePresetTokens(themeDoc, { resetComponents: true }))) {
     rootLines.push(`  ${name}: ${value};`);
+  }
+  // Component-token faces beyond the four roles (Zine's --callout-font, and
+  // a picked option's, such as the toner-block quote's). They come after
+  // the remaps, as in the generated stylesheet (scripts/lib/tokens.cjs):
+  // the component reset above names every component token's default, and
+  // written first, a picked face lost to it.
+  for (const [name, setId] of Object.entries(resolveComponentFonts(themeDoc))) {
+    const stack = FONT_SETS[setId];
+    if (stack) rootLines.push(`  ${name}: ${stack};`);
   }
 
   // The record of which motif set is active. It does NOT do the switching:

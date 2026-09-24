@@ -327,7 +327,11 @@ node scripts/init-event.cjs --check
 
 `init-event.cjs` runs from an operator's machine (or a follow-up dispatch of a future
 provisioning workflow), not from `deploy-client.yml` — it is the one-time content bootstrap, not a
-repeatable deploy step. See `scripts/README.md`.
+repeatable deploy step. See `scripts/README.md`. `--admin` seeds the operator tier; `--staff`
+(repeatable) seeds staff, who run content, schedule, speakers, and attendees but not branding,
+features, access, or deployment settings. Both can be granted later from admin Settings → Access.
+A re-run of init never removes a grant made there, and it never puts back an address removed there:
+on a re-run the answers file's lists are not re-applied, and only `--admin` and `--staff` add.
 
 **Step 3 — normal dispatch**, now that `config/event` exists:
 
@@ -566,6 +570,14 @@ after `npm run build`, from the SAME generated snapshot the build just used (nev
 demo copy), through the same builders in `scripts/lib/site-manifest.cjs` — so a client's site never
 goes without these files between its first deploy and its first content publish, whether or not the
 site publisher is enabled at all.
+
+**App icons.** Both paths also write two raster app icons beside the manifest,
+`branding/app-icon-192.png` and `branding/app-icon-512.png` (#218). When the square icon slot
+(`config/theme.logos.mark`) names an uploaded square PNG, the job reads it from
+`EVENT_STORAGE_BUCKET` over its public download URL and resamples it. `branding/` is public read in
+`storage.rules`, so neither the publisher nor the `build` job needs an IAM change or a credential
+for this. Any other slot value ships the neutral placeholder icons, and the job log names the
+reason on a line that starts `app icons: neutral placeholder:`. An icon problem never fails the job.
 
 **It is optional.** With `EVENT_SITE_PUBLISHER_ENABLED` unset or `false`, nothing below exists, the
 `publisher` deploy job is skipped, `EVENT_SITE_PUBLISHER_JOB` is never written into the functions

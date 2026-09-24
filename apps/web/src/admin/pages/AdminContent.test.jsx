@@ -47,6 +47,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { sectionEditPath } from '../../components/SectionEditLink.jsx';
 
 const SCHOLARSHIPS_PAGE = {
   id: 'scholarships',
@@ -172,6 +173,23 @@ describe('content browsing', () => {
     await renderAt('/admin/content/scholarships/intro');
     expect(await screen.findByRole('link', { name: 'body' })).toBeInTheDocument();
     expect(screen.getByText('Rich text')).toBeInTheDocument();
+    // The title band names the section and its identifiers (the editor a
+    // public "Edit section" link opens, issue #198).
+    expect(screen.getByRole('heading', { level: 1, name: 'Intro' })).toBeInTheDocument();
+    expect(screen.getByText('scholarships · intro · 1 block')).toBeInTheDocument();
+  });
+
+  it('opens the right section from the path a public edit link builds, even for an id that needs encoding', async () => {
+    const odd = { ...SCHOLARSHIPS_PAGE.sections[0], id: 'a b/c', label: 'Odd section' };
+    sources.cmsPages_drafts = [
+      { ...SCHOLARSHIPS_PAGE, sections: [...SCHOLARSHIPS_PAGE.sections, odd] },
+    ];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
+
+    await renderAt(sectionEditPath('scholarships', 'a b/c'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Odd section' })).toBeInTheDocument();
+    expect(screen.getByText('scholarships · a b/c · 0 blocks')).toBeInTheDocument();
+    expect(screen.queryByText('No such section')).toBeNull();
   });
 
   it('fails soft when a listener errors: rows stay, with a non-blocking notice', async () => {
@@ -206,7 +224,7 @@ describe('content browsing', () => {
 
     await renderAt('/admin/content/scholarships/intro/body');
 
-    expect(screen.getByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
+    expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
     expect(screen.queryByDisplayValue(/STALE live content/)).toBeNull();
   });
 

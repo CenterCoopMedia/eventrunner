@@ -63,6 +63,31 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+  fact: {
+    id: 'fact',
+    label: 'Fact',
+    description:
+      'A fact that is not a number: The term, its description, and one optional line ' +
+      'under it. Where, who, format, room. A fact names no source and counts nothing, ' +
+      'so it carries none of the evidence parts a statistic must.',
+    fields: [
+      { id: 'label', type: 'string', required: true },
+      { id: 'value', type: 'string', required: true },
+      { id: 'note', type: 'string', required: false },
+      { id: 'order', type: 'number', required: false },
+    ],
+  },
+  quote: {
+    id: 'quote',
+    label: 'Quote',
+    description:
+      'A quoted sentence from a speaker or a session, with who said it. The first on a page ' +
+      'is set as the pull quote; any other is set as a plain quotation.',
+    fields: [
+      { id: 'text', type: 'string', required: true },
+      { id: 'attribution', type: 'string', required: false },
+    ],
+  },
   list_item: {
     id: 'list_item',
     label: 'List item',
@@ -93,6 +118,20 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+  sponsor_package: {
+    id: 'sponsor_package',
+    label: 'Sponsor package',
+    description:
+      'One sponsorship package for the sponsors page: Its name, its price, how many sponsors ' +
+      'can take it, and what it includes.',
+    fields: [
+      { id: 'name', type: 'string', required: true },
+      { id: 'price', type: 'string', required: false },
+      { id: 'limit', type: 'number', required: false },
+      { id: 'benefits', type: 'richtext', required: true },
+      { id: 'order', type: 'number', required: false },
+    ],
+  },
 });
 
 /**
@@ -110,6 +149,26 @@ export const STAT_CONTRACT_HINTS = Object.freeze({
   description: 'Say what the number counts, and over what period.',
   source: 'Name where the number came from, and the date you read it.',
   alt: 'Describe the finding for a screen reader. Do not describe the shape of the chart.',
+});
+
+/**
+ * What to write in each part of a fact (#234) and a quote, shown under the
+ * field in the block editor. Neither type is enforced on write beyond its
+ * required fields; the hints exist because `label` and `value` are the
+ * registry's names and "the term" and "the description" are the operator's.
+ */
+export const FACT_HINTS = Object.freeze({
+  label: 'The term. “Where”, “Who”, “Format”.',
+  value: 'The fact itself. “The main hall”, “Local newsroom staff”.',
+  note: 'One line under the fact, if it needs one. An address, a way to get there.',
+});
+
+export const QUOTE_HINTS = Object.freeze({
+  text:
+    'The sentence as it was said, without quotation marks: the page draws them in every site ' +
+    'style. The first quote on a page is set as the pull quote; any quote after it is set as a ' +
+    'plain quotation in the body.',
+  attribution: 'Who said it, and in what role. “Marisol Reyes, opening talk”.',
 });
 
 /** Registry order — the palette's display order. */

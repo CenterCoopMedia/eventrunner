@@ -46,6 +46,10 @@ vi.mock('../firebase.js', () => ({
 }));
 
 import App from '../App.jsx';
+import ContentPage from './ContentPage.jsx';
+import AuthContext from '../contexts/AuthContext.jsx';
+import { ContentProvider } from '../contexts/ContentContext.jsx';
+import { EventConfigProvider } from '../contexts/EventConfigContext.jsx';
 import siteContent from '@generated/siteContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import pagesData from '@generated/pagesData.js';
@@ -88,8 +92,10 @@ describe('Home', () => {
     // section a second time further down the page.
     const infoSection = home.sections.find((s) => s.id === 'info');
     expect(screen.getAllByRole('heading', { name: infoSection.label })).toHaveLength(1);
-    expect(screen.getByText(siteContent.info__when.takeaway)).toBeInTheDocument();
-    expect(screen.getByText(siteContent.info__where_venue.text)).toBeInTheDocument();
+    // The cards are facts (#234): a term and a description, no evidence.
+    // The hero states the range too, so the card is found as its <dd>.
+    expect(screen.getByText(siteContent.info__when.value, { selector: 'dd' })).toBeInTheDocument();
+    expect(screen.getByText(siteContent.info__where.value)).toBeInTheDocument();
     // The sponsor strip (M7 issue 10) draws the demo's own published
     // organizations on the home page, in the section's own place: it comes
     // after the History section, which is where the seed puts it.
@@ -455,6 +461,58 @@ describe('ContentPage — search and section index on long pages', () => {
     pushPage(LONG_SECTIONS_PAGE);
     pushContent(LONG_SECTIONS_BLOCKS);
   }
+
+  // One pull quote per page at most (expansion record §3.1), enforced by the
+  // budget the content page provides from its sections in order
+  // (components/blocks/pullQuoteBudget.jsx).
+  it('sets the first quote block in section order as the pull quote and any later one plain', async () => {
+    const page = {
+      id: 'two-quotes',
+      label: 'Two quotes fixture',
+      path: '/two-quotes',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [pageSection('tq_first', 'Opening'), pageSection('tq_second', 'Closing')],
+    };
+    const quote = (section, text) => ({
+      id: `${section}__quote`, section, field: 'quote', blockType: 'quote', text,
+      attribution: 'A speaker', visible: true, order: 0,
+    });
+    renderAt('/two-quotes');
+    pushPage(page);
+    pushContent([
+      quote('tq_second', 'The second quote, further down the page.'),
+      quote('tq_first', 'The first quote a reader meets.'),
+    ]);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Two quotes fixture' })).toBeInTheDocument();
+    const pulled = document.querySelectorAll('figure.pull-quote');
+    expect(pulled).toHaveLength(1);
+    expect(pulled[0].textContent).toContain('The first quote a reader meets.');
+    const plain = document.querySelectorAll('figure.quote-plain');
+    expect(plain).toHaveLength(1);
+    expect(plain[0].textContent).toContain('The second quote, further down the page.');
+  });
+
+  // The long read opening belongs to the page's first section, not to
+  // whichever section a keyword filter happens to leave first (connector
+  // review of PR 270).
+  it('keeps the long read opening on the first section, never on the first match of a filter', async () => {
+    renderAt('/long-sections');
+    pushPage({ ...LONG_SECTIONS_PAGE, template: 'long-read' });
+    pushContent(LONG_SECTIONS_BLOCKS);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' })).toBeInTheDocument();
+    const openings = () => document.querySelectorAll('.long-read-opening');
+    expect(openings()).toHaveLength(1);
+    expect(openings()[0].textContent).toContain('Welcome to the fixture page');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter by keyword' }), {
+      target: { value: 'Zzyzx' },
+    });
+    expect(screen.getByText(/Zzyzx, a word that appears nowhere else/)).toBeInTheDocument();
+    expect(openings()).toHaveLength(0);
+  });
 
   it('shows a filter box and a section index once a page crosses the section-count threshold', async () => {
     renderLongSectionsPage();
@@ -1056,5 +1114,67 @@ describe('ContentPage — search and section index on long pages', () => {
     // section is showing.
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'More detail' })).toBeInTheDocument();
+  });
+});
+
+// The section edit links on a content page (issue #198). The route itself is
+// rendered, inside the real config and content providers, under an auth
+// value that states the probe's answer, so the links read what the site does.
+describe('ContentPage section edit links', () => {
+  function renderFaqAs(auth) {
+    return render(
+      <MemoryRouter
+        initialEntries={['/faq']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <EventConfigProvider>
+          <AuthContext.Provider value={auth}>
+            <ContentProvider>
+              <ContentPage />
+            </ContentProvider>
+          </AuthContext.Provider>
+        </EventConfigProvider>
+      </MemoryRouter>,
+    );
+  }
+  const faq = pagesData.find((page) => page.id === 'faq');
+  const intro = faq.sections.find((section) => section.id === 'faq_intro');
+  const items = faq.sections.find((section) => section.id === 'faq_items');
+
+  it('puts the link in a visible head’s row, after the heading', async () => {
+    renderFaqAs({ adminStatus: 'admin' });
+    const heading = await screen.findByRole('heading', { level: 2, name: items.label });
+    const link = within(heading.parentElement).getByRole('link', { name: `Edit section: ${items.label}` });
+    expect(link).toHaveAttribute('href', '/admin/content/faq/faq_items');
+  });
+
+  it('puts the link after the content of a section whose heading is for screen readers only', async () => {
+    renderFaqAs({ adminStatus: 'admin' });
+    const heading = await screen.findByRole('heading', { level: 2, name: intro.label });
+    expect(heading).toHaveClass('sr-only');
+    const section = heading.closest('section');
+    const link = within(section).getByRole('link', { name: `Edit section: ${intro.label}` });
+    expect(link).toHaveAttribute('href', '/admin/content/faq/faq_intro');
+    // Last in the section's body, so nothing it draws sits under a control.
+    expect(link.parentElement.lastElementChild).toBe(link);
+    expect(heading.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('draws no link for a section the filter leaves out', async () => {
+    renderFaqAs({ adminStatus: 'admin' });
+    const filter = await screen.findByRole('searchbox', { name: 'Filter by keyword' });
+    fireEvent.change(filter, { target: { value: 'dietary' } });
+    expect(screen.queryByRole('heading', { name: intro.label })).toBeNull();
+    expect(screen.queryByRole('link', { name: `Edit section: ${intro.label}` })).toBeNull();
+    expect(screen.getByRole('link', { name: `Edit section: ${items.label}` })).toBeInTheDocument();
+  });
+
+  it('draws no link for a signed-out reader or a signed-in non-admin', async () => {
+    for (const auth of [null, { adminStatus: 'unknown' }, { adminStatus: 'denied' }]) {
+      const { unmount } = renderFaqAs(auth);
+      await screen.findByRole('heading', { level: 2, name: items.label });
+      expect(screen.queryByRole('link', { name: /^Edit section/ })).toBeNull();
+      unmount();
+    }
   });
 });

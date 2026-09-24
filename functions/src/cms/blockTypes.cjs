@@ -92,6 +92,31 @@ const BLOCK_TYPES = Object.freeze({
       field('order', 'number', false),
     ],
   }),
+  fact: blockType({
+    id: 'fact',
+    label: 'Fact',
+    description:
+      'A fact that is not a number: The term, its description, and one optional line ' +
+      'under it. Where, who, format, room. A fact names no source and counts nothing, ' +
+      'so it carries none of the evidence parts a statistic must.',
+    fields: [
+      field('label', 'string', true),
+      field('value', 'string', true),
+      field('note', 'string', false),
+      field('order', 'number', false),
+    ],
+  }),
+  quote: blockType({
+    id: 'quote',
+    label: 'Quote',
+    description:
+      'A quoted sentence from a speaker or a session, with who said it. The first on a page ' +
+      'is set as the pull quote; any other is set as a plain quotation.',
+    fields: [
+      field('text', 'string', true),
+      field('attribution', 'string', false),
+    ],
+  }),
   list_item: blockType({
     id: 'list_item',
     label: 'List item',
@@ -119,6 +144,20 @@ const BLOCK_TYPES = Object.freeze({
       field('group', 'string', true),
       field('label', 'string', true),
       field('url', 'url', true),
+      field('order', 'number', false),
+    ],
+  }),
+  sponsor_package: blockType({
+    id: 'sponsor_package',
+    label: 'Sponsor package',
+    description:
+      'One sponsorship package for the sponsors page: Its name, its price, how many sponsors ' +
+      'can take it, and what it includes.',
+    fields: [
+      field('name', 'string', true),
+      field('price', 'string', false),
+      field('limit', 'number', false),
+      field('benefits', 'richtext', true),
       field('order', 'number', false),
     ],
   }),

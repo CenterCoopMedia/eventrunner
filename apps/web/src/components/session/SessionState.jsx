@@ -2,14 +2,21 @@
 //
 // IN WORDS, AND THEN IN INK. A tinted pill that says nothing in words fails
 // a reader who cannot see it, so the mark is the sentence itself — "Running
-// now", "Finished" — and the one tag shape the system has only carries it.
-// The mark sits beside the title, where a reader scanning the programme
-// already looks.
-import Tag from '../editorial/Tag.jsx';
+// now", "Finished" — drawn through the state marker device (components/
+// editorial/StateMarker.jsx; expansion record §3.2): the word in the data
+// face, the accent while the session runs, the back-issue ink and the
+// hairline once it has finished. The mark sits beside the title, where a
+// reader scanning the programme already looks.
+import StateMarker from '../editorial/StateMarker.jsx';
 
 const STATE_WORD = {
   running: 'Running now',
   finished: 'Finished',
+};
+
+const STATE_TONE = {
+  running: 'live',
+  finished: 'past',
 };
 
 /**
@@ -18,5 +25,9 @@ const STATE_WORD = {
 export default function SessionState({ state, className = '' }) {
   const word = STATE_WORD[state];
   if (!word) return null;
-  return <Tag className={className}>{word}</Tag>;
+  return (
+    <StateMarker tone={STATE_TONE[state]} className={className}>
+      {word}
+    </StateMarker>
+  );
 }

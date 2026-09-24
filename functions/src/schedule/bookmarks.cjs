@@ -36,18 +36,33 @@ class SessionNotFoundError extends Error {
   }
 }
 
+/** The account the caller was admitted through is gone (deleted mid-request). */
+class AccountGoneError extends Error {
+  constructor(uid) {
+    super(`users/${uid} no longer exists`);
+    this.name = 'AccountGoneError';
+  }
+}
+
 /**
  * @param {{ db: FirebaseFirestore.Firestore, uid: string, sessionId: string,
  *           bookmarked: boolean, now?: () => number }} args
  * @returns {Promise<{ bookmarked: boolean, count: number }>}
  * @throws {SessionNotFoundError} the session does not exist or is hidden
  */
-async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, now = Date.now }) {
+async function toggleSessionBookmark({ db, uid, sessionId, bookmarked, requireAccount = false, now = Date.now }) {
   const sessionRef = db.collection('cmsSchedule').doc(sessionId);
   const membershipRef = db.collection(`users/${uid}/bookmarks`).doc(sessionId);
   const aggregateRef = db.collection('sessionBookmarks').doc(sessionId);
+  const accountRef = db.collection('users').doc(uid);
 
   return db.runTransaction(async (tx) => {
+    // An account delete removes users/{uid} in one transaction and then
+    // sweeps the bookmarks (users/records.cjs). Reading the account here
+    // puts this write in conflict with that delete, so a bookmark either
+    // commits before it (and is swept) or finds the account gone and writes
+    // nothing; none can land after the sweep (connector review of PR 274).
+    if (requireAccount && !(await tx.get(accountRef)).exists) throw new AccountGoneError(uid);
     const sessionSnap = await tx.get(sessionRef);
     if (!sessionSnap.exists || sessionSnap.data()?.visible !== true) {
       throw new SessionNotFoundError(sessionId);
@@ -108,9 +123,12 @@ function createBookmarkSessionHandler({ db, auth, getConfig, now = Date.now, log
 
     let result;
     try {
-      result = await toggleSessionBookmark({ db, uid: gate.uid, sessionId, bookmarked, now });
+      result = await toggleSessionBookmark({
+        db, uid: gate.uid, sessionId, bookmarked, requireAccount: gate.viaAccount === true, now,
+      });
     } catch (err) {
       if (err instanceof SessionNotFoundError) return notFound(res, 'Session not found.');
+      if (err instanceof AccountGoneError) return sendError(res, 403, 'forbidden', 'Attendee access required.');
       log.error('bookmarkSession failed', err);
       return internal(res, 'The bookmark could not be saved.');
     }
@@ -158,5 +176,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { toggleSessionBookmark, SessionNotFoundError },
+  internals: { toggleSessionBookmark, SessionNotFoundError, AccountGoneError },
 };

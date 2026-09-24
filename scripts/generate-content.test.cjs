@@ -145,6 +145,7 @@ test('readDeployment filters every publishable collection to visible docs only',
       cmsContent: [{ __id: 'a', visible: true }, { __id: 'b', visible: false }],
       cmsSchedule: [{ __id: 's1', visible: true }, { __id: 's2', visible: false }],
       cmsOrganizations: [{ __id: 'o1', visible: true }, { __id: 'o2', visible: false }],
+      cmsTimeline: [{ __id: 't1', visible: true }, { __id: 't2', visible: false }],
     },
   });
 
@@ -154,6 +155,7 @@ test('readDeployment filters every publishable collection to visible docs only',
   assert.deepEqual(snapshot.content.map((d) => d.id), ['a']);
   assert.deepEqual(snapshot.sessions.map((d) => d.id), ['s1']);
   assert.deepEqual(snapshot.organizations.map((d) => d.id), ['o1']);
+  assert.deepEqual(snapshot.timeline.map((d) => d.id), ['t1']);
 });
 
 test('an unpublished (visible: false) live doc never reaches the snapshot', async () => {

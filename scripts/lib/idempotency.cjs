@@ -29,6 +29,8 @@
  * Pure: decides, never writes.
  */
 
+const { isSeedOwned } = require('shared/seed');
+
 /** @typedef {'create'|'overwrite'|'skip'} SeedAction */
 
 /**
@@ -42,6 +44,12 @@
  * then publish the placeholder over it, destroying work that was never
  * visible to this script's live-doc check.
  *
+ * THE FLAG AND THE WRITER (adversarial review, 2026-09-24). The CMS once
+ * carried `seeded: true` through an edit, so a deployment from then holds
+ * edited documents that still say seeded. `isSeedOwned` (shared/seed) asks
+ * who wrote the revision as well: the seed's own actor, or nobody recorded,
+ * keeps it the seed's; an operator's uid or email makes it the client's.
+ *
  * @param {object|null|undefined} existing the live doc, or null when absent
  * @param {{ force?: boolean, draft?: object|null }} [opts] `force` still
  *   respects client edits; it only relaxes the whole-run refusal.
@@ -52,11 +60,11 @@ function decideSeedWrite(existing, opts = {}) {
   // An edited draft protects the document whether or not the live copy
   // still looks seeded — including the case where no live doc exists yet
   // (a seeded page whose first draft was rewritten before any publish).
-  if (draft != null && draft.seeded !== true) {
+  if (draft != null && !isSeedOwned(draft)) {
     return { action: 'skip', reason: 'unpublished editor draft' };
   }
   if (existing == null) return { action: 'create', reason: 'absent' };
-  if (existing.seeded === true) {
+  if (isSeedOwned(existing)) {
     return { action: 'overwrite', reason: 'still seeded (unedited)' };
   }
   if (opts.force === true) {
@@ -71,9 +79,10 @@ function decideSeedWrite(existing, opts = {}) {
 /**
  * What to do with one `config/*` document.
  *
- * `config/bootstrap` is the exception: admin emails are additive, because
- * re-running init with a new `--admin` must be able to add an operator
- * without dropping the admins a client granted through the UI.
+ * `config/bootstrap` is the exception: both admin lists are additive,
+ * because re-running init with a new `--admin` or `--staff` must be able
+ * to add an account without dropping the ones a client granted through
+ * the admin's Access page.
  *
  * @param {{ docId: string, existing: object|null, next: object, force?: boolean }} args
  * @returns {{ action: SeedAction, reason: string, value: object }}
@@ -87,10 +96,12 @@ function decideConfigWrite({ docId, existing, next, force = false }) {
     // normalized form, and skipping that write leaves an entry
     // firestore.rules can never match — `adminEmails.hasAny([email.lower()])`
     // — i.e. an admin who silently cannot authenticate.
-    const before = Array.isArray(existing.adminEmails) ? existing.adminEmails : [];
-    const changed =
-      before.length !== merged.adminEmails.length ||
-      before.some((email, i) => email !== merged.adminEmails[i]);
+    const listChanged = (field) => {
+      const before = Array.isArray(existing[field]) ? existing[field] : [];
+      return before.length !== merged[field].length
+        || before.some((email, i) => email !== merged[field][i]);
+    };
+    const changed = listChanged('adminEmails') || listChanged('staffEmails');
     return {
       action: changed ? 'overwrite' : 'skip',
       reason: changed ? 'admin list extended or renormalized' : 'admin list unchanged',
@@ -104,33 +115,41 @@ function decideConfigWrite({ docId, existing, next, force = false }) {
 }
 
 /**
- * Union of the existing and new admin lists, lowercased and de-duplicated.
- * Lowercase is load-bearing: firestore.rules compares the stored list
- * against `request.auth.token.email.lower()`, so a mixed-case entry is an
- * admin who can never authenticate.
+ * Union of the existing and new admin lists, per tier, lowercased and
+ * de-duplicated. Lowercase is load-bearing: firestore.rules compares the
+ * stored list against `request.auth.token.email.lower()`, so a mixed-case
+ * entry is an admin who can never authenticate. An address that ends up
+ * on both lists is an operator (issue #186): the wider grant wins, so it
+ * is dropped from `staffEmails` rather than stored twice.
  *
  * @param {object|null} existing
  * @param {object} next
- * @returns {{ adminEmails: string[] }}
+ * @returns {{ adminEmails: string[], staffEmails: string[] }}
  */
 function mergeAdminEmails(existing, next) {
   const normalize = (list) => (Array.isArray(list) ? list : [])
     .map((e) => String(e).trim().toLowerCase())
     .filter(Boolean);
-  return { adminEmails: [...new Set([...normalize(existing?.adminEmails), ...normalize(next?.adminEmails)])] };
+  const adminEmails = [...new Set([...normalize(existing?.adminEmails), ...normalize(next?.adminEmails)])];
+  const staffEmails = [...new Set([...normalize(existing?.staffEmails), ...normalize(next?.staffEmails)])]
+    .filter((email) => !adminEmails.includes(email));
+  return { adminEmails, staffEmails };
 }
 
 /**
  * Fields a `--force` config refresh must never take back from the
  * deployment, because something other than init owns them:
- * verify-sender-domain.cjs owns the sender verification pair (§1.3), the
- * admin Settings UI owns the legal review flag and the lifecycle stamps
- * (§2.5), the ticketing webhook script owns its registration stamps, and
- * the auth attestation is recorded by a separate operator action.
+ * verify-sender-domain.cjs owns the whole sender verification record
+ * (§1.3), the admin Settings UI owns the legal review flag and the
+ * lifecycle stamps (§2.5), the ticketing webhook script owns its
+ * registration stamps, and the auth attestation is recorded by a separate
+ * operator action.
  */
 const PRESERVED_PATHS = Object.freeze([
   'sender.domainVerified',
   'sender.domainVerifiedAt',
+  'sender.domainVerifiedBy',
+  'sender.domainVerifiedDomain',
   'legal.reviewRequired',
   'announcedAt',
   'archivedAt',

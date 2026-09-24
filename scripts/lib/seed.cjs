@@ -28,6 +28,7 @@
  */
 
 const { VENUE_MAP_SECTION_ID } = require('shared/venue');
+const { SEED_WHEN_PLACEHOLDER } = require('shared/seed');
 const { buildLegalContent } = require('./legal.cjs');
 const { getDefaultTemplate } = require('../../functions/src/email/templates.cjs');
 
@@ -63,9 +64,11 @@ function block(field, blockType, description) {
  * the page's `template`, `layout`, and section slots. Without a document
  * there is nothing in the admin Pages list to open, so those two pages were
  * the only ones an operator could not shape. They seed the same way
- * schedule, speakers, and sponsors do: a document with no sections, because
- * the route's own component is the page and the sections are what an
- * operator adds around it.
+ * schedule and speakers do: a document with no sections, because the
+ * route's own component is the page and the sections are what an operator
+ * adds around it. Sponsors seeds one section, Sponsorship packages (#193),
+ * and seeds it empty the way recap and guidelines do: it draws nothing
+ * until an operator adds a package, and then it sits after the logo wall.
  *
  * LABELS ARE THE NAVIGATION'S NAMES, NOT THE PAGE'S. `label` is what the
  * header nav and the footer page list print, and there are fifteen of them
@@ -125,41 +128,34 @@ function defaultPages() {
             block('title', 'text', 'Event name headline.'),
             block('subtitle', 'text', 'One warm supporting sentence.'),
           ]),
-        // The essentials, as a group of cards (M7 issue 9). A stat block
+        // The essentials, as a group of cards (M7 issue 9). A fact or a stat
         // opens a card and the list items after it are that card's own
-        // lines, so the dates can carry the facts that belong beside them
+        // lines, so a card can carry the lines that belong beside it
         // without a second section.
         //
-        // Seeded as placeholders, not from config/event, on purpose. The
-        // dates already render from configuration in the home page's own
-        // Dates list, and a second copy of them here would be two answers
-        // to one question that drift apart the moment an operator edits
-        // either. What belongs in these cards is the event's own summary of
-        // itself, which only the operator can write.
+        // THREE FACTS, NOT THREE STATS (#234). A fact is a term and a
+        // description — "Where", the hall's name, and one line under it —
+        // and it carries no evidence field, because a venue counts nothing
+        // and names no source. A stat carries the six-part contract (design
+        // brief §2.1.1) for a figure that IS evidence, and it stays in the
+        // allowed list so an operator can open a fourth card on one.
         //
-        // ONE STAT AND THREE LINES, NOT THREE STATS. A stat carries the
-        // six-part contract (design brief §2.1.1), so every seeded stat is
-        // six [Replace] instructions an operator has to answer before the
-        // block says anything — and three of them put fifteen of those
-        // lines under the hero of a site nobody has edited yet. One figure
-        // with its lines under it is a card an operator can finish in a
-        // sitting, and the section takes twelve blocks, so a second fact
-        // is one more stat away.
-        //
-        // Which facts: the dates are a figure and belong in the stat; where
-        // the event happens is a name, an address and a way to get there,
-        // which are lines. A venue is not a number, and dressing one as a
-        // stat would mean inventing a count and a source line to cite it
-        // to. Issue #234 tracks a block for a non-numeric fact.
-        section('info', 'Key facts', 'The event’s own short answers. A stat opens a card; the list items after it are that card’s lines.',
-          ['stat', 'list_item'], 12, [
-            block('when', 'stat', 'When the event runs.'),
-            block('where_venue', 'list_item', 'The venue’s name, labelled.'),
-            block('where_address', 'list_item', 'The venue’s street address, labelled.'),
+        // The dates and the venue are seeded from config/event, the way the
+        // travel page's venue name is, so both are correct the moment init
+        // runs; who the event is for is a sentence only the operator can
+        // write, so it arrives as the instruction to write it.
+        section('info', 'Key facts', 'The event’s own short answers. A fact or a stat opens a card; the list items after it are that card’s lines.',
+          ['fact', 'stat', 'list_item'], 12, [
+            block('when', 'fact', 'When the event runs.'),
+            block('where', 'fact', 'Where the event happens: The venue’s name, with its address under it.'),
             block('where_transit', 'list_item', 'The nearest transit to the venue, labelled.'),
+            block('who', 'fact', 'Who the event is for.'),
           ]),
-        section('details', 'Details', 'Body copy describing what happens at the event.',
-          ['richtext', 'image'], 6, [
+        // A quote block may sit among the body copy: one pull quote per page
+        // at most, which the six-block cap and the operator hold between
+        // them.
+        section('details', 'Details', 'Body copy describing what happens at the event. One quote at most.',
+          ['richtext', 'image', 'quote'], 6, [
             block('intro', 'richtext', 'What happens across the days.'),
           ]),
         section('highlights', 'Highlights', 'A short list of what attendees can expect.',
@@ -171,7 +167,11 @@ function defaultPages() {
             block('attendees', 'stat', 'Expected attendance.'),
             block('sessions', 'stat', 'Sessions planned.'),
           ]),
-        section('history', 'History', 'Background on previous editions of the event.',
+        // The past editions (issue #194). The section holds the operator's
+        // own words and pictures; the editions themselves come from the
+        // Timeline list, and the home page draws them under this section's
+        // blocks, oldest first. No edition seeds: a client starts with none.
+        section('history', 'History', 'Background on previous editions of the event. The editions themselves come from the Timeline list, not from here.',
           ['richtext', 'image'], 6),
         // The sponsor strip (M7 issue 10). The section holds one optional
         // line of copy; the organizations themselves come from the
@@ -220,7 +220,11 @@ function defaultPages() {
       order: 3,
       visible: true,
       systemPage: true,
-      sections: [],
+      sections: [
+        section('sponsor_packages', 'Sponsorship packages',
+          'What a sponsor can support, one package per block. The section is not shown until it holds a package.',
+          ['sponsor_package', 'richtext'], 6, []),
+      ],
     },
     {
       id: 'travel',
@@ -483,6 +487,50 @@ function defaultPages() {
 /** Page ids seeded from the §5.5 legal templates rather than placeholders. */
 const LEGAL_PAGE_IDS = Object.freeze(['privacy', 'terms']);
 
+/**
+ * The event's dates as one range, from `config/event.days`, or null where
+ * the event has published no day yet. "14–16 October 2026" inside one
+ * month, "30 September – 2 October 2026" across two, and both dates in full
+ * across a year boundary. The en dash is the range mark (interface
+ * guidelines, Typography), and the locale is fixed so a seed is the same
+ * text on every machine that runs it.
+ *
+ * @param {object} event config/event
+ * @returns {string|null}
+ */
+// The same range the home page shows while the When fact is still the
+// seed's (apps/web/src/lib/eventTime.js eventDateRangeLabel): "October 15,
+// 2026", "October 15–17, 2026", "October 30 – November 1, 2026", or
+// "December 31, 2026 – January 2, 2027". The days are calendar dates, so they
+// are formatted as the wall dates they are.
+const FULL_DATE = new Intl.DateTimeFormat('en-US', {
+  month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+});
+const MONTH_DAY = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+
+/** A real calendar date, not merely a string shaped like one ('2026-13-01' is not). */
+function isCalendarDate(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const [y, m, d] = date.split('-').map(Number);
+  const instant = new Date(Date.UTC(y, m - 1, d));
+  return instant.getUTCFullYear() === y && instant.getUTCMonth() === m - 1 && instant.getUTCDate() === d;
+}
+
+function eventDateRange(event = {}) {
+  const dates = (Array.isArray(event.days) ? event.days : [])
+    .map((day) => day?.date)
+    .filter(isCalendarDate)
+    .sort();
+  if (dates.length === 0) return null;
+  const first = new Date(`${dates[0]}T00:00:00Z`);
+  const last = new Date(`${dates[dates.length - 1]}T00:00:00Z`);
+  if (dates[0] === dates[dates.length - 1]) return FULL_DATE.format(first);
+  const sameYear = first.getUTCFullYear() === last.getUTCFullYear();
+  const sameMonth = sameYear && first.getUTCMonth() === last.getUTCMonth();
+  if (sameMonth) return `${MONTH_DAY.format(first)}–${last.getUTCDate()}, ${last.getUTCFullYear()}`;
+  return `${(sameYear ? MONTH_DAY : FULL_DATE).format(first)} – ${FULL_DATE.format(last)}`;
+}
+
 /** Full street address from `config/event.venue`, blank parts dropped. */
 function venueAddress(venue = {}) {
   const line = [venue.addressLine1, venue.addressLine2].filter(Boolean).join(', ');
@@ -523,6 +571,26 @@ const CONFIG_SEEDS = Object.freeze({
   // will count or where it came from.
   'stats.attendees': () => ({ value: '0', label: 'attendees expected', ...statContract('attendance') }),
   'stats.sessions': () => ({ value: '0', label: 'sessions planned', ...statContract('the session count') }),
+  // The two key facts configuration can answer (#234). A fact is a term
+  // and a description, and neither of these needs a source line. A note
+  // is written only where the venue states an address, because a fact's
+  // note is optional and an empty one is a field an operator has to notice
+  // and delete. The When fact is seeded with the range so the stored block
+  // is right, and the home page reads the range LIVE from config/event for
+  // as long as the block is still the seed's (pages/Home.jsx
+  // withLiveDates), so a moved day never leaves a stale fact.
+  'info.when': ({ event }) => ({
+    label: 'When',
+    value: eventDateRange(event) || SEED_WHEN_PLACEHOLDER,
+  }),
+  'info.where': ({ event }) => {
+    const address = venueAddress(event.venue);
+    return {
+      label: 'Where',
+      value: event.venue?.name || '[Replace] The venue’s name.',
+      ...(address ? { note: address } : {}),
+    };
+  },
   'travel_venue.venue_name': ({ event }) => ({
     value: event.venue?.name || '[Replace] Venue name.',
   }),
@@ -568,12 +636,21 @@ function placeholderBlock(blockType, description) {
       return { label: '[Replace] Button label', url: 'https://example.org', external: true };
     case 'stat':
       return { value: '0', label: text, ...statContract('this number') };
+    case 'fact':
+      // The term is the instruction's own first word where it has one
+      // ("Who the event is for." seeds the term "Who"), so a placeholder
+      // card already reads as a term and a description.
+      return { label: text.replace(/^\[Replace\] /u, '').split(/\s/u)[0], value: text };
+    case 'quote':
+      return { text, attribution: '[Replace] Who said it, and in what role.' };
     case 'list_item':
       return { text };
     case 'faq_item':
       return { question: text, answer: `<p>[Replace] Answer this question in a sentence or two.</p>` };
     case 'link_group':
       return { group: 'Links', label: text, url: 'https://example.org' };
+    case 'sponsor_package':
+      return { name: text, benefits: '<p>[Replace] What this package includes.</p>' };
     default:
       // Unreachable while defaultBlocks pass validatePageDoc, which
       // rejects unknown block types by name before a seed is built.
@@ -746,7 +823,42 @@ const OBSOLETE_CONTENT_IDS = Object.freeze([
   // configuration now (`config/event.registration`), read by the page and
   // by the ticket provider's email alike, and an unset one draws nothing.
   'hero__register_cta',
+  // #234: the venue's name and address were two labelled lines under the
+  // dates card. They are the `info__where` fact now, with the address as
+  // its note, so a site upgraded in place would otherwise state the venue
+  // twice. Removed only while they are still the seed's; see
+  // REPLACED_CONTENT_IDS for what happens when a client has edited them.
+  'info__where_venue',
+  'info__where_address',
 ]);
+
+/**
+ * Seeded documents that REPLACE documents an earlier release seeded, keyed
+ * replacement → predecessors (adversarial review of the 2026-09-10 wave).
+ *
+ * `OBSOLETE_CONTENT_IDS` removes a predecessor only while it is still the
+ * seed's. On a launched site the predecessors are usually the client's —
+ * `info__where_venue` and `info__where_address` were placeholders nothing
+ * filled, so every live site has typed the venue into them — and the seed
+ * then keeps them and would CREATE the replacement beside them: the venue
+ * stated twice on the home page, once in the client's words and once in
+ * the seed's. So `withholdUpgradeSeeds` (scripts/lib/write.cjs) does not
+ * create a replacement while any predecessor survives as client-edited, and
+ * init keeps those predecessors out of the obsolete removal, so a client
+ * who edited only the venue line does not lose the address line beside it.
+ * Both are reported as kept, the way an obsolete seed the client owns is.
+ *
+ * `info__who` and `info__when` replace nothing: `info__when` keeps its id
+ * from the earlier release (a stat then, a fact now, refreshed only while it
+ * is still the seed's), and `info__who` is new. A new placeholder is not
+ * published onto a launched home page either — `withholdUpgradeSeeds`
+ * creates no "[Replace]" block in a section a client has edited — so
+ * `info__who` arrives on a fresh site and on one whose key facts are still
+ * the seed's, and nowhere else; an operator adds it from the palette.
+ */
+const REPLACED_CONTENT_IDS = Object.freeze({
+  info__where: Object.freeze(['info__where_venue', 'info__where_address']),
+});
 
 module.exports = {
   defaultPages,
@@ -756,6 +868,7 @@ module.exports = {
   placeholderBlock,
   LEGAL_PAGE_IDS,
   OBSOLETE_CONTENT_IDS,
+  REPLACED_CONTENT_IDS,
   EMAIL_TEMPLATE_OVERRIDE_IDS,
-  internals: { venueAddress, CONFIG_SEEDS },
+  internals: { venueAddress, eventDateRange, CONFIG_SEEDS },
 };

@@ -23,7 +23,7 @@ const {
  * FieldPath.documentId()): orderBy/startAfter treat it as the doc's id
  * rather than a stored data field.
  */
-function makeFakeDb(seed = {}) {
+function makeBareFakeDb(seed = {}) {
   const store = new Map(); // "collection/id" -> data
   for (const [path, data] of Object.entries(seed)) {
     store.set(path, { ...data });
@@ -142,6 +142,14 @@ function makeFakeDb(seed = {}) {
     },
   };
 }
+
+// requireAdmin reads config/bootstrap live from the db it is handed (fails
+// closed on an absent document), so every fake carries the admin and the
+// staff address the tests use.
+const makeFakeDb = (seed = {}) => makeBareFakeDb({
+  'config/bootstrap': { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] },
+  ...seed,
+});
 
 const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
 const USER = { uid: 'user1', email: 'user@example.org', email_verified: true };
@@ -521,4 +529,20 @@ test('the (resolved ASC, createdAt DESC) composite index is declared for deploy'
       ix.fields[1].order === 'DESCENDING',
   );
   assert.ok(match, 'firestore.indexes.json must declare (resolved ASC, createdAt DESC) on system_errors');
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('listSystemErrors / resolveSystemErrors are operator-only: a staff admin is refused', async () => {
+  const STAFF = { uid: 'staff1', email: 'staff@example.org', email_verified: true };
+  const auth = { async verifyIdToken(t) { if (t === 'staff-token') return STAFF; throw new Error('bad'); } };
+  const tiered = async () => ({ bootstrap: { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] } });
+  const db = makeFakeDb({ 'system_errors/e1': { kind: 'client-error', resolved: false, createdAt: new Date(1) } });
+  for (const create of [createListSystemErrorsHandler, createResolveSystemErrorsHandler]) {
+    const res = fakeRes();
+    await create({ db, auth, getConfig: tiered })(req({ token: 'staff-token', body: { id: 'e1' } }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.message, 'Operator access required.');
+  }
+  assert.equal(db.store.get('system_errors/e1').resolved, false);
 });

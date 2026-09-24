@@ -28,8 +28,11 @@ import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
 import AreaMap from '../components/AreaMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
+import { PullQuoteBudget } from '../components/blocks/pullQuoteBudget.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import LongReadOpening from '../components/editorial/LongReadOpening.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
+import SectionEditLink from '../components/SectionEditLink.jsx';
 import { blockMatchesQuery } from '../lib/blockSearchText.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { inputClass, primaryActionClass, quietActionClass } from '../components/controlClasses.js';
@@ -251,6 +254,11 @@ export default function ContentPage() {
 
   const trimmedQuery = query.trim();
   const settledTrimmedQuery = settledQuery.trim();
+  // The stored template id, read directly: a page STATES the Long read
+  // template or it does not, and pulling the template table (with its
+  // editor copy) into the public bundle to say so would cost every reader
+  // the words an operator reads.
+  const isLongRead = page.template === 'long-read';
   // THE MAP COUNTS AS ONE. It is not a block, so counting blocks alone made
   // the live region announce "No items match" over a page that was, right
   // then, showing the plan the query had retained (filterSections keeps a
@@ -289,6 +297,9 @@ export default function ContentPage() {
   };
 
   return (
+    // The page's one pull quote (expansion record §3.1) goes to the first
+    // quote block in the page's section order; any later one is set plain.
+    <PullQuoteBudget sections={page.sections ?? []} getSectionBlocks={getSectionBlocks}>
     <article>
       <h1 className="pb-lg font-heading text-h1 font-semibold text-text-primary">
         {pageHeading(page)}
@@ -389,16 +400,35 @@ export default function ContentPage() {
                   id={`section-${section.id}`}
                   title={section.label}
                   tabIndex={-1}
+                  action={<SectionEditLink pageId={page.id} sectionId={section.id} label={section.label} />}
                 />
               )}
               <div className={index === 0 ? undefined : 'mt-md'}>
-                <SectionBlocks blocks={blocks} />
+                {/* The long read opening (expansion record §3.1): the first
+                    block of the first section of a page that STATES the
+                    Long read template takes the style's opening — a drop
+                    cap, a standfirst-sized line, or nothing. Never inferred
+                    from the layout values, and never on any later section,
+                    even when a keyword filter leaves it first. */}
+                <LongReadOpening active={isLongRead && section.id === baseSections[0]?.section.id}>
+                  <SectionBlocks blocks={blocks} />
+                </LongReadOpening>
                 {page.id === 'travel' && section.id === 'travel_local' ? <AreaMap url={eventConfig.venue?.mapUrl} /> : null}
                 <VenueMap
                   map={sectionMap}
                   image={venueMapImage}
                   className={blocks.length > 0 ? 'mt-md' : undefined}
                 />
+                {/* A section with no visible head carries its edit link
+                    (issue #198) after its content, never above it. */}
+                {isTitleRepeatingSection(section, page) ? (
+                  <SectionEditLink
+                    pageId={page.id}
+                    sectionId={section.id}
+                    label={section.label}
+                    className="mt-sm"
+                  />
+                ) : null}
               </div>
             </section>
           ))}
@@ -424,5 +454,6 @@ export default function ContentPage() {
         </>
       )}
     </article>
+    </PullQuoteBudget>
   );
 }

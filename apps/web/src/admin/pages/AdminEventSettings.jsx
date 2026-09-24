@@ -28,6 +28,7 @@ import {
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import VenueReferenceEditor, {
   normalizeVenueReferences,
   validateVenueMap,
@@ -39,6 +40,11 @@ import SocialHandlesEditor, {
   socialHandlesPayload,
   validateSocialHandles,
 } from '../components/SocialHandlesEditor.jsx';
+import MilestonesEditor, {
+  milestonesPayload,
+  normalizeMilestones,
+  validateMilestoneRows,
+} from '../components/MilestonesEditor.jsx';
 
 /** Shared empty result, so a render with no errors is not a new Map. */
 const NO_ERRORS = new Map();
@@ -93,7 +99,9 @@ function toForm(eventConfig) {
       closesAt: registration.closesAt ?? '',
       externalUrl: registration.externalUrl ?? '',
       actionLabel: registration.actionLabel ?? '',
+      goal: registration.goal == null ? '' : String(registration.goal),
     },
+    milestones: normalizeMilestones(c.milestones),
     legal: {
       operatorName: legal.operatorName ?? '',
       supportEmail: legal.supportEmail ?? '',
@@ -114,7 +122,27 @@ const orNull = (value) => {
   return trimmed === '' || trimmed === undefined ? null : trimmed;
 };
 
-function toPayload(form) {
+/**
+ * The registration goal as the server stores it: a number, or null when
+ * the field is blank. Anything that is not a finite number goes as typed,
+ * so the server refuses it by name and the field is marked. It is never
+ * sent as NaN: JSON writes NaN as null, and null clears the goal.
+ */
+function goalPayload(value) {
+  const typed = orNull(value);
+  if (typed === null) return null;
+  const number = Number(typed);
+  return Number.isFinite(number) ? number : typed;
+}
+
+/**
+ * The editable slice, shaped for updateEventConfig. `includeSender` is
+ * false for a staff caller: the sender block is the operator's to change
+ * (functions/src/admin/config.cjs), so staff neither edit it nor send it —
+ * a save that carried it unchanged would go through, but a save that never
+ * carries it cannot be refused for it either.
+ */
+function toPayload(form, { includeSender = true } = {}) {
   return {
     name: form.name,
     shortName: form.shortName,
@@ -145,17 +173,23 @@ function toPayload(form) {
       mapUrl: orNull(form.venue.mapUrl),
       ...venueReferencesPayload(form.venue),
     },
-    sender: {
-      email: form.sender.email,
-      name: orNull(form.sender.name),
-      replyTo: orNull(form.sender.replyTo),
-    },
+    ...(includeSender
+      ? {
+        sender: {
+          email: form.sender.email,
+          name: orNull(form.sender.name),
+          replyTo: orNull(form.sender.replyTo),
+        },
+      }
+      : {}),
     registration: {
       opensAt: orNull(form.registration.opensAt),
       closesAt: orNull(form.registration.closesAt),
       externalUrl: orNull(form.registration.externalUrl),
       actionLabel: orNull(form.registration.actionLabel),
+      goal: goalPayload(form.registration.goal),
     },
+    milestones: milestonesPayload(form.milestones),
     legal: {
       operatorName: orNull(form.legal.operatorName),
       supportEmail: orNull(form.legal.supportEmail),
@@ -177,6 +211,12 @@ export default function AdminEventSettings() {
   const { eventConfig, sources } = useEventConfig();
   const call = useAdminApi();
   const { showToast } = useToast();
+  // The sender block is the operator's (issue #186): staff read it here and
+  // never send it, so their save is never refused for a field they cannot
+  // change. The server compares a sent sender against the stored one and
+  // refuses only a CHANGE from staff; this is the client's half.
+  const { adminTier } = useAuth();
+  const canEditSender = adminTier === 'operator';
 
   const [form, setForm] = useState(() => toForm(eventConfig));
   const [error, setError] = useState(null);
@@ -248,10 +288,18 @@ export default function AdminEventSettings() {
     () => (socialChecked ? validateSocialHandles(form.social.handles) : NO_ERRORS),
     [socialChecked, form.social.handles],
   );
+  // The milestones are checked at submit as well (issue #180): a row just
+  // added says nothing until a save is attempted.
+  const [milestonesChecked, setMilestonesChecked] = useState(false);
+  const milestoneErrors = useMemo(
+    () => (milestonesChecked ? validateMilestoneRows(form.milestones) : NO_ERRORS),
+    [milestonesChecked, form.milestones],
+  );
   const errorFor = (field) =>
     localVenueErrors.get(field)
     ?? mapErrors.get(field)
     ?? socialErrors.get(field)
+    ?? milestoneErrors.get(field)
     ?? fieldErrors.get(field);
   const placeUsage = useMemo(() => {
     const usage = new Map();
@@ -292,10 +340,12 @@ export default function AdminEventSettings() {
     // its fields say nothing until a save is attempted.
     setMapChecked(true);
     setSocialChecked(true);
+    setMilestonesChecked(true);
     if (
       localVenueErrors.size > 0
       || validateVenueMap(form.venue).size > 0
       || validateSocialHandles(form.social.handles).size > 0
+      || validateMilestoneRows(form.milestones).size > 0
     ) {
       setStatus('');
       // A rejection from the SERVER, if one is still standing, goes now.
@@ -312,7 +362,7 @@ export default function AdminEventSettings() {
     setError(null);
     setStatus('');
     try {
-      await call('updateEventConfig', { event: toPayload(form) });
+      await call('updateEventConfig', { event: toPayload(form, { includeSender: canEditSender }) });
       setForm((current) => ({
         ...current,
         venue: {
@@ -321,6 +371,7 @@ export default function AdminEventSettings() {
         },
       }));
       setSocialChecked(false);
+      setMilestonesChecked(false);
       setStatus('Saved. The site picks the change up live.');
       // The line above is the record and it announces; the bar repeats it.
       showToast('Event settings saved.', { announce: false });
@@ -341,7 +392,7 @@ export default function AdminEventSettings() {
     <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit} noValidate>
       <AdminPageHeader
         title="Event"
-        description="Name, dates, venue, social accounts, and the addresses the site and its email use."
+        description="Name, dates, venue, milestones, social accounts, and the addresses the site and its email use."
         actions={
           <button
             type="submit"
@@ -613,12 +664,36 @@ export default function AdminEventSettings() {
               hint="What the register control says. Empty means it says Register."
             />
           </div>
+          {/* The goal (issue #180): the overview sets the approved count
+              against it. A text field with a numeric keyboard rather than
+              type="number", because a number field reads an entry it cannot
+              parse as empty, and an empty goal is sent as null, which would
+              clear the stored goal instead of refusing the entry. */}
+          <TextField
+            label="Registration goal"
+            inputMode="numeric"
+            value={form.registration.goal}
+            onChange={(value) => setGroup('registration', { goal: value })}
+            error={errorFor('registration.goal')}
+            hint="The number of approved attendees you are aiming for. Anyone can read it. The overview compares the approved count with it. Leave it empty for no goal."
+            className="font-admin-data"
+          />
         </div>
       </Panel>
 
+      <MilestonesEditor
+        milestones={form.milestones}
+        onChange={(milestones) => setForm((current) => ({ ...current, milestones }))}
+        errorFor={errorFor}
+      />
+
       <Panel
         title="Sender"
-        description="The From address every transactional email uses."
+        description={
+          canEditSender
+            ? 'The From address every transactional email uses.'
+            : 'The From address every transactional email uses. You can read it here. An operator changes it.'
+        }
       >
         <div className="grid gap-sm sm:grid-cols-2">
           <TextField
@@ -627,12 +702,14 @@ export default function AdminEventSettings() {
             value={form.sender.email}
             onChange={(value) => setGroup('sender', { email: value })}
             error={errorFor('sender.email')}
+            readOnly={!canEditSender}
           />
           <TextField
             label="Sender name"
             value={form.sender.name}
             onChange={(value) => setGroup('sender', { name: value })}
             error={errorFor('sender.name')}
+            readOnly={!canEditSender}
           />
           <TextField
             label="Reply-to"
@@ -640,6 +717,7 @@ export default function AdminEventSettings() {
             value={form.sender.replyTo}
             onChange={(value) => setGroup('sender', { replyTo: value })}
             error={errorFor('sender.replyTo')}
+            readOnly={!canEditSender}
           />
           <p className="self-center text-admin-sm text-admin-ink-secondary">
             Sender domain:{' '}

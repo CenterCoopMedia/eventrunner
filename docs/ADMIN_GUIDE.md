@@ -4,6 +4,27 @@ How to run a client's site from the admin panel, in the order the work happens. 
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
+**The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.
+
+## Find your way: The tour
+
+The first time you open the admin panel, a short tour opens above the page. It has one step for each group on the rail that your tier can open, and one step on the edit links on the public site. Move with **Next** and **Back**. End it at any step with **End tour** or the Escape key. The tour does not block the page: You can open a section it names while it stays on screen.
+
+To take the tour again, select **Take the tour** at the foot of the rail. The browser remembers that you ended the tour, for your account only. A different browser, or another account in the same browser, shows the tour once more.
+
+## Who can do what: Operator and staff
+
+An admin account holds one of two tiers. The rail shows the tier under your address, and it shows only the sections your tier can open. A link you type or follow to a section outside your tier meets a refusal, not the page. The server and the database rules refuse the same requests, so the tier is not only a matter of what the rail shows.
+
+| Tier | Sections | For |
+|---|---|---|
+| Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+
+Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
+
+An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
+
 ## Set the site up: Six steps
 
 This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.
@@ -29,7 +50,11 @@ Work down the controls in this order.
 
 **Logo and icon.** Two slots are asked for here — the primary logo and the square icon — and the other three sit behind **More image slots**: The footer logo, the social sharing image, and the favicon. All five use the same image picker the Media tab uses.
 
+The square icon also sets the app icon. A phone or a desktop browser shows the app icon when a visitor installs the site. To use your own app icon, upload a square PNG to the square icon slot, from 512 to 4096 pixels on a side. Any other value gives the neutral placeholder icon: An SVG, JPEG, or WebP file, an image that is not square, or a path that is not an uploaded file. The app icon changes at the next deploy. If the site publisher is on for your deployment, it also changes at the next content publish. Publishing the theme alone does not change it. When the placeholder is used, the deploy log names the reason. If the site publisher is on, its log after a content publish names the reason too. [`DEPLOY_RUNBOOK.md`](DEPLOY_RUNBOOK.md) §9 describes the site publisher.
+
 **Main brand colour.** One colour, as a hex value. The darker and lighter steps, the rules, the control boundaries, and the whole dark palette are worked out from it. Leave it blank to keep the site style's own colour.
+
+**Five more choices sit under Advanced.** Each site style also answers **Long read opening** (a drop cap, a standfirst, or plain, for the first paragraph of a page on the Long read template), **Quote device** (how a quoted sentence is set), **Directory style** (how the speaker shelf and the attendee index are set), **Section boundary** (whether a section heading carries its folio, and where), and **Table rules** (hairline rows, a ruled head, or the full grid). Every style comes with the answer that suits it, and each choice retunes values the style already declares.
 
 **Header and schedule.** One panel holding two choices. **Header style** is how the site's identity appears at the top of every page: Each site style offers its own three — a letterhead, a masthead bar, a title page — and comes with the one that suits it. It is a site-wide choice on purpose, because the header is furniture a reader should stop noticing and it stops working the moment it differs page to page. **Schedule style** is how a session is set out on the schedule: A posted agenda, a hairline row, a departure board, and so on, depending on the style. Both retune the site style rather than inventing a value of their own, so you cannot make a combination the house has not looked at.
 
@@ -50,6 +75,27 @@ Work down the controls in this order.
 **A contrast failure stops a publish, not a save.** A draft may hold two colours too close together to read. Publishing that draft is refused, and the message names the pair, the mode, and the ratio it measured. Fix the pair, then publish again.
 
 Fonts come from the bundled open-licence sets, so no page asks an external font service for anything.
+
+## Overview
+
+The admin opens here, for staff and operators alike. The page states how the event is going in short sentences. The server counts every number in them when you open the page or refresh it, so a figure is never a guess made in your browser.
+
+| Sentence | What it counts |
+|---|---|
+| Accounts | Every account, then the accounts at each registration status: Pending, ticketed, approved, and revoked. |
+| Profiles complete | The accounts with a complete profile, out of all accounts. |
+| Tickets | Every ticket record, then valid, refunded, cancelled, and waiting for details. A ticket is one ticket record, not one seat. |
+| Speakers | Every speaker record, by stage: Draft, invited, accepted, approved, and removed. |
+| Sessions | The sessions on the site, and the sessions with unpublished changes. A new session that was never published counts as one with unpublished changes. |
+| Unresolved errors | The count only. Operators read the errors themselves on the System errors page. |
+
+**Read at.** The time under the title says when the server counted the figures, on the event's clock. The figures do not change by themselves. Select **Refresh figures** to count again. If a refresh fails, the page keeps the figures it has and says when they were read.
+
+**Registration funnel.** Three stages, each stated as a number of all accounts beside a bar: **Accounts**, then **Ticketed or approved**, then **Approved**. The middle stage counts approved accounts too, because an admin can approve an account that never held a ticket. Revoked accounts count as accounts and in no later stage, and the panel says how many there are. With no accounts, the panel says "No one has signed up yet." and draws no bar.
+
+**Content readiness.** A table with one row per collection: Pages, Content blocks, Sessions, Organizations, Timeline, and Updates. **On the site** counts the records attendees can see. **Unpublished changes** counts the records with a draft that is not published yet, including new records that were never published. A zero is printed as 0, and when nothing at all is on the site the panel says so.
+
+**Milestones.** When the event settings list milestones or a registration goal, a **Milestones** panel sets the approved count against the goal and lists each milestone with its date and the days left. You set both under Settings → Event settings, in **Milestones and the registration goal**. With neither set, the panel is not shown.
 
 ## Pages
 
@@ -90,23 +136,105 @@ One page can still differ. **Change the individual settings** also carries **Nav
 
 The schedule itself: Create, edit, publish, and delete a session. Saving writes a draft, and publishing sends it to the public schedule, the same two steps every other content tab uses. Use **Preview draft** to read the session's public page with the draft applied before you publish it.
 
+**Most saved.** The panel at the top of the list ranks the sessions by how many attendees saved them to their own schedule, most first. Each row names the session, links to its editor, and gives its day and the count. The counts are the same ones the public schedule shows. A sentence under the table says how many sessions on the site nobody has saved yet; drafts and hidden sessions are not counted, because attendees cannot save them. Before anyone saves a session the panel says "No session has been saved yet." If the `sessionBookmarks` feature is off (Settings → Features), the panel says so, because the counts cannot change until an operator turns it on again.
+
 **Recording link.** One optional field on a session, in the **Public session** panel. Enter the address where attendees can watch the session afterwards. The link must start with `http://` or `https://`; the editor and the server both refuse anything else, so a session cannot store an address a reader's browser would treat as a script. Leave the field empty until the recording is public. A session with a recording link shows **Watch the recording** on its schedule row and on its session page, and the link opens in a new tab. A session with no link shows nothing at all, so an empty field does not promise a recording later. The link stays on the page after the event, when a past day becomes a back issue and the live controls come off.
+
+## Organizations
+
+The organizations the Sponsors page draws: Add, edit, publish, and delete them here, without a script. Saving writes a draft, and publishing sends it to the Sponsors page and to the home page's logo wall.
+
+**The list** is a table in the order the Sponsors page draws the organizations: by **Order**, lowest first. Each row gives the name, the page address, the tier, the order, and the state in words. An organization that is saved but not shown on the site also says **Hidden**. **Publish all** publishes every organization with a saved draft.
+
+**The fields.** **Name** is required. **Description** is one or two sentences under the name on the organization's page and on the Sponsors page in the list arrangement. **Website** must start with `http://` or `https://`. **Tier** is the group heading on the Sponsors page. **Order** is a number, and lower numbers come first. **Logo** comes from the media library, or you upload it there. Clear **Show this organization when it is published** to keep a published organization off the site.
+
+**Tiers group by their exact text.** Organizations with the same tier text form one group, so "Gold" and "gold" are two groups. The Tier field suggests the tiers already in use. The groups appear in the order of their first organization, and the first group draws the largest logos. To move a tier up, give its organizations lower order numbers.
+
+**Each organization has its own page** at its page address, `/sponsors/` and then the address. It shows the logo, the name, the description, the tier, and a link to the website. The **Read more** link on the Sponsors page opens it. Use **Preview draft** to read the page with the draft applied before you publish it.
+
+**The page address is set once.** A new organization's page address follows its name until you type your own. It uses lowercase letters, digits, and hyphens, and it cannot change after the first save. To change it, delete the organization and add it again. Two organizations cannot share an address: The editor names an address already in use before it saves, and the server refuses a second organization with the same address when you save, not when you publish. Deleting an organization frees its address.
+
+**Every save is checked.** The editor and the server refuse an empty name, an order that is not a number, and a website that does not start with `http://` or `https://`. The server also refuses a name that is not text, and it checks the logo path: The path must point inside the site's own files, so a web address, a path that starts with `/`, and a path that contains `..` are refused. The server does not check that the file exists. Each refusal names the field, and the editor shows it on that field, the logo's on the Logo field.
+
+**Delete** removes the live organization and its draft. The logo stays in the media library.
 
 ## Content (Pages → Content editor)
 
-Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eight block types are editable here.
+Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eleven block types are editable here.
 
-**The home page's Key facts section is a group of cards.** It answers the questions a first-time reader arrives with. Each **statistic** in that section opens a card. Each **list item** after a statistic is a line on that card, so a card is one figure and then whatever a reader also needs to know beside it. Move a line under a different statistic and it moves to that card. On a wide screen the cards sit in a row of three; on a phone they stack into one plain list, in the same order.
+**A fact is a term and a description.** The **fact** block carries three parts: The term ("Where", "Who", "Format"), the fact itself (the hall's name, the audience), and one optional line under it (the address, a way to get there). It asks for no source and no finding, because a venue counts nothing. A run of facts renders as one ruled list of term and description pairs. Use it for anything that is true and is not a number.
+
+**A quote is one sentence and who said it.** The **quote** block carries the sentence, without quotation marks, and an optional attribution. The site draws the marks and the rules in every site style, either a large opening mark or a pair around the sentence. One pull quote per page: The first quote block on a page, in reading order, is set as the pull quote, and any quote after it is set as a plain quotation in the body, with its attribution under it. Nothing you wrote is dropped; the second one does not take the page's one expressive frame.
+
+**The home page's Key facts section is a group of cards.** It answers the questions a first-time reader arrives with. Each **fact** or **statistic** in that section opens a card. Each **list item** after one is a line on that card, so a card is one fact and then whatever a reader also needs to know beside it. Move a line under a different fact and it moves to that card. On a wide screen the cards sit in a row of three; on a phone they stack into one plain list, in the same order.
 
 **You place it, like any other section.** Move it up or down the home page's section list and the group moves with it. Set it to appear before or after the main feature and it obeys that too. The seed puts it near the top, under the opening, which is where a reader looks first.
 
-**A fresh site seeds one card**: The dates as the figure, and three lines for the venue name, its address, and the nearest transit. Add a statistic to open a second card. A fact that is not a number — a venue, an audience — belongs in the lines, not in a statistic: A statistic has to name where its number came from, and there is no source to name for the name of a hall. Empty the section, or fill it only with block types this section does not draw, and no heading is printed at all.
+**A fresh site seeds three cards**: When, with the dates from your event settings; Where, with the venue's name and its address under it, and one line for the nearest transit; and Who, which you write. The When card follows your event settings for as long as you have not edited it: Move a day in Settings and the card moves with it, so it never disagrees with the Dates list beside it. Remove every day and the card goes back to the placeholder the seed writes for an event with no dates. Edit the card and it reads as you wrote it from then on. Add a statistic to open a card on a figure that is evidence: A statistic has to name where its number came from, and there is no source to name for the name of a hall, which is why a place or an audience is a fact and not a statistic. Empty the section, or fill it only with block types this section does not draw, and no heading is printed at all.
 
 **The home page's Sponsors section is the logo wall, not a list of blocks.** It holds one line of text, and under it the site draws the same tiered logo wall the Sponsors page draws, from the same published organizations in the same tier order. Add or reorder organizations in the Organizations list; nothing about them is edited here.
 
 **It is a section like any other, so you place it.** Move it up or down the home page's section list and the wall moves with it. Set it to appear before or after the main feature and it obeys that too. The section draws nothing at all when no organization is published yet, when the *Sponsors* feature is switched off, or when you delete the section from the home page. Deleting the section is how you take the wall off the home page and keep the Sponsors page.
 
+**The home page's History section is your text, then the timeline.** Write the section's own words and pictures here, as for any other section. Under them the site draws the past editions from the Timeline list, oldest first. You edit the editions under Timeline, not here. Move the section and the list moves with it. Delete the section and the list is gone from the site too.
+
+**A sponsor package is one thing a sponsor can support.** The **sponsor package** block carries a name and what the package includes, both required, and an optional price and limit. Write the price as it should read, with its currency. The limit is how many sponsors can take the package, as a whole number of 1 or more: The page shows "Open to 3 sponsors", and shows nothing for no limit. The save refuses any other number. The Sponsors page seeds one section for packages, **Sponsorship packages**, after the logo wall. It is not shown until it holds a package, so an empty section never reaches a visitor. A site whose Sponsors page was edited before this section existed keeps its own sections; add the section in Pages if you want it.
+
+**Edit a section from the site.** While you are signed in as an admin, each section on a public page shows an **Edit section** link beside its heading. On a section with no visible heading, the link comes after the section's content. The link opens that section's blocks here, the same screen you reach from Content → page → section. Visitors and signed-in accounts that are not admins do not see the link. On the home page, the opening section's link is the last line of the opening. The Sponsors link opens the line of text above the logo wall. You change the wall itself in the Organizations list. A page's own feature, such as the schedule grid or a directory, has no link: Edit it in its own section of the rail. An empty section is not shown on the site, so it has no link either.
+
 **A statistic needs four things**, and the editor will not save one without them: The finding in words ("Two thirds of sessions are workshops", not "Session types"), what the number counts and over what period, where the number came from and the date you read it, and a line describing the finding for a screen reader. A stat block saved before this rule existed keeps working; the next time you edit one, you will be asked to fill the four parts in.
+
+## Updates
+
+Every update on the site's Updates page. Each row gives the update's title, its state in the three words every editor uses, its date, its category, and its place in the list: **Featured**, **Featured and pinned**, **Pinned**, or **By date**. An update that is not shown when published also carries **Hidden**. The list is in the order the public page uses: Pinned updates first, then the newest date first, and undated updates last. Short notices for the dashboard card are a different feed, under **Live updates**.
+
+**Write an update** opens an empty editor. Give it a title and the text. **Save draft** writes a draft: The public page does not show it. **Save and publish** saves and then publishes it, and the public page shows it at once. **Publish all** on the list publishes every update with a saved draft that is not live. Press Enter in a one-line field to save a draft.
+
+**The date is the date readers see, on the event's clock.** It is set in the event's time zone (Settings → Event settings), the same clock the public page uses for the date under the title. Leave it empty for an undated update; an undated update goes after every dated one. A date with a part missing is refused when you save, so finish it or clear the field. The date does not delay publishing. An update dated next month goes live when you publish it, and it shows next month's date.
+
+**Pin** an update to hold it at the top of the list, above newer updates. Clear **Show this update when it is published** to publish an update that the public page does not show.
+
+**A category is one or two words**, such as Travel or Program, shown as a tag beside the update's title on the Updates page. It takes up to 24 characters on one line, so the tag fits on a phone. Leave it empty for no tag. The field suggests the categories other updates already use, so one topic keeps one spelling.
+
+**Feature an update to put it at the head of the page.** The Updates page sets the featured update first, under its own heading, **Featured**, with a larger title and its opening lines. If more than one update is featured, the one that comes first in the list leads: A pinned update before an unpinned one, then the newest date. The other featured updates stay in their usual places. To change the lead, clear **Feature this update at the head of the list** on the update that leads now.
+
+**A picture and content blocks.** An update can also carry a picture and content blocks. This editor does not change them. When an update has them, the editor says so, and a save keeps them as they are.
+
+**Delete this update** removes the live update and its draft together. Its version history stays. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
+
+## Timeline
+
+The past editions of the event: Add, edit, publish, and delete them here. The home page's History section lists them under its own text. Saving writes a draft, and publishing sends the entry to the home page.
+
+**The list** gives each entry's title, year, and id, and its state in words, oldest first. An entry that is saved but not shown on the site also says **Hidden**. **Publish all** publishes every entry that is not live.
+
+**The fields.** **Year** is four digits, from 1900 to 2100. The site shows it beside the title and orders the list by it, oldest first; two entries in one year go in title order. **Title** is required: What that edition is remembered for, in a few words, on one line of up to 120 characters. Leave the year out of it. **Description** is optional: One or two sentences of plain text, up to 600 characters, shown as one paragraph. Clear **Show this entry when it is published** to keep a published entry off the site.
+
+**Every save is checked.** The editor and the server refuse a year that is not four digits in range, a missing title, and text that is too long. The refusal names the field.
+
+**There is no draft preview.** The entries appear only on the home page, and the home page can send an account with no display name to its profile, so the editor offers no preview link. Save and publish, then read the home page.
+
+**The list appears only in the History section.** If the home page has no section with the id `history`, published entries do not appear anywhere, and the Timeline list says so. Add a section with that id to the home page under Pages.
+
+**Delete** removes the live entry and its draft together. Its version history stays.
+
+## Unpublished changes
+
+Everything that is saved and not yet on the site, in one place, under Content on the rail. Staff and operators both open it. The page lists pages, content blocks, sessions, organizations, updates, and timeline entries. Speaker edits are not listed here: You review them on each speaker's page.
+
+**One count, two places.** The sentence under the title, such as "5 unpublished changes: 2 content blocks, 1 page, 2 sessions.", is the same sentence the banner shows on every other admin page. Both read the same saved drafts, so they always agree. A save in any editor raises the count at once, and a publish lowers it at once.
+
+**One table per kind of record.** Each row names the record, with its id under the name, and gives its state (**Draft** for a record that was never published, **Live with unpublished changes** for one that was), when it was saved on the event's clock, and which account saved it. A record set to hidden also reads **Hidden**. The newest save comes first. The name links to the record's editor, where the admin has an editor for that kind of record.
+
+**Three ways to publish.**
+
+- **Publish all** at the top publishes every unpublished change on the site.
+- The button on each table, such as **Publish 2 content blocks**, publishes that table only. One table takes at most 2,000 changes at a time; past that, the table asks you to use **Publish all**.
+- **Resume publish** on a failed run, below.
+
+While one publish runs, the other publish buttons do nothing. When the list cannot be refreshed, the button on each table waits until it can: a record in a stale list may have been published since, and sending it again would publish it twice. **Publish all** still works, because it publishes what is unpublished when you press it. The result is stated under the title. A change that was edited while it was being published stays unpublished, and the result names it, then names what did go out.
+
+**Recent publishes.** Under the tables, the last 10 publish runs and the 20 newest runs still marked **Failed**, newest first. **Running** means the run is still publishing. **Done** means it finished; the line says how many changes it published and how many it skipped. **Failed** means it stopped part-way; the line says how many changes went out before it stopped, and the run shows the error. A run with no progress for 90 minutes is marked **Failed** by the maintenance sweep, which runs every 30 minutes. A failed run stays in the list until you resume it, however many finished runs follow it. When more than 20 runs are marked **Failed**, the list shows the 20 newest. **Resume publish** publishes the current saved version of each record the run did not reach, so a record edited since the run failed goes out as it reads now.
 
 ## Media
 
@@ -117,6 +245,8 @@ A browsable library, split by namespace because each answers a different questio
 - **`speaker-photos/`** — set from the speaker editor, not uploaded loose here.
 
 Upload, edit alt text, and delete from the library. A delete warns you first if anything currently on the site references the asset — do not dismiss that warning without checking what it names.
+
+**Branding needs an operator.** An upload into `branding/`, and a delete or an alt-text edit of a branding asset or of any asset a Branding slot or the social sharing image uses, is refused for a staff account, with or without the delete warning dismissed. A staff account sees the Branding drawer read-only, with a note that an operator manages branding files. Everything else in the library is staff work.
 
 ## Speakers
 
@@ -146,6 +276,39 @@ The full attendee list with registration status and a search/filter. What action
 
 Approve and revoke always go through the server endpoints. Every registration field involved is server-owned and not editable directly, even for the account's own owner.
 
+**Export the list.** The button in the title band reads **Export 42 attendees**, where the number is the rows on screen after your search and status filter. It saves a CSV file with one row per account, in the order the page lists them. The file has nine columns, and nothing else leaves the site:
+
+| Column | What it holds |
+|---|---|
+| Name | The display name |
+| Email | The sign-in address |
+| Organization | The organization on the profile |
+| Role | The role on the profile (the job title, not an access level) |
+| Registration status | The stored value: `pending`, `ticketed`, `approved`, or `revoked` |
+| Badges | The configured badge labels, then the custom badges while that feature is on |
+| Past attendance | The editions an organizer recorded on the account |
+| Social handles | `label: handle` pairs, sorted by label |
+| Profile visibility | The stored value: `public`, `attendees_only`, or `private` |
+
+A cell with more than one entry joins them with a semicolon. The file carries no account id, pronouns, bio, photo, or dates. The status and visibility columns keep the stored words, so a spreadsheet filter on them stays stable.
+
+**Formulas stay text.** A spreadsheet runs a cell that starts with `=`, `+`, `-`, or `@` as a formula. In the file, such a cell starts with an apostrophe, and so does a cell that starts with a tab or a carriage return, or with spaces and then one of those four characters. The spreadsheet shows the value as text.
+
+**Every export is recorded.** The server writes an admin log entry with your address, the number of rows, the status filter, and whether a search narrowed the list. It never records the search text, because that text can name a person. If the entry cannot be written, the server refuses the export and makes no file. The server keeps no copy of the file. One export holds at most 10,000 attendees and 10 MB; a larger one is refused before anything is recorded, and the message asks you to narrow the filter.
+
+**Past attendance.** Select **Edit record** on a row to open that account's record. **Past attendance** takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select **Save record** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
+
+**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, and the change requests the person sent. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
+
+The server refuses a delete in four cases, and says why:
+
+- Your own account.
+- An account with operator or staff access. An operator removes that access on the Access page first.
+- An account linked to a speaker. Delete the speaker record first, in Speakers.
+- An account that holds more than 496 claimed tickets. The refusal names the count, because one delete can release at most 496.
+
+**If a delete stops part way.** When the account has left the directory but some of its data did not clear, the page keeps a notice with **Try the delete again**. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. For up to an hour after the delete, the person's open session can still claim a ticket; a retry also releases a ticket claim made after the delete. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.
+
 ## Ticketing
 
 Provider status, CSV import, and a searchable ticket list. What is here depends on the client's provider choice ([`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md) §3 item 5):
@@ -164,9 +327,55 @@ Compose, edit, and delete entries in the live-updates feed shown on the public s
 
 Every submission from the public feedback modal, newest first, with a mark-reviewed / archived action. Admins can read the feedback collection directly; only the status change goes through an admin endpoint, because every client write to that collection is denied outright.
 
+## Email log
+
+Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here.
+
+- **Search** looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers **Search older messages**, which reads the next 500.
+- **Source** picks one kind of message. **Status** picks **Sent** or **Failed**, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed. **Bounced** means the recipient's mail server refused the message. **Complained** means the recipient marked it as spam. **Suppressed** means the mail provider did not send it, because the address is on the provider's block list.
+- **The filters stay in the page address**, so a reload or a shared link keeps them. The search text does not: An address you search for never enters the page address, the browser history, or an error report.
+- **Preview** opens the stored message under its row, with the plain text version under it. The preview runs no script and loads no remote image. A link shows as its words only. So opening a message, or clicking in it, sends nothing to any other site. If the HTML of a message cannot be shown safely, the preview shows the plain text version instead. A stored body stops at 100 KB, and the preview says so when a body was cut.
+- **Sign-in codes and speaker invitations never store their body or their subject**, because each one holds a code or a link that signs a person in. Their rows show "Not stored", and their preview says why.
+- **Every preview you open is recorded** in the admin log with your account and the message's record. The record never holds the address or the subject.
+
+Sent messages are closed to every browser, admins included. The page reads them through two admin-gated endpoints.
+
+## Change requests
+
+Requests for a change to the site, from signed-in visitors and from staff. Both kinds arrive in one list, newest first. Staff and operators can open it.
+
+- **The feature is off by default.** An operator turns on `changeRequests` in Settings → Features. While it is off, the footer has no **Request a change** button, this page has no form, and the server refuses every request. The list, the status changes, and **Remove** still work, so you can clear the list after the feature is off.
+- **Only a signed-in visitor can send one.** The footer shows **Request a change** only to a visitor who is signed in, and the server refuses a request from an address that is not verified. The request is stored with the sender's sign-in address. One account can send 5 requests in 15 minutes. The server refuses more, and the refusal says how many minutes to wait.
+- **Send one yourself** from the **Request a change** panel at the top of the page. It goes through the same server checks and the same limit.
+- **Show** picks the requests the list shows: **Open** (new and in progress, the default), **All**, **New**, **In progress**, **Done**, or **Declined**. The choice stays in the page address.
+- **Each row** shows the status as a word, the time the request arrived, the sender's address, the page it is about, and the text. The row's button is the next step: **Mark in progress**, **Mark done**, or **Reopen**. **Decline** closes a new or in-progress request.
+- **Remove** deletes the request and its text. It cannot be undone.
+- **The admin log records every request, status change, and removal**, with the account that did it and the request's record. The log never holds the text of a request.
+
+Only admins can read a request. The sender cannot read it back, and no email is sent. When an account is deleted in Attendees, the change requests it sent are deleted too, and the server refuses a new request from that account's open session.
+
 ## Materials
 
-Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions.
+Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions. Staff and operators both use this page.
+
+**The table.** One table lists the materials for every session, hidden sessions included. It shows at most 2,000 materials. Past that, a notice above the table says that some materials are not shown. Each row gives the file name, the word **File** or **Link** with its storage path or address, the session, the review state as a word, and when the material last changed. Select **Material**, **Session**, or **Changed** at the top of a column to sort by it; the button states the order in words, such as **A to Z** or **Newest first**. The table opens in schedule order. Under **Show**, the **Session** and **Review** filters narrow the rows. **Add a link** appears when one session is chosen. **Refresh** reads the list again and says **Refreshing…** until the list arrives. If the list does not load, the table stays as it was and the page says so.
+
+**Download one file.** Select **Download** on a file row. A link row has **Open link** instead, which opens the address in a new tab. A stored address that is not a web address gets no link, and the row says so.
+
+**Download an archive.** Tick the files you want, or tick the box at the top of the column to select every file row shown, then select **Download as archive**. The browser saves `session-materials.zip`, with one folder per session (named by the session id) and each file under its own name. Two files with the same name in one folder are saved as, for example, `slides.pdf` and `slides (2).pdf`. Two sessions whose ids give the same folder name get a folder each, the second as, for example, `talk-one (2)`. Links have no checkbox and never go in an archive. One archive holds at most 50 files and 9 MB, because the server sends it as one stream and the hosting platform stops a stream at 10 MB; for more, download in parts. The line above the table counts what is selected. A change to either filter clears the selection. The server builds the archive and sends it straight to your browser: There is no shareable download link, and nothing is stored. If the transfer stops part way, the browser saves nothing and the page says so.
+
+**Every archive is recorded.** The server writes one admin log entry per file in the archive, with your address, before it sends the first byte. If those entries cannot be written, the server refuses the archive. A single-file download writes no entry.
+
+**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures.
+
+## Version history
+
+Every publish keeps a version of the record. A version holds the record's content as it went live, the time it was published, and the account that published it. Saving a draft adds no version. Staff and operators can open it.
+
+- **Pick a collection, then a record.** **Collection** picks content blocks, pages, sessions, organizations, updates, or the timeline. The list shows the records that collection holds now, with their state, the live version, and the time of the last publish. A record whose live version is hidden says **Hidden**, and the site shows nothing for it. **Search by name or id** narrows the list as you type. **Order records by** sorts by the most recent publish or by name. The collection, the search, and the order stay in the page address, so a reload or a shared link keeps them.
+- **Read a version.** A record's page lists its versions, newest first, 20 at a time. **Load older versions** reads the next 20. Each version names its number, its time on the event's clock, and the account that published it. Its table lists each field that changed, with the value before and after the publish. The first version lists its values. A long value shows its first 300 characters, and **Show all** opens the rest. Every value shows as plain text: Rich text shows its tags, and a link is not clickable.
+- **A deleted record keeps its versions.** The list does not show it, because the list shows the records that exist now. Its page still opens at `/admin/versions/<collection>/<id>`.
+- **Versions cannot be changed or restored.** The page only reads the history. To go back to an earlier version, copy its values into the record's editor, then save and publish. A value published by mistake stays in the history. An operator can remove it in the database console.
 
 ## System errors
 
@@ -174,7 +383,7 @@ Unresolved system-error rows — the operational surface for things like an inva
 
 ## Settings → Event settings
 
-The event's own identity fields: Name, dates, timezone, venue, sender address, social accounts, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
+The event's own identity fields: Name, dates, timezone, venue, sender address, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
 
 **Tracks** live here too: The lines your event runs when sessions happen at the same time in different rooms. Each track has a letter (A to Z) and a name, and the schedule shows both — a reader tells two lines apart by the letter and the name, never by colour alone. Sessions point at a track by its letter, so renaming a track is one edit here rather than a change to every session. Leave the list empty if everything happens in one room.
 
@@ -277,9 +486,23 @@ Select **Add account**. Focus moves to the new row's **Service** field. Each acc
 
 **Social hashtag.** One word with no spaces, such as #EventName. The event settings store it, but the site and its email do not show it.
 
+### Milestones and the registration goal
+
+The **Milestones** panel lists the dates the Overview counts down to, such as the day proposals close or the day the programme is announced. The Overview shows them in date order, each with its date and the days left: **In 12 days**, **Today**, or **3 days ago** once it has passed.
+
+**Anyone can read the milestones and the goal.** They are stored with the event settings, which the public site reads, so every name, date, and goal is public. Keep private notes out of them.
+
+Select **Add milestone**. Focus moves to the new row's name field. Each milestone has a name, at most 80 characters, and a date. An event can list 20 milestones; at 20, **Add milestone** does nothing and says so until you remove one. **Remove milestone** moves focus to the milestone that takes its place, or to the one before it when you removed the last, or to **Add milestone** when none is left. A milestone goes when you save. A milestone with no name or no date is refused when you save, and focus moves to the field that needs it.
+
+**Registration goal** is in the **Registration** panel: The number of approved attendees you are aiming for. Anyone can read it. The Overview sets the approved count against it, as a sentence and a bar. Leave it empty for no goal. It must be a whole number from 1 to 1,000,000; the server refuses anything else and names the field.
+
+With no milestones and no goal, the Overview shows no milestone panel at all.
+
 ## Settings → Features
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form's key list comes from the same shared schema the server validates against.
+
+`changeRequests` turns on the change request form in the footer and on the Change requests page. It is off by default. See [Change requests](#change-requests).
 
 ## Settings → Badges
 
@@ -288,6 +511,20 @@ The badge catalog: Categories, each with a max-picks cap and its list of badges,
 **Custom badges.** The separate feature is off by default. When enabled, attendees can enter up to three badges of 24 characters each. Reserved role words are always blocked; `config/badges.customBadgeBlockList` adds event-specific words. The owner form and public projection use the same validator. The category editor preserves this list; an operator changes it through the badge configuration API.
 
 **Remove a custom badge.** In Attendees, select the removal action beside the badge and confirm. The result stays on the page and an `admin_logs` entry records the action. Turning the feature off removes custom badges from the public projection; attendees can still edit their other profile fields.
+
+## Settings → Access
+
+Operators only. One ruled table of every admin account with its tier word, and a form to grant access to a new address.
+
+**Grant access.** Enter the address and pick a tier. The page asks you to confirm, states what the person gains, and only then writes the grant. The address is stored lowercase, so the case you type does not matter. The person signs in with that address the way every admin does, by Google or by the emailed code; there is no invitation to send.
+
+**Change a tier or remove access.** Each row carries two quiet actions: **Change to staff** or **Change to operator**, and **Remove access**. Each one opens a confirmation under the grant form, above the table, that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.
+
+**At least one operator stays.** The server refuses a change that would leave the deployment with no operator: Demoting or removing the last operator, your own grant included. Grant a second operator first. The refusal is stated in place, in the server's words.
+
+**What is recorded.** Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. A change that changes nothing writes no row.
+
+**When it takes effect.** At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.
 
 ## Legal pages
 

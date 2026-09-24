@@ -8,9 +8,10 @@
 //
 // THE LIST IS COMPLETE. It was written with a `PENDING_CONTROLS` half while
 // the eight shared controls were being built beside this page; every one of
-// them now has a module and a file here, so the promise half is gone. A
-// control added to `components/forms/` and left out of this list is what
-// `index.test.js` fails on.
+// them now has a module and a file here, so the promise half is gone. Wave 2
+// added the dropzone and the repeater at the end. A control added to
+// `components/forms/` and left out of this list is what `index.test.js`
+// fails on.
 import primaryAction from './primaryAction.jsx';
 import secondaryAction from './secondaryAction.jsx';
 import quietAction from './quietAction.jsx';
@@ -24,6 +25,8 @@ import radioControl from './radioControl.jsx';
 import searchFieldControl from './searchFieldControl.jsx';
 import sortControlControl from './sortControlControl.jsx';
 import filterGroupControl from './filterGroupControl.jsx';
+import dropzoneControl from './dropzoneControl.jsx';
+import repeaterControl from './repeaterControl.jsx';
 
 /**
  * The shared shapes first, because they carry the hover, focus and press of
@@ -44,6 +47,8 @@ export const CONTROL_SPECIMENS = Object.freeze([
   searchFieldControl,
   sortControlControl,
   filterGroupControl,
+  dropzoneControl,
+  repeaterControl,
 ]);
 
 export default CONTROL_SPECIMENS;

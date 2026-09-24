@@ -21,8 +21,10 @@
 const { decideSeedWrite, decideConfigWrite } = require('./idempotency.cjs');
 const { draftCollectionFor } = require('../../functions/src/cms/blockTypes.cjs');
 
-/** Actor recorded on seeded writes; not a person, and deliberately visible. */
-const SEED_ACTOR = Object.freeze({ uid: 'init-event-script', email: 'init-event-script' });
+// The actor recorded on seeded writes; not a person, and deliberately
+// visible. Defined once in shared/seed, because the functions and the web
+// read it back to decide whose a document is (adversarial review, 2026-09-24).
+const { SEED_ACTOR } = require('shared/seed');
 
 /**
  * Write the `config/*` documents (§5.1 steps b–c).
@@ -34,20 +36,37 @@ const SEED_ACTOR = Object.freeze({ uid: 'init-event-script', email: 'init-event-
  * settings), so it must build from what is stored, not from what init
  * proposed and the merge rules then declined to apply.
  *
+ * `bootstrapAdditions` is what a RE-RUN may add to config/bootstrap: the
+ * addresses named by explicit `--admin` / `--staff` flags, and nothing
+ * else. On a fresh deployment the answers file's lists seed the document;
+ * on a re-run they are NOT re-applied, because an operator may have
+ * removed or demoted one of those addresses on the admin's Access page
+ * since, and a re-run must never quietly put it back (issue #187 review).
+ * The bootstrap result row carries `added` so the caller can say exactly
+ * what a re-run granted. Omit it to keep the older additive behaviour
+ * (the demo seed does).
+ *
  * @param {{ db: object, docs: object, force?: boolean, dryRun?: boolean,
- *           now?: () => number }} args
- * @returns {Promise<{ results: Array<{ docId: string, action: string, reason: string }>,
+ *           now?: () => number,
+ *           bootstrapAdditions?: { adminEmails?: string[], staffEmails?: string[] }|null }} args
+ * @returns {Promise<{ results: Array<{ docId: string, action: string, reason: string,
+ *                                       added?: { adminEmails: string[], staffEmails: string[] } }>,
  *                     effective: object }>}
  */
-async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = Date.now }) {
+async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = Date.now, bootstrapAdditions = null }) {
   const results = [];
   const effective = {};
-  for (const [docId, next] of Object.entries(docs)) {
+  for (const [docId, proposed] of Object.entries(docs)) {
     const ref = db.collection('config').doc(docId);
     const snap = await ref.get();
     const existing = snap.exists ? snap.data() : null;
+    const next = docId === 'bootstrap' && existing != null && bootstrapAdditions
+      ? { adminEmails: bootstrapAdditions.adminEmails ?? [], staffEmails: bootstrapAdditions.staffEmails ?? [] }
+      : proposed;
     const decision = decideConfigWrite({ docId, existing, next, force });
-    results.push({ docId, action: decision.action, reason: decision.reason });
+    const row = { docId, action: decision.action, reason: decision.reason };
+    if (docId === 'bootstrap' && existing != null) row.added = addedAccounts(existing, decision.value);
+    results.push(row);
     effective[docId] = decision.value;
     if (decision.action === 'skip' || dryRun) continue;
     await ref.set({
@@ -57,6 +76,20 @@ async function writeConfigDocs({ db, docs, force = false, dryRun = false, now = 
     });
   }
   return { results, effective };
+}
+
+/**
+ * The addresses a bootstrap merge added, per list, lowercased the way the
+ * merge stores them.
+ *
+ * @param {object} existing the stored document
+ * @param {{ adminEmails?: string[], staffEmails?: string[] }} merged the decided value
+ * @returns {{ adminEmails: string[], staffEmails: string[] }}
+ */
+function addedAccounts(existing, merged) {
+  const before = (list) => (Array.isArray(list) ? list : []).map((e) => String(e).trim().toLowerCase());
+  const added = (field) => (merged?.[field] ?? []).filter((email) => !before(existing?.[field]).includes(email));
+  return { adminEmails: added('adminEmails'), staffEmails: added('staffEmails') };
 }
 
 /**
@@ -168,6 +201,121 @@ async function removeObsoleteSeeds({ db, store, collection, docIds, dryRun = fal
     await store.deleteBoth({ db, collection, docId: id });
   }
   return { removed, kept };
+}
+
+/** Whether a seeded document is placeholder copy an operator has to replace. */
+function isPlaceholder(fields) {
+  return Object.values(fields).some((value) => typeof value === 'string' && value.includes('[Replace]'));
+}
+
+/**
+ * The upgrade rule for content this release seeds and the site does not yet
+ * have (adversarial review of the 2026-09-10 wave).
+ *
+ * `seedCollection` decides document by document, by the id it was handed,
+ * and it has no idea that `info__where` says the same thing two older
+ * documents say. On a launched site those two are the client's (they were
+ * placeholders the client filled), so `removeObsoleteSeeds` rightly keeps
+ * them — and the seed would then CREATE the replacement beside them: the
+ * venue stated twice on the home page. And a brand-new placeholder, created
+ * and published into a section a client has already written, is a
+ * "[Replace]" line on a live home page that nobody asked for.
+ *
+ * So, for a document NEITHER revision holds yet:
+ *
+ *   - a replacement (`replacedBy[id]` names its predecessors) is withheld
+ *     while any predecessor survives as client-edited, and those predecessors
+ *     are reported as protected so the caller keeps them out of the obsolete
+ *     removal — deleting the still-seeded address line while keeping the
+ *     client's venue line would lose the address;
+ *   - a placeholder is withheld when its section already holds a document
+ *     the seed may not touch, in either revision. A section the client has
+ *     written is theirs to add to from the palette. An unpublished draft
+ *     would be a block the operator never wrote, waiting to ride the next
+ *     publish, so the placeholder is not created at all.
+ *
+ * A document the site already has is passed through untouched:
+ * `seedCollection` refreshes or skips it under the ownership rule it has
+ * always applied. Nothing here writes.
+ *
+ * @param {{ db: object, collection: string, docs: object[],
+ *           replacedBy?: Record<string, readonly string[]> }} args
+ * @returns {Promise<{ docs: object[], withheld: Array<{ id: string, reason: string }>,
+ *                     protected: string[] }>}
+ */
+async function withholdUpgradeSeeds({ db, collection, docs, replacedBy = {} }) {
+  const draftCollection = draftCollectionFor(collection);
+  const readBoth = async (id) => {
+    const [snap, draftSnap] = await Promise.all([
+      db.collection(collection).doc(id).get(),
+      db.collection(draftCollection).doc(id).get(),
+    ]);
+    return {
+      existing: snap.exists ? snap.data() : null,
+      draft: draftSnap.exists ? draftSnap.data() : null,
+    };
+  };
+  const present = ({ existing, draft }) => existing != null || draft != null;
+  const clientOwned = (both) => present(both) && decideSeedWrite(both.existing, { draft: both.draft }).action === 'skip';
+
+  // Whether a section holds anything the seed may not touch, asked once per
+  // section: every document of the section in both revisions, paired by id.
+  const editedSections = new Map();
+  async function sectionEdited(sectionId) {
+    if (editedSections.has(sectionId)) return editedSections.get(sectionId);
+    const [live, drafts] = await Promise.all([
+      db.collection(collection).where('section', '==', sectionId).get(),
+      db.collection(draftCollection).where('section', '==', sectionId).get(),
+    ]);
+    const byId = new Map();
+    for (const doc of live.docs) byId.set(doc.id, { existing: doc.data(), draft: null });
+    for (const doc of drafts.docs) {
+      const entry = byId.get(doc.id) ?? { existing: null, draft: null };
+      entry.draft = doc.data();
+      byId.set(doc.id, entry);
+    }
+    const edited = [...byId.values()].some(clientOwned);
+    editedSections.set(sectionId, edited);
+    return edited;
+  }
+
+  const out = [];
+  const withheld = [];
+  const protectedIds = new Set();
+  for (const doc of docs) {
+    const { id, ...fields } = doc;
+    if (present(await readBoth(id))) {
+      out.push(doc);
+      continue;
+    }
+    const survivors = [];
+    const held = [];
+    for (const predecessor of replacedBy[id] ?? []) {
+      const both = await readBoth(predecessor);
+      if (present(both)) held.push(predecessor);
+      if (clientOwned(both)) survivors.push(predecessor);
+    }
+    if (survivors.length > 0) {
+      // Every predecessor the site holds stays, edited or not — but only
+      // those it holds, or init would report "kept" for a document that
+      // does not exist.
+      for (const predecessor of held) protectedIds.add(predecessor);
+      withheld.push({
+        id,
+        reason: `replaces ${survivors.join(' and ')}, which the client has edited`,
+      });
+      continue;
+    }
+    if (isPlaceholder(fields) && typeof fields.section === 'string' && (await sectionEdited(fields.section))) {
+      withheld.push({
+        id,
+        reason: `a placeholder, and the ${fields.section} section already holds client-edited blocks`,
+      });
+      continue;
+    }
+    out.push(doc);
+  }
+  return { docs: out, withheld, protected: [...protectedIds] };
 }
 
 /**
@@ -390,10 +538,12 @@ module.exports = {
   writeConfigDocs,
   seedCollection,
   removeObsoleteSeeds,
+  withholdUpgradeSeeds,
   findPagePathCollisions,
   findPageSectionCollisions,
   seedEmailTemplateOverrides,
   countSeeded,
   readConfig,
+  addedAccounts,
   SEED_ACTOR,
 };

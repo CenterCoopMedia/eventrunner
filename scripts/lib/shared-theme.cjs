@@ -15,4 +15,10 @@
  * `exports` map points `./theme` at exactly this path.
  */
 
+// The preset remaps register themselves with the resolver when they are
+// required (2026-09-10 vocabulary expansion), and the token generator
+// resolves every style in full, so they are required here once for every
+// script that reaches the resolver through this file.
+require('../../packages/shared/src/presetRemaps.cjs');
+
 module.exports = require('../../packages/shared/src/theme.cjs');

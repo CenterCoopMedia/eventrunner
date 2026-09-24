@@ -12,10 +12,12 @@
 // keyboard path per control, `aria-current` on the active section.
 //
 // THE RAIL. The navigation stands on its own dark ground down the leading
-// edge, so the tool's frame and the work surface are never confused. Fifteen
-// named sections read as a standing list grouped by what the operator came
-// to do: content, people, operations, system. Group heads are folios. Every
-// item is a word — no icon rail, no collapse to glyphs, no counts in
+// edge, so the tool's frame and the work surface are never confused. The
+// Overview stands first and alone, with no folio over it, because it is
+// where the admin opens rather than a kind of work (issue #179). The named
+// sections under it read as a standing list grouped by what the operator
+// came to do: content, people, operations, system. Group heads are folios.
+// Every item is a word — no icon rail, no collapse to glyphs, no counts in
 // bubbles. The current item is a filled block in the action blue and carries
 // four signals, never colour alone: the marker at its leading edge, the bold
 // weight, the ground shift, and `aria-current="page"`.
@@ -31,11 +33,28 @@
 // thing on the rail and it belongs to the client. With the accent in
 // AdminPageHeader's mark, it is one of exactly two client-owned elements on
 // this surface.
-import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+//
+// THE TIERS (issue #186). Every docket item names the tier it needs, and
+// that one declaration does two things: the rail draws only the sections the
+// signed-in tier may reach, and the shell refuses the route of one it may
+// not, so a bookmarked or typed URL to an out-of-tier section meets a
+// refusal rather than the page. A page a builder adds declares its tier by
+// its docket entry and nowhere else. The tier comes from AuthContext's
+// probes; the server's requireAdmin and the rules are the enforcement.
+//
+// THE TOUR (issue #198). A first visit opens the editor tour at the head of
+// the stone; "Take the tour" on the rail opens it again. It is its own lazy
+// chunk (components/AdminTour.jsx), and its steps are this docket.
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
+import { AdminEmptyState } from './components/adminChrome.jsx';
+import PendingChangesBanner from './components/PendingChangesBanner.jsx';
+import { linkButtonClass } from './components/formControls.jsx';
+import { PendingChangesProvider } from './PendingChangesContext.jsx';
+import { markTourDone, readTourDone } from './tourState.js';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
  * the current LOCATION inside this nested `<Routes>`, so on /admin/branding
@@ -44,50 +63,166 @@ import { brandingSrc } from '../lib/mediaSource.js';
 const ROOT = '/admin';
 
 /**
- * The docket. Four groups, in the order an operator works: what the event
- * says, who is in it, how it runs, and how the deployment is set up.
+ * The two admin tiers, as the server names them (functions/src/core/auth.cjs
+ * ADMIN_TIERS). A docket item's `tier` is the LEAST it needs: 'staff' admits
+ * both tiers, 'operator' admits operators only.
+ */
+export const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
+
+/**
+ * The docket. A lead group with no label holds the Overview, the page the
+ * admin opens on (issue #179): it reports on every group below it, so it
+ * belongs to none of them, and the rail draws no folio over it. Then four
+ * groups, in the order an operator works: what the event says, who is in
+ * it, how it runs, and how the deployment is set up.
+ *
+ * The Overview is staff work: it shows counts only, and the rows behind the
+ * unresolved error count stay on the operator-only System errors page.
+ *
+ * Content, people and operations are staff work. Under System, the event
+ * settings admit staff (dates, venue, places and social handles are content
+ * an organizer runs; the server holds the sender address back for an
+ * operator); features, branding, access and system errors are the
+ * operator's, because each one changes what the deployment is rather than
+ * what the event says.
  */
 export const DOCKET = Object.freeze([
+  {
+    id: 'lead',
+    label: null,
+    items: [{ to: 'overview', label: 'Overview', tier: 'staff' }],
+  },
   {
     id: 'content',
     label: 'Content',
     items: [
-      { to: 'pages', label: 'Pages' },
-      { to: 'sessions', label: 'Sessions' },
-      { to: 'content', label: 'Content' },
-      { to: 'media', label: 'Media' },
-      { to: 'materials', label: 'Materials' },
+      { to: 'pages', label: 'Pages', tier: 'staff' },
+      { to: 'sessions', label: 'Sessions', tier: 'staff' },
+      { to: 'organizations', label: 'Organizations', tier: 'staff' },
+      { to: 'content', label: 'Content', tier: 'staff' },
+      { to: 'updates', label: 'Updates', tier: 'staff' },
+      { to: 'timeline', label: 'Timeline', tier: 'staff' },
+      { to: 'media', label: 'Media', tier: 'staff' },
+      { to: 'materials', label: 'Materials', tier: 'staff' },
+      { to: 'versions', label: 'Version history', tier: 'staff' },
+      { to: 'unpublished', label: 'Unpublished changes', tier: 'staff' },
     ],
   },
   {
     id: 'people',
     label: 'People',
     items: [
-      { to: 'speakers', label: 'Speakers' },
-      { to: 'attendees', label: 'Attendees' },
-      { to: 'badges', label: 'Badges' },
+      { to: 'speakers', label: 'Speakers', tier: 'staff' },
+      { to: 'attendees', label: 'Attendees', tier: 'staff' },
+      { to: 'badges', label: 'Badges', tier: 'staff' },
     ],
   },
   {
     id: 'operations',
     label: 'Operations',
     items: [
-      { to: 'live-updates', label: 'Live updates' },
-      { to: 'ticketing', label: 'Ticketing' },
-      { to: 'feedback', label: 'Feedback' },
+      { to: 'live-updates', label: 'Live updates', tier: 'staff' },
+      { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
+      { to: 'feedback', label: 'Feedback', tier: 'staff' },
+      { to: 'email-log', label: 'Email log', tier: 'staff' },
+      { to: 'change-requests', label: 'Change requests', tier: 'staff' },
     ],
   },
   {
     id: 'system',
     label: 'System',
     items: [
-      { to: 'settings', label: 'Event' },
-      { to: 'features', label: 'Features' },
-      { to: 'branding', label: 'Branding' },
-      { to: 'system-errors', label: 'System errors' },
+      { to: 'settings', label: 'Event', tier: 'staff' },
+      { to: 'features', label: 'Features', tier: 'operator' },
+      { to: 'branding', label: 'Branding', tier: 'operator' },
+      { to: 'access', label: 'Access', tier: 'operator' },
+      { to: 'system-errors', label: 'System errors', tier: 'operator' },
     ],
   },
 ]);
+
+/**
+ * Whether a tier the caller holds reaches a tier a section asks for. An
+ * item with no tier declared falls to the strictest, the same default the
+ * server's requireAdmin takes, so a forgotten declaration closes a section
+ * to staff rather than opening it.
+ *
+ * @param {'operator'|'staff'|null} held
+ * @param {'operator'|'staff'|undefined} required
+ * @returns {boolean}
+ */
+export function tierReaches(held, required = 'operator') {
+  if (held === 'operator') return true;
+  return held === 'staff' && required === 'staff';
+}
+
+/**
+ * The tier the section at `pathname` asks for, from its docket entry. A
+ * section owns every path under it, so /admin/pages/new is Pages. The
+ * WHOLE pathname is read the way the router matches it — every segment
+ * percent-decoded and lowercased, the /admin prefix included, because
+ * `<Route>` matches case-insensitively and /Admin/Branding renders the
+ * Branding page — so the lookup cannot be stepped around by spelling
+ * either half. A path no docket item owns is the operator's, the same
+ * default an undeclared item takes: fail closed. So is a segment that
+ * decodes to a slash, or an empty segment with more path after it —
+ * nothing the docket names. Only the bare index (the redirect to the Overview)
+ * asks for nothing.
+ *
+ * @param {string} pathname
+ * @returns {'operator'|'staff'|null}
+ */
+export function sectionTier(pathname) {
+  const segments = [];
+  for (const raw of String(pathname ?? '').split('/').slice(1)) {
+    let segment;
+    try {
+      segment = decodeURIComponent(raw).toLowerCase();
+    } catch {
+      return 'operator';
+    }
+    if (segment.includes('/')) return 'operator';
+    segments.push(segment);
+  }
+  // A trailing slash is not a section.
+  if (segments.length > 1 && segments[segments.length - 1] === '') segments.pop();
+  if (segments[0] !== 'admin') return 'operator';
+  const section = segments[1];
+  if (section === undefined) return null;
+  for (const group of DOCKET) {
+    const item = group.items.find((entry) => entry.to === section);
+    if (item) return item.tier ?? 'operator';
+  }
+  return 'operator';
+}
+
+/** "A, B and C" from a list of labels; one label stands alone. */
+export function listWords(labels) {
+  if (labels.length <= 1) return labels.join('');
+  return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
+}
+
+const labelsForTier = (tier) =>
+  DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.label);
+
+/**
+ * Each tier's sections, named once in the rail's own words, for every
+ * sentence that describes a tier: the refusal below, the Access page's
+ * description and its confirmation sentences. Derived from the docket so a
+ * section added there is named everywhere at once.
+ */
+export const TIER_SCOPE = Object.freeze({
+  staff: listWords(labelsForTier('staff')),
+  operatorOnly: listWords(labelsForTier('operator')),
+});
+
+/** The docket with the sections `held` cannot reach left out. */
+export function docketForTier(held) {
+  return DOCKET.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => tierReaches(held, item.tier)),
+  })).filter((group) => group.items.length > 0);
+}
 
 /**
  * A docket item. The marker is a short rule in the rail's own ink at the
@@ -110,14 +245,83 @@ const railButtonClass =
   'border-admin-rail-rule px-sm py-2xs text-admin-sm font-semibold text-admin-rail-ink ' +
   'hover:bg-admin-rail-ground-hover';
 
+/**
+ * The refusal an out-of-tier route meets. It is a page, not a redirect: the
+ * reader typed or followed a link here, and the honest answer is what this
+ * section is and who may open it, with the rail still beside it so the next
+ * move is one click away.
+ */
+function TierRefusal() {
+  return (
+    <div className="px-md py-lg">
+      <AdminEmptyState
+        title="This section needs operator access"
+        description={`Your account has staff access. Staff run ${TIER_SCOPE.staff}. Ask an operator to change your access if you need this section.`}
+      />
+    </div>
+  );
+}
+
+/**
+ * What a tour chunk that fails to load leaves: a stated line and a way to
+ * close it, so "Take the tour" never becomes a control that does nothing.
+ */
+function TourLoadFailed({ onEnd }) {
+  return (
+    <aside aria-label="Admin tour" className="admin-tour">
+      <p role="status">The tour did not load. Reload the page to try again.</p>
+      <button type="button" className={linkButtonClass} onClick={onEnd}>End tour</button>
+    </aside>
+  );
+}
+
+const AdminTour = lazy(() => import('./components/AdminTour.jsx').catch(() => ({ default: TourLoadFailed })));
+
+/**
+ * The shell. One count of unpublished changes (issue #196) is opened here,
+ * once, for the banner above the stone and the Unpublished changes page to
+ * read; the shell mounts only inside AdminGate, so a non-admin opens none.
+ */
 export default function AdminLayout() {
+  return (
+    <PendingChangesProvider>
+      <AdminDesk />
+    </PendingChangesProvider>
+  );
+}
+
+function AdminDesk() {
   const { eventConfig, theme } = useEventConfig();
-  const { user, signOut } = useAuth();
+  const { user, adminTier, refreshAdminStatus, signOut } = useAuth();
+  const { pathname } = useLocation();
   // A branding slot can point at an object that has since been deleted from
   // the bucket, so the job mark degrades to the event's short name rather
   // than to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
   const markSrc = brandingSrc(theme?.logos?.mark ?? theme?.logos?.primary);
+  // An unknown tier (the probe failed for a reason other than
+  // permission-denied) draws the sections every admin holds and refuses
+  // nothing on a guess: the server decides, and the rail says the check
+  // failed and offers it again.
+  const tierKnown = adminTier === 'operator' || adminTier === 'staff';
+  const docket = docketForTier(tierKnown ? adminTier : 'staff');
+  const required = sectionTier(pathname);
+  const refused = tierKnown && required !== null && !tierReaches(adminTier, required);
+  // The editor tour (issue #198): null while closed, else the run number.
+  // Run 0 is the first visit and takes no focus; each "Take the tour" is a
+  // new run, so it starts again at step 1 with the focus on its heading.
+  // Ending it stores the mark and gives the focus back to the rail button.
+  const uid = user?.uid;
+  const [tour, setTour] = useState(null);
+  const takeTourRef = useRef(null);
+  useEffect(() => {
+    setTour(readTourDone(uid) ? null : 0);
+  }, [uid]);
+  const endTour = () => {
+    markTourDone(uid);
+    setTour(null);
+    takeTourRef.current?.focus();
+  };
 
   return (
     <div className="admin-room flex min-h-screen flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
@@ -142,14 +346,16 @@ export default function AdminLayout() {
         </div>
 
         <nav aria-label="Admin sections" className="flex-1 px-md py-xs lg:px-xs lg:py-sm">
-          {DOCKET.map((group) => (
+          {docket.map((group) => (
             <div
               key={group.id}
               className="flex flex-wrap items-center gap-x-xs gap-y-3xs py-3xs lg:mt-sm lg:block lg:py-0 lg:first:mt-0"
             >
-              <p className="admin-folio me-2xs lg:me-0 lg:px-sm lg:pb-3xs lg:pt-2xs">
-                {group.label}
-              </p>
+              {group.label ? (
+                <p className="admin-folio me-2xs lg:me-0 lg:px-sm lg:pb-3xs lg:pt-2xs">
+                  {group.label}
+                </p>
+              ) : null}
               <ul className="flex flex-wrap gap-2xs lg:flex-col lg:gap-3xs">
                 {group.items.map((item) => (
                   <li key={item.to}>
@@ -166,11 +372,37 @@ export default function AdminLayout() {
         <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline px-md py-sm lg:flex-col lg:items-stretch">
           {/* An operator has to be able to tell which account the server
               will see, so the address is set in the data face: it is an
-              identifier, and identifiers are the machine's. */}
-          <p className="min-w-0 break-all font-admin-data text-admin-xs text-admin-rail-ink-muted">
-            {user?.email}
-          </p>
+              identifier, and identifiers are the machine's. The tier word
+              beside it says what that account may do here. */}
+          <div className="min-w-0">
+            <p className="break-all font-admin-data text-admin-xs text-admin-rail-ink-muted">
+              {user?.email}
+            </p>
+            {tierKnown ? (
+              <p className="text-admin-xs font-semibold text-admin-rail-ink" data-admin-tier={adminTier}>
+                {adminTier === 'operator' ? 'Operator' : 'Staff'}
+              </p>
+            ) : null}
+            {adminTier === 'unknown' ? (
+              <div className="mt-2xs flex flex-col items-start gap-2xs">
+                <p className="text-admin-xs text-admin-rail-ink-muted" role="status">
+                  Your access tier could not be checked.
+                </p>
+                <button type="button" onClick={refreshAdminStatus} className={railButtonClass}>
+                  Check again
+                </button>
+              </div>
+            ) : null}
+          </div>
           <div className="flex flex-wrap items-center gap-xs">
+            <button
+              type="button"
+              ref={takeTourRef}
+              onClick={() => setTour((run) => (run ?? 0) + 1)}
+              className={railButtonClass}
+            >
+              Take the tour
+            </button>
             <NavLink to="/" className={railButtonClass}>
               View site
             </NavLink>
@@ -182,8 +414,19 @@ export default function AdminLayout() {
       </div>
 
       <main id="admin-content" className="min-w-0 flex-1">
+        {/* Above the stone, never inside it: the title band pulls itself
+            up by the stone's top padding and would slide over it. */}
+        <PendingChangesBanner />
         <div className="admin-stone mx-auto w-full max-w-admin-canvas">
-          <Outlet />
+          {/* The tour is the one thing in the stone before the page:
+              `.admin-tour` (index.css) keeps room under it for the title
+              band's pull, so the band lands below it, never over it. */}
+          {tour === null ? null : (
+            <Suspense fallback={null}>
+              <AdminTour key={tour} docket={docket} takeFocus={tour > 0} onEnd={endTour} />
+            </Suspense>
+          )}
+          {refused ? <TierRefusal /> : <Outlet />}
         </div>
       </main>
     </div>

@@ -11,6 +11,7 @@ const { makeFakeDb } = require('../functions/src/cms/firestoreFake.cjs');
 const store = require('../functions/src/cms/store.cjs');
 const { buildConfigDocs } = require('./lib/answers.cjs');
 const { seedCollection } = require('./lib/write.cjs');
+const { createCmsUpdateContentHandler } = require('../functions/src/cms/content.cjs');
 
 const TIER_A = Object.freeze({
   slug: 'test-event',
@@ -164,7 +165,7 @@ test('init prints the manual checklist including the Firebase Auth steps (§5.6)
   assert.match(output, /Authentication → Sign-in method → enable Google/);
   assert.match(output, /Authorized domains/);
   assert.match(output, /ops@example\.org/);
-  assert.match(output, /second admin/);
+  assert.match(output, /second operator/);
 });
 
 test('an unprovisioned Storage bucket is a warning, not a failed init', async () => {
@@ -647,4 +648,129 @@ test('a fresh init has no legacy document to remove and says nothing about one',
     runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
   assert.equal(value, 0);
   assert.doesNotMatch(output, /hero__register_cta/);
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('--staff seeds the staff tier, lowercased, beside the operators', async () => {
+  const db = makeFakeDb();
+  const { value } = await quietly(() => runInit({
+    db, store, bucket: noBucket,
+    args: initArgs({ staff: ['Desk@Example.org', 'ops@example.org'] }),
+    tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  assert.equal(value, 0);
+  const bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org']);
+  // An address on both lists is an operator and is stored once.
+  assert.deepEqual(bootstrap.staffEmails, ['desk@example.org']);
+});
+
+test('a re-run keeps the staff an operator granted through the Access page', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  const bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.staffEmails, []);
+  await db.collection('config').doc('bootstrap').set({ ...bootstrap, staffEmails: ['granted@example.org'] });
+
+  await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true, admin: ['second@example.org'] }),
+    tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  const after = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(after.adminEmails, ['ops@example.org', 'second@example.org']);
+  assert.deepEqual(after.staffEmails, ['granted@example.org']);
+});
+
+test('a re-run never puts back an address an operator removed on the Access page', async () => {
+  const db = makeFakeDb();
+  const answers = answersFile({ ...ANSWERS, adminEmails: ['ops@example.org', 'revoked@example.org'] });
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: { answers }, tierA: TIER_A, env: ENV, now: () => 0 }));
+  let bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org', 'revoked@example.org']);
+
+  // The operator removes one address and demotes nobody else.
+  await db.collection('config').doc('bootstrap').set({ ...bootstrap, adminEmails: ['ops@example.org'] });
+
+  // The same answers file, re-run: the removed address stays removed, and
+  // the output says nothing was added.
+  const rerun = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: { answers, force: true }, tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  assert.equal(rerun.value, 0);
+  bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org']);
+  assert.match(rerun.output, /config\/bootstrap.*no accounts added/);
+
+  // An explicit flag adds, and the output names it.
+  const flagged = await quietly(() => runInit({
+    db, store, bucket: noBucket,
+    args: { answers, force: true, admin: ['third@example.org'], staff: ['desk@example.org'] },
+    tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  bootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+  assert.deepEqual(bootstrap.adminEmails, ['ops@example.org', 'third@example.org']);
+  assert.deepEqual(bootstrap.staffEmails, ['desk@example.org']);
+  assert.match(flagged.output, /added operators: third@example\.org; added staff: desk@example\.org/);
+});
+
+// THE #234 UPGRADE THROUGH runInit (adversarial review, 2026-09-24). The
+// wiring in runInit — withhold, seed, then remove the obsolete minus the
+// protected — had no test of its own: seeding the full content, or removing
+// every obsolete id, passed every test in this file. This one fails under
+// either.
+test('re-running init on a launched site keeps the client’s venue lines and creates no duplicate fact or placeholder', async () => {
+  const db = makeFakeDb();
+  const now = () => 1_750_000_000_000;
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now }));
+
+  // Make the site look as the base release left it: the venue as two lines
+  // under the dates card, seeded, and this release's fact and placeholder
+  // not yet in existence.
+  await store.deleteBoth({ db, collection: 'cmsContent', docId: 'info__where' });
+  await store.deleteBoth({ db, collection: 'cmsContent', docId: 'info__who' });
+  const seed = { visible: true, seeded: true, seededAt: 'T0' };
+  await seedCollection({
+    db, store, collection: 'cmsContent', now,
+    docs: [
+      { id: 'info__where_venue', section: 'info', field: 'where_venue', blockType: 'list_item', text: '[Replace] The venue’s name, labelled.', order: 1, ...seed },
+      { id: 'info__where_address', section: 'info', field: 'where_address', blockType: 'list_item', text: '[Replace] The venue’s street address, labelled.', order: 2, ...seed },
+    ],
+  });
+
+  // The client types the venue into its line through the REAL admin write
+  // path and publishes it; the address line stays the seed's.
+  const admin = { uid: 'admin1', email: 'ops@example.org', email_verified: true };
+  const res = {
+    statusCode: null, body: null,
+    set() { return this; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+  await createCmsUpdateContentHandler({
+    db, now, log: { warn() {}, error() {} },
+    auth: { async verifyIdToken() { return admin; } },
+    getConfig: async () => ({ bootstrap: { adminEmails: [admin.email] } }),
+  })({
+    method: 'POST', headers: { authorization: 'Bearer t' },
+    body: { section: 'info', field: 'where_venue', visible: true, fields: { text: 'Venue: Test Hall' } },
+  }, res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  await store.publishDocs({ db, collection: 'cmsContent', docIds: ['info__where_venue'], actor: admin, now });
+
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 1_750_000_001_000,
+  }));
+  assert.equal(value, 0);
+
+  for (const id of ['info__where', 'info__who']) {
+    assert.equal((await db.collection('cmsContent').doc(id).get()).exists, false, `${id} is not created live`);
+    assert.equal((await db.collection('cmsContent_drafts').doc(id).get()).exists, false, `${id} is not drafted`);
+  }
+  assert.equal((await db.collection('cmsContent').doc('info__where_venue').get()).data().text, 'Venue: Test Hall');
+  assert.equal((await db.collection('cmsContent').doc('info__where_address').get()).exists, true, 'the seeded address line stays beside the client’s venue line');
+  assert.match(output, /info__where: not created \(replaces info__where_venue, which the client has edited\)/);
+  assert.match(output, /info__who: not created \(a placeholder/);
+  assert.match(output, /info__where_venue: no longer seeded, kept/);
+  assert.match(output, /info__where_address: no longer seeded, kept/);
 });

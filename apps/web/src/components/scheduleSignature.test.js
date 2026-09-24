@@ -11,7 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { getPreset, THEME_PRESET_IDS } from 'shared/theme';
+import { THEME_PRESET_IDS } from 'shared/theme';
+import { PRESET_REMAPS } from 'shared/presetRemaps';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const indexCss = fs.readFileSync(path.resolve(here, '..', 'index.css'), 'utf8');
@@ -81,7 +82,7 @@ describe('the column that comes forward', () => {
     // whole site's one expressive moment outside §2.2 with nothing to say
     // so. The budget belongs to the brief, not to a theme.
     for (const id of THEME_PRESET_IDS) {
-      const override = getPreset(id).tokens?.['--er-duration-signature'];
+      const override = PRESET_REMAPS.presets[id]?.tokens?.['--er-duration-signature'];
       if (override === undefined) continue;
       const ms = /^(\d+)ms$/.exec(String(override).trim());
       expect(ms, `${id} states its signature duration in whole ms`).not.toBeNull();
@@ -134,8 +135,7 @@ describe('the column that comes forward', () => {
     // no theme test and no second rule.
     expect(themeCss).toContain('--schedule-trace-width: 0;');
     for (const id of THEME_PRESET_IDS) {
-      const preset = getPreset(id);
-      const width = preset.tokens?.['--schedule-trace-width'];
+      const width = PRESET_REMAPS.presets[id]?.tokens?.['--schedule-trace-width'];
       if (id === 'atlas') {
         expect(width, 'Atlas traces the line').toBeTruthy();
         expect(width).not.toBe('0');

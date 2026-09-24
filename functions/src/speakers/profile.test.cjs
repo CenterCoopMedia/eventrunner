@@ -17,7 +17,15 @@ const {
   createApplySpeakerPendingEditsHandler,
   createDiscardSpeakerPendingEditsHandler,
 } = require('./profile.cjs');
-const { makeSpeakersDb } = require('./speakersFake.cjs');
+const { makeSpeakersDb: makeBareSpeakersDb } = require('./speakersFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the admin and the staff address the tests use.
+const makeSpeakersDb = (seed = {}) => makeBareSpeakersDb({
+  'config/bootstrap': { adminEmails: [ACTOR.email], staffEmails: ['staff@example.org'] },
+  ...seed,
+});
 
 const ACTOR = { uid: 'admin-1', email: 'admin@example.org' };
 const NOW = () => Date.parse('2026-08-21T12:00:00Z');
@@ -308,8 +316,10 @@ function fakeRes() {
 function adminDeps(db, { admin = true } = {}) {
   return {
     db,
-    auth: { verifyIdToken: async () => ({ uid: ACTOR.uid, email: ACTOR.email, email_verified: true }) },
-    getConfig: async () => ({ bootstrap: { adminEmails: admin ? [ACTOR.email] : [] } }),
+    // The gate reads the admin list live off the db, so "not an admin" is
+    // a token whose address is not on it.
+    auth: { verifyIdToken: async () => ({ uid: ACTOR.uid, email: admin ? ACTOR.email : 'stranger@example.org', email_verified: true }) },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ACTOR.email] } }),
     now: NOW,
     log: { error() {}, warn() {} },
   };
@@ -960,4 +970,198 @@ test('getOwnSpeakerProfile handler surfaces pendingEdits to the owner', async ()
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.speaker.pendingEdits, { bio: 'queued bio' });
   assert.equal(res.body.speaker.bio, 'old bio');
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('createSpeaker admits a staff admin — speakers are staff work', async () => {
+  const db = makeSpeakersDb();
+  const staffDeps = {
+    ...adminDeps(db),
+    auth: { verifyIdToken: async () => ({ uid: 'staff-1', email: 'staff@example.org', email_verified: true }) },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ACTOR.email], staffEmails: ['staff@example.org'] } }),
+  };
+  const res = fakeRes();
+  await createCreateSpeakerHandler(staffDeps)(adminReq({ speaker: { firstName: 'Rae', lastName: 'Okonkwo' } }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('getOwnSpeakerProfile treats a staff admin as an admin and reads any record', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const staff = {
+    ...speakerDeps(db, { uid: 'staff-1', email: 'staff@example.org' }),
+    getConfig: async () => ({ bootstrap: { adminEmails: [], staffEmails: ['staff@example.org'] } }),
+  };
+  const res = fakeRes();
+  await createGetOwnSpeakerProfileHandler(staff)(speakerReq({ speakerId: 'rae' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.speaker.speakerId, 'rae');
+});
+
+// ------------------------------- headshotPath on the admin paths (issue 186)
+
+test("an admin create refuses a headshotPath outside the speaker's own prefix", async () => {
+  const db = makeSpeakersDb();
+  for (const headshotPath of ['branding/logo.svg', 'speaker-photos/someone-else/photo.png', 'cms-images/x.png']) {
+    const result = await applyCreateSpeaker({
+      db, speakerId: 'rae',
+      payload: { firstName: 'Rae', lastName: 'Okonkwo', headshotPath },
+      actor: ACTOR, now: NOW,
+    });
+    assert.equal(result.ok, false, headshotPath);
+    assert.equal(result.status, 400);
+    assert.match(result.message, /^headshotPath: must be null or under speaker-photos\/rae\//);
+  }
+  assert.deepEqual(db.writes, []);
+});
+
+test('an admin create accepts a headshotPath under the id the record will carry', async () => {
+  const db = makeSpeakersDb();
+  const explicit = await applyCreateSpeaker({
+    db, speakerId: 'rae',
+    payload: { firstName: 'Rae', lastName: 'Okonkwo', headshotPath: 'speaker-photos/rae/a1/photo.png' },
+    actor: ACTOR, now: NOW,
+  });
+  assert.equal(explicit.ok, true);
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speaker-photos/rae/a1/photo.png');
+
+  // Without an explicit id the record takes the slug, and the prefix is
+  // checked against that id — not against the (absent) speakerId argument.
+  const derived = await applyCreateSpeaker({
+    db,
+    payload: { firstName: 'Sam', lastName: 'Adeyemi', headshotPath: 'speaker-photos/sam-adeyemi/b2/photo.png' },
+    actor: ACTOR, now: NOW,
+  });
+  assert.equal(derived.ok, true);
+  const wrongId = await applyCreateSpeaker({
+    db,
+    payload: { firstName: 'Kim', lastName: 'Lee', headshotPath: 'speaker-photos/rae/b2/photo.png' },
+    actor: ACTOR, now: NOW,
+  });
+  assert.equal(wrongId.ok, false);
+  assert.match(wrongId.message, /^headshotPath: must be null or under speaker-photos\/kim-lee\//);
+
+  const avatar = await applyCreateSpeaker({
+    db, speakerId: 'ada',
+    payload: { firstName: 'Ada', lastName: 'Ng', headshotPath: 'default-avatars/03.svg' },
+    actor: ACTOR, now: NOW,
+  });
+  assert.equal(avatar.ok, true);
+});
+
+test("an admin update refuses a headshotPath outside the speaker's own prefix and writes nothing", async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const before = db.writes.length;
+  for (const headshotPath of ['branding/logo.svg', 'speaker-photos/someone-else/photo.png']) {
+    const result = await applyUpdateSpeaker({
+      db, speakerId: 'rae', payload: { headshotPath }, actor: ACTOR, now: NOW,
+    });
+    assert.equal(result.ok, false, headshotPath);
+    assert.equal(result.status, 400);
+    assert.match(result.message, /^headshotPath: must be null or under speaker-photos\/rae\//);
+  }
+  assert.equal(db.writes.length, before);
+  assert.equal(db.read('speakers', 'rae').headshotPath, null);
+
+  const own = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { headshotPath: 'speaker-photos/rae/c3/photo.png' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(own.ok, true);
+  const cleared = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { headshotPath: null }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(cleared.ok, true);
+});
+
+test('the admin update handler returns the headshotPath refusal verbatim', async () => {
+  const db = makeSpeakersDb(ownedWorld());
+  const res = fakeRes();
+  await createUpdateSpeakerHandler(adminDeps(db))(
+    adminReq({ speakerId: 'rae', speaker: { headshotPath: 'branding/logo.svg' } }), res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^headshotPath: must be null or under speaker-photos\/rae\//);
+});
+
+test("applying pending edits only ever deletes the speaker's own superseded headshot", async () => {
+  // A stored path outside the speaker's prefix (however it got there) is
+  // not this speaker's object to delete: a branding file or another
+  // speaker's photo must survive the apply.
+  for (const stale of ['branding/logo.svg', 'speaker-photos/someone-else/photo.png', 'default-avatars/03.svg']) {
+    const db = makeSpeakersDb(approvedWorld({
+      headshotPath: stale,
+      pendingEdits: { headshotPath: 'speaker-photos/rae/new/photo.png' },
+    }));
+    const bucket = fakeBucket();
+    const result = await applyApplySpeakerPendingEdits({ db, bucket, speakerId: 'rae', actor: ACTOR, now: NOW });
+    assert.equal(result.ok, true, stale);
+    assert.equal(db.read('speakers', 'rae').headshotPath, 'speaker-photos/rae/new/photo.png');
+    assert.deepEqual(bucket.deleted, [], stale);
+  }
+});
+
+// ------------------------------------ the gates fail closed (issue 186 review)
+
+function bootstrapDownDb(seed = {}) {
+  const db = makeSpeakersDb(seed);
+  const realCollection = db.collection.bind(db);
+  db.collection = (name) => {
+    if (name === 'config') return { doc: () => ({ async get() { throw new Error('firestore down'); } }) };
+    return realCollection(name);
+  };
+  return db;
+}
+
+test('createSpeaker answers 500 and writes nothing when config/bootstrap cannot be read', async () => {
+  const db = bootstrapDownDb();
+  const res = fakeRes();
+  await createCreateSpeakerHandler(adminDeps(db))(adminReq({ speaker: { firstName: 'Rae', lastName: 'Okonkwo' } }), res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.body.error.code, 'internal');
+  assert.deepEqual(db.writes, []);
+});
+
+test('the speaker self-or-admin gate answers 500 and writes nothing when config/bootstrap cannot be read', async () => {
+  const db = bootstrapDownDb(ownedWorld());
+  const read = fakeRes();
+  await createGetOwnSpeakerProfileHandler(speakerDeps(db))(speakerReq({ speakerId: 'rae' }), read);
+  assert.equal(read.statusCode, 500);
+  assert.equal(read.body.error.code, 'internal');
+
+  const write = fakeRes();
+  await createUpdateOwnSpeakerProfileHandler(speakerDeps(db))(speakerReq({ speakerId: 'rae', speaker: { bio: 'new' } }), write);
+  assert.equal(write.statusCode, 500);
+  assert.equal(write.body.error.code, 'internal');
+  assert.deepEqual(db.writes, []);
+  assert.equal(db.read('speakers', 'rae').bio, 'old bio');
+});
+
+// ------------------------- legacy headshot paths (connector review, issue 186)
+
+test('an admin edit that carries a legacy headshotPath UNCHANGED goes through', async () => {
+  // Records written before the prefix rule may hold any Storage path, and
+  // the admin editor sends the current headshotPath on every save.
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: 'speakers/rae.jpg' }));
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { bio: 'edited', headshotPath: 'speakers/rae.jpg' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(db.read('speakers', 'rae').bio, 'edited');
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speakers/rae.jpg');
+});
+
+test('an admin edit that CHANGES a legacy headshotPath to another foreign path is refused', async () => {
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: 'speakers/rae.jpg' }));
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { headshotPath: 'speakers/other.jpg' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 400);
+  assert.match(result.message, /^headshotPath: must be null or under speaker-photos\/rae\//);
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speakers/rae.jpg');
+
+  const own = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { headshotPath: 'speaker-photos/rae/new/photo.png' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(own.ok, true);
 });

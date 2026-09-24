@@ -21,6 +21,7 @@
 // E2E_EMULATOR_LOG, but only as a post-mortem debugging aid — no test reads it.
 import fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { expect } from '@playwright/test';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -215,4 +216,34 @@ export function waitForInviteToken(since, email, timeoutMs) {
     const match = `${mail.text || ''} ${mail.html || ''}`.match(/\/speaker\/accept\?token=([0-9a-f]{64})/);
     return match ? match[1] : null;
   }, timeoutMs);
+}
+
+/** Empty the emulator's sign-in rate-limit buckets (auth_rate_limits). */
+export async function clearSignInRateLimits() {
+  const snap = await adminDb().collection('auth_rate_limits').get();
+  await Promise.all(snap.docs.map((doc) => doc.ref.delete()));
+}
+
+/**
+ * Sign `email` in through the real sign-in page: request a code, read it from
+ * the captured mail, and submit it. Sending the code writes a `sent_emails`
+ * row, which the email log spec reads back. A new user can go straight to
+ * /profile, so this waits only for the page to leave /signin rather than
+ * racing that redirect for a brief intermediate home route.
+ */
+export async function signIn(page, email) {
+  // The server allows five sign-in codes per address per 15 minutes
+  // (functions/src/auth/challenges.cjs). The whole suite signs the seeded
+  // operator in more often than that, so the last spec to do so was
+  // refused a code. Each sign-in here starts from an empty window, as a
+  // person signing in once would; no spec tests the limit itself.
+  await clearSignInRateLimits();
+  const since = mailFileSize();
+  await page.goto('/signin');
+  await page.locator('#signin-email').fill(email);
+  await page.getByRole('button', { name: /email me a code/i }).click();
+  await expect(page.locator('#signin-code')).toBeVisible();
+  await page.locator('#signin-code').fill(await waitForOtpCode(since, email, 30_000));
+  await page.getByRole('button', { name: /^sign in$/i }).click();
+  await page.waitForURL((url) => url.pathname !== '/signin');
 }

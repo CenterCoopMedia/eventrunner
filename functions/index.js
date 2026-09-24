@@ -5,6 +5,7 @@
 // export is re-exported here by name.
 
 const email = require('./src/email/send.cjs');
+const emailLog = require('./src/email/log.cjs');
 const auth = require('./src/auth/otp.cjs');
 const cmsContent = require('./src/cms/content.cjs');
 const cmsPages = require('./src/cms/pages.cjs');
@@ -18,6 +19,9 @@ const adminConfig = require('./src/admin/config.cjs');
 const adminCustomBadges = require('./src/admin/customBadges.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
+const adminChangeRequests = require('./src/admin/changeRequests.cjs');
+const adminAccess = require('./src/admin/access.cjs');
+const adminEventStats = require('./src/admin/eventStats.cjs');
 const webMcpDiagnostics = require('./src/admin/webMcpDiagnostics.cjs');
 const scheduleBookmarks = require('./src/schedule/bookmarks.cjs');
 const schedulePdf = require('./src/schedule/pdf.cjs');
@@ -27,6 +31,8 @@ const scheduleReactions = require('./src/schedule/reactions.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 const usersApproval = require('./src/users/approval.cjs');
+const usersExport = require('./src/users/export.cjs');
+const usersRecords = require('./src/users/records.cjs');
 const speakersProfile = require('./src/speakers/profile.cjs');
 const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
 const speakersProjection = require('./src/speakers/projection.cjs');
@@ -39,6 +45,7 @@ const materialsReview = require('./src/materials/review.cjs');
 const materialsAccess = require('./src/materials/access.cjs');
 const materialsDownload = require('./src/materials/download.cjs');
 const materialsProjection = require('./src/materials/projection.cjs');
+const materialsBulk = require('./src/materials/bulk.cjs');
 const ticketingRegistry = require('./src/ticketing/index.cjs');
 const ticketingWebhook = require('./src/ticketing/webhook.cjs');
 const ticketingSync = require('./src/ticketing/sync.cjs');
@@ -50,6 +57,7 @@ const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
 
 module.exports = {
   ...email.handlers,
+  ...emailLog.handlers,
   ...auth.handlers,
   ...cmsContent.handlers,
   ...cmsPages.handlers,
@@ -63,6 +71,9 @@ module.exports = {
   ...adminCustomBadges.handlers,
   ...adminLiveUpdates.handlers,
   ...adminFeedback.handlers,
+  ...adminChangeRequests.handlers,
+  ...adminAccess.handlers,
+  ...adminEventStats.handlers,
   ...webMcpDiagnostics.handlers,
   ...scheduleBookmarks.handlers,
   ...schedulePdf.handlers,
@@ -72,6 +83,8 @@ module.exports = {
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...usersApproval.handlers,
+  ...usersExport.handlers,
+  ...usersRecords.handlers,
   ...speakersProfile.handlers,
   ...speakersLifecycle.handlers,
   ...speakersProjection.handlers,
@@ -84,6 +97,7 @@ module.exports = {
   ...materialsAccess.handlers,
   ...materialsDownload.handlers,
   ...materialsProjection.handlers,
+  ...materialsBulk.handlers,
   ...ticketingRegistry.handlers,
   ...ticketingWebhook.handlers,
   ...ticketingSync.handlers,

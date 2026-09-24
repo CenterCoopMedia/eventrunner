@@ -9,7 +9,13 @@
 // a chooser: `onSelect` is supplied, tiles become picker buttons, and the
 // "details" affordance moves to a secondary control so a pick is never one
 // mis-click from a delete dialog.
+//
+// The Branding drawer is the operator's (issue 186): for staff it lists and
+// shows, but offers no upload, and its asset modal offers no save or
+// delete. The server refuses those writes anyway; the drawer says so in one
+// line rather than with buttons that fail.
 import { useMemo, useState } from 'react';
+import { useAuth } from '../../../contexts/AuthContext.jsx';
 import { formatBytes } from '../../../lib/mediaSource.js';
 import { AdminEmptyState, AdminLoadingState, StatusBadge } from '../adminChrome.jsx';
 import {
@@ -23,6 +29,7 @@ import {
 import AssetImage from '../../../components/media/AssetImage.jsx';
 import { useMediaLibrary } from '../../../components/media/useMediaLibrary.js';
 import AssetModal from './AssetModal.jsx';
+import { BRANDING_NOTE } from './mediaErrors.js';
 import UploadModal from './UploadModal.jsx';
 
 /** Case-insensitive match across the fields a person would search by. */
@@ -52,6 +59,9 @@ export default function MediaLibrary({
 }) {
   const library = useMediaLibrary({ folder });
   const { assets, loading, error, scanUsage, upload, updateMetadata, remove } = library;
+  const { adminTier } = useAuth();
+  const operator = adminTier === 'operator';
+  const brandingLocked = folder === 'branding' && !operator;
   const [term, setTerm] = useState('');
   const [uploading, setUploading] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -80,9 +90,13 @@ export default function MediaLibrary({
             className={inputClass}
           />
         </div>
-        <button type="button" className={primaryButtonClass} onClick={() => setUploading(true)}>
-          Upload a file
-        </button>
+        {brandingLocked ? (
+          <p className="text-admin-sm text-admin-ink-secondary">{BRANDING_NOTE}</p>
+        ) : (
+          <button type="button" className={primaryButtonClass} onClick={() => setUploading(true)}>
+            Upload a file
+          </button>
+        )}
       </div>
 
       {error ? (
@@ -101,7 +115,9 @@ export default function MediaLibrary({
           description={
             term
               ? 'Try a different word, or clear the search to see everything.'
-              : emptyHint ||
+              : brandingLocked
+                ? BRANDING_NOTE
+                : emptyHint ||
                 'Upload an image to start the library. Files are stored server-side; nothing is written from the browser.'
           }
         />
@@ -174,6 +190,7 @@ export default function MediaLibrary({
           scanUsage={scanUsage}
           updateMetadata={updateMetadata}
           remove={remove}
+          operator={operator}
           onChanged={() => setNotice('Library updated.')}
           onClose={() => setDetail(null)}
         />

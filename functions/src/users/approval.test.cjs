@@ -3,7 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
+
+// requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
+// #186 review: it fails closed on an absent document), so every fake this
+// file builds carries the document the file's getConfig describes.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.com'], staffEmails: ['staff@example.com'] };
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 const {
   createApproveUserHandler,
   createRevokeUserHandler,
@@ -239,4 +245,23 @@ test('a refused transition writes no audit row and no state', async () => {
   const db = seeded({ registrationStatus: 'pending' });
   await revoke(db)(req('admin'), makeRes());
   assert.deepEqual(adminLogs(db), []);
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('a staff admin may approve and revoke — attendees are staff work', async () => {
+  const STAFF = 'staff@example.com';
+  const staffAuth = {
+    async verifyIdToken(token) {
+      if (token === 'staff') return { uid: 'staff-1', email: STAFF, email_verified: true };
+      throw new Error('invalid token');
+    },
+  };
+  const tiered = async () => ({ bootstrap: { adminEmails: [ADMIN], staffEmails: [STAFF] }, features: {} });
+  const db = seeded();
+  const res = makeRes();
+  await createApproveUserHandler({ db, auth: staffAuth, getConfig: tiered, now: () => T0, log: QUIET })(req('staff'), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'approved');
+  assert.equal(adminLogs(db)[0].email, STAFF);
 });

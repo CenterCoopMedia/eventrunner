@@ -15,7 +15,8 @@
  * `event.sender.email`, and at least one admin email):
  *
  *   {
- *     "adminEmails": ["ops@example.org"],
+ *     "adminEmails": ["ops@example.org"],        // operators (issue #186)
+ *     "staffEmails": ["desk@example.org"],       // staff, optional
  *     "event":    { name, shortName, tagline, timezone, days: [...], venue,
  *                   registration, sender, legal, social, seo },
  *     "features": { ...booleans },
@@ -82,8 +83,14 @@ const PROMPTS = Object.freeze([
   },
   {
     path: 'adminEmails',
-    question: 'First admin email addresses (comma separated)',
+    question: 'First operator email addresses (comma separated)',
     required: true,
+    parse: parseEmailList,
+  },
+  {
+    path: 'staffEmails',
+    question: 'Staff email addresses (comma separated; content, schedule, speakers, attendees)',
+    required: false,
     parse: parseEmailList,
   },
 ]);
@@ -216,12 +223,15 @@ function parseAnswersFile(text) {
     return { ok: false, errors: ['answers file must contain a JSON object'] };
   }
   const errors = [];
-  const known = ['adminEmails', 'event', 'features', 'theme', 'badges', 'providers'];
+  const known = ['adminEmails', 'staffEmails', 'event', 'features', 'theme', 'badges', 'providers'];
   for (const key of Object.keys(parsed)) {
     if (!known.includes(key)) errors.push(`${key}: unknown top-level key in the answers file`);
   }
   if (parsed.adminEmails !== undefined && !Array.isArray(parsed.adminEmails)) {
     errors.push('adminEmails: must be an array of email addresses');
+  }
+  if (parsed.staffEmails !== undefined && !Array.isArray(parsed.staffEmails)) {
+    errors.push('staffEmails: must be an array of email addresses');
   }
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, answers: parsed };
@@ -460,15 +470,24 @@ function buildConfigDocs({ answers, tierA, now = Date.now }) {
   const theme = mergeTheme(defaultTheme(), answers.theme);
   const badges = isPlainObject(answers.badges) ? answers.badges : defaultBadges();
 
-  const adminEmails = Array.isArray(answers.adminEmails)
-    ? [...new Set(answers.adminEmails.map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
-    : [];
+  // The two admin tiers (issue #186): adminEmails is the operator list,
+  // staffEmails the staff list. Both lowercased and de-duplicated, because
+  // firestore.rules matches the stored list against the lowercased token
+  // email. An address on both lists is an operator, so it is dropped from
+  // staff here rather than stored twice.
+  const normalizeEmails = (list) => (Array.isArray(list)
+    ? [...new Set(list.map((e) => String(e).trim().toLowerCase()).filter(Boolean))]
+    : []);
+  const adminEmails = normalizeEmails(answers.adminEmails);
+  const staffEmails = normalizeEmails(answers.staffEmails).filter((e) => !adminEmails.includes(e));
   if (adminEmails.length === 0) {
     errors.push('adminEmails: at least one first-admin address is required (--admin or the answers file)');
   }
-  for (const email of adminEmails) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.push(`adminEmails: "${email}" is not an email address`);
+  for (const [label, list] of [['adminEmails', adminEmails], ['staffEmails', staffEmails]]) {
+    for (const email of list) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.push(`${label}: "${email}" is not an email address`);
+      }
     }
   }
 
@@ -492,7 +511,7 @@ function buildConfigDocs({ answers, tierA, now = Date.now }) {
       theme,
       badges,
       providers,
-      bootstrap: { adminEmails, createdAt },
+      bootstrap: { adminEmails, staffEmails, createdAt },
     },
   };
 }

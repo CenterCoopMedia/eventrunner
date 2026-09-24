@@ -126,7 +126,7 @@ const LOGO_SLOT_LABELS = {
 
 const LOGO_SLOT_HINTS = {
   primary: 'The header logo, shown at the top of every page.',
-  mark: 'A square version for tight spaces.',
+  mark: 'A square version for tight spaces. A square PNG from 512 to 4096 pixels on a side also becomes the app icon.',
   footer: 'Used in the site footer; falls back to the primary logo.',
   ogDefault: 'The image link previews use when a page has none of its own.',
   favicon: 'The browser tab icon.',

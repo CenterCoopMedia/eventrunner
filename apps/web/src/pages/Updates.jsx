@@ -21,14 +21,27 @@
 // "Pinned" on an entry is the small ruled rectangle Tag established (issue
 // #113): never a pill, never a colored badge, and beside the title, never
 // above it.
+//
+// THE LEAD AND THE CATEGORY (issue #191). An operator can feature a post.
+// The first featured post in the feed's order leads the page under its own
+// folio, "Featured", before "Pinned", because featured is not a date either.
+// It keeps the spine and sets its title a step larger, its date as a
+// dateline, and its opening as a standfirst: a lead position, not a card.
+// A post's category is a plain Tag beside its title, before "Pinned", and
+// it draws only when it passes the rule the server stored it under
+// (shared/update validUpdateCategory), so a stray stored value draws
+// nothing.
 import { Link } from 'react-router-dom';
+import { validUpdateCategory } from 'shared/update';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { UpdateImage } from '../components/UpdateContent.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import Standfirst from '../components/editorial/Standfirst.jsx';
 import Tag from '../components/editorial/Tag.jsx';
+import { Dateline } from '../components/editorial/Byline.jsx';
 import { groupUpdates, publishDateLabel, sortUpdates, toPublishDate } from '../lib/updateDates.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 
@@ -42,8 +55,48 @@ function excerpt(body, maxLen = 200) {
   return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trim()}…`;
 }
 
+/** The tags beside a title: the category, then "Pinned". */
+function EntryTags({ update }) {
+  const category = validUpdateCategory(update.category) ? update.category.trim() : null;
+  return (
+    <>
+      {category ? <Tag>{category}</Tag> : null}
+      {update.pinned === true ? <Tag>Pinned</Tag> : null}
+    </>
+  );
+}
+
+/** The featured post at the head of the page (issue #191). */
+function LeadEntry({ update, timeZone }) {
+  const dateLabel = publishDateLabel(update.publishAt, timeZone);
+  const body = excerpt(update.body, 320);
+  return (
+    <li className="update-feed__entry">
+      <div className="flex flex-wrap items-baseline gap-x-sm gap-y-2xs">
+        <h3 className="font-heading text-h2 font-semibold text-text-primary">
+          <Link to={`/updates/${update.id}`} className="hover:underline">
+            {update.title}
+          </Link>
+        </h3>
+        <EntryTags update={update} />
+      </div>
+      {dateLabel ? (
+        <Dateline
+          className="mt-3xs"
+          dateTime={toPublishDate(update.publishAt).toISOString()}
+          label={dateLabel}
+        />
+      ) : (
+        <p className="byline mt-3xs">Undated</p>
+      )}
+      {update.featuredImage ? <div className="mt-sm max-w-2xl"><UpdateImage image={update.featuredImage} /></div> : null}
+      {body ? <Standfirst className="mt-xs">{body}</Standfirst> : null}
+    </li>
+  );
+}
+
 export default function Updates() {
-  const { features } = useEventConfig();
+  const { features, eventConfig } = useEventConfig();
   const { updates } = useContent();
 
   if (!features.updates) {
@@ -77,7 +130,7 @@ export default function Updates() {
         </div>
       ) : (
         <div className="update-feed mt-lg">
-          {groupUpdates(visible).map((run, index) => (
+          {groupUpdates(visible, eventConfig?.timezone).map((run, index) => (
             <section
               key={`${run.kind}-${run.label}`}
               aria-labelledby={`update-run-${index}`}
@@ -91,8 +144,10 @@ export default function Updates() {
                 rule="hairline"
               />
               <ul className="mt-sm">
-                {run.members.map((update) => {
-                  const dateLabel = publishDateLabel(update.publishAt);
+                {run.kind === 'lead' ? (
+                  <LeadEntry key={run.members[0].id} update={run.members[0]} timeZone={eventConfig?.timezone} />
+                ) : run.members.map((update) => {
+                  const dateLabel = publishDateLabel(update.publishAt, eventConfig?.timezone);
                   const publishDate = toPublishDate(update.publishAt);
                   const body = excerpt(update.body);
                   return (
@@ -108,7 +163,7 @@ export default function Updates() {
                             {update.title}
                           </Link>
                         </h3>
-                        {update.pinned ? <Tag>Pinned</Tag> : null}
+                        <EntryTags update={update} />
                       </div>
                       {/* The day, in the mono face with tabular figures —
                           the run's head already carries the month, so the

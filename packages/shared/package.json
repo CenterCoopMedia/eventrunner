@@ -14,11 +14,13 @@
     "./slug": { "require": "./src/slug.cjs", "import": "./src/slug.mjs" },
     "./speaker": { "require": "./src/speaker.cjs", "import": "./src/speaker.mjs" },
     "./theme": { "require": "./src/theme.cjs", "import": "./src/theme.mjs" },
+    "./presetRemaps": { "require": "./src/presetRemaps.cjs", "import": "./src/presetRemaps.mjs" },
     "./urlSafety": { "require": "./src/urlSafety.cjs", "import": "./src/urlSafety.mjs" },
     "./routing": { "require": "./src/routing.cjs", "import": "./src/routing.mjs" },
     "./page": { "require": "./src/page.cjs", "import": "./src/page.mjs" },
     "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" },
     "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
-    "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" }
+    "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" },
+    "./seed": { "require": "./src/seed.cjs", "import": "./src/seed.mjs" }
   }
 }

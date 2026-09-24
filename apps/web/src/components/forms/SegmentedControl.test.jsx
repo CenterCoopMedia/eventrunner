@@ -1,7 +1,13 @@
 // The segmented control: the radio group's keyboard, and what it announces.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import SegmentedControl from './SegmentedControl.jsx';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const indexCss = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'utf8');
 
 const OPTIONS = [
   { value: 'day', label: 'Day' },
@@ -69,5 +75,106 @@ describe('SegmentedControl', () => {
     // The filled ground is the second signal, never the only one.
     const { options } = renderControl('all');
     expect(options[2].className).toContain('aria-checked:font-bold');
+  });
+
+  // An unavailable option (expansion record §2.1): aria-disabled, focusable
+  // so it can explain itself, and every activation path refused.
+  it('marks an unavailable option and refuses to choose it by pointer or by key', () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        label="Range"
+        options={[OPTIONS[0], { ...OPTIONS[1], disabled: true, hint: 'No sessions this week' }, OPTIONS[2]]}
+        value="day"
+        onChange={onChange}
+      />,
+    );
+    const options = screen.getAllByRole('radio');
+    expect(options[1]).toHaveAttribute('aria-disabled', 'true');
+    expect(options[1]).not.toBeDisabled();
+    expect(options[1]).toHaveAccessibleName('Week (No sessions this week)');
+    fireEvent.click(options[1]);
+    expect(onChange).not.toHaveBeenCalled();
+    options[0].focus();
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(options[1]).toHaveFocus();
+    expect(onChange).not.toHaveBeenCalled();
+    // From the unavailable option the next key moves on and chooses.
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(onChange).toHaveBeenCalledWith('all');
+  });
+
+  it('moves the one tab stop with focus onto an unavailable option, and back when focus leaves', () => {
+    render(
+      <>
+        <SegmentedControl
+          label="Range"
+          options={[OPTIONS[0], { ...OPTIONS[1], disabled: true, hint: 'No sessions this week' }, OPTIONS[2]]}
+          value="day"
+          onChange={() => {}}
+        />
+        <button type="button">Outside the row</button>
+      </>,
+    );
+    const options = screen.getAllByRole('radio');
+    const stops = () => options.map((option) => option.tabIndex);
+    expect(stops()).toEqual([0, -1, -1]);
+    options[0].focus();
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(options[1]).toHaveFocus();
+    expect(stops()).toEqual([-1, 0, -1]);
+    fireEvent.blur(options[1], { relatedTarget: screen.getByRole('button', { name: 'Outside the row' }) });
+    expect(stops()).toEqual([0, -1, -1]);
+  });
+
+  it('shows the reason for an unavailable option under the row while it has focus or the pointer', () => {
+    render(
+      <SegmentedControl
+        label="Range"
+        options={[OPTIONS[0], { ...OPTIONS[1], disabled: true, hint: 'No sessions this week' }, OPTIONS[2]]}
+        value="day"
+        onChange={() => {}}
+      />,
+    );
+    const options = screen.getAllByRole('radio');
+    const shown = () => document.querySelector('.segmented__reason');
+    expect(shown()).toBeNull();
+    options[0].focus();
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(shown()).toHaveTextContent('No sessions this week');
+    expect(shown()).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.blur(options[1], { relatedTarget: document.body });
+    expect(shown()).toBeNull();
+    fireEvent.mouseEnter(options[1]);
+    expect(shown()).toHaveTextContent('No sessions this week');
+    fireEvent.mouseLeave(screen.getByRole('radiogroup'));
+    expect(shown()).toBeNull();
+  });
+
+  it('draws an unavailable option with a dashed rule under the word, not the ground tint alone', () => {
+    const rule = indexCss.match(/\.segmented__option\[aria-disabled='true'\] \{[^}]*\}/u)?.[0] ?? '';
+    expect(rule).toContain('text-decoration-style: dashed');
+  });
+
+  it('keeps showing the focused unavailable option’s reason while the pointer rests on another option', () => {
+    // A reader clicks the first option and arrows onto the unavailable one:
+    // the pointer still rests on the first. The reason is the focused
+    // option's; an available option under the pointer has none to show and
+    // must not hide it (adversarial review, 2026-09-24).
+    render(
+      <SegmentedControl
+        label="Range"
+        options={[OPTIONS[0], { ...OPTIONS[1], disabled: true, hint: 'No sessions this week' }, OPTIONS[2]]}
+        value="day"
+        onChange={() => {}}
+      />,
+    );
+    const options = screen.getAllByRole('radio');
+    fireEvent.mouseEnter(options[0]);
+    fireEvent.click(options[0]);
+    options[0].focus();
+    fireEvent.keyDown(screen.getByRole('radiogroup'), { key: 'ArrowRight' });
+    expect(options[1]).toHaveFocus();
+    expect(document.querySelector('.segmented__reason')).toHaveTextContent('No sessions this week');
   });
 });

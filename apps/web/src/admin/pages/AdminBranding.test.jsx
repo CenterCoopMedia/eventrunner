@@ -76,6 +76,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { markTourDone } from '../tourState.js';
 import { PREVIEW_COMPARE_SCOPE_ID, PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
 
 // Hex values are DATA here, never literals in source (spec §7.6 forbids hex
@@ -191,6 +192,9 @@ function panelTitles() {
 }
 
 beforeEach(() => {
+  // The editor tour (issue #198) opens on a first visit; this file tests
+  // the page, so the account has already ended it.
+  markTourDone('admin-1');
   configSubscriptions.clear();
   document.getElementById(PREVIEW_STYLE_ID)?.remove();
   for (const attribute of ['theme', 'mode', 'motifSet', 'texture']) {
@@ -647,6 +651,16 @@ describe('publishing the theme', () => {
     expect(screen.getByLabelText('Favicon').closest('[hidden]')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Choose or upload…' }).length).toBe(5);
   });
+
+  // The square icon also becomes the app icon when it is a square PNG. The
+  // field's description is where an operator learns that rule, so it is
+  // read through the field itself, as a screen reader reads it.
+  it('describes the square icon field with the app icon rule', async () => {
+    await renderBranding();
+    expect(screen.getByLabelText('Square icon')).toHaveAccessibleDescription(
+      'A square version for tight spaces. A square PNG from 512 to 4096 pixels on a side also becomes the app icon.',
+    );
+  }, 20_000);
 });
 
 describe('color picker input', () => {

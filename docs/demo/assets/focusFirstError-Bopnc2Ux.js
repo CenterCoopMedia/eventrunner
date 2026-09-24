@@ -1,0 +1,1 @@
+const r='[aria-invalid="true"]:not([disabled])',u=":invalid:not([disabled])";function n(t,e){try{return t.querySelector(e)}catch{return null}}function i(t){if(!t||typeof t.querySelector!="function")return!1;const e=n(t,r)||n(t,u);return!e||typeof e.focus!="function"?!1:(e.focus(),!0)}export{i as f};

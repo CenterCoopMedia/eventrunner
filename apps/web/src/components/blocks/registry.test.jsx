@@ -16,9 +16,12 @@ const SAMPLE_BLOCKS = {
   image: { blockType: 'image', url: 'https://example.org/i.png', alt: 'Sample image', caption: 'Caption' },
   cta: { blockType: 'cta', label: 'Register now', url: 'https://example.org/register', external: true },
   stat: { blockType: 'stat', value: '450', label: 'Attendees expected' },
+  fact: { blockType: 'fact', label: 'Where', value: 'Test Hall', note: '1 Test Way' },
+  quote: { blockType: 'quote', text: 'Decide who checks sources first.', attribution: 'A speaker' },
   list_item: { blockType: 'list_item', text: 'Sample list entry' },
   faq_item: { blockType: 'faq_item', question: 'Sample question?', answer: '<p>Sample answer.</p>' },
   link_group: { blockType: 'link_group', group: 'About', label: 'Contact the organizers', url: 'mailto:hi@example.org' },
+  sponsor_package: { blockType: 'sponsor_package', name: 'Coffee break', price: 'Illustrative', limit: 2, benefits: '<p>Signs</p>' },
 };
 
 afterEach(() => {

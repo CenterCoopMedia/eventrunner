@@ -128,6 +128,9 @@ test('the build job writes sitemap.xml, robots.txt, and the manifest right after
   // from (runner.temp/generated), never the committed demo copy.
   assert.match(write, /--generated "\$\{\{ runner\.temp \}\}\/generated"/);
   assert.match(write, /--public-url "\$\{\{ vars\.EVENT_PUBLIC_URL \}\}"/);
+  // The app icons read an uploaded square icon from the client's own
+  // bucket, over its public download URL, so the step needs no credentials.
+  assert.match(write, /--storage-bucket "\$\{\{ vars\.EVENT_STORAGE_BUCKET \}\}"/);
 });
 
 // --- site publisher (spec §8.4 phase 5, issue #36) -----------------------------

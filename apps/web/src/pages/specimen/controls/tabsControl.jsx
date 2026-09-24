@@ -19,8 +19,13 @@ function TabsSpecimen({ state }) {
   return (
     <Tabs value={open} onChange={setOpen} tabs={IDS}>
       <TabList label="Track">
-        {TABS.map((tab) => (
-          <Tab key={tab.id} id={tab.id}>
+        {TABS.map((tab, index) => (
+          <Tab
+            key={tab.id}
+            id={tab.id}
+            disabled={state === 'disabled' && index === TABS.length - 1}
+            hint="Opens once the programme is published"
+          >
             {tab.label}
           </Tab>
         ))}
@@ -41,16 +46,12 @@ export default Object.freeze({
   name: 'Tabs',
   file: 'components/forms/Tabs.jsx',
   contract: null,
-  note: 'The open word carries the strong rule — the same boundary a section head takes — so the row is set in the page’s own typography. One tab stop, arrow keys along the row, never a pill.',
-  states: Object.freeze(['rest', 'selected']),
+  note: 'The open word carries the strong rule — the same boundary a section head takes — so the row is set in the page’s own typography. One tab stop, arrow keys along the row, never a pill. An unavailable tab stays in the row with aria-disabled under a dashed rule, so the arrow keys can land on it, a reader hears why, and a sighted reader sees the reason under the row while the tab has focus or the pointer; it opens nothing.',
+  states: Object.freeze(['rest', 'selected', 'disabled']),
   absent: Object.freeze([
     sharedGrammar('hover'),
     sharedGrammar('focus'),
     sharedGrammar('pressed'),
-    Object.freeze({
-      state: 'disabled',
-      reason: 'A tab with nothing behind it is not rendered. A row that points at an empty panel is a dead end.',
-    }),
     Object.freeze({
       state: 'busy',
       reason: 'Selection follows focus and the panel is already in the document, so nothing waits.',

@@ -57,18 +57,48 @@
   "shape": { "radius": "sharp", "texture": "paper", "density": "loose" },
   "motifSet": "none",
 
-  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default.",
+  "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default. The definition list sets its terms in the monospaced font in capitals between strong rules. The pull quote is the handwritten callout between strong rules. The timeline spine is a strong rule, the progress fill is toner black with square ends, the notice bar sits on the page ground between strong rules and doubles them for an urgent notice, and table heads are set in the monospaced font in capitals. The avatar, the dropzone and the repeater take strong rules with square corners (the dropzone doubles its rule while a file is held over it), the count figure the bold weight, the legend a struck rule above it, the state marker and the byline the monospaced font, and the standfirst a strong rule under it in the full ink.",
   "tokens": {
     "--session-card-rule-width": "var(--rule-strong-width)",
     "--folio-rule-width": "var(--rule-strong-width)",
     "--folio-font": "var(--font-mono)",
     "--callout-angle": "-2.5deg",
     "--marginalia-display": "none",
+    "--definition-list-rule-width": "var(--rule-strong-width)",
+    "--definition-list-term-font": "var(--font-mono)",
+    "--definition-list-term-transform": "uppercase",
+    "--definition-list-term-tracking": "0.04em",
+    "--pull-quote-pad-block": "var(--space-lg)",
+    "--timeline-spine-width": "var(--rule-strong-width)",
+    "--progress-fill": "rgb(var(--color-text-primary-rgb))",
+    "--progress-radius": "0",
+    "--notice-bar-ground": "rgb(var(--color-surface-rgb))",
+    "--notice-bar-rule-width": "var(--rule-strong-width)",
+    "--notice-bar-urgent-rule-width": "calc(var(--rule-strong-width) * 2)",
+    "--notice-bar-word-font": "var(--font-mono)",
+    "--table-head-font": "var(--font-mono)",
+    "--table-head-transform": "uppercase",
+    "--table-head-tracking": "0.04em",
     "--hero-art-width": "64%",
     "--hero-title-size": "clamp(2.8rem, 6vw, 6rem)",
     "--hero-title-tracking": "-.06em",
     "--hero-title-transform": "uppercase",
-    "--hero-press-display": "block"
+    "--hero-press-display": "block",
+    "--avatar-frame-width": "var(--rule-strong-width)",
+    "--avatar-radius": "0",
+    "--dropzone-rule-style": "solid",
+    "--dropzone-rule-width": "var(--rule-strong-width)",
+    "--dropzone-drag-rule-width": "calc(var(--rule-strong-width) * 2)",
+    "--repeater-rule-width": "var(--rule-strong-width)",
+    "--count-figure-weight": "var(--weight-bold)",
+    "--legend-font": "var(--font-mono)",
+    "--legend-rule-width": "var(--rule-strong-width)",
+    "--legend-pad-block": "var(--space-2xs)",
+    "--state-marker-font": "var(--font-mono)",
+    "--standfirst-ink": "rgb(var(--color-text-primary-rgb))",
+    "--standfirst-rule-width": "var(--rule-strong-width)",
+    "--standfirst-pad-block-end": "var(--space-sm)",
+    "--byline-font": "var(--font-mono)"
   },
 
   "options": {
@@ -188,6 +218,158 @@
           "label": "On",
           "why": "Shows up to two small marks and one callout on a page. It does not mark headline words.",
           "tokens": { "--marginalia-display": "inline" }
+        }
+      ]
+    },
+    "longReadOpening": {
+      "label": "Long read opening",
+      "prompt": "Choose how the first paragraph of a Long read page opens.",
+      "default": "plain",
+      "choices": [
+        {
+          "id": "drop-cap",
+          "label": "Drop cap",
+          "why": "Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.",
+          "tokens": {
+            "--drop-cap-float": "left",
+            "--drop-cap-size": "3.1em",
+            "--drop-cap-pad-inline-end": "var(--space-xs)"
+          }
+        },
+        {
+          "id": "standfirst",
+          "label": "Standfirst",
+          "why": "Sets the first paragraph at the lead size, as a summary of the page.",
+          "tokens": {
+            "--long-read-opening-size": "var(--text-lead)",
+            "--long-read-opening-leading": "var(--text-lead-leading)"
+          }
+        },
+        {
+          "id": "plain",
+          "label": "Plain",
+          "why": "Keeps the first paragraph at body size with no drop cap.",
+          "tokens": {
+            "--drop-cap-float": "none"
+          }
+        }
+      ]
+    },
+    "quote": {
+      "label": "Quote device",
+      "prompt": "Choose how a quoted sentence is set.",
+      "default": "handwritten",
+      "choices": [
+        {
+          "id": "handwritten",
+          "label": "Handwritten",
+          "why": "Sets the quote in the script typeface at a small angle between strong rules.",
+          "tokens": {
+            "--pull-quote-rule-block-width": "var(--rule-strong-width)"
+          }
+        },
+        {
+          "id": "toner-block",
+          "label": "Toner block",
+          "why": "Sets the quote in the poster typeface, level, between strong rules.",
+          "componentFonts": {
+            "--callout-font": "karrik"
+          },
+          "tokens": {
+            "--callout-angle": "0deg",
+            "--pull-quote-pad-block": "var(--space-md)"
+          }
+        },
+        {
+          "id": "cut-out",
+          "label": "Cut-out",
+          "why": "Sets the quote in the script typeface beside one strong rule, with no rules above or below.",
+          "tokens": {
+            "--pull-quote-rule-block-width": "0",
+            "--pull-quote-rule-inline-width": "var(--rule-strong-width)",
+            "--pull-quote-pad-inline": "var(--space-md)",
+            "--pull-quote-pad-block": "var(--space-sm)"
+          }
+        }
+      ]
+    },
+    "directory": {
+      "label": "Directory style",
+      "prompt": "Choose how the speaker shelf and the attendee index are set.",
+      "default": "contact-sheet",
+      "choices": [
+        {
+          "id": "contact-sheet",
+          "label": "Contact sheet",
+          "why": "Sets square portraits with square corners between strong rules.",
+          "tokens": {
+            "--directory-portrait-radius": "0",
+            "--directory-rule-width": "var(--rule-strong-width)"
+          }
+        },
+        {
+          "id": "cut-outs",
+          "label": "Cut-outs",
+          "why": "Sets tall portraits on the page ground with square corners and hairline rules.",
+          "tokens": {
+            "--directory-portrait-aspect": "4 / 5",
+            "--directory-portrait-radius": "0",
+            "--directory-portrait-ground": "rgb(var(--color-surface-rgb))"
+          }
+        }
+      ]
+    },
+    "sectionBoundary": {
+      "label": "Section boundary",
+      "prompt": "Choose how a section heading is ruled and labelled.",
+      "default": "rule-and-folio",
+      "choices": [
+        {
+          "id": "rule-and-folio",
+          "label": "Rule and folio",
+          "why": "Draws the section rule with the folio at the far end of the heading line.",
+          "tokens": {
+            "--section-folio-display": "inline"
+          }
+        },
+        {
+          "id": "rule-only",
+          "label": "Rule only",
+          "why": "Draws the section rule and hides the folio beside the heading.",
+          "tokens": {
+            "--section-folio-display": "none"
+          }
+        }
+      ]
+    },
+    "tableRules": {
+      "label": "Table rules",
+      "prompt": "Choose how a table is ruled.",
+      "default": "ruled-head",
+      "choices": [
+        {
+          "id": "hairline-rows",
+          "label": "Hairline rows",
+          "why": "Rules the rows and the head at the hairline and draws no column rules.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-hairline-width)"
+          }
+        },
+        {
+          "id": "ruled-head",
+          "label": "Ruled head",
+          "why": "Closes the head with a strong rule and rules the rows at the hairline, with no column rules.",
+          "tokens": {
+            "--table-head-rule-width": "var(--rule-strong-width)"
+          }
+        },
+        {
+          "id": "full-grid",
+          "label": "Full grid",
+          "why": "Rules the rows and the columns at the hairline, with the head closed at the width the style sets.",
+          "tokens": {
+            "--table-column-rule-width": "var(--rule-hairline-width)"
+          }
         }
       ]
     }

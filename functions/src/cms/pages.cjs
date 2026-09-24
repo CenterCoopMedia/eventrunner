@@ -316,7 +316,7 @@ async function writeAdminLog({ db, store, now, log }, { action, docPath, uid, em
 function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log = console }) {
   return async function cmsSavePage(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const page = req.body?.page;
@@ -436,7 +436,7 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
 function createDeletePageHandler({ db, auth, getConfig, store, now = Date.now, log = console }) {
   return async function cmsDeletePage(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const id = req.body?.id;

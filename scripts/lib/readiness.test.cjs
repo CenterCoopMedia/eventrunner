@@ -102,3 +102,12 @@ test('every unmet row prints a remedy', () => {
   }
   assert.match(table, /UNMET/);
 });
+
+test('staff accounts do not count toward the two-operator floor (issue 186)', () => {
+  const rows = evaluateReadiness(readySnapshot({
+    bootstrap: { adminEmails: ['only@example.org'], staffEmails: ['desk@example.org', 'desk-2@example.org'] },
+  }));
+  const row = rows.find((r) => r.id === 'admins');
+  assert.equal(row.ok, false);
+  assert.match(row.detail, /1 operator account/);
+});

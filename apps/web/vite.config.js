@@ -34,9 +34,12 @@ export default defineConfig({
       'shared/badges',
       'shared/speaker',
       'shared/theme',
+      'shared/presetRemaps',
       'shared/urlSafety',
       'shared/venue',
       'shared/update',
+      'shared/seed',
+      'shared/slug',
     ],
   },
   resolve: {

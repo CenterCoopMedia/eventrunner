@@ -118,6 +118,8 @@
               <li><a href="#publish">Publish</a></li>
               <li><a href="#speakers">Speakers</a></li>
               <li><a href="#custom-badges">Custom badges</a></li>
+              <li><a href="#attendees">Attendees</a></li>
+              <li><a href="#change-requests">Change requests</a></li>
               <li><a href="#materials">Materials</a></li>
               <li><a href="#tickets">Tickets</a></li>
               <li><a href="#when-to-email-ccm-instead-of-posting">When to email CCM instead of posting</a></li>
@@ -142,13 +144,19 @@
           <p>Invite by email. They accept with a login code, the same way attendees sign in. Do not send them a magic link. One speaker record is the source of truth — if a name is wrong in three places, fix the speaker record.</p>
           <h2 id="custom-badges">Custom badges<a class="heading-anchor" href="#custom-badges" aria-label="Link to this section">#</a></h2>
           <p>Custom badges are off by default. If enabled in Features, attendees can write up to three badges of 24 characters each. Reserved role words and the event block list are refused. In Attendees, select the removal action beside a custom badge and confirm it. The removal is recorded in the admin log. Turning the feature off hides these badges and keeps other profile fields editable.</p>
+          <h2 id="attendees">Attendees<a class="heading-anchor" href="#attendees" aria-label="Link to this section">#</a></h2>
+          <p>Approve and revoke registrations in Attendees. Select <strong>Export</strong> to save the rows on screen as a spreadsheet file. The file holds names, email addresses, organizations, roles, registration status, badges, past attendance, social handles, and profile visibility. Treat it as personal data. Every export is recorded in the admin log with your address.</p>
+          <p><strong>Edit record</strong> on a row holds what only organizers keep: the past attendance list, one edition per line. Attendees cannot change it. The same panel deletes an account. A delete takes the person out of the directory at once and removes their sign-in, saved sessions, notes, profile photo, change requests, and ticket claim. It cannot be undone. You cannot delete your own account, an admin account, or an account linked to a speaker. If a delete stops part way, select <strong>Try the delete again</strong>.</p>
+          <h2 id="change-requests">Change requests<a class="heading-anchor" href="#change-requests" aria-label="Link to this section">#</a></h2>
+          <p>Change requests are off by default. An operator turns them on in Features. Then a signed-in visitor can select <strong>Request a change</strong> in the footer, and you can send one from the Change requests page. Every request lands in one list on that page. Move a request on with its button (<strong>Mark in progress</strong>, <strong>Mark done</strong>, <strong>Reopen</strong>) or select <strong>Decline</strong>. <strong>Remove</strong> deletes a request and its text for good. The admin log records every request, status change, and removal, but never the text.</p>
           <h2 id="materials">Materials<a class="heading-anchor" href="#materials" aria-label="Link to this section">#</a></h2>
           <p>Upload or link files on the session. Embargo holds them until the session ends. Prefer a real label (&quot;Slides&quot;) over a raw URL as the link text.</p>
+          <p>The Materials page lists every session&#39;s files and links in one table. Tick files and select <strong>Download as archive</strong> to save them as one zip file, at most 50 files and 200 MB at a time. Every archive is recorded in the admin log with your address. The <strong>Coverage</strong> panel names the sessions and speakers that have no materials yet, so you know whom to ask.</p>
           <h2 id="tickets">Tickets<a class="heading-anchor" href="#tickets" aria-label="Link to this section">#</a></h2>
           <p>Your operator chose Eventbrite, a spreadsheet import, or no ticketing. Signup email should match that choice. If a new person is told to &quot;buy on Eventbrite&quot; and you are not using Eventbrite, that is a product bug — <a href="https://github.com/CenterCoopMedia/eventrunner/issues/new?template=bug.yml">file it</a>.</p>
           <h2 id="when-to-email-ccm-instead-of-posting">When to email CCM instead of posting<a class="heading-anchor" href="#when-to-email-ccm-instead-of-posting" aria-label="Link to this section">#</a></h2>
           <ul>
-          <li>Someone needs admin</li>
+          <li>Someone needs operator access (an operator can grant staff access from Settings → Access without asking)</li>
           <li>Login codes are not arriving (sender domain / spam)</li>
           <li>The site is down</li>
           <li>You need a new day added after launch and the admin will not let you</li>

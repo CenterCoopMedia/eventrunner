@@ -6,7 +6,19 @@
  * updateTheme, updateBadges. Every write:
  *
  *   1. Requires admin (core/auth requireAdmin — token + verified email +
- *      config/bootstrap.adminEmails membership).
+ *      config/bootstrap membership) at the doc's tier (issue #186):
+ *      features and theme are operator-only, because a feature flag or the
+ *      site's identity is a deployment decision; event and badges admit
+ *      staff, because dates, venue, places, tracks, the register link,
+ *      social handles, milestones, the registration goal, and the badge
+ *      catalogue are the content an organizer runs day to day. One field of config/event is held back:
+ *      a CHANGE to `sender` (the outbound address, display name, reply-to)
+ *      needs an operator, because it is the email identity
+ *      verify-sender-domain.cjs attests — a staff member changing it could
+ *      point the deployment's mail at an address nobody verified. The
+ *      comparison happens inside the write transaction against the stored
+ *      values, so a staff save that carries the sender unchanged (the
+ *      form sends the whole editable slice) goes through.
  *   2. Targets only {event, features, theme, badges}. `config/bootstrap`
  *      (the admin-list seed) and `config/providers` (a read-only mirror of
  *      Tier A deploy env) are NEVER writable from the panel, and the
@@ -27,10 +39,11 @@
  *      days/sender, so a plain replace would let a partial save silently
  *      erase venue/legal/social/seo. Unknown top-level event keys are
  *      rejected by name (the shared validator does not); an unknown key
- *      in a track, a venue place, movement, or map, the legal block, or
- *      the social block, and a social account whose link is not a safe
- *      absolute URL, are refused by the shared validator on the merged
- *      result. To clear an optional nested value, send it explicitly null.
+ *      in a track, a venue place, movement, or map, the legal block, the
+ *      social block, or a milestone, and a social account whose link is
+ *      not a safe absolute URL, are refused by the shared validator on
+ *      the merged result. Arrays replace on merge, so `milestones: []`
+ *      clears the list. To clear an optional nested value, send it explicitly null.
  *      features/theme/badges stay whole-doc replaces (their validators
  *      cover the full shape, and omitted feature flags defaulting off is
  *      the §2.2 contract). Every write stamps { updatedAt, updatedBy: email }. On
@@ -97,13 +110,165 @@ const EVENT_EDITABLE_KEYS = Object.freeze([
   'sender',
   'legal',
   'social',
+  // The overview's dated markers (issue #180). The registration goal sits
+  // inside `registration`, which is already editable.
+  'milestones',
   'announcedAt',
   'archivedAt',
   'seo',
 ]);
 
-/** Only verify-sender-domain.cjs may set these (spec §1.3 item 3). */
-const SENDER_VERIFICATION_FIELDS = Object.freeze(['domainVerified', 'domainVerifiedAt']);
+/**
+ * Only verify-sender-domain.cjs may set these (spec §1.3 item 3): the whole
+ * verification record it writes, not just the pair the readiness check
+ * reads. Read-only for both tiers.
+ */
+const SENDER_VERIFICATION_FIELDS = Object.freeze([
+  'domainVerified',
+  'domainVerifiedAt',
+  'domainVerifiedBy',
+  'domainVerifiedDomain',
+]);
+
+/**
+ * Top-level config/event keys only an operator may CHANGE (issue #186).
+ * Everything else on EVENT_EDITABLE_KEYS is staff content.
+ */
+const EVENT_OPERATOR_KEYS = Object.freeze(['sender']);
+
+/** The editable sender fields, the only ones the comparison looks at. */
+const SENDER_EDITABLE_FIELDS = Object.freeze(['email', 'name', 'replyTo']);
+
+/**
+ * One sender field, normalized the way the save stores it: trimmed, an
+ * empty string and a missing value both read as null (the form sends
+ * `orNull`), and an address compared without regard to case.
+ */
+function normalizeSenderField(field, value) {
+  if (typeof value !== 'string') return value == null ? null : value;
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  return field === 'replyTo' || field === 'email' ? trimmed.toLowerCase() : trimmed;
+}
+
+/**
+ * Whether a payload's sender differs from the stored one on any editable
+ * field. The verification record is not compared: it is refused by name
+ * before this runs, whoever the caller is. A sender that is not an object
+ * would replace the block wholesale, so it counts as a change. Pure.
+ *
+ * @param {object|undefined} payloadSender
+ * @param {object|undefined} storedSender
+ * @returns {boolean}
+ */
+function senderChanged(payloadSender, storedSender) {
+  if (payloadSender === undefined) return false;
+  if (!isPlainObject(payloadSender)) return true;
+  const stored = isPlainObject(storedSender) ? storedSender : {};
+  return SENDER_EDITABLE_FIELDS.some((field) => field in payloadSender
+    && normalizeSenderField(field, payloadSender[field]) !== normalizeSenderField(field, stored[field]));
+}
+
+/**
+ * The config/event.seo key that names the social sharing card. The card is
+ * a branding surface — public/og.cjs renders it right after
+ * theme.logos.ogDefault — so pointing it elsewhere is the operator's, the
+ * same as a theme slot.
+ */
+const OG_IMAGE_KEY = 'defaultOgImagePath';
+
+/** A storage path the way the save stores it: trimmed; '' and absent both null. */
+function normalizePath(value) {
+  if (typeof value !== 'string') return value == null ? null : value;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Whether a payload's seo block moves the social card image. A seo value
+ * that is not an object would replace the block, so it is a change when
+ * a card image is stored. Pure.
+ *
+ * @param {object|undefined} payloadSeo
+ * @param {object|undefined} storedSeo
+ * @returns {boolean}
+ */
+function ogImageChanged(payloadSeo, storedSeo) {
+  if (payloadSeo === undefined) return false;
+  const stored = isPlainObject(storedSeo) ? storedSeo : {};
+  if (!isPlainObject(payloadSeo)) return normalizePath(stored[OG_IMAGE_KEY]) !== null;
+  if (!(OG_IMAGE_KEY in payloadSeo)) return false;
+  return normalizePath(payloadSeo[OG_IMAGE_KEY]) !== normalizePath(stored[OG_IMAGE_KEY]);
+}
+
+/**
+ * Operator-only values a staff payload would CHANGE, each named. Runs
+ * inside the event transaction, against the stored document. A sender key
+ * outside the editable three is a change whatever it holds — staff cannot
+ * add to the sender block, only carry it. Pure.
+ *
+ * @param {string} docId
+ * @param {object} payload
+ * @param {object} stored the stored document (stamps stripped)
+ * @param {'operator'|'staff'} tier the caller's tier
+ * @returns {string[]}
+ */
+function findOperatorKeyChanges(docId, payload, stored, tier) {
+  if (tier === 'operator' || docId !== 'event') return [];
+  const violations = [];
+  if ('sender' in payload) {
+    if (senderChanged(payload.sender, stored?.sender)) {
+      violations.push('sender: operator access required');
+    }
+    if (isPlainObject(payload.sender)) {
+      for (const key of Object.keys(payload.sender)) {
+        if (!SENDER_EDITABLE_FIELDS.includes(key)) {
+          violations.push(`sender.${key}: operator access required`);
+        }
+      }
+    }
+  }
+  if ('seo' in payload && ogImageChanged(payload.seo, stored?.seo)) {
+    violations.push(`seo.${OG_IMAGE_KEY}: operator access required`);
+  }
+  return violations;
+}
+
+/**
+ * A staff payload with the operator-only values it was just proven not to
+ * change REMOVED, so the merge keeps the stored bytes for them: a sender
+ * spelt with other case or spacing is judged unchanged, and must not be
+ * re-spelt on the way through. An operator's payload is returned as is.
+ * Pure; findOperatorKeyChanges has already refused any change.
+ *
+ * @param {object} payload
+ * @param {'operator'|'staff'} tier
+ * @returns {object}
+ */
+function withoutUnchangedOperatorKeys(payload, tier) {
+  if (tier === 'operator') return payload;
+  const out = { ...payload };
+  delete out.sender;
+  if (isPlainObject(out.seo) && OG_IMAGE_KEY in out.seo) {
+    const seo = { ...out.seo };
+    delete seo[OG_IMAGE_KEY];
+    out.seo = seo;
+  }
+  return out;
+}
+
+/**
+ * The tier each panel-writable doc asks of its caller (issue #186). The
+ * classification the module doc explains; `createConfigWriteHandler` reads
+ * it so every handler states its tier in exactly one place.
+ */
+const CONFIG_DOC_TIERS = Object.freeze({
+  event: 'staff',
+  features: 'operator',
+  theme: 'operator',
+  badges: 'staff',
+});
+
 
 /** Server-stamped bookkeeping — silently stripped from payloads. */
 const STAMP_FIELDS = Object.freeze(['updatedAt', 'updatedBy']);
@@ -208,6 +373,16 @@ function deepMerge(base, patch) {
   return out;
 }
 
+/** Thrown inside the event transaction when a staff caller changes an
+ * operator-only key; applyConfigWrite maps it to a 403. */
+class OperatorKeyRefusedError extends Error {
+  constructor(errors) {
+    super(errors.join('; '));
+    this.name = 'OperatorKeyRefusedError';
+    this.errors = errors;
+  }
+}
+
 /** Thrown inside the event transaction when the MERGED doc fails the
  * shared validator; applyConfigWrite maps it to a 400. */
 class MergedConfigInvalidError extends Error {
@@ -254,12 +429,18 @@ async function removedPlaceReferences({ db, tx, stored, written }) {
  * touching `res`, so the four handlers share it and tests can drive the
  * allowlist directly (e.g. prove `bootstrap` is rejected).
  *
+ * `actor.tier` is the caller's admin tier; when it is 'staff' a change to
+ * an operator-only key of config/event is refused inside the transaction,
+ * against the stored values (see findOperatorKeyChanges). A missing tier
+ * reads as staff, the strict side.
+ *
  * @param {{ db: FirebaseFirestore.Firestore, docId: string, payload: object,
- *           actor: { uid: string, email: string }, now?: () => number }} args
+ *           actor: { uid: string, email: string, tier?: 'operator'|'staff' }, now?: () => number }} args
  * @returns {Promise<{ ok: true, docPath: string } |
  *                    { ok: false, status: 400|403, code: string, message: string }>}
  */
 async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
+  const tier = actor?.tier === 'operator' ? 'operator' : 'staff';
   const validate = WRITABLE_CONFIG_DOCS[docId];
   if (!validate) {
     // Covers bootstrap, providers, and any unknown id in one refusal that
@@ -325,13 +506,21 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
       if (docId === 'event') {
         const snap = await tx.get(ref);
         const stored = snap.exists ? stripStamps(snap.data()) : {};
+        // A staff save may carry the sender unchanged (the form sends the
+        // whole editable slice); only a CHANGE to it is the operator's.
+        const operatorKeyChanges = findOperatorKeyChanges(docId, fields, stored, tier);
+        if (operatorKeyChanges.length > 0) throw new OperatorKeyRefusedError(operatorKeyChanges);
+        // Proven unchanged, the operator's values are then DROPPED from a
+        // staff payload, so the merge keeps the stored bytes for them.
+        const merged = withoutUnchangedOperatorKeys(fields, tier);
         // MERGE the payload over the stored doc, then validate the RESULT:
         // the validator accepts a partial shape, so validating (or writing)
         // the payload alone would let a partial save erase venue/legal/etc.
-        written = deepMerge(stored, fields);
-        // The merge already preserves a stored verification pair (the
-        // payload was proven not to carry either field), but normalize it
-        // explicitly so a first write can never omit it.
+        written = deepMerge(stored, merged);
+        // The merge already preserves a stored verification record (the
+        // payload was proven not to carry any of its fields), but normalize
+        // the pair the readiness check reads so a first write can never
+        // omit it.
         const storedSender = isPlainObject(stored.sender) ? stored.sender : {};
         written.sender = {
           ...(isPlainObject(written.sender) ? written.sender : {}),
@@ -366,6 +555,9 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
     if (err instanceof MergedConfigInvalidError) {
       return { ok: false, status: 400, code: 'bad-request', message: err.message };
     }
+    if (err instanceof OperatorKeyRefusedError) {
+      return { ok: false, status: 403, code: 'forbidden', message: err.message };
+    }
     throw err;
   }
   return { ok: true, docPath: `config/${docId}` };
@@ -382,15 +574,20 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
 function createConfigWriteHandler({ docId, action }, { db, auth, getConfig, now = Date.now, log = console }) {
+  // An unknown doc id falls to the strictest tier; applyConfigWrite then
+  // refuses it by name, so the two refusals agree on who gets past the gate.
+  const tier = CONFIG_DOC_TIERS[docId] ?? 'operator';
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const payload = req.body?.[docId];
     if (!isPlainObject(payload)) return badRequest(res, `${docId}: must be an object`);
 
-    const actor = { uid: gate.uid, email: gate.email };
+    // The tier rides on the actor: a staff CHANGE to an operator-only key is
+    // refused inside the transaction, by name, against the stored values.
+    const actor = { uid: gate.uid, email: gate.email, tier: gate.tier };
     let result;
     try {
       result = await applyConfigWrite({ db, docId, payload, actor, now });
@@ -474,7 +671,12 @@ module.exports = {
     deepMerge,
     stripStamps,
     createConfigWriteHandler,
+    findOperatorKeyChanges,
+    senderChanged,
     WRITABLE_CONFIG_DOCS,
+    CONFIG_DOC_TIERS,
+    EVENT_OPERATOR_KEYS,
+    SENDER_EDITABLE_FIELDS,
     TIER_A_FIELDS,
     EVENT_EDITABLE_KEYS,
     SENDER_VERIFICATION_FIELDS,

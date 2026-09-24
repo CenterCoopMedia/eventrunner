@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { ADMIN_TOOL_DEFINITIONS } from './adminTools.js';
+import { adminToolsForTier } from './adminTools.js';
 import { mountToolSet, resolveModelContext } from './registration.js';
 
 const PAGE_EDITOR_RE = /^\/admin\/pages\/([A-Za-z0-9_-]{1,64})$/;
@@ -19,7 +19,7 @@ export function adminToolsEnabled({ features, user, adminStatus }) {
 export default function AdminWebMcpRegistration() {
   const { pathname } = useLocation();
   const { features } = useEventConfig();
-  const { user, adminStatus } = useAuth();
+  const { user, adminStatus, adminTier } = useAuth();
   const stateRef = useRef(null);
   stateRef.current = { user, currentPageId: currentAdminPageId(pathname) };
 
@@ -28,13 +28,15 @@ export default function AdminWebMcpRegistration() {
     if (!enabled) return undefined;
     const modelContext = resolveModelContext();
     if (!modelContext) return undefined;
+    // The set a tier holds (issue #186): the server refuses an out-of-tier
+    // diagnostic either way; this keeps the model from offering one.
     return mountToolSet({
       modelContext,
       setId: 'eventrunner-admin',
-      definitions: ADMIN_TOOL_DEFINITIONS,
+      definitions: adminToolsForTier(adminTier),
       stateRef,
     });
-  }, [enabled, user?.uid]);
+  }, [enabled, user?.uid, adminTier]);
 
   return null;
 }

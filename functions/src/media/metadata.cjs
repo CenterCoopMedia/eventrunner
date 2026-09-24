@@ -18,8 +18,11 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { sendError, badRequest, methodNotAllowed, notFound, internal } = require('../core/errors.cjs');
 const { internals: uploadInternals } = require('./upload.cjs');
+const { scanUsage } = require('./usage.cjs');
 
-const { MAX_ALT_LENGTH, MAX_TITLE_LENGTH, trimmedText } = uploadInternals;
+const {
+  MAX_ALT_LENGTH, MAX_TITLE_LENGTH, trimmedText, isBrandingAsset, referencedByBranding, BRANDING_REFUSAL,
+} = uploadInternals;
 
 /** Fields a client may change on an existing row. */
 const EDITABLE_FIELDS = Object.freeze(['alt', 'title']);
@@ -62,7 +65,7 @@ function validateMetadata(body) {
 function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now, log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
-    const gate = await requireAdmin({ auth, getConfig }, req);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     const assetId = typeof req.body?.assetId === 'string' ? req.body.assetId.trim() : '';
@@ -74,9 +77,36 @@ function createMediaUpdateMetadataHandler({ db, auth, getConfig, now = Date.now,
     const ref = db.collection('media_assets').doc(assetId);
     const actor = { uid: gate.uid, email: gate.email };
     const at = new Date(now());
+    let stored;
     try {
       const snap = await ref.get();
       if (!snap.exists) return notFound(res, 'That asset is not in the media library.');
+      stored = snap.data() || {};
+    } catch (err) {
+      log.error('mediaUpdateMetadata could not read the asset', err);
+      return internal(res, 'The asset could not be updated.');
+    }
+    if (gate.tier !== 'operator') {
+      // A branding asset's words are the operator's too (upload.cjs), and
+      // so are a page image's once a theme slot or the social card names
+      // it. The scan is the same one mediaDelete reads, and a scan that
+      // cannot run is not permission to write: staff cannot prove the
+      // asset is not on a branding surface.
+      if (isBrandingAsset(stored)) return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
+      const path = typeof stored.path === 'string' ? stored.path : '';
+      let references = [];
+      if (path) {
+        try {
+          const usage = await scanUsage({ db, paths: [path] });
+          references = usage[path] ?? [];
+        } catch (err) {
+          log.error('mediaUpdateMetadata usage scan failed', err);
+          return internal(res, 'The asset could not be checked for usage.');
+        }
+      }
+      if (referencedByBranding(references)) return sendError(res, 403, 'forbidden', BRANDING_REFUSAL);
+    }
+    try {
       await ref.update({ ...verdict.patch, updatedAt: at, updatedBy: actor.email });
     } catch (err) {
       log.error('mediaUpdateMetadata failed', err);

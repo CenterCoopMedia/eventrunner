@@ -10,7 +10,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const call = vi.fn();
 let assets;
+// The caller's tier (issue 186): the Branding drawer reads it to decide
+// whether it offers the write controls at all.
+let adminTier = 'operator';
 
+vi.mock('../../../contexts/AuthContext.jsx', () => ({
+  useAuth: () => ({ adminTier, adminStatus: 'admin', isOperator: adminTier === 'operator' }),
+}));
 vi.mock('../../adminApi.js', async () => {
   const actual = await vi.importActual('../../adminApi.js');
   return { ...actual, useAdminApi: () => call };
@@ -61,6 +67,7 @@ const LOGO = {
 
 beforeEach(() => {
   assets = [HERO, LOGO];
+  adminTier = 'operator';
   call.mockReset();
   call.mockImplementation(async (name) => {
     if (name === 'scanMediaUsage') return { usage: { [HERO.path]: [] } };
@@ -270,5 +277,103 @@ describe('ImagePicker', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(onChange).toHaveBeenCalledWith('');
+  });
+});
+
+// Round three of the tier review (issue 186): the Branding drawer for staff.
+// The server refuses a staff write to a branding asset (functions/src/media);
+// the drawer says so up front instead of offering controls that will fail,
+// and the refusal, when it does come back, reads as a sentence.
+describe('the Branding drawer for staff', () => {
+  const brandingRefusal = () => new AdminApiError({
+    code: 'forbidden',
+    status: 403,
+    message: 'branding: operator access required',
+  });
+
+  it('offers no upload, says an operator manages branding files, and opens a read-only asset', async () => {
+    adminTier = 'staff';
+    render(<MediaLibrary folder="branding" />);
+    expect(await screen.findByText('Logo')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Upload a file' })).toBeNull();
+    expect(screen.getByText('An operator manages branding files.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Logo/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save description' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete this file' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete this file anyway' })).toBeNull();
+    expect(screen.getByLabelText('Alt text')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Title')).toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    // The note is in the dialog too, where the missing controls would have been.
+    expect(screen.getAllByText('An operator manages branding files.').length).toBeGreaterThan(1);
+  });
+
+  it('keeps the Page images drawer fully editable for staff', async () => {
+    adminTier = 'staff';
+    render(<MediaLibrary folder="cms-images" />);
+    expect(await screen.findByText('Hero')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload a file' })).toBeInTheDocument();
+    expect(screen.queryByText('An operator manages branding files.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Hero/ }));
+    expect(await screen.findByRole('button', { name: 'Save description' })).toBeInTheDocument();
+    expect(await screen.findByText(/Deleting it is safe/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete this file' })).toBeInTheDocument();
+  });
+
+  it('keeps the Branding drawer fully editable for an operator', async () => {
+    adminTier = 'operator';
+    render(<MediaLibrary folder="branding" />);
+    expect(await screen.findByText('Logo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload a file' })).toBeInTheDocument();
+    expect(screen.queryByText('An operator manages branding files.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Logo/ }));
+    expect(await screen.findByRole('button', { name: 'Save description' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Alt text')).not.toHaveAttribute('readonly');
+  });
+
+  it('a page image a theme slot or the social card uses is read-only for staff once the scan says so', async () => {
+    adminTier = 'staff';
+    call.mockImplementation(async (name) => {
+      if (name === 'scanMediaUsage') {
+        return { usage: { [HERO.path]: [{ docPath: 'config/theme', field: 'logos.primary' }] } };
+      }
+      return {};
+    });
+    render(<MediaLibrary folder="cms-images" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
+    expect(await screen.findByText('config/theme')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save description' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete this file anyway' })).toBeNull();
+    expect(screen.getByText('An operator manages branding files.')).toBeInTheDocument();
+  });
+
+  it("maps the server's branding refusal to a plain sentence on save, delete and upload", async () => {
+    adminTier = 'staff';
+    call.mockImplementation(async (name) => {
+      if (name === 'scanMediaUsage') return { usage: { [HERO.path]: [] } };
+      throw brandingRefusal();
+    });
+    const { unmount } = render(<MediaLibrary folder="cms-images" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Hero/ }));
+    await screen.findByText(/Deleting it is safe/);
+    fireEvent.click(screen.getByRole('button', { name: 'Save description' }));
+    expect(await screen.findByText('Only an operator can change branding files.')).toBeInTheDocument();
+    expect(screen.queryByText('branding: operator access required')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this file' }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith('mediaDelete', expect.anything()));
+    expect(await screen.findByText('Only an operator can change branding files.')).toBeInTheDocument();
+    unmount();
+
+    render(<MediaLibrary folder="cms-images" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload a file' }));
+    const file = new File(['x'], 'new.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('File'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+    expect(await screen.findByText('Only an operator can change branding files.')).toBeInTheDocument();
   });
 });

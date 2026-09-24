@@ -183,6 +183,18 @@ test('features default to the four §2.2 toggles, and unknown keys warn instead 
   assert.match(built.warnings.join(' '), /notAFeature/);
 });
 
+// Issue #188: a public text surface is off until the client opts in.
+test('the change request flag is written false by default, and an answers file can turn it on', () => {
+  const built = buildConfigDocs({ answers: MINIMAL, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.docs.features.changeRequests, false);
+  const optedIn = buildConfigDocs({
+    answers: { ...MINIMAL, features: { changeRequests: true } },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(optedIn.docs.features.changeRequests, true);
+});
+
 test('Tier A wins on provider selection, and an answers-file override warns', () => {
   const { providers, warnings } = buildProviders({
     tierA: TIER_A,
@@ -255,4 +267,42 @@ test('a partial fonts or logos override merges the same way', () => {
 test('every prompt targets a distinct answers path', () => {
   const paths = PROMPTS.map((p) => p.path);
   assert.equal(new Set(paths).size, paths.length);
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+test('staff emails are optional, normalized, and never duplicated onto both lists', () => {
+  const none = buildConfigDocs({ answers: MINIMAL, tierA: TIER_A, now: () => 0 });
+  assert.deepEqual(none.docs.bootstrap.staffEmails, []);
+
+  const built = buildConfigDocs({
+    answers: {
+      ...MINIMAL,
+      adminEmails: ['ops@example.org'],
+      staffEmails: ['Desk@Example.org', ' desk@example.org ', 'ops@example.org'],
+    },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(built.ok, true);
+  assert.deepEqual(built.docs.bootstrap.adminEmails, ['ops@example.org']);
+  // An address on both lists is an operator; it is not stored as staff too.
+  assert.deepEqual(built.docs.bootstrap.staffEmails, ['desk@example.org']);
+});
+
+test('a malformed staff address is rejected by name', () => {
+  const built = buildConfigDocs({
+    answers: { ...MINIMAL, adminEmails: ['ops@example.org'], staffEmails: ['not-an-address'] },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(built.ok, false);
+  assert.match(built.errors.join(' '), /staffEmails: "not-an-address"/);
+});
+
+test('the answers file accepts staffEmails as a list and refuses any other shape', () => {
+  assert.equal(parseAnswersFile(JSON.stringify({ ...MINIMAL, staffEmails: ['desk@example.org'] })).ok, true);
+  const bad = parseAnswersFile(JSON.stringify({ ...MINIMAL, staffEmails: 'desk@example.org' }));
+  assert.equal(bad.ok, false);
+  assert.match(bad.errors.join(' '), /staffEmails/);
 });

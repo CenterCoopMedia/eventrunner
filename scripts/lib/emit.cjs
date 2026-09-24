@@ -4,7 +4,7 @@
  * The `apps/web/src/generated/*` emitters (spec §2.4 path 1, §8.6).
  *
  * `generate-content.cjs` reads a deployment (or the in-repo demo fixture)
- * and writes five files: four ES modules and one stylesheet. Everything
+ * and writes seven files: six ES modules and one stylesheet. Everything
  * here is pure string building — no Firestore, no fs — so the exact bytes
  * a deploy would write are unit-testable, which is what the §8.6 hygiene
  * gate depends on: CI regenerates from the demo fixture and fails if the
@@ -22,6 +22,7 @@
  */
 
 const { buildTokenCss } = require('./tokens.cjs');
+const { publicContentDoc } = require('shared/seed');
 
 /** Publish-model and seed bookkeeping stripped from every emitted doc. */
 const STRIPPED_FIELDS = Object.freeze([
@@ -86,10 +87,15 @@ function jsValue(value, depth = 0) {
   throw new TypeError(`Cannot emit value of type ${typeof value}`);
 }
 
-/** @param {object} doc @returns {object} doc without STRIPPED_FIELDS */
+/**
+ * @param {object} doc
+ * @returns {object} the doc without STRIPPED_FIELDS, its `seeded` flag
+ *   stated by the public rule (shared/seed): a document an operator
+ *   published is not the seed's, whatever flag it still carries
+ */
 function stripBookkeeping(doc) {
   const out = {};
-  for (const [k, v] of Object.entries(doc)) {
+  for (const [k, v] of Object.entries(publicContentDoc(doc))) {
     if (!STRIPPED_FIELDS.includes(k)) out[k] = v;
   }
   return out;
@@ -284,6 +290,32 @@ function emitOrganizationsData(organizations) {
 }
 
 /**
+ * timelineData.js — published cmsTimeline docs (issue #194), oldest first.
+ *
+ * @param {object[]} [timeline]
+ * @returns {string}
+ */
+function emitTimelineData(timeline = []) {
+  const sorted = [...timeline].sort(
+    (a, b) => (a.year ?? 0) - (b.year ?? 0) || a.id.localeCompare(b.id),
+  );
+  return [
+    header([
+      'GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).',
+      '',
+      'Regenerate with:  node scripts/generate-content.cjs --demo',
+      '',
+      'Shape mirrors published cmsTimeline docs. Every entry is fictional.',
+    ]),
+    '',
+    `export const timelineData = ${jsValue(sorted.map(stripBookkeeping))};`,
+    '',
+    'export default timelineData;',
+    '',
+  ].join('\n');
+}
+
+/**
  * theme.css — the design tokens, resolved against `config/theme`.
  *
  * The token graph itself lives in `design/tokens/*.json` and resolves in
@@ -329,7 +361,7 @@ function emitThemeCss(theme) {
  *
  * @param {{ event: object, features: object, theme: object, pages: object[],
  *           content: object[], sessions: object[], speakers: object[],
- *           organizations: object[] }} snapshot
+ *           organizations: object[], timeline: object[] }} snapshot
  * @returns {Record<string, string>}
  */
 function emitAll(snapshot) {
@@ -339,6 +371,7 @@ function emitAll(snapshot) {
     'pagesData.js': emitPagesData(snapshot.pages),
     'scheduleData.js': emitScheduleData(snapshot),
     'organizationsData.js': emitOrganizationsData(snapshot.organizations),
+    'timelineData.js': emitTimelineData(snapshot.timeline),
     'theme.css': emitThemeCss(snapshot.theme),
   };
 }
@@ -350,6 +383,7 @@ module.exports = {
   emitPagesData,
   emitScheduleData,
   emitOrganizationsData,
+  emitTimelineData,
   emitThemeCss,
   STRIPPED_FIELDS,
   internals: { jsValue, quote, stripBookkeeping },

@@ -514,14 +514,53 @@ test('start_url and scope are manifest-relative, not origin-root — the manifes
   assert.notEqual(manifest.scope, '/');
 });
 
-test('the manifest icons reuse the committed branding slots, as manifest-relative paths', () => {
+test('the manifest lists exactly the two PNG app icons, as manifest-relative paths', () => {
   const manifest = buildWebManifest({ event: { name: 'x', shortName: 'x' }, theme: {} });
-  assert.ok(manifest.icons.some((icon) => icon.src === 'branding/mark.svg'));
-  assert.ok(manifest.icons.some((icon) => icon.src === 'branding/favicon.svg'));
+  assert.deepEqual(manifest.icons, [
+    { src: 'branding/app-icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+    { src: 'branding/app-icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+  ]);
   for (const icon of manifest.icons) {
-    assert.equal(icon.type, 'image/svg+xml');
     assert.equal(icon.src.startsWith('/'), false, `${icon.src} must not be origin-root-relative`);
+    assert.doesNotMatch(icon.src, /\.svg$/);
   }
+});
+
+test('icons whose safe zone is unknown are listed for purpose any alone', () => {
+  const manifest = buildWebManifest({ event: {}, theme: {}, maskable: false });
+  assert.deepEqual(manifest.icons.map((icon) => icon.purpose), ['any', 'any']);
+  const artifacts = buildSiteArtifacts({
+    event: {}, features: FEATURES, theme: {}, pages: PAGES, publicUrl: PUBLIC_URL, maskable: false,
+  });
+  assert.deepEqual(artifacts.manifest.icons.map((icon) => icon.purpose), ['any', 'any']);
+});
+
+/**
+ * The manifest half of Chrome's install check: a name, a start URL, an
+ * app display mode, no redirect to a store app, and a 192 and a 512 PNG
+ * icon whose purpose includes `any`. The e2e installability spec asks the
+ * browser itself; this pins the shape for every input the builder takes.
+ */
+function assertInstallableShape(manifest) {
+  assert.ok(manifest.name || manifest.short_name);
+  assert.equal(typeof manifest.start_url, 'string');
+  assert.ok(['fullscreen', 'standalone', 'minimal-ui'].includes(manifest.display));
+  assert.notEqual(manifest.prefer_related_applications, true);
+  for (const size of [192, 512]) {
+    const icon = manifest.icons.find((candidate) => candidate.sizes.split(' ').includes(`${size}x${size}`));
+    assert.ok(icon, `a ${size} icon`);
+    assert.equal(icon.type, 'image/png');
+    assert.ok(icon.purpose.split(' ').includes('any'), `the ${size} icon's purpose includes any`);
+  }
+}
+
+test('the manifest has the shape the browser install check needs, configured or not', () => {
+  assertInstallableShape(buildWebManifest({ event: {}, theme: {} }));
+  assertInstallableShape(buildWebManifest({ event: {}, theme: {}, maskable: false }));
+  assertInstallableShape(buildWebManifest({
+    event: { name: 'Harborlight Summit', shortName: 'HARBOR', tagline: 'Three days.' },
+    theme: { colors: { primary: 'rgb(20, 40, 60)' } },
+  }));
 });
 
 test('theme_color and background_color are set only when the event has configured them', () => {
@@ -553,6 +592,10 @@ test('the checked-in fallback manifest matches the neutral shape buildWebManifes
   const fallback = JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
   const neutral = buildWebManifest({ event: {}, theme: {} });
   assert.deepEqual(fallback, neutral);
+  // The icons it names ship beside it in apps/web/public.
+  for (const icon of fallback.icons) {
+    assert.ok(fs.existsSync(path.join(path.dirname(fallbackPath), icon.src)), `${icon.src} is committed`);
+  }
 });
 
 // --- buildSiteArtifacts -------------------------------------------------------

@@ -8,11 +8,14 @@ import * as blockTypesCjs from '../../../../functions/src/cms/blockTypes.cjs';
 import {
   BLOCK_TYPES,
   BLOCK_TYPE_IDS,
+  FACT_HINTS,
+  QUOTE_HINTS,
   STAT_CONTRACT_HINTS,
   blockTypeFieldSummary,
   blockTypeFor,
   blockTypeLabel,
 } from './blockTypes.js';
+import { SPONSOR_PACKAGE_HINTS } from './sponsorPackageHints.js';
 
 const { BLOCK_TYPES: BACKEND_BLOCK_TYPES } = blockTypesCjs.default ?? blockTypesCjs;
 
@@ -69,6 +72,13 @@ describe('admin block palette', () => {
     const enforced = Object.keys(blockTypesCjs.internals.STAT_CONTRACT);
     expect(enforced).toContain('value');
     expect(enforced).toContain('label');
+  });
+
+  it('writes a hint only for a field the block type has', () => {
+    for (const [id, hints] of [['fact', FACT_HINTS], ['quote', QUOTE_HINTS], ['sponsor_package', SPONSOR_PACKAGE_HINTS]]) {
+      const fields = BLOCK_TYPES[id].fields.map((field) => field.id);
+      for (const key of Object.keys(hints)) expect(fields, `${id}.${key}`).toContain(key);
+    }
   });
 
   it('keeps the legacy figure and caption on the stat block', () => {

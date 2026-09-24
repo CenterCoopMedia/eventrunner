@@ -6,9 +6,10 @@
      scripts/build-preset-catalog.test.cjs fails when this is stale. -->
 
 This catalog lists each site style, its default configuration, and the options
-staff can select. Runtime values are in `packages/shared/src/presetCatalog.cjs`.
+staff can select. Runtime values are in `packages/shared/src/presetCatalog.cjs`
+and `packages/shared/src/presetRemaps.cjs`.
 Admin labels and explanations are in `apps/web/src/admin/presetCopy.js`.
-All three outputs are generated from the same JSON source files.
+All four outputs are generated from the same JSON source files.
 
 The picker uses the order shown below. A new deployment starts with Institutional.
 Each style includes one default configuration. Options marked *default* are selected
@@ -52,7 +53,7 @@ Use this style for universities, public agencies, and organizations with formal 
 
 **font-note.** Uses Merriweather for headings, Public Sans for body text and labels, and IBM Plex Mono for times, room codes, and identifiers.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses comfortable vertical padding and the data font for folio text. The definition list widens its term column for the long labels a public notice carries. The pull quote keeps the plain ruled form with a rule at its inline start, like a quoted minute. A table takes the full hairline grid, like a posted schedule. The timeline, the progress bar and the notice bar keep the contract defaults. The other wave 2 devices (the avatar, the dropzone, the repeater, the count, the legend, the state marker, the byline) keep the contract defaults: a public notice adds no treatment of its own.
 
 ### Heading face: `headingFace`
 
@@ -76,6 +77,44 @@ Choose the schedule layout.
 
 - **Posted agenda** *(default)*: Uses fixed columns, hairline row rules, and tabular figures. It keeps the same order at each screen width.
 - **Numbered agenda**: Adds plain sequence numbers to the schedule. The numbers are not zero-padded.
+
+### Long read opening: `longReadOpening`
+
+Choose how the first paragraph of a Long read page opens.
+
+- **Drop cap**: Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.
+- **Standfirst**: Sets the first paragraph at the lead size, as a summary of the page.
+- **Plain** *(default)*: Keeps the first paragraph at body size with no drop cap.
+
+### Quote device: `quote`
+
+Choose how a quoted sentence is set.
+
+- **Ruled minute** *(default)*: Sets the quote between two hairlines with a strong rule at its start, like a quoted minute.
+- **Plain rules**: Sets the quote between two hairlines with no side rule.
+
+### Directory style: `directory`
+
+Choose how the speaker shelf and the attendee index are set.
+
+- **Ruled entries** *(default)*: Sets square portraits and rules each entry at the hairline.
+- **Portrait plates**: Sets taller portraits on the alternate ground and gives each index row more room.
+
+### Section boundary: `sectionBoundary`
+
+Choose how a section heading is ruled and labelled.
+
+- **Rule and folio** *(default)*: Draws the section rule with the folio at the far end of the heading line.
+- **Rule only**: Draws the section rule and hides the folio beside the heading.
+- **Folio in the margin**: Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.
+
+### Table rules: `tableRules`
+
+Choose how a table is ruled.
+
+- **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
+- **Ruled head**: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
+- **Full grid** *(default)*: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.
 
 ## Newsroom
 
@@ -110,7 +149,7 @@ Use this style for publications, media conferences, and newsroom events.
 
 **font-note.** Uses Fraunces for headings, Newsreader for body text, Plex Sans for labels and data, and Plex Mono for figures and identifiers.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading. The definition list keeps the data face for its terms in a wide column. The pull quote sits between strong rules with a large opening mark. An urgent notice takes the nameplate rule, and table heads are set in small capitals over a strong rule. The standfirst is set in the heading typeface at regular weight.
 
 ### Heading face: `headingFace`
 
@@ -134,6 +173,45 @@ Choose the schedule row style.
 
 - **Hairline row** *(default)*: Uses one row for the title, time, track, and speaker. Hairline rules separate the rows.
 - **Lead and rest**: Makes the first session larger than the remaining sessions. Use it when one session must lead the list.
+
+### Long read opening: `longReadOpening`
+
+Choose how the first paragraph of a Long read page opens.
+
+- **Drop cap**: Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.
+- **Standfirst** *(default)*: Sets the first paragraph at the lead size, as a summary of the page.
+- **Plain**: Keeps the first paragraph at body size with no drop cap.
+
+### Quote device: `quote`
+
+Choose how a quoted sentence is set.
+
+- **Ruled with an opening mark** *(default)*: Sets the quote between strong rules with a large opening mark in the heading typeface.
+- **Side rule**: Sets the quote beside one strong rule with no rules above or below; the quotation marks sit inline around the sentence.
+- **Opening mark only**: Sets the quote with the large opening mark and no rules.
+
+### Directory style: `directory`
+
+Choose how the speaker shelf and the attendee index are set.
+
+- **Portrait shelf** *(default)*: Sets square portraits on the alternate ground, ruled at the hairline.
+- **Tall portraits**: Sets portraits at three by four, like a profile picture in a print feature.
+
+### Section boundary: `sectionBoundary`
+
+Choose how a section heading is ruled and labelled.
+
+- **Rule and folio** *(default)*: Draws the section rule with the folio at the far end of the heading line.
+- **Rule only**: Draws the section rule and hides the folio beside the heading.
+- **Folio in the margin**: Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.
+
+### Table rules: `tableRules`
+
+Choose how a table is ruled.
+
+- **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
+- **Ruled head** *(default)*: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
+- **Full grid**: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.
 
 ## Broadsheet
 
@@ -168,7 +246,7 @@ Use this style for formal programmes, anniversary editions, and events that need
 
 **font-note.** Uses serif type for headings, body text, programme data, and figures. The data roles use compact editorial type instead of a typewriter face.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule uses tight vertical padding and the data font for folio text. The definition list sets its terms in italic. The pull quote is centred between hairlines with a large opening mark and a small-capitals attribution. The timeline spine is a column rule at the strong width, the progress bar is a hairline-thin ink bar, the notice bar sits on the page ground, and tables take the full hairline grid with small-capitals heads. The avatar and the portraits take square corners with the initial in the full ink, the legend and the byline are set in small capitals, and the standfirst is italic.
 
 ### Heading face: `headingFace`
 
@@ -192,6 +270,44 @@ Choose the programme density.
 
 - **Ruled programme** *(default)*: Uses hairline rows and a separate time column at the standard body leading.
 - **Agate block**: Reduces type size, row leading, and vertical padding to fit more sessions on one page.
+
+### Long read opening: `longReadOpening`
+
+Choose how the first paragraph of a Long read page opens.
+
+- **Drop cap** *(default)*: Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.
+- **Standfirst**: Sets the first paragraph at the lead size, as a summary of the page.
+- **Plain**: Keeps the first paragraph at body size with no drop cap.
+
+### Quote device: `quote`
+
+Choose how a quoted sentence is set.
+
+- **Centred with an opening mark** *(default)*: Centres the quote between hairlines with a large opening mark and a small-capitals attribution.
+- **Column rule**: Sets the quote beside one hairline, like a boxed paragraph in a column, with the quotation marks inline around the sentence.
+
+### Directory style: `directory`
+
+Choose how the speaker shelf and the attendee index are set.
+
+- **Agate directory** *(default)*: Sets square portraits and tight index rows, like a newspaper directory.
+- **Plate portraits**: Sets tall portraits between strong rules, like a photograph page.
+
+### Section boundary: `sectionBoundary`
+
+Choose how a section heading is ruled and labelled.
+
+- **Rule and folio** *(default)*: Draws the section rule with the folio at the far end of the heading line.
+- **Rule only**: Draws the section rule and hides the folio beside the heading.
+- **Folio in the margin**: Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.
+
+### Table rules: `tableRules`
+
+Choose how a table is ruled.
+
+- **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
+- **Ruled head**: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
+- **Full grid** *(default)*: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.
 
 ## Atlas
 
@@ -228,7 +344,7 @@ Use this style for multi-venue events, city festivals, and events where visitors
 
 **font-note.** Uses Overpass for headings, Libre Franklin for body text, and Overpass Mono for schedule data, coordinates, and identifiers.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The schedule trace connects entries vertically. The grid remains below hairline contrast. Other styles set the trace width to zero. The definition list sets its terms as a map key: the monospaced font in capitals in a narrow column. The pull quote takes a strong rule at its inline start, like a route line, and no rules above or below. The timeline draws a station stop on its spine, the progress bar is a thin route line, the notice word and table heads are set in the monospaced font in capitals, and tables take the departure board grid. The avatar takes a strong frame, the dropzone a solid rule, the legend, the state marker and the byline the monospaced font, and the standfirst the sign typeface at regular weight.
 
 ### Heading face: `headingFace`
 
@@ -255,6 +371,43 @@ Choose the schedule map.
 - **Departure board** *(default)*: Places times in the left column and keeps the coordinate grid behind the schedule.
 - **Line diagram**: Removes the grid and links the day as one vertical route. Rows use more line spacing.
 - **Gazetteer list**: Removes the grid and uses a compact place index. Use it when visitors choose a location before a time.
+
+### Long read opening: `longReadOpening`
+
+Choose how the first paragraph of a Long read page opens.
+
+- **Drop cap**: Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.
+- **Standfirst**: Sets the first paragraph at the lead size, as a summary of the page.
+- **Plain** *(default)*: Keeps the first paragraph at body size with no drop cap.
+
+### Quote device: `quote`
+
+Choose how a quoted sentence is set.
+
+- **Route line** *(default)*: Sets the quote beside one strong rule, like a route on the map, with the attribution in the monospaced font.
+- **Boxed sign**: Sets the quote between strong rules above and below with the strong rule at its start, like a sign.
+
+### Directory style: `directory`
+
+Choose how the speaker shelf and the attendee index are set.
+
+- **Gazetteer** *(default)*: Sets square portraits with tight index rows, like a place index.
+- **Station index**: Sets tall portraits and rules each entry at the strong width, like a departure board.
+
+### Section boundary: `sectionBoundary`
+
+Choose how a section heading is ruled and labelled.
+
+- **Rule and folio** *(default)*: Draws the section rule with the folio at the far end of the heading line.
+- **Rule only**: Draws the section rule and hides the folio beside the heading.
+
+### Table rules: `tableRules`
+
+Choose how a table is ruled.
+
+- **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
+- **Ruled head**: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
+- **Full grid** *(default)*: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.
 
 ## Field Guide
 
@@ -295,7 +448,7 @@ Use this style for environmental events, science programs, and regional gatherin
 
 **motif-note.** Botanical line drawings are enabled by default. The site can show them in the masthead mark, masthead divider, and public empty state. A client logo replaces the masthead mark. Clients can select no illustrations or the fauna set.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses a hairline plate frame, visible specimen-label rules, visible field names, the data font for folio text, and no marginalia by default.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses a hairline plate frame, visible specimen-label rules, visible field names, the data font for folio text, and no marginalia by default. The definition list sets its terms as label keys in the monospaced font. The pull quote takes a hairline at its inline start, like a field note, and no rules above or below. The timeline tick is longer, the progress fill is clay, the notice word and table heads are label keys in the monospaced font, and a table head is ruled at the hairline. The avatar takes square corners, the legend and the byline the monospaced font, and the standfirst is italic.
 
 ### Heading face: `headingFace`
 
@@ -328,6 +481,44 @@ Show or hide the optional pencil mark.
 
 - **Off** *(default)*: Does not show pencil marks.
 - **On**: Shows one thin underline or note mark. It does not underline headings.
+
+### Long read opening: `longReadOpening`
+
+Choose how the first paragraph of a Long read page opens.
+
+- **Drop cap** *(default)*: Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.
+- **Standfirst**: Sets the first paragraph at the lead size, as a summary of the page.
+- **Plain**: Keeps the first paragraph at body size with no drop cap.
+
+### Quote device: `quote`
+
+Choose how a quoted sentence is set.
+
+- **Field note** *(default)*: Sets the quote beside one hairline, like a note in the margin of a field book.
+- **Pressed page**: Centres the quote between hairlines with a large opening mark, like an epigraph.
+
+### Directory style: `directory`
+
+Choose how the speaker shelf and the attendee index are set.
+
+- **Specimen plates** *(default)*: Sets tall portraits on the page ground with square corners, like mounted plates.
+- **Field list**: Sets square portraits on the alternate ground with hairline rules.
+
+### Section boundary: `sectionBoundary`
+
+Choose how a section heading is ruled and labelled.
+
+- **Rule and folio** *(default)*: Draws the section rule with the folio at the far end of the heading line.
+- **Rule only**: Draws the section rule and hides the folio beside the heading.
+- **Folio in the margin**: Places the folio where the margin column opens beside the text measure on wide screens. On narrow screens it returns to the end of the line.
+
+### Table rules: `tableRules`
+
+Choose how a table is ruled.
+
+- **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
+- **Ruled head** *(default)*: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
+- **Full grid**: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.
 
 ## Zine
 
@@ -366,7 +557,7 @@ Use this style for unconferences, community events, and student programs.
 
 **shape-note.** Paper grain is enabled by default and appears only when data-texture is paper. A client can select Flat in the advanced settings. The optional stamped schedule remains off by default.
 
-**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default.
+**tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses strong rules, the monospaced font for folio text, a small callout angle, and no marginalia by default. The definition list sets its terms in the monospaced font in capitals between strong rules. The pull quote is the handwritten callout between strong rules. The timeline spine is a strong rule, the progress fill is toner black with square ends, the notice bar sits on the page ground between strong rules and doubles them for an urgent notice, and table heads are set in the monospaced font in capitals. The avatar, the dropzone and the repeater take strong rules with square corners (the dropzone doubles its rule while a file is held over it), the count figure the bold weight, the legend a struck rule above it, the state marker and the byline the monospaced font, and the standfirst a strong rule under it in the full ink.
 
 ### Heading face: `headingFace`
 
@@ -400,3 +591,41 @@ Show or hide the optional pen marks.
 
 - **Off** *(default)*: Does not show pen marks.
 - **On**: Shows up to two small marks and one callout on a page. It does not mark headline words.
+
+### Long read opening: `longReadOpening`
+
+Choose how the first paragraph of a Long read page opens.
+
+- **Drop cap**: Enlarges the first letter of the first paragraph to the height of three lines, in the heading typeface.
+- **Standfirst**: Sets the first paragraph at the lead size, as a summary of the page.
+- **Plain** *(default)*: Keeps the first paragraph at body size with no drop cap.
+
+### Quote device: `quote`
+
+Choose how a quoted sentence is set.
+
+- **Handwritten** *(default)*: Sets the quote in the script typeface at a small angle between strong rules.
+- **Toner block**: Sets the quote in the poster typeface, level, between strong rules.
+- **Cut-out**: Sets the quote in the script typeface beside one strong rule, with no rules above or below.
+
+### Directory style: `directory`
+
+Choose how the speaker shelf and the attendee index are set.
+
+- **Contact sheet** *(default)*: Sets square portraits with square corners between strong rules.
+- **Cut-outs**: Sets tall portraits on the page ground with square corners and hairline rules.
+
+### Section boundary: `sectionBoundary`
+
+Choose how a section heading is ruled and labelled.
+
+- **Rule and folio** *(default)*: Draws the section rule with the folio at the far end of the heading line.
+- **Rule only**: Draws the section rule and hides the folio beside the heading.
+
+### Table rules: `tableRules`
+
+Choose how a table is ruled.
+
+- **Hairline rows**: Rules the rows and the head at the hairline and draws no column rules.
+- **Ruled head** *(default)*: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
+- **Full grid**: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.

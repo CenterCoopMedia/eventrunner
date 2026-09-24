@@ -155,7 +155,13 @@ function fakeDb(seed = {}) {
 }
 
 function makeDeps(seed = {}) {
-  const db = fakeDb(seed);
+  // requireAdmin reads config/bootstrap live from this db (fails closed on
+  // an absent document), so every fake carries the operator and the staff
+  // address the tests use.
+  const db = fakeDb({
+    'config/bootstrap': { adminEmails: [ADMIN_EMAIL], staffEmails: ['staff@example.org'] },
+    ...seed,
+  });
   return {
     db,
     auth: {
@@ -746,4 +752,369 @@ test('a failed admin_logs write never fails the call', async () => {
   await createUpdateFeaturesHandler(deps)(makeReq({ features: { schedule: true } }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(deps.db.docs.get('config/features').schedule, true);
+});
+
+// ------------------------------------------------------- the two tiers (#186)
+
+const STAFF_EMAIL = 'staff@example.org';
+const { internals } = require('./config.cjs');
+
+/** makeDeps with a staff caller on the token and both lists on bootstrap. */
+function tieredDeps(seed = {}) {
+  const deps = makeDeps(seed);
+  return {
+    ...deps,
+    auth: {
+      async verifyIdToken(token) {
+        if (token === 'admin-token') {
+          return { uid: 'admin-1', email: ADMIN_EMAIL, email_verified: true };
+        }
+        if (token === 'staff-token') {
+          return { uid: 'staff-1', email: STAFF_EMAIL, email_verified: true };
+        }
+        throw new Error('bad token');
+      },
+    },
+    getConfig: async () => ({
+      bootstrap: { adminEmails: [ADMIN_EMAIL], staffEmails: [STAFF_EMAIL] },
+    }),
+  };
+}
+
+test('every panel-writable doc states a tier, and only features and theme are operator-only', () => {
+  const { CONFIG_DOC_TIERS, WRITABLE_CONFIG_DOCS } = internals;
+  assert.deepEqual(Object.keys(CONFIG_DOC_TIERS).sort(), Object.keys(WRITABLE_CONFIG_DOCS).sort());
+  assert.deepEqual(CONFIG_DOC_TIERS, { event: 'staff', features: 'operator', theme: 'operator', badges: 'staff' });
+});
+
+test('a staff caller is refused a theme write and a features write — the branding and flag surfaces are the operator’s', async () => {
+  for (const [create, body] of [
+    [createUpdateThemeHandler, { theme: validTheme() }],
+    [createUpdateFeaturesHandler, { features: { schedule: true } }],
+  ]) {
+    const deps = tieredDeps();
+    const res = makeRes();
+    await create(deps)(makeReq(body, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.code, 'forbidden');
+    assert.equal(res.body.error.message, 'Operator access required.');
+    assert.equal(deps.db.writes.length, 0);
+  }
+});
+
+test('a staff caller keeps the event settings and the badge catalogue', async () => {
+  const eventDeps = tieredDeps({ 'config/event': validEvent() });
+  let res = makeRes();
+  await createUpdateEventConfigHandler(eventDeps)(
+    makeReq({ event: { tagline: 'Set by the desk' } }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(eventDeps.db.docs.get('config/event').tagline, 'Set by the desk');
+  assert.equal(eventDeps.db.docs.get('config/event').updatedBy, STAFF_EMAIL);
+
+  const badgeDeps = tieredDeps();
+  res = makeRes();
+  await createUpdateBadgesHandler(badgeDeps)(makeReq({ badges: validBadges() }, { token: 'staff-token' }), res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('a staff event save that CHANGES sender is refused by name, and nothing is written', async () => {
+  const deps = tieredDeps({ 'config/event': validEvent() });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { tagline: 'Fine', sender: { email: 'other@example.org' } } }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.message, 'sender: operator access required');
+  assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+  assert.equal(deps.db.writes.length, 0);
+});
+
+test('an operator may still write sender on config/event', async () => {
+  const deps = tieredDeps({ 'config/event': validEvent() });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { sender: { email: 'ops@example.org', name: 'Ops' } } }, { token: 'admin-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(deps.db.docs.get('config/event').sender.email, 'ops@example.org');
+});
+
+/** The whole editable slice the Event form sends (AdminEventSettings toPayload), for `stored`. */
+function fullStaffPayload(stored, overrides = {}) {
+  return {
+    name: stored.name,
+    shortName: stored.shortName,
+    tagline: 'Set by the desk',
+    timezone: stored.timezone,
+    days: stored.days,
+    tracks: [],
+    venue: {
+      name: 'Riverside Hall', addressLine1: null, addressLine2: null, city: null, region: null,
+      postalCode: null, country: null, mapUrl: null, places: [], movements: [],
+    },
+    sender: { email: stored.sender.email, name: stored.sender.name ?? null, replyTo: stored.sender.replyTo ?? null },
+    registration: { opensAt: null, closesAt: null, externalUrl: null, actionLabel: null },
+    legal: { operatorName: null, supportEmail: null, conductEmail: null },
+    seo: { description: null, organizerName: null, organizerUrl: null },
+    social: { hashtag: null },
+    ...overrides,
+  };
+}
+
+test('a staff save of the whole form, sender carried unchanged, goes through', async () => {
+  // The form sends every editable field, the sender included; the review
+  // of the first cut found staff could therefore never save the page.
+  const stored = validEvent();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: fullStaffPayload(stored) }, { token: 'staff-token' }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const written = deps.db.docs.get('config/event');
+  assert.equal(written.tagline, 'Set by the desk');
+  assert.equal(written.sender.email, stored.sender.email);
+  assert.equal(written.updatedBy, STAFF_EMAIL);
+});
+
+test('a staff save whose sender differs only in case or whitespace is unchanged, and goes through', async () => {
+  const stored = validEvent();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: fullStaffPayload(stored, { sender: { email: 'SUMMIT@Example.org', name: ' Example Summit ', replyTo: null } }) }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+});
+
+test('a staff save that changes only the sender name, or only the reply-to, is refused by name', async () => {
+  const stored = validEvent();
+  for (const sender of [
+    { email: stored.sender.email, name: 'Someone else', replyTo: null },
+    { email: stored.sender.email, name: stored.sender.name, replyTo: 'desk@example.org' },
+  ]) {
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: fullStaffPayload(stored, { sender }) }, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.message, 'sender: operator access required');
+    assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+  }
+});
+
+test('senderChanged compares the editable fields only, normalized the way the save stores them', () => {
+  const { senderChanged } = internals;
+  const stored = { email: 'summit@example.org', name: 'Example Summit', replyTo: null, domainVerified: true, domainVerifiedAt: 'x' };
+  assert.equal(senderChanged({ email: 'Summit@Example.org', name: ' Example Summit ', replyTo: '' }, stored), false);
+  assert.equal(senderChanged({ email: 'summit@example.org' }, stored), false);
+  assert.equal(senderChanged({ email: 'other@example.org' }, stored), true);
+  assert.equal(senderChanged({ name: 'Other' }, stored), true);
+  assert.equal(senderChanged({ replyTo: 'r@example.org' }, stored), true);
+  assert.equal(senderChanged(undefined, stored), false);
+  assert.equal(senderChanged({ email: 'summit@example.org' }, undefined), true);
+});
+
+test('findOperatorKeyChanges names sender only when a staff payload changes it, only on config/event', () => {
+  const { findOperatorKeyChanges } = internals;
+  const stored = { sender: { email: 'summit@example.org', name: null, replyTo: null } };
+  assert.deepEqual(findOperatorKeyChanges('event', { sender: { email: 'other@example.org' }, tagline: 'x' }, stored, 'staff'), ['sender: operator access required']);
+  assert.deepEqual(findOperatorKeyChanges('event', { sender: { email: 'summit@example.org' } }, stored, 'staff'), []);
+  assert.deepEqual(findOperatorKeyChanges('event', { sender: { email: 'other@example.org' } }, stored, 'operator'), []);
+  assert.deepEqual(findOperatorKeyChanges('event', { tagline: 'x' }, stored, 'staff'), []);
+  assert.deepEqual(findOperatorKeyChanges('badges', { sender: {} }, stored, 'staff'), []);
+});
+
+// ---------------------------------------------- round three: the social card and sender bytes
+
+const OG_SEEDED = 'branding/og-default.svg';
+const storedWithSeo = () => ({ ...validEvent(), seo: { description: null, organizerName: null, organizerUrl: null, defaultOgImagePath: OG_SEEDED } });
+
+test('a staff save that changes seo.defaultOgImagePath is refused by name — the social card is branding', async () => {
+  const stored = storedWithSeo();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: fullStaffPayload(stored, { seo: { description: 'x', organizerName: null, organizerUrl: null, defaultOgImagePath: 'cms-images/abc/evil.png' } }) }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.message, 'seo.defaultOgImagePath: operator access required');
+  assert.equal(deps.db.docs.get('config/event').seo.defaultOgImagePath, OG_SEEDED);
+  assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+});
+
+test('a staff save that carries seo.defaultOgImagePath unchanged, or leaves it out, goes through and keeps the stored value', async () => {
+  for (const seo of [
+    { description: 'A summit', organizerName: null, organizerUrl: null, defaultOgImagePath: OG_SEEDED },
+    { description: 'A summit', organizerName: null, organizerUrl: null },
+  ]) {
+    const stored = storedWithSeo();
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: fullStaffPayload(stored, { seo }) }, { token: 'staff-token' }), res);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+    assert.equal(deps.db.docs.get('config/event').seo.defaultOgImagePath, OG_SEEDED);
+    assert.equal(deps.db.docs.get('config/event').seo.description, 'A summit');
+  }
+});
+
+test('an operator may change seo.defaultOgImagePath', async () => {
+  const stored = storedWithSeo();
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { seo: { defaultOgImagePath: 'branding/og-card.png' } } }, { token: 'admin-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(deps.db.docs.get('config/event').seo.defaultOgImagePath, 'branding/og-card.png');
+});
+
+test('a staff sender judged unchanged keeps the STORED bytes — the merge does not take the payload’s own spelling', async () => {
+  const stored = validEvent({ sender: { email: 'summit@example.org', name: 'Example Summit', replyTo: null } });
+  const deps = tieredDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: fullStaffPayload(stored, { sender: { email: 'SUMMIT@Example.org', name: ' Example Summit ', replyTo: null } }) }, { token: 'staff-token' }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(deps.db.docs.get('config/event').sender, {
+    email: 'summit@example.org', name: 'Example Summit', replyTo: null, domainVerified: false, domainVerifiedAt: null,
+  });
+});
+
+test('a staff sender that carries any key outside email, name and replyTo is refused by name', async () => {
+  const stored = validEvent();
+  for (const extra of [{ extra: 'x' }, { domainVerified: false }]) {
+    const deps = tieredDeps({ 'config/event': stored });
+    const res = makeRes();
+    await createUpdateEventConfigHandler(deps)(
+      makeReq({ event: fullStaffPayload(stored, { sender: { email: stored.sender.email, name: stored.sender.name, replyTo: null, ...extra } }) }, { token: 'staff-token' }),
+      res,
+    );
+    assert.equal(res.ok === undefined ? res.statusCode : res.statusCode, Object.keys(extra)[0] === 'extra' ? 403 : 400, JSON.stringify(extra));
+    if (Object.keys(extra)[0] === 'extra') assert.equal(res.body.error.message, 'sender.extra: operator access required');
+    assert.equal(deps.db.docs.get('config/event').tagline, undefined);
+  }
+});
+
+test('domainVerifiedBy and domainVerifiedDomain are read-only for BOTH tiers, like the rest of the verification record', async () => {
+  const stored = validEvent();
+  for (const token of ['admin-token', 'staff-token']) {
+    for (const field of ['domainVerified', 'domainVerifiedAt', 'domainVerifiedBy', 'domainVerifiedDomain']) {
+      const deps = tieredDeps({ 'config/event': stored });
+      const res = makeRes();
+      await createUpdateEventConfigHandler(deps)(
+        makeReq({ event: { sender: { email: stored.sender.email, [field]: 'x' } } }, { token }),
+        res,
+      );
+      assert.equal(res.statusCode, 400, `${token} ${field}`);
+      assert.match(res.body.error.message, new RegExp(`sender\\.${field}: read-only`));
+    }
+  }
+});
+
+// THE MILESTONES AND THE REGISTRATION GOAL (issue #180), stored on
+// config/event rather than in a settings collection of their own.
+const MILESTONES = [
+  { label: 'Call for proposals closes', date: '2027-03-01' },
+  { label: 'Programme announced', date: '2027-04-15' },
+];
+
+test('milestones are editable on config/event and merge over the stored doc', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), ...STORED_EXTRAS } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { milestones: MILESTONES } }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const written = deps.db.docs.get('config/event');
+  assert.deepEqual(written.milestones, MILESTONES);
+  // The rest of the stored doc survives a milestones-only save.
+  assert.equal(written.venue.name, STORED_EXTRAS.venue.name);
+  assert.equal(written.tagline, STORED_EXTRAS.tagline);
+  assert.equal(internals.EVENT_EDITABLE_KEYS.includes('milestones'), true);
+});
+
+test('an empty milestone list clears the stored one', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), milestones: MILESTONES } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { milestones: [] } }), res);
+  assert.equal(res.statusCode, 200);
+  // Arrays replace on merge, so the stored list does not come back.
+  assert.deepEqual(deps.db.docs.get('config/event').milestones, []);
+});
+
+test('a milestone with an impossible date or a stray field is refused by name, and nothing is written', async () => {
+  const deps = makeDeps({ 'config/event': { ...validEvent(), milestones: MILESTONES } });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({
+      event: {
+        milestones: [
+          { label: 'Early rate ends', date: '2027-02-30' },
+          { label: 'Doors open', date: '2027-05-13', note: 'private' },
+        ],
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /milestones\[0\]\.date: must match YYYY-MM-DD and name a real calendar date/);
+  assert.match(res.body.error.message, /milestones\[1\]\.note: unknown milestone field/);
+  assert.equal(deps.db.writes.length, 0);
+  assert.deepEqual(deps.db.docs.get('config/event').milestones, MILESTONES);
+});
+
+test('the registration goal round-trips inside registration, and a bad one is refused by name', async () => {
+  const deps = makeDeps({ 'config/event': validEvent() });
+  const ok = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { registration: { goal: 500 } } }), ok);
+  assert.equal(ok.statusCode, 200);
+  const stored = deps.db.docs.get('config/event').registration;
+  assert.equal(stored.goal, 500);
+  // A nested partial merges: the stored registration dates survive.
+  assert.equal(stored.opensAt, validEvent().registration.opensAt);
+
+  for (const goal of [0, 1.5, '500']) {
+    const bad = makeRes();
+    await createUpdateEventConfigHandler(deps)(makeReq({ event: { registration: { goal } } }), bad);
+    assert.equal(bad.statusCode, 400, String(goal));
+    assert.match(bad.body.error.message, /registration\.goal: must be null or a whole number from 1 to 1000000/);
+  }
+  assert.equal(deps.db.docs.get('config/event').registration.goal, 500);
+
+  const cleared = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: { registration: { goal: null } } }), cleared);
+  assert.equal(cleared.statusCode, 200);
+  assert.equal(deps.db.docs.get('config/event').registration.goal, null);
+});
+
+test('a staff caller saves milestones and the goal: alone, and in the whole form without the sender', async () => {
+  const stored = validEvent();
+  const deps = tieredDeps({ 'config/event': stored });
+  const alone = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { milestones: MILESTONES } }, { token: 'staff-token' }),
+    alone,
+  );
+  assert.equal(alone.statusCode, 200, JSON.stringify(alone.body));
+  assert.deepEqual(deps.db.docs.get('config/event').milestones, MILESTONES);
+
+  // What the Event form sends for staff: every editable field but the
+  // sender block (AdminEventSettings leaves it out of a staff payload).
+  const { sender: _sender, ...withoutSender } = fullStaffPayload(stored, {
+    milestones: [MILESTONES[1]],
+    registration: { opensAt: null, closesAt: null, externalUrl: null, actionLabel: null, goal: 250 },
+  });
+  const whole = makeRes();
+  await createUpdateEventConfigHandler(deps)(makeReq({ event: withoutSender }, { token: 'staff-token' }), whole);
+  assert.equal(whole.statusCode, 200, JSON.stringify(whole.body));
+  const written = deps.db.docs.get('config/event');
+  assert.deepEqual(written.milestones, [MILESTONES[1]]);
+  assert.equal(written.registration.goal, 250);
+  assert.equal(written.sender.email, stored.sender.email);
+  assert.equal(written.updatedBy, STAFF_EMAIL);
 });

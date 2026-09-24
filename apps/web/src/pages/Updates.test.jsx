@@ -2,7 +2,7 @@
 // somewhere real). No Firebase, no network; context providers only, same
 // pattern as Sponsors.test.jsx / SessionDetail.test.jsx.
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
@@ -41,11 +41,11 @@ const HIDDEN = {
   visible: false,
 };
 
-function renderUpdates({ features = { updates: true }, updates = [] } = {}) {
+function renderUpdates({ features = { updates: true }, updates = [], eventConfig = {} } = {}) {
   return render(
     <MemoryRouter>
       <EventConfigContext.Provider
-        value={{ eventConfig: {}, features, theme: {}, badges: null, source: 'snapshot' }}
+        value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <ContentContext.Provider
           value={{ updates, getBlock: () => null, getPage: () => null, getSectionBlocks: () => [] }}
@@ -117,6 +117,34 @@ describe('Updates', () => {
     expect(heads[2]).toBe('September 2026');
   });
 
+  it('dates the feed and its month heads on the event’s clock, not the reader’s', () => {
+    // 02:30 UTC on 1 November is the evening of 31 October at a west-coast
+    // venue: the post belongs under October, dated the 31st (design record
+    // §3.1, the dateline carries the event's clock). The east-of-UTC render
+    // shows the same instant land in November, so the assertion holds in
+    // whatever zone the test runner sits.
+    const post = { id: 'u-late', title: 'Late post', publishAt: '2026-11-01T02:30:00Z' };
+    const west = renderUpdates({ updates: [post], eventConfig: { timezone: 'America/Los_Angeles' } });
+    expect(screen.getByRole('heading', { level: 2, name: 'October 2026' })).toBeInTheDocument();
+    expect(screen.getByText('October 31, 2026').tagName).toBe('TIME');
+    west.unmount();
+    renderUpdates({ updates: [post], eventConfig: { timezone: 'Pacific/Auckland' } });
+    expect(screen.getByRole('heading', { level: 2, name: 'November 2026' })).toBeInTheDocument();
+    expect(screen.getByText('November 1, 2026').tagName).toBe('TIME');
+  });
+
+  it('shows a published update dated in the future: the date is display scheduling only (issue 190)', () => {
+    // publishAt never gates the publish action, and it never hides a
+    // published post either. A post dated a year ahead is on the page, at
+    // the top of the dated runs, under its own month.
+    const future = { id: 'u-future', title: 'Next year’s dates', publishAt: '2027-10-15T16:00:00Z', visible: true };
+    renderUpdates({ updates: [NEWER, future], eventConfig: { timezone: 'America/New_York' } });
+    const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/updates/'));
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/updates/u-future', '/updates/update-newer']);
+    expect(screen.getByRole('heading', { level: 2, name: 'October 2027' })).toBeInTheDocument();
+    expect(screen.getByText('October 15, 2027').tagName).toBe('TIME');
+  });
+
   it('puts the title before the date, so the date never stacks above the heading', () => {
     // The eyebrow ban is absolute and holds at every size (design brief
     // §2.4). An entry on the spine is one column at every width, so the
@@ -127,4 +155,90 @@ describe('Updates', () => {
     const time = container.querySelector('.update-feed__entry time');
     expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+
+  // THE CATEGORY AND THE LEAD (issue #191).
+  it('sets a category as a plain tag in the title row, before Pinned', () => {
+    const { container } = renderUpdates({ updates: [{ ...PINNED, category: ' Travel ' }] });
+    const row = container.querySelector('.update-feed__entry h3').parentElement;
+    const tags = [...row.querySelectorAll('span')].map((tag) => tag.textContent);
+    expect(tags).toEqual(['Travel', 'Pinned']);
+    // The ruled rectangle, never a pill; the word stays in natural case.
+    expect(within(row).getByText('Travel').className).toContain('rounded-brand');
+    expect(within(row).getByText('Travel').className).not.toContain('rounded-full');
+  });
+
+  it('draws the Pinned tag only for a real true, and a truthy value stays in its month (review round)', () => {
+    const odd = [
+      { ...NEWER, id: 'u-yes', title: 'Pinned as a word', pinned: 'yes', publishAt: '2026-10-12T12:00:00Z' },
+      { ...NEWER, id: 'u-one', title: 'Pinned as a number', pinned: 1, publishAt: '2026-10-11T12:00:00Z' },
+    ];
+    const { container } = renderUpdates({ updates: odd });
+    expect(screen.queryByText('Pinned')).toBeNull();
+    const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent.trim());
+    expect(heads).toEqual(['October 2026']);
+    for (const entry of container.querySelectorAll('.update-feed__entry')) {
+      expect(entry.querySelector('h3').parentElement.querySelectorAll('span')).toHaveLength(0);
+    }
+  });
+
+  it('draws no tag for a stored category that breaks the rule, and the page still renders', () => {
+    const bad = [
+      { ...NEWER, id: 'u-long', title: 'Long', category: 'x'.repeat(25) },
+      { ...NEWER, id: 'u-num', title: 'Number', category: 7 },
+      { ...NEWER, id: 'u-lines', title: 'Lines', category: 'Two\nlines' },
+      { ...NEWER, id: 'u-blank', title: 'Blank', category: '   ' },
+    ];
+    const { container } = renderUpdates({ updates: bad });
+    expect(screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/updates/'))).toHaveLength(4);
+    for (const entry of container.querySelectorAll('.update-feed__entry')) {
+      expect(entry.querySelector('h3').parentElement.querySelectorAll('span')).toHaveLength(0);
+    }
+  });
+
+  it('leads the list with the featured update, under its own Featured head, once', () => {
+    const featured = { ...OLDER, id: 'update-featured', title: '[Fixture] Featured', featured: true, category: 'Workshops' };
+    const { container } = renderUpdates({ updates: [OLDER, NEWER, PINNED, featured] });
+    const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent.trim());
+    expect(heads[0]).toBe('Featured');
+    expect(heads[1]).toBe('Pinned');
+    const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/updates/'));
+    // Ahead of a pinned post and a newer one, and listed once.
+    expect(links.map((a) => a.getAttribute('href'))).toEqual([
+      '/updates/update-featured',
+      '/updates/update-pinned',
+      '/updates/update-newer',
+      '/updates/update-older',
+    ]);
+    const lead = container.querySelector('section .update-feed__entry');
+    expect(within(lead).getByRole('heading', { level: 3 }).className).toContain('text-h2');
+    expect(within(lead).getByText('Workshops')).toBeInTheDocument();
+    // The opening is a standfirst, and it is the lead's own text.
+    expect(lead.querySelector('.standfirst')).toHaveTextContent(OLDER.body);
+  });
+
+  it('keeps a second featured update in its own run', () => {
+    const first = { ...NEWER, id: 'f-newer', title: 'First featured', featured: true };
+    const second = { ...OLDER, id: 'f-older', title: 'Second featured', featured: true };
+    renderUpdates({ updates: [second, first] });
+    const sections = screen.getAllByRole('region');
+    expect(within(sections[0]).getByRole('heading', { level: 2 })).toHaveTextContent('Featured');
+    expect(within(sections[0]).getByRole('link', { name: 'First featured' })).toBeInTheDocument();
+    expect(within(sections[0]).queryByRole('link', { name: 'Second featured' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'Second featured' })).toHaveLength(1);
+  });
+
+  it('dates the lead with a dateline on the event’s clock', () => {
+    const featured = { id: 'u-lead', title: 'Late lead', body: 'Body.', publishAt: '2026-10-01T02:30:00Z', featured: true };
+    const { container } = renderUpdates({ updates: [featured], eventConfig: { timezone: 'America/Los_Angeles' } });
+    const dateline = container.querySelector('.update-feed__entry .byline time');
+    expect(dateline).toHaveTextContent('September 30, 2026');
+    expect(dateline).toHaveAttribute('datetime', '2026-10-01T02:30:00.000Z');
+  });
+
+  it('says Undated in the lead’s byline when it has no date', () => {
+    const featured = { id: 'u-lead', title: 'Undated lead', body: 'Body.', publishAt: null, featured: true };
+    const { container } = renderUpdates({ updates: [featured] });
+    expect(container.querySelector('.update-feed__entry .byline')).toHaveTextContent('Undated');
+  });
 });
+

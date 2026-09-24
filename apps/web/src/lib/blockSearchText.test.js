@@ -87,6 +87,35 @@ describe('blockSearchText', () => {
     ).toBe('Attendance grew Registered attendees this year Registration system, read live');
   });
 
+  it('joins the term, the fact and its note on a fact block', () => {
+    expect(
+      blockSearchText({ blockType: 'fact', label: 'Where', value: 'The hall', note: '1 Test Way' }),
+    ).toBe('Where The hall 1 Test Way');
+    expect(blockMatchesQuery({ blockType: 'fact', label: 'Where', value: 'The hall' }, 'hall')).toBe(true);
+  });
+
+  it('joins the name, the price and the stripped benefits on a sponsor package (issue 193)', () => {
+    const block = {
+      blockType: 'sponsor_package',
+      name: 'Coffee break',
+      price: 'Illustrative figure',
+      limit: 3,
+      benefits: '<ul><li>Signs &amp; cups</li></ul>',
+    };
+    const searchText = blockSearchText(block);
+    for (const words of ['Coffee break', 'Illustrative figure', 'Signs & cups']) {
+      expect(searchText).toContain(words);
+    }
+    expect(blockMatchesQuery(block, 'cups')).toBe(true);
+    expect(blockMatchesQuery(block, 'li>')).toBe(false);
+  });
+
+  it('joins the sentence and the attribution on a quote block', () => {
+    expect(
+      blockSearchText({ blockType: 'quote', text: 'Decide who checks sources.', attribution: 'A speaker' }),
+    ).toBe('Decide who checks sources. A speaker');
+  });
+
   it('reads alt and caption from an image block', () => {
     expect(
       blockSearchText({ blockType: 'image', alt: 'Venue entrance', caption: 'Main doors' }),

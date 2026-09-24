@@ -4,7 +4,7 @@
 import { test, expect } from '@playwright/test';
 import {
   ADMIN_EMAIL, PROJECT_ID, adminDb, adminIdToken, callFunction,
-  ensureUser, idTokenFor, mailFileSize, waitForOtpCode,
+  ensureUser, idTokenFor, signIn,
 } from './helpers.mjs';
 import { installWebMcpHarness } from './webmcp-harness.mjs';
 
@@ -45,19 +45,6 @@ async function expectToolSet(page, expected) {
     expect(definition.inputSchema).toEqual({ type: 'object', properties: {}, additionalProperties: false });
     expect(definition.annotations.readOnlyHint).toBe(true);
   }
-}
-
-async function signIn(page, email) {
-  const since = mailFileSize();
-  await page.goto('/signin');
-  await page.locator('#signin-email').fill(email);
-  await page.getByRole('button', { name: /email me a code/i }).click();
-  await expect(page.locator('#signin-code')).toBeVisible();
-  await page.locator('#signin-code').fill(await waitForOtpCode(since, email, 30_000));
-  await page.getByRole('button', { name: /^sign in$/i }).click();
-  // A new user can go straight to /profile. Do not race that redirect by
-  // requiring the brief intermediate home route.
-  await page.waitForURL((url) => url.pathname !== '/signin');
 }
 
 test.describe.serial('Read-only WebMCP browser integration', () => {

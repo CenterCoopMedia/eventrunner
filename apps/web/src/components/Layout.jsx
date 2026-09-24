@@ -53,7 +53,7 @@
 // So: what the page states, then what the site states, then the default.
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config';
@@ -69,9 +69,25 @@ import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import RegistrationAction from './RegistrationAction.jsx';
-import FeedbackModal from './FeedbackModal.jsx';
+import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
+import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
+
+// The feedback dialog and the change request dialog (issue #188) each sit
+// behind a flag that is off by default and open only on a press, so they
+// load on demand and stay out of the public first paint, which is at its
+// budget (scripts/ci/bundle-budget.json).
+function onDemand(importer) {
+  return lazy(() =>
+    importer().then((module) => {
+      clearReloadFlag();
+      return module;
+    }),
+  );
+}
+const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
+const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 
 /**
  * The page's own header, read into the theme's vocabulary.
@@ -236,6 +252,17 @@ export default function Layout() {
   const operatorName = legal.operatorName;
   const supportEmail = legal.supportEmail;
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [changeRequestOpen, setChangeRequestOpen] = useState(false);
+  // A change request is free text from a reader the operator does not
+  // control, so it is offered only while the event turns it on, and only to
+  // a signed-in reader: the server stores the request against the sign-in
+  // and refuses a signed-out one (issue #188).
+  const canRequestChange = features.changeRequests === true && Boolean(user);
+  // The dialog goes with the control: a flag turned off or a sign-out closes
+  // it, and it does not come back on its own when either returns.
+  useEffect(() => {
+    if (!canRequestChange) setChangeRequestOpen(false);
+  }, [canRequestChange]);
 
   // The page this URL renders, if it has a document. A route below a page
   // (/schedule/:id) matches nothing here and keeps the shell's own rule,
@@ -345,9 +372,16 @@ export default function Layout() {
   // timetable, and behind an about page or a speaker bio it is texture for
   // its own sake. Schedule.jsx and MySchedule.jsx carry the `map-grid` class
   // on the surface that holds the programme.
+  // tabindex -1 makes the landmark a programmatic focus target: the skip
+  // link lands here, and so does focus after a notice bar is dismissed
+  // (components/NoticeBar.jsx, through focusAsDestination), rather than
+  // dropping to the body. It is not in the tab order. The ring is never
+  // removed (interface guidelines): [data-focus-ring]:focus in index.css
+  // draws it when a control sends the reader here.
   const main = (
     <main
       id="main-content"
+      tabIndex={-1}
       className={
         navPlacement === 'side'
           ? 'min-w-0 flex-1 pb-2xl pt-xl'
@@ -478,19 +512,49 @@ export default function Layout() {
                 </ul>
               </nav>
             )}
-            {features.feedbackInbox ? (
-              <button
-                type="button"
-                className={`${quietActionClass} mt-md`}
-                onClick={() => setFeedbackOpen(true)}
-              >
-                Share feedback
-              </button>
+            {features.feedbackInbox || canRequestChange ? (
+              <div className="mt-md flex flex-wrap gap-xs">
+                {features.feedbackInbox ? (
+                  <button
+                    type="button"
+                    className={quietActionClass}
+                    onClick={() => setFeedbackOpen(true)}
+                  >
+                    Share feedback
+                  </button>
+                ) : null}
+                {canRequestChange ? (
+                  <button
+                    type="button"
+                    className={quietActionClass}
+                    onClick={() => setChangeRequestOpen(true)}
+                  >
+                    Request a change
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>
       </footer>
-      {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
+      {feedbackOpen ? (
+        <ChunkErrorBoundary>
+          <Suspense fallback={null}>
+            <FeedbackModal onClose={() => setFeedbackOpen(false)} />
+          </Suspense>
+        </ChunkErrorBoundary>
+      ) : null}
+      {changeRequestOpen && canRequestChange ? (
+        <ChunkErrorBoundary>
+          <Suspense fallback={null}>
+            <ChangeRequestModal
+              user={user}
+              initialPage={pathname}
+              onClose={() => setChangeRequestOpen(false)}
+            />
+          </Suspense>
+        </ChunkErrorBoundary>
+      ) : null}
     </div>
   );
 }
