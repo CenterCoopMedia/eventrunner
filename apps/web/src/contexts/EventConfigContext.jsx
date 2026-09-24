@@ -144,7 +144,9 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
     };
   }, [demoMode, effectiveDemoTheme, overlay]);
 
-  // THE document the rendering of the theme resolves from.
+  // THE document the rendering of the theme resolves from: the live one,
+  // or the snapshot when there is none (appliedThemeDoc below, once its
+  // overlay is written whole).
   //
   // Not `value.theme`. That one is the shallow overlay, and the shallow
   // overlay is right for the CONSUMERS of the context — a live doc that
@@ -158,7 +160,6 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   //
   // The demo is different on purpose: it changes only the style and mode, so
   // it keeps the snapshot's header and logo fields while it compares presets.
-  const themeDoc = effectiveDemoTheme || overlay.theme || snapshotTheme;
   const runtimeThemeDoc = effectiveDemoTheme || overlay.theme;
 
   // THE DOCUMENT THE PAGE SHOWS: the one whose overlay was last written
@@ -290,8 +291,11 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   // this writes data-mode on <html>, which is what picks between the two
   // color blocks in the generated stylesheet. Under the 'system' policy the
   // subscription stays open, so the page follows the reader's setting when
-  // it changes. A document with no `mode` renders light.
-  useEffect(() => startModeSync(themeDoc.mode), [themeDoc.mode]);
+  // it changes. A document with no `mode` renders light. The mode reads the
+  // document last written whole, like the root attributes above, so a new
+  // mode never lands on the old style while the overlay waits.
+  const mode = appliedThemeDoc.mode;
+  useEffect(() => startModeSync(mode), [mode]);
 
   return (
     <EventConfigContext.Provider value={value}>

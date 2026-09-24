@@ -128,6 +128,28 @@ describe('EventConfigProvider and the preset remaps', () => {
     expect(runtimeStyle().textContent).not.toBe('');
   });
 
+  it('keeps the display mode with the theme last written whole, too', async () => {
+    // The mode is part of the theme document. Applying a new mode while the
+    // overlay still waited drew the old style in the new mode — for good if
+    // the chunk never landed (connector review of PR 270).
+    render(
+      <EventConfigProvider>
+        <p>The page</p>
+      </EventConfigProvider>,
+    );
+    const root = document.documentElement;
+    const before = root.dataset.mode;
+    const next = before === 'dark' ? 'light' : 'dark';
+    act(() => {
+      subscriptions.get('theme')({ preset: OTHER_PRESET, mode: next });
+    });
+    expect(root.dataset.mode).toBe(before);
+    await act(async () => {
+      loader.resolve();
+    });
+    expect(root.dataset.mode).toBe(next);
+  });
+
   it('writes a document that names no style at once, because it needs no remaps', () => {
     render(
       <EventConfigProvider>
