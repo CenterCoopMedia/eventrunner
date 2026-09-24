@@ -16,6 +16,18 @@ vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
 const showToastMock = vi.fn();
 vi.mock('../../contexts/ToastContext.jsx', () => ({ useToast: () => ({ showToast: showToastMock }) }));
 
+// The signed-in operator, and the re-probe the page asks for after it
+// changes its OWN standing (connector review): the rail and the route
+// refusal must follow at once, not on the next sign-in.
+const refreshAdminStatusMock = vi.fn(() => Promise.resolve());
+vi.mock('../../contexts/AuthContext.jsx', () => ({
+  useAuth: () => ({
+    user: { uid: 'ops-1', email: 'Ops@Example.org' },
+    adminTier: 'operator',
+    refreshAdminStatus: refreshAdminStatusMock,
+  }),
+}));
+
 import AdminAccess, { describeChange, describeResult } from './AdminAccess.jsx';
 import { TIER_SCOPE } from '../AdminLayout.jsx';
 
@@ -71,6 +83,36 @@ const listCalls = () => callMock.mock.calls.filter(([name]) => name === 'listAdm
 beforeEach(() => {
   callMock.mockReset();
   showToastMock.mockReset();
+  refreshAdminStatusMock.mockClear();
+});
+
+describe('a change to the signed-in account', () => {
+  it('re-probes the tier after the operator changes their OWN standing, and not after anyone else’s', async () => {
+    await renderPage();
+    // Someone else: no re-probe.
+    fireEvent.click(rowFor('desk@example.org').querySelector('button'));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Change desk@example.org to operator' })).getByRole('button', { name: 'Change to operator' }));
+    await waitFor(() => expect(setCalls()).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Change desk@example.org to operator' })).toBeNull());
+    expect(refreshAdminStatusMock).not.toHaveBeenCalled();
+
+    // Their own row (the address as the server lowercases it): the tier is
+    // read again so the rail and the route refusal follow at once.
+    fireEvent.click(rowFor('ops@example.org').querySelectorAll('button')[1]);
+    fireEvent.click(within(screen.getByRole('region', { name: 'Remove access for ops@example.org' })).getByRole('button', { name: 'Remove access' }));
+    await waitFor(() => expect(setCalls()).toHaveLength(2));
+    await waitFor(() => expect(refreshAdminStatusMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('reports a write that only tidied the stored lists as no change of access', async () => {
+    // The server answers changed:true when it rewrote a mis-normalized list,
+    // with the tier unchanged; the sentence must not claim a new tier.
+    await renderPage({ set: { ok: true, changed: true, tier: 'operator', previousTier: 'operator' } });
+    fireEvent.click(rowFor('desk@example.org').querySelector('button'));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Change desk@example.org to operator' })).getByRole('button', { name: 'Change to operator' }));
+    expect(await screen.findByText('desk@example.org already had this access.')).toBeInTheDocument();
+    expect(screen.queryByText('desk@example.org is now operator.')).toBeNull();
+  });
 });
 
 describe('AdminAccess', () => {

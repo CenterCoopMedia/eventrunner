@@ -45,6 +45,7 @@
 // so the description, the confirmation sentences and the shell's refusal
 // cannot drift apart.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { useAdminApi } from '../adminApi.js';
@@ -208,6 +209,7 @@ function GalleyHead({ children, align = 'start' }) {
 export default function AdminAccess() {
   const call = useAdminApi();
   const { showToast } = useToast();
+  const { user, refreshAdminStatus } = useAuth();
 
   // null until the first load answers; then the list, even when a LATER
   // reload fails (those keep the last values and say so).
@@ -331,8 +333,14 @@ export default function AdminAccess() {
     try {
       const response = await call('setAdminAccess', { email, tier });
       const nextTier = response?.tier ?? (tier === 'none' ? null : tier);
-      const standing = previousTier === undefined ? response?.previousTier ?? null : previousTier;
-      const sentence = response?.changed === false
+      // The server read the stored standing inside its transaction; it wins
+      // over what this page remembered when the two differ.
+      const standing = response?.previousTier !== undefined
+        ? response.previousTier
+        : previousTier === undefined ? null : previousTier;
+      // A write that only tidied the stored lists answers changed:true with
+      // the tier standing; that is not a new tier and is not said as one.
+      const sentence = response?.changed === false || nextTier === standing
         ? `${email} already had this access.`
         : describeResult({ email, tier: nextTier, previousTier: standing });
       // The line on the page is the record and it announces; the bar
@@ -340,7 +348,14 @@ export default function AdminAccess() {
       setResult({ tone: 'ok', message: sentence });
       showToast(sentence, { announce: false });
       if (standing === null && tier !== 'none') setForm({ email: '', tier: 'staff' });
-      await load();
+      // The operator's OWN standing changed: read the tier again so the
+      // rail and the route refusal follow now (a demotion refuses this
+      // page; a revocation shows the not-an-admin state), not on the next
+      // sign-in. The list reload may then be refused, and the page may be
+      // gone before it answers; both are the right outcome.
+      const ownAddress = (user?.email ?? '').trim().toLowerCase();
+      const isSelf = email === callerEmail || (ownAddress !== '' && email === ownAddress);
+      await Promise.all([load(), isSelf && nextTier !== standing ? refreshAdminStatus() : undefined]);
       close();
     } catch (err) {
       // Verbatim and in place: the server's sentence names the rule.

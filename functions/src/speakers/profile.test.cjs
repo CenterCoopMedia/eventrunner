@@ -1135,3 +1135,33 @@ test('the speaker self-or-admin gate answers 500 and writes nothing when config/
   assert.deepEqual(db.writes, []);
   assert.equal(db.read('speakers', 'rae').bio, 'old bio');
 });
+
+// ------------------------- legacy headshot paths (connector review, issue 186)
+
+test('an admin edit that carries a legacy headshotPath UNCHANGED goes through', async () => {
+  // Records written before the prefix rule may hold any Storage path, and
+  // the admin editor sends the current headshotPath on every save.
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: 'speakers/rae.jpg' }));
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { bio: 'edited', headshotPath: 'speakers/rae.jpg' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(db.read('speakers', 'rae').bio, 'edited');
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speakers/rae.jpg');
+});
+
+test('an admin edit that CHANGES a legacy headshotPath to another foreign path is refused', async () => {
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: 'speakers/rae.jpg' }));
+  const result = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { headshotPath: 'speakers/other.jpg' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 400);
+  assert.match(result.message, /^headshotPath: must be null or under speaker-photos\/rae\//);
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speakers/rae.jpg');
+
+  const own = await applyUpdateSpeaker({
+    db, speakerId: 'rae', payload: { headshotPath: 'speaker-photos/rae/new/photo.png' }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(own.ok, true);
+});

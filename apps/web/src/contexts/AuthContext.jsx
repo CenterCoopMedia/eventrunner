@@ -45,6 +45,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -144,9 +145,20 @@ export function AuthProvider({ children }) {
   // that read isAdmin at that instant would show "not an admin" to an admin
   // for a tick, so the tri-state is exposed alongside the boolean.
   const [adminStatus, setAdminStatus] = useState('unknown'); // 'unknown'|'admin'|'denied'
-  // null until adminStatus is 'admin'; then 'operator' or 'staff'.
+  // null until adminStatus is 'admin'; then 'operator' or 'staff' — or
+  // 'unknown' when the tier probe failed for a reason other than
+  // permission-denied. Only a permission-denied answer proves staff; a
+  // transient failure must not make an operator staff for the session, so
+  // it is left unknown, the rail says so and offers a retry, and no section
+  // is refused on a guess (the server decides regardless).
   const [adminTier, setAdminTier] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Bumped by refreshAdminStatus: the probes run again for the same user,
+  // keeping the current verdict until the new one lands. The Access page
+  // asks for this after an operator changes their OWN standing, so the rail
+  // and the route refusal follow at once rather than on the next sign-in.
+  const [probeRun, setProbeRun] = useState(0);
+  const probedUserRef = useRef(null);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (nextUser) => {
@@ -155,35 +167,51 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  // Admin probes (see module comment). Run once per signed-in user; a
-  // permission-denied answer on the first simply means "not an admin", and
-  // on the second "an admin, but not an operator".
+  // Admin probes (see module comment). Run once per signed-in user, and
+  // again on refreshAdminStatus. A permission-denied answer on the first
+  // means "not an admin", and on the second "an admin, but not an
+  // operator"; any other failure of the second leaves the tier unknown.
   useEffect(() => {
     if (!user) {
+      probedUserRef.current = null;
       setAdminStatus('denied');
       setAdminTier(null);
       return undefined;
     }
     let cancelled = false;
-    // A new user means the previous answer no longer applies; go back to
-    // 'unknown' so consumers wait rather than reusing a stale verdict.
-    setAdminStatus('unknown');
-    setAdminTier(null);
+    if (probedUserRef.current !== user) {
+      // A new user means the previous answer no longer applies; go back to
+      // 'unknown' so consumers wait rather than reusing a stale verdict. A
+      // re-probe for the same user keeps the current verdict meanwhile.
+      probedUserRef.current = user;
+      setAdminStatus('unknown');
+      setAdminTier(null);
+    }
     const probe = (name) =>
-      getDocs(query(collection(db, name), limit(1))).then(() => true, () => false);
+      getDocs(query(collection(db, name), limit(1))).then(
+        () => 'ok',
+        (err) => (err?.code === 'permission-denied' ? 'denied' : 'error'),
+      );
     (async () => {
-      const [isAnyAdmin, isOperator] = await Promise.all([
+      const [drafts, logs] = await Promise.all([
         probe('cmsContent_drafts'),
         probe('admin_logs'),
       ]);
       if (cancelled) return;
-      setAdminTier(isAnyAdmin ? (isOperator ? 'operator' : 'staff') : null);
+      const isAnyAdmin = drafts === 'ok';
+      let tier = null;
+      if (isAnyAdmin) tier = logs === 'ok' ? 'operator' : logs === 'denied' ? 'staff' : 'unknown';
+      setAdminTier(tier);
       setAdminStatus(isAnyAdmin ? 'admin' : 'denied');
     })();
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, probeRun]);
+
+  const refreshAdminStatus = useCallback(() => {
+    setProbeRun((run) => run + 1);
+  }, []);
 
   const isAdmin = adminStatus === 'admin';
   const isOperator = adminTier === 'operator';
@@ -222,6 +250,7 @@ export function AuthProvider({ children }) {
       adminStatus,
       adminTier,
       loading,
+      refreshAdminStatus,
       signInWithGoogle,
       sendOtpCode,
       verifyOtpCode,
@@ -234,6 +263,7 @@ export function AuthProvider({ children }) {
       adminStatus,
       adminTier,
       loading,
+      refreshAdminStatus,
       signInWithGoogle,
       sendOtpCode,
       verifyOtpCode,

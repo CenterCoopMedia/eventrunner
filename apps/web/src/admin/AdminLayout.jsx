@@ -236,16 +236,21 @@ function TierRefusal() {
 
 export default function AdminLayout() {
   const { eventConfig, theme } = useEventConfig();
-  const { user, adminTier, signOut } = useAuth();
+  const { user, adminTier, refreshAdminStatus, signOut } = useAuth();
   const { pathname } = useLocation();
   // A branding slot can point at an object that has since been deleted from
   // the bucket, so the job mark degrades to the event's short name rather
   // than to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
   const markSrc = brandingSrc(theme?.logos?.mark ?? theme?.logos?.primary);
-  const docket = docketForTier(adminTier);
+  // An unknown tier (the probe failed for a reason other than
+  // permission-denied) draws the sections every admin holds and refuses
+  // nothing on a guess: the server decides, and the rail says the check
+  // failed and offers it again.
+  const tierKnown = adminTier === 'operator' || adminTier === 'staff';
+  const docket = docketForTier(tierKnown ? adminTier : 'staff');
   const required = sectionTier(pathname);
-  const refused = required !== null && !tierReaches(adminTier, required);
+  const refused = tierKnown && required !== null && !tierReaches(adminTier, required);
 
   return (
     <div className="admin-room flex min-h-screen flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
@@ -300,10 +305,20 @@ export default function AdminLayout() {
             <p className="break-all font-admin-data text-admin-xs text-admin-rail-ink-muted">
               {user?.email}
             </p>
-            {adminTier ? (
+            {tierKnown ? (
               <p className="text-admin-xs font-semibold text-admin-rail-ink" data-admin-tier={adminTier}>
                 {adminTier === 'operator' ? 'Operator' : 'Staff'}
               </p>
+            ) : null}
+            {adminTier === 'unknown' ? (
+              <div className="mt-2xs flex flex-col items-start gap-2xs">
+                <p className="text-admin-xs text-admin-rail-ink-muted" role="status">
+                  Your access tier could not be checked.
+                </p>
+                <button type="button" onClick={refreshAdminStatus} className={railButtonClass}>
+                  Check again
+                </button>
+              </div>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-xs">

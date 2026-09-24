@@ -4,7 +4,7 @@
 // isAdmin). The server (requireAdmin) and firestore.rules remain the
 // enforcement; these tests pin the UI's three states.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../lib/configSource.js', () => ({
@@ -43,8 +43,11 @@ vi.mock('firebase/auth', () => ({
 // drafts read (i.e. an admin); rejecting means it did not.
 let adminProbeShouldSucceed = true;
 // The tier probe (issue #186): resolving means the rules allowed the
-// operator-only admin_logs read; rejecting means staff.
+// operator-only admin_logs read; rejecting with permission-denied means
+// staff. Any other rejection is a failed check, not a tier.
 let operatorProbeShouldSucceed = true;
+let operatorProbeError = null;
+const permissionDenied = () => Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
 // When set, the drafts probe hangs until the test settles it — the window
 // in which the auth handshake has finished but admin-ness is still unknown.
 let pendingProbe = null;
@@ -62,9 +65,10 @@ vi.mock('firebase/firestore', () => ({
           pendingOperatorProbe = { resolve, reject };
         });
       }
+      if (operatorProbeError) return Promise.reject(operatorProbeError);
       return operatorProbeShouldSucceed
         ? Promise.resolve({ docs: [] })
-        : Promise.reject(new Error('permission denied'));
+        : Promise.reject(permissionDenied());
     }
     if (pendingProbe) {
       return new Promise((resolve, reject) => {
@@ -73,9 +77,17 @@ vi.mock('firebase/firestore', () => ({
     }
     return adminProbeShouldSucceed
       ? Promise.resolve({ docs: [] })
-      : Promise.reject(new Error('permission denied'));
+      : Promise.reject(permissionDenied());
   }),
 }));
+
+// The admin endpoints the Access page calls; the shell tests below drive a
+// change to the signed-in account through them.
+const adminCall = vi.fn(() => Promise.resolve({}));
+vi.mock('./adminApi.js', async () => {
+  const actual = await vi.importActual('./adminApi.js');
+  return { ...actual, useAdminApi: () => adminCall };
+});
 
 import App from '../App.jsx';
 
@@ -103,8 +115,11 @@ async function renderAt(path) {
 beforeEach(() => {
   adminProbeShouldSucceed = true;
   operatorProbeShouldSucceed = true;
+  operatorProbeError = null;
   pendingProbe = null;
   pendingOperatorProbe = null;
+  adminCall.mockReset();
+  adminCall.mockImplementation(() => Promise.resolve({}));
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
 });
 
@@ -269,6 +284,78 @@ describe('admin route gating', () => {
       expect(screen.queryByRole('heading', { level: 1, name: 'Access' })).toBeNull();
       unmount();
     }
+  });
+
+  // Connector review: only permission-denied proves staff. Any other failure
+  // of the tier probe leaves the tier unknown — nothing is refused on a
+  // guess, the rail says the check failed, and one press checks again.
+  it('does not make an operator staff when the tier probe fails for another reason; the rail offers a retry', async () => {
+    operatorProbeError = Object.assign(new Error('unavailable'), { code: 'unavailable' });
+    await renderAt('/admin/branding');
+    // Not refused: the server decides, and the page renders.
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+    expect(screen.queryByText('Staff')).toBeNull();
+    expect(screen.queryByText('Operator')).toBeNull();
+    const rail = screen.getByRole('navigation', { name: 'Admin sections' }).parentElement;
+    expect(rail.textContent).toContain('Your access tier could not be checked.');
+
+    operatorProbeError = null;
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(await screen.findByText('Operator')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Access' })).toBeInTheDocument();
+  });
+
+  // Connector review: an operator who demotes or revokes THEMSELVES must see
+  // the result at once — the probe is read again after the change, so the
+  // rail and the route refusal follow without a new sign-in.
+  it('shows the not-an-admin state at once when an operator revokes their own access', async () => {
+    adminCall.mockImplementation((name) => {
+      if (name === 'listAdminAccess') {
+        return Promise.resolve({
+          accounts: [
+            { email: 'admin@example.org', tier: 'operator' },
+            { email: 'second@example.org', tier: 'operator' },
+          ],
+          callerEmail: 'admin@example.org',
+        });
+      }
+      // The revocation lands: from here the rules refuse every admin read.
+      adminProbeShouldSucceed = false;
+      operatorProbeShouldSucceed = false;
+      return Promise.resolve({ ok: true, email: 'admin@example.org', tier: null, previousTier: 'operator', changed: true });
+    });
+    await renderAt('/admin/access');
+    const row = (await screen.findByText('admin@example.org', { selector: 'span' })).closest('tr');
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove access' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Remove access for admin@example.org' })).getByRole('button', { name: 'Remove access' }));
+
+    expect(await screen.findByRole('heading', { name: 'You don’t have admin access' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
+  });
+
+  it('draws the staff rail and refuses the Access route at once when an operator demotes themselves', async () => {
+    adminCall.mockImplementation((name) => {
+      if (name === 'listAdminAccess') {
+        return Promise.resolve({
+          accounts: [
+            { email: 'admin@example.org', tier: 'operator' },
+            { email: 'second@example.org', tier: 'operator' },
+          ],
+          callerEmail: 'admin@example.org',
+        });
+      }
+      operatorProbeShouldSucceed = false;
+      return Promise.resolve({ ok: true, email: 'admin@example.org', tier: 'staff', previousTier: 'operator', changed: true });
+    });
+    await renderAt('/admin/access');
+    const row = (await screen.findByText('admin@example.org', { selector: 'span' })).closest('tr');
+    fireEvent.click(within(row).getByRole('button', { name: 'Change to staff' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Change admin@example.org to staff' })).getByRole('button', { name: 'Change to staff' }));
+
+    expect(await screen.findByRole('heading', { name: 'This section needs operator access' })).toBeInTheDocument();
+    expect(screen.getByText('Staff')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Access' })).toBeNull();
   });
 
   it('names the staff sections in the refusal, Event included, in the rail’s own words', async () => {

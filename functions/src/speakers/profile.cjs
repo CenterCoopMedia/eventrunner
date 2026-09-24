@@ -249,16 +249,6 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
   if (Object.keys(verdict.fields).length === 0) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speaker: no editable fields in the payload' };
   }
-  // Same prefix rule as create and the self-service path, for the same reason.
-  if ('headshotPath' in verdict.fields && !isOwnHeadshotPath(speakerId, verdict.fields.headshotPath)) {
-    return {
-      ok: false,
-      status: 400,
-      code: 'bad-request',
-      message: `headshotPath: must be null or under speaker-photos/${speakerId}/`,
-    };
-  }
-
   const at = new Date(now());
   const ref = db.collection(SPEAKERS).doc(speakerId);
 
@@ -272,6 +262,22 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
       }
       const stored = snap.data();
       const patch = { ...verdict.fields };
+
+      // Same prefix rule as create and the self-service path, for the same
+      // reason — applied to a CHANGE only. A record written before the rule
+      // may hold any Storage path, and the admin editor sends the current
+      // headshotPath on every save, so the stored value is always allowed
+      // back; only a move to a path that is not this speaker's is refused.
+      if ('headshotPath' in patch && patch.headshotPath !== stored.headshotPath
+        && !isOwnHeadshotPath(speakerId, patch.headshotPath)) {
+        const err = new Error('HEADSHOT_PATH');
+        err.conflict = {
+          status: 400,
+          code: 'bad-request',
+          message: `headshotPath: must be null or under speaker-photos/${speakerId}/`,
+        };
+        throw err;
+      }
 
       // A name change with no explicit slug re-derives the slug, so the
       // public URL follows the name instead of silently keeping the old
