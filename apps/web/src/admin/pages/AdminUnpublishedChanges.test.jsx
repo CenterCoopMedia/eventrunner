@@ -69,6 +69,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { unavailableButtonClass } from '../components/formControls.jsx';
 
 const ALL = ['cmsContent', 'cmsPages', 'cmsSchedule', 'cmsOrganizations', 'cmsUpdates', 'cmsTimeline'];
 
@@ -473,9 +474,18 @@ describe('the Unpublished changes page', () => {
     });
     const table = screen.getByRole('table', { name: /^Sessions with unpublished changes/ });
     const panel = table.closest('section');
-    expect(within(panel).queryByRole('button')).toBeNull();
-    expect(panel).toHaveTextContent('Use Publish all. One collection publish takes at most 2,000 changes.');
-    expect(within(main()).getByRole('button', { name: 'Publish all (2001)' })).toBeInTheDocument();
+    // The control stays, unavailable, and says why: never a removed control.
+    const button = within(panel).getByRole('button', { name: 'Publish 2001 sessions' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button.className).toContain(unavailableButtonClass);
+    expect(button).toHaveAccessibleDescription('Use Publish all. One collection publish takes at most 2,000 changes.');
+    button.focus();
+    expect(document.activeElement).toBe(button);
+    fireEvent.click(button);
+    fireEvent.keyDown(button, { key: 'Enter' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(button).not.toHaveAttribute('aria-busy');
+    expect(within(main()).getByRole('button', { name: 'Publish all (2001)' })).not.toHaveAttribute('aria-disabled');
   }, 20_000);
 
   it('renders a hostile title as text, marks a hidden record, and links only where an editor exists', async () => {

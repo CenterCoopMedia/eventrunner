@@ -19,7 +19,7 @@
 // The design record's ruled table (§3.4), without its sort and bulk row:
 // the order that matters is newest first, and the panel's own action is the
 // bulk action.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -105,21 +105,26 @@ function RecordName({ row }) {
 function CollectionPanel({ group, pages, timeZone, busyKey, controlProps }) {
   const { choice, rows } = group;
   const key = `collection:${choice.id}`;
+  // Past the server's cap the control stays, unavailable, and names why:
+  // a removed control would leave the reader to guess.
   const tooMany = rows.length > MAX_COLLECTION_IDS;
+  const whyId = useId();
   return (
     <Panel
       flush
       title={choice.label}
       actions={
-        tooMany ? null : (
-          <button type="button" {...controlProps(key, secondaryButtonClass)}>
-            {busyKey === key ? 'Publishing…' : `Publish ${countWords(choice, rows.length)}`}
-          </button>
-        )
+        <button
+          type="button"
+          {...controlProps(key, secondaryButtonClass, tooMany)}
+          aria-describedby={tooMany ? whyId : undefined}
+        >
+          {busyKey === key ? 'Publishing…' : `Publish ${countWords(choice, rows.length)}`}
+        </button>
       }
     >
       {tooMany ? (
-        <p className="px-md pb-sm text-admin-sm text-admin-ink-secondary">
+        <p id={whyId} className="px-md pb-sm text-admin-sm text-admin-ink-secondary">
           Use Publish all. One collection publish takes at most 2,000 changes.
         </p>
       ) : null}
@@ -317,7 +322,8 @@ export default function AdminUnpublishedChanges() {
         publish(event, key, { all: true }, summarizeAll);
       } else if (key.startsWith('collection:')) {
         const group = groups.find((candidate) => `collection:${candidate.choice.id}` === key);
-        if (!group) return;
+        // Past the server's cap the control refuses every press.
+        if (!group || group.rows.length > MAX_COLLECTION_IDS) return;
         const ids = group.rows.map((row) => row.id);
         publish(event, key, { collection: group.choice.id, docIds: ids }, (response) =>
           summarizePublish(response, group.choice.id, ids, group.choice.plural),
@@ -328,14 +334,17 @@ export default function AdminUnpublishedChanges() {
     };
   }
 
-  /** Every publish control: one handler, unavailable while any call runs. */
-  function controlProps(key, className) {
-    const busy = busyKey !== null;
+  /**
+   * Every publish control: one handler, unavailable while any call runs,
+   * or always when `unavailable` (a collection past the server's cap).
+   */
+  function controlProps(key, className, unavailable = false) {
     const pressed = busyKey === key;
+    const held = unavailable || busyKey !== null;
     return {
-      className: pressed || !busy ? className : `${className} ${unavailableButtonClass}`,
+      className: held && !pressed ? `${className} ${unavailableButtonClass}` : className,
       onClick: onPress(key),
-      'aria-disabled': busy ? 'true' : undefined,
+      'aria-disabled': held ? 'true' : undefined,
       'aria-busy': pressed ? 'true' : undefined,
       'data-publish-control': key,
     };
