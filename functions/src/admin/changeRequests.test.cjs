@@ -339,9 +339,11 @@ test('rate limit: the sixth request in 15 minutes is 429 with Retry-After, and w
 
   assert.equal(limited.statusCode, 429);
   assert.equal(limited.body.error.code, 'rate-limited');
-  // The oldest slot frees at T0 + 15 minutes: five minutes from now.
+  // The oldest slot frees at T0 + 15 minutes: five minutes from now, and
+  // the reader is told so in the words they see.
   assert.equal(limited.headers['Retry-After'], '300');
   assert.equal(limited.body.error.retryAfterSeconds, 300);
+  assert.equal(limited.body.error.message, 'Too many change requests. Try again in 5 minutes.');
   assert.equal(written(db).length, before, 'no request, no row, no slot');
   assert.equal(db.read('change_requests', 'burst00000005'), undefined);
   assert.equal(requests(db).length, RATE_LIMIT_MAX);
@@ -362,6 +364,25 @@ test('rate limit: the sixth request in 15 minutes is 429 with Retry-After, and w
   });
   assert.equal(later.statusCode, 201);
   assert.equal(rateLimit(db).requests.length, RATE_LIMIT_MAX);
+});
+
+test('rate limit: the refusal names the wait in whole minutes, rounded up, singular at one', async () => {
+  const db = makeFakeDb();
+  for (let i = 0; i < RATE_LIMIT_MAX; i += 1) {
+    await submit(db, { payload: body({ submissionKey: `wait00000000${i}` }), now: () => T0 });
+  }
+  for (const [elapsedMs, expected] of [
+    [0, 'Try again in 15 minutes.'],
+    // 4 minutes and 1 second left reads as 5.
+    [RATE_LIMIT_WINDOW_MS - (4 * 60_000 + 1000), 'Try again in 5 minutes.'],
+    [RATE_LIMIT_WINDOW_MS - 61_000, 'Try again in 2 minutes.'],
+    [RATE_LIMIT_WINDOW_MS - 60_000, 'Try again in 1 minute.'],
+    [RATE_LIMIT_WINDOW_MS - 1000, 'Try again in 1 minute.'],
+  ]) {
+    const res = await submit(db, { payload: body({ submissionKey: 'wait00000009' }), now: () => T0 + elapsedMs });
+    assert.equal(res.statusCode, 429, String(elapsedMs));
+    assert.equal(res.body.error.message, `Too many change requests. ${expected}`);
+  }
 });
 
 test('rate limit: a refused request spends no slot', async () => {

@@ -84,11 +84,11 @@ describe('ChangeRequestModal', () => {
   });
 
   it('states a refusal from the server as one alert at the head of the form', async () => {
-    submitMock.mockResolvedValueOnce({ ok: false, error: 'Too many change requests. Try again later.' });
+    submitMock.mockResolvedValueOnce({ ok: false, error: 'Too many change requests. Try again in 12 minutes.' });
     renderModal();
     fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: 'Hello' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Too many change requests. Try again later.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many change requests. Try again in 12 minutes.');
     expect(screen.getByLabelText('What should change?')).not.toHaveAttribute('aria-invalid');
   });
 

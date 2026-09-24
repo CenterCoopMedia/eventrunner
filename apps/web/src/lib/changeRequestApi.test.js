@@ -35,10 +35,10 @@ describe('submitChangeRequest', () => {
   });
 
   it('passes the server’s own words through on a refusal', async () => {
-    const fetchImpl = respond(429, { error: { code: 'rate-limited', message: 'Too many change requests. Try again later.' } });
+    const fetchImpl = respond(429, { error: { code: 'rate-limited', message: 'Too many change requests. Try again in 12 minutes.' } });
     expect(await submitChangeRequest(PAYLOAD, { user, env: ENV, fetchImpl })).toEqual({
       ok: false,
-      error: 'Too many change requests. Try again later.',
+      error: 'Too many change requests. Try again in 12 minutes.',
     });
   });
 

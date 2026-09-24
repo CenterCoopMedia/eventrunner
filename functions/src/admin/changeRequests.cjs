@@ -100,6 +100,18 @@ function rateLimitWindow(stored, nowMs) {
 }
 
 /**
+ * The refusal a reader sees when the window is full, with the wait in whole
+ * minutes, rounded up so it never promises a slot too early.
+ *
+ * @param {number} retryAfterMs
+ * @returns {string}
+ */
+function rateLimitMessage(retryAfterMs) {
+  const minutes = Math.max(1, Math.ceil(retryAfterMs / 60_000));
+  return `Too many change requests. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+}
+
+/**
  * Validate a submission body. Unknown fields are ignored; `uid` and
  * `email` in the body are never read.
  *
@@ -248,7 +260,7 @@ function createSubmitChangeRequestHandler({ db, auth, now = Date.now, log = cons
       const retryAfterSeconds = Math.max(1, Math.ceil(result.retryAfterMs / 1000));
       res.set('Retry-After', String(retryAfterSeconds));
       res.status(429).json({
-        error: { code: 'rate-limited', message: 'Too many change requests. Try again later.', retryAfterSeconds },
+        error: { code: 'rate-limited', message: rateLimitMessage(result.retryAfterMs), retryAfterSeconds },
       });
       return;
     }
@@ -392,6 +404,7 @@ module.exports = {
   internals: {
     auditRow,
     rateLimitWindow,
+    rateLimitMessage,
     readSubmission,
     COLLECTION,
     RATE_LIMIT_COLLECTION,

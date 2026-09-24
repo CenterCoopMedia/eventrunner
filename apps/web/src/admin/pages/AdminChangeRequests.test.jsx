@@ -499,7 +499,7 @@ describe('AdminChangeRequests: the form and the flag', () => {
   });
 
   it('keeps the same key on a retry after a failure, and states the failure in place', async () => {
-    const failure = Object.assign(new Error('Too many change requests. Try again later.'), { fieldErrors: [] });
+    const failure = Object.assign(new Error('Too many change requests. Try again in 12 minutes.'), { fieldErrors: [] });
     callMock.mockRejectedValueOnce(failure);
     callMock.mockResolvedValueOnce({ id: 'k', ok: true });
     renderPage();
@@ -508,7 +508,7 @@ describe('AdminChangeRequests: the form and the flag', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
     await flush();
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Too many change requests. Try again later.');
+    expect(alert).toHaveTextContent('Too many change requests. Try again in 12 minutes.');
     expect(alert).toHaveFocus();
 
     fireEvent.click(screen.getByRole('button', { name: 'Send request' }));

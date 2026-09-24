@@ -190,6 +190,11 @@ test.describe.serial('change requests', () => {
     expect(limited.status).toBe(429);
     expect(limited.body.error.code).toBe('rate-limited');
     expect(limited.body.error.retryAfterSeconds).toBeGreaterThan(0);
+    // The wait the reader sees is the server's window, in whole minutes, rounded up.
+    const minutes = Math.ceil(limited.body.error.retryAfterSeconds / 60);
+    expect(limited.body.error.message).toBe(
+      `Too many change requests. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`,
+    );
     expect((await adminDb().collection('change_requests').doc(`burst${stamp}6`).get()).exists).toBe(false);
     const logged = await adminDb().collection('admin_logs').where('docPath', '==', `change_requests/burst${stamp}6`).get();
     expect(logged.size).toBe(0);
@@ -200,7 +205,7 @@ test.describe.serial('change requests', () => {
     const dialog = visitor.getByRole('dialog', { name: 'Request a change' });
     await dialog.getByLabel('What should change?').fill('Still one too many.');
     await dialog.getByRole('button', { name: 'Send request' }).click();
-    await expect(dialog.getByRole('alert')).toHaveText('Too many change requests. Try again later.');
+    await expect(dialog.getByRole('alert')).toHaveText(/^Too many change requests\. Try again in \d+ minutes?\.$/);
     await dialog.getByRole('button', { name: 'Cancel' }).click();
   });
 
