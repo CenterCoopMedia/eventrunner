@@ -295,8 +295,22 @@ describe('summarizeAll', () => {
       },
     });
     expect(verdict.ok).toBe(false);
+    // The page that went out is reported too: two of the three changes are live.
     expect(verdict.message).toBe(
-      'Published 1 of 2 content blocks. Not published: b was edited while publishing, so its newer draft stayed unpublished.',
+      'Published 1 of 2 content blocks. Not published: b was edited while publishing, so its newer draft stayed unpublished. Published 1 page.',
     );
+  });
+
+  it('reports every collection that went out in full beside the one that did not, in choice order', () => {
+    const verdict = summarizeAll({
+      results: {
+        cmsSchedule: { published: ['s1', 's2'], skipped: [] },
+        cmsContent: { published: [], skipped: [{ docId: 'b', reason: 'no-draft' }] },
+        cmsUpdates: { published: [], skipped: [] },
+        cmsPages: { published: ['home'], skipped: [] },
+      },
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.message).toBe('Nothing was published: b has no draft to publish. Published 1 page, 2 sessions.');
   });
 });

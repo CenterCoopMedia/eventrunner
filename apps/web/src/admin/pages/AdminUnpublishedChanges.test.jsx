@@ -476,10 +476,33 @@ describe('the Unpublished changes page', () => {
     pushDrafts({ cmsPages: [{ id: 'home', label: 'Home', status: 'dirty' }] });
     expect(within(main()).queryByText('We could not count the unpublished changes. We will try again.')).toBeNull();
     act(() => drafts.get('cmsPages').onError(new Error('offline again')));
-    expect(within(main()).getByText('The list could not be refreshed. It will try again.')).toHaveAttribute('role', 'status');
+    expect(within(main()).getByText(
+      'The list could not be refreshed. Until it is, the buttons on each table wait. Publish all reads the current list. It will try again.',
+    )).toHaveAttribute('role', 'status');
     expect(screen.getByRole('table', { name: /^Pages with unpublished changes/ })).toBeInTheDocument();
     act(() => runs.recent.onError(new Error('offline')));
     expect(within(main()).getByText('The publish runs could not be refreshed. The list will try again.')).toBeInTheDocument();
+  });
+
+  it('holds the collection buttons while the list is stale, and keeps Publish all, which reads the current list', async () => {
+    await renderAt('/admin/unpublished');
+    pushDrafts({ cmsPages: [{ id: 'home', label: 'Home', status: 'dirty' }] });
+    act(() => drafts.get('cmsPages').onError(new Error('offline')));
+    // The row may have been published elsewhere since: sending its id again
+    // would publish a clean draft as a new live revision.
+    const stale = screen.getByRole('button', { name: 'Publish 1 page' });
+    expect(stale).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(stale);
+    expect(within(main()).getByText(
+      'The list could not be refreshed. Until it is, the buttons on each table wait. Publish all reads the current list. It will try again.',
+    )).toHaveAttribute('role', 'status');
+    const all = screen.getByRole('button', { name: 'Publish all (1)' });
+    expect(all).not.toHaveAttribute('aria-disabled');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetch).not.toHaveBeenCalled();
+    // The next delivery clears the error and frees the buttons.
+    pushDrafts({ cmsPages: [{ id: 'home', label: 'Home', status: 'dirty' }] });
+    expect(screen.getByRole('button', { name: 'Publish 1 page' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('asks for Publish all past 2,000 changes in one collection', async () => {

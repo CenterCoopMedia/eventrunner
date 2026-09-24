@@ -6,7 +6,7 @@
 // cmsPublishQueue rows cmsPublish writes (functions/src/cms/publish.cjs),
 // read as the progress and failure record beside them.
 import { zoneLabel } from '../lib/eventTime.js';
-import { COLLECTION_CHOICES } from './collectionWords.js';
+import { COLLECTION_CHOICES, countWords } from './collectionWords.js';
 import { summarizePublish } from './publishResult.js';
 import { state } from './recordState.js';
 import { sectionTier } from './AdminLayout.jsx';
@@ -256,8 +256,11 @@ export function summarizeAll(response) {
   const collections = Object.keys(results);
   if (collections.length === 0) return { ok: true, message: 'Nothing was waiting to be published.' };
   const problems = [];
+  // The collections that went out in full, named beside the problems so a
+  // partial answer still says everything that reached the site.
+  const whole = [];
   let publishedCount = 0;
-  for (const collection of collections) {
+  for (const collection of inChoiceOrder(collections)) {
     const result = results[collection] ?? {};
     const published = Array.isArray(result.published) ? result.published : [];
     const skipped = Array.isArray(result.skipped) ? result.skipped : [];
@@ -266,11 +269,27 @@ export function summarizeAll(response) {
     const verdict = summarizePublish(response, collection, ids, choice?.plural ?? collection);
     publishedCount += verdict.published.length;
     if (!verdict.ok) problems.push(verdict.message);
+    else if (verdict.published.length > 0) {
+      whole.push(
+        choice
+          ? countWords(choice, verdict.published.length)
+          : `${verdict.published.length} ${collection}`,
+      );
+    }
   }
   if (problems.length === 0) {
     const pronoun = publishedCount === 1 ? 'it' : 'them';
     return { ok: true, message: `Published ${changesWords(publishedCount)}. The public site picks ${pronoun} up live.` };
   }
+  if (whole.length > 0) problems.push(`Published ${whole.join(', ')}.`);
   return { ok: false, message: problems.join(' ') };
 }
 
+/** The known collections in the admin's order, then any other, as given. */
+function inChoiceOrder(collections) {
+  const rank = (id) => {
+    const index = COLLECTION_CHOICES.findIndex((choice) => choice.id === id);
+    return index === -1 ? COLLECTION_CHOICES.length : index;
+  };
+  return [...collections].sort((a, b) => rank(a) - rank(b));
+}
