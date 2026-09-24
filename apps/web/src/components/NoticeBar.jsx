@@ -26,13 +26,16 @@
 // holds focus drops focus to the body, which sends a keyboard reader back
 // to the top of the page. So the bar hands focus to the main landmark
 // (`#main-content`, which the shell renders with tabindex -1 as the skip
-// link's target), or to whatever the caller names instead.
+// link's target), or to whatever the caller names instead — as a
+// destination (lib/scrollToTop.js focusAsDestination), so the ring is drawn
+// however the reader pressed the control.
 //
 // The message is the operator's, and this component draws whatever it is
 // handed. What carries a notice into the shell — a content slot, a field on
 // config/event — is the milestones' work (issues 196 and 199).
 import { useState } from 'react';
 import { quietActionClass } from './controlClasses.js';
+import { focusAsDestination } from '../lib/scrollToTop.js';
 
 const STORAGE_PREFIX = 'notice-dismissed:';
 
@@ -95,8 +98,7 @@ export default function NoticeBar({
     if (remember) rememberNoticeDismissed(id);
     setDismissedId(id);
     onDismiss?.();
-    const target = globalThis.document?.getElementById(focusTargetId);
-    if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
+    focusAsDestination(globalThis.document?.getElementById(focusTargetId));
   }
 
   return (

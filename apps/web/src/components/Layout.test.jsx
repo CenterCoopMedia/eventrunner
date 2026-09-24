@@ -764,6 +764,18 @@ describe('Layout back-to-top', () => {
     expect(banner).toHaveAttribute('tabindex', '-1');
   });
 
+  it('makes the main landmark a focus target that keeps its ring', () => {
+    // The skip link and a dismissed notice bar (components/NoticeBar.jsx)
+    // both land here. tabindex -1 lets it take focus outside the tab order;
+    // the ring is never removed (interface guidelines), so no utility may
+    // switch the outline off — focusAsDestination draws it through
+    // [data-focus-ring] (adversarial review, 2026-09-24).
+    const { container } = renderShell({});
+    const main = container.querySelector('main#main-content');
+    expect(main).toHaveAttribute('tabindex', '-1');
+    expect(main.className).not.toMatch(/outline-none/u);
+  });
+
   it('keeps the skip link first, ahead of the banner it names', () => {
     const { container } = renderShell({});
     const skip = container.querySelector('a.skip-link');

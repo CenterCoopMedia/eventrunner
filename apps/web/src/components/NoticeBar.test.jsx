@@ -76,7 +76,13 @@ describe('NoticeBar', () => {
     const button = screen.getByRole('button', { name: 'Dismiss this notice' });
     button.focus();
     fireEvent.click(button);
-    expect(screen.getByRole('main')).toHaveFocus();
+    const main = screen.getByRole('main');
+    expect(main).toHaveFocus();
+    // Moved as a destination (lib/scrollToTop.js), so the ring is drawn
+    // however the reader pressed the control, and clears when focus moves on.
+    expect(main).toHaveAttribute('data-focus-ring');
+    main.blur();
+    expect(main).not.toHaveAttribute('data-focus-ring');
   });
 
   it('hands focus to the target the caller names', () => {

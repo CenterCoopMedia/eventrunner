@@ -347,16 +347,18 @@ export default function Layout() {
   // on the surface that holds the programme.
   // tabindex -1 makes the landmark a programmatic focus target: the skip
   // link lands here, and so does focus after a notice bar is dismissed
-  // (components/NoticeBar.jsx), rather than dropping to the body. It is not
-  // in the tab order and it is not a control, so it draws no ring.
+  // (components/NoticeBar.jsx, through focusAsDestination), rather than
+  // dropping to the body. It is not in the tab order. The ring is never
+  // removed (interface guidelines): [data-focus-ring]:focus in index.css
+  // draws it when a control sends the reader here.
   const main = (
     <main
       id="main-content"
       tabIndex={-1}
       className={
         navPlacement === 'side'
-          ? 'min-w-0 flex-1 pb-2xl pt-xl outline-none'
-          : 'stage flex-1 pb-2xl pt-md outline-none'
+          ? 'min-w-0 flex-1 pb-2xl pt-xl'
+          : 'stage flex-1 pb-2xl pt-md'
       }
     >
       <Outlet />
