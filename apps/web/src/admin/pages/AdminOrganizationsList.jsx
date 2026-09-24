@@ -108,6 +108,7 @@ export default function AdminOrganizationsList() {
                 className={secondaryButtonClass}
                 onClick={resumePublish}
                 disabled={publishing !== null}
+                aria-busy={publishing === 'resume' || undefined}
               >
                 {publishing === 'resume' ? 'Resuming…' : 'Resume publish'}
               </button>
@@ -118,6 +119,7 @@ export default function AdminOrganizationsList() {
                 className={secondaryButtonClass}
                 onClick={publishAll}
                 disabled={publishing !== null}
+                aria-busy={publishing === 'all' || undefined}
               >
                 {publishing === 'all' ? 'Publishing…' : `Publish all (${dirtyIds.length})`}
               </button>

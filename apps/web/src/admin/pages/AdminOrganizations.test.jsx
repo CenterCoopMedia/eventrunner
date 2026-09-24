@@ -215,6 +215,40 @@ describe('the organizations list, announcing a publish', () => {
   });
 });
 
+// Review round (c2, finding 4): a busy control says so in its words and
+// in aria-busy.
+describe('the organizations list, while a publish runs', () => {
+  it('marks Publish all and Resume publish busy while they run', async () => {
+    await renderAt('/admin/organizations');
+    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    pushOrganizations(LIVE, DRAFTS);
+    let finish;
+    fetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: { code: 'publish-failed', message: 'Publish failed part-way.' }, queueId: 'queue-7' }),
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+    expect(resume).not.toHaveAttribute('aria-busy');
+    fireEvent.click(resume);
+    const resuming = await screen.findByRole('button', { name: 'Resuming…' });
+    expect(resuming).toHaveAttribute('aria-busy', 'true');
+    await act(async () => finish(published(['tide-media', 'new-grant'])));
+
+    const publishAll = await screen.findByRole('button', { name: 'Publish all (2)' });
+    expect(publishAll).not.toHaveAttribute('aria-busy');
+    fireEvent.click(publishAll);
+    const publishing = await screen.findByRole('button', { name: 'Publishing…' });
+    expect(publishing).toHaveAttribute('aria-busy', 'true');
+    await act(async () => finish(published(['tide-media', 'new-grant'])));
+  });
+});
+
 describe('the organization editor', () => {
   it('creates a draft at the address the name suggests', async () => {
     holdAdminCollections = true;
