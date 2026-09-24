@@ -65,11 +65,18 @@ export function mintUpdateId() {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 }
 
-/** The checks the editor makes before it sends anything. */
-export function validateUpdateForm(form) {
+/**
+ * The checks the editor makes before it sends anything.
+ *
+ * `dateIncomplete` is the date control's own `validity.badInput`. A date
+ * control with only some of its parts filled reports the value '', the
+ * same as an empty one, so the value alone would save it as undated.
+ */
+export function validateUpdateForm(form, { dateIncomplete = false } = {}) {
   const errors = new Map();
   if (!String(form.title ?? '').trim()) errors.set('title', 'Enter a title.');
   if (!String(form.body ?? '').trim()) errors.set('body', 'Enter the text of the update.');
+  if (dateIncomplete) errors.set('date', 'Enter the full date, or clear the field.');
   // The rule the server and the public page read (shared/update).
   const category = String(form.category ?? '');
   if (category.trim() && !validUpdateCategory(category)) {
@@ -145,7 +152,11 @@ export default function AdminUpdateEditor({ mode }) {
     if (focusRequest > 0) focusFirstError(formRef.current);
   }, [focusRequest]);
 
-  const localErrors = useMemo(() => validateUpdateForm(form), [form]);
+  // Whether the date control holds a date with a part missing. The input
+  // event keeps it current as the operator types; a save reads the control
+  // itself as well, so a state no event reported cannot slip through.
+  const [dateIncomplete, setDateIncomplete] = useState(false);
+  const localErrors = useMemo(() => validateUpdateForm(form, { dateIncomplete }), [form, dateIncomplete]);
   const serverErrors = useMemo(() => {
     const map = new Map();
     for (const segment of error?.fieldErrors ?? []) {
@@ -162,9 +173,12 @@ export default function AdminUpdateEditor({ mode }) {
   async function save({ publish = false } = {}) {
     if (saving) return;
     setAttempted(true);
+    const dateField = formRef.current?.elements?.namedItem('date');
+    const partialDate = dateField?.validity?.badInput === true;
+    setDateIncomplete(partialDate);
     // The save controls stay enabled while a field is invalid: pressing one
     // moves the keyboard to the field that stopped it and sends nothing.
-    if (localErrors.size > 0) {
+    if (validateUpdateForm(form, { dateIncomplete: partialDate }).size > 0) {
       setFocusRequest((count) => count + 1);
       return;
     }
@@ -325,8 +339,12 @@ export default function AdminUpdateEditor({ mode }) {
             label="Date"
             type="date"
             hint="The date readers see, on the event's clock. Leave it empty for an undated update. It does not delay publishing: the update goes live when you publish it."
+            name="date"
             value={form.date}
             onChange={(value) => set({ date: value })}
+            // A partly filled date moves the value from '' to '' and React
+            // reports no change, so the input event is read as well.
+            onInput={(event) => setDateIncomplete(event.currentTarget.validity?.badInput === true)}
             error={errorFor('date')}
             className="sm:max-w-[16rem]"
           />

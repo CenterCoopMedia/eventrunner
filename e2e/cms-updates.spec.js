@@ -11,7 +11,8 @@
 // publish" runs cmsPublish from the same editor, and the signed-out browser
 // finds the new update on a reload, at the head of the page under
 // "Featured", with its category as a tag that stays inside a 320 pixel
-// screen. The date a year ahead holds nothing back.
+// screen. The date a year ahead holds nothing back, and a date with a
+// part cleared is refused at save rather than stored as undated.
 //
 // config/features is restored and the update deleted when the file is
 // done, because later specs read the flags and count the collection.
@@ -105,6 +106,28 @@ test.describe.serial('the updates editor', () => {
     await publicPage.goto('/updates');
     await expect(publicPage.getByRole('link', { name: SEEDED_TITLE })).toBeVisible();
     await expect(publicPage.getByRole('link', { name: title })).toHaveCount(0);
+  });
+
+  test('a partly cleared date is refused at save, never stored as undated', async () => {
+    // Chromium's date control: clear the day part only. The control then
+    // reports the value '' with validity.badInput, which is not a blank date.
+    const date = page.getByLabel('Date', { exact: true });
+    await expect(date).toHaveValue(day);
+    await date.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Backspace');
+    expect(await date.evaluate((input) => input.validity.badInput)).toBe(true);
+    const save = page.getByRole('button', { name: 'Save draft' });
+    await save.click();
+    await expect(page.getByText('Enter the full date, or clear the field.')).toBeVisible();
+    await expect(date).toHaveAttribute('aria-invalid', 'true');
+    await expect(date).toBeFocused();
+    await expect(save).toBeEnabled();
+    const stored = (await adminDb().collection('cmsUpdates_drafts').doc(updateId).get()).data();
+    expect(stored.publishAt).not.toBeNull();
+
+    await date.fill(day);
+    await expect(page.getByText('Enter the full date, or clear the field.')).toHaveCount(0);
   });
 
   test('a category and the featured flag survive a save and a reload of the editor', async () => {

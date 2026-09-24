@@ -294,6 +294,52 @@ describe('the update editor', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  // Review round, finding 3: a date control with only some of its parts
+  // filled reports the value '' and validity.badInput. That is not a
+  // blank date, and it must not save as undated.
+  it('refuses a partly typed date, marks the field and moves focus to it, and saves once it is whole', async () => {
+    await renderAt('/admin/updates/new/update');
+    await screen.findByRole('heading', { level: 1, name: 'New update' });
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Half a date' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Body.' } });
+    const date = screen.getByLabelText('Date');
+    // jsdom has no date segments, so the browser's state is set by hand:
+    // what Chromium reports for "10/dd/2026".
+    Object.defineProperty(date, 'validity', { configurable: true, get: () => ({ badInput: true, valid: false }) });
+    fireEvent.input(date, { target: { value: '' } });
+
+    const save = screen.getByRole('button', { name: 'Save draft' });
+    fireEvent.click(save);
+    expect(await screen.findByText('Enter the full date, or clear the field.')).toBeInTheDocument();
+    expect(date).toHaveAttribute('aria-invalid', 'true');
+    await waitFor(() => expect(date).toHaveFocus());
+    expect(save).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save and publish' })).toBeEnabled();
+    expect(fetch).not.toHaveBeenCalled();
+
+    Object.defineProperty(date, 'validity', { configurable: true, get: () => ({ badInput: false, valid: true }) });
+    fireEvent.input(date, { target: { value: '2026-10-15' } });
+    expect(screen.queryByText('Enter the full date, or clear the field.')).toBeNull();
+    fetch.mockImplementation(async (_url, init) => response({ id: JSON.parse(init.body).id, status: 'dirty' }));
+    fireEvent.click(save);
+    await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
+    expect(bodyOf(callsTo('cmsSaveUpdate')[0]).update.publishAt).toBe('2026-10-15T16:00:00.000Z');
+  });
+
+  it('reads the date control’s state when the save is pressed, even with no input event before it', async () => {
+    await renderAt('/admin/updates/new/update');
+    await screen.findByRole('heading', { level: 1, name: 'New update' });
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Half a date' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Body.' } });
+    Object.defineProperty(screen.getByLabelText('Date'), 'validity', {
+      configurable: true,
+      get: () => ({ badInput: true, valid: false }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(await screen.findByText('Enter the full date, or clear the field.')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('saves a draft on Enter in a one-line field: Save draft is the form’s first submit control', async () => {
     await renderAt('/admin/updates/new/update');
     await screen.findByRole('heading', { level: 1, name: 'New update' });
