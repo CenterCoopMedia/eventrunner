@@ -61,6 +61,15 @@ describe('rankSessionsBySaves', () => {
     expect(unsaved).toBe(3);
   });
 
+  // A deleted session's count stays in sessionBookmarks, and a new draft
+  // may reuse its id; the count belongs to the old session, never to a
+  // draft that was never published (connector review of PR 272).
+  it('never gives a count to a draft that was never published, even one that reuses a saved id', () => {
+    const { ranked, unsaved } = rankSessionsBySaves(GROUPS, new Map([['draft-only', 12], ['data', 2]]));
+    expect(ranked.map((row) => row.id)).toEqual(['data']);
+    expect(unsaved).toBe(3);
+  });
+
   it('counts only sessions on the site as unsaved: drafts and hidden sessions are left out', () => {
     const { ranked, unsaved } = rankSessionsBySaves(GROUPS, new Map());
     expect(ranked).toEqual([]);

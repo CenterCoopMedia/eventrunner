@@ -21,7 +21,8 @@ const byTitle = (row) => String(row.current?.title || row.id);
  *
  * Ties break on the title, then the id, so the order is stable from one
  * snapshot to the next. A count whose id matches no row (a session deleted
- * since it was saved) is ignored.
+ * since it was saved) is ignored, and so is one on a row that was never
+ * published.
  *
  * @param {Array<{ label: string, rows: Array<{ id: string, live: object|null, current: object }> }>} groups
  * @param {Map<string, number>} countsById
@@ -34,7 +35,10 @@ export function rankSessionsBySaves(groups, countsById) {
   for (const group of groups ?? []) {
     for (const row of group.rows ?? []) {
       const count = counts.get(row.id);
-      if (Number.isFinite(count) && count > 0) {
+      // Only a published session can hold saves. A count on a draft-only
+      // row is a deleted session's, left behind under an id the draft
+      // reused, so it is not this row's.
+      if (row.live && Number.isFinite(count) && count > 0) {
         ranked.push({ id: row.id, title: byTitle(row), dayLabel: group.label, count });
       } else if (row.live?.visible === true) {
         unsaved += 1;
