@@ -407,7 +407,11 @@
           </code></pre>
           <p><code>init-event.cjs</code> runs from an operator&#39;s machine (or a follow-up dispatch of a future
           provisioning workflow), not from <code>deploy-client.yml</code> — it is the one-time content bootstrap, not a
-          repeatable deploy step. See <code>scripts/README.md</code>.</p>
+          repeatable deploy step. See <code>scripts/README.md</code>. <code>--admin</code> seeds the operator tier; <code>--staff</code>
+          (repeatable) seeds staff, who run content, schedule, speakers, and attendees but not branding,
+          features, access, or deployment settings. Both can be granted later from admin Settings → Access.
+          A re-run of init never removes a grant made there, and it never puts back an address removed there:
+          on a re-run the answers file&#39;s lists are not re-applied, and only <code>--admin</code> and <code>--staff</code> add.</p>
           <p><strong>Step 3 — normal dispatch</strong>, now that <code>config/event</code> exists:</p>
           <pre data-scroll-region data-scroll-label="Code example"><code>Actions tab → Deploy → Run workflow
             client: &lt;CLIENT_ENV&gt;
