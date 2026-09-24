@@ -83,6 +83,17 @@ describe('the pending-changes banner', () => {
     expect(link.className).not.toContain('text-admin-ink-link');
   });
 
+  it('gives its link the hit-area floor: 24px on a pointer, 44px on touch', () => {
+    renderBanner();
+    deliver({ cmsContent: drafts('cmsContent', 1) });
+    const link = screen.getByRole('link', { name: 'Review unpublished changes' });
+    // .admin-target sets the floor (index.css); inline-flex lets a link that
+    // stays in the sentence take a minimum height at all.
+    expect(link.className).toMatch(/\badmin-target\b/);
+    expect(link.className).toMatch(/\binline-flex\b/);
+    expect(link.className).toMatch(/\bitems-center\b/);
+  });
+
   it('follows the count as saves and publishes arrive', () => {
     renderBanner();
     deliver({ cmsContent: drafts('cmsContent', 1) });

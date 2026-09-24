@@ -51,12 +51,13 @@ export default function PendingChangesBanner() {
           <p>
             {sentence}{' '}
             {/* The ink, not the link ink: the ink on the proof ground is a
-                measured pair, and the underline and weight say "link". A
-                link inside a sentence, so it keeps the line's height; the
+                measured pair, and the underline and weight say "link". It
+                stays in the sentence and still takes the hit-area floor
+                (admin-target: 24px on a pointer, 44px on touch); the
                 room's ring draws its focus. */}
             <Link
               to={UNPUBLISHED_PATH}
-              className="rounded-admin-small font-semibold text-admin-ink underline underline-offset-2"
+              className="admin-target inline-flex items-center rounded-admin-small font-semibold text-admin-ink underline underline-offset-2"
             >
               Review unpublished changes
             </Link>
