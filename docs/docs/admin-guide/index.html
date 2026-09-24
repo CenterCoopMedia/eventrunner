@@ -126,6 +126,7 @@
               <li><a href="#ticketing">Ticketing</a></li>
               <li><a href="#live-updates">Live updates</a></li>
               <li><a href="#feedback">Feedback</a></li>
+              <li><a href="#email-log">Email log</a></li>
               <li><a href="#materials">Materials</a></li>
               <li><a href="#system-errors">System errors</a></li>
               <li><a href="#settings-event-settings">Settings → Event settings</a></li>
@@ -146,7 +147,7 @@
           </thead>
           <tbody>
           <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, and System errors</td><td>The person who set the site up and answers for the deployment</td></tr>
-          <tr><td>Staff</td><td>Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, and Event settings</td><td>The people who run the event day to day</td></tr>
+          <tr><td>Staff</td><td>Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, and Event settings</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
           </div>
@@ -296,6 +297,17 @@
           <p>Compose, edit, and delete entries in the live-updates feed shown on the public site. There is no draft/publish step here, unlike the CMS content tabs — a save is live immediately. This is an admin-authored feed only; nothing ingests from Slack or any other external source.</p>
           <h2 id="feedback">Feedback<a class="heading-anchor" href="#feedback" aria-label="Link to this section">#</a></h2>
           <p>Every submission from the public feedback modal, newest first, with a mark-reviewed / archived action. Admins can read the feedback collection directly; only the status change goes through an admin endpoint, because every client write to that collection is denied outright.</p>
+          <h2 id="email-log">Email log<a class="heading-anchor" href="#email-log" aria-label="Link to this section">#</a></h2>
+          <p>Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here.</p>
+          <ul>
+          <li><strong>Search</strong> looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers <strong>Search older messages</strong>, which reads the next 500.</li>
+          <li><strong>Source</strong> picks one kind of message. <strong>Status</strong> picks <strong>Sent</strong> or <strong>Failed</strong>, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed. <strong>Bounced</strong> means the recipient&#39;s mail server refused the message. <strong>Complained</strong> means the recipient marked it as spam. <strong>Suppressed</strong> means the mail provider did not send it, because the address is on the provider&#39;s block list.</li>
+          <li><strong>The filters stay in the page address</strong>, so a reload or a shared link keeps them. The search text does not: An address you search for never enters the page address, the browser history, or an error report.</li>
+          <li><strong>Preview</strong> opens the stored message under its row, with the plain text version under it. The preview runs no script and loads no remote image. A link shows as its words only. So opening a message, or clicking in it, sends nothing to any other site. If the HTML of a message cannot be shown safely, the preview shows the plain text version instead. A stored body stops at 100 KB, and the preview says so when a body was cut.</li>
+          <li><strong>Sign-in codes and speaker invitations never store their body or their subject</strong>, because each one holds a code or a link that signs a person in. Their rows show &quot;Not stored&quot;, and their preview says why.</li>
+          <li><strong>Every preview you open is recorded</strong> in the admin log with your account and the message&#39;s record. The record never holds the address or the subject.</li>
+          </ul>
+          <p>Sent messages are closed to every browser, admins included. The page reads them through two admin-gated endpoints.</p>
           <h2 id="materials">Materials<a class="heading-anchor" href="#materials" aria-label="Link to this section">#</a></h2>
           <p>Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. Prefer a real label (&quot;Slides&quot;) over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin&#39;s direct read, so every action here goes through Cloud Functions.</p>
           <h2 id="system-errors">System errors<a class="heading-anchor" href="#system-errors" aria-label="Link to this section">#</a></h2>
