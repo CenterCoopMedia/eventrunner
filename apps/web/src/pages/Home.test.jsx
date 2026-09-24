@@ -8,7 +8,7 @@
 // defensively, independent of the write-boundary fix in
 // packages/shared/src/config/schema.cjs.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render as testingRender, screen } from '@testing-library/react';
+import { cleanup, render as testingRender, screen, within } from '@testing-library/react';
 
 import { MemoryRouter } from 'react-router-dom';
 const render = (ui) => testingRender(<MemoryRouter>{ui}</MemoryRouter>);
@@ -29,12 +29,16 @@ let pageDoc;
 let features;
 let organizationsData;
 let sectionBlocks;
+// The History section (issue #194) reads the past editions as the
+// cmsTimeline listener reported them; null would serve the snapshot.
+let timelineDocs;
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig, theme, features }),
 }));
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
     organizationsData,
+    timelineDocs,
     getPage: () => pageDoc,
     getSectionBlocks: (section) => {
       if (section === 'hero') return heroBlocks;
@@ -103,6 +107,7 @@ beforeEach(() => {
   features = {};
   organizationsData = [];
   sectionBlocks = {};
+  timelineDocs = [];
 });
 
 describe('Home', () => {
@@ -620,5 +625,105 @@ describe('Home sponsor strip', () => {
       expect(screen.queryByRole('heading', { name: 'Sponsors' })).toBeNull();
       unmount();
     }
+  });
+});
+
+describe('Home history section', () => {
+  const history = { id: 'history', label: 'History' };
+  const other = { id: 'details', label: 'Details' };
+  const EDITIONS = [
+    { id: 'edition-2025', year: 2025, title: 'Two workshop tracks', description: 'Practice and planning.', visible: true },
+    { id: 'edition-2024', year: 2024, title: 'The first meeting', description: null, visible: true },
+  ];
+
+  /** The History section, once its on-demand list has loaded. */
+  async function historySection() {
+    let section = null;
+    await vi.waitFor(() => {
+      section = screen.getByRole('region', { name: 'History' });
+      expect(section.querySelector('ol')).not.toBeNull();
+    });
+    return section;
+  }
+
+  const headings = (container) =>
+    [...container.querySelectorAll('h2')].map((el) => el.textContent.trim());
+
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    pageDoc = { id: 'home', path: '/', label: 'Home', layout: { arrangement: 'grid' }, sections: [history] };
+    timelineDocs = EDITIONS;
+    sectionBlocks = {
+      history: [{ section: 'history', field: 'story', blockType: 'richtext', value: '<p>How it began.</p>' }],
+      details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
+    };
+  });
+
+  it('lists the editions under the section’s own label, after its blocks', async () => {
+    render(<Home />);
+    const section = await historySection();
+    expect(within(section).getByRole('heading', { level: 2, name: 'History' })).toBeInTheDocument();
+    const story = within(section).getByText('How it began.');
+    expect(story.compareDocumentPosition(section.querySelector('ol')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('draws the editions as an ordered list, oldest first, each year a <time> beside its title', async () => {
+    render(<Home />);
+    const section = await historySection();
+    const entries = [...section.querySelector('ol').children];
+    expect(entries.map((entry) => entry.tagName)).toEqual(['LI', 'LI']);
+    expect(entries.map((entry) => entry.querySelector('h3').textContent)).toEqual([
+      'The first meeting',
+      'Two workshop tracks',
+    ]);
+    const time = entries[0].querySelector('time');
+    expect(time).toHaveAttribute('dateTime', '2024');
+    expect(time.textContent).toBe('2024');
+    const heading = entries[0].querySelector('h3');
+    expect(heading.parentElement).toBe(time.closest('p').parentElement);
+    expect(heading.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('prints no number in an entry but its year: no counter, no sequence', async () => {
+    render(<Home />);
+    const section = await historySection();
+    for (const entry of section.querySelectorAll('ol > li')) {
+      const year = entry.querySelector('time').textContent;
+      expect(entry.textContent.match(/\d+/g)).toEqual([year]);
+    }
+  });
+
+  it('keeps the blocks on the stage’s columns on a grid page and on the text measure on a list page', async () => {
+    const grid = render(<Home />);
+    let section = await historySection();
+    expect(section.querySelector('ol').parentElement).not.toHaveClass('measure');
+    expect(section.querySelector('ol').parentElement).toHaveClass('mt-md');
+    grid.unmount();
+
+    pageDoc = { ...pageDoc, layout: { arrangement: 'list' } };
+    render(<Home />);
+    section = await historySection();
+    expect(section.querySelector('ol').parentElement).toHaveClass('measure');
+  });
+
+  it('moves when an operator reorders the section', async () => {
+    pageDoc = { ...pageDoc, sections: [other, history] };
+    const before = render(<Home />);
+    await historySection();
+    expect(headings(before.container)).toEqual(['Details', 'History']);
+    before.unmount();
+
+    pageDoc = { ...pageDoc, sections: [history, other] };
+    const after = render(<Home />);
+    await historySection();
+    expect(headings(after.container)).toEqual(['History', 'Details']);
+  });
+
+  it('draws nothing when an operator has deleted the section from the page', async () => {
+    pageDoc = { ...pageDoc, sections: [other] };
+    render(<Home />);
+    await screen.findByRole('region', { name: 'Details' });
+    expect(screen.queryByRole('region', { name: 'History' })).toBeNull();
+    expect(screen.queryByText('The first meeting')).toBeNull();
   });
 });

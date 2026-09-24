@@ -31,6 +31,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   materials, from the same list the table shows: A pending or approved material counts, and only published
   sessions with a speaker who is not removed are counted. The new `listAllSessionMaterials` endpoint reads the
   list (#189).
+- The timeline editor, under Content, for staff and operators, and the past editions on the home
+  page. Each timeline entry is a year, a title, and an optional description. The list shows the
+  entries oldest first with each state in words, and the editor saves a draft or saves and
+  publishes through `cmsPublish`. The home page's History section draws its own blocks, then the
+  published entries as an ordered list, oldest first, with the year beside each title and no
+  counter. The site subscribes to `cmsTimeline` at runtime, so an entry published from the admin
+  appears on an open home page with no rebuild, and a new `timelineData.js` snapshot draws the
+  list before any listener answers. The list and its snapshot load on demand when the home page
+  has a History section, so they stay out of the first download. The content save checks each field: a year that is not a whole
+  number from 1900 to 2100, a title that is not text on one line, a description longer than 600
+  characters, or a field the entry does not store is refused with the field named, and nothing is
+  written. The demo carries two fictional past editions (#194).
 - A page for each sponsor at `/sponsors/<slug>`, with the logo, the name, the description as the
   standfirst, the tier as a term and its description, and the link to the sponsor's website. The
   slug is the organization's document id, set once from its name in the editor, so the address

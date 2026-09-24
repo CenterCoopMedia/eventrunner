@@ -176,7 +176,7 @@ Every collection the site renders can be edited and published from the admin.
 - [x] Add an update category and featured flag (#191)
 - [x] Add the organizations editor (#192)
 - [x] Add a sponsor detail page and package blocks (#193)
-- [ ] Add the timeline editor and the history section (#194)
+- [x] Add the timeline editor and the history section (#194)
 - [x] Add the version history page (#195)
 - [x] Add the pending changes page and banner (#196)
 - [ ] Add rich text editing for rich text fields (#197)

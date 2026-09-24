@@ -9,6 +9,7 @@ const { emitAll, emitScheduleData, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { organizationSlugError, validateOrganizationFields } = require('../../functions/src/cms/organizations.cjs');
+const { validateTimelineFields } = require('../../functions/src/cms/timeline.cjs');
 const {
   speakerDisplayName,
   buildPublicSpeaker,
@@ -45,6 +46,7 @@ test('generation does not depend on the order docs come back from Firestore', ()
     content: [...base.content].reverse(),
     sessions: [...base.sessions].reverse(),
     organizations: [...base.organizations].reverse(),
+    timeline: [...base.timeline].reverse(),
     speakers: [...base.speakers].reverse(),
   };
   assert.deepEqual(emitAll(shuffled), emitAll(base));
@@ -185,6 +187,37 @@ test('every demo organization passes the field checks an admin save applies (iss
     // Its id is its page address (#193), so it has to be one.
     assert.equal(organizationSlugError(id), null, `${id} is not a page address`);
   }
+});
+
+test('every demo timeline entry passes the field checks an admin save applies (issue 194)', () => {
+  // Seeded, never saved through the editor, so nothing else would notice a
+  // fixture edition the timeline seam would refuse.
+  const { timeline } = demoEvent();
+  assert.ok(timeline.length >= 2);
+  for (const entry of timeline) {
+    const { id, visible, ...fields } = entry;
+    assert.equal(visible, true, `${id} is shown`);
+    const verdict = validateTimelineFields(fields, fields);
+    assert.equal(verdict.ok, true, `${id}: ${JSON.stringify(verdict.errors)}`);
+    assert.deepEqual(verdict.fields, fields, `${id} is stored exactly as the seam would store it`);
+    assert.match(entry.description, /This edition is fictional\.$/);
+  }
+});
+
+test('the timeline snapshot lists the published entries oldest first, without bookkeeping (issue 194)', () => {
+  const { 'timelineData.js': timelineData } = emitAll({
+    ...demoSnapshot(),
+    timeline: [
+      { id: 'b', year: 2025, title: 'Second', description: null, visible: true, revision: 2, status: 'clean' },
+      { id: 'a', year: 2023, title: 'First', description: 'One.', visible: true, revision: 1, seededAt: 'T0' },
+      { id: 'c', year: 2025, title: 'Also second', description: null, visible: true },
+    ],
+  });
+  const body = timelineData.slice(timelineData.indexOf('export const'));
+  assert.ok(body.indexOf("id: 'a'") < body.indexOf("id: 'b'"));
+  assert.ok(body.indexOf("id: 'b'") < body.indexOf("id: 'c'"));
+  assert.doesNotMatch(body, /revision|status|seededAt/);
+  assert.match(timelineData, /export default timelineData;/);
 });
 
 test('the demo sponsors page draws three packages, one per demo tier (issue 193)', () => {

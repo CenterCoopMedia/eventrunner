@@ -82,6 +82,9 @@ const AdminVersionHistory = lazy(() => import('./pages/AdminVersionHistory.jsx')
 // Unpublished changes (issue #196): its tables and publish runs load on
 // demand; only the count and the banner that read it live in this chunk.
 const AdminUnpublishedChanges = lazy(() => import('./pages/AdminUnpublishedChanges.jsx'));
+// The timeline list and editor (issue #194) load the same way.
+const AdminTimelineList = lazy(() => import('./pages/AdminTimelineList.jsx'));
+const AdminTimelineEditor = lazy(() => import('./pages/AdminTimelineEditor.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -171,6 +174,20 @@ export default function AdminApp() {
           <Route
             path="organizations/:organizationId"
             element={<DeferredAdminPage label="organization"><AdminOrganizationEditor mode="edit" /></DeferredAdminPage>}
+          />
+          <Route
+            path="timeline"
+            element={<DeferredAdminPage label="timeline"><AdminTimelineList /></DeferredAdminPage>}
+          />
+          {/* Two segments, so no entry id can shadow the create form, as
+              sessions/new/session. */}
+          <Route
+            path="timeline/new/entry"
+            element={<DeferredAdminPage label="entry"><AdminTimelineEditor mode="create" /></DeferredAdminPage>}
+          />
+          <Route
+            path="timeline/:entryId"
+            element={<DeferredAdminPage label="entry"><AdminTimelineEditor mode="edit" /></DeferredAdminPage>}
           />
           <Route path="speakers" element={<AdminSpeakersList />} />
           <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />

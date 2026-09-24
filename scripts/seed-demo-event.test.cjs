@@ -133,3 +133,21 @@ test('a demo dry run writes no announcements', async () => {
   await runSeed(db, { 'dry-run': true });
   assert.deepEqual(db.ids('cmsUpdates'), []);
 });
+
+test('the demo past editions are seeded and published from the same fixture the snapshot uses (issue 194)', async () => {
+  const { DEMO_TIMELINE } = require('./lib/demo-event.cjs');
+  const db = makeFakeDb();
+  await runSeed(db);
+  assert.deepEqual(db.ids('cmsTimeline').sort(), DEMO_TIMELINE.map((entry) => entry.id).sort());
+  for (const { id, ...fields } of DEMO_TIMELINE) {
+    const live = db.read('cmsTimeline', id);
+    for (const [key, value] of Object.entries(fields)) assert.deepEqual(live[key], value, `${id}.${key}`);
+  }
+});
+
+test('a demo dry run writes no past editions', async () => {
+  const db = makeFakeDb();
+  await runSeed(db, { 'dry-run': true });
+  assert.deepEqual(db.ids('cmsTimeline'), []);
+  assert.deepEqual(db.ids('cmsTimeline_drafts'), []);
+});

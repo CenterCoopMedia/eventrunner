@@ -84,6 +84,7 @@ describe('ContentProvider', () => {
       'cmsOrganizations',
       'cmsPages',
       'cmsSchedule',
+      'cmsTimeline',
       'cmsUpdates',
       'speakers_public',
     ]);
@@ -439,6 +440,85 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('organizations-first-name')).toHaveTextContent(
       'Live-published organization',
     );
+  });
+
+  // cmsTimeline (issue #194): the provider subscribes and hands the raw
+  // result on; lib/timelineEntries.js, beside the renderer that loads on
+  // demand, applies the snapshot and the drop.
+  describe('cmsTimeline', () => {
+    function TimelineProbe() {
+      const { timelineDocs, source } = useContent();
+      return (
+        <>
+          <span data-testid="timeline-source">{source}</span>
+          <span data-testid="timeline-docs">
+            {timelineDocs === null ? 'none yet' : timelineDocs.map((doc) => doc.id).join('|') || 'empty'}
+          </span>
+        </>
+      );
+    }
+
+    it('reports no timeline result before the listener has, so the snapshot stands', () => {
+      render(
+        <ContentProvider>
+          <TimelineProbe />
+        </ContentProvider>,
+      );
+      expect(subscriptions.get('cmsTimeline').readSource).toBe('published');
+      expect(screen.getByTestId('timeline-docs')).toHaveTextContent('none yet');
+      expect(screen.getByTestId('timeline-source')).toHaveTextContent('snapshot');
+    });
+
+    it('hands a live set on as it arrived, and turns the source live', () => {
+      render(
+        <ContentProvider>
+          <TimelineProbe />
+        </ContentProvider>,
+      );
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([
+          { id: 'b', year: 2025, title: 'Second', visible: true },
+          { id: 'a', year: 2019, title: 'First', visible: true },
+        ]);
+      });
+      expect(screen.getByTestId('timeline-source')).toHaveTextContent('live');
+      expect(screen.getByTestId('timeline-docs')).toHaveTextContent('b|a');
+    });
+
+    it('hands an empty live set on as empty, not as no result', () => {
+      render(
+        <ContentProvider>
+          <TimelineProbe />
+        </ContentProvider>,
+      );
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([]);
+      });
+      expect(screen.getByTestId('timeline-docs')).toHaveTextContent('empty');
+    });
+
+    it('a listener error leaves the last live set in charge', () => {
+      render(
+        <ContentProvider>
+          <TimelineProbe />
+        </ContentProvider>,
+      );
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([{ id: 'a', year: 2019, title: 'First', visible: true }]);
+      });
+      // subscribeContentCollection never calls onNext on error (it fails soft
+      // and retries), so the slot keeps its value.
+      expect(screen.getByTestId('timeline-docs')).toHaveTextContent('a');
+    });
+
+    it('points the timeline listener at the drafts in preview', () => {
+      render(
+        <ContentProvider readSource="draft">
+          <TimelineProbe />
+        </ContentProvider>,
+      );
+      expect(subscriptions.get('cmsTimeline').readSource).toBe('draft');
+    });
   });
 
   it('hides blocks and pages marked visible: false', () => {

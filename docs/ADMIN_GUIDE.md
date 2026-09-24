@@ -13,7 +13,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -170,6 +170,8 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 
 **It is a section like any other, so you place it.** Move it up or down the home page's section list and the wall moves with it. Set it to appear before or after the main feature and it obeys that too. The section draws nothing at all when no organization is published yet, when the *Sponsors* feature is switched off, or when you delete the section from the home page. Deleting the section is how you take the wall off the home page and keep the Sponsors page.
 
+**The home page's History section is your text, then the timeline.** Write the section's own words and pictures here, as for any other section. Under them the site draws the past editions from the Timeline list, oldest first. You edit the editions under Timeline, not here. Move the section and the list moves with it. Delete the section and the list is gone from the site too.
+
 **A sponsor package is one thing a sponsor can support.** The **sponsor package** block carries a name and what the package includes, both required, and an optional price and limit. Write the price as it should read, with its currency. The limit is how many sponsors can take the package, as a whole number of 1 or more: The page shows "Open to 3 sponsors", and shows nothing for no limit. The save refuses any other number. The Sponsors page seeds one section for packages, **Sponsorship packages**, after the logo wall. It is not shown until it holds a package, so an empty section never reaches a visitor. A site whose Sponsors page was edited before this section existed keeps its own sections; add the section in Pages if you want it.
 
 **A statistic needs four things**, and the editor will not save one without them: The finding in words ("Two thirds of sessions are workshops", not "Session types"), what the number counts and over what period, where the number came from and the date you read it, and a line describing the finding for a screen reader. A stat block saved before this rule existed keeps working; the next time you edit one, you will be asked to fill the four parts in.
@@ -191,6 +193,22 @@ Every update on the site's Updates page. Each row gives the update's title, its 
 **A picture and content blocks.** An update can also carry a picture and content blocks. This editor does not change them. When an update has them, the editor says so, and a save keeps them as they are.
 
 **Delete this update** removes the live update and its draft together. Its version history stays. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
+
+## Timeline
+
+The past editions of the event: Add, edit, publish, and delete them here. The home page's History section lists them under its own text. Saving writes a draft, and publishing sends the entry to the home page.
+
+**The list** gives each entry's title, year, and id, and its state in words, oldest first. An entry that is saved but not shown on the site also says **Hidden**. **Publish all** publishes every entry that is not live.
+
+**The fields.** **Year** is four digits, from 1900 to 2100. The site shows it beside the title and orders the list by it, oldest first; two entries in one year go in title order. **Title** is required: What that edition is remembered for, in a few words, on one line of up to 120 characters. Leave the year out of it. **Description** is optional: One or two sentences of plain text, up to 600 characters, shown as one paragraph. Clear **Show this entry when it is published** to keep a published entry off the site.
+
+**Every save is checked.** The editor and the server refuse a year that is not four digits in range, a missing title, and text that is too long. The refusal names the field.
+
+**There is no draft preview.** The entries appear only on the home page, and the home page can send an account with no display name to its profile, so the editor offers no preview link. Save and publish, then read the home page.
+
+**The list appears only in the History section.** If the home page has no section with the id `history`, published entries do not appear anywhere, and the Timeline list says so. Add a section with that id to the home page under Pages.
+
+**Delete** removes the live entry and its draft together. Its version history stays.
 
 ## Unpublished changes
 

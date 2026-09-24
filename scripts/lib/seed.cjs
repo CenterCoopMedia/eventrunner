@@ -167,7 +167,11 @@ function defaultPages() {
             block('attendees', 'stat', 'Expected attendance.'),
             block('sessions', 'stat', 'Sessions planned.'),
           ]),
-        section('history', 'History', 'Background on previous editions of the event.',
+        // The past editions (issue #194). The section holds the operator's
+        // own words and pictures; the editions themselves come from the
+        // Timeline list, and the home page draws them under this section's
+        // blocks, oldest first. No edition seeds: a client starts with none.
+        section('history', 'History', 'Background on previous editions of the event. The editions themselves come from the Timeline list, not from here.',
           ['richtext', 'image'], 6),
         // The sponsor strip (M7 issue 10). The section holds one optional
         // line of copy; the organizations themselves come from the

@@ -4,7 +4,7 @@
 /**
  * Build-time content snapshot generator (spec §2.4 path 1, §8.6).
  *
- * Writes the five `apps/web/src/generated/*` files the web app renders on
+ * Writes the seven `apps/web/src/generated/*` files the web app renders on
  * first paint, from one of two sources:
  *
  *   --demo            the in-repo synthetic demo fixture
@@ -119,11 +119,12 @@ async function readDeployment({ db }) {
   // returns an empty snapshot, so the only thing a catch here could
   // swallow is a transient read failure — which would silently ship a
   // build with no speakers rather than failing the generation.
-  const [pages, content, sessions, organizations, speakerProjections] = await Promise.all([
+  const [pages, content, sessions, organizations, timeline, speakerProjections] = await Promise.all([
     readVisibleCollection('cmsPages'),
     readVisibleCollection('cmsContent'),
     readVisibleCollection('cmsSchedule'),
     readVisibleCollection('cmsOrganizations'),
+    readVisibleCollection('cmsTimeline'),
     readCollection('speakers_public'),
   ]);
   // `speakerId` on the projection is the document id under another name;
@@ -139,6 +140,7 @@ async function readDeployment({ db }) {
     content,
     sessions,
     organizations,
+    timeline,
     speakers,
   };
 }

@@ -220,7 +220,8 @@ test('getEventStats returns the counts for the seeded demo event', async () => {
       cmsContent: { published: 104, drafts: 0 },
       cmsSchedule: { published: 31, drafts: 1 },
       cmsOrganizations: { published: 6, drafts: 0 },
-      cmsTimeline: { published: 0, drafts: 0 },
+      // The demo's two past editions (issue 194).
+      cmsTimeline: { published: 2, drafts: 0 },
       cmsUpdates: { published: 6, drafts: 0 },
       cmsPages: { published: 15, drafts: 0 },
     },

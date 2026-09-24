@@ -47,6 +47,7 @@ const {
   slugTakenMessage,
   validateOrganizationFields,
 } = require('./organizations.cjs');
+const { TIMELINE_COLLECTION, validateTimelineFields } = require('./timeline.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
@@ -306,6 +307,25 @@ function checkOrganizationFields({ collection, fields, sent }) {
 }
 
 /**
+ * Timeline entry fields at the content-write seam (issue #194): the year,
+ * the title and the description, judged on the MERGED result like the seams
+ * above (functions/src/cms/timeline.cjs). `sent` is the request's own
+ * `fields`: a key in it outside the entry's field set is refused, and a
+ * stray key only the stored document carries is dropped. The returned
+ * `fields` are trimmed, and they are what the caller stores. A no-op for
+ * every other collection.
+ *
+ * @param {{ collection: string, fields: object, sent: object }} args
+ * @returns {{ ok: true, fields: object } | { ok: false, message: string }}
+ */
+function checkTimelineFields({ collection, fields, sent }) {
+  if (collection !== TIMELINE_COLLECTION) return { ok: true, fields };
+  const verdict = validateTimelineFields(fields, sent);
+  if (!verdict.ok) return { ok: false, message: verdict.errors.join('; ') };
+  return verdict;
+}
+
+/**
  * The words a create meets when its document already exists. For an
  * organization the id is its page address (#193), so the refusal names the
  * slug, at the save, where the editor puts it on the Page address field.
@@ -399,12 +419,19 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         });
         if (!organization.ok) throw new RequestError(400, 'bad-request', organization.message);
 
+        const timeline = checkTimelineFields({
+          collection,
+          fields: organization.fields,
+          sent: checked.fields,
+        });
+        if (!timeline.ok) throw new RequestError(400, 'bad-request', timeline.message);
+
         const structure = await checkSessionStructure({
           db,
           tx,
           collection,
           docId,
-          fields: organization.fields,
+          fields: timeline.fields,
         });
         if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 
@@ -493,12 +520,19 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
         });
         if (!organization.ok) throw new RequestError(400, 'bad-request', organization.message);
 
+        const timeline = checkTimelineFields({
+          collection,
+          fields: organization.fields,
+          sent: checked.fields,
+        });
+        if (!timeline.ok) throw new RequestError(400, 'bad-request', timeline.message);
+
         const structure = await checkSessionStructure({
           db,
           tx,
           collection,
           docId,
-          fields: organization.fields,
+          fields: timeline.fields,
         });
         if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 

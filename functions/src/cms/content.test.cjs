@@ -1331,3 +1331,125 @@ test('an update that sets a bad sponsor package limit is refused, and the stored
   assert.equal(res.statusCode, 400);
   assert.equal(db.read('cmsContent_drafts', 'sponsor_packages__supporting').limit, 3);
 });
+
+// --- timeline entries (issue #194) ------------------------------------------
+
+const ENTRY = Object.freeze({
+  year: 2024,
+  title: 'The first meeting',
+  description: 'Teams compared shared reporting projects.',
+});
+
+function createEntry(db, docId, fields, extra = {}) {
+  const res = fakeRes();
+  return createCmsCreateContentHandler(deps(db, extra))(
+    req({ ...extra.request, body: { collection: 'cmsTimeline', docId, fields, visible: true } }),
+    res,
+  ).then(() => res);
+}
+
+function updateEntry(db, docId, fields) {
+  const res = fakeRes();
+  return createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsTimeline', docId, fields } }),
+    res,
+  ).then(() => res);
+}
+
+test('a timeline entry whose year is not a number is refused at save, naming the field, and nothing is written', async () => {
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { ...ENTRY, year: '2024' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'year: enter a year from 1900 to 2100 as four digits');
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024'), undefined);
+  assert.equal(db.ids('admin_logs').length, 0, 'a refused save writes no admin log row');
+});
+
+test('a timeline entry refuses a key it does not store, by name', async () => {
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { ...ENTRY, colour: 'x' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'colour: unknown field');
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024'), undefined);
+});
+
+test('a timeline update is judged on the merged entry', async () => {
+  const db = makeFakeDb({
+    'cmsTimeline_drafts/edition-2024': { ...ENTRY, title: { text: 'x' }, status: 'dirty' },
+  });
+  const res = await updateEntry(db, 'edition-2024', { description: 'New words.' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'title: must be text');
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').description, ENTRY.description);
+});
+
+test('a timeline update over a stored stray key saves, and the stray key is gone', async () => {
+  const db = makeFakeDb({
+    'cmsTimeline_drafts/edition-2024': { ...ENTRY, location: 'Hall A', status: 'dirty', visible: true },
+  });
+  const res = await updateEntry(db, 'edition-2024', { title: 'The first meeting, again' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsTimeline_drafts', 'edition-2024');
+  assert.equal(draft.title, 'The first meeting, again');
+  assert.equal(Object.prototype.hasOwnProperty.call(draft, 'location'), false);
+});
+
+test('a valid timeline entry is stored trimmed, with a blank description as null', async () => {
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { year: 2024, title: '  The first meeting ', description: '  ' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body, { docPath: 'cmsTimeline_drafts/edition-2024', docId: 'edition-2024', status: 'dirty' });
+  const draft = db.read('cmsTimeline_drafts', 'edition-2024');
+  assert.equal(draft.year, 2024);
+  assert.equal(draft.title, 'The first meeting');
+  assert.equal(draft.description, null);
+  assert.equal(draft.status, 'dirty');
+  assert.equal(draft.visible, true);
+  assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('a staff admin creates a timeline entry', async () => {
+  const STAFF = { uid: 'staff-1', email: 'staff@example.org', email_verified: true };
+  const db = makeFakeDb();
+  const res = await createEntry(db, 'edition-2024', { ...ENTRY }, {
+    auth: { async verifyIdToken(t) { if (t === 'staff-token') return STAFF; throw new Error('bad'); } },
+    request: { token: 'staff-token' },
+  });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').updatedBy, 'staff@example.org');
+});
+
+test('the timeline seam leaves content blocks and sessions alone', async () => {
+  const db = makeFakeDb();
+  // A block or a session may carry a `year` of any shape and keys the entry
+  // does not know; the seam is not their rule.
+  let res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'era', fields: { blockType: 'text', value: 'x', year: 'then', colour: 'x' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsContent_drafts', 'hero__era').colour, 'x');
+  res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'sess-era', fields: { title: 'x', year: 'then' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsSchedule_drafts', 'sess-era').year, 'then');
+});
+
+test('a timeline entry created, edited and published is live with its three fields', async () => {
+  const db = makeFakeDb();
+  let res = await createEntry(db, 'edition-2024', { ...ENTRY });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  res = await updateEntry(db, 'edition-2024', { title: 'The first meeting ', description: null });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  await publishDocs({ db, collection: 'cmsTimeline', docIds: ['edition-2024'], actor: ADMIN, now });
+  const live = db.read('cmsTimeline', 'edition-2024');
+  assert.equal(live.year, 2024);
+  assert.equal(live.title, 'The first meeting');
+  assert.equal(live.description, null);
+  assert.equal(live.visible, true);
+  assert.equal(db.read('cmsTimeline_drafts', 'edition-2024').status, 'clean');
+});

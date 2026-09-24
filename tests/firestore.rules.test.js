@@ -1842,3 +1842,38 @@ describe("unpublished changes reads (issue 196)", () => {
     }
   });
 });
+
+// The home page's History section (issue #194) reads cmsTimeline through the
+// runtime listener, and the timeline editor lists both revisions. No rule
+// changed for it: these pin that the listener's query and the editor's list
+// reads are the reads the existing rules allow.
+describe("cmsTimeline: the listener's query and the editor's list reads (issue 194)", () => {
+  it("an anonymous reader may run the listener's visible-only query, and gets only visible entries", async () => {
+    const snap = await assertSucceeds(
+      getDocs(query(collection(anon(), "cmsTimeline"), where("visible", "==", true))),
+    );
+    const ids = snap.docs.map((d) => d.id);
+    if (!ids.includes("pub")) throw new Error(`expected the visible entry, got ${ids.join(", ")}`);
+    if (ids.includes("hidden")) throw new Error("a hidden entry reached an anonymous reader");
+  });
+
+  it("an anonymous reader may not list the collection without the visibility clause", async () => {
+    await assertFails(getDocs(collection(anon(), "cmsTimeline")));
+  });
+
+  it("either admin tier may list both revisions, as the editor does", async () => {
+    for (const db of [staff(), admin()]) {
+      await assertSucceeds(getDocs(collection(db, "cmsTimeline")));
+      await assertSucceeds(getDocs(collection(db, "cmsTimeline_drafts")));
+    }
+  });
+
+  it("a signed-in non-admin may not list the drafts, nor write either revision", async () => {
+    await assertFails(getDocs(collection(nonAdmin(), "cmsTimeline_drafts")));
+    await assertFails(getDocs(collection(anon(), "cmsTimeline_drafts")));
+    for (const db of [nonAdmin(), staff(), admin()]) {
+      await assertFails(setDoc(doc(db, "cmsTimeline/new-entry"), { year: 2024, title: "x", visible: true }));
+      await assertFails(setDoc(doc(db, "cmsTimeline_drafts/new-entry"), { year: 2024, title: "x" }));
+    }
+  });
+});

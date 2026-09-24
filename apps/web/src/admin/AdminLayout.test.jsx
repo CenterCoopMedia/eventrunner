@@ -138,12 +138,12 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Seven links above the base's sixteen (the Overview, issue #179, the
+    // Eight links above the base's sixteen (the Overview, issue #179, the
     // Email log, issue #183, Change requests, issue #188, Organizations,
-    // issue #192, Updates, issue #190, Version history, issue #195, and
-    // Unpublished changes, issue #196), every one a word. No icon rail, no
-    // glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(23);
+    // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
+    // issue #195, and Unpublished changes, issue #196), every one a word. No
+    // icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(24);
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
       'href',
@@ -212,8 +212,8 @@ describe('the admin shell', () => {
     expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
       'overview',
-      'pages', 'sessions', 'organizations', 'content', 'updates', 'media', 'materials', 'versions',
-      'unpublished',
+      'pages', 'sessions', 'organizations', 'content', 'updates', 'timeline', 'media', 'materials',
+      'versions', 'unpublished',
       'speakers', 'attendees', 'badges',
       'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
       'settings',
@@ -242,6 +242,9 @@ describe('the admin shell', () => {
     // Updates is content work (issue #190), its editors included.
     expect(sectionTier('/admin/updates')).toBe('staff');
     expect(sectionTier('/admin/updates/new/update')).toBe('staff');
+    // The timeline list and editor are content, so staff work (#194).
+    expect(sectionTier('/admin/timeline')).toBe('staff');
+    expect(sectionTier('/admin/timeline/new/entry')).toBe('staff');
     expect(sectionTier('/admin')).toBeNull();
     expect(sectionTier('/admin/')).toBeNull();
   });

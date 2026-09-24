@@ -1908,10 +1908,34 @@ const DEMO_ORGANIZATIONS = Object.freeze([
 ]);
 
 /**
+ * Past editions for the home page's History section (issue #194). The
+ * editions are fictional, and each one says so.
+ */
+const DEMO_TIMELINE = Object.freeze([
+  {
+    id: 'demo-edition-2024',
+    year: 2024,
+    title: 'The first meeting',
+    description: 'Local news teams met for one day to compare shared reporting projects. This edition is fictional.',
+    visible: true,
+    seeded: true
+  },
+  {
+    id: 'demo-edition-2025',
+    year: 2025,
+    title: 'Two workshop tracks',
+    description: 'The second edition tested separate practice and sustainability workshops. This edition is fictional.',
+    visible: true,
+    seeded: true
+  }
+]);
+
+/**
  * The whole demo deployment as data.
  *
  * @returns {{ config: object, pages: object[], content: object[],
- *             sessions: object[], speakers: object[], organizations: object[] }}
+ *             sessions: object[], speakers: object[], organizations: object[],
+ *             timeline: object[] }}
  * @throws when the demo answers no longer pass the real config validators —
  *   the fixture is the platform's own dogfood, so a schema change that
  *   breaks it must break here loudly, not on the demo instance.
@@ -1956,6 +1980,7 @@ function demoEvent() {
     sessions: DEMO_SESSIONS.map((s) => ({ ...s })),
     speakers: DEMO_SPEAKERS.map((s) => ({ ...s })),
     organizations: DEMO_ORGANIZATIONS.map((o) => ({ ...o })),
+    timeline: DEMO_TIMELINE.map((entry) => ({ ...entry })),
   };
 }
 
@@ -1981,6 +2006,7 @@ function demoSnapshot() {
     sessions: demo.sessions,
     speakers: demo.speakers.map((speaker) => ({ id: speaker.id, ...buildPublicSpeaker(speaker) })),
     organizations: demo.organizations,
+    timeline: demo.timeline,
   };
 }
 
@@ -1993,6 +2019,7 @@ module.exports = {
   DEMO_SESSIONS,
   DEMO_SPEAKERS,
   DEMO_ORGANIZATIONS,
+  DEMO_TIMELINE,
   DEMO_CONTENT,
   DEMO_PAGE_EXTRA_CONTENT,
 };

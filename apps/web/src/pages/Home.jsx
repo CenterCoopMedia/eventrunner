@@ -16,6 +16,8 @@ import RegistrationAction, {
 } from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
+import { useHistorySection } from '../components/useHistorySection.js';
+import { resolvePageLayout } from '../lib/pageLayout.js';
 import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
 import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
 
@@ -118,6 +120,11 @@ export default function Home() {
 
   const page = getPage('home') ?? getPage('/');
   const title = getBlock('hero', 'title');
+  // The past editions list loads on demand (issue #194). Until it arrives,
+  // the History section draws as a default section, its own blocks only.
+  const HistorySection = useHistorySection(
+    (page?.sections ?? []).some((section) => section?.id === 'history'),
+  );
 
   if (!page && !title) {
     return (
@@ -157,10 +164,11 @@ export default function Home() {
   // it — still has dates and a clock to state, so the core draws the row
   // itself in that one case, with two cells instead of three.
   const hasFactsSection = (page?.sections ?? []).some((section) => section?.id === 'info');
-  // TWO SECTIONS THIS PAGE DRAWS ITSELF, AND BOTH STAY IN THE OPERATOR'S
-  // ORDER. Neither is a list of blocks the generic renderer can draw — the
-  // key facts group is an arrangement of its section's blocks (M7 issue 9)
-  // and the sponsor strip reads cmsOrganizations entirely (M7 issue 10) —
+  // THREE SECTIONS THIS PAGE DRAWS ITSELF, AND ALL STAY IN THE OPERATOR'S
+  // ORDER. None is a list of blocks the generic renderer can draw — the
+  // key facts group is an arrangement of its section's blocks (M7 issue 9),
+  // the sponsor strip reads cmsOrganizations entirely (M7 issue 10), and
+  // the history section adds the cmsTimeline editions (issue #194) —
   // but "the page draws it" used to mean "excluded from the section list
   // and rendered at a fixed point in the core", which silently took both
   // out of the ordering. An operator could drag either one anywhere in the
@@ -168,8 +176,8 @@ export default function Home() {
   //
   // `renderSection` replaces only what is drawn INSIDE a section's own
   // place. Every other section gets `undefined` and renders exactly as it
-  // did before, and either of these deleted from the page document is
-  // simply gone, like any other deleted section.
+  // did before, and any of these deleted from the page document is simply
+  // gone, like any other deleted section.
   const renderHomeSection = (section, blocks) => {
     if (section.id === 'info') {
       // Grouped before the section is opened, because a section whose
@@ -209,6 +217,18 @@ export default function Home() {
           id={`section-${section.id}`}
           title={section.label}
           lede={lede?.value ?? null}
+        />
+      );
+    }
+    if (section.id === 'history' && HistorySection) {
+      // The section's own blocks, then the past editions from the Timeline
+      // list (issue #194), in this section's own place in the order.
+      return (
+        <HistorySection
+          id={`section-${section.id}`}
+          title={section.label}
+          blocks={blocks}
+          arrangement={resolvePageLayout(page).arrangement}
         />
       );
     }

@@ -8,9 +8,9 @@
 // (?preview=1 is convenience only, wired in App.jsx).
 //
 // Overlay semantics, per collection:
-//   - cmsContent / cmsPages / cmsSchedule / cmsOrganizations: any successful
-//     live result — including an empty array — replaces the snapshot
-//     wholesale. The published set is the truth: once a listener has
+//   - cmsContent / cmsPages / cmsSchedule / cmsOrganizations / cmsTimeline:
+//     any successful live result — including an empty array — replaces the
+//     snapshot wholesale. The published set is the truth: once a listener has
 //     actually reported in, an empty result means staff unpublished
 //     everything and the public view must go empty too, not keep showing
 //     stale demo content. Only the *absence* of a result yet (overlay still
@@ -27,8 +27,13 @@
 //     simply has no document. Without this overlay the directory would sit
 //     on the deploy-time snapshot forever, so a speaker added, edited, or
 //     removed after the last build would never appear or disappear.
-//   - cmsTimeline: snapshot-only for now — its runtime overlay belongs to a
-//     later timeline tranche.
+//   - cmsTimeline: the past editions the home page's History section lists
+//     (issue #194), with the same wholesale-replace semantics, so an entry
+//     published from the admin appears without a rebuild. This provider
+//     subscribes and hands the raw result on as `timelineDocs` (null until
+//     the listener reports). The snapshot module (timelineData.js) and the
+//     drop of malformed entries live in lib/timelineEntries.js, beside the
+//     renderer that loads on demand, to keep both out of the initial chunk.
 //
 // `loading` is always false: the snapshot renders synchronously on first
 // paint, and the overlay above is applied fire-and-forget as onSnapshot
@@ -60,6 +65,7 @@ const RUNTIME_COLLECTIONS = [
   'cmsUpdates',
   'cmsSchedule',
   'cmsOrganizations',
+  'cmsTimeline',
 ];
 
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
@@ -124,6 +130,7 @@ export function ContentProvider({ readSource = 'published', children }) {
     cmsUpdates: null,
     cmsSchedule: null,
     cmsOrganizations: null,
+    cmsTimeline: null,
     speakers: null,
   });
 
@@ -136,6 +143,7 @@ export function ContentProvider({ readSource = 'published', children }) {
       cmsUpdates: null,
       cmsSchedule: null,
       cmsOrganizations: null,
+      cmsTimeline: null,
       speakers: null,
     });
     const unsubscribers = [
@@ -194,6 +202,7 @@ export function ContentProvider({ readSource = 'published', children }) {
         overlay.cmsPages != null ||
         overlay.cmsSchedule != null ||
         overlay.cmsOrganizations != null ||
+        overlay.cmsTimeline != null ||
         overlay.speakers != null,
     );
 
@@ -254,6 +263,11 @@ export function ContentProvider({ readSource = 'published', children }) {
       scheduleData,
       speakers,
       organizationsData,
+      // cmsTimeline as the listener reported it, or null until it has. The
+      // snapshot and the drop sit with the History section's renderer
+      // (lib/timelineEntries.js), which loads on demand, so neither rides
+      // in the chunk every visitor downloads (scripts/ci/bundle-budget.json).
+      timelineDocs: overlay.cmsTimeline,
       // The snapshot renders synchronously, so consumers never wait on the
       // network; kept for interface stability with loading-aware pages.
       loading: false,

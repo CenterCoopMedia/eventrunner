@@ -95,6 +95,7 @@ export const DOCKET = Object.freeze([
       { to: 'organizations', label: 'Organizations', tier: 'staff' },
       { to: 'content', label: 'Content', tier: 'staff' },
       { to: 'updates', label: 'Updates', tier: 'staff' },
+      { to: 'timeline', label: 'Timeline', tier: 'staff' },
       { to: 'media', label: 'Media', tier: 'staff' },
       { to: 'materials', label: 'Materials', tier: 'staff' },
       { to: 'versions', label: 'Version history', tier: 'staff' },
