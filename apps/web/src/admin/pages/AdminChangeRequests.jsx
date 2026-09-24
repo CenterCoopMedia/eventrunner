@@ -359,7 +359,16 @@ export default function AdminChangeRequests() {
             title={`No ${filterEntry.empty} requests`}
             description={`None of the ${rows.length} ${rows.length === 1 ? 'request is' : 'requests are'} ${filterEntry.empty}.`}
             action={
-              <button type="button" className={secondaryButtonClass} onClick={() => setFilter('all')}>
+              <button
+                type="button"
+                className={secondaryButtonClass}
+                onClick={() => {
+                  setFilter('all');
+                  // This control goes with the empty state it sits in; the
+                  // list heading stays, so the keyboard goes there.
+                  headingRef.current?.focus();
+                }}
+              >
                 Show all requests
               </button>
             }

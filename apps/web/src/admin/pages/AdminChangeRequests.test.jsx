@@ -167,6 +167,19 @@ describe('AdminChangeRequests: the list', () => {
     expect(items()).toHaveLength(1);
   });
 
+  // Review finding 3: the empty state's one action removes itself, so the
+  // keyboard must land somewhere that stays.
+  it('Show all requests moves focus to the list heading, not the page body', () => {
+    renderPage('/admin/change-requests?status=declined');
+    pushRows([request('open-one')]);
+    const showAll = screen.getByRole('button', { name: 'Show all requests' });
+    showAll.focus();
+    fireEvent.click(showAll);
+    expect(showAll).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Requests' })).toHaveFocus();
+    expect(items()).toHaveLength(1);
+  });
+
   it('keeps the last rows when the listener fails, and says so', () => {
     renderPage();
     pushRows([request('kept')]);
