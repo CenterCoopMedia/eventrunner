@@ -142,6 +142,29 @@ Local branches, not pushed, with every conflict already resolved:
 - To build the real stack, take review fixes onto these: a3 fixes on the
   first, then cherry-pick the resolved b1, b2, b3 commits from the second.
 
+### The stack from #270 up (2026-09-24 04:50 UTC)
+
+Handoff updates now ride on the top branch of the stack, so the lower pull
+requests stay stable.
+
+| PR | Branch | Issues | State |
+|---|---|---|---|
+| #270 | `joe/confident-gates-gy99ip-6-design-wave-2` | #234, refs #249 | Four Codex P2 findings fixed (`d5f0806`, `5d73f7d`, `4d874f6`, `ccc43b7`), threads resolved, all checks green locally |
+| next | `joe/confident-gates-gy99ip-7-admin-overview` | #178 to #182 | Built on #270 in `/home/user/wt-int2`. `762afcb` points the overview shell test at the `useAdminApi` mock a4 added. `4f82523` returns the speaker and session editors to their lists: `navigate('..')` went to the admin index, which the speaker delete test only saw under load |
+| after | `joe/confident-gates-gy99ip-8-email-log` | #183 | b2 commits and fixes from `trial/stack-a3-b3`. Also needs: the same shell test fix for the email log test, and `signIn` in `e2e/helpers.mjs` must clear `auth_rate_limits` first (six operator sign-ins pass the limit of five per 15 minutes, so webmcp.spec.js fails) |
+| after | `joe/confident-gates-gy99ip-9-attendees` | #184, #185 | b3 commits and fixes from `trial/stack-a3-b3` |
+| after | `…-10-change-requests` | #188 | b4 (`/home/user/wt-b4`, `cf22061`, `2d151c8`); review `wf_4b4740d1-d07` running. Drop `0a4092a` (its own copy of the shell test fix) |
+| after | `…-11-materials` | #189 | b5 (`/home/user/wt-b5`, `65c48fd`, `492e90d`); review `wf_bbd1885b-80a` running |
+
+The `AdminSpeakers.test.jsx` failure under load was a real bug (see `4f82523`).
+The demo's initial chunk is at 291,069 of 292,000 gzip bytes after b4.
+`tasks/director/checks.sh` now keeps a failing step's whole output in
+`/tmp/claude-0/checks-<step>-<time>.log`; run it from the top branch's
+worktree, since the main worktree holds the #269 branch.
+
+Filed: #271 (a session material's storage path is not confined to its
+session folder; fix before #213).
+
 ### Resume order
 
 1. Resume the four stopped reviews (the review script is
