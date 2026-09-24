@@ -37,7 +37,10 @@
  *      session's count), the private notes, and the profile photo files.
  *      These can outgrow one transaction's 500-write ceiling, which would
  *      strand an account that could never be deleted, so they run after
- *      the commit, each step on its own.
+ *      the commit, each step on its own. The sweep also releases any ticket
+ *      claim made after the commit: a deleted sign-in's ID token stays
+ *      valid for up to an hour, and claimTicket needs no account document
+ *      (a new sign-up may verify an order before its account exists).
  *
  * A call for an account whose document is already gone takes the RESUME
  * path: it re-checks the guards against the sign-in if one remains, writes
@@ -85,6 +88,10 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
  *   phase 'sweep'     — cleared after that commit, idempotently, and again
  *                       on a resumed delete.
  *
+ *   A 'claim' store is released in the transaction AND by every sweep, so
+ *   a claim the deleted session makes after the commit does not stay on
+ *   the record; a resumed delete that finds one does not answer 404.
+ *
  *   kind 'doc'        — the document `{collection}/{uid}`.
  *   kind 'claim'      — every `{collection}` document whose `{field}` is the
  *                       uid. The document stays; the claim fields are set
@@ -123,9 +130,11 @@ const MAX_TRANSACTION_WRITES = 500;
 const COUNTED_CHUNK = 200;
 const SUBCOLLECTION_CHUNK = 400;
 const FILES_CHUNK = 500;
+const CLAIMS_CHUNK = 400;
 
 const DIRECTORY_STORES = PER_ACCOUNT_STORES.filter((store) => store.phase === 'directory');
-const SWEEP_STORES = PER_ACCOUNT_STORES.filter((store) => store.phase === 'sweep');
+/** What every sweep clears: the sweep stores, and the claims again. */
+const SWEEP_STORES = PER_ACCOUNT_STORES.filter((store) => store.phase === 'sweep' || store.kind === 'claim');
 
 /**
  * The writes phase 1 spends before any claim: the account, the audit row,
@@ -430,7 +439,32 @@ async function sweepFiles({ getBucket, uid, store }) {
   }
 }
 
+/** The claims a store holds on the account, as a query. */
+function claimsOn(db, uid, store) {
+  return db.collection(store.collection).where(store.field, '==', uid);
+}
+
+/**
+ * Release a claim store's claims on the account, a page at a time, one
+ * transaction per page. The documents stay; the claim fields go to null.
+ */
+async function sweepClaims({ db, uid, store, now }) {
+  const cleared = Object.fromEntries(store.clear.map((field) => [field, null]));
+  let released = 0;
+  for (;;) {
+    const count = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(claimsOn(db, uid, store).limit(CLAIMS_CHUNK));
+      const at = now();
+      for (const doc of snap.docs) tx.set(doc.ref, { ...cleared, updatedAt: at }, { merge: true });
+      return snap.docs.length;
+    });
+    if (count === 0) return released;
+    released += count;
+  }
+}
+
 const SWEEPERS = Object.freeze({
+  claim: sweepClaims,
   counted: sweepCounted,
   subcollection: sweepSubcollection,
   files: sweepFiles,
@@ -438,6 +472,7 @@ const SWEEPERS = Object.freeze({
 
 /** Whether a sweep store still holds anything for the account. */
 async function holdsAnything({ db, getBucket, uid, store }) {
+  if (store.kind === 'claim') return !(await claimsOn(db, uid, store).limit(1).get()).empty;
   if (store.kind === 'files') return (await pageOfFiles(getBucket(), store.prefix, uid, 1)).length > 0;
   return (await pageOfMembers(db, uid, store.subcollection, 1)).length > 0;
 }
@@ -499,7 +534,8 @@ function removedCounts(...parts) {
   const out = {};
   for (const store of PER_ACCOUNT_STORES) if (store.key) out[store.key] = 0;
   for (const part of parts) {
-    for (const [key, value] of Object.entries(part || {})) out[key] = value;
+    // A claim store counts twice: the transaction and the sweep.
+    for (const [key, value] of Object.entries(part || {})) out[key] = (out[key] ?? 0) + value;
   }
   return out;
 }

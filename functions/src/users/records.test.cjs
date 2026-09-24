@@ -656,3 +656,59 @@ test('deleteAttendee states its own timeout, long enough for the sweep', () => {
   const { handlers } = require('./records.cjs');
   assert.equal(handlers.deleteAttendee.__endpoint.timeoutSeconds, 540);
 });
+
+// Review finding: an ID token outlives its deleted sign-in by up to an
+// hour, and claimTicket (ticketingVerifyOrder) does not need a users doc,
+// because a new sign-up may verify an order before its account document
+// exists. A claim the deleted session makes after phase 1 must not stay
+// on the ticket, or the person's next account is told the ticket is
+// somebody else's.
+test('a ticket claimed by the deleted session after the delete is released by the next call, not answered 404', async () => {
+  const { claimTicket } = require('../ticketing/registration.cjs');
+  const d = deps(await fullySeeded());
+  await d.db.collection('tickets').doc('tkt-late').set({
+    email: 'ada@example.com', status: 'valid', claimedByUid: null, claimedAt: null,
+  });
+  assert.equal((await remove(d)).statusCode, 200);
+
+  // The deleted session, its token still valid, claims its ticket.
+  const ghost = await claimTicket({ db: d.db, externalId: 'tkt-late', uid: 'uid-ada', email: 'ada@example.com' });
+  assert.equal(ghost.claimed, true);
+
+  const retry = await remove(d);
+
+  assert.equal(retry.statusCode, 200, JSON.stringify(retry.body));
+  assert.equal(retry.body.removed.tickets, 1);
+  assert.deepEqual(d.db.read('tickets', 'tkt-late'), {
+    email: 'ada@example.com', status: 'valid', claimedByUid: null, claimedAt: null, updatedAt: T0,
+  });
+  assert.deepEqual(adminLogs(d.db).find((logRow) => logRow.details)?.details, { resumed: true });
+  // The person's next account can claim their own ticket.
+  const again = await claimTicket({ db: d.db, externalId: 'tkt-late', uid: 'uid-ada-new', email: 'ada@example.com' });
+  assert.equal(again.claimed, true);
+  // And with nothing left, the call after that is a 404.
+  assert.equal((await remove(d)).statusCode, 404);
+});
+
+test('a claim made while the sweep runs is released in the same call and counted with the rest', async () => {
+  const { claimTicket } = require('../ticketing/registration.cjs');
+  const d = deps(await fullySeeded());
+  await d.db.collection('tickets').doc('tkt-late').set({
+    email: 'ada@example.com', status: 'valid', claimedByUid: null, claimedAt: null,
+  });
+  // Between the directory commit and the rest of the sweep.
+  const deleteUser = d.auth.deleteUser.bind(d.auth);
+  d.auth.deleteUser = async (uid) => {
+    await claimTicket({ db: d.db, externalId: 'tkt-late', uid, email: 'ada@example.com' });
+    return deleteUser(uid);
+  };
+
+  const res = await remove(d);
+
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  // tkt-1 in the transaction, tkt-late in the sweep.
+  assert.equal(res.body.removed.tickets, 2);
+  assert.equal(d.db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(d.db.read('tickets', 'tkt-late').claimedByUid, null);
+  assert.equal(d.db.read('tickets', 'tkt-2').claimedByUid, 'uid-bo');
+});
