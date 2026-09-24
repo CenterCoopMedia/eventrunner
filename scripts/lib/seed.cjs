@@ -497,10 +497,18 @@ const FULL_DATE = new Intl.DateTimeFormat('en-US', {
 });
 const MONTH_DAY = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
 
+/** A real calendar date, not merely a string shaped like one ('2026-13-01' is not). */
+function isCalendarDate(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const [y, m, d] = date.split('-').map(Number);
+  const instant = new Date(Date.UTC(y, m - 1, d));
+  return instant.getUTCFullYear() === y && instant.getUTCMonth() === m - 1 && instant.getUTCDate() === d;
+}
+
 function eventDateRange(event = {}) {
   const dates = (Array.isArray(event.days) ? event.days : [])
     .map((day) => day?.date)
-    .filter((date) => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .filter(isCalendarDate)
     .sort();
   if (dates.length === 0) return null;
   const first = new Date(`${dates[0]}T00:00:00Z`);

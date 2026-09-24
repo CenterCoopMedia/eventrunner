@@ -208,6 +208,21 @@ function rollDateForward(dateStr) {
 }
 
 /**
+ * Whether a string is a real calendar date, `YYYY-MM-DD`. The shape alone is
+ * not enough: '2026-13-01' has the shape and makes an invalid Date, which
+ * Intl throws on — and config/event is runtime data, so it may say anything.
+ *
+ * @param {unknown} date
+ * @returns {boolean}
+ */
+export function isCalendarDate(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(date)) return false;
+  const [y, m, d] = date.split('-').map(Number);
+  const instant = new Date(Date.UTC(y, m - 1, d));
+  return instant.getUTCFullYear() === y && instant.getUTCMonth() === m - 1 && instant.getUTCDate() === d;
+}
+
+/**
  * The event's dates as one range, from config/event.days: "October 15, 2026",
  * "October 15–17, 2026", "October 30 – November 1, 2026" or "December 31,
  * 2026 – January 2, 2027". Null when no day carries a date.
@@ -224,7 +239,7 @@ function rollDateForward(dateStr) {
 export function eventDateRangeLabel(eventConfig) {
   const dates = (Array.isArray(eventConfig?.days) ? eventConfig.days : [])
     .map((day) => day?.date)
-    .filter((date) => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(date))
+    .filter(isCalendarDate)
     .sort();
   if (dates.length === 0) return null;
   const first = new Date(`${dates[0]}T00:00:00Z`);

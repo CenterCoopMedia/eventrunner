@@ -222,4 +222,13 @@ describe('eventDateRangeLabel', () => {
     expect(eventDateRangeLabel({})).toBeNull();
     expect(eventDateRangeLabel({ days: [{ date: 'soon' }, { date: '2026-10-14' }] })).toBe('October 14, 2026');
   });
+
+  it('drops a date that is not a real calendar date rather than throwing', () => {
+    // '2026-13-01' passes a shape check and makes an invalid Date, which the
+    // formatter throws on — and the home page with it (adversarial review,
+    // 2026-09-24). config/event is runtime data, so it may say anything.
+    expect(eventDateRangeLabel({ days: [{ date: '2026-13-01' }] })).toBeNull();
+    expect(eventDateRangeLabel({ days: [{ date: '2026-02-30' }, { date: '2026-10-14' }] })).toBe('October 14, 2026');
+    expect(eventDateRangeLabel({ days: [{ date: '2026-02-28' }] })).toBe('February 28, 2026');
+  });
 });
