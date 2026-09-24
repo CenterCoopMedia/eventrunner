@@ -187,6 +187,34 @@ describe('the organizations list', () => {
   });
 });
 
+// Review round (c2, finding 3). The notice in place is the record and the
+// announcement; the toast repeats it with no live role.
+describe('the organizations list, announcing a publish', () => {
+  /** The live regions (status or alert) whose text holds `message`. */
+  const liveRegionsSaying = (message) =>
+    [...document.querySelectorAll('[role="status"], [role="alert"]')]
+      .filter((node) => node.textContent.includes(message));
+
+  it('announces a published result once, and a failure once', async () => {
+    await renderAt('/admin/organizations');
+    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    pushOrganizations(LIVE, DRAFTS);
+    fetch.mockResolvedValueOnce(published(['tide-media', 'new-grant']));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
+    const message = 'Published. The public site picks it up live.';
+    await waitFor(() => expect(screen.getAllByText(message)).toHaveLength(2));
+    expect(liveRegionsSaying(message)).toHaveLength(1);
+
+    fetch.mockResolvedValueOnce(refusal(500, 'Publish failed part-way.', 'publish-failed'));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
+    await waitFor(() => expect(screen.getAllByText('Publish failed part-way.')).toHaveLength(2));
+    expect(liveRegionsSaying('Publish failed part-way.')).toHaveLength(1);
+    // The repeat keeps its error tone, stated as a word.
+    const toast = screen.getAllByText('Publish failed part-way.').find((node) => !node.closest('[role]'));
+    expect(toast.parentElement).toHaveTextContent(/^Problem/);
+  });
+});
+
 describe('the organization editor', () => {
   it('creates a draft at the address the name suggests', async () => {
     holdAdminCollections = true;

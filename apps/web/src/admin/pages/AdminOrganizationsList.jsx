@@ -50,12 +50,14 @@ export default function AdminOrganizationsList() {
   function reportPublish(response, ids) {
     const verdict = summarizePublish(response, 'cmsOrganizations', ids, 'organizations');
     setNotice({ tone: verdict.ok ? 'ok' : 'error', message: verdict.message });
-    showToast(verdict.message, verdict.ok ? undefined : { tone: 'error' });
+    // The notice is the record and the announcement; the toast repeats it
+    // silently, so one result is announced once.
+    showToast(verdict.message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
   function reportFailure(err) {
     setNotice({ tone: 'error', message: err.message });
-    showToast(err.message, { tone: 'error' });
+    showToast(err.message, { tone: 'error', announce: false });
     if (err?.queueId) setResumeQueueId(err.queueId);
   }
 
