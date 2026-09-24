@@ -28,8 +28,6 @@ import AdminContentSection from './pages/AdminContentSection.jsx';
 import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
-import AdminMaterialsTab from './pages/AdminMaterialsTab.jsx';
-import AdminAttendees from './pages/AdminAttendees.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
@@ -37,6 +35,10 @@ import AdminTicketing from './pages/AdminTicketing.jsx';
 import AdminAccess from './pages/AdminAccess.jsx';
 import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 
+// The overview is the page the admin opens on (issue #179). Lazy like the
+// sessions list, so its figures and panels stay out of the admin entry chunk
+// (scripts/ci/bundle-budget.json).
+const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
 // Event settings is the largest page in this area — the whole config/event
@@ -54,6 +56,35 @@ const AdminContentBlockEditor = lazy(() => import('./pages/AdminContentBlockEdit
 // Branding is the largest page left in the entry chunk (the style picker,
 // the option groups and the preview frame), and only an operator opens it.
 const AdminBranding = lazy(() => import('./pages/AdminBranding.jsx'));
+// The email log carries the preview frame and its document builder; it is
+// one screen behind one link, so it waits for somebody to ask for it.
+const AdminEmailLog = lazy(() => import('./pages/AdminEmailLog.jsx'));
+// Attendees gained the export, the record panel, and the account delete
+// (issues 184 and 185), and with them it pushed the entry chunk past the
+// same ceiling. One screen behind one link, loaded the same way.
+const AdminAttendees = lazy(() => import('./pages/AdminAttendees.jsx'));
+// Change requests (issue #188): one screen behind one link, so it stays out
+// of the entry chunk the same way.
+const AdminChangeRequests = lazy(() => import('./pages/AdminChangeRequests.jsx'));
+// Materials gained the table, the archive and the coverage panel (issue
+// 189). One screen behind one link, loaded the same way.
+const AdminMaterialsTab = lazy(() => import('./pages/AdminMaterialsTab.jsx'));
+// The organizations list and editor (issue #192) load the same way.
+const AdminOrganizationsList = lazy(() => import('./pages/AdminOrganizationsList.jsx'));
+const AdminOrganizationEditor = lazy(() => import('./pages/AdminOrganizationEditor.jsx'));
+// The updates list and editor (issue #190), loaded the same way.
+const AdminUpdatesList = lazy(() => import('./pages/AdminUpdatesList.jsx'));
+const AdminUpdateEditor = lazy(() => import('./pages/AdminUpdateEditor.jsx'));
+// Version history (issue #195): the record list and one record's versions,
+// with their formatters, load when somebody opens them.
+const AdminVersionRecords = lazy(() => import('./pages/AdminVersionRecords.jsx'));
+const AdminVersionHistory = lazy(() => import('./pages/AdminVersionHistory.jsx'));
+// Unpublished changes (issue #196): its tables and publish runs load on
+// demand; only the count and the banner that read it live in this chunk.
+const AdminUnpublishedChanges = lazy(() => import('./pages/AdminUnpublishedChanges.jsx'));
+// The timeline list and editor (issue #194) load the same way.
+const AdminTimelineList = lazy(() => import('./pages/AdminTimelineList.jsx'));
+const AdminTimelineEditor = lazy(() => import('./pages/AdminTimelineEditor.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -109,7 +140,11 @@ export default function AdminApp() {
       <AdminWebMcpRegistration />
       <Routes>
         <Route element={<AdminLayout />}>
-          <Route index element={<Navigate to="pages" replace />} />
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route
+            path="overview"
+            element={<DeferredAdminPage label="overview"><AdminOverview /></DeferredAdminPage>}
+          />
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />
@@ -125,9 +160,52 @@ export default function AdminApp() {
             path="sessions/:sessionId"
             element={<DeferredAdminPage label="session"><AdminSessionEditor mode="edit" /></DeferredAdminPage>}
           />
+          <Route
+            path="organizations"
+            element={<DeferredAdminPage label="organizations"><AdminOrganizationsList /></DeferredAdminPage>}
+          />
+          {/* Two parts, 'new/organization': a document id holds no slash, so
+              no organization, a legacy one included, can own this address. A
+              single segment such as 'new' or '_new' is a valid id. */}
+          <Route
+            path="organizations/new/organization"
+            element={<DeferredAdminPage label="organization"><AdminOrganizationEditor mode="create" /></DeferredAdminPage>}
+          />
+          <Route
+            path="organizations/:organizationId"
+            element={<DeferredAdminPage label="organization"><AdminOrganizationEditor mode="edit" /></DeferredAdminPage>}
+          />
+          <Route
+            path="timeline"
+            element={<DeferredAdminPage label="timeline"><AdminTimelineList /></DeferredAdminPage>}
+          />
+          {/* Two segments, so no entry id can shadow the create form, as
+              sessions/new/session. */}
+          <Route
+            path="timeline/new/entry"
+            element={<DeferredAdminPage label="entry"><AdminTimelineEditor mode="create" /></DeferredAdminPage>}
+          />
+          <Route
+            path="timeline/:entryId"
+            element={<DeferredAdminPage label="entry"><AdminTimelineEditor mode="edit" /></DeferredAdminPage>}
+          />
           <Route path="speakers" element={<AdminSpeakersList />} />
           <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
+          <Route
+            path="updates"
+            element={<DeferredAdminPage label="updates"><AdminUpdatesList /></DeferredAdminPage>}
+          />
+          {/* 'new/update', not 'new': `new` is a valid update id, and the
+              edit route for it would always open this creation form. */}
+          <Route
+            path="updates/new/update"
+            element={<DeferredAdminPage label="update"><AdminUpdateEditor mode="create" /></DeferredAdminPage>}
+          />
+          <Route
+            path="updates/:updateId"
+            element={<DeferredAdminPage label="update"><AdminUpdateEditor mode="edit" /></DeferredAdminPage>}
+          />
           <Route path="content" element={<AdminContentPages />} />
           <Route path="content/:pageId" element={<AdminContentSections />} />
           <Route path="content/:pageId/:sectionId" element={<AdminContentSection />} />
@@ -159,11 +237,37 @@ export default function AdminApp() {
           <Route path="badges" element={<AdminBadgeSettings />} />
           <Route path="branding" element={<DeferredAdminPage label="branding"><AdminBranding /></DeferredAdminPage>} />
           <Route path="media" element={<AdminMedia />} />
-          <Route path="materials" element={<AdminMaterialsTab />} />
-          <Route path="attendees" element={<AdminAttendees />} />
+          <Route
+            path="materials"
+            element={<DeferredAdminPage label="materials"><AdminMaterialsTab /></DeferredAdminPage>}
+          />
+          <Route
+            path="versions"
+            element={<DeferredAdminPage label="version history"><AdminVersionRecords /></DeferredAdminPage>}
+          />
+          <Route
+            path="versions/:collection/:docId"
+            element={<DeferredAdminPage label="version history"><AdminVersionHistory /></DeferredAdminPage>}
+          />
+          <Route
+            path="unpublished"
+            element={<DeferredAdminPage label="unpublished changes"><AdminUnpublishedChanges /></DeferredAdminPage>}
+          />
+          <Route
+            path="attendees"
+            element={<DeferredAdminPage label="attendees"><AdminAttendees /></DeferredAdminPage>}
+          />
           <Route path="ticketing" element={<AdminTicketing />} />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="feedback" element={<AdminFeedback />} />
+          <Route
+            path="email-log"
+            element={<DeferredAdminPage label="the email log"><AdminEmailLog /></DeferredAdminPage>}
+          />
+          <Route
+            path="change-requests"
+            element={<DeferredAdminPage label="change requests"><AdminChangeRequests /></DeferredAdminPage>}
+          />
           <Route path="system-errors" element={<AdminSystemErrors />} />
           <Route path="access" element={<AdminAccess />} />
           <Route

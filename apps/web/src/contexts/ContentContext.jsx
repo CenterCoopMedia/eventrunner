@@ -8,9 +8,9 @@
 // (?preview=1 is convenience only, wired in App.jsx).
 //
 // Overlay semantics, per collection:
-//   - cmsContent / cmsPages / cmsSchedule / cmsOrganizations: any successful
-//     live result — including an empty array — replaces the snapshot
-//     wholesale. The published set is the truth: once a listener has
+//   - cmsContent / cmsPages / cmsSchedule / cmsOrganizations / cmsTimeline:
+//     any successful live result — including an empty array — replaces the
+//     snapshot wholesale. The published set is the truth: once a listener has
 //     actually reported in, an empty result means staff unpublished
 //     everything and the public view must go empty too, not keep showing
 //     stale demo content. Only the *absence* of a result yet (overlay still
@@ -27,8 +27,11 @@
 //     simply has no document. Without this overlay the directory would sit
 //     on the deploy-time snapshot forever, so a speaker added, edited, or
 //     removed after the last build would never appear or disappear.
-//   - cmsTimeline: snapshot-only for now — its runtime overlay belongs to a
-//     later timeline tranche.
+//   - cmsTimeline: the past editions the home page's History section lists
+//     (issue #194). The snapshot module is timelineData.js, so the list is
+//     drawn on first paint, and a published entry replaces it at runtime
+//     like every collection above, so an entry published from the admin
+//     appears without a rebuild.
 //
 // `loading` is always false: the snapshot renders synchronously on first
 // paint, and the overlay above is applied fire-and-forget as onSnapshot
@@ -48,6 +51,7 @@ import { publicContentDoc } from 'shared/seed';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotScheduleData, { speakers as snapshotSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
+import snapshotTimelineData from '@generated/timelineData.js';
 import snapshotPages from '@generated/pagesData.js';
 import { isPublicPage } from 'shared/page';
 import { subscribeContentCollection, subscribeSpeakersPublic } from '../lib/contentSource.js';
@@ -60,17 +64,20 @@ const RUNTIME_COLLECTIONS = [
   'cmsUpdates',
   'cmsSchedule',
   'cmsOrganizations',
+  'cmsTimeline',
 ];
 
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 
 // cmsOrganizations is written through the generic content endpoint
-// (functions/src/cms/content.cjs), which only rejects reserved field
-// *names* — it never checks field *types*. Sponsors.jsx renders
-// name/tier/description straight through as JSX children, so a published
-// doc with e.g. `name: { unexpected: true }` would make React throw and
-// blank the route the instant the listener fires. Guard at this overlay
-// boundary instead: drop (not partially render) any doc whose renderable
+// (functions/src/cms/content.cjs), whose organization seam now checks each
+// field's *type* at the save (functions/src/cms/organizations.cjs, issue
+// #192). This drop stays as the second layer: a script, the console, or a
+// document stored before that check can still hold e.g.
+// `name: { unexpected: true }`, and Sponsors.jsx renders
+// name/tier/description straight through as JSX children, so React would
+// throw and blank the route the instant the listener fires. Guard at this
+// overlay boundary: drop (not partially render) any doc whose renderable
 // fields aren't one of the primitive types React can safely render as a
 // child. This keeps the wholesale-replace semantics for every doc that
 // *is* safe — one malformed doc doesn't fall back to the snapshot.
@@ -113,6 +120,30 @@ function prepareSpeakerDocs(docs) {
     );
 }
 
+// The past editions, as the History section lists them: oldest first, then
+// by title and id. The content save checks each field
+// (functions/src/cms/timeline.cjs); this drop guards what reaches the
+// collection another way, so a script-written entry never blanks the home
+// page. A hidden entry is dropped too, because the draft preview reads the
+// unfiltered drafts.
+function prepareTimelineDocs(docs) {
+  return docs
+    .filter(
+      (doc) =>
+        Number.isInteger(doc?.year) &&
+        doc.visible !== false &&
+        typeof doc.title === 'string' &&
+        doc.title.trim() !== '' &&
+        (doc.description == null || typeof doc.description === 'string'),
+    )
+    .sort(
+      (a, b) =>
+        a.year - b.year ||
+        a.title.localeCompare(b.title) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+}
+
 export function ContentProvider({ readSource = 'published', children }) {
   // One overlay slot per collection; null = no runtime result yet, so the
   // committed snapshot stands (spec §2.4 fail-soft first paint).
@@ -122,6 +153,7 @@ export function ContentProvider({ readSource = 'published', children }) {
     cmsUpdates: null,
     cmsSchedule: null,
     cmsOrganizations: null,
+    cmsTimeline: null,
     speakers: null,
   });
 
@@ -134,6 +166,7 @@ export function ContentProvider({ readSource = 'published', children }) {
       cmsUpdates: null,
       cmsSchedule: null,
       cmsOrganizations: null,
+      cmsTimeline: null,
       speakers: null,
     });
     const unsubscribers = [
@@ -187,11 +220,16 @@ export function ContentProvider({ readSource = 'published', children }) {
     const speakers = prepareSpeakerDocs(
       overlay.speakers != null ? overlay.speakers : snapshotSpeakers,
     );
+    // Same != null rule: an empty live result empties the History list.
+    const timeline = prepareTimelineDocs(
+      overlay.cmsTimeline != null ? overlay.cmsTimeline : snapshotTimelineData,
+    );
     const live = Boolean(
       overlay.cmsContent != null ||
         overlay.cmsPages != null ||
         overlay.cmsSchedule != null ||
         overlay.cmsOrganizations != null ||
+        overlay.cmsTimeline != null ||
         overlay.speakers != null,
     );
 
@@ -252,6 +290,7 @@ export function ContentProvider({ readSource = 'published', children }) {
       scheduleData,
       speakers,
       organizationsData,
+      timeline,
       // The snapshot renders synchronously, so consumers never wait on the
       // network; kept for interface stability with loading-aware pages.
       loading: false,

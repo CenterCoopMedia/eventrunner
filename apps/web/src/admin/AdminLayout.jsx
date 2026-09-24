@@ -12,10 +12,12 @@
 // keyboard path per control, `aria-current` on the active section.
 //
 // THE RAIL. The navigation stands on its own dark ground down the leading
-// edge, so the tool's frame and the work surface are never confused. Sixteen
-// named sections read as a standing list grouped by what the operator came
-// to do: content, people, operations, system. Group heads are folios. Every
-// item is a word — no icon rail, no collapse to glyphs, no counts in
+// edge, so the tool's frame and the work surface are never confused. The
+// Overview stands first and alone, with no folio over it, because it is
+// where the admin opens rather than a kind of work (issue #179). The named
+// sections under it read as a standing list grouped by what the operator
+// came to do: content, people, operations, system. Group heads are folios.
+// Every item is a word — no icon rail, no collapse to glyphs, no counts in
 // bubbles. The current item is a filled block in the action blue and carries
 // four signals, never colour alone: the marker at its leading edge, the bold
 // weight, the ground shift, and `aria-current="page"`.
@@ -39,12 +41,20 @@
 // refusal rather than the page. A page a builder adds declares its tier by
 // its docket entry and nowhere else. The tier comes from AuthContext's
 // probes; the server's requireAdmin and the rules are the enforcement.
-import { useState } from 'react';
+//
+// THE TOUR (issue #198). A first visit opens the editor tour at the head of
+// the stone; "Take the tour" on the rail opens it again. It is its own lazy
+// chunk (components/AdminTour.jsx), and its steps are this docket.
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import { AdminEmptyState } from './components/adminChrome.jsx';
+import PendingChangesBanner from './components/PendingChangesBanner.jsx';
+import { linkButtonClass } from './components/formControls.jsx';
+import { PendingChangesProvider } from './PendingChangesContext.jsx';
+import { markTourDone, readTourDone } from './tourState.js';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
  * the current LOCATION inside this nested `<Routes>`, so on /admin/branding
@@ -60,8 +70,14 @@ const ROOT = '/admin';
 export const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
 
 /**
- * The docket. Four groups, in the order an operator works: what the event
- * says, who is in it, how it runs, and how the deployment is set up.
+ * The docket. A lead group with no label holds the Overview, the page the
+ * admin opens on (issue #179): it reports on every group below it, so it
+ * belongs to none of them, and the rail draws no folio over it. Then four
+ * groups, in the order an operator works: what the event says, who is in
+ * it, how it runs, and how the deployment is set up.
+ *
+ * The Overview is staff work: it shows counts only, and the rows behind the
+ * unresolved error count stay on the operator-only System errors page.
  *
  * Content, people and operations are staff work. Under System, the event
  * settings admit staff (dates, venue, places and social handles are content
@@ -72,14 +88,24 @@ export const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
  */
 export const DOCKET = Object.freeze([
   {
+    id: 'lead',
+    label: null,
+    items: [{ to: 'overview', label: 'Overview', tier: 'staff' }],
+  },
+  {
     id: 'content',
     label: 'Content',
     items: [
       { to: 'pages', label: 'Pages', tier: 'staff' },
       { to: 'sessions', label: 'Sessions', tier: 'staff' },
+      { to: 'organizations', label: 'Organizations', tier: 'staff' },
       { to: 'content', label: 'Content', tier: 'staff' },
+      { to: 'updates', label: 'Updates', tier: 'staff' },
+      { to: 'timeline', label: 'Timeline', tier: 'staff' },
       { to: 'media', label: 'Media', tier: 'staff' },
       { to: 'materials', label: 'Materials', tier: 'staff' },
+      { to: 'versions', label: 'Version history', tier: 'staff' },
+      { to: 'unpublished', label: 'Unpublished changes', tier: 'staff' },
     ],
   },
   {
@@ -98,6 +124,8 @@ export const DOCKET = Object.freeze([
       { to: 'live-updates', label: 'Live updates', tier: 'staff' },
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
       { to: 'feedback', label: 'Feedback', tier: 'staff' },
+      { to: 'email-log', label: 'Email log', tier: 'staff' },
+      { to: 'change-requests', label: 'Change requests', tier: 'staff' },
     ],
   },
   {
@@ -138,7 +166,7 @@ export function tierReaches(held, required = 'operator') {
  * either half. A path no docket item owns is the operator's, the same
  * default an undeclared item takes: fail closed. So is a segment that
  * decodes to a slash, or an empty segment with more path after it —
- * nothing the docket names. Only the bare index (the redirect to Pages)
+ * nothing the docket names. Only the bare index (the redirect to the Overview)
  * asks for nothing.
  *
  * @param {string} pathname
@@ -169,7 +197,7 @@ export function sectionTier(pathname) {
 }
 
 /** "A, B and C" from a list of labels; one label stands alone. */
-function listWords(labels) {
+export function listWords(labels) {
   if (labels.length <= 1) return labels.join('');
   return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
 }
@@ -234,7 +262,35 @@ function TierRefusal() {
   );
 }
 
+/**
+ * What a tour chunk that fails to load leaves: a stated line and a way to
+ * close it, so "Take the tour" never becomes a control that does nothing.
+ */
+function TourLoadFailed({ onEnd }) {
+  return (
+    <aside aria-label="Admin tour" className="admin-tour">
+      <p role="status">The tour did not load. Reload the page to try again.</p>
+      <button type="button" className={linkButtonClass} onClick={onEnd}>End tour</button>
+    </aside>
+  );
+}
+
+const AdminTour = lazy(() => import('./components/AdminTour.jsx').catch(() => ({ default: TourLoadFailed })));
+
+/**
+ * The shell. One count of unpublished changes (issue #196) is opened here,
+ * once, for the banner above the stone and the Unpublished changes page to
+ * read; the shell mounts only inside AdminGate, so a non-admin opens none.
+ */
 export default function AdminLayout() {
+  return (
+    <PendingChangesProvider>
+      <AdminDesk />
+    </PendingChangesProvider>
+  );
+}
+
+function AdminDesk() {
   const { eventConfig, theme } = useEventConfig();
   const { user, adminTier, refreshAdminStatus, signOut } = useAuth();
   const { pathname } = useLocation();
@@ -251,6 +307,21 @@ export default function AdminLayout() {
   const docket = docketForTier(tierKnown ? adminTier : 'staff');
   const required = sectionTier(pathname);
   const refused = tierKnown && required !== null && !tierReaches(adminTier, required);
+  // The editor tour (issue #198): null while closed, else the run number.
+  // Run 0 is the first visit and takes no focus; each "Take the tour" is a
+  // new run, so it starts again at step 1 with the focus on its heading.
+  // Ending it stores the mark and gives the focus back to the rail button.
+  const uid = user?.uid;
+  const [tour, setTour] = useState(null);
+  const takeTourRef = useRef(null);
+  useEffect(() => {
+    setTour(readTourDone(uid) ? null : 0);
+  }, [uid]);
+  const endTour = () => {
+    markTourDone(uid);
+    setTour(null);
+    takeTourRef.current?.focus();
+  };
 
   return (
     <div className="admin-room flex min-h-screen flex-col bg-admin-ground font-admin-ui text-admin-base text-admin-ink lg:flex-row">
@@ -280,9 +351,11 @@ export default function AdminLayout() {
               key={group.id}
               className="flex flex-wrap items-center gap-x-xs gap-y-3xs py-3xs lg:mt-sm lg:block lg:py-0 lg:first:mt-0"
             >
-              <p className="admin-folio me-2xs lg:me-0 lg:px-sm lg:pb-3xs lg:pt-2xs">
-                {group.label}
-              </p>
+              {group.label ? (
+                <p className="admin-folio me-2xs lg:me-0 lg:px-sm lg:pb-3xs lg:pt-2xs">
+                  {group.label}
+                </p>
+              ) : null}
               <ul className="flex flex-wrap gap-2xs lg:flex-col lg:gap-3xs">
                 {group.items.map((item) => (
                   <li key={item.to}>
@@ -322,6 +395,14 @@ export default function AdminLayout() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-xs">
+            <button
+              type="button"
+              ref={takeTourRef}
+              onClick={() => setTour((run) => (run ?? 0) + 1)}
+              className={railButtonClass}
+            >
+              Take the tour
+            </button>
             <NavLink to="/" className={railButtonClass}>
               View site
             </NavLink>
@@ -333,7 +414,18 @@ export default function AdminLayout() {
       </div>
 
       <main id="admin-content" className="min-w-0 flex-1">
+        {/* Above the stone, never inside it: the title band pulls itself
+            up by the stone's top padding and would slide over it. */}
+        <PendingChangesBanner />
         <div className="admin-stone mx-auto w-full max-w-admin-canvas">
+          {/* The tour is the one thing in the stone before the page:
+              `.admin-tour` (index.css) keeps room under it for the title
+              band's pull, so the band lands below it, never over it. */}
+          {tour === null ? null : (
+            <Suspense fallback={null}>
+              <AdminTour key={tour} docket={docket} takeFocus={tour > 0} onEnd={endTour} />
+            </Suspense>
+          )}
           {refused ? <TierRefusal /> : <Outlet />}
         </div>
       </main>

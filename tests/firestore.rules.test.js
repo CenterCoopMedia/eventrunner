@@ -13,9 +13,11 @@ import {
   collection,
   doc,
   deleteDoc,
+  deleteField,
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -55,6 +57,7 @@ const ADMIN_READABLE = [
   { path: "users_public/private-profile", tier: "admin" },
   { path: "speakers/spk-tier", tier: "admin" },
   { path: "feedback/f-tier", tier: "admin" },
+  { path: "change_requests/cr-tier", tier: "admin" },
 ];
 
 /**
@@ -178,6 +181,16 @@ beforeAll(async () => {
       category: "other",
       status: "new",
       createdAt: new Date(),
+    });
+    await setDoc(doc(db, "change_requests/cr-tier"), {
+      message: "Tier fixture.",
+      page: null,
+      status: "new",
+      uid: "attendee-1",
+      email: "attendee@example.com",
+      createdAt: new Date(),
+      updatedAt: null,
+      updatedBy: null,
     });
     // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
     // profile visibility on it, and setPublicProfilesFeature() flips it.
@@ -382,6 +395,23 @@ describe("admin tiers on every admin-readable collection (issue 186)", () => {
   });
 });
 
+// The version history page (issue #195) lists a collection's records from
+// two unfiltered list queries, the live collection and its drafts. The tier
+// matrix above reads single documents only, so the query shape the page
+// runs is pinned here, with a hidden live doc and a draft in every one.
+describe("the version history record list (issue 195)", () => {
+  it("both tiers may list every live and draft collection; a non-admin and an anonymous client may not", async () => {
+    for (const c of PUBLISHABLE) {
+      for (const name of [c, `${c}_drafts`]) {
+        await assertSucceeds(getDocs(collection(admin(), name)));
+        await assertSucceeds(getDocs(collection(staff(), name)));
+        await assertFails(getDocs(collection(nonAdmin(), name)));
+        await assertFails(getDocs(collection(anon(), name)));
+      }
+    }
+  });
+});
+
 for (const c of PUBLISHABLE) {
   describe(`${c} two-revision model`, () => {
     it("allows anonymous read of a visible live doc", async () => {
@@ -494,6 +524,8 @@ describe("server-only collections stay deny-all", () => {
     "system_errors",
     "client_error_rate_limits",
     "email_templates",
+    // The change request rate limit (issue #188), one document per account.
+    "change_request_rate_limits",
     "speaker_slugs",
     "speaker_invites",
     // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
@@ -511,6 +543,31 @@ describe("server-only collections stay deny-all", () => {
       await assertFails(setDoc(doc(admin(), `${c}/d1`), { x: 1 }));
     });
   }
+
+  // The email log (issue #183) reads sent_emails through listSentEmails and
+  // getSentEmail on the server. The rules stay closed: no tier lists the
+  // collection or reads a row from the browser, because a stored body can
+  // hold personal data and a list would carry every recipient.
+  it("denies a list query on sent_emails to admin, staff and non-admin, and a get to staff and non-admin", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "sent_emails/logged-1"), {
+        to: "reader@example.com",
+        subject: "Welcome",
+        source: "feedback",
+        status: "sent",
+        bodyStored: true,
+        html: "<p>Hello.</p>",
+        sentAt: new Date(1000),
+      });
+    });
+    for (const db of [admin(), staff(), nonAdmin()]) {
+      await assertFails(getDocs(collection(db, "sent_emails")));
+      await assertFails(getDocs(query(collection(db, "sent_emails"), where("source", "==", "feedback"))));
+    }
+    for (const db of [staff(), nonAdmin()]) {
+      await assertFails(getDoc(doc(db, "sent_emails/logged-1")));
+    }
+  });
 
   it("denies unmatched collections (catch-all)", async () => {
     await assertFails(getDoc(doc(anon(), "activity_logs/a1")));
@@ -1378,6 +1435,77 @@ describe("feedback_rate_limits stays deny-all", () => {
   });
 });
 
+// Change requests (issue #188). Admins of either tier read them through the
+// admin page's listener; no client writes them, admin included, because
+// every write must commit with its admin_logs row on the server. The
+// requester cannot read their own request back.
+describe("change requests", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "change_requests/cr1"), {
+        message: "The travel page lists the wrong hotel.",
+        page: "/travel",
+        status: "new",
+        uid: "attendee-1",
+        email: "attendee@example.com",
+        createdAt: new Date(),
+        updatedAt: null,
+        updatedBy: null,
+      });
+    });
+  });
+
+  it("an operator and a staff admin can get a request and list them all", async () => {
+    for (const db of [admin(), staff()]) {
+      await assertSucceeds(getDoc(doc(db, "change_requests/cr1")));
+      await assertSucceeds(getDocs(collection(db, "change_requests")));
+    }
+  });
+
+  it("a non-admin, the requester included, and an anonymous client cannot get or list them", async () => {
+    // nonAdmin() is attendee-1, the uid on the request.
+    for (const db of [nonAdmin(), attendee("approved-1"), anon()]) {
+      await assertFails(getDoc(doc(db, "change_requests/cr1")));
+      await assertFails(getDocs(collection(db, "change_requests")));
+      await assertFails(
+        getDocs(query(collection(db, "change_requests"), where("uid", "==", "attendee-1"))),
+      );
+    }
+  });
+
+  it("no client creates, changes, or removes a request, admin of either tier included", async () => {
+    const request = {
+      message: "Forged.",
+      page: null,
+      status: "new",
+      uid: "attendee-1",
+      email: "attendee@example.com",
+      createdAt: new Date(),
+    };
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(setDoc(doc(db, "change_requests/forged"), request));
+      await assertFails(updateDoc(doc(db, "change_requests/cr1"), { status: "done" }));
+      await assertFails(setDoc(doc(db, "change_requests/cr1"), { status: "done" }, { merge: true }));
+      await assertFails(deleteDoc(doc(db, "change_requests/cr1")));
+    }
+  });
+
+  it("the rate limit store is closed to every client, the account it counts included", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "change_request_rate_limits/attendee-1"), {
+        requests: [Date.now()],
+        updatedAt: new Date(),
+      });
+    });
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(getDoc(doc(db, "change_request_rate_limits/attendee-1")));
+      await assertFails(getDocs(collection(db, "change_request_rate_limits")));
+      await assertFails(setDoc(doc(db, "change_request_rate_limits/attendee-1"), { requests: [] }));
+      await assertFails(deleteDoc(doc(db, "change_request_rate_limits/attendee-1")));
+    }
+  });
+});
+
 describe("sessionReactions aggregate", () => {
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -1478,5 +1606,274 @@ describe("custom badges", () => {
     await assertSucceeds(update("approved-1", { bio: "An updated profile." }));
     await assertFails(update("approved-1", { customBadges: ["Writer"] }));
     await assertSucceeds(update("approved-1", { customBadges: null }));
+  });
+});
+
+// Attendee export (issue 184). The file lives only in the response body, so
+// the rules' part is the two stores around it: the account documents it is
+// read from, and the audit row it writes. The rules file is unchanged; these
+// pin the two facts the export relies on.
+describe("attendee export: the source rows and the audit row (issue 184)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "admin_logs/export-1"), {
+        action: "exportAttendees",
+        docPath: "users",
+        uid: "staff-1",
+        email: STAFF_EMAIL,
+        at: new Date(),
+        details: { rowCount: 3, filter: { status: "all", searched: false } },
+      });
+    });
+  });
+
+  it("a non-admin cannot list the account documents an export reads", async () => {
+    await assertFails(getDocs(collection(nonAdmin(), "users")));
+    await assertFails(getDocs(collection(attendee("approved-1"), "users")));
+    await assertFails(getDocs(collection(anon(), "users")));
+  });
+
+  it("both admin tiers can list them: an export carries nothing the page does not already show", async () => {
+    await assertSucceeds(getDocs(collection(staff(), "users")));
+    await assertSucceeds(getDocs(collection(admin(), "users")));
+  });
+
+  it("no client of either tier can forge, change, or remove an export's audit row", async () => {
+    for (const db of [admin(), staff(), nonAdmin()]) {
+      await assertFails(
+        setDoc(doc(db, "admin_logs/forged-export"), {
+          action: "exportAttendees",
+          docPath: "users",
+          details: { rowCount: 0 },
+        }),
+      );
+      await assertFails(
+        updateDoc(doc(db, "admin_logs/export-1"), { details: { rowCount: 0 } }),
+      );
+      await assertFails(deleteDoc(doc(db, "admin_logs/export-1")));
+    }
+  });
+
+  it("the audit row is the operator's to read, not staff's", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "admin_logs/export-1")));
+    await assertFails(getDoc(doc(staff(), "admin_logs/export-1")));
+    await assertFails(getDoc(doc(nonAdmin(), "admin_logs/export-1")));
+  });
+});
+
+// Organizer-owned account fields (issue 185). `pastAttendance` is written by
+// the updateAttendee endpoint alone. The rules deny it to every client by
+// leaving it off the self-edit allowlist, and this block is the proof: each
+// denied write has a control, the same write without the organizer field,
+// that succeeds — so the denial is for that key and nothing else.
+describe("organizer-owned account fields stay server-written (issue 185)", () => {
+  const PROFILE = {
+    email: "records@example.com",
+    displayName: "Records One",
+    pronouns: "",
+    bio: "",
+    organization: "",
+    jobTitle: "",
+    photoPath: null,
+    socialHandles: {},
+    badges: [],
+    profileVisibility: "attendees_only",
+    profileComplete: true,
+    registrationStatus: "approved",
+    approvalSource: "admin",
+    speakerId: null,
+    role: "attendee",
+  };
+  // One account with no list yet, and one that already holds a list.
+  const FRESH = { uid: "records-fresh", ...PROFILE };
+  const HELD = { uid: "records-held", ...PROFILE, pastAttendance: ["2024"] };
+
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "users/records-fresh"), FRESH);
+      await setDoc(doc(db, "users/records-held"), HELD);
+      await setDoc(doc(db, "users_public/records-held"), {
+        uid: "records-held",
+        displayName: "Records One",
+        badges: [],
+        profileVisibility: "attendees_only",
+        speakerId: null,
+      });
+      await setDoc(doc(db, "schedule_shares/records-held"), {
+        sessionIds: ["session-1"],
+        displayName: "Records One",
+        scheduleVisibility: "private",
+      });
+    });
+  });
+
+  const fresh = () => doc(attendee("records-fresh"), "users/records-fresh");
+  const held = () => doc(attendee("records-held"), "users/records-held");
+
+  it("the owner cannot set pastAttendance alone", async () => {
+    await assertFails(updateDoc(fresh(), { pastAttendance: ["2023"] }));
+  });
+
+  it("the owner cannot set it beside a field they own; the same edit without it succeeds", async () => {
+    await assertFails(updateDoc(fresh(), { displayName: "Records Renamed", pastAttendance: ["2023"] }));
+    await assertSucceeds(updateDoc(fresh(), { displayName: "Records Renamed" }));
+  });
+
+  it("the owner cannot set it through a setDoc that repeats every stored field; the same setDoc without it succeeds", async () => {
+    const stored = { ...FRESH, displayName: "Records Renamed" };
+    await assertFails(setDoc(fresh(), { ...stored, pastAttendance: ["2023"] }));
+    await assertSucceeds(setDoc(fresh(), { ...stored, bio: "A new bio." }));
+  });
+
+  it("the owner cannot change or remove a stored list, by update, deleteField, or a setDoc that leaves it out", async () => {
+    await assertFails(updateDoc(held(), { pastAttendance: ["2024", "2025"] }));
+    await assertFails(updateDoc(held(), { pastAttendance: [] }));
+    await assertFails(updateDoc(held(), { pastAttendance: deleteField() }));
+    const { pastAttendance: _list, ...withoutList } = HELD;
+    await assertFails(setDoc(held(), withoutList));
+    // The control: repeating the stored list unchanged is not a write to it.
+    await assertSucceeds(setDoc(held(), { ...HELD, bio: "Still here." }));
+    await assertSucceeds(updateDoc(held(), { bio: "Here again." }));
+  });
+
+  it("another attendee and both admin tiers are denied the same writes from the browser", async () => {
+    for (const db of [attendee("approved-1"), staff(), admin()]) {
+      await assertFails(updateDoc(doc(db, "users/records-fresh"), { pastAttendance: ["2023"] }));
+      await assertFails(updateDoc(doc(db, "users/records-held"), { pastAttendance: deleteField() }));
+    }
+  });
+
+  it("no client of either tier can delete the account, its directory profile, or its schedule share", async () => {
+    for (const db of [staff(), admin(), attendee("records-held")]) {
+      await assertFails(deleteDoc(doc(db, "users/records-held")));
+      await assertFails(deleteDoc(doc(db, "users_public/records-held")));
+      await assertFails(deleteDoc(doc(db, "schedule_shares/records-held")));
+    }
+  });
+
+  it("the owner can still read their own account document, list included", async () => {
+    const snap = await assertSucceeds(getDoc(held()));
+    if (!snap.data().pastAttendance) throw new Error("pastAttendance is on the owner's own account document");
+  });
+});
+
+// The Unpublished changes page and the admin banner (issue #196) read the
+// dirty drafts of every publishable collection and the publish runs straight
+// from the browser. These are list queries, not the single-document reads
+// the tier matrix above pins, so each shape the browser runs is pinned here
+// (apps/web/src/admin/pendingChangesSource.js): both tiers may run it, and a
+// signed-in non-admin and an anonymous client may not.
+describe("unpublished changes reads (issue 196)", () => {
+  // The failed read, as pendingChangesSource.js subscribeFailedPublishRuns
+  // builds it (its web test pins the same clauses).
+  const failedRuns = (db) =>
+    query(
+      collection(db, "cmsPublishQueue"),
+      where("status", "==", "failed"),
+      orderBy("requestedAt", "desc"),
+      limit(20),
+    );
+
+  const shapes = [
+    ...PUBLISHABLE.map((c) => [
+      `${c}_drafts where status == dirty`,
+      (db) => query(collection(db, `${c}_drafts`), where("status", "==", "dirty")),
+    ]),
+    [
+      "cmsPublishQueue newest first, limit 10",
+      (db) => query(collection(db, "cmsPublishQueue"), orderBy("requestedAt", "desc"), limit(10)),
+    ],
+    [
+      "cmsPublishQueue where status == failed, newest first, limit 20",
+      (db) => failedRuns(db),
+    ],
+  ];
+
+  for (const [label, build] of shapes) {
+    it(`${label}: an operator and a staff member may run it`, async () => {
+      await assertSucceeds(getDocs(build(admin())));
+      await assertSucceeds(getDocs(build(staff())));
+    });
+
+    it(`${label}: a signed-in non-admin and an anonymous client may not`, async () => {
+      await assertFails(getDocs(build(nonAdmin())));
+      await assertFails(getDocs(build(anon())));
+    });
+  }
+
+  it("the failed read returns the 20 newest failed runs when more than 20 are failed", async () => {
+    // Ids that sort OLDEST first, so a read that took the first 20 by id
+    // would list the oldest runs and drop the newest.
+    const ids = Array.from({ length: 25 }, (_, i) => `failed-run-${String(i).padStart(2, "0")}`);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (const [i, id] of ids.entries()) {
+        await setDoc(doc(db, `cmsPublishQueue/${id}`), {
+          status: "failed",
+          error: "stopped",
+          request: { cmsContent: ["a"] },
+          progress: {},
+          requestedBy: ADMIN_EMAIL,
+          requestedAt: new Date(Date.UTC(2026, 8, 1, 12, i)),
+        });
+      }
+    });
+    try {
+      const snap = await getDocs(failedRuns(staff()));
+      const listed = snap.docs.map((d) => d.id);
+      const newest = ids.slice(5).reverse();
+      if (JSON.stringify(listed) !== JSON.stringify(newest)) {
+        throw new Error(`expected the 20 newest failed runs, got ${JSON.stringify(listed)}`);
+      }
+    } finally {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        for (const id of ids) await deleteDoc(doc(ctx.firestore(), `cmsPublishQueue/${id}`));
+      });
+    }
+  });
+
+  it("the dirty drafts query returns the seeded dirty draft to staff", async () => {
+    const snap = await getDocs(
+      query(collection(staff(), "cmsContent_drafts"), where("status", "==", "dirty")),
+    );
+    if (!snap.docs.some((d) => d.id === "pub")) {
+      throw new Error("the dirty draft was not listed");
+    }
+  });
+});
+
+// The home page's History section (issue #194) reads cmsTimeline through the
+// runtime listener, and the timeline editor lists both revisions. No rule
+// changed for it: these pin that the listener's query and the editor's list
+// reads are the reads the existing rules allow.
+describe("cmsTimeline: the listener's query and the editor's list reads (issue 194)", () => {
+  it("an anonymous reader may run the listener's visible-only query, and gets only visible entries", async () => {
+    const snap = await assertSucceeds(
+      getDocs(query(collection(anon(), "cmsTimeline"), where("visible", "==", true))),
+    );
+    const ids = snap.docs.map((d) => d.id);
+    if (!ids.includes("pub")) throw new Error(`expected the visible entry, got ${ids.join(", ")}`);
+    if (ids.includes("hidden")) throw new Error("a hidden entry reached an anonymous reader");
+  });
+
+  it("an anonymous reader may not list the collection without the visibility clause", async () => {
+    await assertFails(getDocs(collection(anon(), "cmsTimeline")));
+  });
+
+  it("either admin tier may list both revisions, as the editor does", async () => {
+    for (const db of [staff(), admin()]) {
+      await assertSucceeds(getDocs(collection(db, "cmsTimeline")));
+      await assertSucceeds(getDocs(collection(db, "cmsTimeline_drafts")));
+    }
+  });
+
+  it("a signed-in non-admin may not list the drafts, nor write either revision", async () => {
+    await assertFails(getDocs(collection(nonAdmin(), "cmsTimeline_drafts")));
+    await assertFails(getDocs(collection(anon(), "cmsTimeline_drafts")));
+    for (const db of [nonAdmin(), staff(), admin()]) {
+      await assertFails(setDoc(doc(db, "cmsTimeline/new-entry"), { year: 2024, title: "x", visible: true }));
+      await assertFails(setDoc(doc(db, "cmsTimeline_drafts/new-entry"), { year: 2024, title: "x" }));
+    }
   });
 });

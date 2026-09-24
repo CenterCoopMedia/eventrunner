@@ -58,6 +58,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { markTourDone } from '../tourState.js';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 import { NAV_PLACEMENT_LABELS } from '../../lib/themeRuntime.js';
 
@@ -133,6 +134,9 @@ function urlOf(callIndex) {
 }
 
 beforeEach(() => {
+  // The editor tour (issue #198) opens on a first visit; this file tests
+  // the page, so the account has already ended it.
+  markTourDone('admin-1');
   liveDocs = [];
   draftDocs = [];
   listenerError = null;

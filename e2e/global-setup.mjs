@@ -7,11 +7,12 @@
 //      (spec §5.1). This is also where sessionBookmarks and
 //      autoApproveTicketHolders get turned on for the ticket-claim journey.
 //   2. seed-demo-event.cjs — layers the synthetic demo fixture on top
-//      (§5.4): sessions, speakers, sponsors. It never touches config/event
-//      once init has already created it (idempotency rule, scripts/lib/
-//      idempotency.cjs) — only cmsPages/cmsContent (still `seeded: true`,
-//      so refreshed with the demo's overlay copy) and the collections init
-//      does not seed at all (cmsSchedule, cmsOrganizations, speakers).
+//      (§5.4): sessions, speakers, sponsors, past editions. It never
+//      touches config/event once init has already created it (idempotency
+//      rule, scripts/lib/idempotency.cjs) — only cmsPages/cmsContent (still
+//      `seeded: true`, so refreshed with the demo's overlay copy) and the
+//      collections init does not seed at all (cmsSchedule, cmsOrganizations,
+//      cmsTimeline, cmsUpdates, speakers).
 //
 // Runs inside `firebase emulators:exec` (scripts/dev/run-e2e.sh), so
 // FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST /

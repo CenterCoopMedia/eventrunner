@@ -32,6 +32,7 @@ import { PullQuoteBudget } from '../components/blocks/pullQuoteBudget.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import LongReadOpening from '../components/editorial/LongReadOpening.jsx';
 import SectionIndexNav from '../components/SectionIndexNav.jsx';
+import SectionEditLink from '../components/SectionEditLink.jsx';
 import { blockMatchesQuery } from '../lib/blockSearchText.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { inputClass, primaryActionClass, quietActionClass } from '../components/controlClasses.js';
@@ -399,6 +400,7 @@ export default function ContentPage() {
                   id={`section-${section.id}`}
                   title={section.label}
                   tabIndex={-1}
+                  action={<SectionEditLink pageId={page.id} sectionId={section.id} label={section.label} />}
                 />
               )}
               <div className={index === 0 ? undefined : 'mt-md'}>
@@ -417,6 +419,16 @@ export default function ContentPage() {
                   image={venueMapImage}
                   className={blocks.length > 0 ? 'mt-md' : undefined}
                 />
+                {/* A section with no visible head carries its edit link
+                    (issue #198) after its content, never above it. */}
+                {isTitleRepeatingSection(section, page) ? (
+                  <SectionEditLink
+                    pageId={page.id}
+                    sectionId={section.id}
+                    label={section.label}
+                    className="mt-sm"
+                  />
+                ) : null}
               </div>
             </section>
           ))}

@@ -48,7 +48,7 @@ function routeContext(pathname, pages) {
   const routes = [
     [/^\/schedule\/[^/]+$/, 'session', '/schedule/:sessionId'],
     [/^\/speakers\/[^/]+$/, 'speaker', '/speakers/:slug'],
-    [/^\/sponsors\/[^/]+$/, 'sponsor', '/sponsors/:id'],
+    [/^\/sponsors\/[^/]+$/, 'sponsor', '/sponsors/:slug'],
     [/^\/updates\/[^/]+$/, 'update', '/updates/:id'],
     [/^\/attendees\/[^/]+$/, 'attendee-profile', '/attendees/:uid'],
     [/^\/speaker\//, 'speaker-account', '/speaker/:action'],

@@ -145,7 +145,7 @@ export const pagesData = [
       {
         id: 'history',
         label: 'History',
-        description: 'Background on previous editions of the event.',
+        description: 'Background on previous editions of the event. The editions themselves come from the Timeline list, not from here.',
         allowedBlocks: [
           'richtext',
           'image',
@@ -224,7 +224,20 @@ export const pagesData = [
     order: 3,
     visible: true,
     systemPage: true,
-    sections: [],
+    sections: [
+      {
+        id: 'sponsor_packages',
+        label: 'Sponsorship packages',
+        description: 'What a sponsor can support, one package per block. The section is not shown until it holds a package.',
+        allowedBlocks: [
+          'sponsor_package',
+          'richtext',
+        ],
+        maxBlocks: 6,
+        reorderable: true,
+        defaultBlocks: [],
+      },
+    ],
     seeded: true,
   },
   {

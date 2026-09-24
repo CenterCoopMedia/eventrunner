@@ -5,7 +5,7 @@
 // of the page would drag August's month head above October's. Pinned is not
 // a date, so it is its own named run. These pin that.
 import { describe, expect, it } from 'vitest';
-import { groupUpdates, publishDateLabel, publishMonthLabel, sortUpdates } from './updateDates.js';
+import { compareUpdates, groupUpdates, publishDateLabel, publishMonthLabel, sortUpdates } from './updateDates.js';
 
 const post = (id, publishAt, extra = {}) => ({ id, title: id, publishAt, ...extra });
 
@@ -84,5 +84,73 @@ describe('groupUpdates', () => {
 
   it('makes no runs at all from an empty feed', () => {
     expect(groupUpdates([])).toEqual([]);
+  });
+});
+
+// The one order the feed and the admin's updates list share (issue #190).
+describe('compareUpdates', () => {
+  it('puts pinned first, then newest first, then the undated', () => {
+    const shuffled = [
+      post('undated', null),
+      post('old', '2026-09-01T12:00:00Z'),
+      post('pinned-old', '2026-08-01T12:00:00Z', { pinned: true }),
+      post('new', '2026-10-01T12:00:00Z'),
+    ];
+    expect(shuffled.slice().sort(compareUpdates).map((u) => u.id)).toEqual(['pinned-old', 'new', 'old', 'undated']);
+  });
+
+  it('is the order sortUpdates uses, and a date a year ahead is simply the newest', () => {
+    const list = [post('now', '2026-10-01T12:00:00Z'), post('next-year', '2027-10-01T12:00:00Z')];
+    expect(sortUpdates(list).map((u) => u.id)).toEqual(list.slice().sort(compareUpdates).map((u) => u.id));
+    expect(sortUpdates(list)[0].id).toBe('next-year');
+  });
+
+  it('reads a pin only when it is true, and ties two undated posts', () => {
+    expect(compareUpdates(post('a', null, { pinned: 'yes' }), post('b', null))).toBe(0);
+  });
+});
+
+// The lead (issue #191): the first featured post in the feed's order, alone
+// under "Featured", ahead of every other run.
+describe('groupUpdates: the featured lead', () => {
+  it('leads with the first featured post in sorted order, and does not list it again', () => {
+    const sorted = sortUpdates([
+      post('newer', '2026-10-20T12:00:00Z'),
+      post('featured', '2026-10-03T12:00:00Z', { featured: true }),
+      post('pinned', '2026-08-02T12:00:00Z', { pinned: true }),
+    ]);
+    const runs = groupUpdates(sorted);
+    expect(runs.map((run) => [run.kind, run.label, run.members.map((m) => m.id)])).toEqual([
+      ['lead', 'Featured', ['featured']],
+      ['pinned', 'Pinned', ['pinned']],
+      ['month', 'October 2026', ['newer']],
+    ]);
+    const ids = runs.flatMap((run) => run.members.map((m) => m.id));
+    expect(ids.filter((id) => id === 'featured')).toHaveLength(1);
+  });
+
+  it('lets a pinned featured post beat a newer featured one, and leaves the second in its place', () => {
+    const sorted = sortUpdates([
+      post('featured-newer', '2026-10-20T12:00:00Z', { featured: true }),
+      post('featured-pinned', '2026-08-02T12:00:00Z', { featured: true, pinned: true }),
+    ]);
+    expect(groupUpdates(sorted).map((run) => [run.kind, run.members.map((m) => m.id)])).toEqual([
+      ['lead', ['featured-pinned']],
+      ['month', ['featured-newer']],
+    ]);
+  });
+
+  it('features a post only for a real true', () => {
+    const sorted = sortUpdates([post('a', '2026-10-20T12:00:00Z', { featured: 'yes' }), post('b', '2026-10-19T12:00:00Z', { featured: 1 })]);
+    expect(groupUpdates(sorted).map((run) => run.kind)).toEqual(['month']);
+  });
+
+  it('still heads the months on the event’s clock after the lead', () => {
+    const sorted = sortUpdates([
+      post('featured', '2026-10-03T12:00:00Z', { featured: true }),
+      post('late', '2026-11-01T02:30:00Z'),
+    ]);
+    expect(groupUpdates(sorted, 'America/Los_Angeles').map((run) => run.label)).toEqual(['Featured', 'October 2026']);
+    expect(groupUpdates(sorted, 'Pacific/Auckland').map((run) => run.label)).toEqual(['Featured', 'November 2026']);
   });
 });

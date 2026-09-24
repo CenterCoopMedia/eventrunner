@@ -500,3 +500,49 @@ test('the publish-set rule binds cmsSchedule only', async () => {
   );
   assert.equal(res.statusCode, 200);
 });
+
+// --- the failure record (issue #196) -------------------------------------------
+
+test('a failed publish row stays failed, with its error, through later publishes, and the failed read finds it', async () => {
+  // The Unpublished changes page lists the 20 newest rows still marked
+  // failed (where status == 'failed', newest first), so a run that stopped
+  // part-way cannot scroll out of view behind newer finished runs before it
+  // is resumed.
+  const seed = {};
+  const ids = [];
+  for (let i = 0; i < 134; i += 1) {
+    const id = `s-${String(i).padStart(3, '0')}`;
+    ids.push(id);
+    seed[`cmsSchedule_drafts/${id}`] = { title: `S${i}`, visible: true, status: 'dirty' };
+  }
+  seed['cmsContent_drafts/hero__title'] = { value: 'v1', visible: true, status: 'dirty', basedOnRevision: null };
+  const db = makeFakeDb(seed);
+  db.failAtCommit = 2;
+
+  let res = fakeRes();
+  await createCmsPublishHandler(deps(db))(req({ body: { collection: 'cmsSchedule', docIds: ids } }), res);
+  assert.equal(res.statusCode, 500);
+  const failedId = res.body.queueId;
+
+  for (let later = 1; later <= 3; later += 1) {
+    res = fakeRes();
+    await createCmsPublishHandler({ ...deps(db), now: () => NOW + later * 60_000 })(
+      req({ body: later === 1 ? { collection: 'cmsContent', docIds: ['hero__title'] } : { all: true } }),
+      res,
+    );
+    assert.equal(res.statusCode, 200);
+  }
+
+  const row = db.read('cmsPublishQueue', failedId);
+  assert.equal(row.status, 'failed');
+  assert.equal(typeof row.error, 'string');
+  assert.ok(row.error.length > 0);
+  assert.equal(row.progress.cmsSchedule.published.length, 133);
+
+  const failed = await db.collection('cmsPublishQueue')
+    .where('status', '==', 'failed').orderBy('requestedAt', 'desc').limit(20).get();
+  assert.deepEqual(failed.docs.map((doc) => doc.id), [failedId]);
+  const newest = await db.collection('cmsPublishQueue').orderBy('requestedAt', 'desc').limit(1).get();
+  assert.notEqual(newest.docs[0].id, failedId);
+  assert.equal(newest.docs[0].data().status, 'done');
+});

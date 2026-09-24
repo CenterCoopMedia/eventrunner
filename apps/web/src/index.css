@@ -2074,6 +2074,16 @@
     margin: calc(-1 * var(--admin-stone-pad-block)) calc(-1 * var(--admin-stone-pad-inline)) 0;
     padding: var(--space-sm) var(--admin-stone-pad-inline);
   }
+  /* The editor tour (issue #198) is the one panel the shell sets inside the
+     stone above a page: the desk's panel ground and rule, named once here
+     for the tour and for the line that stands in when its chunk fails. The
+     page's title band pulls itself up by the stone's top padding, so the
+     tour keeps twice that under it: the band lands one padding below the
+     tour rather than over its foot. */
+  .admin-tour {
+    @apply rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md;
+    margin-bottom: calc(2 * var(--admin-stone-pad-block));
+  }
 
   /* Moment 1: a record with unpublished changes sits on the proof ground.
      The tint is a LAYER, so a successful publish resolves it to the base

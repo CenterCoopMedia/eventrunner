@@ -101,3 +101,29 @@ test('the first-paint source graph does not reach the Firebase Storage SDK', () 
     'lib/photoUpload.js must stay behind the lazy /profile route',
   );
 });
+
+// Issue #198: the public site carries one edit link per section for a
+// signed-in admin, and nothing of the admin itself. A per-field overlay, or
+// an import of an admin helper into the link, would put the admin bundle in
+// the first paint; this holds the line in source.
+test('the first-paint source graph reaches the section edit link and nothing under src/admin', () => {
+  const { files } = eagerSourceGraph(path.join(WEB_SRC, 'main.jsx'));
+  assert.equal(files.has(path.join(WEB_SRC, 'components', 'SectionEditLink.jsx')), true);
+  const adminFiles = [...files].filter((file) =>
+    file.startsWith(path.join(WEB_SRC, 'admin') + path.sep),
+  );
+  assert.deepEqual(adminFiles, [], 'a file under src/admin is in the first-paint graph');
+});
+
+// The editor tour is its own chunk, fetched only while it is open, so the
+// admin entry chunk every admin screen waits on carries only its button.
+test('the admin entry graph does not reach the editor tour', () => {
+  const { files } = eagerSourceGraph(path.join(WEB_SRC, 'admin', 'AdminApp.jsx'));
+  assert.equal(files.has(path.join(WEB_SRC, 'admin', 'AdminLayout.jsx')), true);
+  assert.equal(files.has(path.join(WEB_SRC, 'admin', 'tourState.js')), true);
+  assert.equal(
+    files.has(path.join(WEB_SRC, 'admin', 'components', 'AdminTour.jsx')),
+    false,
+    'admin/components/AdminTour.jsx must stay behind its lazy import in AdminLayout.jsx',
+  );
+});

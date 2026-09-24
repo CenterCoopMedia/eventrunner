@@ -76,6 +76,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { markTourDone } from '../tourState.js';
 import { PREVIEW_COMPARE_SCOPE_ID, PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
 
 // Hex values are DATA here, never literals in source (spec §7.6 forbids hex
@@ -191,6 +192,9 @@ function panelTitles() {
 }
 
 beforeEach(() => {
+  // The editor tour (issue #198) opens on a first visit; this file tests
+  // the page, so the account has already ended it.
+  markTourDone('admin-1');
   configSubscriptions.clear();
   document.getElementById(PREVIEW_STYLE_ID)?.remove();
   for (const attribute of ['theme', 'mode', 'motifSet', 'texture']) {

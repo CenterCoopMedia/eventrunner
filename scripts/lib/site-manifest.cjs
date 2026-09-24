@@ -52,7 +52,7 @@ const SYSTEM_PAGE_FEATURE_GATES = Object.freeze(
 /**
  * System page ids whose own React route tree owns further paths under it
  * (apps/web/src/App.jsx): `/schedule/:sessionId` and `/schedule/mine`,
- * `/speakers/:slug`, `/sponsors/:id`, `/attendees/:uid`, `/updates/:id`. When one of these
+ * `/speakers/:slug`, `/sponsors/:slug`, `/attendees/:uid`, `/updates/:id`. When one of these
  * pages is excluded, robots.txt has to disallow the whole subtree — an
  * exact-path rule for `/schedule` alone would leave every session detail
  * page reachable. The home page carries no such subtree.

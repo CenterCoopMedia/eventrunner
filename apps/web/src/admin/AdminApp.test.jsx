@@ -81,8 +81,9 @@ vi.mock('firebase/firestore', () => ({
   }),
 }));
 
-// The admin endpoints the Access page calls; the shell tests below drive a
-// change to the signed-in account through them.
+// Every admin endpoint the shell's pages call goes through this mock: the
+// Access page's changes to the signed-in account, and the overview's
+// figures.
 const adminCall = vi.fn(() => Promise.resolve({}));
 vi.mock('./adminApi.js', async () => {
   const actual = await vi.importActual('./adminApi.js');
@@ -90,6 +91,16 @@ vi.mock('./adminApi.js', async () => {
 });
 
 import App from '../App.jsx';
+
+// The overview asks getEventStats for its figures on mount (issue #179).
+const STATS = {
+  readAt: '2026-10-14T13:14:00.000Z',
+  registrations: { total: 9, byStatus: { pending: 1, ticketed: 2, approved: 3, revoked: 3 }, profileComplete: 4 },
+  tickets: { total: 0, byStatus: { valid: 0, refunded: 0, cancelled: 0, pending_info: 0 } },
+  speakers: { total: 0, byStatus: { draft: 0, invited: 0, accepted: 0, approved: 0, removed: 0 } },
+  content: {},
+  errors: { unresolved: 0 },
+};
 
 async function renderAt(path) {
   const result = render(
@@ -119,7 +130,7 @@ beforeEach(() => {
   pendingProbe = null;
   pendingOperatorProbe = null;
   adminCall.mockReset();
-  adminCall.mockImplementation(() => Promise.resolve({}));
+  adminCall.mockImplementation((name) => Promise.resolve(name === 'getEventStats' ? STATS : {}));
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
 });
 
@@ -142,23 +153,34 @@ describe('admin route gating', () => {
     expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
   });
 
-  it('renders the admin shell for an admin, defaulting to the pages list', async () => {
+  it('renders the admin shell for an admin, opening on the overview', async () => {
     await renderAt('/admin');
 
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Pages' })).toBeInTheDocument();
+    // /admin opens on the overview (issue #179), which reads its figures
+    // from the server.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(adminCall).toHaveBeenCalledWith('getEventStats', {}));
+    expect(adminCall.mock.calls.filter(([name]) => name === 'getEventStats')).toHaveLength(1);
     // Every settings surface is reachable from the shell.
     for (const tab of [
+      'Overview',
       'Pages',
       'Sessions',
       'Content',
+      'Updates',
       'Event',
       'Features',
       'Badges',
       'Branding',
       'Live updates',
       'Feedback',
+      'Email log',
+      'Version history',
+      'Change requests',
       'System errors',
+      'Unpublished changes',
     ]) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
@@ -217,8 +239,11 @@ describe('admin route gating', () => {
     await renderAt('/admin');
 
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Pages' })).toBeInTheDocument();
-    for (const tab of ['Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Event']) {
+    // Staff open on the overview too: it is a staff section, so the first
+    // page they meet is one they may open.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -226,6 +251,98 @@ describe('admin route gating', () => {
     }
     // The tier is said in a word beside the address, never left to inference.
     expect(screen.getByText('Staff')).toBeInTheDocument();
+  });
+
+  it('opens the email log for a staff admin: the log is staff visible', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    adminCall.mockImplementation((name) =>
+      Promise.resolve(name === 'listSentEmails' ? { rows: [], nextCursor: null, scanned: 0 } : {}),
+    );
+    await renderAt('/admin/email-log');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Email log' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Email log' })).toHaveAttribute('aria-current', 'page');
+    // The page's calls go through the shell's admin call mock.
+    await waitFor(() => expect(adminCall).toHaveBeenCalledWith('listSentEmails', expect.any(Object)));
+  });
+
+  it('opens change requests for a staff admin: the page loads on demand and reads the store', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/change-requests');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Change requests' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Change requests' })).toHaveAttribute('aria-current', 'page');
+    // The mocked listener answers with no rows.
+    expect(await screen.findByText('No one has sent a change request yet.')).toBeInTheDocument();
+    // The flag is off in the build-time snapshot: no form, and the notice.
+    expect(screen.queryByRole('button', { name: 'Send request' })).toBeNull();
+    expect(screen.getByText('Change requests are off. An operator can turn them on under Features.')).toBeInTheDocument();
+  });
+
+  it('opens the organizations list and editor for a staff admin: organizations are content', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/organizations');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Organizations' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Organizations' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getAllByRole('link', { name: 'Add an organization' })[0]);
+    expect(await screen.findByRole('heading', { level: 1, name: 'New organization' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+  });
+
+  it('opens version history for a staff admin, the record list and one record’s versions', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    adminCall.mockImplementation((name) =>
+      Promise.resolve(name === 'cmsGetVersionHistory' ? { entries: [], nextCursor: null } : {}),
+    );
+    await renderAt('/admin/versions');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Version history' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Version history' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('reads one record’s versions through the shell’s admin call, staff included', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    adminCall.mockImplementation((name) =>
+      Promise.resolve(name === 'cmsGetVersionHistory' ? { entries: [], nextCursor: null } : {}),
+    );
+    await renderAt('/admin/versions/cmsContent/hero__subtitle');
+
+    expect(await screen.findByRole('heading', { name: 'No published versions yet' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(adminCall).toHaveBeenCalledWith('cmsGetVersionHistory', { docPath: 'cmsContent/hero__subtitle', limit: 20 });
+  });
+
+  it('opens the timeline list and editor for a staff admin: timeline entries are content', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/timeline');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Timeline' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Timeline' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getAllByRole('link', { name: 'Add an entry' })[0]);
+    expect(await screen.findByRole('heading', { level: 1, name: 'New entry' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+
+    // The editor's calls go through the shell's admin call mock.
+    adminCall.mockClear();
+    fireEvent.change(screen.getByLabelText('Year'), { target: { value: '2023' } });
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'A staff edition' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(adminCall).toHaveBeenCalledWith('cmsCreateContent', expect.objectContaining({
+      collection: 'cmsTimeline',
+      fields: { year: 2023, title: 'A staff edition', description: null },
+    })));
   });
 
   it('refuses a staff admin an operator route rather than only hiding its link', async () => {
@@ -247,6 +364,24 @@ describe('admin route gating', () => {
     await renderAt('/admin/pages/new');
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+  });
+
+  it('opens the update editor for a staff admin, and its save goes through the admin call (issue 190)', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/updates/new/update');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'New update' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Staff post' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Written by staff.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(adminCall).toHaveBeenCalledWith(
+      'cmsSaveUpdate',
+      expect.objectContaining({ update: expect.objectContaining({ title: 'Staff post' }), visible: true }),
+    ));
+    expect(adminCall.mock.calls.filter(([name]) => name === 'cmsPublish')).toHaveLength(0);
   });
 
   it('waits for the tier probe too, so the docket never draws the staff set and then grows', async () => {
@@ -363,7 +498,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

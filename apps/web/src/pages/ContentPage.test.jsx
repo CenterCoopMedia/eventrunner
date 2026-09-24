@@ -46,6 +46,10 @@ vi.mock('../firebase.js', () => ({
 }));
 
 import App from '../App.jsx';
+import ContentPage from './ContentPage.jsx';
+import AuthContext from '../contexts/AuthContext.jsx';
+import { ContentProvider } from '../contexts/ContentContext.jsx';
+import { EventConfigProvider } from '../contexts/EventConfigContext.jsx';
 import siteContent from '@generated/siteContent.js';
 import { eventConfig } from '@generated/eventConfig.js';
 import pagesData from '@generated/pagesData.js';
@@ -1110,5 +1114,67 @@ describe('ContentPage — search and section index on long pages', () => {
     // section is showing.
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'More detail' })).toBeInTheDocument();
+  });
+});
+
+// The section edit links on a content page (issue #198). The route itself is
+// rendered, inside the real config and content providers, under an auth
+// value that states the probe's answer, so the links read what the site does.
+describe('ContentPage section edit links', () => {
+  function renderFaqAs(auth) {
+    return render(
+      <MemoryRouter
+        initialEntries={['/faq']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <EventConfigProvider>
+          <AuthContext.Provider value={auth}>
+            <ContentProvider>
+              <ContentPage />
+            </ContentProvider>
+          </AuthContext.Provider>
+        </EventConfigProvider>
+      </MemoryRouter>,
+    );
+  }
+  const faq = pagesData.find((page) => page.id === 'faq');
+  const intro = faq.sections.find((section) => section.id === 'faq_intro');
+  const items = faq.sections.find((section) => section.id === 'faq_items');
+
+  it('puts the link in a visible head’s row, after the heading', async () => {
+    renderFaqAs({ adminStatus: 'admin' });
+    const heading = await screen.findByRole('heading', { level: 2, name: items.label });
+    const link = within(heading.parentElement).getByRole('link', { name: `Edit section: ${items.label}` });
+    expect(link).toHaveAttribute('href', '/admin/content/faq/faq_items');
+  });
+
+  it('puts the link after the content of a section whose heading is for screen readers only', async () => {
+    renderFaqAs({ adminStatus: 'admin' });
+    const heading = await screen.findByRole('heading', { level: 2, name: intro.label });
+    expect(heading).toHaveClass('sr-only');
+    const section = heading.closest('section');
+    const link = within(section).getByRole('link', { name: `Edit section: ${intro.label}` });
+    expect(link).toHaveAttribute('href', '/admin/content/faq/faq_intro');
+    // Last in the section's body, so nothing it draws sits under a control.
+    expect(link.parentElement.lastElementChild).toBe(link);
+    expect(heading.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('draws no link for a section the filter leaves out', async () => {
+    renderFaqAs({ adminStatus: 'admin' });
+    const filter = await screen.findByRole('searchbox', { name: 'Filter by keyword' });
+    fireEvent.change(filter, { target: { value: 'dietary' } });
+    expect(screen.queryByRole('heading', { name: intro.label })).toBeNull();
+    expect(screen.queryByRole('link', { name: `Edit section: ${intro.label}` })).toBeNull();
+    expect(screen.getByRole('link', { name: `Edit section: ${items.label}` })).toBeInTheDocument();
+  });
+
+  it('draws no link for a signed-out reader or a signed-in non-admin', async () => {
+    for (const auth of [null, { adminStatus: 'unknown' }, { adminStatus: 'denied' }]) {
+      const { unmount } = renderFaqAs(auth);
+      await screen.findByRole('heading', { level: 2, name: items.label });
+      expect(screen.queryByRole('link', { name: /^Edit section/ })).toBeNull();
+      unmount();
+    }
   });
 });

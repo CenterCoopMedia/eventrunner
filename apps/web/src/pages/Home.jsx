@@ -15,7 +15,10 @@ import RegistrationAction, {
   resolveRegistrationLink,
 } from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import SectionEditLink from '../components/SectionEditLink.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
+import HistorySection from '../components/HistorySection.jsx';
+import { resolvePageLayout } from '../lib/pageLayout.js';
 import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
 import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
 
@@ -33,18 +36,23 @@ import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
  * or of one where the event has not recorded its days or the operator has
  * not written the facts. A row with no cell at all draws nothing.
  *
+ * `action` is the control of the section the row stands for (issue #198):
+ * it sits in the facts cell's head, or after the row when that cell is not
+ * drawn, so the row keeps it either way.
+ *
  * @param {{
  *   days: object[],
  *   timezone?: string,
  *   eventConfig: object,
- *   facts: { id: string, title: string, cards: object[] } | null,
+ *   facts: { id: string, title: string, cards: object[], action?: import('react').ReactNode } | null,
+ *   action?: import('react').ReactNode,
  *   className?: string,
  * }} props
  */
-export function SummaryRow({ days, timezone, eventConfig, facts, className = '' }) {
+export function SummaryRow({ days, timezone, eventConfig, facts, action = null, className = '' }) {
   const clock = countdownDraws(eventConfig);
   if (days.length === 0 && !facts && !clock) return null;
-  return (
+  const row = (
     <div className={['stage-row', className].filter(Boolean).join(' ')}>
       {/* The dates as a ruled list, not a set of cards: the label in the
           heading face, the day's date and hours in the mono face so the
@@ -72,7 +80,7 @@ export function SummaryRow({ days, timezone, eventConfig, facts, className = '' 
       )}
       {facts ? (
         <section aria-labelledby={facts.id}>
-          <SectionHead level={2} id={facts.id} title={facts.title} />
+          <SectionHead level={2} id={facts.id} title={facts.title} action={facts.action} />
           <div className="mt-sm">
             {/* One cell wide, so the cards run down it rather than across
                 a track that cannot hold three of them. */}
@@ -82,6 +90,13 @@ export function SummaryRow({ days, timezone, eventConfig, facts, className = '' 
       ) : null}
       <EventCountdown eventConfig={eventConfig} />
     </div>
+  );
+  if (facts || !action) return row;
+  return (
+    <>
+      {row}
+      {action}
+    </>
   );
 }
 
@@ -157,10 +172,11 @@ export default function Home() {
   // it — still has dates and a clock to state, so the core draws the row
   // itself in that one case, with two cells instead of three.
   const hasFactsSection = (page?.sections ?? []).some((section) => section?.id === 'info');
-  // TWO SECTIONS THIS PAGE DRAWS ITSELF, AND BOTH STAY IN THE OPERATOR'S
-  // ORDER. Neither is a list of blocks the generic renderer can draw — the
-  // key facts group is an arrangement of its section's blocks (M7 issue 9)
-  // and the sponsor strip reads cmsOrganizations entirely (M7 issue 10) —
+  // THREE SECTIONS THIS PAGE DRAWS ITSELF, AND ALL STAY IN THE OPERATOR'S
+  // ORDER. None is a list of blocks the generic renderer can draw — the
+  // key facts group is an arrangement of its section's blocks (M7 issue 9),
+  // the sponsor strip reads cmsOrganizations entirely (M7 issue 10), and
+  // the history section adds the cmsTimeline editions (issue #194) —
   // but "the page draws it" used to mean "excluded from the section list
   // and rendered at a fixed point in the core", which silently took both
   // out of the ordering. An operator could drag either one anywhere in the
@@ -168,9 +184,12 @@ export default function Home() {
   //
   // `renderSection` replaces only what is drawn INSIDE a section's own
   // place. Every other section gets `undefined` and renders exactly as it
-  // did before, and either of these deleted from the page document is
-  // simply gone, like any other deleted section.
-  const renderHomeSection = (section, blocks) => {
+  // did before, and any of these deleted from the page document is simply
+  // gone, like any other deleted section.
+  // Each receives the section's edit link (issue #198) and draws it in its
+  // own head, the way the default draw does. The key facts row with no card
+  // has no head of its own, so its link sits after the row.
+  const renderHomeSection = (section, blocks, editLink) => {
     if (section.id === 'info') {
       // Grouped before the section is opened, because a section whose
       // blocks are all of some type this arrangement does not draw would
@@ -188,7 +207,10 @@ export default function Home() {
           days={days}
           timezone={eventConfig.timezone}
           eventConfig={eventConfig}
-          facts={cards.length ? { id: `section-${section.id}`, title: section.label, cards } : null}
+          facts={cards.length ? { id: `section-${section.id}`, title: section.label, cards, action: editLink } : null}
+          action={
+            <SectionEditLink pageId={page.id} sectionId={section.id} label={section.label} className="mt-sm" />
+          }
         />
       );
     }
@@ -209,6 +231,20 @@ export default function Home() {
           id={`section-${section.id}`}
           title={section.label}
           lede={lede?.value ?? null}
+          action={editLink}
+        />
+      );
+    }
+    if (section.id === 'history') {
+      // The section's own blocks, then the past editions from the Timeline
+      // list (issue #194), in this section's own place in the order.
+      return (
+        <HistorySection
+          id={`section-${section.id}`}
+          title={section.label}
+          blocks={blocks}
+          arrangement={resolvePageLayout(page).arrangement}
+          action={editLink}
         />
       );
     }
@@ -217,6 +253,9 @@ export default function Home() {
   // One lead image at most. An editor who stores several images in the
   // opening section gets the first one, never a gallery.
   const lead = heroBlocks.find((block) => block.blockType === 'image') ?? null;
+  // The lead is the core, so its section's edit link is drawn here, last in
+  // the lead, and only where the page states a hero section to open.
+  const heroSection = (page?.sections ?? []).find((section) => section?.id === 'hero');
   const plate = buildNameplate(eventConfig);
 
   return (
@@ -256,6 +295,9 @@ export default function Home() {
               <RegistrationAction placement="lead" />
               {heroCtas.map((block) => <CtaBlock key={`${block.section}__${block.field}`} block={block} />)}
             </div>
+          ) : null}
+          {heroSection ? (
+            <SectionEditLink pageId={page.id} sectionId="hero" label={heroSection.label} className="mt-sm" />
           ) : null}
         </EventHero>
       </section>

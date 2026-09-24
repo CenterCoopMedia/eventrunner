@@ -5,8 +5,9 @@
 // `main`, `below` — so these tests read the rendered document in order
 // rather than asserting that each piece exists somewhere on the page.
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import AuthContext from '../contexts/AuthContext.jsx';
 
 let page;
 let blocksBySection;
@@ -285,5 +286,84 @@ describe('SystemPage renderSection', () => {
     const plain = container.querySelectorAll('figure.quote-plain');
     expect(plain).toHaveLength(1);
     expect(plain[0].textContent).toContain('The second quote, further down the page.');
+  });
+});
+
+// One edit link per drawn section, for a signed-in admin only (issue #198).
+// The link opens the section's blocks, so it is per section and never per
+// block, and a section the page does not draw has none.
+describe('SystemPage section edit links', () => {
+  function renderAs(auth, props = {}) {
+    return render(
+      <MemoryRouter>
+        <AuthContext.Provider value={auth}>
+          <SystemPage pageId="schedule" {...props}>
+            <h1>Core</h1>
+          </SystemPage>
+        </AuthContext.Provider>
+      </MemoryRouter>,
+    );
+  }
+
+  const editLinks = (container) =>
+    [...container.querySelectorAll('a')].filter((link) => link.textContent.startsWith('Edit section'));
+
+  it('gives each drawn section in every slot exactly one link to its own editor, and an empty one none', () => {
+    page = {
+      id: 'schedule',
+      sections: [
+        section('above-one', 'above'),
+        section('main-one'),
+        section('empty-one'),
+        section('below-one', 'below'),
+      ],
+    };
+    blocksBySection = {
+      'above-one': [textBlock('above-one'), { ...textBlock('above-one'), field: 'more' }],
+      'main-one': [textBlock('main-one')],
+      'below-one': [textBlock('below-one')],
+    };
+    const { container } = renderAs({ adminStatus: 'admin' });
+    // Three drawn sections, four blocks: one link per section, not per block.
+    expect(editLinks(container).map((link) => link.getAttribute('href'))).toEqual([
+      '/admin/content/schedule/above-one',
+      '/admin/content/schedule/main-one',
+      '/admin/content/schedule/below-one',
+    ]);
+    for (const id of ['above-one', 'main-one', 'below-one']) {
+      const head = screen.getByRole('heading', { name: `${id} label` }).parentElement;
+      expect(within(head).getByRole('link', { name: `Edit section: ${id} label` })).toBeInTheDocument();
+    }
+  });
+
+  it('hands a custom draw the link as its third argument', () => {
+    page = { id: 'schedule', sections: [section('custom'), section('one')] };
+    blocksBySection = { one: [textBlock('one')] };
+    const renderSection = vi.fn((sectionDoc, _blocks, editLink) =>
+      sectionDoc.id === 'custom' ? <div><p>custom</p>{editLink}</div> : undefined,
+    );
+    const { container } = renderAs({ adminStatus: 'admin' }, { renderSection });
+    expect(renderSection).toHaveBeenCalledWith(page.sections[0], [], expect.anything());
+    expect(editLinks(container).map((link) => link.getAttribute('href'))).toEqual([
+      '/admin/content/schedule/custom',
+      '/admin/content/schedule/one',
+    ]);
+  });
+
+  it('draws no link for a signed-out reader or a non-admin, and leaves the reading order as it was', () => {
+    page = { id: 'schedule', sections: [section('above-one', 'above'), section('main-one')] };
+    blocksBySection = { 'above-one': [textBlock('above-one')], 'main-one': [textBlock('main-one')] };
+    const plain = renderPage();
+    const expected = readingOrder(plain.container);
+    plain.unmount();
+    for (const auth of [null, { adminStatus: 'unknown' }, { adminStatus: 'denied' }]) {
+      const { container, unmount } = renderAs(auth);
+      expect(editLinks(container)).toHaveLength(0);
+      expect(readingOrder(container)).toEqual(expected);
+      unmount();
+    }
+    // An admin's links add no heading or paragraph to the order either.
+    const admin = renderAs({ adminStatus: 'admin' });
+    expect(readingOrder(admin.container)).toEqual(expected);
   });
 });

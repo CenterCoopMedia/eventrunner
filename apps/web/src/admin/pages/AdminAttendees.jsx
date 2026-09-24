@@ -27,19 +27,43 @@
 // record state. A revoked account is dead matter: it keeps its word and
 // drops to the standing-matter ink (moment 1's device reused for the one
 // axis this surface actually has).
-import { useEffect, useMemo, useState } from 'react';
+//
+// Export (issue #184): the title band's one action saves the rows on screen
+// as a CSV file. The page sends the uids it shows, in the order it shows
+// them, plus the status filter and whether a search narrowed the list —
+// never the search text, which can name a person and would outlive them in
+// the audit row. The server re-reads each account, writes the admin_logs
+// row, and only then returns the file (functions/src/users/export.cjs).
+//
+// The organizer record (issue #185): "Edit record" on a row opens its
+// AttendeeRecordPanel, one at a time — the organizer-owned past attendance
+// list and the account delete. A deleted row leaves through the listener,
+// often before the call answers, so a delete's result is stated HERE, at
+// page level: a success line that takes focus, or an error notice that
+// keeps the uid and offers "Try the delete again" until a retry succeeds.
+// Only a refusal made before anything was deleted, for a row still listed,
+// goes back to that row's panel (refusedBeforeDelete). Every other failure
+// — delete-incomplete, a gateway timeout, a dropped connection — may have
+// come after the directory commit, and the retry resumes it.
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
+import { saveTextFile } from '../downloadFile.js';
 import {
   DestructiveConfirm,
   Notice,
   Panel,
+  SaveStatus,
   SelectField,
   TextField,
   rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import AttendeeRecordPanel, {
+  AttendeeRecordToggle,
+  refusedBeforeDelete,
+} from '../components/AttendeeRecordPanel.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -84,6 +108,11 @@ function canRevoke(row) {
   return ['ticketed', 'approved'].includes(row.registrationStatus);
 }
 
+/** "1 attendee", "42 attendees". */
+function attendeeCount(count) {
+  return `${count} attendee${count === 1 ? '' : 's'}`;
+}
+
 function matchesSearch(row, needle) {
   if (!needle) return true;
   const haystack = [row.displayName, row.email, row.organization, row.id]
@@ -98,17 +127,38 @@ export default function AdminAttendees() {
   const { showToast } = useToast();
 
   const [rows, setRows] = useState(null);
+  // The latest listener delivery, for a delete result that arrives after it.
+  const rowsRef = useRef(null);
   const [listError, setListError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [busyUid, setBusyUid] = useState(null);
   const [removingBadges, setRemovingBadges] = useState([]);
   const [badgeRemovalResult, setBadgeRemovalResult] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState(null);
+  // A second press in the same tick, before the disabled state renders,
+  // must not start a second export: each one writes an audit row.
+  const exportingRef = useRef(false);
+  const [openUid, setOpenUid] = useState(null);
+  // { tone: 'ok', message } after a delete, or { tone: 'incomplete', uid,
+  // name, message } while an account is out of the directory with data
+  // still to clear. It outlives the row, which the listener removes.
+  const [deleteResult, setDeleteResult] = useState(null);
+  const [retrying, setRetrying] = useState(false);
+  const deleteResultRef = useRef(null);
+  // { uid, error }: a refusal made before anything was deleted, shown in
+  // that row's panel while the row is still listed.
+  const [rowDeleteError, setRowDeleteError] = useState(null);
+
+  useEffect(() => {
+    if (deleteResult) deleteResultRef.current?.focus();
+  }, [deleteResult]);
 
   useEffect(() => {
     return subscribeAdminCollection(
       'users',
-      (docs) => { setRows(docs); setListError(null); },
+      (docs) => { rowsRef.current = docs; setRows(docs); setListError(null); },
       setListError,
     );
   }, []);
@@ -138,6 +188,86 @@ export default function AdminAttendees() {
     }
   }
 
+  async function exportShown() {
+    if (exportingRef.current || shown.length === 0) return;
+    exportingRef.current = true;
+    setExporting(true);
+    setExportResult(null);
+    try {
+      const result = await call('exportAttendees', {
+        uids: shown.map((row) => row.id),
+        filter: { status: filter, searched: search.trim() !== '' },
+      });
+      saveTextFile(result.filename, result.csv);
+      setExportResult({
+        tone: 'ok',
+        message: `Exported ${attendeeCount(result.rowCount)} to ${result.filename}. The export is in the admin log.`,
+      });
+    } catch (err) {
+      setExportResult({ tone: 'error', message: err.message });
+    } finally {
+      exportingRef.current = false;
+      setExporting(false);
+    }
+  }
+
+  function deleted({ name }) {
+    setOpenUid(null);
+    setRowDeleteError(null);
+    setDeleteResult({ tone: 'ok', message: `Deleted the account for ${name}.` });
+  }
+
+  function deleteUnfinished({ uid, name, error }) {
+    setOpenUid(null);
+    setRowDeleteError(null);
+    setDeleteResult({
+      tone: 'incomplete',
+      uid,
+      name,
+      // The server's own words when it says what happened; otherwise the
+      // call's own failure, with what it may mean.
+      message: error?.code === 'delete-incomplete'
+        ? error.message
+        : `The delete may not have finished. ${error?.message ?? ''}`.trim(),
+    });
+  }
+
+  function deleteStarted(uid) {
+    setRowDeleteError((current) => (current?.uid === uid ? null : current));
+  }
+
+  function deleteFailed({ uid, name, error }) {
+    // A 404 means nothing of the account remains.
+    if (error?.status === 404) {
+      deleted({ name });
+      return;
+    }
+    const stillListed = (rowsRef.current ?? []).some((listed) => listed.id === uid);
+    if (refusedBeforeDelete(error) && stillListed) {
+      setOpenUid(uid);
+      setRowDeleteError({ uid, error });
+      return;
+    }
+    deleteUnfinished({ uid, name, error });
+  }
+
+  async function retryDelete() {
+    if (deleteResult?.tone !== 'incomplete' || retrying) return;
+    const { uid, name } = deleteResult;
+    setRetrying(true);
+    try {
+      await call('deleteAttendee', { uid });
+      deleted({ name });
+    } catch (err) {
+      // A 404 on a retry means nothing of the account remains: the earlier
+      // call finished the work after all.
+      if (err?.status === 404) deleted({ name });
+      else deleteUnfinished({ uid, name, error: err });
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   async function removeCustomBadge(uid, badge) {
     const pendingKey = `${uid}:${badge}`;
     setRemovingBadges((current) => [...current, pendingKey]);
@@ -159,8 +289,49 @@ export default function AdminAttendees() {
       <AdminPageHeader
         title="Attendees"
         identifiers={rows ? `${shown.length} of ${rows.length} account${rows.length === 1 ? '' : 's'}` : undefined}
-        description="Registration status for every account. An approval you make here is recorded as an organizer decision and survives a ticket refund; a revocation is never undone by a later ticket sync."
+        description="Registration status for every account. An approval you make here is recorded as an organizer decision and survives a ticket refund; a revocation is never undone by a later ticket sync. An export holds names, email addresses, and profile details, and every export is recorded."
+        actions={
+          rows === null ? null : (
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              onClick={exportShown}
+              disabled={exporting || shown.length === 0}
+              aria-busy={exporting ? 'true' : undefined}
+            >
+              {exporting ? 'Exporting…' : `Export ${attendeeCount(shown.length)}`}
+            </button>
+          )
+        }
       />
+
+      {exportResult?.tone === 'ok' ? <SaveStatus message={exportResult.message} /> : null}
+      {exportResult?.tone === 'error' ? <Notice tone="error" message={exportResult.message} /> : null}
+
+      {deleteResult?.tone === 'ok' ? (
+        <p
+          ref={deleteResultRef}
+          tabIndex={-1}
+          role="status"
+          className="text-admin-sm text-admin-ink-secondary"
+        >
+          {deleteResult.message}
+        </p>
+      ) : null}
+      {deleteResult?.tone === 'incomplete' ? (
+        <div ref={deleteResultRef} tabIndex={-1} className="flex flex-col items-start gap-xs">
+          <Notice tone="error" message={`${deleteResult.name}: ${deleteResult.message}`} />
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={retryDelete}
+            disabled={retrying}
+            aria-busy={retrying ? 'true' : undefined}
+          >
+            {retrying ? 'Deleting…' : 'Try the delete again'}
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-end gap-sm">
         <div className="min-w-0 flex-1">
@@ -211,6 +382,11 @@ export default function AdminAttendees() {
                       {row.speakerId ? <StatusBadge tone="info">Speaker</StatusBadge> : null}
                     </div>
                     <p className={`mt-3xs truncate ${rowMetaClass}`}>{row.email}</p>
+                    {Array.isArray(row.pastAttendance) && row.pastAttendance.length > 0 ? (
+                      <p className={`mt-3xs ${rowMetaClass}`}>
+                        Past attendance: {row.pastAttendance.filter((entry) => typeof entry === 'string').join('; ')}
+                      </p>
+                    ) : null}
                     {Array.isArray(row.customBadges) && row.customBadges.length > 0 ? (
                       <div className="mt-xs">
                         <p className={rowMetaClass}>Custom badges</p>
@@ -246,7 +422,7 @@ export default function AdminAttendees() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 gap-xs">
+                  <div className="flex shrink-0 flex-wrap items-center gap-xs">
                     {canApprove(row) ? (
                       <button
                         type="button"
@@ -269,8 +445,25 @@ export default function AdminAttendees() {
                         onConfirm={() => act('revokeUser', row.id)}
                       />
                     ) : null}
+                    <AttendeeRecordToggle
+                      uid={row.id}
+                      open={openUid === row.id}
+                      onToggle={() => {
+                        setRowDeleteError(null);
+                        setOpenUid((current) => (current === row.id ? null : row.id));
+                      }}
+                    />
                   </div>
                 </div>
+                {openUid === row.id ? (
+                  <AttendeeRecordPanel
+                    row={row}
+                    deleteError={rowDeleteError?.uid === row.id ? rowDeleteError.error : null}
+                    onDeleteStart={deleteStarted}
+                    onDeleted={deleted}
+                    onDeleteFailed={deleteFailed}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

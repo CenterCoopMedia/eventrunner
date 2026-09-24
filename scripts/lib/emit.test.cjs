@@ -8,6 +8,8 @@ const path = require('node:path');
 const { emitAll, emitScheduleData, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
+const { organizationSlugError, validateOrganizationFields } = require('../../functions/src/cms/organizations.cjs');
+const { validateTimelineFields } = require('../../functions/src/cms/timeline.cjs');
 const {
   speakerDisplayName,
   buildPublicSpeaker,
@@ -44,6 +46,7 @@ test('generation does not depend on the order docs come back from Firestore', ()
     content: [...base.content].reverse(),
     sessions: [...base.sessions].reverse(),
     organizations: [...base.organizations].reverse(),
+    timeline: [...base.timeline].reverse(),
     speakers: [...base.speakers].reverse(),
   };
   assert.deepEqual(emitAll(shuffled), emitAll(base));
@@ -170,6 +173,70 @@ test('every demo page is a valid page doc, and the demo names stay fictional', (
     'Harborlight Media Summit',
     'Harborlight Cooperative',
   ]);
+});
+
+test('every demo organization passes the field checks an admin save applies (issue 192)', () => {
+  // The demo is seeded, never saved through the editor, so nothing else
+  // would notice a fixture sponsor the organization seam would refuse. Every
+  // field is checked, the three profile fields included.
+  for (const organization of demoEvent().organizations) {
+    const { id, ...fields } = organization;
+    const verdict = validateOrganizationFields(fields, fields);
+    assert.equal(verdict.ok, true, `${id}: ${JSON.stringify(verdict.errors)}`);
+    assert.deepEqual(verdict.fields, fields, `${id} is stored exactly as the seam would store it`);
+    // Its id is its page address (#193), so it has to be one.
+    assert.equal(organizationSlugError(id), null, `${id} is not a page address`);
+  }
+});
+
+test('every demo timeline entry passes the field checks an admin save applies (issue 194)', () => {
+  // Seeded, never saved through the editor, so nothing else would notice a
+  // fixture edition the timeline seam would refuse.
+  const { timeline } = demoEvent();
+  assert.ok(timeline.length >= 2);
+  for (const entry of timeline) {
+    const { id, visible, ...fields } = entry;
+    assert.equal(visible, true, `${id} is shown`);
+    const verdict = validateTimelineFields(fields, fields);
+    assert.equal(verdict.ok, true, `${id}: ${JSON.stringify(verdict.errors)}`);
+    assert.deepEqual(verdict.fields, fields, `${id} is stored exactly as the seam would store it`);
+    assert.match(entry.description, /This edition is fictional\.$/);
+  }
+});
+
+test('the timeline snapshot lists the published entries oldest first, without bookkeeping (issue 194)', () => {
+  const { 'timelineData.js': timelineData } = emitAll({
+    ...demoSnapshot(),
+    timeline: [
+      { id: 'b', year: 2025, title: 'Second', description: null, visible: true, revision: 2, status: 'clean' },
+      { id: 'a', year: 2023, title: 'First', description: 'One.', visible: true, revision: 1, seededAt: 'T0' },
+      { id: 'c', year: 2025, title: 'Also second', description: null, visible: true },
+    ],
+  });
+  const body = timelineData.slice(timelineData.indexOf('export const'));
+  assert.ok(body.indexOf("id: 'a'") < body.indexOf("id: 'b'"));
+  assert.ok(body.indexOf("id: 'b'") < body.indexOf("id: 'c'"));
+  assert.doesNotMatch(body, /revision|status|seededAt/);
+  assert.match(timelineData, /export default timelineData;/);
+});
+
+test('the demo sponsors page draws three packages, one per demo tier (issue 193)', () => {
+  const demo = demoEvent();
+  const sponsors = demo.pages.find((page) => page.id === 'sponsors');
+  const { seeded, ...contract } = sponsors;
+  assert.equal(seeded, true);
+  assert.equal(validatePageDoc(contract).ok, true);
+  const packages = demo.content.filter((doc) => doc.section === 'sponsor_packages');
+  assert.deepEqual(packages.map((doc) => doc.name), ['Presenting', 'Supporting', 'Partner']);
+  const tiers = new Set(demo.organizations.map((organization) => organization.tier.toLowerCase()));
+  for (const doc of packages) {
+    assert.equal(doc.blockType, 'sponsor_package');
+    assert.ok(tiers.has(doc.name.toLowerCase()), `${doc.name} is a demo tier`);
+    assert.match(doc.benefits, /illustrative/);
+    assert.match(doc.benefits, /Nothing here is on offer/);
+    const copy = `${doc.name} ${doc.price} ${doc.benefits.replace(/<[^>]*>/g, '')}`;
+    assert.ok(copy.length < 200, `${doc.id} keeps its copy under 200 characters (${copy.length})`);
+  }
 });
 
 test('demo speakers are canonical documents, and the bundle ships only their projection', () => {

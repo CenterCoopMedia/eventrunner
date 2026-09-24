@@ -206,6 +206,20 @@ describe('SponsorStrip', () => {
     expect(screen.queryByText('A paragraph.')).toBeNull();
   });
 
+  // The home page hands the strip its section's edit link (issue #198).
+  it('draws its action in the section head, after the heading', () => {
+    organizationsData = PUBLISHED;
+    render(
+      <SponsorStrip
+        id="section-sponsors"
+        title="Sponsors"
+        action={<a href="/admin/content/home/sponsors">Edit section</a>}
+      />,
+    );
+    const head = screen.getByRole('heading', { level: 2, name: 'Sponsors' }).parentElement;
+    expect(head.lastElementChild).toBe(screen.getByRole('link', { name: 'Edit section' }));
+  });
+
   it('renders nothing at all when there is nothing to acknowledge', () => {
     for (const list of [[], undefined, [org('one', 'Hidden', 'Partner', { visible: false })]]) {
       organizationsData = list;

@@ -17,6 +17,10 @@
 //
 // Heading level is a prop and never a size choice: pick the level the
 // document outline needs (§8.1) and let the variant carry the size.
+//
+// `action` is one control that belongs to the section, such as the admin's
+// "Edit section" link (issue #198). It is drawn LAST in the head row, after
+// the running rule and the folio, so it is never above the heading.
 import Rule from './Rule.jsx';
 
 /**
@@ -29,6 +33,7 @@ import Rule from './Rule.jsx';
  *   rule?: 'strong' | 'hairline' | 'none',
  *   className?: string,
  *   tabIndex?: -1,                      // a jump target a section index can focus (issue #14)
+ *   action?: import('react').ReactNode, // one control after the heading (issue #198)
  * }} props
  */
 export default function SectionHead({
@@ -40,6 +45,7 @@ export default function SectionHead({
   rule = 'strong',
   className = '',
   tabIndex,
+  action = null,
 }) {
   const Tag = `h${level >= 2 && level <= 6 ? level : 2}`;
   const isFolioHead = variant === 'folio';
@@ -69,6 +75,7 @@ export default function SectionHead({
         </Tag>
         <span aria-hidden="true" className="folio__rule flex-1 self-center" />
         {folio ? <p className="section-head__folio folio font-medium">{folio}</p> : null}
+        {action}
       </div>
     </div>
   );

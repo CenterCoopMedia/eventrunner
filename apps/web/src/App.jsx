@@ -111,7 +111,7 @@ export function AppRoutes() {
         <Route path="speakers" element={<DeferredPage component={Speakers} label="speakers" />} />
         <Route path="speakers/:slug" element={<DeferredPage component={SpeakerDetail} label="speaker" />} />
         <Route path="sponsors" element={<DeferredPage component={Sponsors} label="sponsors" />} />
-        <Route path="sponsors/:id" element={<DeferredPage component={SponsorDetail} label="sponsor" />} />
+        <Route path="sponsors/:slug" element={<DeferredPage component={SponsorDetail} label="sponsor" />} />
         <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
         <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
         <Route path="signin" element={<DeferredPage component={Login} label="sign in" />} />

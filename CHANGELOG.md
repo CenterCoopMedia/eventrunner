@@ -9,6 +9,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Change requests, off by default behind the `changeRequests` feature flag. With the flag on, a
+  signed-in visitor can select **Request a change** in the footer, and staff can send one from the
+  new Change requests page under Operations. Both reach one store through `submitChangeRequest`,
+  which takes the sender from the ID token, refuses every request while the flag is off, and
+  allows 5 requests per account in 15 minutes. The page lists the requests newest first with a
+  status filter kept in the address, moves each one through New, In progress, Done, or Declined,
+  and removes a request and its text outright. Every request, status change, and removal commits
+  with its admin log row, which never holds the text. Only admins read the store, and deleting an
+  account deletes its change requests (#188).
+- Bulk material download and coverage on the Materials page, for staff and operators. One ruled table lists
+  the materials for every session, hidden sessions included, up to 2,000 (past that it says so), with session
+  and review filters and sortable columns that state their order in words. Each file row has **Download** and
+  a checkbox; **Download as archive** saves the selected files as `session-materials.zip`, one folder per
+  session, at most 50 files and 9 MB (the platform stops a streamed response at 10 MB). The archive is not a
+  signed URL, which the issue named: Signing needs an IAM grant a fresh client project lacks, so the new
+  staff-tier `downloadSessionMaterialsArchive` endpoint builds a stored zip with `yazl` and streams it through
+  the function, as the single-file download already does. No link to a file is written anywhere. The server
+  writes one admin log entry per file before the first byte and refuses the archive without them, and a
+  transfer that fails part way saves nothing. A **Coverage** panel names the sessions and speakers with no
+  materials, from the same list the table shows: A pending or approved material counts, and only published
+  sessions with a speaker who is not removed are counted. The new `listAllSessionMaterials` endpoint reads the
+  list (#189).
+- The timeline editor, under Content, for staff and operators, and the past editions on the home
+  page. Each timeline entry is a year, a title, and an optional description. The list shows the
+  entries oldest first with each state in words, and the editor saves a draft or saves and
+  publishes through `cmsPublish`. The home page's History section draws its own blocks, then the
+  published entries as an ordered list, oldest first, with the year beside each title and no
+  counter. The site subscribes to `cmsTimeline` at runtime, so an entry published from the admin
+  appears on an open home page with no rebuild, and a new `timelineData.js` snapshot draws the
+  list on first paint, before any listener answers. The content save checks each field: a year that is not a whole
+  number from 1900 to 2100, a title that is not text on one line, a description longer than 600
+  characters, or a field the entry does not store is refused with the field named, and nothing is
+  written. The demo carries two fictional past editions (#194).
+- A page for each sponsor at `/sponsors/<slug>`, with the logo, the name, the description as the
+  standfirst, the tier as a term and its description, and the link to the sponsor's website. The
+  slug is the organization's document id, set once from its name in the editor, so the address
+  is unique by construction: a second organization claiming the same slug is refused with a 409
+  that names it when it is saved, not when it is published, and deleting an organization frees
+  it. The tier line above the name is gone, and the About section draws only when there is a
+  biography, so the description no longer prints twice. A new `sponsor_package` block type
+  (name, price, limit, and what the package includes) draws on the Sponsors page, in a
+  Sponsorship packages section the seed adds after the logo wall and leaves empty until an
+  operator adds a package. The demo carries three illustrative packages (#193).
+- The organizations editor, under Content, for staff and operators: a table of the organizations in
+  the order the Sponsors page draws them, with each state in words, and an editor for the name,
+  tier, order, logo, website, and description. Publishing goes through `cmsPublish`, as every
+  other editor does. The content save now checks each organization field's type and length: a
+  name that is not text, an order that is not a number, a website that does not start with
+  `http://` or `https://`, or a logo path that leaves the site's own files (a web address, a
+  leading `/`, or `..`) is refused with the field named, and nothing is written. The server does
+  not check that the logo file exists. The public site still drops a malformed organization that
+  reaches the collection another way (#192).
+- The updates editor, under Content, for staff and operators: a list of every update on the site's
+  Updates page with its state in the admin's three words, its date on the event's clock, and
+  whether it is pinned or hidden, and an editor for the title, the text, the date, the pin, and
+  whether the update shows. Save writes a draft through `cmsSaveUpdate`, and **Save and publish**
+  then calls `cmsPublish`, as every other editor does. The date is display scheduling only: a date
+  in the future never holds a publish back. A new update's id is made in the browser once per
+  form, so a retry after a failed publish rewrites the same draft. An update's picture and content
+  blocks are kept as they are on every save (#190).
+- An update category and a featured flag. `cmsSaveUpdate` takes `category` (null, or one line of
+  1 to 24 characters once trimmed, stored trimmed) and `featured` (a boolean), and refuses a bad
+  value by field name; both are optional on the wire and always stored. The rule lives in
+  `shared/update` (`validUpdateCategory`, `UPDATE_CATEGORY_MAX`), which the server and the Updates
+  page both read. The editor has a Category field that suggests the categories in use and a
+  Feature checkbox, and the list shows both. The Updates page sets a category as a plain tag
+  beside the title and opens with the first featured update in the feed's order under its own
+  Featured head, with a dateline and a standfirst. The demo updates carry four categories and one
+  featured update (#191).
+- Version history, under Content, for staff and operators. Pick a collection and a record to read
+  every version the record has had, newest first: the time of the publish on the event's clock,
+  the account that published it, and a table of each field that changed, with its value before
+  and after. Versions cannot be changed or restored. Every stored value shows as text.
+  `cmsGetVersionHistory` now sends named fields only. Each entry holds `id`, `docPath`,
+  `revision`, `visible`, `publishedAt` in milliseconds, `publishedBy`, `publishedByUid`,
+  `previousRevision`, and `changes`: each changed field path with its value before and after, a
+  time as milliseconds, at most 50, with `moreChanges` counting the rest. The server compares
+  each version with the one before it at no extra read. The stored field snapshot is no longer
+  sent (#195).
+- An editor tour in the admin panel. On a first visit a short tour opens above the page: a
+  welcome that names the three record words, one step for each rail group the account's tier can
+  open, and a step on the public edit links. **Next**, **Back**, **End tour** and the Escape key
+  work at every step, and each step's heading takes the focus. It is a panel, not an overlay, so
+  the page stays usable. The browser remembers the end per account; **Take the tour** at the foot
+  of the rail opens it again. The tour is its own lazy chunk (#198).
+- Section edit links on the public site. While an admin is signed in, each section a page draws
+  shows **Edit section** beside its heading (after the content where the heading is for screen
+  readers only), and the link opens that section's blocks in the admin panel. Visitors and
+  signed-in accounts that are not admins see nothing. The link reads the admin probe only and
+  imports nothing from the admin, and a bundle test holds that line. No endpoint, rule or stored
+  field changed (#198).
+- Unpublished changes, under Content, for staff and operators: every page, content block, session,
+  organization, update, and timeline entry that is saved and not yet on the site, in one ruled
+  table per collection with its state, when it was saved, and by whom. **Publish all** and a
+  publish per table call `cmsPublish`; a table's button waits while the list cannot be refreshed,
+  so a stale row is never published twice. Under the tables, **Recent publishes** lists the last 10
+  publish runs and the 20 newest runs still marked Failed, with **Resume publish** on a failed
+  run. A banner above every other admin page states the same count in one sentence and links to
+  the page. The banner and the page read one live source, the dirty drafts of each collection,
+  never the publish run rows, so they always agree. No endpoint or rule changed; one composite
+  index on `cmsPublishQueue` (`status`, `requestedAt` descending) orders the failed runs (#196).
+- The email log, under Operations, for staff and operators: every message the site sent, newest
+  first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
+  word. Search looks in the recipient and the subject across the 500 most recent messages at a
+  time; the source and status filters stay in the page address, and the search text never does.
+  A preview opens the stored body in an empty sandboxed frame under a content policy that blocks
+  script, remote images, and every other fetch, with every link shown as its words only, so opening
+  a message or clicking in it sends nothing to any other site. HTML that cannot be shown safely is
+  replaced by the plain text version. Sign-in codes and speaker invitations still store no body. Two staff-tier endpoints,
+  `listSentEmails` and `getSentEmail`, are the only readers of `sent_emails`, whose rules stay
+  closed to every browser; each preview read is recorded in the admin log by account and record
+  only (#183).
 - `docs/adr/0003-optional-google-calendar-sync.md`, the proposed decision record for the optional
   Google Calendar sync of saved sessions (#177). It supersedes the one row of ADR 0001 §9 that
   removed the feature, names the client's own Google Cloud project as the owner of the consent
@@ -35,6 +147,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   access, and every change asks for a confirmation first, is written by the server with the
   address lowercased, and is recorded in the admin log. The server refuses a change that would
   leave the deployment with no operator, including an operator removing their own last grant.
+- `getEventStats`, a staff-tier endpoint for the admin overview (#178). It answers the event's
+  figures as server aggregates: accounts by registration status and completed profiles, ticket
+  records by status, speakers by pipeline status, records on the site and records with unpublished
+  changes for each content collection, and unresolved errors. Every figure is a Firestore
+  `count()`, so no document leaves the database. A caller who is not an admin is refused.
+- The admin overview (#179). `/admin` now opens on **Overview**, the first item on the rail, above
+  the four groups and with no folio. It prints the endpoint's figures as sentences, each number in
+  the data face beside the words that say what it counts, with the time they were read on the
+  event's clock. **Refresh figures** counts again; while it runs it says so and ignores another
+  press. A failed first read shows the server's words and no figures; a failed refresh keeps the
+  figures and says when they were read. Staff and operators both open it.
+- Milestones and a registration goal in the event settings (#180). `config/event.milestones` holds
+  up to 20 named dates and `config/event.registration.goal` a whole number of approved attendees;
+  the shared schema refuses anything else by field, and staff can save both. The Event page edits
+  them in a **Milestones** panel and a **Registration goal** field, and says that anyone can read
+  them. The overview lists the milestones in date order with the days left, sets the approved
+  count against the goal as a sentence and a bar, and shows nothing when neither is set.
+- The registration funnel and content readiness panels on the overview (#181). The funnel states
+  accounts, then ticketed or approved, then approved, each as a number of all accounts beside a
+  native progress bar, with revoked accounts named beside it; `getEventStats` sums the stages on the
+  server. The readiness table lists, for pages, content blocks, sessions, organizations, the
+  timeline, and updates, the records on the site and the records with unpublished changes. Both
+  state zero in words: "No one has signed up yet." and "Nothing is on the site yet."
+- A **Most saved** panel on the admin Sessions page (#182). It ranks sessions by the public
+  bookmark counts, most saved first, in a scrolling ruled table with the session (a link to its
+  editor), its day heading, and the count. It says how many sessions on the site have no saves,
+  says "No session has been saved yet." when none has, says so when saving sessions is switched
+  off, and keeps the last counts under a notice if the listener fails. `useBookmarkCounts` now
+  also answers `ready` and `error`.
+- Attendee export (#184). The Attendees page saves the rows on screen as a CSV file through the
+  staff-tier `exportAttendees` endpoint. The file carries exactly the approved field set: name,
+  email, organization, role, registration status, badges, past attendance, social handles, and
+  profile visibility. A cell that a spreadsheet would run as a formula starts with an apostrophe.
+  Every export writes an `admin_logs` row with the actor, the row count, the status filter, and
+  whether a search was used, never the search text; the server refuses the file when that row
+  cannot be written, and keeps no copy of it.
+- Attendee records and a guarded account delete (#185). **Edit record** on an Attendees row opens
+  the organizer-owned past attendance list, saved through the staff-tier `updateAttendee`
+  endpoint; the rules deny the field to every client, its owner included. The same panel deletes
+  an account through `deleteAttendee`: one transaction checks that the account is not the
+  caller's, not an admin's, and not linked to a speaker, then removes the account, its directory
+  profile, and its schedule share, releases its ticket claims, and writes the audit row. The
+  sign-in, saved sessions, notes, and profile photos are cleared after it, and a part-way delete
+  keeps a "Try the delete again" action that resumes it. Approve and revoke are unchanged.
 
 - A `fact` block for a fact that is not a number (#234): The term, the fact itself, and one
   optional line under it. It renders through the new definition list device, a real `<dl>` ruled
@@ -109,6 +265,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The speaker and session editors now return to their own list after a delete or **Cancel**, and
+  a new speaker opens its own editor. They went to the admin index, which is now the Overview,
+  because a relative link from an editor resolved against the admin layout, not the list.
 - The second wave's devices, after an adversarial review of the branch. The ruled table's scroll
   region carries its own overflow, so a wide table scrolls inside it and the page never scrolls
   sideways; the head no longer claims to stick, because a head pinned inside a region that scrolls

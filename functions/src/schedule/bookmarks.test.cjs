@@ -308,3 +308,48 @@ test('handler: a bootstrap admin with a pending, non-speaker profile can still b
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body, { bookmarked: true, count: 1 });
 });
+
+// An account delete (functions/src/users/records.cjs) removes users/{uid} in
+// one transaction and then sweeps the bookmarks. A bookmark whose gate read
+// the account just before that commit, and whose transaction commits after
+// the sweep's last read, would leave an orphaned bookmark and a raised
+// count (connector review of PR 274). The bookmark transaction re-reads the
+// account it was admitted through, so a deleted account writes nothing.
+test('handler: an account deleted between the gate and the transaction is refused, and nothing is written', async () => {
+  const db = fakeDb({ ...seedSession('s1'), 'users/u1': { registrationStatus: 'approved' } });
+  const runTransaction = db.runTransaction.bind(db);
+  db.runTransaction = async (fn) => {
+    db.docs.delete('users/u1');
+    return runTransaction(fn);
+  };
+  const handler = createBookmarkSessionHandler({
+    db,
+    auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+    getConfig: fakeGetConfig(),
+    now,
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer good' }, body: { sessionId: 's1', bookmarked: true } },
+    res,
+  );
+  assert.equal(res.statusCode, 403);
+  assert.equal(db.docs.has('users/u1/bookmarks/s1'), false);
+  assert.equal(db.docs.has('sessionBookmarks/s1'), false);
+});
+
+test('handler: a bootstrap admin admitted without an account document can still bookmark', async () => {
+  const db = fakeDb({ ...seedSession('s1') });
+  const handler = createBookmarkSessionHandler({
+    db,
+    auth: fakeAuth({ good: ATTENDEE_TOKEN }),
+    getConfig: fakeGetConfig({}, { adminEmails: ['attendee@example.org'] }),
+    now,
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer good' }, body: { sessionId: 's1', bookmarked: true } },
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+});

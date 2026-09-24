@@ -36,3 +36,70 @@ Rules written after user corrections. Read at session start.
 - A push of task files turned CI red: `npm run lint` also covers `tasks/`, and a
   copied browser script used a global ESLint did not know. Run lint before any
   push, even one that looks docs-only.
+
+## 2026-09-24: a scratch worktree's Vite cache hides a shared package change
+
+- An E2E run in a scratch worktree failed with "does not provide an export
+  named MAX_MILESTONES": Vite's pre-bundled `node_modules/.vite/deps` still
+  held the `shared` package from before the stack changed it, because no
+  regeneration had moved the lockfile hash. Regenerate (or delete
+  `node_modules/.vite`) before an E2E run in a worktree whose `packages/shared`
+  changed, and read the trace's page errors before calling a failure real.
+
+## 2026-09-24: commit with the repository's own identity
+
+- A fix commit was made with `-c user.email=` set to the owner's work
+  address. The repository's configured identity is the GitHub noreply
+  address, and every commit and sign-off on the stack uses it. It was caught
+  and amended before the push. Never pass `-c user.name` or `-c user.email`;
+  `git commit -s` with the configured identity is the rule, and
+  `git log -1 --format='%ae %B'` is read before every push.
+
+## 2026-09-24: a dispatch prompt must not widen the spec
+
+- The c4 spec said versions cannot be restored. The director's dispatch
+  prompt named "restores an earlier version" as the E2E proof, and the
+  builder followed the prompt. The review then found three major defects in
+  the restore alone (section caps, editor-only field rules, a draft lost
+  behind a plain confirm), and the restore came out of the branch as #280.
+  A dispatch prompt restates the spec's proof and adds nothing to it; new
+  scope is a spec change, reviewed like one.
+
+## 2026-09-24: never edit a worktree while its checks run
+
+- A fix went into the branch 12 worktree while `checks.sh` was still running
+  there, after one step had failed. Later steps, the E2E run among them, then
+  read a tree that was changing. The run had to be stopped and started again.
+  Stop a failed run first, then edit, then run every check again.
+- Two builders wrote the same scratch runner file in the shared scratchpad,
+  and one E2E run went to the wrong worktree. Scratch files now go in a
+  folder per group id (tasks/builder-brief.md, "Where you work").
+
+## 2026-09-24: check the syntax of every "take both sides" conflict join
+
+- Branch 16's conflicts in `content.test.cjs` and the rules test were
+  resolved by keeping both sides. The two sides had shared a closing
+  `});`, which sat outside the conflict markers, so the join left one test
+  open and the file would not parse. Lint caught the rules test; the unit
+  run caught the other. After every scripted join, run `node --check` (or
+  lint) on the joined files before `cherry-pick --continue`, and fold any
+  fix into the commit that broke it so no commit on the branch fails to
+  parse.
+
+## 2026-09-24: a change every admin page shows reaches the tests of pages it never saw
+
+- c7's tour was cut before four admin pages joined the stack. Stacked on
+  them, the tour's welcome badge ("Draft") gave the updates editor test two
+  matches, and three other files passed only because their queries ran
+  before the tour chunk loaded. When a branch adds something every admin
+  or public page shows (a banner, a tour, a link in every head), grep the
+  tests of the pages that landed after its base for the words it prints,
+  and fix them in the same pass, before the full run.
+- A literal list of a docket group's pages in a test goes stale the next
+  time a builder adds a page. Read the list from `docketForTier` instead.
+
+## 2026-09-24: never `pkill -f` a pattern that is in your own command
+
+- `pkill -f "checks.sh /home/user/wt-int8"` matched the shell that ran it,
+  and killed the command. Stop a background run through its task, then
+  confirm with `pgrep -af` that nothing of it is left.

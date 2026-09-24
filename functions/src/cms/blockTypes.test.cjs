@@ -14,9 +14,10 @@ const {
 
 // The eight v1 types, plus the two the design vocabulary expansion added
 // (wave 2): `fact`, the non-numeric fact of #234, and `quote`, the pull
-// quote's block.
+// quote's block; and `sponsor_package` (#193), the sponsors page's package.
 const V1_TYPE_IDS = [
   'text', 'richtext', 'image', 'cta', 'stat', 'fact', 'quote', 'list_item', 'faq_item', 'link_group',
+  'sponsor_package',
 ];
 
 test('registry ships exactly the v1 block types', () => {
@@ -40,6 +41,24 @@ test('a fact block carries no evidence field, and the stat contract is unchanged
   // The write-time contract is a stat rule and a no-op for a fact.
   assert.deepEqual(statContractErrors({ blockType: 'fact', label: 'Where', value: 'The hall' }), []);
   assert.equal(statContractErrors({ blockType: 'stat', value: '3' }).length > 0, true);
+});
+
+// #193: a package is a name and what it includes; its price, its limit and
+// its place in the run are optional, and the write carries no contract
+// beyond the registry, like a fact.
+test('a sponsor package names its parts, and only the name and the benefits are required', () => {
+  assert.deepEqual(
+    BLOCK_TYPES.sponsor_package.fields.map((f) => [f.id, f.type, f.required]),
+    [
+      ['name', 'string', true],
+      ['price', 'string', false],
+      ['limit', 'number', false],
+      ['benefits', 'richtext', true],
+      ['order', 'number', false],
+    ],
+  );
+  assert.equal(BLOCK_TYPES.sponsor_package.label, 'Sponsor package');
+  assert.deepEqual(statContractErrors({ blockType: 'sponsor_package', name: 'Presenting' }), []);
 });
 
 test('every block type is a well-formed contract', () => {

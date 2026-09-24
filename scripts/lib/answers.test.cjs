@@ -183,6 +183,18 @@ test('features default to the four §2.2 toggles, and unknown keys warn instead 
   assert.match(built.warnings.join(' '), /notAFeature/);
 });
 
+// Issue #188: a public text surface is off until the client opts in.
+test('the change request flag is written false by default, and an answers file can turn it on', () => {
+  const built = buildConfigDocs({ answers: MINIMAL, tierA: TIER_A, now: () => 0 });
+  assert.equal(built.docs.features.changeRequests, false);
+  const optedIn = buildConfigDocs({
+    answers: { ...MINIMAL, features: { changeRequests: true } },
+    tierA: TIER_A,
+    now: () => 0,
+  });
+  assert.equal(optedIn.docs.features.changeRequests, true);
+});
+
 test('Tier A wins on provider selection, and an answers-file override warns', () => {
   const { providers, warnings } = buildProviders({
     tierA: TIER_A,

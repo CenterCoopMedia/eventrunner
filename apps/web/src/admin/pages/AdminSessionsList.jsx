@@ -20,6 +20,7 @@ import AdminPageHeader, {
   RecordState,
   proofRowClass,
 } from '../components/adminChrome.jsx';
+import SessionPopularityPanel from '../components/SessionPopularityPanel.jsx';
 
 export default function AdminSessionsList() {
   const { eventConfig } = useEventConfig();
@@ -133,38 +134,43 @@ export default function AdminSessionsList() {
           }
         />
       ) : (
-        groups.map((group) => (
-          <Panel key={group.dayId} title={group.label} flush>
-            <ul>
-              {group.rows.map((row) => {
-                const session = row.current;
-                const place = placeNames.get(session.placeId) || session.location || 'No place';
-                return (
-                  <li
-                    key={row.id}
-                    className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(row.state.id)}`}
-                  >
-                    <div className={`${rowClass} ${session.parentId ? 'ms-md' : ''}`}>
-                      <div className="min-w-0">
-                        <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
-                          {session.title || row.id}
-                        </Link>
-                        <p className={`mt-3xs ${rowMetaClass}`}>
-                          {[`${session.startTime || 'Time unset'}${session.endTime ? `–${session.endTime}` : ''}`,
-                            session.track ? `Track ${session.track}` : null,
-                            place]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </p>
+        <>
+          {/* The sessions attendees saved most (issue #182), above the
+              day groups, from the public bookmark counts. */}
+          <SessionPopularityPanel groups={groups} />
+          {groups.map((group) => (
+            <Panel key={group.dayId} title={group.label} flush>
+              <ul>
+                {group.rows.map((row) => {
+                  const session = row.current;
+                  const place = placeNames.get(session.placeId) || session.location || 'No place';
+                  return (
+                    <li
+                      key={row.id}
+                      className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(row.state.id)}`}
+                    >
+                      <div className={`${rowClass} ${session.parentId ? 'ms-md' : ''}`}>
+                        <div className="min-w-0">
+                          <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
+                            {session.title || row.id}
+                          </Link>
+                          <p className={`mt-3xs ${rowMetaClass}`}>
+                            {[`${session.startTime || 'Time unset'}${session.endTime ? `–${session.endTime}` : ''}`,
+                              session.track ? `Track ${session.track}` : null,
+                              place]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        </div>
+                        <RecordState state={row.state} />
                       </div>
-                      <RecordState state={row.state} />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </Panel>
-        ))
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+          ))}
+        </>
       )}
     </div>
   );

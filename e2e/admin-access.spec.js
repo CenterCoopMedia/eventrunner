@@ -13,23 +13,11 @@
 // because every later spec signs in as the seeded operator.
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor,
-  mailFileSize, waitForOtpCode,
+  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, signIn,
 } from './helpers.mjs';
 
 const STAFF_EMAIL = 'e2e-staff@example.test';
 const STAFF_ADDRESS_AS_TYPED = 'E2E-Staff@Example.TEST';
-
-async function signIn(page, email) {
-  const since = mailFileSize();
-  await page.goto('/signin');
-  await page.locator('#signin-email').fill(email);
-  await page.getByRole('button', { name: /email me a code/i }).click();
-  await expect(page.locator('#signin-code')).toBeVisible();
-  await page.locator('#signin-code').fill(await waitForOtpCode(since, email, 30_000));
-  await page.getByRole('button', { name: /^sign in$/i }).click();
-  await page.waitForURL((url) => url.pathname !== '/signin');
-}
 
 test.describe.serial('admin tiers and the Access page', () => {
   const bootstrapRef = () => adminDb().doc('config/bootstrap');
@@ -138,8 +126,9 @@ test.describe.serial('admin tiers and the Access page', () => {
     await page.goto('/admin');
     const nav = page.getByRole('navigation', { name: 'Admin sections' });
     await expect(nav).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1, name: 'Pages' })).toBeVisible();
-    for (const label of ['Pages', 'Sessions', 'Speakers', 'Attendees', 'Materials', 'Event']) {
+    // /admin opens on the overview, a staff section (issue #179).
+    await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+    for (const label of ['Overview', 'Pages', 'Sessions', 'Speakers', 'Attendees', 'Materials', 'Event']) {
       await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
     for (const label of ['Features', 'Branding', 'Access', 'System errors']) {

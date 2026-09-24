@@ -118,6 +118,20 @@ export const BLOCK_TYPES = Object.freeze({
       { id: 'order', type: 'number', required: false },
     ],
   },
+  sponsor_package: {
+    id: 'sponsor_package',
+    label: 'Sponsor package',
+    description:
+      'One sponsorship package for the sponsors page: Its name, its price, how many sponsors ' +
+      'can take it, and what it includes.',
+    fields: [
+      { id: 'name', type: 'string', required: true },
+      { id: 'price', type: 'string', required: false },
+      { id: 'limit', type: 'number', required: false },
+      { id: 'benefits', type: 'richtext', required: true },
+      { id: 'order', type: 'number', required: false },
+    ],
+  },
 });
 
 /**

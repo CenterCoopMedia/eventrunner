@@ -89,6 +89,7 @@ vi.mock('./lib/profileSource.js', () => ({
 import App from './App.jsx';
 import { eventConfig } from '@generated/eventConfig.js';
 import siteContent from '@generated/siteContent.js';
+import pagesData from '@generated/pagesData.js';
 
 function renderAt(path) {
   return render(
@@ -318,5 +319,47 @@ describe('app shell', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Draft-only headline' }),
     ).toBeInTheDocument();
+  });
+});
+
+// The section edit links (issue #198) through the real providers: the link
+// reads the same admin probe the admin gate does, so the whole app decides
+// who sees it, not a stubbed context.
+describe('section edit links on the public site', () => {
+  const home = pagesData.find((page) => page.id === 'home');
+  const details = home.sections.find((section) => section.id === 'details');
+
+  it('shows none to a signed-out reader', () => {
+    renderAt('/');
+    expect(screen.getByRole('heading', { name: details.label })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Edit section/ })).toBeNull();
+  });
+
+  it('shows a signed-in admin one link per section, each to that section’s editor', async () => {
+    renderAt('/');
+    await act(async () => {
+      authStateCallback({ uid: 'admin-1' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(
+      await screen.findByRole('link', { name: `Edit section: ${details.label}` }),
+    ).toHaveAttribute('href', '/admin/content/home/details');
+    // Never more links than the page has sections.
+    expect(screen.getAllByRole('link', { name: /^Edit section/ }).length).toBeLessThanOrEqual(
+      home.sections.length,
+    );
+  });
+
+  it('shows none to a signed-in account the admin probe refuses', async () => {
+    adminProbeShouldSucceed = false;
+    renderAt('/');
+    await act(async () => {
+      authStateCallback({ uid: 'reader-1' });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('heading', { name: details.label })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Edit section/ })).toBeNull();
   });
 });

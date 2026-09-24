@@ -189,6 +189,7 @@ export const features = {
   publicAttendeeProfiles: false,
   webmcpPublic: false,
   webmcpAdmin: false,
+  changeRequests: false,
 };
 
 export const theme = {

@@ -171,4 +171,97 @@ describe('AdminContentBlockEditor value fields', () => {
     fireEvent.change(urlInput, { target: { value: 'https://example.org/resources' } });
     expect(urlInput).toHaveValue('https://example.org/resources');
   });
+
+  // Issue 193: the sponsors page's package section takes the new block, and
+  // the editor says what the limit is for under the field itself.
+  it('edits a sponsor package, with the limit a number and its hint under it', async () => {
+    pagesLive = [{
+      id: 'sponsors',
+      label: 'Sponsors',
+      path: '/sponsors',
+      icon: null,
+      order: 3,
+      visible: true,
+      systemPage: true,
+      sections: [{
+        id: 'sponsor_packages',
+        label: 'Sponsorship packages',
+        description: 'What a sponsor can support, one package per block.',
+        allowedBlocks: ['sponsor_package', 'richtext'],
+        maxBlocks: 6,
+        reorderable: true,
+        defaultBlocks: [],
+      }],
+    }];
+    await renderAt('/admin/content/sponsors/sponsor_packages/_new');
+
+    expect(await screen.findByRole('combobox', { name: /block type/i })).toHaveValue('sponsor_package');
+    const limit = screen.getByLabelText('limit (optional)');
+    expect(limit).toHaveAttribute('type', 'number');
+    expect(limit).toHaveAccessibleDescription('How many sponsors can take this package. Leave it empty for no limit.');
+    expect(screen.getByLabelText('price (optional)')).toHaveAccessibleDescription(
+      'As it should read, with its currency. Leave it empty to show no price.',
+    );
+
+    fireEvent.change(screen.getByLabelText(/^field id/i), { target: { value: 'coffee' } });
+    fireEvent.change(screen.getByLabelText('name'), { target: { value: 'Coffee break' } });
+    fireEvent.change(limit, { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('benefits'), { target: { value: '<p>Signs</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
+    expect(JSON.parse(call[1].body).fields).toMatchObject({
+      blockType: 'sponsor_package',
+      name: 'Coffee break',
+      limit: 2,
+      benefits: '<p>Signs</p>',
+    });
+  });
+
+  // Review round (c2, finding 1): "Leave it empty for no limit" has to hold
+  // on an existing package too. The update merges onto the stored draft, so
+  // the cleared field goes as a deletion.
+  it('clears a stored limit when the field is emptied and saved', async () => {
+    pagesLive = [{
+      id: 'sponsors',
+      label: 'Sponsors',
+      path: '/sponsors',
+      icon: null,
+      order: 3,
+      visible: true,
+      systemPage: true,
+      sections: [{
+        id: 'sponsor_packages',
+        label: 'Sponsorship packages',
+        description: 'What a sponsor can support, one package per block.',
+        allowedBlocks: ['sponsor_package', 'richtext'],
+        maxBlocks: 6,
+        reorderable: true,
+        defaultBlocks: [],
+      }],
+    }];
+    contentLive = [{
+      id: 'sponsor_packages__supporting',
+      section: 'sponsor_packages',
+      field: 'supporting',
+      blockType: 'sponsor_package',
+      name: 'Supporting',
+      price: 'Illustrative figure: 3,000',
+      limit: 3,
+      benefits: '<p>Workshop materials.</p>',
+      order: 1,
+      visible: true,
+    }];
+    await renderAt('/admin/content/sponsors/sponsor_packages/supporting');
+    const limit = await screen.findByLabelText('limit (optional)');
+    expect(limit).toHaveValue(3);
+    fireEvent.change(limit, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
+    expect(call).toBeTruthy();
+    expect(JSON.parse(call[1].body).fields.limit).toBe('__cms_delete_field__');
+  });
 });

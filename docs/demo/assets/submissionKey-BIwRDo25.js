@@ -1,0 +1,1 @@
+function e(){return typeof crypto<"u"&&typeof crypto.randomUUID=="function"?crypto.randomUUID().replace(/-/g,""):`${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`}function i(){let n=e(),t=null;return{keyFor(o){const r=JSON.stringify(o);return t!==null&&t!==r&&(n=e()),t=r,n},reset(){n=e(),t=null}}}export{i as c};

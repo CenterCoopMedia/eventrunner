@@ -28,4 +28,14 @@ function validUpdateBlock(block) {
 function validUpdateContent(content) {
   return Array.isArray(content) && content.length <= 20 && content.every(validUpdateBlock);
 }
-module.exports = { validUpdateImage, validUpdateBlock, validUpdateContent };
+// An update's category (issue #191): one short line the Updates page sets as
+// a tag beside the title. The tag never wraps, so the cap keeps it inside a
+// phone's width. cmsSaveUpdate refuses anything else on write, and the page
+// draws nothing for a stored value that fails here on read.
+const UPDATE_CATEGORY_MAX = 24;
+function validUpdateCategory(value) {
+  if (typeof value !== 'string' || /\p{Cc}/u.test(value)) return false;
+  const length = value.trim().length;
+  return length >= 1 && length <= UPDATE_CATEGORY_MAX;
+}
+module.exports = { validUpdateImage, validUpdateBlock, validUpdateContent, UPDATE_CATEGORY_MAX, validUpdateCategory };

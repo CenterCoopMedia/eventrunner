@@ -64,9 +64,11 @@ function block(field, blockType, description) {
  * the page's `template`, `layout`, and section slots. Without a document
  * there is nothing in the admin Pages list to open, so those two pages were
  * the only ones an operator could not shape. They seed the same way
- * schedule, speakers, and sponsors do: a document with no sections, because
- * the route's own component is the page and the sections are what an
- * operator adds around it.
+ * schedule and speakers do: a document with no sections, because the
+ * route's own component is the page and the sections are what an operator
+ * adds around it. Sponsors seeds one section, Sponsorship packages (#193),
+ * and seeds it empty the way recap and guidelines do: it draws nothing
+ * until an operator adds a package, and then it sits after the logo wall.
  *
  * LABELS ARE THE NAVIGATION'S NAMES, NOT THE PAGE'S. `label` is what the
  * header nav and the footer page list print, and there are fifteen of them
@@ -165,7 +167,11 @@ function defaultPages() {
             block('attendees', 'stat', 'Expected attendance.'),
             block('sessions', 'stat', 'Sessions planned.'),
           ]),
-        section('history', 'History', 'Background on previous editions of the event.',
+        // The past editions (issue #194). The section holds the operator's
+        // own words and pictures; the editions themselves come from the
+        // Timeline list, and the home page draws them under this section's
+        // blocks, oldest first. No edition seeds: a client starts with none.
+        section('history', 'History', 'Background on previous editions of the event. The editions themselves come from the Timeline list, not from here.',
           ['richtext', 'image'], 6),
         // The sponsor strip (M7 issue 10). The section holds one optional
         // line of copy; the organizations themselves come from the
@@ -214,7 +220,11 @@ function defaultPages() {
       order: 3,
       visible: true,
       systemPage: true,
-      sections: [],
+      sections: [
+        section('sponsor_packages', 'Sponsorship packages',
+          'What a sponsor can support, one package per block. The section is not shown until it holds a package.',
+          ['sponsor_package', 'richtext'], 6, []),
+      ],
     },
     {
       id: 'travel',
@@ -639,6 +649,8 @@ function placeholderBlock(blockType, description) {
       return { question: text, answer: `<p>[Replace] Answer this question in a sentence or two.</p>` };
     case 'link_group':
       return { group: 'Links', label: text, url: 'https://example.org' };
+    case 'sponsor_package':
+      return { name: text, benefits: '<p>[Replace] What this package includes.</p>' };
     default:
       // Unreachable while defaultBlocks pass validatePageDoc, which
       // rejects unknown block types by name before a seed is built.

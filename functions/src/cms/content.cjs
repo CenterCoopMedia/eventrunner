@@ -41,6 +41,13 @@ const {
   checkSessionDeletable,
 } = require('../schedule/sessions.cjs');
 const { deleteMaterialsForSession } = require('../materials/store.cjs');
+const {
+  ORGANIZATIONS_COLLECTION,
+  organizationSlugError,
+  slugTakenMessage,
+  validateOrganizationFields,
+} = require('./organizations.cjs');
+const { TIMELINE_COLLECTION, validateTimelineFields } = require('./timeline.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
@@ -256,11 +263,77 @@ async function checkSessionStructure({ db, tx = null, collection, docId, fields 
  * @param {{ collection: string, fields: object }} args
  * @returns {{ ok: true } | { ok: false, message: string }}
  */
+/**
+ * A sponsor package's limit, when set, is a whole number of sponsors (issue
+ * #193): the page draws "Open to N sponsors" only for one, so any other
+ * value would be saved, published, and then silently not shown. The
+ * deletion sentinel clears it.
+ *
+ * @param {object} fields the block's fields as they will be stored
+ * @returns {string[]}
+ */
+function sponsorPackageErrors(fields) {
+  if (!fields || fields.blockType !== 'sponsor_package') return [];
+  const { limit } = fields;
+  if (limit === undefined || limit === null || limit === DELETE_FIELD_SENTINEL) return [];
+  if (Number.isSafeInteger(limit) && limit >= 1) return [];
+  return ['limit: must be a whole number of 1 or more. Leave it empty for no limit.'];
+}
+
 function checkBlockContract({ collection, fields }) {
   if (collection !== 'cmsContent') return { ok: true };
-  const errors = statContractErrors(fields);
+  const errors = [...statContractErrors(fields), ...sponsorPackageErrors(fields)];
   if (errors.length > 0) return { ok: false, message: errors.join('; ') };
   return { ok: true };
+}
+
+/**
+ * Organization fields at the content-write seam (issue #192): types,
+ * lengths, the website's scheme and the logo's path shape, judged on the
+ * MERGED result like the seams above (functions/src/cms/organizations.cjs).
+ * `sent` is the request's own `fields`, which decides whether the profile
+ * fields the editor does not show are checked at all. The returned `fields`
+ * are trimmed and the website canonical, and they are what the caller
+ * stores. A no-op for every other collection.
+ *
+ * @param {{ collection: string, fields: object, sent: object }} args
+ * @returns {{ ok: true, fields: object } | { ok: false, message: string }}
+ */
+function checkOrganizationFields({ collection, fields, sent }) {
+  if (collection !== ORGANIZATIONS_COLLECTION) return { ok: true, fields };
+  const verdict = validateOrganizationFields(fields, sent);
+  if (!verdict.ok) return { ok: false, message: verdict.errors.join('; ') };
+  return verdict;
+}
+
+/**
+ * Timeline entry fields at the content-write seam (issue #194): the year,
+ * the title and the description, judged on the MERGED result like the seams
+ * above (functions/src/cms/timeline.cjs). `sent` is the request's own
+ * `fields`: a key in it outside the entry's field set is refused, and a
+ * stray key only the stored document carries is dropped. The returned
+ * `fields` are trimmed, and they are what the caller stores. A no-op for
+ * every other collection.
+ *
+ * @param {{ collection: string, fields: object, sent: object }} args
+ * @returns {{ ok: true, fields: object } | { ok: false, message: string }}
+ */
+function checkTimelineFields({ collection, fields, sent }) {
+  if (collection !== TIMELINE_COLLECTION) return { ok: true, fields };
+  const verdict = validateTimelineFields(fields, sent);
+  if (!verdict.ok) return { ok: false, message: verdict.errors.join('; ') };
+  return verdict;
+}
+
+/**
+ * The words a create meets when its document already exists. For an
+ * organization the id is its page address (#193), so the refusal names the
+ * slug, at the save, where the editor puts it on the Page address field.
+ */
+function alreadyExistsMessage(collection, docId) {
+  return collection === ORGANIZATIONS_COLLECTION
+    ? slugTakenMessage(docId)
+    : 'That document already exists; use cmsUpdateContent.';
 }
 
 /**
@@ -303,6 +376,11 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
     if (!checked.ok) return badRequest(res, checked.message);
 
     const { collection, docId, extraFields } = target;
+    // An organization's id is its page address, so it has to be one (#193).
+    if (collection === ORGANIZATIONS_COLLECTION) {
+      const slugError = organizationSlugError(docId);
+      if (slugError) return badRequest(res, slugError);
+    }
 
     // ONE transaction: the live-doc existence check, the speaker-reference
     // reads, and the draft write. See checkSpeakerReferences — a reference
@@ -317,7 +395,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
       docPath = await db.runTransaction(async (tx) => {
         const liveSnap = await tx.get(db.collection(collection).doc(docId));
         if (liveSnap.exists) {
-          throw new RequestError(409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
+          throw new RequestError(409, 'already-exists', alreadyExistsMessage(collection, docId));
         }
         // Deletions are applied BEFORE the reference check, so the check
         // runs on what will actually be written: a caller dropping
@@ -334,12 +412,26 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
+        const organization = checkOrganizationFields({
+          collection,
+          fields: references.fields,
+          sent: checked.fields,
+        });
+        if (!organization.ok) throw new RequestError(400, 'bad-request', organization.message);
+
+        const timeline = checkTimelineFields({
+          collection,
+          fields: organization.fields,
+          sent: checked.fields,
+        });
+        if (!timeline.ok) throw new RequestError(400, 'bad-request', timeline.message);
+
         const structure = await checkSessionStructure({
           db,
           tx,
           collection,
           docId,
-          fields: references.fields,
+          fields: timeline.fields,
         });
         if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 
@@ -362,7 +454,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         return sendError(res, status, code, message);
       }
       if (isAlreadyExistsError(err)) {
-        return sendError(res, 409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
+        return sendError(res, 409, 'already-exists', alreadyExistsMessage(collection, docId));
       }
       throw err;
     }
@@ -421,12 +513,26 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
+        const organization = checkOrganizationFields({
+          collection,
+          fields: references.fields,
+          sent: checked.fields,
+        });
+        if (!organization.ok) throw new RequestError(400, 'bad-request', organization.message);
+
+        const timeline = checkTimelineFields({
+          collection,
+          fields: organization.fields,
+          sent: checked.fields,
+        });
+        if (!timeline.ok) throw new RequestError(400, 'bad-request', timeline.message);
+
         const structure = await checkSessionStructure({
           db,
           tx,
           collection,
           docId,
-          fields: references.fields,
+          fields: timeline.fields,
         });
         if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 
@@ -595,6 +701,7 @@ module.exports = {
     checkSpeakerReferences,
     checkSessionStructure,
     checkBlockContract,
+    checkOrganizationFields,
     isValidDocId,
     SECTION_FIELD_RE,
     GENERIC_COLLECTIONS,

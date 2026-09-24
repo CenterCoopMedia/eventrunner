@@ -27,6 +27,7 @@ the committed **synthetic snapshot** in `src/generated/`:
 | `pagesData.js` | pages-as-data, routed at each page's own root-level `path` |
 | `scheduleData.js` | schedule days/sessions |
 | `organizationsData.js` | speakers/sponsors |
+| `timelineData.js` | past editions for the home page's History section |
 
 Four providers then overlay live Firestore data on top of that snapshot,
 outermost first:
@@ -38,7 +39,8 @@ EventConfigProvider          — subscribes to config/{event,features,theme,badg
       ContentProvider         — subscribes to published (or draft) CMS collections
         ToastProvider
           <Routes>             — Home, Schedule (/schedule, /schedule/mine,
-                                 /schedule/:sessionId), Speakers, Sponsors,
+                                 /schedule/:sessionId), Speakers, Sponsors
+                                 (/sponsors, /sponsors/:slug),
                                  /signin, /profile, /attendees,
                                  /attendees/:uid, catch-all (cmsPages)
 ```
@@ -50,6 +52,16 @@ that overrides the same custom properties `theme.css` defines, so a live
 `ContentProvider` takes a `readSource` of `'published'` or `'draft'`.
 `App.jsx` derives it from the `?preview=1` query param — convenience only;
 `firestore.rules` is the actual control on who may read `*_drafts`.
+
+Section edit links (issue #198) are convenience too.
+`components/SectionEditLink.jsx` draws "Edit section" beside each section a
+public page draws, and only while `AuthContext` reports `adminStatus` as
+`'admin'`. The link opens `/admin/content/<page>/<section>`, where
+`AdminGate`, the tier check in the admin shell, `requireAdmin` and
+`firestore.rules` decide every read and write as before. The component
+imports nothing under `src/admin`, so the public first paint carries one link
+and no editor. `scripts/ci/bundle-budget.test.cjs` fails if the first-paint
+source graph reaches a file under `src/admin`.
 
 Every subscription is fail-soft: a listener error is logged and the app
 keeps rendering the last-known (snapshot or previously-live) values rather
@@ -265,8 +277,14 @@ attempting a network fetch.
 `node scripts/dev/login-smoke.mjs` above covers OTP sign-in on its own; the
 repo-root [`e2e/`](../../e2e/) Playwright suite (`npm run test:e2e`, spec
 §8.1, issue #38) covers that plus the other three critical journeys — admin
-CMS edit → publish → public, speaker invite → accept → wizard, ticket claim
-→ approved → bookmark — against the same emulator/dev-server combination,
+CMS edit → publish → public → version history, speaker invite → accept → wizard, ticket claim
+→ approved → bookmark — the updates editor (issues #190 and #191: an
+update written and saved as a draft in the admin stays off the public Updates
+page until the editor publishes it, and then leads the page as the featured
+update with its category tag), and the timeline journey (`e2e/cms-timeline.spec.js`:
+an entry published from the admin editor appears on an open home page with
+no reload, and with every listener held the first render of the home page
+already lists the snapshot editions) against the same emulator/dev-server combination,
 seeded from `scripts/init-event.cjs` + `scripts/seed-demo-event.cjs`. See
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full test command
 table.

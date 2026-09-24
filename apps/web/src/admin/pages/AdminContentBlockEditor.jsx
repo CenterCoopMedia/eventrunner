@@ -29,6 +29,7 @@ import {
   blockTypeFor,
   blockTypeLabel,
 } from '../blockTypes.js';
+import { SPONSOR_PACKAGE_HINTS } from '../sponsorPackageHints.js';
 import {
   blankContent,
   staleFieldDeletions,
@@ -70,6 +71,7 @@ const FIELD_HINTS = Object.freeze({
   stat: STAT_CONTRACT_HINTS,
   fact: FACT_HINTS,
   quote: QUOTE_HINTS,
+  sponsor_package: SPONSOR_PACKAGE_HINTS,
 });
 
 function hintFor(blockTypeId, fieldId) {
@@ -127,6 +129,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
               value={value}
               onChange={(next) => onChange(field.id, next)}
               error={error}
+              hint={hint}
             />
           );
         }

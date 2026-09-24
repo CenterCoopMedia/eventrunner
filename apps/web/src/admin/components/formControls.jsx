@@ -65,6 +65,18 @@ export const secondaryButtonClass =
   `${buttonBase} border-admin-rule-strong bg-admin-ground-raised font-medium text-admin-ink ` +
   'hover:border-admin-action-soft-hover hover:bg-admin-action-soft hover:text-admin-ink-link';
 
+/**
+ * Unavailable, for a control that must stay focusable to say why it does
+ * nothing (`aria-disabled="true"`, its handler refusing every press): the
+ * disabled ink on the alternate ground, with the hover tint held off. Add it
+ * beside the control's own class. It is not in buttonBase because a busy
+ * control carries aria-disabled too and keeps its own look.
+ */
+export const unavailableButtonClass =
+  'aria-disabled:border-admin-rule-strong aria-disabled:bg-admin-ground-soft ' +
+  'aria-disabled:text-admin-ink-disabled aria-disabled:hover:border-admin-rule-strong ' +
+  'aria-disabled:hover:bg-admin-ground-soft aria-disabled:hover:text-admin-ink-disabled';
+
 /** The quietest control: no rule until the pointer arrives. */
 export const ghostButtonClass =
   `${buttonBase} border-transparent bg-transparent font-medium text-admin-ink-secondary ` +

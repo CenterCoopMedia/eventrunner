@@ -94,6 +94,22 @@ describe('blockSearchText', () => {
     expect(blockMatchesQuery({ blockType: 'fact', label: 'Where', value: 'The hall' }, 'hall')).toBe(true);
   });
 
+  it('joins the name, the price and the stripped benefits on a sponsor package (issue 193)', () => {
+    const block = {
+      blockType: 'sponsor_package',
+      name: 'Coffee break',
+      price: 'Illustrative figure',
+      limit: 3,
+      benefits: '<ul><li>Signs &amp; cups</li></ul>',
+    };
+    const searchText = blockSearchText(block);
+    for (const words of ['Coffee break', 'Illustrative figure', 'Signs & cups']) {
+      expect(searchText).toContain(words);
+    }
+    expect(blockMatchesQuery(block, 'cups')).toBe(true);
+    expect(blockMatchesQuery(block, 'li>')).toBe(false);
+  });
+
   it('joins the sentence and the attribution on a quote block', () => {
     expect(
       blockSearchText({ blockType: 'quote', text: 'Decide who checks sources.', attribution: 'A speaker' }),

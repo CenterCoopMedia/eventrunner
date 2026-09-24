@@ -32,6 +32,7 @@ import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotPages from '@generated/pagesData.js';
 import snapshotScheduleData, { speakers as snapshotScheduleSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
+import snapshotTimelineData from '@generated/timelineData.js';
 
 function Probe() {
   const { source, getBlock, getSectionBlocks, scheduleData, organizationsData, speakers, loading } =
@@ -84,6 +85,7 @@ describe('ContentProvider', () => {
       'cmsOrganizations',
       'cmsPages',
       'cmsSchedule',
+      'cmsTimeline',
       'cmsUpdates',
       'speakers_public',
     ]);
@@ -355,8 +357,9 @@ describe('ContentProvider', () => {
 
   it('drops a live cmsOrganizations doc with a non-primitive renderable field, keeping the rest wholesale', () => {
     // Regression test: the generic content writer (functions/src/cms/
-    // content.cjs) only rejects reserved field *names*, never field *types*,
-    // so a published doc can carry e.g. name: { unexpected: true }.
+    // content.cjs) now refuses a non-text name at the save (issue #192),
+    // but a script or the console can still store e.g.
+    // name: { unexpected: true }, so this drop is kept as the second layer.
     // Sponsors.jsx renders name/tier/description directly as JSX children —
     // an object there would make React throw and blank the whole route the
     // moment this listener fires. The malformed doc must be dropped, not
@@ -392,6 +395,8 @@ describe('ContentProvider', () => {
   });
 
   it('drops a live cmsOrganizations doc whose tier or description is a non-primitive value', () => {
+    // The save refuses these too (issue #192); this guards what reaches the
+    // collection without passing through it.
     render(
       <ContentProvider>
         <Probe />
@@ -436,6 +441,99 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('organizations-first-name')).toHaveTextContent(
       'Live-published organization',
     );
+  });
+
+  // cmsTimeline (issue #194): the home page's History section lists these,
+  // so the snapshot is served on first paint and a live set replaces it.
+  describe('cmsTimeline', () => {
+    function TimelineProbe() {
+      const { timeline, source } = useContent();
+      return (
+        <>
+          <span data-testid="timeline-source">{source}</span>
+          <span data-testid="timeline-ids">{timeline.map((entry) => entry.id).join('|') || 'empty'}</span>
+        </>
+      );
+    }
+
+    const renderTimeline = (props = {}) =>
+      render(
+        <ContentProvider {...props}>
+          <TimelineProbe />
+        </ContentProvider>,
+      );
+    const entry = (id, year, title, extra = {}) => ({ id, year, title, description: null, visible: true, ...extra });
+
+    it('serves the committed snapshot, oldest first, before the listener reports', () => {
+      renderTimeline();
+      expect(snapshotTimelineData.length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByTestId('timeline-ids')).toHaveTextContent(
+        [...snapshotTimelineData].sort((a, b) => a.year - b.year).map((doc) => doc.id).join('|'),
+      );
+      expect(screen.getByTestId('timeline-source')).toHaveTextContent('snapshot');
+      expect(subscriptions.get('cmsTimeline').readSource).toBe('published');
+    });
+
+    it('replaces the snapshot wholesale with a live set, sorted, and turns the source live', () => {
+      renderTimeline();
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([entry('b', 2025, 'Second'), entry('a', 2019, 'First')]);
+      });
+      expect(screen.getByTestId('timeline-source')).toHaveTextContent('live');
+      expect(screen.getByTestId('timeline-ids')).toHaveTextContent(/^a\|b$/);
+    });
+
+    it('empties the list when the live set is empty: the published set is the truth', () => {
+      renderTimeline();
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([]);
+      });
+      expect(screen.getByTestId('timeline-ids')).toHaveTextContent('empty');
+    });
+
+    it('a listener error leaves the last live set in charge, not the snapshot', () => {
+      renderTimeline();
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([entry('a', 2019, 'First')]);
+      });
+      // subscribeContentCollection never calls onNext on error (it fails soft
+      // and retries), so the slot keeps its value.
+      expect(screen.getByTestId('timeline-ids')).toHaveTextContent(/^a$/);
+    });
+
+    it('orders one year by title, then by id', () => {
+      renderTimeline();
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([
+          entry('z', 2024, 'Beta'),
+          entry('y', 2024, 'Alpha'),
+          entry('x', 2024, 'Alpha'),
+          entry('w', 2020, 'Zeta'),
+        ]);
+      });
+      expect(screen.getByTestId('timeline-ids')).toHaveTextContent(/^w\|x\|y\|z$/);
+    });
+
+    it('drops an entry the page cannot draw, and keeps the rest', () => {
+      renderTimeline();
+      act(() => {
+        subscriptions.get('cmsTimeline').onNext([
+          entry('ok', 2024, 'Kept'),
+          entry('title-object', 2024, { text: 'x' }),
+          entry('title-blank', 2024, '   '),
+          entry('year-string', '2024', 'Year as text'),
+          entry('year-fraction', 2024.5, 'Half a year'),
+          entry('description-object', 2024, 'Description object', { description: { html: '<b>x</b>' } }),
+          entry('hidden', 2024, 'Hidden', { visible: false }),
+        ]);
+      });
+      expect(screen.getByTestId('timeline-ids')).toHaveTextContent(/^ok$/);
+    });
+
+    it('points the timeline listener at the drafts in preview', () => {
+      renderTimeline({ readSource: 'draft' });
+      expect(subscriptions.get('cmsTimeline').readSource).toBe('draft');
+    });
   });
 
   it('hides blocks and pages marked visible: false', () => {
