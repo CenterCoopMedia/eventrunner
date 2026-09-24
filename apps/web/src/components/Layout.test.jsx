@@ -1117,6 +1117,14 @@ describe('the footer change request control', () => {
     expect(document.querySelector('dialog')).toBeNull();
   });
 
+  it('opens the feedback dialog on demand when Share feedback is pressed', async () => {
+    const { container } = renderShell({}, { featureFlags: { ...FIXTURE_FEATURES, feedbackInbox: true } });
+    fireEvent.click(within(container.querySelector('footer')).getByRole('button', { name: 'Share feedback' }));
+    // The dialog loads on demand, so it arrives after the press.
+    const dialog = (await screen.findByRole('heading', { name: 'Share feedback' })).closest('dialog');
+    expect(dialog).not.toBeNull();
+  });
+
   it('sits beside Share feedback when both are on', () => {
     const { container } = renderShell({}, {
       featureFlags: { ...FIXTURE_FEATURES, feedbackInbox: true, changeRequests: true },

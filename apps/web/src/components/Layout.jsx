@@ -69,21 +69,25 @@ import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import RegistrationAction from './RegistrationAction.jsx';
-import FeedbackModal from './FeedbackModal.jsx';
 import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
 import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
 
-// The change request dialog (issue #188) sits behind a flag that is off by
-// default and opens only on a press, so it loads on demand and stays out of
-// the public first paint, which is at its budget (scripts/ci/bundle-budget.json).
-const ChangeRequestModal = lazy(() =>
-  import('./ChangeRequestModal.jsx').then((module) => {
-    clearReloadFlag();
-    return module;
-  }),
-);
+// The feedback dialog and the change request dialog (issue #188) each sit
+// behind a flag that is off by default and open only on a press, so they
+// load on demand and stay out of the public first paint, which is at its
+// budget (scripts/ci/bundle-budget.json).
+function onDemand(importer) {
+  return lazy(() =>
+    importer().then((module) => {
+      clearReloadFlag();
+      return module;
+    }),
+  );
+}
+const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
+const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 
 /**
  * The page's own header, read into the theme's vocabulary.
@@ -533,7 +537,13 @@ export default function Layout() {
           </div>
         </div>
       </footer>
-      {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
+      {feedbackOpen ? (
+        <ChunkErrorBoundary>
+          <Suspense fallback={null}>
+            <FeedbackModal onClose={() => setFeedbackOpen(false)} />
+          </Suspense>
+        </ChunkErrorBoundary>
+      ) : null}
       {changeRequestOpen && canRequestChange ? (
         <ChunkErrorBoundary>
           <Suspense fallback={null}>
