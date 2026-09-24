@@ -153,8 +153,8 @@ requests stay stable.
 | #272 | `joe/confident-gates-gy99ip-7-admin-overview` | #178 to #182 | Codex round fixed (`323fa9f` saves need a live session, `3553711` one read-only transaction for the figures, `1a1157c` event clock for countdowns), resolved; green. Also `4f82523` returns the speaker and session editors to their lists |
 | #273 | `joe/confident-gates-gy99ip-8-email-log` | #183 | Rebuilt on #272 after its fixes (force-pushed with a lease); Codex found nothing; green |
 | #274 | `joe/confident-gates-gy99ip-9-attendees` | #184, #185 | Codex round fixed (`8aebebf` a bookmark re-reads its account in the transaction, `8515ccb` the export is built per chunk with a 10 MB limit), resolved; green locally |
-| #275 | `joe/confident-gates-gy99ip-10-change-requests` | #188 | b4's feature, report and seven review fixes on #274 in `/home/user/wt-int2`; `0a4092a` and the old regenerate commit left out |
-| next | `joe/confident-gates-gy99ip-11-materials` | #189 | b5's feature, report and seven review fixes on #275 in `/home/user/wt-int`; conflicts in CHANGELOG, AdminApp.jsx, ROADMAP and functions/README resolved by hand |
+| #275 | `joe/confident-gates-gy99ip-10-change-requests` | #188 | b4's feature, report and seven review fixes on #274 in `/home/user/wt-int2`. Codex round fixed in `1cb0a0c`: the store reads `users/{uid}` in its transaction (an account delete wins), a changed retry under a used key is 409 and both forms take a new key on an edit (`lib/submissionKey.js`), and a removal the listener delivers first keeps its row |
+| next | `joe/confident-gates-gy99ip-11-materials` | #189 | b5's feature, report and seven review fixes, rebased onto #275's fixed tip in `/home/user/wt-int` (the pre-rebase tip is kept as branch `s11-backup-45c8199`); 13 of 14 checks passed before the rebase |
 
 M10: spec reviews finished for c1 to c5 and c7; c6's review is running (`wf_c0486301-fd0` resumed). c1 (#190, #191) and c2 (#192, #193) were dispatched 2026-09-24 05:25 UTC from #274's tip `874976f` in `/home/user/wt-c1` and `/home/user/wt-c2`. Order: c2 before c3 (content.cjs seams), c5 before c7 (banner, then tour). Next: c4, c5, c6 as builders free up, then c3 and c7.
 
@@ -165,7 +165,8 @@ The demo's initial chunk is at 291,069 of 292,000 gzip bytes after b4.
 worktree, since the main worktree holds the #269 branch.
 
 Filed: #271 (a session material's storage path is not confined to its
-session folder; fix before #213).
+session folder; fix before #213) and #276 (feedback has the same
+changed-retry flaw Codex found in change requests).
 
 ### Resume order
 

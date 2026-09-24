@@ -45,3 +45,12 @@ Rules written after user corrections. Read at session start.
   regeneration had moved the lockfile hash. Regenerate (or delete
   `node_modules/.vite`) before an E2E run in a worktree whose `packages/shared`
   changed, and read the trace's page errors before calling a failure real.
+
+## 2026-09-24: commit with the repository's own identity
+
+- A fix commit was made with `-c user.email=` set to the owner's work
+  address. The repository's configured identity is the GitHub noreply
+  address, and every commit and sign-off on the stack uses it. It was caught
+  and amended before the push. Never pass `-c user.name` or `-c user.email`;
+  `git commit -s` with the configured identity is the rule, and
+  `git log -1 --format='%ae %B'` is read before every push.
