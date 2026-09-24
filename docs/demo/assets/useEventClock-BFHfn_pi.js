@@ -1,0 +1,1 @@
+import{r as t}from"./index-c-CwOZwn.js";const s=6e4;function c({intervalMs:e=s}={}){const[n,r]=t.useState(()=>new Date);return t.useEffect(()=>{if(!(e>0))return;const o=setInterval(()=>r(new Date),e);return()=>clearInterval(o)},[e]),n}export{c as u};
