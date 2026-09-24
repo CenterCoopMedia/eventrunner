@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FONT_SET_STACKS,
   buildRuntimeThemeCss,
   fontSetFaces,
   hexToRgbTriple,
@@ -81,6 +82,17 @@ describe('buildRuntimeThemeCss', () => {
     // document order.
     expect(css.startsWith(LIGHT_BLOCK)).toBe(true);
     expect(css).toContain(DARK_BLOCK);
+  });
+
+  it("lets a picked option's component face win over the component reset (connector review of PR 270)", () => {
+    // Zine's toner-block quote points --callout-font at the karrik set. The
+    // overlay resets every component token to its default first, so the
+    // picked face has to come after the reset, as it does in the generated
+    // stylesheet (scripts/lib/tokens.cjs), or the reset wins.
+    const css = buildRuntimeThemeCss({ preset: 'zine', optionPicks: { quote: 'toner-block' } });
+    const declared = [...css.matchAll(/--callout-font: ([^;]+);/g)].map((match) => match[1]);
+    expect(declared.length).toBeGreaterThan(0);
+    expect(declared.at(-1)).toBe(FONT_SET_STACKS.karrik);
   });
 
   it('derives a dark block from a document that names one palette', () => {
