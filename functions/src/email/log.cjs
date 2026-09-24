@@ -52,6 +52,13 @@ const MAX_QUERY_LENGTH = 200;
 const MAX_ID_LENGTH = 128;
 const SOURCE_RE = /^[a-z0-9-]{1,64}$/;
 const STATUSES = Object.freeze(['sent', 'failed']);
+/**
+ * The first and the last millisecond a Firestore Timestamp can hold
+ * (0001-01-01T00:00:00Z and 9999-12-31T23:59:59.999Z). The Admin SDK throws
+ * synchronously when startAfter gets a Date outside them.
+ */
+const MIN_SENT_AT = -62_135_596_800_000;
+const MAX_SENT_AT = 253_402_300_799_999;
 
 /** Every field a list row carries. Never a body. */
 const LIST_FIELDS = Object.freeze([
@@ -91,6 +98,11 @@ function isValidDocId(id) {
     id !== '..' &&
     !/^__.*__$/.test(id)
   );
+}
+
+/** A cursor's sentAt: whole milliseconds inside the Firestore timestamp range. */
+function isValidCursorTime(sentAt) {
+  return Number.isInteger(sentAt) && sentAt >= MIN_SENT_AT && sentAt <= MAX_SENT_AT;
 }
 
 /** @param {unknown} v @returns {number|null} millis, or null if not a usable instant */
@@ -169,7 +181,7 @@ function parseListRequest(body) {
   if (!absent(limit) && !(Number.isInteger(limit) && limit >= 1 && limit <= MAX_LIMIT)) {
     return { ok: false, message: `limit must be a whole number from 1 to ${MAX_LIMIT}.` };
   }
-  if (!absent(cursor) && !(isPlainObject(cursor) && Number.isFinite(cursor.sentAt) && isValidDocId(cursor.id))) {
+  if (!absent(cursor) && !(isPlainObject(cursor) && isValidCursorTime(cursor.sentAt) && isValidDocId(cursor.id))) {
     return { ok: false, message: 'cursor must be { sentAt, id } from a previous page.' };
   }
   return {
@@ -202,21 +214,21 @@ function createListSentEmailsHandler({ db, auth, getConfig, log = console }) {
     if (!request.ok) return badRequest(res, request.message);
     const { q, source, status, limit, cursor } = request;
 
-    // Each filter shape has its composite index (firestore.indexes.json);
-    // the __name__ tiebreaker rides on every index automatically.
-    let query = db.collection(COLLECTION);
-    if (source) query = query.where('source', '==', source);
-    if (status) query = query.where('status', '==', status);
-    query = query.orderBy('sentAt', 'desc').orderBy('__name__', 'desc');
-    if (cursor) query = query.startAfter(new Date(cursor.sentAt), cursor.id);
-    query = query.select(...LIST_FIELDS);
-
     // Without q, one extra row decides nextCursor without a second query.
     // With q, one query of SCAN_CAP rows is the whole budget.
     const asked = q ? SCAN_CAP : limit + 1;
     let snap;
     try {
-      snap = await query.limit(asked).get();
+      // The whole query is built inside the try: the SDK validates as it
+      // builds and throws synchronously, and a throw here must still answer.
+      // Each filter shape has its composite index (firestore.indexes.json);
+      // the __name__ tiebreaker rides on every index automatically.
+      let query = db.collection(COLLECTION);
+      if (source) query = query.where('source', '==', source);
+      if (status) query = query.where('status', '==', status);
+      query = query.orderBy('sentAt', 'desc').orderBy('__name__', 'desc');
+      if (cursor) query = query.startAfter(new Date(cursor.sentAt), cursor.id);
+      snap = await query.select(...LIST_FIELDS).limit(asked).get();
     } catch (err) {
       log.error('listSentEmails query failed', err);
       return internal(res, 'The email log is temporarily unavailable.');
@@ -325,6 +337,7 @@ module.exports = {
     toDetail,
     toMillis,
     isValidDocId,
+    isValidCursorTime,
     parseListRequest,
     LIST_FIELDS,
     SCAN_CAP,

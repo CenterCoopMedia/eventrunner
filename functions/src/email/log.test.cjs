@@ -507,6 +507,43 @@ test('a failed query answers 500 without detail', async () => {
   assert.ok(!res.body.error.message.includes('FAILED_PRECONDITION'));
 });
 
+test('a cursor sentAt outside the Firestore timestamp range is a 400, never a thrown startAfter', async () => {
+  // The Admin SDK throws synchronously when startAfter gets a Date past
+  // Firestore's Timestamp range. This fake never throws, so a 400 here can
+  // only come from the range check itself.
+  const db = makeFakeDb({ ...BOOTSTRAP, 'sent_emails/m1': row() });
+  for (const sentAt of [1e15, -1e15, 8e15, 1.5, -62_135_596_800_001, 253_402_300_800_000]) {
+    const res = await list(db, { cursor: { sentAt, id: 'm1' } });
+    assert.equal(res.statusCode, 400, String(sentAt));
+    assert.match(res.body.error.message, /^cursor /);
+  }
+  // The first and the last millisecond Firestore can store are accepted.
+  for (const sentAt of [-62_135_596_800_000, 253_402_300_799_999]) {
+    assert.equal((await list(db, { cursor: { sentAt, id: 'm1' } })).statusCode, 200, String(sentAt));
+  }
+});
+
+test('an SDK throw while the query is built answers 500 rather than leaving the request open', async () => {
+  const db = makeFakeDb(BOOTSTRAP);
+  const throwing = (at) => ({
+    collection(name) {
+      if (name !== 'sent_emails') return db.collection(name);
+      const chain = new Proxy({}, {
+        get: (_t, key) => (key === at ? () => { throw new Error(`INVALID_ARGUMENT: ${at}`); } : () => chain),
+      });
+      return chain;
+    },
+  });
+  for (const at of ['where', 'orderBy', 'startAfter', 'select', 'limit']) {
+    const res = fakeRes();
+    const body = { source: 'feedback', cursor: { sentAt: 1000, id: 'm1' } };
+    await createListSentEmailsHandler({ db: throwing(at), auth, getConfig, log: quietLog })(req({ body }), res);
+    assert.equal(res.statusCode, 500, at);
+    assert.equal(res.body.error.code, 'internal');
+    assert.ok(!res.body.error.message.includes('INVALID_ARGUMENT'));
+  }
+});
+
 // --- getSentEmail -------------------------------------------------------------
 
 test('getSentEmail returns the stored bodies and the provider fields', async () => {
