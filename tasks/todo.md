@@ -133,11 +133,10 @@ Local branches, not pushed, with every conflict already resolved:
   prove the rule through the `.avatar` tokens, and Branding and the block
   editor load on demand (admin entry chunk 51,756 to 35,297 gzip). Every
   check passed on it before the lazy-load commit, except the chunk budget.
-- `trial/stack-a3-b3` (worktree `/home/user/wt-int2`): b1, b2 and b3 on the
-  a3 trial, before the lazy-load commit. Unit tests pass after regenerating
-  except b1's `eventStats.test.cjs` seed pin: 100 content blocks must be 101,
-  because a3 adds a key fact. b1 also leaves `getEventStats` out of the
-  staff row in `functions/README.md`.
+- `trial/stack-a3-b3` (worktree `/home/user/wt-int2`): b1, b2 and b3 on
+  `trial/a3-on-tiers`. b1's review (4 of 9 confirmed, all minor) is fixed
+  there by the director in `6d86f81`, and `36b8955` moves the seed pin to 101
+  content blocks because a3 adds a key fact. b2 and b3 wait on their reviews.
 - To build the real stack, take review fixes onto these: a3 fixes on the
   first, then cherry-pick the resolved b1, b2, b3 commits from the second.
 
