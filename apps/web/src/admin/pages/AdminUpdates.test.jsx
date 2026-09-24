@@ -281,6 +281,14 @@ describe('the update editor', () => {
     expect(callsTo('cmsSaveUpdate').map(bodyOf).map((body) => body.id)).toEqual([id, id]);
   });
 
+  it('describes the date in short sentences, capitalized after every stop', async () => {
+    await renderAt('/admin/updates/new/update');
+    await screen.findByRole('heading', { level: 1, name: 'New update' });
+    expect(screen.getByLabelText('Date')).toHaveAccessibleDescription(
+      'The date readers see, on the event\'s clock. Leave it empty for an undated update. It does not delay publishing. The update goes live when you publish it.',
+    );
+  });
+
   it('refuses a save with no title or text, marks the fields, and moves focus to the first', async () => {
     await renderAt('/admin/updates/new/update');
     await screen.findByRole('heading', { level: 1, name: 'New update' });

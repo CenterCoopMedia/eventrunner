@@ -174,7 +174,7 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 
 ## Updates
 
-The posts on the site's Updates page. Each row gives the post's title, its state in the three words every editor uses, its date, its category, and its place in the list: **Featured**, **Featured and pinned**, **Pinned**, or **By date**. A post that is not shown when published also carries **Hidden**. The list is in the order the public page uses: pinned posts first, then the newest date first, and undated posts last. Short notices for the dashboard card are a different feed, under **Live updates**.
+The posts on the site's Updates page. Each row gives the post's title, its state in the three words every editor uses, its date, its category, and its place in the list: **Featured**, **Featured and pinned**, **Pinned**, or **By date**. A post that is not shown when published also carries **Hidden**. The list is in the order the public page uses: Pinned posts first, then the newest date first, and undated posts last. Short notices for the dashboard card are a different feed, under **Live updates**.
 
 **Write an update** opens an empty editor. Give it a title and the text. **Save draft** writes a draft: The public page does not show it. **Save and publish** saves and then publishes it, and the public page shows it at once. **Publish all** on the list publishes every update with a saved draft that is not live. Press Enter in a one-line field to save a draft.
 
@@ -184,7 +184,7 @@ The posts on the site's Updates page. Each row gives the post's title, its state
 
 **A category is one or two words**, such as Travel or Program, shown as a tag beside the post's title on the Updates page. It takes up to 24 characters on one line, so the tag fits on a phone. Leave it empty for no tag. The field suggests the categories other posts already use, so one topic keeps one spelling.
 
-**Feature a post to put it at the head of the page.** The Updates page sets the featured post first, under its own heading, **Featured**, with a larger title and its opening lines. If more than one post is featured, the one that comes first in the list leads: a pinned post before an unpinned one, then the newest date. The other featured posts stay in their usual places. To change the lead, clear **Feature this update at the head of the list** on the post that leads now.
+**Feature a post to put it at the head of the page.** The Updates page sets the featured post first, under its own heading, **Featured**, with a larger title and its opening lines. If more than one post is featured, the one that comes first in the list leads: A pinned post before an unpinned one, then the newest date. The other featured posts stay in their usual places. To change the lead, clear **Feature this update at the head of the list** on the post that leads now.
 
 **A picture and content blocks.** A post can also carry a picture and content blocks. This editor does not change them. When a post has them, the editor says so, and a save keeps them as they are.
 

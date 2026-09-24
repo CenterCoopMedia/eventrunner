@@ -338,7 +338,7 @@ export default function AdminUpdateEditor({ mode }) {
           <TextField
             label="Date"
             type="date"
-            hint="The date readers see, on the event's clock. Leave it empty for an undated update. It does not delay publishing: the update goes live when you publish it."
+            hint="The date readers see, on the event's clock. Leave it empty for an undated update. It does not delay publishing. The update goes live when you publish it."
             name="date"
             value={form.date}
             onChange={(value) => set({ date: value })}
