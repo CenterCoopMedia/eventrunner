@@ -270,7 +270,7 @@ CMS edit → publish → public, speaker invite → accept → wizard, ticket cl
 → approved → bookmark — and the updates editor (issues #190 and #191: an
 update written and saved as a draft in the admin stays off the public Updates
 page until the editor publishes it, and then leads the page as the featured
-post with its category tag) against the same emulator/dev-server combination,
+update with its category tag) against the same emulator/dev-server combination,
 seeded from `scripts/init-event.cjs` + `scripts/seed-demo-event.cjs`. See
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full test command
 table.

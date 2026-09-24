@@ -317,7 +317,7 @@ export default function AdminUpdateEditor({ mode }) {
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel title="Post">
+      <Panel title="Public update">
         <div className="flex flex-col gap-sm">
           <TextField
             label="Title"

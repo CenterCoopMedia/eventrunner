@@ -27,3 +27,24 @@ describe('the admin guide’s Updates section', () => {
     expect(lower).toEqual([]);
   });
 });
+
+// docs/COPY_STYLE.md, "Use one term for one concept": every control on
+// these screens says "update", so the text around them says it too.
+describe('one term for an update', () => {
+  const POST = /\bposts?\b/i;
+
+  it('says "update", never "post", in the admin guide’s Updates section', () => {
+    expect(prose(section('docs/ADMIN_GUIDE.md', 'Updates')).match(new RegExp(POST, 'gi')) ?? []).toEqual([]);
+  });
+
+  it('says "update" in the changelog entries and the design reference line for these screens', () => {
+    const changelog = readFileSync(path.join(REPO, 'CHANGELOG.md'), 'utf8');
+    const entries = changelog.split('\n- ').filter((entry) => /\(#19[01]\)/.test(entry));
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) expect(entry).not.toMatch(POST);
+    const reference = readFileSync(path.join(REPO, 'docs/design-reference.md'), 'utf8');
+    const feed = reference.split('\n').find((line) => line.startsWith('- **Updates feed**'));
+    expect(feed).toBeTruthy();
+    expect(feed).not.toMatch(POST);
+  });
+});

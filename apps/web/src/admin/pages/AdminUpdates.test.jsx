@@ -126,6 +126,8 @@ describe('the updates list', () => {
     await renderAt('/admin/updates');
     expect(await screen.findByRole('heading', { name: 'No updates yet' })).toBeInTheDocument();
     expect(screen.getByText('Write the first update. It stays a draft until you publish it.')).toBeInTheDocument();
+    // One term: every control says "update", so the description does too.
+    expect(screen.getByText("Every update on the site's Updates page, and whether each one is live. Short notices for the dashboard card are under Live updates.")).toBeInTheDocument();
     for (const link of screen.getAllByRole('link', { name: 'Write an update' })) {
       expect(link).toHaveAttribute('href', '/admin/updates/new/update');
     }
@@ -200,6 +202,9 @@ describe('the update editor', () => {
     fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'The clinic moves to Room B.' } });
     fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-10-15' } });
     expect(screen.getByLabelText('Show this update when it is published')).toBeChecked();
+    // One term: the fields sit under "Public update", never "Post".
+    expect(screen.getByRole('heading', { level: 2, name: 'Public update' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Post' })).toBeNull();
 
     fetch.mockResolvedValueOnce(response({ error: { code: 'internal', message: 'The update could not be saved.' } }, 500));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));

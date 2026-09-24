@@ -174,21 +174,21 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 
 ## Updates
 
-The posts on the site's Updates page. Each row gives the post's title, its state in the three words every editor uses, its date, its category, and its place in the list: **Featured**, **Featured and pinned**, **Pinned**, or **By date**. A post that is not shown when published also carries **Hidden**. The list is in the order the public page uses: Pinned posts first, then the newest date first, and undated posts last. Short notices for the dashboard card are a different feed, under **Live updates**.
+Every update on the site's Updates page. Each row gives the update's title, its state in the three words every editor uses, its date, its category, and its place in the list: **Featured**, **Featured and pinned**, **Pinned**, or **By date**. An update that is not shown when published also carries **Hidden**. The list is in the order the public page uses: Pinned updates first, then the newest date first, and undated updates last. Short notices for the dashboard card are a different feed, under **Live updates**.
 
 **Write an update** opens an empty editor. Give it a title and the text. **Save draft** writes a draft: The public page does not show it. **Save and publish** saves and then publishes it, and the public page shows it at once. **Publish all** on the list publishes every update with a saved draft that is not live. Press Enter in a one-line field to save a draft.
 
-**The date is the date readers see, on the event's clock.** It is set in the event's time zone (Settings → Event settings), the same clock the public page uses for the date under the title. Leave it empty for an undated post; an undated post goes after every dated one. The date does not delay publishing. A post dated next month goes live when you publish it, and it shows next month's date.
+**The date is the date readers see, on the event's clock.** It is set in the event's time zone (Settings → Event settings), the same clock the public page uses for the date under the title. Leave it empty for an undated update; an undated update goes after every dated one. A date with a part missing is refused when you save, so finish it or clear the field. The date does not delay publishing. An update dated next month goes live when you publish it, and it shows next month's date.
 
-**Pin** a post to hold it at the top of the list, above newer posts. Clear **Show this update when it is published** to publish a post that the public page does not show.
+**Pin** an update to hold it at the top of the list, above newer updates. Clear **Show this update when it is published** to publish an update that the public page does not show.
 
-**A category is one or two words**, such as Travel or Program, shown as a tag beside the post's title on the Updates page. It takes up to 24 characters on one line, so the tag fits on a phone. Leave it empty for no tag. The field suggests the categories other posts already use, so one topic keeps one spelling.
+**A category is one or two words**, such as Travel or Program, shown as a tag beside the update's title on the Updates page. It takes up to 24 characters on one line, so the tag fits on a phone. Leave it empty for no tag. The field suggests the categories other updates already use, so one topic keeps one spelling.
 
-**Feature a post to put it at the head of the page.** The Updates page sets the featured post first, under its own heading, **Featured**, with a larger title and its opening lines. If more than one post is featured, the one that comes first in the list leads: A pinned post before an unpinned one, then the newest date. The other featured posts stay in their usual places. To change the lead, clear **Feature this update at the head of the list** on the post that leads now.
+**Feature an update to put it at the head of the page.** The Updates page sets the featured update first, under its own heading, **Featured**, with a larger title and its opening lines. If more than one update is featured, the one that comes first in the list leads: A pinned update before an unpinned one, then the newest date. The other featured updates stay in their usual places. To change the lead, clear **Feature this update at the head of the list** on the update that leads now.
 
-**A picture and content blocks.** A post can also carry a picture and content blocks. This editor does not change them. When a post has them, the editor says so, and a save keeps them as they are.
+**A picture and content blocks.** An update can also carry a picture and content blocks. This editor does not change them. When an update has them, the editor says so, and a save keeps them as they are.
 
-**Delete this update** removes the live post and its draft together. Its version history stays. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
+**Delete this update** removes the live update and its draft together. Its version history stays. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
 
 ## Media
 

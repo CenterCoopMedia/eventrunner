@@ -122,7 +122,7 @@ export default function AdminUpdatesList() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Updates"
-        description="Posts on the site's Updates page and whether each one is live. Short notices for the dashboard card are under Live updates."
+        description="Every update on the site's Updates page, and whether each one is live. Short notices for the dashboard card are under Live updates."
         identifiers={loading ? null : `${rows.length} update${rows.length === 1 ? '' : 's'}`}
         actions={
           <>
