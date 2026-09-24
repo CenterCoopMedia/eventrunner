@@ -1,8 +1,7 @@
 // One record's version history (issue #195): clauses (a) what changed, (b)
-// when, and (c) by which account, on the page that shows them; and the
-// restore a past version offers. Mocks adminApi directly, the convention
-// the email log and attendee page tests follow, and adminSource.js for the
-// record's live and draft documents.
+// when, and (c) by which account, on the page that shows them. Mocks
+// adminApi directly, the convention the email log and attendee page tests
+// follow, and adminSource.js for the record's live and draft documents.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -24,7 +23,6 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
 }));
 
 import AdminVersionHistory from './AdminVersionHistory.jsx';
-import { DELETE_FIELD_SENTINEL } from '../contentDoc.js';
 
 const DOC_PATH = 'cmsContent/hero__subtitle';
 // 2:02 PM on Sep 23, 2026 in New York.
@@ -71,9 +69,9 @@ function serverError(status, code, text) {
 /**
  * cmsGetVersionHistory answers each entry of `pages` in turn (the last
  * repeats); an Error entry is thrown, and a function entry is called for
- * a promise the test controls. Other endpoints answer from `others`.
+ * a promise the test controls. The page calls no other endpoint.
  */
-function serve({ pages = [{ entries: [EDITED, SEEDED], nextCursor: null }], others = {} } = {}) {
+function serve({ pages = [{ entries: [EDITED, SEEDED], nextCursor: null }] } = {}) {
   let n = 0;
   callMock.mockImplementation((name, body) => {
     if (name === 'cmsGetVersionHistory') {
@@ -83,9 +81,6 @@ function serve({ pages = [{ entries: [EDITED, SEEDED], nextCursor: null }], othe
       if (answer instanceof Error) return Promise.reject(answer);
       return Promise.resolve(answer);
     }
-    const answer = others[name];
-    if (answer instanceof Error) return Promise.reject(answer);
-    if (answer !== undefined) return Promise.resolve(answer);
     return Promise.reject(new Error(`unexpected call ${name}`));
   });
 }
@@ -159,6 +154,10 @@ describe('one record’s versions', () => {
       'Four days of workshops.',
     ]);
     expect(screen.getByText('This is the published version.')).toBeInTheDocument();
+    // Read only: nothing on the page changes or restores a version, and it
+    // calls nothing but the history read.
+    expect(screen.queryByRole('button', { name: /restore/i })).toBeNull();
+    expect(new Set(callMock.mock.calls.map(([name]) => name))).toEqual(new Set(['cmsGetVersionHistory']));
   });
 
   it('heads the page with the record’s name, state and path, and says how many versions it shows', async () => {
@@ -362,128 +361,5 @@ describe('one record’s versions', () => {
     await renderPage(undefined, { pages: [serverError(403, 'forbidden', 'Admin access required.')] });
     expect(screen.getByRole('heading', { name: 'You don’t have access to version history' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
-  });
-});
-
-describe('restoring a version', () => {
-  it('offers a restore on a past version and not on the one the site shows', async () => {
-    await renderPage();
-    // Not before the record's documents are known: a restore needs them.
-    expect(screen.queryByRole('button', { name: /Restore version/ })).toBeNull();
-    reportRecord();
-    expect(within(versionItem(2)).queryByRole('button', { name: /Restore/ })).toBeNull();
-    expect(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' })).toBeInTheDocument();
-  });
-
-  it('offers the published version back when a newer draft sits over it', async () => {
-    await renderPage();
-    reportRecord({ drafts: [{ ...CLEAN_DRAFT, value: 'Unsaved idea', status: 'dirty' }] });
-    fireEvent.click(within(versionItem(2)).getByRole('button', { name: 'Restore version 2' }));
-    expect(screen.getByRole('region', { name: 'Restore version 2?' })).toHaveTextContent('It replaces the current draft.');
-  });
-
-  it('opens a still confirmation, and Cancel returns focus to the button', async () => {
-    await renderPage();
-    reportRecord();
-    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
-    const confirm = screen.getByRole('region', { name: 'Restore version 1?' });
-    expect(within(confirm).getByRole('heading', { name: 'Restore version 1?' })).toHaveFocus();
-    expect(confirm).toHaveTextContent('Version 1 becomes the draft of this record. The site does not change until you publish.');
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('region', { name: 'Restore version 1?' })).toBeNull();
-    expect(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' })).toHaveFocus();
-    expect(callMock.mock.calls.filter(([name]) => name !== 'cmsGetVersionHistory')).toEqual([]);
-  });
-
-  it('saves the version as the draft through the editor’s endpoint, then publishes it on request', async () => {
-    await renderPage(undefined, {
-      pages: [
-        { entries: [EDITED, SEEDED], nextCursor: null },
-        {
-          entries: [
-            entry(3, { changes: [{ path: 'value', kind: 'changed', before: 'Four days of workshops.', after: 'Three days of workshops.' }] }),
-            EDITED,
-            SEEDED,
-          ],
-          nextCursor: null,
-        },
-      ],
-      others: {
-        cmsUpdateContent: { docPath: 'cmsContent_drafts/hero__subtitle', docId: 'hero__subtitle', status: 'dirty' },
-        cmsPublish: { queueId: 'q1', status: 'done', results: { cmsContent: { published: ['hero__subtitle'], skipped: [] } } },
-      },
-    });
-    reportRecord({ drafts: [{ ...CLEAN_DRAFT, order: 4 }] });
-    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
-
-    await waitFor(() =>
-      expect(screen.getByText('Version 1 is now the draft. The site still shows version 2 until you publish.')).toBeInTheDocument(),
-    );
-    expect(callMock).toHaveBeenCalledWith('cmsUpdateContent', {
-      collection: 'cmsContent',
-      section: 'hero',
-      field: 'subtitle',
-      // The seed's bookkeeping is not sent, and a field the version did not
-      // have is cleared, so the draft is the version and nothing else.
-      fields: { section: 'hero', field: 'subtitle', blockType: 'text', value: 'Three days of workshops.', order: DELETE_FIELD_SENTINEL },
-      visible: true,
-    });
-    const notice = screen.getByText(/is now the draft/).closest('[tabindex="-1"]');
-    expect(notice).toHaveFocus();
-    expect(callMock.mock.calls.some(([name]) => name === 'cmsPublish')).toBe(false);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Publish now' }));
-    await waitFor(() => expect(screen.getByText('Published. The public site picks it up live.')).toBeInTheDocument());
-    expect(callMock).toHaveBeenCalledWith('cmsPublish', { collection: 'cmsContent', docIds: ['hero__subtitle'] });
-    // The new version is read back and leads the list.
-    await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 })[0]).toHaveTextContent('Version 3'));
-    expect(historyCalls()).toHaveLength(2);
-  });
-
-  it('shows a refused restore in place, focused, and keeps the confirmation open', async () => {
-    await renderPage(undefined, {
-      others: { cmsUpdateContent: serverError(400, 'bad-request', 'speakerIds: no speaker spk-9') },
-    });
-    reportRecord();
-    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
-    const confirm = screen.getByRole('region', { name: 'Restore version 1?' });
-    await waitFor(() => expect(within(confirm).getByRole('alert')).toHaveTextContent('speakerIds: no speaker spk-9'));
-    expect(within(confirm).getByRole('alert').parentElement).toHaveFocus();
-    expect(screen.queryByRole('button', { name: 'Publish now' })).toBeNull();
-  });
-
-  it('keeps the publish on offer when it did not go through', async () => {
-    await renderPage(undefined, {
-      others: {
-        cmsUpdateContent: { status: 'dirty' },
-        cmsPublish: { queueId: 'q1', status: 'done', results: { cmsContent: { published: [], skipped: [{ docId: 'hero__subtitle', reason: 'conflict' }] } } },
-      },
-    });
-    reportRecord();
-    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Publish now' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Nothing was published'));
-    expect(screen.getByRole('button', { name: 'Publish now' })).toBeInTheDocument();
-  });
-
-  it('creates a removed record again as a draft', async () => {
-    await renderPage(undefined, { others: { cmsCreateContent: { status: 'dirty' } } });
-    reportRecord({ live: [], drafts: [] });
-    fireEvent.click(within(versionItem(2)).getByRole('button', { name: 'Restore version 2' }));
-    expect(screen.getByRole('region', { name: 'Restore version 2?' })).toHaveTextContent('The record is saved again as a draft.');
-    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
-    await waitFor(() =>
-      expect(screen.getByText('Version 2 is now the draft. Nothing is on the site until you publish.')).toBeInTheDocument(),
-    );
-    expect(callMock).toHaveBeenCalledWith('cmsCreateContent', {
-      collection: 'cmsContent',
-      section: 'hero',
-      field: 'subtitle',
-      fields: EDITED.fields,
-      visible: true,
-    });
   });
 });

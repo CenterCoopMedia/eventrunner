@@ -6,18 +6,14 @@
 // one docPath, 20 versions a call, and renders what the server answers: the
 // server compares each version with the one before it, so this page never
 // diffs anything itself. It reads the record's live and draft documents too
-// (useAdminRecords), for its name, its state, and what a restore replaces.
+// (useAdminRecords), for its name and its state.
+//
+// READ ONLY. A version cannot be changed or restored here: the page reads
+// history and writes nothing.
 //
 // STORED VALUES ARE TEXT. Every value, path and account is a React text
 // node. Rich text shows its tags; nothing is parsed, and a stored URL is
 // never made a link, so a `javascript:` value cannot run here.
-//
-// RESTORE. A past version can become the record's draft again. The page
-// sends the version's fields through the record's own save endpoint
-// (versionHistory.js restoreRequestFor), so every check the editor's save
-// runs, runs on the restored content, and the save writes its admin log
-// row. Restoring publishes nothing: the notice that follows says what the
-// site still shows and offers the publish, which adds a new version.
 //
 // LATE ANSWERS. Every call takes a sequence number. An answer from a call
 // that Refresh, another record, or leaving the page has overtaken is
@@ -25,10 +21,8 @@
 // record.
 //
 // FOCUS. Load older versions moves focus to the first new version's
-// heading. Opening a restore moves focus into it; Cancel returns it to the
-// button that opened it. A restore or a publish moves focus to the notice
-// that reports it.
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+// heading.
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -37,13 +31,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
-import {
-  Notice,
-  Panel,
-  primaryButtonClass,
-  secondaryButtonClass,
-} from '../components/formControls.jsx';
-import { summarizePublish } from '../publishResult.js';
+import { Notice, Panel, secondaryButtonClass } from '../components/formControls.jsx';
 import { deadMatter } from '../recordState.js';
 import { useAdminRecords } from '../useAdminRecords.js';
 import {
@@ -52,7 +40,6 @@ import {
   formatPublishedAt,
   pathText,
   recordNameOf,
-  restoreRequestFor,
   valueText,
 } from '../versionHistory.js';
 
@@ -141,48 +128,6 @@ function ChangeTable({ entry, timeZone }) {
   );
 }
 
-/** The still surface a restore opens: what it replaces, and the one action. */
-function RestoreConfirm({ entry, row, busy, error, onConfirm, onCancel, headingRef, errorRef }) {
-  const headingId = useId();
-  const replacesDraft = row?.draft?.status === 'dirty' || (row && !row.live);
-  return (
-    <section
-      aria-labelledby={headingId}
-      className="flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-soft px-md py-sm"
-    >
-      <h3 id={headingId} ref={headingRef} tabIndex={-1} className="font-admin-ui text-admin-base font-bold text-admin-ink">
-        {`Restore version ${entry.revision}?`}
-      </h3>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">
-        {`Version ${entry.revision} becomes the draft of this record.`}
-        {replacesDraft ? ' It replaces the current draft.' : ''}
-        {row ? '' : ' The record is saved again as a draft.'}
-        {' The site does not change until you publish.'}
-      </p>
-      {error ? (
-        <div ref={errorRef} tabIndex={-1}>
-          <Notice tone="error" message={error.message} />
-        </div>
-      ) : null}
-      <div className="flex flex-wrap items-center gap-xs">
-        <button
-          type="button"
-          className={primaryButtonClass}
-          aria-busy={busy ? 'true' : undefined}
-          onClick={() => {
-            if (!busy) onConfirm();
-          }}
-        >
-          {busy ? 'Restoring…' : 'Restore as draft'}
-        </button>
-        <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
-          Cancel
-        </button>
-      </div>
-    </section>
-  );
-}
-
 export default function AdminVersionHistory() {
   const { collection, docId } = useParams();
   const choice = collectionChoice(collection);
@@ -197,26 +142,13 @@ export default function AdminVersionHistory() {
   const [pending, setPending] = useState(null); // 'load' | 'refresh' | 'more' | null
   const [error, setError] = useState(null);
   const [focusRevision, setFocusRevision] = useState(null);
-  const [confirming, setConfirming] = useState(null); // the revision whose restore is open
-  const [restoring, setRestoring] = useState(false);
-  const [restoreError, setRestoreError] = useState(null);
-  // { kind: 'restored', revision, liveRevision, publishError? } | { kind: 'published', message }
-  const [notice, setNotice] = useState(null);
-  const [publishing, setPublishing] = useState(false);
-  const [noticeFocus, setNoticeFocus] = useState(0);
-  const [returnFocus, setReturnFocus] = useState(null); // the revision whose restore button takes focus back
 
   const requestRef = useRef(0);
   // The latest call, read when a read starts: a new token-bound callback
-  // (useAdminApi follows the signed-in user) must not restart the reads
-  // and close an open restore.
+  // (useAdminApi follows the signed-in user) must not restart the reads.
   const callRef = useRef(call);
   callRef.current = call;
   const headingRefs = useRef(new Map());
-  const restoreButtonRefs = useRef(new Map());
-  const confirmHeadingRef = useRef(null);
-  const confirmErrorRef = useRef(null);
-  const noticeRef = useRef(null);
 
   const load = useCallback(
     async (kind) => {
@@ -246,9 +178,6 @@ export default function AdminVersionHistory() {
     if (!docPath) return undefined;
     setResult(null);
     setError(null);
-    setConfirming(null);
-    setRestoreError(null);
-    setNotice(null);
     load('load');
     return () => {
       requestRef.current += 1;
@@ -260,26 +189,6 @@ export default function AdminVersionHistory() {
     headingRefs.current.get(focusRevision)?.focus();
     setFocusRevision(null);
   }, [focusRevision]);
-
-  useEffect(() => {
-    if (confirming !== null) confirmHeadingRef.current?.focus();
-  }, [confirming]);
-
-  useEffect(() => {
-    if (restoreError) confirmErrorRef.current?.focus();
-  }, [restoreError]);
-
-  useEffect(() => {
-    if (noticeFocus > 0) noticeRef.current?.focus();
-  }, [noticeFocus]);
-
-  // Cancel closes the restore, and the button that opened it is drawn again
-  // on the same render; this effect runs after it is back.
-  useEffect(() => {
-    if (returnFocus === null) return;
-    restoreButtonRefs.current.get(returnFocus)?.focus();
-    setReturnFocus(null);
-  }, [returnFocus]);
 
   function refresh() {
     load('refresh');
@@ -296,7 +205,7 @@ export default function AdminVersionHistory() {
     const cursor = result.nextCursor;
     setPending('more');
     try {
-      const response = await call('cmsGetVersionHistory', { docPath, limit: PAGE_SIZE, cursor });
+      const response = await callRef.current('cmsGetVersionHistory', { docPath, limit: PAGE_SIZE, cursor });
       if (requestId !== requestRef.current) return;
       const more = Array.isArray(response?.entries) ? response.entries : [];
       setResult((current) => {
@@ -313,59 +222,6 @@ export default function AdminVersionHistory() {
       if (requestId === requestRef.current) setError(err);
     } finally {
       if (requestId === requestRef.current) setPending(null);
-    }
-  }
-
-  function openRestore(revision) {
-    setRestoreError(null);
-    setConfirming(revision);
-  }
-
-  function cancelRestore() {
-    setReturnFocus(confirming);
-    setConfirming(null);
-    setRestoreError(null);
-  }
-
-  async function restore(entry) {
-    const request = restoreRequestFor(choice.id, docId, entry, row?.current ?? null);
-    if (!request || restoring) return;
-    setRestoring(true);
-    setRestoreError(null);
-    try {
-      await call(request.endpoint, request.body);
-      setConfirming(null);
-      setNotice({
-        kind: 'restored',
-        revision: entry.revision,
-        liveRevision: typeof row?.live?.revision === 'number' ? row.live.revision : null,
-      });
-      setNoticeFocus((n) => n + 1);
-    } catch (err) {
-      setRestoreError(err);
-    } finally {
-      setRestoring(false);
-    }
-  }
-
-  async function publishRestored() {
-    if (publishing) return;
-    setPublishing(true);
-    try {
-      const response = await call('cmsPublish', { collection: choice.id, docIds: [docId] });
-      const verdict = summarizePublish(response, choice.id, [docId], choice.plural);
-      if (verdict.ok) {
-        setNotice({ kind: 'published', message: verdict.message });
-        load('refresh');
-      } else {
-        // The restored draft is still there, so the publish stays on offer.
-        setNotice((current) => ({ ...current, publishError: verdict.message }));
-      }
-    } catch (err) {
-      setNotice((current) => ({ ...current, publishError: err.message }));
-    } finally {
-      setPublishing(false);
-      setNoticeFocus((n) => n + 1);
     }
   }
 
@@ -429,37 +285,7 @@ export default function AdminVersionHistory() {
     }
   }
 
-  let noticeBody = null;
-  if (notice?.kind === 'restored') {
-    const site =
-      notice.liveRevision === null
-        ? 'Nothing is on the site until you publish.'
-        : `The site still shows version ${notice.liveRevision} until you publish.`;
-    noticeBody = (
-      <div className="flex flex-col items-start gap-xs">
-        <Notice tone="info" message={`Version ${notice.revision} is now the draft. ${site}`} />
-        <button
-          type="button"
-          className={primaryButtonClass}
-          aria-busy={publishing ? 'true' : undefined}
-          onClick={publishRestored}
-        >
-          {publishing ? 'Publishing…' : 'Publish now'}
-        </button>
-        {notice.publishError ? <Notice tone="error" message={notice.publishError} /> : null}
-      </div>
-    );
-  } else if (notice?.kind === 'published') {
-    noticeBody = <Notice tone="ok" message={notice.message} />;
-  }
-
   const liveRevision = typeof row?.live?.revision === 'number' ? row.live.revision : null;
-  const restoreOffered = (entry) => {
-    if (!records.ready || restoreRequestFor(choice.id, docId, entry, row?.current ?? null) === null) return false;
-    // The version the site shows, with nothing pending over it, is already
-    // what a restore would give.
-    return !(row?.state?.id === 'live' && liveRevision === entry.revision);
-  };
 
   let body = null;
   if (denied) {
@@ -525,32 +351,6 @@ export default function AdminVersionHistory() {
                   ) : null}
                 </div>
                 <ChangeTable entry={entry} timeZone={timeZone} />
-                {confirming === entry.revision ? (
-                  <RestoreConfirm
-                    entry={entry}
-                    row={row}
-                    busy={restoring}
-                    error={restoreError}
-                    onConfirm={() => restore(entry)}
-                    onCancel={cancelRestore}
-                    headingRef={confirmHeadingRef}
-                    errorRef={confirmErrorRef}
-                  />
-                ) : restoreOffered(entry) ? (
-                  <div>
-                    <button
-                      type="button"
-                      ref={(node) => {
-                        if (node) restoreButtonRefs.current.set(entry.revision, node);
-                        else restoreButtonRefs.current.delete(entry.revision);
-                      }}
-                      className={secondaryButtonClass}
-                      onClick={() => openRestore(entry.revision)}
-                    >
-                      {`Restore version ${entry.revision}`}
-                    </button>
-                  </div>
-                ) : null}
               </li>
             );
           })}
@@ -582,12 +382,6 @@ export default function AdminVersionHistory() {
       />
 
       {errorNotice}
-
-      {noticeBody ? (
-        <div ref={noticeRef} tabIndex={-1}>
-          {noticeBody}
-        </div>
-      ) : null}
 
       {result && entries.length > 0 && !denied ? (
         <p role="status" className="text-admin-sm text-admin-ink-secondary">

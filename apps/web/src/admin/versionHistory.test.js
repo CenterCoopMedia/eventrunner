@@ -5,8 +5,6 @@
 // serves.
 import { describe, expect, it } from 'vitest';
 import * as blockTypesCjs from '../../../../functions/src/cms/blockTypes.cjs';
-import * as storeCjs from '../../../../functions/src/cms/store.cjs';
-import { DELETE_FIELD_SENTINEL } from './contentDoc.js';
 import {
   COLLECTION_CHOICES,
   collectionChoice,
@@ -14,13 +12,11 @@ import {
   formatPublishedAt,
   pathText,
   recordNameOf,
-  restoreRequestFor,
   toMillis,
   valueText,
 } from './versionHistory.js';
 
 const { PUBLISHABLE_COLLECTIONS } = blockTypesCjs.default ?? blockTypesCjs;
-const { internals: storeInternals } = storeCjs.default ?? storeCjs;
 
 // 2:02 PM on Sep 23, 2026 in New York (EDT, UTC-4).
 const PUBLISHED = Date.UTC(2026, 8, 23, 18, 2);
@@ -131,60 +127,5 @@ describe('pathText', () => {
 
   it('says what the visibility flag does', () => {
     expect(pathText('visible')).toBe('Shown on the site');
-  });
-});
-
-describe('restoreRequestFor', () => {
-  const entry = (fields, visible = true) => ({ revision: 3, fields, visible });
-
-  it('saves a content block through the editor’s own endpoint, clearing a field the version did not have', () => {
-    const request = restoreRequestFor(
-      'cmsContent',
-      'hero__subtitle',
-      entry({ section: 'hero', field: 'subtitle', blockType: 'text', value: 'Old', seeded: true, seededAt: 'x' }),
-      { id: 'hero__subtitle', section: 'hero', field: 'subtitle', blockType: 'text', value: 'New', order: 2, status: 'clean', visible: true, basedOnRevision: 4 },
-    );
-    expect(request).toEqual({
-      endpoint: 'cmsUpdateContent',
-      body: {
-        collection: 'cmsContent',
-        section: 'hero',
-        field: 'subtitle',
-        fields: { section: 'hero', field: 'subtitle', blockType: 'text', value: 'Old', order: DELETE_FIELD_SENTINEL },
-        visible: true,
-      },
-    });
-  });
-
-  it('never clears the publish model’s own bookkeeping', () => {
-    const current = { id: 's1', title: 'Now', materialCount: 2 };
-    for (const key of storeInternals.RESERVED_FIELDS) current[key] = current[key] ?? 'x';
-    const { body } = restoreRequestFor('cmsSchedule', 's1', entry({ title: 'Then' }, false), current);
-    expect(body).toEqual({ collection: 'cmsSchedule', docId: 's1', fields: { title: 'Then' }, visible: false });
-  });
-
-  it('creates a deleted record again', () => {
-    expect(restoreRequestFor('cmsTimeline', 't1', entry({ year: 2020, title: 'First' }), null)).toEqual({
-      endpoint: 'cmsCreateContent',
-      body: { collection: 'cmsTimeline', docId: 't1', fields: { year: 2020, title: 'First' }, visible: true },
-    });
-  });
-
-  it('sends a page to cmsSavePage and an update to cmsSaveUpdate, whole', () => {
-    expect(restoreRequestFor('cmsPages', 'about', entry({ id: 'about', label: 'About', seeded: true }, false), { id: 'about' })).toEqual({
-      endpoint: 'cmsSavePage',
-      body: { page: { id: 'about', label: 'About', visible: false } },
-    });
-    expect(
-      restoreRequestFor('cmsUpdates', 'u1', entry({ title: 'T', body: 'B', publishAt: '2026-09-23T18:02:00.000Z', pinned: false }), null),
-    ).toEqual({
-      endpoint: 'cmsSaveUpdate',
-      body: { id: 'u1', update: { title: 'T', body: 'B', publishAt: '2026-09-23T18:02:00.000Z', pinned: false }, visible: true },
-    });
-  });
-
-  it('refuses a content block version that cannot name its record', () => {
-    expect(restoreRequestFor('cmsContent', 'hero__subtitle', entry({ value: 'x' }), null)).toBeNull();
-    expect(restoreRequestFor('cmsContent', 'hero__subtitle', entry({ section: 'hero', field: 'title' }), null)).toBeNull();
   });
 });

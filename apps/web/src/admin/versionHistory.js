@@ -10,7 +10,6 @@
 // It is imported by the two lazy version pages only, so none of it rides in
 // the admin entry chunk (scripts/ci/bundle-budget.json).
 import { zoneLabel } from '../lib/eventTime.js';
-import { DELETE_FIELD_SENTINEL } from './contentDoc.js';
 
 /**
  * The six publishable collections (functions/src/cms/blockTypes.cjs
@@ -173,89 +172,4 @@ export function pathText(path) {
     .split('.')
     .map((segment) => (/^\d+$/.test(segment) ? `item ${Number(segment) + 1}` : segment))
     .join(' › ');
-}
-
-/**
- * The publish model's bookkeeping on a live or draft document
- * (functions/src/cms/store.cjs RESERVED_FIELDS), plus the id a listener
- * row carries. None of it is content, so a restore never clears it.
- */
-const NOT_CONTENT = Object.freeze([
-  'id',
-  'visible',
-  'status',
-  'revision',
-  'basedOnRevision',
-  'updatedAt',
-  'updatedBy',
-  'publishedAt',
-  'publishedBy',
-  'materialCount',
-]);
-
-/**
- * The seed's bookkeeping. Every admin save drops it (functions/src/cms/
- * content.cjs SEED_FIELDS), and cmsSavePage and cmsSaveUpdate refuse a key
- * they do not know, so a restore never sends it.
- */
-const SEED_FIELDS = Object.freeze(['seeded', 'seededAt']);
-
-function withoutSeedFields(fields) {
-  const out = {};
-  for (const [key, value] of Object.entries(fields ?? {})) {
-    if (!SEED_FIELDS.includes(key)) out[key] = value;
-  }
-  return out;
-}
-
-/**
- * The save that makes a past version the record's draft again: the same
- * endpoint and body the record's own editor sends, so every check that
- * editor's save runs (field rules, speaker and parent references, path
- * uniqueness, the system page guards) runs on the restored content too,
- * and the save writes its own admin log row. Nothing is published.
- *
- * The generic endpoint merges what it is sent onto the stored draft, so a
- * field the current record holds and the version does not is sent as the
- * delete sentinel: the draft that results holds the version's fields and
- * nothing else. `current` is the record's draft, or its live document when
- * it has no draft, or null when neither exists (a deleted record), which
- * creates it again.
- *
- * @param {string} collection
- * @param {string} docId
- * @param {{ fields?: object, visible?: boolean }} entry a version from cmsGetVersionHistory
- * @param {object|null} current
- * @returns {{ endpoint: string, body: object }|null} null when the version
- *   cannot name its record (a content block with no section and field)
- */
-export function restoreRequestFor(collection, docId, entry, current) {
-  const fields = withoutSeedFields(entry?.fields);
-  const visible = entry?.visible !== false;
-  if (collection === 'cmsPages') {
-    return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible } } };
-  }
-  if (collection === 'cmsUpdates') {
-    return { endpoint: 'cmsSaveUpdate', body: { id: docId, update: fields, visible } };
-  }
-  let target;
-  if (collection === 'cmsContent') {
-    const { section, field } = fields;
-    if (!nonEmpty(section) || !nonEmpty(field) || `${section}__${field}` !== docId) return null;
-    target = { section, field };
-  } else {
-    target = { docId };
-  }
-  if (!current) {
-    return { endpoint: 'cmsCreateContent', body: { collection, ...target, fields, visible } };
-  }
-  const cleared = {};
-  for (const key of Object.keys(current)) {
-    if (NOT_CONTENT.includes(key) || SEED_FIELDS.includes(key)) continue;
-    if (!Object.hasOwn(fields, key)) cleared[key] = DELETE_FIELD_SENTINEL;
-  }
-  return {
-    endpoint: 'cmsUpdateContent',
-    body: { collection, ...target, fields: { ...fields, ...cleared }, visible },
-  };
 }
