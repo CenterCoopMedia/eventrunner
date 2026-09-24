@@ -4,7 +4,8 @@
 // follow, and adminSource.js for the record's live and draft documents.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Profiler } from 'react';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
@@ -342,6 +343,40 @@ describe('one record’s versions', () => {
     await waitFor(() => expect(versionItem(6)).toBeInTheDocument());
     await act(async () => older.resolve({ entries: [entry(3), entry(2)], nextCursor: null }));
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Version 6', 'Version 5']);
+  });
+
+  // Codex review on #284: React Router keeps this page mounted when the
+  // address moves from one record to another, so its first render for the
+  // new address must not draw the old record's versions. A Profiler's
+  // onRender runs in the commit phase, before any passive effect, so it
+  // sees exactly what that render put on screen.
+  it('never draws one record’s versions under another record’s address', async () => {
+    serve({ pages: [{ entries: [EDITED, SEEDED], nextCursor: null }, () => new Promise(() => {})] });
+    let go;
+    function Navigator() {
+      go = useNavigate();
+      return null;
+    }
+    const commits = [];
+    render(
+      <Profiler id="history" onRender={() => commits.push(document.body.textContent)}>
+        <MemoryRouter initialEntries={[`/admin/versions/${DOC_PATH}`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Navigator />
+          <Routes>
+            <Route path="/admin/versions/:collection/:docId" element={<AdminVersionHistory />} />
+          </Routes>
+        </MemoryRouter>
+      </Profiler>,
+    );
+    await screen.findByText('Four days of workshops.');
+    commits.length = 0;
+
+    await act(async () => {
+      go('/admin/versions/cmsContent/hero__title');
+    });
+    const underNewAddress = commits.filter((text) => text.includes('hero__title'));
+    expect(underNewAddress.length).toBeGreaterThan(0);
+    for (const text of underNewAddress) expect(text).not.toContain('Four days of workshops.');
   });
 
   it('says so when the record has never been published', async () => {

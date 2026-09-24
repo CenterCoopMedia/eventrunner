@@ -11,7 +11,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { subscribeAdminCollection } from './adminSource.js';
 import { mergePageRevisions } from './pageDoc.js';
 
-const NOTHING = Object.freeze({ collection: null, live: null, drafts: null, error: null });
+// Each listener keeps its own error, and only that listener's next answer
+// clears it: one listener's answer says nothing about the other's failure.
+const NOTHING = Object.freeze({ collection: null, live: null, drafts: null, liveError: null, draftsError: null });
 
 /**
  * @param {string|null} collection a publishable collection, or null to read nothing
@@ -24,18 +26,18 @@ export function useAdminRecords(collection) {
 
   useEffect(() => {
     if (!collection) return undefined;
-    setSnapshot({ collection, live: null, drafts: null, error: null });
+    setSnapshot({ ...NOTHING, collection });
     const forThis = (update) => (current) => (current.collection === collection ? update(current) : current);
     const unsubscribers = [
       subscribeAdminCollection(
         collection,
-        (docs) => setSnapshot(forThis((current) => ({ ...current, live: docs, error: null }))),
-        (error) => setSnapshot(forThis((current) => ({ ...current, error }))),
+        (docs) => setSnapshot(forThis((current) => ({ ...current, live: docs, liveError: null }))),
+        (error) => setSnapshot(forThis((current) => ({ ...current, liveError: error }))),
       ),
       subscribeAdminCollection(
         `${collection}_drafts`,
-        (docs) => setSnapshot(forThis((current) => ({ ...current, drafts: docs, error: null }))),
-        (error) => setSnapshot(forThis((current) => ({ ...current, error }))),
+        (docs) => setSnapshot(forThis((current) => ({ ...current, drafts: docs, draftsError: null }))),
+        (error) => setSnapshot(forThis((current) => ({ ...current, draftsError: error }))),
       ),
     ];
     return () => {
@@ -46,7 +48,8 @@ export function useAdminRecords(collection) {
   }, [collection]);
 
   const own = snapshot.collection === collection ? snapshot : NOTHING;
-  const { live, drafts, error } = own;
+  const { live, drafts } = own;
+  const error = own.liveError ?? own.draftsError ?? null;
   const rows = useMemo(() => mergePageRevisions(live, drafts), [live, drafts]);
   const ready = live !== null && drafts !== null;
 

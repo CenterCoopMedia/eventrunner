@@ -143,7 +143,11 @@ export default function AdminVersionHistory() {
   const records = useAdminRecords(choice ? choice.id : null);
   const row = records.ready ? records.findRow(docId) : null;
 
-  const [result, setResult] = useState(null);
+  const [stored, setResult] = useState(null);
+  // A result is shown only for the record that produced it. The router keeps
+  // this page mounted from one record's address to the next, and the effect
+  // below clears the old result only after the first render at the new one.
+  const result = stored?.docPath === docPath ? stored : null;
   const [pending, setPending] = useState(null); // 'load' | 'refresh' | 'more' | null
   const [error, setError] = useState(null);
   const [focusRevision, setFocusRevision] = useState(null);
@@ -163,6 +167,7 @@ export default function AdminVersionHistory() {
         const response = await callRef.current('cmsGetVersionHistory', { docPath, limit: PAGE_SIZE });
         if (requestId !== requestRef.current) return;
         setResult({
+          docPath,
           entries: Array.isArray(response?.entries) ? response.entries : [],
           nextCursor: Number.isFinite(response?.nextCursor) ? response.nextCursor : null,
           readAt: Date.now(),
@@ -217,6 +222,7 @@ export default function AdminVersionHistory() {
       setResult((current) => {
         const known = new Set(current.entries.map((entry) => entry.revision));
         return {
+          docPath: current.docPath,
           entries: [...current.entries, ...more.filter((entry) => !known.has(entry.revision))],
           nextCursor: Number.isFinite(response?.nextCursor) ? response.nextCursor : null,
           readAt: Date.now(),
