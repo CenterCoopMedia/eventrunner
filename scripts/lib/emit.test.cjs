@@ -8,6 +8,7 @@ const path = require('node:path');
 const { emitAll, emitScheduleData, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
+const { validateOrganizationFields } = require('../../functions/src/cms/organizations.cjs');
 const {
   speakerDisplayName,
   buildPublicSpeaker,
@@ -170,6 +171,18 @@ test('every demo page is a valid page doc, and the demo names stay fictional', (
     'Harborlight Media Summit',
     'Harborlight Cooperative',
   ]);
+});
+
+test('every demo organization passes the field checks an admin save applies (issue 192)', () => {
+  // The demo is seeded, never saved through the editor, so nothing else
+  // would notice a fixture sponsor the organization seam would refuse. Every
+  // field is checked, the three profile fields included.
+  for (const organization of demoEvent().organizations) {
+    const { id, ...fields } = organization;
+    const verdict = validateOrganizationFields(fields, fields);
+    assert.equal(verdict.ok, true, `${id}: ${JSON.stringify(verdict.errors)}`);
+    assert.deepEqual(verdict.fields, fields, `${id} is stored exactly as the seam would store it`);
+  }
 });
 
 test('demo speakers are canonical documents, and the bundle ships only their projection', () => {

@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   materials, from the same list the table shows: A pending or approved material counts, and only published
   sessions with a speaker who is not removed are counted. The new `listAllSessionMaterials` endpoint reads the
   list (#189).
+- The organizations editor, under Content, for staff and operators: a table of the organizations in
+  the order the Sponsors page draws them, with each state in words, and an editor for the name,
+  tier, order, logo, website, and description. Publishing goes through `cmsPublish`, as every
+  other editor does. The content save now checks each organization field's type and length: a
+  name that is not text, an order that is not a number, a website that does not start with
+  `http://` or `https://`, or a logo that is not a media library path is refused with the field
+  named, and nothing is written. The public site still drops a malformed organization that
+  reaches the collection another way (#192).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
   word. Search looks in the recipient and the subject across the 500 most recent messages at a

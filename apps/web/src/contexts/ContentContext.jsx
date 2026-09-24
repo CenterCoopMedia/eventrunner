@@ -65,12 +65,14 @@ const RUNTIME_COLLECTIONS = [
 const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
 
 // cmsOrganizations is written through the generic content endpoint
-// (functions/src/cms/content.cjs), which only rejects reserved field
-// *names* — it never checks field *types*. Sponsors.jsx renders
-// name/tier/description straight through as JSX children, so a published
-// doc with e.g. `name: { unexpected: true }` would make React throw and
-// blank the route the instant the listener fires. Guard at this overlay
-// boundary instead: drop (not partially render) any doc whose renderable
+// (functions/src/cms/content.cjs), whose organization seam now checks each
+// field's *type* at the save (functions/src/cms/organizations.cjs, issue
+// #192). This drop stays as the second layer: a script, the console, or a
+// document stored before that check can still hold e.g.
+// `name: { unexpected: true }`, and Sponsors.jsx renders
+// name/tier/description straight through as JSX children, so React would
+// throw and blank the route the instant the listener fires. Guard at this
+// overlay boundary: drop (not partially render) any doc whose renderable
 // fields aren't one of the primitive types React can safely render as a
 // child. This keeps the wholesale-replace semantics for every doc that
 // *is* safe — one malformed doc doesn't fall back to the snapshot.

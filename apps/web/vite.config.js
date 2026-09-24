@@ -39,6 +39,7 @@ export default defineConfig({
       'shared/venue',
       'shared/update',
       'shared/seed',
+      'shared/slug',
     ],
   },
   resolve: {

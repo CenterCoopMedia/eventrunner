@@ -174,7 +174,7 @@ Every collection the site renders can be edited and published from the admin.
 
 - [ ] Add the updates editor (#190)
 - [ ] Add an update category and featured flag (#191)
-- [ ] Add the organizations editor (#192)
+- [x] Add the organizations editor (#192)
 - [ ] Add a sponsor detail page and package blocks (#193)
 - [ ] Add the timeline editor and the history section (#194)
 - [ ] Add the version history page (#195)

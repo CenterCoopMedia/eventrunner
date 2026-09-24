@@ -69,6 +69,9 @@ const AdminChangeRequests = lazy(() => import('./pages/AdminChangeRequests.jsx')
 // Materials gained the table, the archive and the coverage panel (issue
 // 189). One screen behind one link, loaded the same way.
 const AdminMaterialsTab = lazy(() => import('./pages/AdminMaterialsTab.jsx'));
+// The organizations list and editor (issue #192) load the same way.
+const AdminOrganizationsList = lazy(() => import('./pages/AdminOrganizationsList.jsx'));
+const AdminOrganizationEditor = lazy(() => import('./pages/AdminOrganizationEditor.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -143,6 +146,20 @@ export default function AdminApp() {
           <Route
             path="sessions/:sessionId"
             element={<DeferredAdminPage label="session"><AdminSessionEditor mode="edit" /></DeferredAdminPage>}
+          />
+          <Route
+            path="organizations"
+            element={<DeferredAdminPage label="organizations"><AdminOrganizationsList /></DeferredAdminPage>}
+          />
+          {/* '_new', not 'new': a page address may be 'new', and no address
+              starts with an underscore (functions/src/cms/organizations.cjs). */}
+          <Route
+            path="organizations/_new"
+            element={<DeferredAdminPage label="organization"><AdminOrganizationEditor mode="create" /></DeferredAdminPage>}
+          />
+          <Route
+            path="organizations/:organizationId"
+            element={<DeferredAdminPage label="organization"><AdminOrganizationEditor mode="edit" /></DeferredAdminPage>}
           />
           <Route path="speakers" element={<AdminSpeakersList />} />
           <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />

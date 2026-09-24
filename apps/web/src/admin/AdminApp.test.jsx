@@ -240,7 +240,7 @@ describe('admin route gating', () => {
     // page they meet is one they may open.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
-    for (const tab of ['Overview', 'Pages', 'Sessions', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -278,6 +278,19 @@ describe('admin route gating', () => {
     // The flag is off in the build-time snapshot: no form, and the notice.
     expect(screen.queryByRole('button', { name: 'Send request' })).toBeNull();
     expect(screen.getByText('Change requests are off. An operator can turn them on under Features.')).toBeInTheDocument();
+  });
+
+  it('opens the organizations list and editor for a staff admin: organizations are content', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/organizations');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Organizations' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Organizations' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getAllByRole('link', { name: 'Add an organization' })[0]);
+    expect(await screen.findByRole('heading', { level: 1, name: 'New organization' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
   });
 
   it('refuses a staff admin an operator route rather than only hiding its link', async () => {
@@ -415,7 +428,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

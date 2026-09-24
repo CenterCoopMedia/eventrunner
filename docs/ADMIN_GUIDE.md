@@ -11,7 +11,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -131,6 +131,22 @@ The schedule itself: Create, edit, publish, and delete a session. Saving writes 
 **Most saved.** The panel at the top of the list ranks the sessions by how many attendees saved them to their own schedule, most first. Each row names the session, links to its editor, and gives its day and the count. The counts are the same ones the public schedule shows. A sentence under the table says how many sessions on the site nobody has saved yet; drafts and hidden sessions are not counted, because attendees cannot save them. Before anyone saves a session the panel says "No session has been saved yet." If the `sessionBookmarks` feature is off (Settings → Features), the panel says so, because the counts cannot change until an operator turns it on again.
 
 **Recording link.** One optional field on a session, in the **Public session** panel. Enter the address where attendees can watch the session afterwards. The link must start with `http://` or `https://`; the editor and the server both refuse anything else, so a session cannot store an address a reader's browser would treat as a script. Leave the field empty until the recording is public. A session with a recording link shows **Watch the recording** on its schedule row and on its session page, and the link opens in a new tab. A session with no link shows nothing at all, so an empty field does not promise a recording later. The link stays on the page after the event, when a past day becomes a back issue and the live controls come off.
+
+## Organizations
+
+The organizations the Sponsors page draws: Add, edit, publish, and delete them here, without a script. Saving writes a draft, and publishing sends it to the Sponsors page and to the home page's logo wall.
+
+**The list** is a table in the order the Sponsors page draws the organizations: by **Order**, lowest first. Each row gives the name, the page address, the tier, the order, and the state in words. An organization that is saved but not shown on the site also says **Hidden**. **Publish all** publishes every organization with a saved draft.
+
+**The fields.** **Name** is required. **Description** is one or two sentences under the name on the organization's page and on the Sponsors page in the list arrangement. **Website** must start with `http://` or `https://`. **Tier** is the group heading on the Sponsors page. **Order** is a number, and lower numbers come first. **Logo** comes from the media library, or you upload it there. Clear **Show this organization when it is published** to keep a published organization off the site.
+
+**Tiers group by their exact text.** Organizations with the same tier text form one group, so "Gold" and "gold" are two groups. The Tier field suggests the tiers already in use. The groups appear in the order of their first organization, and the first group draws the largest logos. To move a tier up, give its organizations lower order numbers.
+
+**The page address is set once.** A new organization's page address follows its name until you type your own. It uses lowercase letters, digits, and hyphens, and it cannot change after the first save. To change it, delete the organization and add it again.
+
+**Every save is checked.** The editor and the server refuse a name that is not text, an order that is not a number, a website that does not start with `http://` or `https://`, and a logo path that is not a file in the media library. The refusal names the field.
+
+**Delete** removes the live organization and its draft. The logo stays in the media library.
 
 ## Content (Pages → Content editor)
 

@@ -41,6 +41,7 @@ const {
   checkSessionDeletable,
 } = require('../schedule/sessions.cjs');
 const { deleteMaterialsForSession } = require('../materials/store.cjs');
+const { ORGANIZATIONS_COLLECTION, validateOrganizationFields } = require('./organizations.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
@@ -264,6 +265,25 @@ function checkBlockContract({ collection, fields }) {
 }
 
 /**
+ * Organization fields at the content-write seam (issue #192): types,
+ * lengths, the website's scheme and the logo's path shape, judged on the
+ * MERGED result like the seams above (functions/src/cms/organizations.cjs).
+ * `sent` is the request's own `fields`, which decides whether the profile
+ * fields the editor does not show are checked at all. The returned `fields`
+ * are trimmed and the website canonical, and they are what the caller
+ * stores. A no-op for every other collection.
+ *
+ * @param {{ collection: string, fields: object, sent: object }} args
+ * @returns {{ ok: true, fields: object } | { ok: false, message: string }}
+ */
+function checkOrganizationFields({ collection, fields, sent }) {
+  if (collection !== ORGANIZATIONS_COLLECTION) return { ok: true, fields };
+  const verdict = validateOrganizationFields(fields, sent);
+  if (!verdict.ok) return { ok: false, message: verdict.errors.join('; ') };
+  return verdict;
+}
+
+/**
  * An HTTP-shaped rejection thrown from inside a transaction body, so a
  * refusal aborts the transaction (writing nothing) instead of returning a
  * verdict the caller would have to unwind by hand.
@@ -334,12 +354,19 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
+        const organization = checkOrganizationFields({
+          collection,
+          fields: references.fields,
+          sent: checked.fields,
+        });
+        if (!organization.ok) throw new RequestError(400, 'bad-request', organization.message);
+
         const structure = await checkSessionStructure({
           db,
           tx,
           collection,
           docId,
-          fields: references.fields,
+          fields: organization.fields,
         });
         if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 
@@ -421,12 +448,19 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
+        const organization = checkOrganizationFields({
+          collection,
+          fields: references.fields,
+          sent: checked.fields,
+        });
+        if (!organization.ok) throw new RequestError(400, 'bad-request', organization.message);
+
         const structure = await checkSessionStructure({
           db,
           tx,
           collection,
           docId,
-          fields: references.fields,
+          fields: organization.fields,
         });
         if (!structure.ok) throw new RequestError(400, 'bad-request', structure.message);
 
@@ -595,6 +629,7 @@ module.exports = {
     checkSpeakerReferences,
     checkSessionStructure,
     checkBlockContract,
+    checkOrganizationFields,
     isValidDocId,
     SECTION_FIELD_RE,
     GENERIC_COLLECTIONS,

@@ -1071,3 +1071,130 @@ test('getSiteContent states seeded only for a block the seed published, and neve
   assert.equal('seeded' in byId.hero__subtitle, false, 'an operator’s publish wins over the stale flag');
   for (const doc of res.body.content) assert.equal('publishedBy' in doc, false);
 });
+
+// --- organization fields at the seam (issue #192) ---------------------------
+
+const ORG = Object.freeze({
+  name: 'Example Fund',
+  tier: 'presenting',
+  order: 0,
+  logoPath: 'cms-images/example-fund.webp',
+  url: 'https://example.org/',
+  description: 'Funds the travel grants.',
+});
+
+function createOrganization(db, docId, fields, extra = {}) {
+  const res = fakeRes();
+  return createCmsCreateContentHandler(deps(db, extra))(
+    req({ ...extra.request, body: { collection: 'cmsOrganizations', docId, fields, visible: true } }),
+    res,
+  ).then(() => res);
+}
+
+function updateOrganization(db, docId, fields) {
+  const res = fakeRes();
+  return createCmsUpdateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsOrganizations', docId, fields } }),
+    res,
+  ).then(() => res);
+}
+
+test('an organization whose name is not text is refused at save, naming the field, and nothing is written', async () => {
+  const db = makeFakeDb();
+  const res = await createOrganization(db, 'example-fund', { ...ORG, name: 42 });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'name: must be text');
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund'), undefined);
+  assert.equal(db.ids('admin_logs').length, 0, 'a refused save writes no admin log row');
+});
+
+test('an organization update is judged on the merged record', async () => {
+  const db = makeFakeDb({ 'cmsOrganizations_drafts/example-fund': { ...ORG, status: 'dirty' } });
+  let res = await updateOrganization(db, 'example-fund', { tier: { level: 1 } });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'tier: must be text');
+
+  // A stored value the request did not send still decides the verdict.
+  const broken = makeFakeDb({ 'cmsOrganizations_drafts/example-fund': { ...ORG, name: { x: 1 }, status: 'dirty' } });
+  res = await updateOrganization(broken, 'example-fund', { description: 'New words.' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'name: must be text');
+  assert.equal(broken.read('cmsOrganizations_drafts', 'example-fund').description, ORG.description);
+});
+
+test('an organization order sent as a string, or a website that is not http(s), is refused', async () => {
+  const db = makeFakeDb();
+  let res = await createOrganization(db, 'example-fund', { ...ORG, order: '3' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'order: must be a number');
+
+  res = await createOrganization(db, 'example-fund', { ...ORG, url: 'javascript:alert(1)' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'url: must start with http:// or https://');
+
+  res = await createOrganization(db, 'example-fund', { ...ORG, name: 7, order: 'first' });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message, 'name: must be text; order: must be a number');
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund'), undefined);
+});
+
+test('a valid organization is stored trimmed, with its website in canonical form', async () => {
+  const db = makeFakeDb();
+  const res = await createOrganization(db, 'example-fund', {
+    ...ORG,
+    name: '  Example Fund ',
+    tier: ' presenting ',
+    url: ' HTTPS://Example.ORG ',
+    description: '',
+  });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsOrganizations_drafts', 'example-fund');
+  assert.equal(draft.name, 'Example Fund');
+  assert.equal(draft.tier, 'presenting');
+  assert.equal(draft.url, 'https://example.org/');
+  assert.equal(draft.description, null);
+  assert.equal(draft.status, 'dirty');
+  assert.equal(draft.visible, true);
+  assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('an editor save over a record whose profile fields a script stored badly is accepted', async () => {
+  const db = makeFakeDb({
+    'cmsOrganizations/example-fund': { ...ORG, bio: {}, supportDescription: 3, visible: true, revision: 1 },
+  });
+  const res = await updateOrganization(db, 'example-fund', { name: 'Example Fund Two' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsOrganizations_drafts', 'example-fund');
+  assert.equal(draft.name, 'Example Fund Two');
+  assert.deepEqual(draft.bio, {}, 'the stored value is kept, not rewritten');
+  // Sending the malformed field is what gets it judged.
+  const again = await updateOrganization(db, 'example-fund', { bio: {} });
+  assert.equal(again.statusCode, 400);
+  assert.equal(again.body.error.message, 'bio: must be text');
+});
+
+test('a staff admin creates an organization', async () => {
+  const STAFF = { uid: 'staff-1', email: 'staff@example.org', email_verified: true };
+  const db = makeFakeDb();
+  const res = await createOrganization(db, 'example-fund', { ...ORG }, {
+    auth: { async verifyIdToken(t) { if (t === 'staff-token') return STAFF; throw new Error('bad'); } },
+    request: { token: 'staff-token' },
+  });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund').updatedBy, 'staff@example.org');
+});
+
+test('the organization seam leaves content blocks and sessions alone', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  // A cmsContent block may carry a `name` of any shape; the seam is not its rule.
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'blurb', fields: { blockType: 'text', value: 'x', name: 42, order: '1' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(
+    internals.checkOrganizationFields({ collection: 'cmsSchedule', fields: { name: 42 }, sent: {} }),
+    { ok: true, fields: { name: 42 } },
+  );
+});

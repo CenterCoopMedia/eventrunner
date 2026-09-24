@@ -10,7 +10,7 @@
 // page and seeing the new copy — is what this spec actually drives through
 // Playwright, which is the part no API call could stand in for.
 import { test, expect } from '@playwright/test';
-import { adminIdToken, callFunction } from './helpers.mjs';
+import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
 
 test.describe.serial('CMS edit -> publish -> public visibility', () => {
   const newSubtitle = `E2E edited subtitle ${Date.now()}`;
@@ -85,5 +85,62 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     // ?preview=1 — now shows the published change.
     await page.goto('/');
     await expect(subtitle).toHaveText(newSubtitle);
+  });
+});
+
+// The organizations editor (issue #192), on the real surface: the seeded
+// operator signs in through the sign-in page, creates an organization in
+// the admin editor and publishes it from there, and a signed-out browser
+// finds it in its tier group on the public sponsors page. The type check
+// at the save is proven against the deployed endpoint.
+test.describe.serial('organizations: admin editor -> publish -> sponsors page', () => {
+  const stamp = Date.now();
+  const name = `E2E Org ${stamp}`;
+  const slug = `e2e-org-${stamp}`;
+  let idToken;
+
+  test.beforeAll(async () => {
+    idToken = await adminIdToken();
+  });
+
+  test.afterAll(async () => {
+    await callFunction('cmsDeleteContent', { collection: 'cmsOrganizations', docId: slug }, idToken);
+  });
+
+  test('an organization published from the editor appears in its tier group (issue 192)', async ({ page, browser }) => {
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/organizations/_new');
+    await expect(page.getByRole('heading', { level: 1, name: 'New organization' })).toBeVisible();
+    await page.getByLabel('Name', { exact: true }).fill(name);
+    await expect(page.getByLabel(/^Page address/)).toHaveValue(slug);
+    await page.getByLabel(/^Tier/).fill('supporting');
+    await page.getByRole('button', { name: 'Save and publish' }).click();
+
+    await page.waitForURL((url) => url.pathname === `/admin/organizations/${slug}`);
+    await expect(page.locator('header [data-record-state]')).toHaveText('Live');
+
+    const visitor = await browser.newContext();
+    try {
+      const publicPage = await visitor.newPage();
+      await publicPage.goto('/sponsors');
+      const group = publicPage.getByRole('region', { name: 'supporting', exact: true });
+      await expect(group.getByText(name, { exact: true })).toBeVisible();
+    } finally {
+      await visitor.close();
+    }
+  });
+
+  test('a name that is not text is refused at save, naming the field (issue 192)', async () => {
+    const badId = `e2e-bad-${stamp}`;
+    const refused = await callFunction('cmsCreateContent', {
+      collection: 'cmsOrganizations',
+      docId: badId,
+      fields: { name: 42 },
+      visible: true,
+    }, idToken);
+    expect(refused.status).toBe(400);
+    expect(refused.body?.error?.message).toMatch(/^name: /);
+    const draft = await adminDb().collection('cmsOrganizations_drafts').doc(badId).get();
+    expect(draft.exists).toBe(false);
   });
 });

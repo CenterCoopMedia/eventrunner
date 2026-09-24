@@ -355,8 +355,9 @@ describe('ContentProvider', () => {
 
   it('drops a live cmsOrganizations doc with a non-primitive renderable field, keeping the rest wholesale', () => {
     // Regression test: the generic content writer (functions/src/cms/
-    // content.cjs) only rejects reserved field *names*, never field *types*,
-    // so a published doc can carry e.g. name: { unexpected: true }.
+    // content.cjs) now refuses a non-text name at the save (issue #192),
+    // but a script or the console can still store e.g.
+    // name: { unexpected: true }, so this drop is kept as the second layer.
     // Sponsors.jsx renders name/tier/description directly as JSX children —
     // an object there would make React throw and blank the whole route the
     // moment this listener fires. The malformed doc must be dropped, not
@@ -392,6 +393,8 @@ describe('ContentProvider', () => {
   });
 
   it('drops a live cmsOrganizations doc whose tier or description is a non-primitive value', () => {
+    // The save refuses these too (issue #192); this guards what reaches the
+    // collection without passing through it.
     render(
       <ContentProvider>
         <Probe />
