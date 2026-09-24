@@ -53,7 +53,7 @@
 // So: what the page states, then what the site states, then the default.
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config';
@@ -70,9 +70,20 @@ import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
 import RegistrationAction from './RegistrationAction.jsx';
 import FeedbackModal from './FeedbackModal.jsx';
-import ChangeRequestModal from './ChangeRequestModal.jsx';
+import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
+import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
+
+// The change request dialog (issue #188) sits behind a flag that is off by
+// default and opens only on a press, so it loads on demand and stays out of
+// the public first paint, which is at its budget (scripts/ci/bundle-budget.json).
+const ChangeRequestModal = lazy(() =>
+  import('./ChangeRequestModal.jsx').then((module) => {
+    clearReloadFlag();
+    return module;
+  }),
+);
 
 /**
  * The page's own header, read into the theme's vocabulary.
@@ -524,11 +535,15 @@ export default function Layout() {
       </footer>
       {feedbackOpen ? <FeedbackModal onClose={() => setFeedbackOpen(false)} /> : null}
       {changeRequestOpen && canRequestChange ? (
-        <ChangeRequestModal
-          user={user}
-          initialPage={pathname}
-          onClose={() => setChangeRequestOpen(false)}
-        />
+        <ChunkErrorBoundary>
+          <Suspense fallback={null}>
+            <ChangeRequestModal
+              user={user}
+              initialPage={pathname}
+              onClose={() => setChangeRequestOpen(false)}
+            />
+          </Suspense>
+        </ChunkErrorBoundary>
       ) : null}
     </div>
   );

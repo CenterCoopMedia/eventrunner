@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 
@@ -1095,7 +1095,7 @@ describe('the footer change request control', () => {
     expect(requestButton(container)).toBeNull();
   });
 
-  it('opens the dialog on the page the reader is on, and closes it again', () => {
+  it('opens the dialog on the page the reader is on, and closes it again', async () => {
     const { container } = renderShell({}, {
       path: '/travel',
       featureFlags: { ...FIXTURE_FEATURES, changeRequests: true },
@@ -1107,9 +1107,10 @@ describe('the footer change request control', () => {
     expect(button.className).not.toMatch(/admin-/);
 
     fireEvent.click(button);
-    const dialog = document.querySelector('dialog');
+    // The dialog loads on demand, so it arrives after the press.
+    const heading = await screen.findByRole('heading', { name: 'Request a change' });
+    const dialog = heading.closest('dialog');
     expect(dialog).not.toBeNull();
-    expect(within(dialog).getByRole('heading', { name: 'Request a change' })).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Page (optional)')).toHaveValue('/travel');
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
