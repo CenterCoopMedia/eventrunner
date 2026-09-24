@@ -12,6 +12,10 @@ worktree, a branch, and a list of issues.
   you did not start. Never run `pkill` or `killall`.
 - The worktree has its dependencies installed. If you add a dependency, run
   `npm install` in your worktree and commit the lockfile change.
+- Scratch files (runner scripts, logs, captures) go in a folder named for your
+  group id inside the shared scratchpad, for example `scratchpad/c3/`. Other
+  builders write to the same scratchpad, and a shared file name gets
+  overwritten.
 
 ## Read before you write
 

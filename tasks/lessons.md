@@ -54,3 +54,23 @@ Rules written after user corrections. Read at session start.
   and amended before the push. Never pass `-c user.name` or `-c user.email`;
   `git commit -s` with the configured identity is the rule, and
   `git log -1 --format='%ae %B'` is read before every push.
+
+## 2026-09-24: a dispatch prompt must not widen the spec
+
+- The c4 spec said versions cannot be restored. The director's dispatch
+  prompt named "restores an earlier version" as the E2E proof, and the
+  builder followed the prompt. The review then found three major defects in
+  the restore alone (section caps, editor-only field rules, a draft lost
+  behind a plain confirm), and the restore came out of the branch as #280.
+  A dispatch prompt restates the spec's proof and adds nothing to it; new
+  scope is a spec change, reviewed like one.
+
+## 2026-09-24: never edit a worktree while its checks run
+
+- A fix went into the branch 12 worktree while `checks.sh` was still running
+  there, after one step had failed. Later steps, the E2E run among them, then
+  read a tree that was changing. The run had to be stopped and started again.
+  Stop a failed run first, then edit, then run every check again.
+- Two builders wrote the same scratch runner file in the shared scratchpad,
+  and one E2E run went to the wrong worktree. Scratch files now go in a
+  folder per group id (tasks/builder-brief.md, "Where you work").
