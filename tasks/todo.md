@@ -149,12 +149,14 @@ requests stay stable.
 
 | PR | Branch | Issues | State |
 |---|---|---|---|
-| #270 | `joe/confident-gates-gy99ip-6-design-wave-2` | #234, refs #249 | Four Codex P2 findings fixed (`d5f0806`, `5d73f7d`, `4d874f6`, `ccc43b7`), threads resolved, all checks green locally |
-| #272 | `joe/confident-gates-gy99ip-7-admin-overview` | #178 to #182 | Built on #270 in `/home/user/wt-int2`. `762afcb` points the overview shell test at the `useAdminApi` mock a4 added. `4f82523` returns the speaker and session editors to their lists: `navigate('..')` went to the admin index, which the speaker delete test only saw under load |
-| #273 | `joe/confident-gates-gy99ip-8-email-log` | #183 | Built on #272 in `/home/user/wt-int`, with `f8cd76d` (the email log shell test through the admin call mock) and `c572626` (`signIn` clears `auth_rate_limits` first; without it the full E2E run failed WebMCP at the code field) |
-| next | `joe/confident-gates-gy99ip-9-attendees` | #184, #185 | Built on #273 in `/home/user/wt-int2` from the b3 commits and fixes |
-| after | `…-10-change-requests` | #188 | b4 (`/home/user/wt-b4`, `cf22061`, `2d151c8`); review `wf_4b4740d1-d07` running. Drop `0a4092a` (its own copy of the shell test fix) |
-| after | `…-11-materials` | #189 | b5 (`/home/user/wt-b5`, `65c48fd`, `492e90d`); review `wf_bbd1885b-80a` running |
+| #270 | `joe/confident-gates-gy99ip-6-design-wave-2` | #234, refs #249 | Codex round fixed and resolved; green |
+| #272 | `joe/confident-gates-gy99ip-7-admin-overview` | #178 to #182 | Codex round fixed (`323fa9f` saves need a live session, `3553711` one read-only transaction for the figures, `1a1157c` event clock for countdowns), resolved; green. Also `4f82523` returns the speaker and session editors to their lists |
+| #273 | `joe/confident-gates-gy99ip-8-email-log` | #183 | Rebuilt on #272 after its fixes (force-pushed with a lease); Codex found nothing; green |
+| #274 | `joe/confident-gates-gy99ip-9-attendees` | #184, #185 | Built on #273; all 14 checks green locally |
+| after | `…-10-change-requests` | #188 | b4 review: 10 of 22 confirmed (focus and state on the admin page, a deleted account can still send, rate-limit wording); builder fixing in `/home/user/wt-b4`. Drop `0a4092a` |
+| after | `…-11-materials` | #189 | b5 review: 9 of 15 confirmed (a read stream left open when the admin leaves early, zip entry names, Refresh busy state, the 2,000-row notice); builder fixing in `/home/user/wt-b5` |
+
+M10: spec reviews finished for c1 to c5 and c7; c6's review is running (`wf_c0486301-fd0` resumed). c1 (#190, #191) and c2 (#192, #193) were dispatched 2026-09-24 05:25 UTC from #274's tip `874976f` in `/home/user/wt-c1` and `/home/user/wt-c2`. Order: c2 before c3 (content.cjs seams), c5 before c7 (banner, then tour). Next: c4, c5, c6 as builders free up, then c3 and c7.
 
 The `AdminSpeakers.test.jsx` failure under load was a real bug (see `4f82523`).
 The demo's initial chunk is at 291,069 of 292,000 gzip bytes after b4.
