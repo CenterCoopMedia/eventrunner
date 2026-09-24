@@ -20,8 +20,14 @@
  * the editor cannot reach. The public page guards each of those at render.
  * Every other key passes through, as the generic endpoint always allowed.
  *
- * The document id is the organization's page address, `/sponsors/<id>`,
- * so the editor derives it from the name in the slug shape below.
+ * THE SLUG IS THE DOCUMENT KEY (#193). `/sponsors/:slug`, the social card,
+ * the sitemap and the wall all address an organization by its id, and a
+ * Firestore create already refuses an id that exists, live or draft, so
+ * the key is the reservation: no second store, and nothing to release on
+ * delete. content.cjs checks the shape before a create and answers a taken
+ * slug with a 409 at the save, never at the publish. The shape is checked
+ * on create only, so a record a script made under another id stays
+ * editable. The slug never changes after the first save.
  *
  * Pure: no db, no clock. content.cjs calls these inside the write
  * transaction and throws the joined messages as a 400.
@@ -53,6 +59,7 @@ const ORGANIZATION_LIMITS = Object.freeze({
 });
 
 const MESSAGES = Object.freeze({
+  slug: `slug: use lowercase letters, digits, and single hyphens, up to ${ORGANIZATION_LIMITS.slug} characters`,
   nameMissing: "name: enter the organization's name",
   order: 'order: must be a number',
   url: 'url: must start with http:// or https://',
@@ -64,6 +71,28 @@ const PROFILE_FIELDS = Object.freeze(['bio', 'supportDescription', 'readMorePath
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object ?? {}, key);
 
 const tooLong = (field) => `${field}: use ${ORGANIZATION_LIMITS[field]} characters or fewer`;
+
+/**
+ * The refusal for a document id that is not a usable page address, or null.
+ *
+ * @param {unknown} docId
+ * @returns {string|null}
+ */
+function organizationSlugError(docId) {
+  if (typeof docId !== 'string') return MESSAGES.slug;
+  if (docId.length > ORGANIZATION_LIMITS.slug || !ORGANIZATION_SLUG_RE.test(docId)) return MESSAGES.slug;
+  return null;
+}
+
+/**
+ * The 409 a create meets when the address is taken, live or as a draft.
+ *
+ * @param {string} docId
+ * @returns {string}
+ */
+function slugTakenMessage(docId) {
+  return `slug: another organization already uses "${docId}"`;
+}
 
 /**
  * An optional text field: null and absent stay as they are, a string is
@@ -161,5 +190,7 @@ module.exports = {
   ORGANIZATIONS_COLLECTION: COLLECTION,
   ORGANIZATION_SLUG_RE,
   ORGANIZATION_LIMITS,
+  organizationSlugError,
+  slugTakenMessage,
   validateOrganizationFields,
 };

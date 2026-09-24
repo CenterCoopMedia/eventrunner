@@ -259,6 +259,36 @@ describe('the organization editor', () => {
     expect(screen.getByLabelText('Website')).not.toHaveAttribute('aria-invalid');
   });
 
+  it('marks the page address when the server says another organization holds it (issue 193)', async () => {
+    await openNewOrganization();
+    fetch.mockResolvedValueOnce(refusal(409, 'slug: another organization already uses "example-fund"', 'already-exists'));
+    await fillNewOrganization();
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+
+    const summary = await screen.findByRole('alert');
+    expect(summary).toHaveTextContent('slug: another organization already uses "example-fund"');
+    const address = screen.getByLabelText(/^Page address/);
+    expect(address).toHaveAttribute('aria-invalid', 'true');
+    expect(address).toHaveAccessibleDescription(
+      expect.stringContaining('slug: another organization already uses "example-fund"'),
+    );
+    // Refused at the save: nothing was published.
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(currentPath).toBe('/admin/organizations/_new');
+  });
+
+  it('catches an address a loaded organization holds before any call (issue 193)', async () => {
+    await openNewOrganization();
+    pushOrganizations(LIVE, DRAFTS);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Tide Media' } });
+    const address = screen.getByLabelText(/^Page address/);
+    expect(address).toHaveValue('tide-media');
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(fetch).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(address));
+    expect(screen.getByText('Another organization already uses this address.')).toBeInTheDocument();
+  });
+
   it('answers a save with an invalid field by moving to it, and sends nothing', async () => {
     await openNewOrganization();
     // A blank form shows no errors until the operator acts.

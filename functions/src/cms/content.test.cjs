@@ -1198,3 +1198,71 @@ test('the organization seam leaves content blocks and sessions alone', async () 
     { ok: true, fields: { name: 42 } },
   );
 });
+
+// --- the page address is the document key (issue #193) ----------------------
+
+test('an organization address that is not slug-shaped is refused at save, for organizations only', async () => {
+  const db = makeFakeDb();
+  let res = await createOrganization(db, 'Bad Slug', { ...ORG });
+  assert.equal(res.statusCode, 400);
+  assert.equal(
+    res.body.error.message,
+    'slug: use lowercase letters, digits, and single hyphens, up to 80 characters',
+  );
+  res = await createOrganization(db, 'a'.repeat(81), { ...ORG });
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^slug: /);
+  assert.deepEqual(db.ids('cmsOrganizations_drafts'), []);
+  assert.equal(db.ids('admin_logs').length, 0);
+
+  // Other collections keep their own id rules.
+  res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 'Bad Slug', fields: {} } }),
+    res,
+  );
+  assert.notEqual(res.statusCode, 400, JSON.stringify(res.body));
+  assert.equal(db.read('cmsSchedule_drafts', 'Bad Slug') !== undefined, true);
+});
+
+test('a second organization claiming a published address is refused at save, naming the slug', async () => {
+  const db = makeFakeDb({
+    'cmsOrganizations/example-fund': { ...ORG, visible: true, revision: 1 },
+  });
+  const res = await createOrganization(db, 'example-fund', { ...ORG, name: 'Another Fund' });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.message, 'slug: another organization already uses "example-fund"');
+  assert.equal(db.read('cmsOrganizations_drafts', 'example-fund'), undefined);
+  assert.equal(db.read('cmsOrganizations', 'example-fund').name, ORG.name);
+});
+
+test('a second organization claiming an address held only by a draft is refused, and the first draft is unchanged', async () => {
+  const db = makeFakeDb();
+  const first = await createOrganization(db, 'example-fund', { ...ORG });
+  assert.equal(first.statusCode, 200, JSON.stringify(first.body));
+  const before = db.read('cmsOrganizations_drafts', 'example-fund');
+
+  const second = await createOrganization(db, 'example-fund', { ...ORG, name: 'Another Fund', tier: 'partner' });
+  assert.equal(second.statusCode, 409);
+  assert.equal(second.body.error.message, 'slug: another organization already uses "example-fund"');
+  assert.deepEqual(db.read('cmsOrganizations_drafts', 'example-fund'), before);
+  assert.equal(db.ids('admin_logs').length, 1, 'only the first create is logged');
+});
+
+test('an organization stored under an id that is not a slug stays editable', async () => {
+  const db = makeFakeDb({ 'cmsOrganizations/Legacy_Org': { ...ORG, visible: true, revision: 1 } });
+  const res = await updateOrganization(db, 'Legacy_Org', { description: 'Edited.' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsOrganizations_drafts', 'Legacy_Org').description, 'Edited.');
+});
+
+test('every other collection keeps its own already-exists words', async () => {
+  const db = makeFakeDb({ 'cmsSchedule/s1': { title: 'x', revision: 1 } });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { collection: 'cmsSchedule', docId: 's1', fields: {} } }),
+    res,
+  );
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.message, 'That document already exists; use cmsUpdateContent.');
+});

@@ -294,6 +294,22 @@ test('the recap and guidelines pages seed no default blocks (issue: seed a recap
   }
 });
 
+test('the sponsors page seeds an empty Sponsorship packages section (issue 193)', () => {
+  // The gap table asks for a package section on the sponsors page. It seeds
+  // empty, like recap and guidelines, so the page draws nothing extra until
+  // an operator adds a package, and no placeholder ever reaches a visitor.
+  const sponsors = defaultPages().find((page) => page.id === 'sponsors');
+  assert.deepEqual(sponsors.sections.map((section) => section.id), ['sponsor_packages']);
+  const [packages] = sponsors.sections;
+  assert.equal(packages.label, 'Sponsorship packages');
+  assert.deepEqual(packages.allowedBlocks, ['sponsor_package', 'richtext']);
+  assert.deepEqual(packages.defaultBlocks, []);
+  assert.ok(isNonEmptyDescription(packages.description));
+  assert.equal(packages.slot, undefined, 'it sits in the main slot, after the logo wall');
+  const content = buildSeedContent({ pages: defaultPages(), docs: configDocs(), tierA: TIER_A });
+  assert.equal(content.some((doc) => doc.section === 'sponsor_packages'), false);
+});
+
 test('no content doc is seeded for the recap or guidelines pages', () => {
   const docs = configDocs();
   const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });

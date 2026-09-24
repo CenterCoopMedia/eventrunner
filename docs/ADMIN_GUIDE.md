@@ -142,7 +142,9 @@ The organizations the Sponsors page draws: Add, edit, publish, and delete them h
 
 **Tiers group by their exact text.** Organizations with the same tier text form one group, so "Gold" and "gold" are two groups. The Tier field suggests the tiers already in use. The groups appear in the order of their first organization, and the first group draws the largest logos. To move a tier up, give its organizations lower order numbers.
 
-**The page address is set once.** A new organization's page address follows its name until you type your own. It uses lowercase letters, digits, and hyphens, and it cannot change after the first save. To change it, delete the organization and add it again.
+**Each organization has its own page** at its page address, `/sponsors/` and then the address. It shows the logo, the name, the description, the tier, and a link to the website. The **Read more** link on the Sponsors page opens it. Use **Preview draft** to read the page with the draft applied before you publish it.
+
+**The page address is set once.** A new organization's page address follows its name until you type your own. It uses lowercase letters, digits, and hyphens, and it cannot change after the first save. To change it, delete the organization and add it again. Two organizations cannot share an address: The editor names an address already in use before it saves, and the server refuses a second organization with the same address when you save, not when you publish. Deleting an organization frees its address.
 
 **Every save is checked.** The editor and the server refuse a name that is not text, an order that is not a number, a website that does not start with `http://` or `https://`, and a logo path that is not a file in the media library. The refusal names the field.
 
@@ -150,7 +152,7 @@ The organizations the Sponsors page draws: Add, edit, publish, and delete them h
 
 ## Content (Pages → Content editor)
 
-Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All ten block types are editable here.
+Filling in what a page's blocks say is a separate step from shaping the page: Pick a page, then a section, then the block inside it. A page's *structure* — its sections, which block types each allows, its default blocks — is set in the page editor above; this tree of screens is for the block *content*. All eleven block types are editable here.
 
 **A fact is a term and a description.** The **fact** block carries three parts: The term ("Where", "Who", "Format"), the fact itself (the hall's name, the audience), and one optional line under it (the address, a way to get there). It asks for no source and no finding, because a venue counts nothing. A run of facts renders as one ruled list of term and description pairs. Use it for anything that is true and is not a number.
 
@@ -165,6 +167,8 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 **The home page's Sponsors section is the logo wall, not a list of blocks.** It holds one line of text, and under it the site draws the same tiered logo wall the Sponsors page draws, from the same published organizations in the same tier order. Add or reorder organizations in the Organizations list; nothing about them is edited here.
 
 **It is a section like any other, so you place it.** Move it up or down the home page's section list and the wall moves with it. Set it to appear before or after the main feature and it obeys that too. The section draws nothing at all when no organization is published yet, when the *Sponsors* feature is switched off, or when you delete the section from the home page. Deleting the section is how you take the wall off the home page and keep the Sponsors page.
+
+**A sponsor package is one thing a sponsor can support.** The **sponsor package** block carries a name and what the package includes, both required, and an optional price and limit. Write the price as it should read, with its currency. The limit is how many sponsors can take the package: The page shows "Open to 3 sponsors", and shows nothing for no limit. The Sponsors page seeds one section for packages, **Sponsorship packages**, after the logo wall. It is not shown until it holds a package, so an empty section never reaches a visitor. A site whose Sponsors page was edited before this section existed keeps its own sections; add the section in Pages if you want it.
 
 **A statistic needs four things**, and the editor will not save one without them: The finding in words ("Two thirds of sessions are workshops", not "Session types"), what the number counts and over what period, where the number came from and the date you read it, and a line describing the finding for a screen reader. A stat block saved before this rule existed keeps working; the next time you edit one, you will be asked to fill the four parts in.
 

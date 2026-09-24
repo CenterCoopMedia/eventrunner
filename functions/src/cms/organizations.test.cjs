@@ -6,6 +6,8 @@ const assert = require('node:assert/strict');
 const {
   ORGANIZATION_LIMITS,
   ORGANIZATION_SLUG_RE,
+  organizationSlugError,
+  slugTakenMessage,
   validateOrganizationFields,
 } = require('./organizations.cjs');
 
@@ -158,4 +160,15 @@ test('the slug shape is the speaker slug shape, and the limit is 80', () => {
     assert.equal(ORGANIZATION_SLUG_RE.test(bad), false, bad);
   }
   assert.equal(ORGANIZATION_LIMITS.slug, 80);
+});
+
+test('a page address is refused unless it is slug-shaped and at most 80 characters (issue 193)', () => {
+  const message = 'slug: use lowercase letters, digits, and single hyphens, up to 80 characters';
+  assert.equal(organizationSlugError('example-fund'), null);
+  assert.equal(organizationSlugError('a'.repeat(80)), null);
+  assert.equal(organizationSlugError('a'.repeat(81)), message);
+  for (const bad of ['Bad Slug', 'UPPER', 'a--b', '-a', 'a-', '_new', '', null, 42]) {
+    assert.equal(organizationSlugError(bad), message, String(bad));
+  }
+  assert.equal(slugTakenMessage('example-fund'), 'slug: another organization already uses "example-fund"');
 });

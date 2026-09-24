@@ -1030,7 +1030,27 @@ const DEMO_PAGE_EXTRA_CONTENT = Object.freeze([
     order: 0,
     seeded: true,
     seededAt: '2026-01-01T00:00:00.000Z'
-  }
+  },
+  // The sponsors page's packages (#193), one per demo tier. The figures are
+  // made up, and the copy says so: the demo offers nothing for sale.
+  {
+    id: 'sponsor_packages__presenting', section: 'sponsor_packages', field: 'presenting',
+    blockType: 'sponsor_package', name: 'Presenting', price: 'Illustrative figure: 8,000', limit: 1,
+    benefits: '<p>Names the sponsor on the plenary sessions and the travel grants. The figures are illustrative. Nothing here is on offer.</p>',
+    visible: true, order: 0, seeded: true, seededAt: DEMO_SEEDED_AT,
+  },
+  {
+    id: 'sponsor_packages__supporting', section: 'sponsor_packages', field: 'supporting',
+    blockType: 'sponsor_package', name: 'Supporting', price: 'Illustrative figure: 3,000', limit: 3,
+    benefits: '<p>Supports speaker preparation, peer coaching, and workshop materials. The figures are illustrative. Nothing here is on offer.</p>',
+    visible: true, order: 1, seeded: true, seededAt: DEMO_SEEDED_AT,
+  },
+  {
+    id: 'sponsor_packages__partner', section: 'sponsor_packages', field: 'partner',
+    blockType: 'sponsor_package', name: 'Partner', price: 'Illustrative figure: 1,000',
+    benefits: '<p>Hosts a clinic, the partnership exchange, or the coffee breaks. The figures are illustrative. Nothing here is on offer.</p>',
+    visible: true, order: 2, seeded: true, seededAt: DEMO_SEEDED_AT,
+  },
 ]);
 
 /** Fictional sessions across the three demo days. */

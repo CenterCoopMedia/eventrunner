@@ -12,6 +12,7 @@ import FactBlock from './FactBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
 import FaqItemBlock from './FaqItemBlock.jsx';
 import LinkGroupBlock from './LinkGroupBlock.jsx';
+import SponsorPackageBlock, { sponsorPackageDraws } from './SponsorPackageBlock.jsx';
 import Folio from '../editorial/Folio.jsx';
 
 const blockKey = (block, index) =>
@@ -81,6 +82,18 @@ const RUN_RENDERERS = {
     </div>
   ),
   link_group: (run) => <LinkGroups blocks={run} />,
+  // A run of sponsor packages (#193) is one list of entries, each ruled on
+  // top: no box, no card. A package with no name is left out rather than
+  // drawn as an empty entry.
+  sponsor_package: (run) => (
+    <ul className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
+      {run.filter(sponsorPackageDraws).map((block, i) => (
+        <li key={blockKey(block, i)} className="border-t-hairline border-t-rule-hairline pt-sm">
+          <SponsorPackageBlock block={block} />
+        </li>
+      ))}
+    </ul>
+  ),
 };
 
 export default function SectionBlocks({ blocks }) {

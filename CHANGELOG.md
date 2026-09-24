@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   materials, from the same list the table shows: A pending or approved material counts, and only published
   sessions with a speaker who is not removed are counted. The new `listAllSessionMaterials` endpoint reads the
   list (#189).
+- A page for each sponsor at `/sponsors/<slug>`, with the logo, the name, the description as the
+  standfirst, the tier as a term and its description, and the link to the sponsor's website. The
+  slug is the organization's document id, set once from its name in the editor, so the address
+  is unique by construction: a second organization claiming the same slug is refused with a 409
+  that names it when it is saved, not when it is published, and deleting an organization frees
+  it. The tier line above the name is gone, and the About section draws only when there is a
+  biography, so the description no longer prints twice. A new `sponsor_package` block type
+  (name, price, limit, and what the package includes) draws on the Sponsors page, in a
+  Sponsorship packages section the seed adds after the logo wall and leaves empty until an
+  operator adds a package. The demo carries three illustrative packages (#193).
 - The organizations editor, under Content, for staff and operators: a table of the organizations in
   the order the Sponsors page draws them, with each state in words, and an editor for the name,
   tier, order, logo, website, and description. Publishing goes through `cmsPublish`, as every

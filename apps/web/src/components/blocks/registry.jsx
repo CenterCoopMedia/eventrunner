@@ -13,6 +13,7 @@ import QuoteBlock from './QuoteBlock.jsx';
 import ListItemBlock from './ListItemBlock.jsx';
 import FaqItemBlock from './FaqItemBlock.jsx';
 import LinkGroupBlock from './LinkGroupBlock.jsx';
+import SponsorPackageBlock from './SponsorPackageBlock.jsx';
 import UnknownBlock from './UnknownBlock.jsx';
 
 export const BLOCK_RENDERERS = Object.freeze({
@@ -26,6 +27,7 @@ export const BLOCK_RENDERERS = Object.freeze({
   list_item: ListItemBlock,
   faq_item: FaqItemBlock,
   link_group: LinkGroupBlock,
+  sponsor_package: SponsorPackageBlock,
 });
 
 /** Renderer for an id — UnknownBlock for anything outside the registry.

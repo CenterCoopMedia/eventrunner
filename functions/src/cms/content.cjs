@@ -41,7 +41,12 @@ const {
   checkSessionDeletable,
 } = require('../schedule/sessions.cjs');
 const { deleteMaterialsForSession } = require('../materials/store.cjs');
-const { ORGANIZATIONS_COLLECTION, validateOrganizationFields } = require('./organizations.cjs');
+const {
+  ORGANIZATIONS_COLLECTION,
+  organizationSlugError,
+  slugTakenMessage,
+  validateOrganizationFields,
+} = require('./organizations.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
@@ -284,6 +289,17 @@ function checkOrganizationFields({ collection, fields, sent }) {
 }
 
 /**
+ * The words a create meets when its document already exists. For an
+ * organization the id is its page address (#193), so the refusal names the
+ * slug, at the save, where the editor puts it on the Page address field.
+ */
+function alreadyExistsMessage(collection, docId) {
+  return collection === ORGANIZATIONS_COLLECTION
+    ? slugTakenMessage(docId)
+    : 'That document already exists; use cmsUpdateContent.';
+}
+
+/**
  * An HTTP-shaped rejection thrown from inside a transaction body, so a
  * refusal aborts the transaction (writing nothing) instead of returning a
  * verdict the caller would have to unwind by hand.
@@ -323,6 +339,11 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
     if (!checked.ok) return badRequest(res, checked.message);
 
     const { collection, docId, extraFields } = target;
+    // An organization's id is its page address, so it has to be one (#193).
+    if (collection === ORGANIZATIONS_COLLECTION) {
+      const slugError = organizationSlugError(docId);
+      if (slugError) return badRequest(res, slugError);
+    }
 
     // ONE transaction: the live-doc existence check, the speaker-reference
     // reads, and the draft write. See checkSpeakerReferences — a reference
@@ -337,7 +358,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
       docPath = await db.runTransaction(async (tx) => {
         const liveSnap = await tx.get(db.collection(collection).doc(docId));
         if (liveSnap.exists) {
-          throw new RequestError(409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
+          throw new RequestError(409, 'already-exists', alreadyExistsMessage(collection, docId));
         }
         // Deletions are applied BEFORE the reference check, so the check
         // runs on what will actually be written: a caller dropping
@@ -389,7 +410,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         return sendError(res, status, code, message);
       }
       if (isAlreadyExistsError(err)) {
-        return sendError(res, 409, 'already-exists', 'That document already exists; use cmsUpdateContent.');
+        return sendError(res, 409, 'already-exists', alreadyExistsMessage(collection, docId));
       }
       throw err;
     }

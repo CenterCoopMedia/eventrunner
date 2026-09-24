@@ -88,12 +88,13 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
   });
 });
 
-// The organizations editor (issue #192), on the real surface: the seeded
-// operator signs in through the sign-in page, creates an organization in
-// the admin editor and publishes it from there, and a signed-out browser
-// finds it in its tier group on the public sponsors page. The type check
-// at the save is proven against the deployed endpoint.
-test.describe.serial('organizations: admin editor -> publish -> sponsors page', () => {
+// The organizations editor (issue #192) and the sponsor page (issue #193),
+// on the real surface: the seeded operator signs in through the sign-in
+// page, creates an organization in the admin editor and publishes it from
+// there, and a signed-out browser finds it in its tier group on the public
+// sponsors page and on its own page at its slug. The type check and the
+// duplicate address are proven against the deployed endpoint, at the save.
+test.describe.serial('organizations: admin editor -> publish -> sponsor pages', () => {
   const stamp = Date.now();
   const name = `E2E Org ${stamp}`;
   const slug = `e2e-org-${stamp}`;
@@ -142,5 +143,34 @@ test.describe.serial('organizations: admin editor -> publish -> sponsors page', 
     expect(refused.body?.error?.message).toMatch(/^name: /);
     const draft = await adminDb().collection('cmsOrganizations_drafts').doc(badId).get();
     expect(draft.exists).toBe(false);
+  });
+
+  test('the sponsor has its own page, and a second organization is refused its address at save (issue 193)', async ({ browser }) => {
+    const visitor = await browser.newContext();
+    try {
+      const publicPage = await visitor.newPage();
+      await publicPage.goto(`/sponsors/${slug}`);
+      await expect(publicPage.getByRole('heading', { level: 1 })).toHaveText(name);
+    } finally {
+      await visitor.close();
+    }
+
+    const draftRef = adminDb().collection('cmsOrganizations_drafts').doc(slug);
+    const before = (await draftRef.get()).data();
+    const second = await callFunction('cmsCreateContent', {
+      collection: 'cmsOrganizations',
+      docId: slug,
+      fields: { name: 'Another E2E Org', tier: 'partner' },
+      visible: true,
+    }, idToken);
+    expect(second.status).toBe(409);
+    expect(second.body?.error?.message).toBe(`slug: another organization already uses "${slug}"`);
+    expect((await draftRef.get()).data()).toEqual(before);
+  });
+
+  test('the sponsors page shows the demo sponsorship packages (issue 193)', async ({ page }) => {
+    await page.goto('/sponsors');
+    const packages = page.getByRole('region', { name: 'Sponsorship packages', exact: true });
+    await expect(packages.getByRole('heading', { level: 3 })).toHaveText(['Presenting', 'Supporting', 'Partner']);
   });
 });

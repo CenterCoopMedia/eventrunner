@@ -8,7 +8,7 @@ const path = require('node:path');
 const { emitAll, emitScheduleData, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
-const { validateOrganizationFields } = require('../../functions/src/cms/organizations.cjs');
+const { organizationSlugError, validateOrganizationFields } = require('../../functions/src/cms/organizations.cjs');
 const {
   speakerDisplayName,
   buildPublicSpeaker,
@@ -182,6 +182,27 @@ test('every demo organization passes the field checks an admin save applies (iss
     const verdict = validateOrganizationFields(fields, fields);
     assert.equal(verdict.ok, true, `${id}: ${JSON.stringify(verdict.errors)}`);
     assert.deepEqual(verdict.fields, fields, `${id} is stored exactly as the seam would store it`);
+    // Its id is its page address (#193), so it has to be one.
+    assert.equal(organizationSlugError(id), null, `${id} is not a page address`);
+  }
+});
+
+test('the demo sponsors page draws three packages, one per demo tier (issue 193)', () => {
+  const demo = demoEvent();
+  const sponsors = demo.pages.find((page) => page.id === 'sponsors');
+  const { seeded, ...contract } = sponsors;
+  assert.equal(seeded, true);
+  assert.equal(validatePageDoc(contract).ok, true);
+  const packages = demo.content.filter((doc) => doc.section === 'sponsor_packages');
+  assert.deepEqual(packages.map((doc) => doc.name), ['Presenting', 'Supporting', 'Partner']);
+  const tiers = new Set(demo.organizations.map((organization) => organization.tier.toLowerCase()));
+  for (const doc of packages) {
+    assert.equal(doc.blockType, 'sponsor_package');
+    assert.ok(tiers.has(doc.name.toLowerCase()), `${doc.name} is a demo tier`);
+    assert.match(doc.benefits, /illustrative/);
+    assert.match(doc.benefits, /Nothing here is on offer/);
+    const copy = `${doc.name} ${doc.price} ${doc.benefits.replace(/<[^>]*>/g, '')}`;
+    assert.ok(copy.length < 200, `${doc.id} keeps its copy under 200 characters (${copy.length})`);
   }
 });
 

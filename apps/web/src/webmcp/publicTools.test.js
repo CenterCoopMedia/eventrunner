@@ -42,7 +42,7 @@ describe('public WebMCP tools', () => {
 
   it('describes sponsor detail routes without exposing the organization id', () => {
     expect(publicToolInternals.publicPage(state({ pathname: '/sponsors/private-id' }))).toEqual({
-      type: 'sponsor', route: '/sponsors/:id', label: null, contentSource: 'generated-snapshot',
+      type: 'sponsor', route: '/sponsors/:slug', label: null, contentSource: 'generated-snapshot',
     });
   });
 

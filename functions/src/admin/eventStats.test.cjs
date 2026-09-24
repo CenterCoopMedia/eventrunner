@@ -216,7 +216,8 @@ test('getEventStats returns the counts for the seeded demo event', async () => {
     tickets: { total: 26, byStatus: { valid: 5, refunded: 6, cancelled: 7, pending_info: 8 } },
     speakers: { total: 22, byStatus: { draft: 1, invited: 2, accepted: 3, approved: 12, removed: 4 } },
     content: {
-      cmsContent: { published: 101, drafts: 0 },
+      // 101 before the demo's three sponsor packages (issue 193).
+      cmsContent: { published: 104, drafts: 0 },
       cmsSchedule: { published: 31, drafts: 1 },
       cmsOrganizations: { published: 6, drafts: 0 },
       cmsTimeline: { published: 0, drafts: 0 },

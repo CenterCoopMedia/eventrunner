@@ -124,8 +124,11 @@ export default function AdminOrganizationEditor({ mode }) {
   }, [focusRequest]);
 
   const localErrors = useMemo(
-    () => validateOrganizationForm(form, { mode: creating ? 'create' : 'edit' }),
-    [form, creating],
+    () => validateOrganizationForm(form, {
+      mode: creating ? 'create' : 'edit',
+      takenIds: rows.map((candidate) => candidate.id),
+    }),
+    [form, creating, rows],
   );
   const serverErrors = useMemo(() => {
     const map = new Map();

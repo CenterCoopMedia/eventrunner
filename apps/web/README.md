@@ -38,7 +38,8 @@ EventConfigProvider          — subscribes to config/{event,features,theme,badg
       ContentProvider         — subscribes to published (or draft) CMS collections
         ToastProvider
           <Routes>             — Home, Schedule (/schedule, /schedule/mine,
-                                 /schedule/:sessionId), Speakers, Sponsors,
+                                 /schedule/:sessionId), Speakers, Sponsors
+                                 (/sponsors, /sponsors/:slug),
                                  /signin, /profile, /attendees,
                                  /attendees/:uid, catch-all (cmsPages)
 ```

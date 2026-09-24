@@ -135,6 +135,12 @@ describe('the editor’s own checks', () => {
     expect(validateOrganizationForm({ ...FORM, slug: '' }, { mode: 'create' }).get('slug')).toBe('Enter a page address.');
   });
 
+  it('names an address another loaded organization already holds (issue 193)', () => {
+    const errors = validateOrganizationForm(FORM, { mode: 'create', takenIds: ['other', 'example-fund'] });
+    expect(errors.get('slug')).toBe('Another organization already uses this address.');
+    expect(validateOrganizationForm(FORM, { mode: 'edit', takenIds: ['example-fund'] }).size).toBe(0);
+  });
+
   it('does not check the address of a record that already has one', () => {
     expect(validateOrganizationForm({ ...FORM, slug: 'Legacy_Id' }, { mode: 'edit' }).size).toBe(0);
   });

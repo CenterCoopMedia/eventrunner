@@ -124,17 +124,23 @@ const tooLong = (field) => `Use ${ORGANIZATION_FIELD_LIMITS[field]} characters o
  * The editor's own checks, field by field. The server repeats each one;
  * these name the problem while the operator is still looking at the field.
  *
+ * A new address already held by a loaded organization, live or draft, is
+ * named here before any call (#193); the server's create refuses the same
+ * address at the save if two editors race.
+ *
  * @param {object} form
- * @param {{ mode: 'create'|'edit' }} options
+ * @param {{ mode: 'create'|'edit', takenIds?: Iterable<string> }} options
  * @returns {Map<string, string>} field → message
  */
-export function validateOrganizationForm(form, { mode }) {
+export function validateOrganizationForm(form, { mode, takenIds = [] }) {
   const errors = new Map();
   if (mode === 'create') {
     const slug = String(form.slug ?? '');
     if (!slug) errors.set('slug', 'Enter a page address.');
     else if (slug.length > ORGANIZATION_FIELD_LIMITS.slug || !ORGANIZATION_SLUG_RE.test(slug)) {
       errors.set('slug', 'Use lowercase letters, digits, and single hyphens, up to 80 characters.');
+    } else if (new Set(takenIds).has(slug)) {
+      errors.set('slug', 'Another organization already uses this address.');
     }
   }
   const name = String(form.name ?? '').trim();
