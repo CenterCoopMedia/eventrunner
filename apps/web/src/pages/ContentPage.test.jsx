@@ -458,6 +458,39 @@ describe('ContentPage — search and section index on long pages', () => {
     pushContent(LONG_SECTIONS_BLOCKS);
   }
 
+  // One pull quote per page at most (expansion record §3.1), enforced by the
+  // budget the content page provides from its sections in order
+  // (components/blocks/pullQuoteBudget.jsx).
+  it('sets the first quote block in section order as the pull quote and any later one plain', async () => {
+    const page = {
+      id: 'two-quotes',
+      label: 'Two quotes fixture',
+      path: '/two-quotes',
+      icon: null,
+      order: 99,
+      visible: true,
+      systemPage: false,
+      sections: [pageSection('tq_first', 'Opening'), pageSection('tq_second', 'Closing')],
+    };
+    const quote = (section, text) => ({
+      id: `${section}__quote`, section, field: 'quote', blockType: 'quote', text,
+      attribution: 'A speaker', visible: true, order: 0,
+    });
+    renderAt('/two-quotes');
+    pushPage(page);
+    pushContent([
+      quote('tq_second', 'The second quote, further down the page.'),
+      quote('tq_first', 'The first quote a reader meets.'),
+    ]);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Two quotes fixture' })).toBeInTheDocument();
+    const pulled = document.querySelectorAll('figure.pull-quote');
+    expect(pulled).toHaveLength(1);
+    expect(pulled[0].textContent).toContain('The first quote a reader meets.');
+    const plain = document.querySelectorAll('figure.quote-plain');
+    expect(plain).toHaveLength(1);
+    expect(plain[0].textContent).toContain('The second quote, further down the page.');
+  });
+
   it('shows a filter box and a section index once a page crosses the section-count threshold', async () => {
     renderLongSectionsPage();
     expect(
