@@ -85,3 +85,21 @@ Rules written after user corrections. Read at session start.
   lint) on the joined files before `cherry-pick --continue`, and fold any
   fix into the commit that broke it so no commit on the branch fails to
   parse.
+
+## 2026-09-24: a change every admin page shows reaches the tests of pages it never saw
+
+- c7's tour was cut before four admin pages joined the stack. Stacked on
+  them, the tour's welcome badge ("Draft") gave the updates editor test two
+  matches, and three other files passed only because their queries ran
+  before the tour chunk loaded. When a branch adds something every admin
+  or public page shows (a banner, a tour, a link in every head), grep the
+  tests of the pages that landed after its base for the words it prints,
+  and fix them in the same pass, before the full run.
+- A literal list of a docket group's pages in a test goes stale the next
+  time a builder adds a page. Read the list from `docketForTier` instead.
+
+## 2026-09-24: never `pkill -f` a pattern that is in your own command
+
+- `pkill -f "checks.sh /home/user/wt-int8"` matched the shell that ran it,
+  and killed the command. Stop a background run through its task, then
+  confirm with `pgrep -af` that nothing of it is left.
