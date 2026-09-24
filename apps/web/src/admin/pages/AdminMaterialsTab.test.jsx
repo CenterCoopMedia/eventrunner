@@ -449,13 +449,86 @@ describe('AdminMaterialsTab: page states', () => {
     expect(await screen.findByText('Slides.pdf')).toBeInTheDocument();
   });
 
-  it('keeps the rows on screen when a reload fails, and says so', async () => {
+  it('Try again stays in place and busy through the retry, a repeat failure mounts a fresh alert, and success moves focus to the table', async () => {
+    handlers.listAllSessionMaterials = () => refusal(500, 'internal', 'Materials could not be listed.');
+    renderTab();
+    const first = await screen.findByRole('alert');
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+
+    let answer;
+    handlers.listAllSessionMaterials = () => new Promise((resolve) => { answer = resolve; });
+    fireEvent.click(retry);
+    await waitFor(() => expect(retry).toHaveAttribute('aria-busy', 'true'));
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    expect(retry).toHaveTextContent('Loading…');
+    expect(screen.queryByRole('alert')).toBeNull();
+    fireEvent.click(retry);
+    expect(callsTo('listAllSessionMaterials')).toHaveLength(2);
+
+    await act(async () => {
+      answer(refusal(500, 'internal', 'Materials could not be listed.'));
+    });
+    const second = await screen.findByRole('alert');
+    expect(second).not.toBe(first);
+    expect(retry).toBeInTheDocument();
+    expect(retry).toHaveTextContent('Try again');
+    expect(document.activeElement).toBe(retry);
+
+    handlers.listAllSessionMaterials = () => ok({ materials: MATERIALS, truncated: false });
+    fireEvent.click(retry);
+    await screen.findByText('Slides.pdf');
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Materials' })));
+  });
+
+  it('keeps the rows on screen when a refresh fails, and says so', async () => {
     await renderLoaded();
     handlers.listAllSessionMaterials = () => refusal(500, 'internal', 'Materials could not be listed.');
-    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('The materials did not load');
     expect(rowNames()).toHaveLength(5);
+  });
+
+  it('Refresh states its work, ignores a second press, and keeps focus', async () => {
+    await renderLoaded();
+    let finish;
+    handlers.listAllSessionMaterials = () => new Promise((resolve) => { finish = resolve; });
+    const button = screen.getByRole('button', { name: 'Refresh' });
+    button.focus();
+    fireEvent.click(button);
+
+    await waitFor(() => expect(button).toHaveAttribute('aria-busy', 'true'));
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).not.toHaveAttribute('disabled');
+    expect(button).toHaveTextContent('Refreshing…');
+    fireEvent.click(button);
+    expect(callsTo('listAllSessionMaterials')).toHaveLength(2);
+
+    await act(async () => {
+      finish(ok({ materials: MATERIALS, truncated: false }));
+    });
+    expect(button).not.toHaveAttribute('aria-busy');
+    expect(button).toHaveTextContent('Refresh');
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('clears the old error when a refresh starts, and a second failure mounts a fresh alert', async () => {
+    await renderLoaded();
+    handlers.listAllSessionMaterials = () => refusal(500, 'internal', 'Materials could not be listed.');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    const first = await screen.findByRole('alert');
+
+    let fail;
+    handlers.listAllSessionMaterials = () => new Promise((resolve) => { fail = resolve; });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    await act(async () => {
+      fail(refusal(500, 'internal', 'Materials could not be listed.'));
+    });
+    const second = await screen.findByRole('alert');
+    expect(second).not.toBe(first);
+    expect(second).toHaveTextContent('Materials could not be listed.');
   });
 
   it('states a refusal in the server’s words, with no retry and no coverage', async () => {
@@ -502,8 +575,13 @@ describe('AdminMaterialsTab: row actions', () => {
     renderTab();
     await waitFor(() => expect(callsTo('listAllSessionMaterials')).toHaveLength(1));
 
+    // Adding a link loads the list again while the first request is out.
+    handlers.addSessionMaterialLink = () => ok({ id: 'b1', material: { filename: 'External link' } });
     handlers.listAllSessionMaterials = () => ok({ materials: [file('b1', 's2', 'Newer list.pdf', 'pending')], truncated: false });
-    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    fireEvent.change(screen.getByLabelText('Session'), { target: { value: 's2' } });
+    fireEvent.change(screen.getByLabelText('Link URL'), { target: { value: 'https://x.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+    fireEvent.change(screen.getByLabelText('Session'), { target: { value: '' } });
     expect(await screen.findByText('Newer list.pdf')).toBeInTheDocument();
 
     await act(async () => {

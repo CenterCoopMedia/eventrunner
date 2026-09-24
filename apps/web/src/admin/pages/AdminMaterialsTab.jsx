@@ -465,14 +465,28 @@ export default function AdminMaterialsTab() {
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveResult, setArchiveResult] = useState(null);
   const archiveBusyRef = useRef(false);
+  // A list request is out. Refresh and Try again state it and ignore a
+  // press while it lasts; the ref answers a press in the same tick.
+  const [listing, setListing] = useState(false);
+  const listingRef = useRef(false);
+  // A first load failed (not a refusal), so the error state and its Try
+  // again stay in place until a list arrives, through each retry.
+  const [retryShown, setRetryShown] = useState(false);
+  const focusListRef = useRef(false);
+  const listBodyRef = useRef(null);
   // Guards against an out-of-order response: every row action and every
-  // Reload calls load() again while an earlier request may still be in
+  // Refresh calls load() again while an earlier request may still be in
   // flight. Each call bumps this ref and keeps its own value; a response
   // applies only if it is still the newest request when it lands.
   const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
     const requestId = (requestIdRef.current += 1);
+    listingRef.current = true;
+    setListing(true);
+    // The old error goes when the new request starts, so a second failure
+    // mounts a fresh alert rather than leaving the first one in place.
+    setLoadError(null);
     try {
       const response = await call('listAllSessionMaterials', {});
       if (requestIdRef.current !== requestId) return; // superseded by a newer request
@@ -481,16 +495,37 @@ export default function AdminMaterialsTab() {
         truncated: response.truncated === true,
         readAt: new Date(),
       });
-      setLoadError(null);
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
       setLoadError(err);
+      if (err?.status !== 403) setRetryShown(true);
+    } finally {
+      if (requestIdRef.current === requestId) {
+        listingRef.current = false;
+        setListing(false);
+      }
     }
   }, [call]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  /** Refresh and Try again: one request at a time. */
+  function refresh({ fromRetry = false } = {}) {
+    if (listingRef.current) return;
+    focusListRef.current = fromRetry;
+    load();
+  }
+
+  // Try again leaves the page when the list arrives, so focus goes to what
+  // replaced it: the table, or the empty state's action.
+  useEffect(() => {
+    if (!result || !focusListRef.current) return;
+    focusListRef.current = false;
+    const body = listBodyRef.current;
+    (body?.querySelector('[role="region"]') ?? body?.querySelector('button'))?.focus();
+  }, [result]);
 
   const sessions = useMemo(
     () => liveSessions(sessionsState.rows, eventConfig?.days ?? [], eventConfig?.timezone),
@@ -627,12 +662,19 @@ export default function AdminMaterialsTab() {
         <Notice tone="error" message={loadError.message} />
       </div>
     );
-  } else if (!result && loadError) {
+  } else if (!result && (loadError || retryShown)) {
+    // The button keeps its place through the retry, so focus stays on it.
     tableBody = (
       <div className="flex flex-col items-start gap-sm px-md pb-md">
-        <ServerErrorSummary error={loadError} title="The materials did not load" />
-        <button type="button" className={secondaryButtonClass} onClick={load}>
-          Try again
+        {loadError ? <ServerErrorSummary error={loadError} title="The materials did not load" /> : null}
+        <button
+          type="button"
+          className={secondaryButtonClass}
+          onClick={() => refresh({ fromRetry: true })}
+          aria-busy={listing ? 'true' : undefined}
+          aria-disabled={listing ? 'true' : undefined}
+        >
+          {listing ? 'Loading…' : 'Try again'}
         </button>
       </div>
     );
@@ -780,18 +822,24 @@ export default function AdminMaterialsTab() {
         title="Materials"
         flush
         actions={
-          <button type="button" className={secondaryButtonClass} onClick={load}>
-            Reload
+          <button
+            type="button"
+            className={secondaryButtonClass}
+            onClick={() => refresh()}
+            aria-busy={listing ? 'true' : undefined}
+            aria-disabled={listing ? 'true' : undefined}
+          >
+            {listing ? 'Refreshing…' : 'Refresh'}
           </button>
         }
       >
-        {/* A reload that fails keeps the last list on screen and says so. */}
+        {/* A refresh that fails keeps the last list on screen and says so. */}
         {result && loadError && !refused ? (
           <div className="px-md pb-sm">
             <ServerErrorSummary error={loadError} title="The materials did not load" />
           </div>
         ) : null}
-        {tableBody}
+        <div ref={listBodyRef}>{tableBody}</div>
       </Panel>
 
       {result && !refused ? (
