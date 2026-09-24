@@ -62,16 +62,18 @@ describe('UpdateDetail', () => {
   it('dates the update on the event’s clock, not the reader’s', () => {
     // The dateline device carries the event's clock (design record §3.1).
     // Half past two in the morning UTC on 1 October is the evening of 30
-    // September at a west-coast venue; the test runner's own zone is UTC,
-    // so a dateline in the reader's zone would say 1 October.
-    renderDetail('late-night', {
-      eventConfig: { timezone: 'America/Los_Angeles' },
-      updates: [{ ...VISIBLE_UPDATE, id: 'late-night', publishAt: new Date('2026-10-01T02:30:00Z') }],
-    });
+    // September at a west-coast venue and the afternoon of 1 October east of
+    // the date line. Rendering both zones makes the test hold whatever zone
+    // the runner sits in: at most one of them can be the reader's.
+    const update = { ...VISIBLE_UPDATE, id: 'late-night', publishAt: new Date('2026-10-01T02:30:00Z') };
+    const west = renderDetail('late-night', { eventConfig: { timezone: 'America/Los_Angeles' }, updates: [update] });
     const time = screen.getByText('September 30, 2026');
     expect(time.tagName).toBe('TIME');
     expect(time).toHaveAttribute('dateTime', '2026-10-01T02:30:00.000Z');
     expect(time.closest('p')).toHaveClass('byline');
+    west.unmount();
+    renderDetail('late-night', { eventConfig: { timezone: 'Pacific/Auckland' }, updates: [update] });
+    expect(screen.getByText('October 1, 2026').tagName).toBe('TIME');
   });
 
   it('404s (designed empty state) for an unknown update id', () => {

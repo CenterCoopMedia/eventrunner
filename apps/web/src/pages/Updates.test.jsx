@@ -41,11 +41,11 @@ const HIDDEN = {
   visible: false,
 };
 
-function renderUpdates({ features = { updates: true }, updates = [] } = {}) {
+function renderUpdates({ features = { updates: true }, updates = [], eventConfig = {} } = {}) {
   return render(
     <MemoryRouter>
       <EventConfigContext.Provider
-        value={{ eventConfig: {}, features, theme: {}, badges: null, source: 'snapshot' }}
+        value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <ContentContext.Provider
           value={{ updates, getBlock: () => null, getPage: () => null, getSectionBlocks: () => [] }}
@@ -115,6 +115,22 @@ describe('Updates', () => {
     expect(heads[0]).toBe('Pinned');
     expect(heads[1]).toBe('October 2026');
     expect(heads[2]).toBe('September 2026');
+  });
+
+  it('dates the feed and its month heads on the event’s clock, not the reader’s', () => {
+    // 02:30 UTC on 1 November is the evening of 31 October at a west-coast
+    // venue: the post belongs under October, dated the 31st (design record
+    // §3.1, the dateline carries the event's clock). The east-of-UTC render
+    // shows the same instant land in November, so the assertion holds in
+    // whatever zone the test runner sits.
+    const post = { id: 'u-late', title: 'Late post', publishAt: '2026-11-01T02:30:00Z' };
+    const west = renderUpdates({ updates: [post], eventConfig: { timezone: 'America/Los_Angeles' } });
+    expect(screen.getByRole('heading', { level: 2, name: 'October 2026' })).toBeInTheDocument();
+    expect(screen.getByText('October 31, 2026').tagName).toBe('TIME');
+    west.unmount();
+    renderUpdates({ updates: [post], eventConfig: { timezone: 'Pacific/Auckland' } });
+    expect(screen.getByRole('heading', { level: 2, name: 'November 2026' })).toBeInTheDocument();
+    expect(screen.getByText('November 1, 2026').tagName).toBe('TIME');
   });
 
   it('puts the title before the date, so the date never stacks above the heading', () => {
