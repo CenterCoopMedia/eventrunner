@@ -198,6 +198,7 @@ function makeFakeDb(seed = {}) {
       // whose data() is `{ count }`, and no document body is read.
       count() {
         return {
+          _kind: 'aggregate',
           async get() {
             const { size } = await query(col, filters, order, limitN, startAfterValue).get();
             return { data: () => ({ count: size }) };
@@ -273,7 +274,7 @@ function makeFakeDb(seed = {}) {
         };
         const tx = {
           async get(target) {
-            if (target && target._kind === 'query') return target.get();
+            if (target && (target._kind === 'query' || target._kind === 'aggregate')) return target.get();
             return trackRead(target._col, target.id);
           },
           async getAll(...refs) {

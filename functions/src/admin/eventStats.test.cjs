@@ -66,7 +66,7 @@ function instrument(db, { reject = null } = {}) {
       if (prop === 'count') {
         return () => {
           counted.push(label);
-          if (label === reject) return { get: async () => { throw new Error('UNAVAILABLE'); } };
+          if (label === reject) return { _kind: 'aggregate', get: async () => { throw new Error('UNAVAILABLE'); } };
           return object.count();
         };
       }
@@ -143,6 +143,39 @@ test('getEventStats runs thirty count() aggregates and reads no document body', 
   assert.equal(new Set(counted).size, 30);
   // Whole collections and one == filter each: single-field indexes serve them.
   for (const label of counted) assert.ok(label.split(' ').length <= 2, label);
+});
+
+// Thirty separate queries could each see a different moment: an account
+// moving from ticketed to approved between two counts was counted twice,
+// and a funnel stage could exceed its total (connector review of PR 272).
+// A read-only transaction reads every aggregate at one time.
+test('getEventStats reads every aggregate inside one read-only transaction', async () => {
+  const base = await seeded();
+  const transactions = [];
+  const db = new Proxy(base, {
+    get(object, prop) {
+      if (prop === 'runTransaction') {
+        return async (fn, options) => {
+          const reads = [];
+          transactions.push({ options, reads });
+          return object.runTransaction((tx) => fn(new Proxy(tx, {
+            get(txObject, txProp) {
+              if (txProp === 'get') return (target) => { reads.push(target); return txObject.get(target); };
+              const value = txObject[txProp];
+              return typeof value === 'function' ? value.bind(txObject) : value;
+            },
+          })), options);
+        };
+      }
+      const value = object[prop];
+      return typeof value === 'function' ? value.bind(object) : value;
+    },
+  });
+  const res = await call(db);
+  assert.equal(res.statusCode, 200);
+  assert.equal(transactions.length, 1);
+  assert.deepEqual(transactions[0].options, { readOnly: true });
+  assert.equal(transactions[0].reads.length, 30);
 });
 
 test('getEventStats returns the counts for the seeded demo event', async () => {

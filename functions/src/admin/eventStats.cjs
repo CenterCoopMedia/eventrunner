@@ -125,7 +125,15 @@ function setPath(target, path, value) {
  */
 async function readEventStats({ db, now = Date.now }) {
   const plan = aggregatePlan(db);
-  const snapshots = await Promise.all(plan.map(({ query }) => query.count().get()));
+  // One read-only transaction, so every count reads the same moment. Thirty
+  // separate queries could each see a different one: an account moving from
+  // ticketed to approved between two counts was counted twice, and a funnel
+  // stage could exceed its total (connector review of PR 272). A read-only
+  // transaction takes no locks and never retries for contention.
+  const snapshots = await db.runTransaction(
+    (tx) => Promise.all(plan.map(({ query }) => tx.get(query.count()))),
+    { readOnly: true },
+  );
   const stats = { readAt: new Date(now()).toISOString() };
   plan.forEach(({ path }, index) => setPath(stats, path, countOf(snapshots[index])));
   stats.funnel = funnelOf(stats.registrations);
