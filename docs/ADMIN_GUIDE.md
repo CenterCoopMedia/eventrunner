@@ -4,6 +4,8 @@ How to run a client's site from the admin panel, in the order the work happens. 
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
+**The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero.
+
 ## Who can do what: Operator and staff
 
 An admin account holds one of two tiers. The rail shows the tier under your address, and it shows only the sections your tier can open. A link you type or follow to a section outside your tier meets a refusal, not the page. The server and the database rules refuse the same requests, so the tier is not only a matter of what the rail shows.
@@ -11,7 +13,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -189,6 +191,24 @@ Every update on the site's Updates page. Each row gives the update's title, its 
 **A picture and content blocks.** An update can also carry a picture and content blocks. This editor does not change them. When an update has them, the editor says so, and a save keeps them as they are.
 
 **Delete this update** removes the live update and its draft together. Its version history stays. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
+
+## Unpublished changes
+
+Everything that is saved and not yet on the site, in one place, under Content on the rail. Staff and operators both open it. The page lists pages, content blocks, sessions, organizations, updates, and timeline entries. Speaker edits are not listed here: You review them on each speaker's page.
+
+**One count, two places.** The sentence under the title, such as "5 unpublished changes: 2 content blocks, 1 page, 2 sessions.", is the same sentence the banner shows on every other admin page. Both read the same saved drafts, so they always agree. A save in any editor raises the count at once, and a publish lowers it at once.
+
+**One table per kind of record.** Each row names the record, with its id under the name, and gives its state (**Draft** for a record that was never published, **Live with unpublished changes** for one that was), when it was saved on the event's clock, and which account saved it. A record set to hidden also reads **Hidden**. The newest save comes first. The name links to the record's editor, where the admin has an editor for that kind of record.
+
+**Three ways to publish.**
+
+- **Publish all** at the top publishes every unpublished change on the site.
+- The button on each table, such as **Publish 2 content blocks**, publishes that table only. One table takes at most 2,000 changes at a time; past that, the table asks you to use **Publish all**.
+- **Resume publish** on a failed run, below.
+
+While one publish runs, the other publish buttons do nothing. The result is stated under the title. A change that was edited while it was being published stays unpublished, and the result names it.
+
+**Recent publishes.** Under the tables, the last 10 publish runs and every run still marked **Failed**, newest first. **Running** means the run is still publishing. **Done** means it finished; the line says how many changes it published and how many it skipped. **Failed** means it stopped part-way; the line says how many changes went out before it stopped, and the run shows the error. A run with no progress for 90 minutes is marked **Failed** by the maintenance sweep, which runs every 30 minutes. A failed run stays in the list until you resume it, however many runs follow it. **Resume publish** publishes the current saved version of each record the run did not reach, so a record edited since the run failed goes out as it reads now.
 
 ## Media
 

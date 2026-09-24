@@ -17,6 +17,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
@@ -1757,3 +1758,46 @@ describe("organizer-owned account fields stay server-written (issue 185)", () =>
   });
 });
 
+// The Unpublished changes page and the admin banner (issue #196) read the
+// dirty drafts of every publishable collection and the publish runs straight
+// from the browser. These are list queries, not the single-document reads
+// the tier matrix above pins, so each shape the browser runs is pinned here
+// (apps/web/src/admin/pendingChangesSource.js): both tiers may run it, and a
+// signed-in non-admin and an anonymous client may not.
+describe("unpublished changes reads (issue 196)", () => {
+  const shapes = [
+    ...PUBLISHABLE.map((c) => [
+      `${c}_drafts where status == dirty`,
+      (db) => query(collection(db, `${c}_drafts`), where("status", "==", "dirty")),
+    ]),
+    [
+      "cmsPublishQueue newest first, limit 10",
+      (db) => query(collection(db, "cmsPublishQueue"), orderBy("requestedAt", "desc"), limit(10)),
+    ],
+    [
+      "cmsPublishQueue where status == failed, limit 20",
+      (db) => query(collection(db, "cmsPublishQueue"), where("status", "==", "failed"), limit(20)),
+    ],
+  ];
+
+  for (const [label, build] of shapes) {
+    it(`${label}: an operator and a staff member may run it`, async () => {
+      await assertSucceeds(getDocs(build(admin())));
+      await assertSucceeds(getDocs(build(staff())));
+    });
+
+    it(`${label}: a signed-in non-admin and an anonymous client may not`, async () => {
+      await assertFails(getDocs(build(nonAdmin())));
+      await assertFails(getDocs(build(anon())));
+    });
+  }
+
+  it("the dirty drafts query returns the seeded dirty draft to staff", async () => {
+    const snap = await getDocs(
+      query(collection(staff(), "cmsContent_drafts"), where("status", "==", "dirty")),
+    );
+    if (!snap.docs.some((d) => d.id === "pub")) {
+      throw new Error("the dirty draft was not listed");
+    }
+  });
+});

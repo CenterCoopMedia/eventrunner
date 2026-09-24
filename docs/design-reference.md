@@ -331,6 +331,7 @@ The admin CMS is its own design surface and it does not restyle. It reads its ow
 - **One action colour** for the primary button, the current rail item, the links, and the focus ring. By default it is the site's main brand colour worked to the admin's own contrast bars, in light and in dark; **Admin colours** on the Branding tab can replace it with one of six house schemes: navy, graphite, forest, oxblood, teal, or plum. Either way it is one colour per deployment, and it does not change with the site style.
 - **Three state words, everywhere**: Draft, Live, and Live with unpublished changes, each set in a tinted badge.
 - **A destructive action stands still and states what it costs.** Nothing animates in a destructive moment.
+- **Unpublished changes are counted once.** While something is saved and not published, a band on the proof ground above the page states the count in one sentence and links to the Unpublished changes page, which states the same sentence. The band and the page read one source, so they cannot disagree. The count is never a number on the rail.
 
 **Engine.** The `admin-*` blocks are emitted once per mode and never once per (style, mode), which is the mechanical form of "the admin ignores the site style". They stay root-only, because the admin never renders inside the page-preview frame.
 

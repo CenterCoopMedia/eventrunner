@@ -1,0 +1,66 @@
+// The unpublished changes seam (issue #196). src/test/setup.js mocks this
+// module for every test file; here the real module runs over setup's
+// firebase/firestore stand-ins, which record the query each read builds.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { onSnapshot } from 'firebase/firestore';
+
+const source = await vi.importActual('./pendingChangesSource.js');
+
+beforeEach(() => {
+  vi.mocked(onSnapshot).mockClear();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** The query and callbacks of the last listener attached. */
+function lastListener() {
+  const [ref, onNext, onError] = vi.mocked(onSnapshot).mock.calls.at(-1);
+  return { ref, onNext, onError };
+}
+
+const snapshotOf = (docs) => ({
+  docs: docs.map(({ id, ...data }) => ({ id, data: () => data })),
+});
+
+describe('the unpublished changes reads', () => {
+  it('reads the dirty drafts of one collection with the listDirty predicate', () => {
+    const onNext = vi.fn();
+    source.subscribeDirtyDrafts('cmsContent', onNext);
+    const { ref, onNext: deliver } = lastListener();
+    expect(ref.ref.path).toBe('cmsContent_drafts');
+    expect(ref.clauses).toEqual([{ where: ['status', '==', 'dirty'] }]);
+    deliver(snapshotOf([{ id: 'hero__subtitle', status: 'dirty', value: 'x' }]));
+    expect(onNext).toHaveBeenCalledWith([{ id: 'hero__subtitle', status: 'dirty', value: 'x' }]);
+  });
+
+  it('reads the most recent publish runs, newest first', () => {
+    source.subscribeRecentPublishRuns(10, vi.fn());
+    const { ref } = lastListener();
+    expect(ref.ref.path).toBe('cmsPublishQueue');
+    expect(ref.clauses).toEqual([{ orderBy: ['requestedAt', 'desc'] }, { limit: 10 }]);
+  });
+
+  it('reads the runs still marked failed, on one field', () => {
+    source.subscribeFailedPublishRuns(20, vi.fn());
+    const { ref } = lastListener();
+    expect(ref.ref.path).toBe('cmsPublishQueue');
+    expect(ref.clauses).toEqual([{ where: ['status', '==', 'failed'] }, { limit: 20 }]);
+  });
+
+  it('reports an error, keeps quiet otherwise, and attaches a fresh listener later', () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const unsubscribe = source.subscribeDirtyDrafts('cmsPages', vi.fn(), onError);
+    const attached = vi.mocked(onSnapshot).mock.calls.length;
+    const failure = Object.assign(new Error('denied'), { code: 'permission-denied' });
+    lastListener().onError(failure);
+    expect(onError).toHaveBeenCalledWith(failure);
+    vi.advanceTimersByTime(15_000);
+    expect(vi.mocked(onSnapshot).mock.calls.length).toBe(attached + 1);
+    expect(lastListener().ref.ref.path).toBe('cmsPages_drafts');
+    unsubscribe();
+  });
+});

@@ -47,6 +47,8 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
 import { AdminEmptyState } from './components/adminChrome.jsx';
+import PendingChangesBanner from './components/PendingChangesBanner.jsx';
+import { PendingChangesProvider } from './PendingChangesContext.jsx';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
  * the current LOCATION inside this nested `<Routes>`, so on /admin/branding
@@ -96,6 +98,7 @@ export const DOCKET = Object.freeze([
       { to: 'media', label: 'Media', tier: 'staff' },
       { to: 'materials', label: 'Materials', tier: 'staff' },
       { to: 'versions', label: 'Version history', tier: 'staff' },
+      { to: 'unpublished', label: 'Unpublished changes', tier: 'staff' },
     ],
   },
   {
@@ -252,7 +255,20 @@ function TierRefusal() {
   );
 }
 
+/**
+ * The shell. One count of unpublished changes (issue #196) is opened here,
+ * once, for the banner above the stone and the Unpublished changes page to
+ * read; the shell mounts only inside AdminGate, so a non-admin opens none.
+ */
 export default function AdminLayout() {
+  return (
+    <PendingChangesProvider>
+      <AdminDesk />
+    </PendingChangesProvider>
+  );
+}
+
+function AdminDesk() {
   const { eventConfig, theme } = useEventConfig();
   const { user, adminTier, refreshAdminStatus, signOut } = useAuth();
   const { pathname } = useLocation();
@@ -353,6 +369,9 @@ export default function AdminLayout() {
       </div>
 
       <main id="admin-content" className="min-w-0 flex-1">
+        {/* Above the stone, never inside it: the title band pulls itself
+            up by the stone's top padding and would slide over it. */}
+        <PendingChangesBanner />
         <div className="admin-stone mx-auto w-full max-w-admin-canvas">
           {refused ? <TierRefusal /> : <Outlet />}
         </div>

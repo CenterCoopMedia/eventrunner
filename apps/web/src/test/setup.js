@@ -82,6 +82,22 @@ vi.mock('firebase/firestore', () => {
   };
 });
 
+// The admin shell counts unpublished changes on every screen (issue #196)
+// through its own seam. By default each read answers once with nothing, so
+// a shell test sees zero changes and needs no mock of its own; a test that
+// steers the count overrides this with vi.mocked(...) or its own vi.mock.
+vi.mock('@/admin/pendingChangesSource.js', () => {
+  const empty = (onNext) => {
+    onNext([]);
+    return () => {};
+  };
+  return {
+    subscribeDirtyDrafts: vi.fn((_collection, onNext) => empty(onNext)),
+    subscribeRecentPublishRuns: vi.fn((_count, onNext) => empty(onNext)),
+    subscribeFailedPublishRuns: vi.fn((_count, onNext) => empty(onNext)),
+  };
+});
+
 // jsdom implements <dialog> as markup and nothing else: it ships the
 // interface, but showModal, close, the top layer and cancel-on-Escape are
 // all missing. A component that opens a dialog would therefore be untestable

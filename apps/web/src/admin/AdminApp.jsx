@@ -79,6 +79,9 @@ const AdminUpdateEditor = lazy(() => import('./pages/AdminUpdateEditor.jsx'));
 // with their formatters, load when somebody opens them.
 const AdminVersionRecords = lazy(() => import('./pages/AdminVersionRecords.jsx'));
 const AdminVersionHistory = lazy(() => import('./pages/AdminVersionHistory.jsx'));
+// Unpublished changes (issue #196): its tables and publish runs load on
+// demand; only the count and the banner that read it live in this chunk.
+const AdminUnpublishedChanges = lazy(() => import('./pages/AdminUnpublishedChanges.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -228,6 +231,10 @@ export default function AdminApp() {
           <Route
             path="versions/:collection/:docId"
             element={<DeferredAdminPage label="version history"><AdminVersionHistory /></DeferredAdminPage>}
+          />
+          <Route
+            path="unpublished"
+            element={<DeferredAdminPage label="unpublished changes"><AdminUnpublishedChanges /></DeferredAdminPage>}
           />
           <Route
             path="attendees"

@@ -54,6 +54,8 @@ vi.mock('firebase/firestore', () => ({
 
 import App from '../App.jsx';
 import { ADMIN_TIERS, DOCKET, TIER_SCOPE, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
+// Mocked for every file in src/test/setup.js; steered here for the banner.
+import { subscribeDirtyDrafts } from './pendingChangesSource.js';
 
 async function renderAdmin(path = '/admin/pages') {
   const result = render(
@@ -136,12 +138,17 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Six links above the base's sixteen (the Overview, issue #179, the
+    // Seven links above the base's sixteen (the Overview, issue #179, the
     // Email log, issue #183, Change requests, issue #188, Organizations,
-    // issue #192, Updates, issue #190, and Version history, issue #195),
-    // every one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(22);
+    // issue #192, Updates, issue #190, Version history, issue #195, and
+    // Unpublished changes, issue #196), every one a word. No icon rail, no
+    // glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(23);
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
+    expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
+      'href',
+      '/admin/unpublished',
+    );
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
@@ -206,6 +213,7 @@ describe('the admin shell', () => {
     expect(byTier('staff')).toEqual([
       'overview',
       'pages', 'sessions', 'organizations', 'content', 'updates', 'media', 'materials', 'versions',
+      'unpublished',
       'speakers', 'attendees', 'badges',
       'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
       'settings',
@@ -224,6 +232,8 @@ describe('the admin shell', () => {
     // Version history is staff work, the record route under it too (issue #195).
     expect(sectionTier('/admin/versions')).toBe('staff');
     expect(sectionTier('/admin/versions/cmsContent/x')).toBe('staff');
+    // So is the list of unpublished changes (issue #196).
+    expect(sectionTier('/admin/unpublished')).toBe('staff');
     expect(sectionTier('/admin/pages/new')).toBe('staff');
     expect(sectionTier('/admin/sessions/abc')).toBe('staff');
     // The organizations list and editor are content, so staff work (#192).
@@ -292,6 +302,37 @@ describe('the admin shell', () => {
     expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
     expect(docketForTier('operator')).toEqual(DOCKET);
     expect(docketForTier(null)).toEqual([]);
+  });
+
+  // The pending-changes banner (issue #196) sits above the stone, never
+  // inside it: the title band pulls itself up by the stone's top padding
+  // and would slide over anything placed before it there.
+  it('puts the unpublished changes banner first in main, outside the stone', async () => {
+    vi.mocked(subscribeDirtyDrafts).mockImplementation((collection, onNext) => {
+      onNext(
+        collection === 'cmsContent'
+          ? [{ id: 'hero__subtitle', section: 'hero', field: 'subtitle', status: 'dirty', basedOnRevision: 1 }]
+          : [],
+      );
+      return () => {};
+    });
+    try {
+      const { container } = await renderAdmin('/admin/pages');
+      const banner = await screen.findByRole('complementary', { name: 'Unpublished changes' });
+      const main = container.querySelector('main#admin-content');
+      expect(main.firstElementChild.contains(banner)).toBe(true);
+      expect(banner.closest('.admin-stone')).toBeNull();
+      expect(main.firstElementChild.nextElementSibling).toHaveClass('admin-stone');
+      expect(banner).toHaveAttribute('data-pending-total', '1');
+      expect(banner).toHaveTextContent('1 unpublished change: 1 content block.');
+      // The rail carries words only: no count joins the docket link.
+      expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveTextContent(/^Unpublished changes$/);
+    } finally {
+      vi.mocked(subscribeDirtyDrafts).mockImplementation((_collection, onNext) => {
+        onNext([]);
+        return () => {};
+      });
+    }
   });
 
   it('holds the account controls at the control height on every pointer', async () => {
