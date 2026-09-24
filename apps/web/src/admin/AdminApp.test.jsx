@@ -252,21 +252,16 @@ describe('admin route gating', () => {
   it('opens the email log for a staff admin: the log is staff visible', async () => {
     operatorProbeShouldSucceed = false;
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
-    // functionsOrigin() names the missing project id on console.error.
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ rows: [], nextCursor: null, scanned: 0 }),
-    }));
-    globalThis.fetch = fetchMock;
+    adminCall.mockImplementation((name) =>
+      Promise.resolve(name === 'listSentEmails' ? { rows: [], nextCursor: null, scanned: 0 } : {}),
+    );
     await renderAt('/admin/email-log');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Email log' }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Email log' })).toHaveAttribute('aria-current', 'page');
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/listSentEmails$/);
+    // The page's calls go through the shell's admin call mock.
+    await waitFor(() => expect(adminCall).toHaveBeenCalledWith('listSentEmails', expect.any(Object)));
   });
 
   it('refuses a staff admin an operator route rather than only hiding its link', async () => {
