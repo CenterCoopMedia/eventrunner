@@ -122,6 +122,7 @@
               <li><a href="#organizations">Organizations</a></li>
               <li><a href="#content-pages-content-editor">Content (Pages → Content editor)</a></li>
               <li><a href="#updates">Updates</a></li>
+              <li><a href="#unpublished-changes">Unpublished changes</a></li>
               <li><a href="#media">Media</a></li>
               <li><a href="#speakers">Speakers</a></li>
               <li><a href="#attendees">Attendees</a></li>
@@ -142,6 +143,7 @@
           </nav>
           <p>How to run a client&#39;s site from the admin panel, in the order the work happens. For the narrative &quot;why does this work this way&quot; version, hand a new staff member <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see <a href="/eventrunner/docs/design-reference/"><code>design-reference.md</code></a>. You do not need it to run a site.</p>
           <p><strong>Draft and live are separate almost everywhere below.</strong> Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.</p>
+          <p><strong>The banner above each admin page counts what is saved and not published.</strong> It names the count by kind, such as &quot;2 unpublished changes: 1 content block, 1 page.&quot;, and links to <strong>Unpublished changes</strong>, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.</p>
           <h2 id="who-can-do-what-operator-and-staff">Who can do what: Operator and staff<a class="heading-anchor" href="#who-can-do-what-operator-and-staff" aria-label="Link to this section">#</a></h2>
           <p>An admin account holds one of two tiers. The rail shows the tier under your address, and it shows only the sections your tier can open. A link you type or follow to a section outside your tier meets a refusal, not the page. The server and the database rules refuse the same requests, so the tier is not only a matter of what the rail shows.</p>
           <div class="table-scroll" data-scroll-region data-scroll-label="Table">
@@ -151,7 +153,7 @@
           </thead>
           <tbody>
           <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, and System errors</td><td>The person who set the site up and answers for the deployment</td></tr>
-          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings</td><td>The people who run the event day to day</td></tr>
+          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
           </div>
@@ -273,6 +275,18 @@
           <p><strong>Feature an update to put it at the head of the page.</strong> The Updates page sets the featured update first, under its own heading, <strong>Featured</strong>, with a larger title and its opening lines. If more than one update is featured, the one that comes first in the list leads: A pinned update before an unpinned one, then the newest date. The other featured updates stay in their usual places. To change the lead, clear <strong>Feature this update at the head of the list</strong> on the update that leads now.</p>
           <p><strong>A picture and content blocks.</strong> An update can also carry a picture and content blocks. This editor does not change them. When an update has them, the editor says so, and a save keeps them as they are.</p>
           <p><strong>Delete this update</strong> removes the live update and its draft together. Its version history stays. If <em>Updates</em> is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.</p>
+          <h2 id="unpublished-changes">Unpublished changes<a class="heading-anchor" href="#unpublished-changes" aria-label="Link to this section">#</a></h2>
+          <p>Everything that is saved and not yet on the site, in one place, under Content on the rail. Staff and operators both open it. The page lists pages, content blocks, sessions, organizations, updates, and timeline entries. Speaker edits are not listed here: You review them on each speaker&#39;s page.</p>
+          <p><strong>One count, two places.</strong> The sentence under the title, such as &quot;5 unpublished changes: 2 content blocks, 1 page, 2 sessions.&quot;, is the same sentence the banner shows on every other admin page. Both read the same saved drafts, so they always agree. A save in any editor raises the count at once, and a publish lowers it at once.</p>
+          <p><strong>One table per kind of record.</strong> Each row names the record, with its id under the name, and gives its state (<strong>Draft</strong> for a record that was never published, <strong>Live with unpublished changes</strong> for one that was), when it was saved on the event&#39;s clock, and which account saved it. A record set to hidden also reads <strong>Hidden</strong>. The newest save comes first. The name links to the record&#39;s editor, where the admin has an editor for that kind of record.</p>
+          <p><strong>Three ways to publish.</strong></p>
+          <ul>
+          <li><strong>Publish all</strong> at the top publishes every unpublished change on the site.</li>
+          <li>The button on each table, such as <strong>Publish 2 content blocks</strong>, publishes that table only. One table takes at most 2,000 changes at a time; past that, the table asks you to use <strong>Publish all</strong>.</li>
+          <li><strong>Resume publish</strong> on a failed run, below.</li>
+          </ul>
+          <p>While one publish runs, the other publish buttons do nothing. The result is stated under the title. A change that was edited while it was being published stays unpublished, and the result names it.</p>
+          <p><strong>Recent publishes.</strong> Under the tables, the last 10 publish runs and the 20 newest runs still marked <strong>Failed</strong>, newest first. <strong>Running</strong> means the run is still publishing. <strong>Done</strong> means it finished; the line says how many changes it published and how many it skipped. <strong>Failed</strong> means it stopped part-way; the line says how many changes went out before it stopped, and the run shows the error. A run with no progress for 90 minutes is marked <strong>Failed</strong> by the maintenance sweep, which runs every 30 minutes. A failed run stays in the list until you resume it, however many finished runs follow it. When more than 20 runs are marked <strong>Failed</strong>, the list shows the 20 newest. <strong>Resume publish</strong> publishes the current saved version of each record the run did not reach, so a record edited since the run failed goes out as it reads now.</p>
           <h2 id="media">Media<a class="heading-anchor" href="#media" aria-label="Link to this section">#</a></h2>
           <p>A browsable library, split by namespace because each answers a different question:</p>
           <ul>
