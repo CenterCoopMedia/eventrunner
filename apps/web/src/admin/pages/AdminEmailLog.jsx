@@ -15,12 +15,14 @@
 // not to remember it. Source and status carry nothing personal, so they
 // live in the URL and a reload or a shared link keeps them.
 //
-// THE PREVIEW. A stored body renders only inside <iframe sandbox="">, from
+// THE PREVIEW. Stored HTML renders only inside <iframe sandbox="">, from
 // admin/emailPreview.js buildPreviewDoc, under a content policy that blocks
-// script and every fetch. The frame has an opaque origin: it cannot reach
-// this page, its storage, or the admin's token. Opening a preview sends no
-// request but the getSentEmail call. Markup in an address, a subject, or a
-// bounce reason is React text, never HTML.
+// script and every fetch, with every link turned into its words. The frame
+// has an opaque origin: it cannot reach this page, its storage, or the
+// admin's token. Opening a preview sends no request but the getSentEmail
+// call. HTML the builder refuses is not shown; the plain text is. The
+// plain-text body, an address, a subject, and a bounce reason are React
+// text, never HTML.
 //
 // THE FIGURE SENTENCE, NOT A TILE. One stated line under the form says what
 // is shown and when it was read. It never states a total: a search reads a
@@ -201,9 +203,8 @@ function StatusCell({ row }) {
   );
 }
 
-/** The sandboxed frame. The document is built once per body. */
-function PreviewFrame({ html, to }) {
-  const srcDoc = useMemo(() => buildPreviewDoc(html), [html]);
+/** The sandboxed frame, over a document emailPreview.js has already built. */
+function PreviewFrame({ srcDoc, to }) {
   return (
     <>
       <iframe
@@ -217,6 +218,42 @@ function PreviewFrame({ html, to }) {
         Links and remote images are turned off in this preview.
       </p>
     </>
+  );
+}
+
+/**
+ * A stored body: the frame when the HTML can be shown safely, the plain
+ * text beside it or instead of it. The document is built once per body; a
+ * body buildPreviewDoc refuses gets the plain text, open, and a line that
+ * says why.
+ */
+function StoredBody({ message }) {
+  const { html, text, bodyTruncated, to } = message;
+  const srcDoc = useMemo(() => (html ? buildPreviewDoc(html) : null), [html]);
+  const refused = Boolean(html) && srcDoc === null;
+  return (
+    <div className="flex flex-col gap-xs">
+      {srcDoc ? <PreviewFrame srcDoc={srcDoc} to={to} /> : null}
+      {refused ? (
+        <p className="text-admin-sm text-admin-ink">
+          {text
+            ? 'This message’s HTML cannot be shown safely, so its plain text version is shown instead.'
+            : 'This message’s HTML cannot be shown safely, and it has no plain text version.'}
+        </p>
+      ) : null}
+      {text ? (
+        <details open={!srcDoc} className="text-admin-sm">
+          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
+          <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
+            {text}
+          </pre>
+        </details>
+      ) : null}
+      {!html && !text ? <p className="text-admin-sm text-admin-ink">This message has no stored body.</p> : null}
+      {bodyTruncated ? (
+        <p className="text-admin-sm text-admin-ink-secondary">The stored body stops at 100 KB.</p>
+      ) : null}
+    </div>
   );
 }
 
@@ -237,24 +274,7 @@ function PreviewBody({ row, detail }) {
     );
   }
   if (detail.state === 'error') return <Notice tone="error" message={detail.error.message} />;
-  const { html, text, bodyTruncated } = detail.row;
-  return (
-    <div className="flex flex-col gap-xs">
-      {html ? <PreviewFrame html={html} to={detail.row.to} /> : null}
-      {text ? (
-        <details open={!html} className="text-admin-sm">
-          <summary className="admin-target cursor-pointer font-semibold text-admin-ink">Plain text version</summary>
-          <pre className="mt-2xs max-h-[24rem] overflow-auto whitespace-pre-wrap break-words font-admin-data text-admin-sm text-admin-ink-data">
-            {text}
-          </pre>
-        </details>
-      ) : null}
-      {!html && !text ? <p className="text-admin-sm text-admin-ink">This message has no stored body.</p> : null}
-      {bodyTruncated ? (
-        <p className="text-admin-sm text-admin-ink-secondary">The stored body stops at 100 KB.</p>
-      ) : null}
-    </div>
-  );
+  return <StoredBody message={detail.row} />;
 }
 
 export default function AdminEmailLog() {

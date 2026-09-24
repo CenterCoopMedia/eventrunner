@@ -6,7 +6,11 @@
 // sent_emails row, and the email log page then finds that row by the
 // operator's own address. The preview half seeds one stored body that tries
 // to run script and to load a remote image, opens it in the real sandboxed
-// frame, and watches every request the page and its frames make.
+// frame, and watches every request the page and its frames make. Then it
+// seeds one body per known way to bring a link back into the frame (SVG
+// animation, a declarative shadow root, markup that re-parses into a link),
+// clicks where the link was drawn, and checks that nothing was requested and
+// the frame stayed on the message.
 import { test, expect } from '@playwright/test';
 import {
   ADMIN_EMAIL, adminDb, callFunction, ensureUser, idTokenFor, signIn,
@@ -14,6 +18,40 @@ import {
 
 const PROBE_TO = 'preview-probe@example.test';
 const PIXEL_HOST = 'pixel.example.test';
+const LINK_HOST = 'link-probe.example.test';
+const BLOCK = 'display:block;width:320px;height:90px';
+
+/**
+ * One stored body per way the review found to navigate the frame. Each draws
+ * its would-be link over the frame's top-left corner, where the test clicks.
+ */
+const LINK_PROBES = [
+  ['smil-set', `<svg width="320" height="90"><a href="https://${LINK_HOST}/smil-set"><set attributeName="target" to="_self"/><rect width="320" height="90"/></a></svg>`],
+  ['smil-animate', `<svg width="320" height="90"><a href="https://${LINK_HOST}/smil-animate"><animate attributeName="target" values="_self" fill="freeze"/><rect width="320" height="90"/></a></svg>`],
+  ['smil-outside', `<svg width="320" height="90"><a id="lnk" href="https://${LINK_HOST}/smil-outside"><rect width="320" height="90"/></a><set href="#lnk" attributeName="target" to="_self"/></svg>`],
+  ['shadow-root', `<div><template shadowrootmode="open"><a href="https://${LINK_HOST}/shadow-root" target="_self" style="${BLOCK}">Read more</a><link rel="dns-prefetch" href="https://${LINK_HOST}"></template></div>`],
+  ['reparse', `<form><math><mtext></form><form><mglyph><style></math><link rel="preconnect" href="https://${LINK_HOST}"><a href="https://${LINK_HOST}/reparse" target="_self" style="${BLOCK}">Click</a><base href="https://${LINK_HOST}/"></style></mglyph></form></mtext></math></form>`],
+  ['same-frame', `<a href="https://${LINK_HOST}/same-frame" target="_self" style="${BLOCK}">Read online</a>`],
+];
+
+/** A sent_emails row as send.cjs writes it, with a stored html body. */
+const storedRow = (to, subject, html, text) => ({
+  to,
+  from: null,
+  subject,
+  templateId: null,
+  providerMessageId: null,
+  status: 'sent',
+  providerStatus: null,
+  error: null,
+  retries: 0,
+  bodyStored: true,
+  html,
+  text,
+  bodyTruncated: false,
+  source: 'operator-notify',
+  sentAt: new Date(),
+});
 const NON_ADMIN_EMAIL = 'email-log-viewer@example.test';
 
 const searchField = (page) => page.getByRole('searchbox', { name: 'Search recipient or subject' });
@@ -27,9 +65,11 @@ async function search(page, text) {
 
 test.describe.serial('the email log', () => {
   let probeRef;
+  const linkProbeRefs = [];
 
   test.afterAll(async () => {
     if (probeRef) await probeRef.delete();
+    for (const ref of linkProbeRefs) await ref.delete();
   });
 
   test('a sent code email appears in the log, with its body not stored', async ({ page }) => {
@@ -118,10 +158,10 @@ test.describe.serial('the email log', () => {
     // The body rendered, and neither the script nor the handler changed it.
     const frame = page.frameLocator(`iframe[title="Message to ${PROBE_TO}"]`);
     await expect(frame.locator('#probe')).toHaveText('Script did not run.');
-    // A click on the link goes nowhere: the sandbox refuses the new tab, and
-    // the frame stays on the message.
+    // The link is its words only: no link role, and a click goes nowhere.
+    await expect(frame.getByRole('link')).toHaveCount(0);
     const popup = page.context().waitForEvent('page', { timeout: 2000 }).then(() => true, () => false);
-    await frame.getByRole('link', { name: 'Read online' }).click();
+    await frame.getByText('Read online').click();
     expect(await popup).toBe(false);
     await expect(frame.locator('#probe')).toHaveText('Script did not run.');
     expect(page.url()).toContain('/admin/email-log');
@@ -138,12 +178,11 @@ test.describe.serial('the email log', () => {
     expect(network.filter((entry) => fromBody(entry) && entry.kind === 'response')).toEqual([]);
     expect(network.filter((entry) => entry.url.endsWith('/read'))).toEqual([]);
     expect(network.filter(({ kind, method, url }) => kind === 'request' && method === 'POST' && /\/getSentEmail$/.test(url))).toHaveLength(1);
-    // Chromium says why: the sandbox refused the script and the handler, the
-    // policy refused the images, and the sandbox refused the new tab.
+    // Chromium says why: the sandbox refused the script and the handler, and
+    // the policy refused the images.
     const said = consoleLines.join('\n');
     expect(said).toContain("Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed");
     expect(said).toContain(`Refused to load the image 'https://${PIXEL_HOST}/open.png'`);
-    expect(said).toContain(`Blocked opening 'https://${PIXEL_HOST}/read' in a new window`);
 
     // The read is on the record, by path and actor only.
     const logs = await adminDb().collection('admin_logs')
@@ -151,6 +190,50 @@ test.describe.serial('the email log', () => {
     expect(logs.size).toBe(1);
     expect(logs.docs[0].data()).toMatchObject({ action: 'view-sent-email', email: ADMIN_EMAIL });
     expect(JSON.stringify(logs.docs[0].data())).not.toContain(PROBE_TO);
+  });
+
+  test('no stored body can bring a link back: a click sends no request and the frame stays on the message', async ({ page }) => {
+    for (const [name, html] of LINK_PROBES) {
+      const ref = adminDb().collection('sent_emails').doc();
+      linkProbeRefs.push(ref);
+      await ref.set(storedRow(`link-probe-${name}@example.test`, `Link probe ${name}`, html, null));
+    }
+    const toLinkHost = [];
+    page.on('request', (request) => {
+      if (request.url().includes(LINK_HOST)) toLinkHost.push(request.url());
+    });
+
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/email-log');
+    for (const [name] of LINK_PROBES) {
+      const to = `link-probe-${name}@example.test`;
+      await search(page, to);
+      const row = page.getByRole('row').filter({ hasText: to });
+      const preview = row.getByRole('button', { name: /^(Preview|Hide preview)$/ });
+      await preview.click();
+      await expect(preview).toHaveText('Hide preview');
+
+      const frameElement = page.locator(`iframe[title="Message to ${to}"]`);
+      await expect(frameElement, name).toBeVisible();
+      const frame = await (await frameElement.elementHandle()).contentFrame();
+      expect(frame.url(), name).toBe('about:srcdoc');
+      expect(await frameElement.getAttribute('srcdoc'), name).not.toContain(LINK_HOST);
+
+      // Click where the link was drawn, then give a navigation the time to start.
+      const navigation = page.waitForEvent('request', {
+        predicate: (request) => request.url().includes(LINK_HOST),
+        timeout: 1500,
+      }).then(() => true, () => false);
+      await frameElement.click({ position: { x: 60, y: 30 } });
+      expect(await navigation, name).toBe(false);
+      expect(frame.url(), name).toBe('about:srcdoc');
+      expect(page.url(), name).toContain('/admin/email-log');
+
+      await preview.click();
+      await expect(preview).toHaveText('Preview');
+    }
+    expect(toLinkHost).toEqual([]);
+    expect(page.context().pages()).toHaveLength(1);
   });
 
   test('the endpoint refuses a caller with no token and a signed-in non-admin', async () => {

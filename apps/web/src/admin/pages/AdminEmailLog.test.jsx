@@ -9,6 +9,13 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
+// The real document builder, except for one body this test marks unsafe, so
+// the page's plain-text fallback can be driven without a parser quirk.
+const UNSAFE_BODY = '<p>Marked unsafe by this test.</p>';
+vi.mock('../emailPreview.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, buildPreviewDoc: (html) => (html === UNSAFE_BODY ? null : actual.buildPreviewDoc(html)) };
+});
 vi.mock('../../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig: { timezone: 'UTC' } }),
 }));
@@ -373,6 +380,26 @@ describe('AdminEmailLog', () => {
     expect(screen.getByText('Only <text>.')).toBeInTheDocument();
     expect(document.querySelector('iframe')).toBeNull();
     expect(screen.getByText('The stored body stops at 100 KB.')).toBeInTheDocument();
+  });
+
+  it('shows the plain text, and no frame, when the stored HTML cannot be shown safely', async () => {
+    await renderPage('/admin/email-log', {
+      details: {
+        plain: { ...message({ id: 'plain' }), html: UNSAFE_BODY, text: 'The plain words.' },
+        bounced: { ...message({ id: 'bounced' }), html: UNSAFE_BODY, text: null },
+      },
+    });
+    fireEvent.click(within(rowOf('plain@example.test')).getByRole('button', { name: 'Preview' }));
+    expect(await screen.findByText('This message’s HTML cannot be shown safely, so its plain text version is shown instead.')).toBeInTheDocument();
+    expect(document.querySelector('iframe')).toBeNull();
+    const summary = screen.getByText('Plain text version');
+    expect(summary.closest('details').open).toBe(true);
+    expect(screen.getByText('The plain words.')).toBeInTheDocument();
+    expect(screen.queryByText('Links and remote images are turned off in this preview.')).toBeNull();
+
+    fireEvent.click(within(rowOf('bounced@example.test')).getByRole('button', { name: 'Preview' }));
+    expect(await screen.findByText('This message’s HTML cannot be shown safely, and it has no plain text version.')).toBeInTheDocument();
+    expect(document.querySelector('iframe')).toBeNull();
   });
 
   it('shows a preview error inside the row', async () => {

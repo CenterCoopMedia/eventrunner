@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   word. Search looks in the recipient and the subject across the 500 most recent messages at a
   time; the source and status filters stay in the page address, and the search text never does.
   A preview opens the stored body in an empty sandboxed frame under a content policy that blocks
-  script, remote images, and every other fetch, so opening a message sends nothing to any other
-  site. Sign-in codes and speaker invitations still store no body. Two staff-tier endpoints,
+  script, remote images, and every other fetch, with every link shown as its words only, so opening
+  a message or clicking in it sends nothing to any other site. HTML that cannot be shown safely is
+  replaced by the plain text version. Sign-in codes and speaker invitations still store no body. Two staff-tier endpoints,
   `listSentEmails` and `getSentEmail`, are the only readers of `sent_emails`, whose rules stay
   closed to every browser; each preview read is recorded in the admin log by account and record
   only (#183).
