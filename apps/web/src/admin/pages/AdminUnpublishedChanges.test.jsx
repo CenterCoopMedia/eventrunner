@@ -9,6 +9,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
+// A docket that does not own an editor yet gives its rows no link. The
+// editors land one branch at a time, so the tests that need an unlinked row
+// take one editor off the docket here rather than naming one that is absent.
+const unowned = vi.hoisted(() => new Set());
+vi.mock('../AdminLayout.jsx', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    sectionTier: (path) => ([...unowned].some((prefix) => path.startsWith(prefix)) ? null : actual.sectionTier(path)),
+  };
+});
+
 const adminSubscriptions = new Map();
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext) => {
@@ -161,6 +173,7 @@ function expectPageAgrees() {
 }
 
 beforeEach(() => {
+  unowned.clear();
   adminSubscriptions.clear();
   drafts.clear();
   runs.recent = null;
@@ -491,6 +504,7 @@ describe('the Unpublished changes page', () => {
   }, 20_000);
 
   it('renders a hostile title as text, marks a hidden record, and links only where an editor exists', async () => {
+    unowned.add('/admin/updates');
     await renderAt('/admin/unpublished');
     pushDrafts({
       cmsSchedule: [{ id: 's1', title: '<img src=x onerror="alert(1)">', status: 'dirty', visible: false }],
@@ -510,6 +524,7 @@ describe('the Unpublished changes page', () => {
   });
 
   it('lets a reader read a name cut at 80 characters in full, with or without an editor link', async () => {
+    unowned.add('/admin/updates');
     await renderAt('/admin/unpublished');
     const long = `A long update title ${'that keeps going '.repeat(8)}until the end`;
     const session = `A long session title ${'that keeps going '.repeat(8)}until the end`;
@@ -517,7 +532,7 @@ describe('the Unpublished changes page', () => {
       cmsUpdates: [{ id: 'u-long', title: long, status: 'dirty' }],
       cmsSchedule: [{ id: 's-long', title: session, status: 'dirty' }],
     });
-    // No editor owns updates yet, so this row has no link.
+    // The docket does not own the updates editor here, so this row has no link.
     const updates = screen.getByRole('table', { name: /^Updates with unpublished changes/ });
     const [row] = within(updates).getAllByRole('row').slice(1);
     expect(within(row).queryByRole('link')).toBeNull();

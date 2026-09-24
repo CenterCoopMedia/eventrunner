@@ -19,6 +19,7 @@ import {
   summarizeAll,
   toMillis,
 } from './pendingChanges.js';
+import { sectionTier } from './AdminLayout.jsx';
 
 const ACTOR = { uid: 'admin-1', email: 'admin@example.org' };
 const NOW = Date.UTC(2026, 8, 23, 18, 2);
@@ -205,10 +206,14 @@ describe('editorPathFor', () => {
     expect(editorPathFor('cmsSchedule', { id: 'a/b' }, pages)).toBeNull();
   });
 
-  it('gives no link to an editor the docket does not own yet', () => {
-    expect(editorPathFor('cmsUpdates', { id: 'u1' }, pages)).toBeNull();
-    expect(editorPathFor('cmsOrganizations', { id: 'o1' }, pages)).toBeNull();
-    expect(editorPathFor('cmsTimeline', { id: 't1' }, pages)).toBeNull();
+  // The rule, not a list of which editors have landed: the editors arrive
+  // one branch at a time, and a test that names them breaks on each one.
+  it('links a record to its editor exactly when the docket owns that editor as staff work', () => {
+    const segments = { cmsPages: 'pages', cmsSchedule: 'sessions', cmsUpdates: 'updates', cmsOrganizations: 'organizations', cmsTimeline: 'timeline' };
+    for (const [collection, segment] of Object.entries(segments)) {
+      const path = `/admin/${segment}/x1`;
+      expect(editorPathFor(collection, { id: 'x1' }, pages), collection).toBe(sectionTier(path) === 'staff' ? path : null);
+    }
     expect(editorPathFor('cmsUnknown', { id: 'x' }, pages)).toBeNull();
   });
 });
