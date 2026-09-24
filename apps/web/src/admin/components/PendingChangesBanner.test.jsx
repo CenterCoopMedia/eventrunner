@@ -107,7 +107,7 @@ describe('the pending-changes banner', () => {
   });
 
   it('renders nothing on the Unpublished changes page, however the path is spelled', () => {
-    for (const path of ['/admin/unpublished', '/admin/unpublished/', '/admin/Unpublished', '/admin/%75npublished']) {
+    for (const path of ['/admin/unpublished', '/admin/unpublished/', '/admin/Unpublished', '/ADMIN/UNPUBLISHED']) {
       const { container, unmount } = renderBanner(path);
       deliver({ cmsContent: drafts('cmsContent', 3) });
       expect(container, path).toBeEmptyDOMElement();

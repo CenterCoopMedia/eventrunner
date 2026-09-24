@@ -17,7 +17,7 @@ vi.mock('../adminSource.js', () => ({
     return () => adminSubscriptions.delete(name);
   },
 }));
-// The page's own seam: the dirty drafts per collection, and the two run
+// The page's two seams: the dirty drafts per collection, and the two run
 // reads. Callbacks are kept so each test delivers what a listener would.
 const drafts = new Map();
 const runs = { recent: null, failed: null };
@@ -26,6 +26,8 @@ vi.mock('../pendingChangesSource.js', () => ({
     drafts.set(collection, { onNext, onError });
     return () => drafts.delete(collection);
   },
+}));
+vi.mock('../publishRunsSource.js', () => ({
   subscribeRecentPublishRuns: (count, onNext, onError) => {
     runs.recent = { count, onNext, onError };
     return () => {

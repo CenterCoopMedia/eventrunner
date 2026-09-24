@@ -1,5 +1,6 @@
-// The unpublished changes seam (issue #196). src/test/setup.js mocks this
-// module for every test file; here the real module runs over setup's
+// The unpublished changes seams (issue #196): the dirty drafts the shell
+// counts, and the publish runs the page lists. src/test/setup.js mocks both
+// modules for every test file; here the real modules run over setup's
 // firebase/firestore stand-ins, which record the query each read builds.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -7,7 +8,12 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onSnapshot } from 'firebase/firestore';
 
-const source = await vi.importActual('./pendingChangesSource.js');
+vi.unmock('./pendingChangesSource.js');
+vi.unmock('./publishRunsSource.js');
+
+const drafts = await import('./pendingChangesSource.js');
+const runs = await import('./publishRunsSource.js');
+const source = { ...drafts, ...runs };
 
 beforeEach(() => {
   vi.mocked(onSnapshot).mockClear();
@@ -29,6 +35,11 @@ const snapshotOf = (docs) => ({
 });
 
 describe('the unpublished changes reads', () => {
+  it('keeps the publish run reads out of the module the shell loads', () => {
+    expect(Object.keys(drafts).sort()).toEqual(['listenWithRetry', 'subscribeDirtyDrafts']);
+    expect(Object.keys(runs).sort()).toEqual(['subscribeFailedPublishRuns', 'subscribeRecentPublishRuns']);
+  });
+
   it('reads the dirty drafts of one collection with the listDirty predicate', () => {
     const onNext = vi.fn();
     source.subscribeDirtyDrafts('cmsContent', onNext);

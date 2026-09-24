@@ -14,13 +14,7 @@ import { subscribeDirtyDrafts } from './pendingChangesSource.js';
 
 const PendingChangesContext = createContext(null);
 
-const OUTSIDE = Object.freeze({
-  ready: false,
-  error: null,
-  docsByCollection: Object.freeze({}),
-  total: 0,
-  sentence: null,
-});
+const OUTSIDE = { ready: false, total: 0 };
 
 export function PendingChangesProvider({ children }) {
   // collection id → its dirty drafts; a collection is absent until its

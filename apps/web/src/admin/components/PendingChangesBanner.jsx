@@ -15,29 +15,20 @@
 //
 // It sits ABOVE the stone, never inside it: the title band pulls itself up
 // by the stone's top padding, and inside the stone it would slide over this.
-import { Link, useLocation } from 'react-router-dom';
+import { Link, matchPath, useLocation } from 'react-router-dom';
 import { usePendingChanges } from '../PendingChangesContext.jsx';
 
 export const UNPUBLISHED_PATH = '/admin/unpublished';
 
-/** Whether `pathname` is the Unpublished changes page, as the router matches it. */
-function onOwnPage(pathname) {
-  let path;
-  try {
-    path = decodeURIComponent(String(pathname ?? '')).toLowerCase();
-  } catch {
-    return false;
-  }
-  return path.replace(/\/+$/, '') === UNPUBLISHED_PATH;
-}
-
 export default function PendingChangesBanner() {
   const { ready, error, total, sentence } = usePendingChanges();
-  const { pathname } = useLocation();
+  // The router's own matcher: any case, a trailing slash allowed. (matchPath
+  // is already in the first-paint bundle; useMatch would add itself there.)
+  const onOwnPage = matchPath(UNPUBLISHED_PATH, useLocation().pathname);
   // A count that failed before it ever arrived says so; a count that
   // arrived keeps showing through a later failure while the read retries.
   const failed = !ready && Boolean(error);
-  if (onOwnPage(pathname) || (!failed && (!ready || total === 0))) return null;
+  if (onOwnPage || (!failed && (!ready || total === 0))) return null;
   return (
     <div className="mx-auto w-full max-w-admin-canvas">
       <aside

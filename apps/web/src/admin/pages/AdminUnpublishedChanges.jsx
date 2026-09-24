@@ -25,7 +25,7 @@ import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { usePendingChanges } from '../PendingChangesContext.jsx';
-import { subscribeFailedPublishRuns, subscribeRecentPublishRuns } from '../pendingChangesSource.js';
+import { subscribeFailedPublishRuns, subscribeRecentPublishRuns } from '../publishRunsSource.js';
 import { countWords } from '../collectionWords.js';
 import { summarizePublish } from '../publishResult.js';
 import {

@@ -86,16 +86,20 @@ vi.mock('firebase/firestore', () => {
 // through its own seam. By default each read answers once with nothing, so
 // a shell test sees zero changes and needs no mock of its own; a test that
 // steers the count overrides this with vi.mocked(...) or its own vi.mock.
-vi.mock('@/admin/pendingChangesSource.js', () => {
-  const empty = (onNext) => {
+vi.mock('@/admin/pendingChangesSource.js', () => ({
+  subscribeDirtyDrafts: vi.fn((_collection, onNext) => {
+    onNext([]);
+    return () => {};
+  }),
+  listenWithRetry: vi.fn(() => () => {}),
+}));
+// The Unpublished changes page's publish run reads, the same way.
+vi.mock('@/admin/publishRunsSource.js', () => {
+  const empty = (_count, onNext) => {
     onNext([]);
     return () => {};
   };
-  return {
-    subscribeDirtyDrafts: vi.fn((_collection, onNext) => empty(onNext)),
-    subscribeRecentPublishRuns: vi.fn((_count, onNext) => empty(onNext)),
-    subscribeFailedPublishRuns: vi.fn((_count, onNext) => empty(onNext)),
-  };
+  return { subscribeRecentPublishRuns: vi.fn(empty), subscribeFailedPublishRuns: vi.fn(empty) };
 });
 
 // jsdom implements <dialog> as markup and nothing else: it ships the

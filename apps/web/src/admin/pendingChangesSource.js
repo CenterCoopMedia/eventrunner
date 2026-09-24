@@ -1,5 +1,5 @@
-// The unpublished changes seam (issue #196): the three live reads the
-// admin's pending-changes banner and page make, and nothing else.
+// The unpublished changes seam (issue #196): the live read the admin's
+// pending-changes banner and page share, and nothing else.
 //
 // A saved draft that is not live is a `<collection>_drafts` document with
 // `status == 'dirty'` — the query functions/src/cms/store.cjs listDirty runs,
@@ -7,20 +7,22 @@
 // predicate here is what keeps the banner, the page, the overview's
 // readiness count and "Publish all" counting one set.
 //
-// The publish runs are the cmsPublishQueue rows cmsPublish writes: they are
-// the progress and failure record, never the count of unpublished work.
+// The publish runs (publishRunsSource.js) are read beside them on the page
+// only, so they load with it and stay out of the admin entry chunk.
 //
 // A module of its own rather than more listeners through adminSource.js, so
 // a test can steer these reads without taking over the name-keyed
 // adminSource mocks other suites hold (src/test/setup.js mocks this module
-// for every test file). firestore.rules let either admin tier read both
-// collections; a non-admin's listener errors, which is the fail-soft path.
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+// for every test file). firestore.rules let either admin tier read every
+// `_drafts` collection; a non-admin's listener errors, which is the
+// fail-soft path.
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase.js';
 import { subscribeWithRetry } from '../lib/retrySubscription.js';
 
 /**
  * One retried listener over a query, mapping documents to `{ id, ...data }`.
+ * The publish run reads (publishRunsSource.js) use it too.
  *
  * @param {string} label named in the warning
  * @param {() => unknown} buildQuery
@@ -28,7 +30,7 @@ import { subscribeWithRetry } from '../lib/retrySubscription.js';
  * @param {(error: unknown) => void} [onError]
  * @returns {() => void} unsubscribe
  */
-function listen(label, buildQuery, onNext, onError) {
+export function listenWithRetry(label, buildQuery, onNext, onError) {
   return subscribeWithRetry(
     (handleError) =>
       onSnapshot(
@@ -57,51 +59,9 @@ function listen(label, buildQuery, onNext, onError) {
  */
 export function subscribeDirtyDrafts(collectionId, onNext, onError) {
   const name = `${collectionId}_drafts`;
-  return listen(
+  return listenWithRetry(
     `${name} dirty`,
     () => query(collection(db, name), where('status', '==', 'dirty')),
-    onNext,
-    onError,
-  );
-}
-
-/**
- * The most recent publish runs, newest first.
- *
- * @param {number} count
- * @param {(rows: Array<object>) => void} onNext
- * @param {(error: unknown) => void} [onError]
- * @returns {() => void} unsubscribe
- */
-export function subscribeRecentPublishRuns(count, onNext, onError) {
-  return listen(
-    'cmsPublishQueue recent',
-    () => query(collection(db, 'cmsPublishQueue'), orderBy('requestedAt', 'desc'), limit(count)),
-    onNext,
-    onError,
-  );
-}
-
-/**
- * The newest publish runs still marked failed, newest first, so a failed
- * run stays in view until it is resumed however many finished runs follow
- * it. Needs the (status, requestedAt desc) index in firestore.indexes.json.
- *
- * @param {number} count
- * @param {(rows: Array<object>) => void} onNext
- * @param {(error: unknown) => void} [onError]
- * @returns {() => void} unsubscribe
- */
-export function subscribeFailedPublishRuns(count, onNext, onError) {
-  return listen(
-    'cmsPublishQueue failed',
-    () =>
-      query(
-        collection(db, 'cmsPublishQueue'),
-        where('status', '==', 'failed'),
-        orderBy('requestedAt', 'desc'),
-        limit(count),
-      ),
     onNext,
     onError,
   );
