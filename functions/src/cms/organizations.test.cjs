@@ -172,3 +172,15 @@ test('a page address is refused unless it is slug-shaped and at most 80 characte
   }
   assert.equal(slugTakenMessage('example-fund'), 'slug: another organization already uses "example-fund"');
 });
+
+// Review round (c2, finding 7): the admin guide and the changelog say what
+// the logo check is. It checks the path's shape only: a path inside the
+// site's own files passes whether or not a file is there.
+test('the logo check is the path shape only, never a file lookup', () => {
+  for (const path of ['cms-images/missing.png', 'users/abc/photo.jpg', 'branding/logo.svg']) {
+    assert.equal(accepted({ ...VALID, logoPath: path }).logoPath, path);
+  }
+  for (const path of ['https://example.org/logo.png', '/cms-images/a.png', 'cms-images/../a.png']) {
+    assert.deepEqual(refused({ ...VALID, logoPath: path }), ['logoPath: choose an image from the media library']);
+  }
+});

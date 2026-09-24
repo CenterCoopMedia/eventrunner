@@ -46,8 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tier, order, logo, website, and description. Publishing goes through `cmsPublish`, as every
   other editor does. The content save now checks each organization field's type and length: a
   name that is not text, an order that is not a number, a website that does not start with
-  `http://` or `https://`, or a logo that is not a media library path is refused with the field
-  named, and nothing is written. The public site still drops a malformed organization that
+  `http://` or `https://`, or a logo path that leaves the site's own files (a web address, a
+  leading `/`, or `..`) is refused with the field named, and nothing is written. The server does
+  not check that the logo file exists. The public site still drops a malformed organization that
   reaches the collection another way (#192).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a

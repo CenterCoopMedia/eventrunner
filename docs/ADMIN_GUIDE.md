@@ -146,7 +146,7 @@ The organizations the Sponsors page draws: Add, edit, publish, and delete them h
 
 **The page address is set once.** A new organization's page address follows its name until you type your own. It uses lowercase letters, digits, and hyphens, and it cannot change after the first save. To change it, delete the organization and add it again. Two organizations cannot share an address: The editor names an address already in use before it saves, and the server refuses a second organization with the same address when you save, not when you publish. Deleting an organization frees its address.
 
-**Every save is checked.** The editor and the server refuse a name that is not text, an order that is not a number, a website that does not start with `http://` or `https://`, and a logo path that is not a file in the media library. The refusal names the field.
+**Every save is checked.** The editor and the server refuse an empty name, an order that is not a number, and a website that does not start with `http://` or `https://`. The server also refuses a name that is not text, and it checks the logo path: The path must point inside the site's own files, so a web address, a path that starts with `/`, and a path that contains `..` are refused. The server does not check that the file exists. Each refusal names the field, and the editor shows it on that field, the logo's on the Logo field.
 
 **Delete** removes the live organization and its draft. The logo stays in the media library.
 
