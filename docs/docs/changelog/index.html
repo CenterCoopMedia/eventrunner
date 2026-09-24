@@ -142,6 +142,35 @@
           access, and every change asks for a confirmation first, is written by the server with the
           address lowercased, and is recorded in the admin log. The server refuses a change that would
           leave the deployment with no operator, including an operator removing their own last grant.</li>
+          <li><code>getEventStats</code>, a staff-tier endpoint for the admin overview (#178). It answers the event&#39;s
+          figures as server aggregates: accounts by registration status and completed profiles, ticket
+          records by status, speakers by pipeline status, records on the site and records with unpublished
+          changes for each content collection, and unresolved errors. Every figure is a Firestore
+          <code>count()</code>, so no document leaves the database. A caller who is not an admin is refused.</li>
+          <li>The admin overview (#179). <code>/admin</code> now opens on <strong>Overview</strong>, the first item on the rail, above
+          the four groups and with no folio. It prints the endpoint&#39;s figures as sentences, each number in
+          the data face beside the words that say what it counts, with the time they were read on the
+          event&#39;s clock. <strong>Refresh figures</strong> counts again; while it runs it says so and ignores another
+          press. A failed first read shows the server&#39;s words and no figures; a failed refresh keeps the
+          figures and says when they were read. Staff and operators both open it.</li>
+          <li>Milestones and a registration goal in the event settings (#180). <code>config/event.milestones</code> holds
+          up to 20 named dates and <code>config/event.registration.goal</code> a whole number of approved attendees;
+          the shared schema refuses anything else by field, and staff can save both. The Event page edits
+          them in a <strong>Milestones</strong> panel and a <strong>Registration goal</strong> field, and says that anyone can read
+          them. The overview lists the milestones in date order with the days left, sets the approved
+          count against the goal as a sentence and a bar, and shows nothing when neither is set.</li>
+          <li>The registration funnel and content readiness panels on the overview (#181). The funnel states
+          accounts, then ticketed or approved, then approved, each as a number of all accounts beside a
+          native progress bar, with revoked accounts named beside it; <code>getEventStats</code> sums the stages on the
+          server. The readiness table lists, for pages, content blocks, sessions, organizations, the
+          timeline, and updates, the records on the site and the records with unpublished changes. Both
+          state zero in words: &quot;No one has signed up yet.&quot; and &quot;Nothing is on the site yet.&quot;</li>
+          <li>A <strong>Most saved</strong> panel on the admin Sessions page (#182). It ranks sessions by the public
+          bookmark counts, most saved first, in a scrolling ruled table with the session (a link to its
+          editor), its day heading, and the count. It says how many sessions on the site have no saves,
+          says &quot;No session has been saved yet.&quot; when none has, says so when saving sessions is switched
+          off, and keeps the last counts under a notice if the listener fails. <code>useBookmarkCounts</code> now
+          also answers <code>ready</code> and <code>error</code>.</li>
           </ul>
           <ul>
           <li>A <code>fact</code> block for a fact that is not a number (#234): The term, the fact itself, and one
@@ -217,6 +246,9 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The speaker and session editors now return to their own list after a delete or <strong>Cancel</strong>, and
+          a new speaker opens its own editor. They went to the admin index, which is now the Overview,
+          because a relative link from an editor resolved against the admin layout, not the list.</li>
           <li>The second wave&#39;s devices, after an adversarial review of the branch. The ruled table&#39;s scroll
           region carries its own overflow, so a wide table scrolls inside it and the page never scrolls
           sideways; the head no longer claims to stick, because a head pinned inside a region that scrolls
