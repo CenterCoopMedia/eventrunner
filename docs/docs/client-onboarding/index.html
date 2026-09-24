@@ -175,7 +175,10 @@
           node scripts/init-event.cjs --answers client-answers.json --admin &lt;first-admin@client-domain&gt;
           </code></pre>
           <p>Repeat <code>--admin</code> for a second address if you already know it — item 5 below still applies if you
-          don&#39;t yet.</p>
+          don&#39;t yet. <code>--admin</code> seeds the <strong>operator</strong> tier (branding, features, access, deployment settings).
+          Pass <code>--staff &lt;email&gt;</code> for anyone who should run content, schedule, speakers, and attendees without
+          the deployment settings; staff can also be granted later from admin Settings → Access
+          (<code>docs/ADMIN_GUIDE.md</code>, &quot;Who can do what&quot;).</p>
           <p>This seeds <code>config/*</code>, the fifteen default pages, placeholder CMS content, the two legal page
           templates (flagged <code>reviewRequired</code>, see item 4 below), the client-visible email template
           overrides, and the placeholder branding assets. It then prints the manual checklist below and the
@@ -258,11 +261,13 @@
           Without it, the functions deploy fails its pre-flight check with a 403 that reads like an unrelated
           permissions error, not a billing one — check this <strong>before</strong> the first real deploy dispatch, not
           after debugging a cryptic failure.</p>
-          <h3 id="7-first-admin-then-a-second">7. First admin, then a second<a class="heading-anchor" href="#7-first-admin-then-a-second" aria-label="Link to this section">#</a></h3>
-          <p>The first admin (from <code>--admin</code> above, or <code>config/bootstrap.adminEmails</code>) signs in and confirms the
-          admin panel loads. Then, <strong>through the admin UI</strong>, grant a second admin — do not leave
-          <code>config/bootstrap</code> as a single point of failure for a client who could lose access to one inbox.
-          <code>--check</code> (§6) requires at least two admin accounts for exactly this reason.</p>
+          <h3 id="7-first-operator-then-a-second">7. First operator, then a second<a class="heading-anchor" href="#7-first-operator-then-a-second" aria-label="Link to this section">#</a></h3>
+          <p>The first operator (from <code>--admin</code> above, or <code>config/bootstrap.adminEmails</code>) signs in and confirms
+          the admin panel loads. Then, from <strong>admin Settings → Access</strong>, grant a second operator — do not
+          leave <code>config/bootstrap</code> as a single point of failure for a client who could lose access to one
+          inbox. <code>--check</code> (§6) requires at least two operator accounts for exactly this reason; staff
+          accounts do not count, because a staff account cannot restore anyone&#39;s access. Grant the client&#39;s
+          day-to-day editors as staff from the same page.</p>
           <h3 id="legal-review-sign-off">Legal review sign-off<a class="heading-anchor" href="#legal-review-sign-off" aria-label="Link to this section">#</a></h3>
           <p>Not numbered in §5.6 (it&#39;s set at seed time, not checked off separately), but it gates go-live:
           <code>init-event.cjs</code> seeds the privacy policy and terms of service from provider-aware templates
