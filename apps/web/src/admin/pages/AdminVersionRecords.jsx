@@ -120,7 +120,7 @@ export default function AdminVersionRecords() {
   if (records.error && !records.ready) {
     // Half a list would show wrong states (a draft-only record as absent),
     // so an error before both listeners report draws no table at all.
-    body = <Notice tone="error" message="The records could not be loaded. It will try again." />;
+    body = <Notice tone="error" message="The records did not load. The page tries again on its own." />;
   } else if (!records.ready) {
     body = <AdminLoadingState label="Loading the records…" />;
   } else if (all.length === 0) {
@@ -240,7 +240,7 @@ export default function AdminVersionRecords() {
       </form>
 
       {records.error && records.ready ? (
-        <Notice tone="caution" message="The list could not be refreshed. It will try again." />
+        <Notice tone="caution" message="The list did not refresh. The page tries again on its own." />
       ) : null}
 
       {records.ready && all.length > 0 ? (

@@ -373,7 +373,7 @@ describe('one record’s versions', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     await waitFor(() =>
-      expect(screen.getByText('We could not reach the version history; showing the versions already loaded.')).toBeInTheDocument(),
+      expect(screen.getByText('The version history did not load. The versions already loaded stay on screen.')).toBeInTheDocument(),
     );
     expect(versionItem(2)).toBeInTheDocument();
   });

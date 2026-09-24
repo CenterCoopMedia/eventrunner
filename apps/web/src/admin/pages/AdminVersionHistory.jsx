@@ -272,7 +272,7 @@ export default function AdminVersionHistory() {
       );
     } else if (result) {
       errorNotice = (
-        <Notice tone="caution" message="We could not reach the version history; showing the versions already loaded." />
+        <Notice tone="caution" message="The version history did not load. The versions already loaded stay on screen." />
       );
     } else {
       errorNotice = (

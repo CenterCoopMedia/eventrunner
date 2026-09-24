@@ -228,7 +228,7 @@ describe('the record list', () => {
     renderPage();
     reportContent();
     fail('cmsContent_drafts');
-    expect(screen.getByText('The list could not be refreshed. It will try again.')).toBeInTheDocument();
+    expect(screen.getByText('The list did not refresh. The page tries again on its own.')).toBeInTheDocument();
     expect(recordLinks()).toHaveLength(3);
   });
 
@@ -236,7 +236,7 @@ describe('the record list', () => {
     renderPage();
     report('cmsContent', CONTENT_LIVE);
     fail('cmsContent_drafts');
-    expect(screen.getByRole('alert')).toHaveTextContent('The records could not be loaded. It will try again.');
+    expect(screen.getByRole('alert')).toHaveTextContent('The records did not load. The page tries again on its own.');
     expect(screen.queryByRole('region', { name: 'Records' })).toBeNull();
     expect(screen.queryByRole('heading', { name: /No content blocks/ })).toBeNull();
     expect(screen.queryByRole('status', { name: 'Loading the records…' })).toBeNull();
