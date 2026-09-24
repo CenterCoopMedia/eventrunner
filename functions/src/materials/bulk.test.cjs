@@ -491,6 +491,28 @@ test('a long CJK or emoji name fits the byte limit, is cut on a character, and k
   }
 });
 
+test('a cut never leaves a trailing dot or space, so a name Windows would merge takes a number', () => {
+  // No extension (no dot, or an ending too long to be one): the cut is the end of the name.
+  assert.equal(cleanNamePart(`${'a'.repeat(239)} ${'x'.repeat(20)}`), 'a'.repeat(239));
+  assert.equal(cleanNamePart(`${'b'.repeat(239)}.${'z'.repeat(20)}`), 'b'.repeat(239));
+  // Cut to "a…a " the first would pass the repeat check beside "a…a", and
+  // Windows would then extract the two as one file.
+  const names = entryNames([
+    { sessionId: 's1', filename: `${'a'.repeat(239)} one` },
+    { sessionId: 's1', filename: 'a'.repeat(239) },
+  ]);
+  assert.deepEqual(names, [`s1/${'a'.repeat(239)}`, `s1/${'a'.repeat(236)} (2)`]);
+  for (const name of names) assert.doesNotMatch(name, /[. ]$/u);
+});
+
+test('a Windows device name is prefixed, with or without an extension, and a longer name is not', () => {
+  const inputs = ['CON.pdf', 'nul', 'Com3.tar.gz', 'lpt9', 'aux .txt', 'PRN', 'console.pdf', 'lpt10.txt', 'com.pdf', 'con-notes'];
+  assert.deepEqual(inputs.map(cleanNamePart), [
+    '_CON.pdf', '_nul', '_Com3.tar.gz', '_lpt9', '_aux .txt', '_PRN', 'console.pdf', 'lpt10.txt', 'com.pdf', 'con-notes',
+  ]);
+  assert.deepEqual(entryNames([{ sessionId: 'con', filename: 'aux.pdf' }]), ['_con/_aux.pdf']);
+});
+
 test('parseSize reads the decimal string Storage sends, and nothing else', () => {
   assert.equal(parseSize('1048576'), 1048576);
   assert.equal(parseSize(12), 12);

@@ -172,7 +172,9 @@ function utf8Length(text) {
 /**
  * Cut a base so base plus `tail` (the " (n)" and the extension) fit
  * MAX_NAME_BYTES. The cut falls between code points, so it never splits a
- * surrogate pair or a multi-byte character.
+ * surrogate pair or a multi-byte character. A cut can end the name on a dot
+ * or a space, which Windows drops on extraction, so the end is stripped
+ * again here, before the repeat check compares names.
  */
 function fitName(base, tail) {
   const room = MAX_NAME_BYTES - utf8Length(tail);
@@ -184,7 +186,16 @@ function fitName(base, tail) {
     kept += character;
     used += size;
   }
-  return `${kept || 'file'}${tail}`;
+  return `${kept}${tail}`.replace(/[.\s]+$/u, '') || 'file';
+}
+
+// Names Windows keeps for devices, with or without an extension ("NUL.txt"
+// and "nul.tar.gz" are both NUL). A file cannot be extracted under one.
+const RESERVED_DEVICE_NAME = /^(?:con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3])$/iu;
+
+/** Whether Windows reads `name` as a device: its part before the first dot, trailing spaces dropped. */
+function isReservedDeviceName(name) {
+  return RESERVED_DEVICE_NAME.test(name.split('.')[0].replace(/\s+$/u, ''));
 }
 
 /**
@@ -194,9 +205,11 @@ function fitName(base, tail) {
  * names, and APFS or HFS+ then extracts one over the other. Separators,
  * control characters and the characters Windows refuses become `-`; leading dots
  * and spaces go (so `..` and `.hidden` cannot climb or hide), and so do
- * trailing dots and spaces, which Windows drops on extraction; the name is
- * cut to 240 UTF-8 bytes with its extension kept. A lone surrogate becomes
- * U+FFFD. An empty result is `file`.
+ * trailing dots and spaces, which Windows drops on extraction; a Windows
+ * device name (`con`, `nul`, `com1`…) takes a leading `_`; the name is cut
+ * to 240 UTF-8 bytes with its extension kept, and a dot or space the cut
+ * leaves at the end goes too. A lone surrogate becomes U+FFFD. An empty
+ * result is `file`.
  *
  * @param {unknown} part
  * @returns {string}
@@ -209,7 +222,8 @@ function cleanNamePart(part) {
     .replace(/^[.\s]+/u, '')
     .replace(/[.\s]+$/u, '');
   if (!cleaned) return 'file';
-  const [base, extension] = splitExtension(cleaned);
+  const safe = isReservedDeviceName(cleaned) ? `_${cleaned}` : cleaned;
+  const [base, extension] = splitExtension(safe);
   return fitName(base, extension);
 }
 
