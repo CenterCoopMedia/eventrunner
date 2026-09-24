@@ -16,7 +16,7 @@ import RegistrationAction, {
 } from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
-import { useHistorySection } from '../components/useHistorySection.js';
+import HistorySection from '../components/HistorySection.jsx';
 import { resolvePageLayout } from '../lib/pageLayout.js';
 import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
 import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
@@ -120,11 +120,6 @@ export default function Home() {
 
   const page = getPage('home') ?? getPage('/');
   const title = getBlock('hero', 'title');
-  // The past editions list loads on demand (issue #194). Until it arrives,
-  // the History section draws as a default section, its own blocks only.
-  const HistorySection = useHistorySection(
-    (page?.sections ?? []).some((section) => section?.id === 'history'),
-  );
 
   if (!page && !title) {
     return (
@@ -220,7 +215,7 @@ export default function Home() {
         />
       );
     }
-    if (section.id === 'history' && HistorySection) {
+    if (section.id === 'history') {
       // The section's own blocks, then the past editions from the Timeline
       // list (issue #194), in this section's own place in the order.
       return (

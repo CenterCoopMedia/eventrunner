@@ -27,7 +27,7 @@ the committed **synthetic snapshot** in `src/generated/`:
 | `pagesData.js` | pages-as-data, routed at each page's own root-level `path` |
 | `scheduleData.js` | schedule days/sessions |
 | `organizationsData.js` | speakers/sponsors |
-| `timelineData.js` | past editions for the home page's History section; loaded with that section's renderer, on demand, not in the initial chunk |
+| `timelineData.js` | past editions for the home page's History section |
 
 Four providers then overlay live Firestore data on top of that snapshot,
 outermost first:
@@ -273,8 +273,8 @@ update written and saved as a draft in the admin stays off the public Updates
 page until the editor publishes it, and then leads the page as the featured
 update with its category tag), and the timeline journey (`e2e/cms-timeline.spec.js`:
 an entry published from the admin editor appears on an open home page with
-no reload, and with every listener held the History section still lists the
-snapshot editions) against the same emulator/dev-server combination,
+no reload, and with every listener held the first render of the home page
+already lists the snapshot editions) against the same emulator/dev-server combination,
 seeded from `scripts/init-event.cjs` + `scripts/seed-demo-event.cjs`. See
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full test command
 table.

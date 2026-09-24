@@ -29,16 +29,16 @@ let pageDoc;
 let features;
 let organizationsData;
 let sectionBlocks;
-// The History section (issue #194) reads the past editions as the
-// cmsTimeline listener reported them; null would serve the snapshot.
-let timelineDocs;
+// The History section (issue #194) reads the past editions as
+// ContentContext serves them: prepared, oldest first.
+let timeline;
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig, theme, features }),
 }));
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
     organizationsData,
-    timelineDocs,
+    timeline,
     getPage: () => pageDoc,
     getSectionBlocks: (section) => {
       if (section === 'hero') return heroBlocks;
@@ -107,7 +107,7 @@ beforeEach(() => {
   features = {};
   organizationsData = [];
   sectionBlocks = {};
-  timelineDocs = [];
+  timeline = [];
 });
 
 describe('Home', () => {
@@ -632,17 +632,14 @@ describe('Home history section', () => {
   const history = { id: 'history', label: 'History' };
   const other = { id: 'details', label: 'Details' };
   const EDITIONS = [
-    { id: 'edition-2025', year: 2025, title: 'Two workshop tracks', description: 'Practice and planning.', visible: true },
     { id: 'edition-2024', year: 2024, title: 'The first meeting', description: null, visible: true },
+    { id: 'edition-2025', year: 2025, title: 'Two workshop tracks', description: 'Practice and planning.', visible: true },
   ];
 
-  /** The History section, once its on-demand list has loaded. */
+  /** The History section, read at once: the list is part of the first render. */
   async function historySection() {
-    let section = null;
-    await vi.waitFor(() => {
-      section = screen.getByRole('region', { name: 'History' });
-      expect(section.querySelector('ol')).not.toBeNull();
-    });
+    const section = screen.getByRole('region', { name: 'History' });
+    expect(section.querySelector('ol')).not.toBeNull();
     return section;
   }
 
@@ -652,11 +649,24 @@ describe('Home history section', () => {
   beforeEach(() => {
     eventConfig = { name: 'Demo Event', days: [] };
     pageDoc = { id: 'home', path: '/', label: 'Home', layout: { arrangement: 'grid' }, sections: [history] };
-    timelineDocs = EDITIONS;
+    timeline = EDITIONS;
     sectionBlocks = {
       history: [{ section: 'history', field: 'story', blockType: 'richtext', value: '<p>How it began.</p>' }],
       details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
     };
+  });
+
+  it('draws the whole section, heading and list, on the first render when it holds no block', () => {
+    // The seed gives the section no block, so on a new client's site the
+    // list is all the section has.
+    sectionBlocks = { ...sectionBlocks, history: [] };
+    render(<Home />);
+    const section = screen.getByRole('region', { name: 'History' });
+    expect(within(section).getByRole('heading', { level: 2, name: 'History' })).toBeInTheDocument();
+    expect([...section.querySelectorAll('ol > li h3')].map((h) => h.textContent)).toEqual([
+      'The first meeting',
+      'Two workshop tracks',
+    ]);
   });
 
   it('lists the editions under the section’s own label, after its blocks', async () => {

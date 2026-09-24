@@ -5,17 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-let timelineDocs;
+let timeline;
 vi.mock('../contexts/ContentContext.jsx', () => ({
-  useContent: () => ({ timelineDocs }),
+  useContent: () => ({ timeline }),
 }));
 
 import HistorySection from './HistorySection.jsx';
 
 const STORY = { section: 'history', field: 'story', blockType: 'richtext', value: '<p>How the event began.</p>' };
+// As ContentContext serves them: prepared, oldest first.
 const EDITIONS = [
-  { id: 'b', year: 2025, title: 'Two tracks', description: 'The second edition.', visible: true },
   { id: 'a', year: 2024, title: 'The first meeting', description: null, visible: true },
+  { id: 'b', year: 2025, title: 'Two tracks', description: 'The second edition.', visible: true },
 ];
 
 function draw(blocks) {
@@ -27,7 +28,7 @@ function draw(blocks) {
 }
 
 beforeEach(() => {
-  timelineDocs = [];
+  timeline = [];
 });
 
 describe('HistorySection', () => {
@@ -39,7 +40,7 @@ describe('HistorySection', () => {
   });
 
   it('draws the entries under its heading when the section holds no block', () => {
-    timelineDocs = EDITIONS;
+    timeline = EDITIONS;
     draw([]);
     const section = screen.getByRole('region', { name: 'History' });
     const titles = within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
@@ -51,7 +52,7 @@ describe('HistorySection', () => {
   });
 
   it('draws the blocks first and the list after them', () => {
-    timelineDocs = EDITIONS;
+    timeline = EDITIONS;
     draw([STORY]);
     const section = screen.getByRole('region', { name: 'History' });
     const story = within(section).getByText('How the event began.');
@@ -65,9 +66,4 @@ describe('HistorySection', () => {
     expect(screen.queryByRole('heading', { name: 'History' })).toBeNull();
   });
 
-  it('serves the committed snapshot while the listener has not reported', () => {
-    timelineDocs = null;
-    draw([]);
-    expect(screen.getByRole('region', { name: 'History' }).querySelectorAll('li').length).toBeGreaterThan(0);
-  });
 });

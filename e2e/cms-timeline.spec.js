@@ -9,15 +9,38 @@
 // entry with no reload: the runtime cmsTimeline listener delivers it.
 //
 // "the snapshot still renders on first paint": with every Firestore listen
-// channel held open and unanswered, the home page stays on the build-time
-// snapshot (`data-content-source="snapshot"`), and the History section still
-// lists the demo's past editions from the committed timelineData.js.
+// channel held open and unanswered, the first DOM commit that holds the home
+// page already holds the History list, with the demo's editions from the
+// committed timelineData.js, on the build-time snapshot
+// (`data-content-source="snapshot"`). A mutation observer installed before
+// the page loads records that commit, so nothing that arrives later, a
+// listener result or a chunk, can satisfy the check.
 import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, adminIdToken, callFunction, signIn } from './helpers.mjs';
 
 // The demo fixture's past editions (scripts/lib/demo-event.cjs DEMO_TIMELINE),
 // oldest first, which is what the committed snapshot and the seed both hold.
 const DEMO_TITLES = ['The first meeting', 'Two workshop tracks'];
+
+/**
+ * Runs in the page before its scripts. Records the History titles and the
+ * content source at the first DOM commit that holds the home page's article,
+ * then stops watching. Self-contained: Playwright serializes it.
+ */
+function recordFirstHomeCommit() {
+  const observer = new globalThis.MutationObserver(() => {
+    const article = globalThis.document.querySelector('article[data-content-source]');
+    if (!article) return;
+    observer.disconnect();
+    const heading = globalThis.document.getElementById('section-history');
+    const section = heading ? heading.closest('section') : null;
+    globalThis.__firstHomeCommit = {
+      source: article.getAttribute('data-content-source'),
+      titles: section ? [...section.querySelectorAll('ol > li h3')].map((h) => h.textContent.trim()) : [],
+    };
+  });
+  observer.observe(globalThis.document, { childList: true, subtree: true });
+}
 
 /** The History section's entry titles, in the order the page draws them. */
 function historyTitles(page) {
@@ -34,7 +57,7 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
     await callFunction('cmsDeleteContent', { collection: 'cmsTimeline', docId: entryId }, idToken);
   });
 
-  test('the History section lists the snapshot editions while every listener is held (issue 194)', async ({ page }) => {
+  test('the first render of the home page lists the snapshot editions while every listener is held (issue 194)', async ({ page }) => {
     // Hold every Firestore listen channel: no request is answered, so no
     // runtime result can arrive and the page can only be drawing the
     // committed snapshot.
@@ -42,8 +65,15 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
     await page.route('**/google.firestore.v1.Firestore/Listen/**', () => {
       held += 1;
     });
+    await page.addInitScript(recordFirstHomeCommit);
     try {
       await page.goto('/');
+      // The first commit of the home page already lists the snapshot.
+      await expect.poll(() => page.evaluate(() => globalThis.__firstHomeCommit ?? null)).not.toBeNull();
+      expect(await page.evaluate(() => globalThis.__firstHomeCommit)).toEqual({
+        source: 'snapshot',
+        titles: DEMO_TITLES,
+      });
       await expect(page.locator('article[data-content-source="snapshot"]')).toBeVisible();
       await expect(historyTitles(page)).toHaveText(DEMO_TITLES);
       // The listeners did ask, and nothing answered: the page is still on the

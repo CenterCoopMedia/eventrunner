@@ -38,8 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   published entries as an ordered list, oldest first, with the year beside each title and no
   counter. The site subscribes to `cmsTimeline` at runtime, so an entry published from the admin
   appears on an open home page with no rebuild, and a new `timelineData.js` snapshot draws the
-  list before any listener answers. The list and its snapshot load on demand when the home page
-  has a History section, so they stay out of the first download. The content save checks each field: a year that is not a whole
+  list on first paint, before any listener answers. The content save checks each field: a year that is not a whole
   number from 1900 to 2100, a title that is not text on one line, a description longer than 600
   characters, or a field the entry does not store is refused with the field named, and nothing is
   written. The demo carries two fictional past editions (#194).

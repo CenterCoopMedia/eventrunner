@@ -28,12 +28,10 @@
 //     on the deploy-time snapshot forever, so a speaker added, edited, or
 //     removed after the last build would never appear or disappear.
 //   - cmsTimeline: the past editions the home page's History section lists
-//     (issue #194), with the same wholesale-replace semantics, so an entry
-//     published from the admin appears without a rebuild. This provider
-//     subscribes and hands the raw result on as `timelineDocs` (null until
-//     the listener reports). The snapshot module (timelineData.js) and the
-//     drop of malformed entries live in lib/timelineEntries.js, beside the
-//     renderer that loads on demand, to keep both out of the initial chunk.
+//     (issue #194). The snapshot module is timelineData.js, so the list is
+//     drawn on first paint, and a published entry replaces it at runtime
+//     like every collection above, so an entry published from the admin
+//     appears without a rebuild.
 //
 // `loading` is always false: the snapshot renders synchronously on first
 // paint, and the overlay above is applied fire-and-forget as onSnapshot
@@ -53,6 +51,7 @@ import { publicContentDoc } from 'shared/seed';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotScheduleData, { speakers as snapshotSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
+import snapshotTimelineData from '@generated/timelineData.js';
 import snapshotPages from '@generated/pagesData.js';
 import { isPublicPage } from 'shared/page';
 import { subscribeContentCollection, subscribeSpeakersPublic } from '../lib/contentSource.js';
@@ -117,6 +116,30 @@ function prepareSpeakerDocs(docs) {
     .sort(
       (a, b) =>
         String(a.displayName ?? '').localeCompare(String(b.displayName ?? '')) ||
+        String(a.id).localeCompare(String(b.id)),
+    );
+}
+
+// The past editions, as the History section lists them: oldest first, then
+// by title and id. The content save checks each field
+// (functions/src/cms/timeline.cjs); this drop guards what reaches the
+// collection another way, so a script-written entry never blanks the home
+// page. A hidden entry is dropped too, because the draft preview reads the
+// unfiltered drafts.
+function prepareTimelineDocs(docs) {
+  return docs
+    .filter(
+      (doc) =>
+        Number.isInteger(doc?.year) &&
+        doc.visible !== false &&
+        typeof doc.title === 'string' &&
+        doc.title.trim() !== '' &&
+        (doc.description == null || typeof doc.description === 'string'),
+    )
+    .sort(
+      (a, b) =>
+        a.year - b.year ||
+        a.title.localeCompare(b.title) ||
         String(a.id).localeCompare(String(b.id)),
     );
 }
@@ -197,6 +220,10 @@ export function ContentProvider({ readSource = 'published', children }) {
     const speakers = prepareSpeakerDocs(
       overlay.speakers != null ? overlay.speakers : snapshotSpeakers,
     );
+    // Same != null rule: an empty live result empties the History list.
+    const timeline = prepareTimelineDocs(
+      overlay.cmsTimeline != null ? overlay.cmsTimeline : snapshotTimelineData,
+    );
     const live = Boolean(
       overlay.cmsContent != null ||
         overlay.cmsPages != null ||
@@ -263,11 +290,7 @@ export function ContentProvider({ readSource = 'published', children }) {
       scheduleData,
       speakers,
       organizationsData,
-      // cmsTimeline as the listener reported it, or null until it has. The
-      // snapshot and the drop sit with the History section's renderer
-      // (lib/timelineEntries.js), which loads on demand, so neither rides
-      // in the chunk every visitor downloads (scripts/ci/bundle-budget.json).
-      timelineDocs: overlay.cmsTimeline,
+      timeline,
       // The snapshot renders synchronously, so consumers never wait on the
       // network; kept for interface stability with loading-aware pages.
       loading: false,

@@ -4,18 +4,14 @@
 //
 // It is drawn through the page's `renderSection`, so the section keeps its
 // place in the operator's order and slot, and deleting the section from the
-// page removes the list with it. The editions come from the published
-// cmsTimeline collection: the committed snapshot until the runtime listener
-// reports, then the listener's set, so an entry published from the admin
-// appears without a rebuild.
-//
-// It loads on demand (components/useHistorySection.js), so it and the
-// snapshot stay out of the chunk every visitor downloads.
+// page removes the list with it. The editions come from ContentContext's
+// `timeline`: the committed snapshot on first paint, then the runtime
+// listener's set, so an entry published from the admin appears without a
+// rebuild.
 //
 // THE YEAR IS EACH ENTRY'S ONLY NUMBER. a3's Timeline is an ordered list
 // that draws no counter; the year sits beside the title in a <time>.
 import { useContent } from '../contexts/ContentContext.jsx';
-import { timelineEntries } from '../lib/timelineEntries.js';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
 import Timeline from './editorial/Timeline.jsx';
@@ -29,8 +25,8 @@ import Timeline from './editorial/Timeline.jsx';
  * }} props
  */
 export default function HistorySection({ id, title, blocks, arrangement }) {
-  const { timelineDocs } = useContent();
-  const entries = timelineEntries(timelineDocs).map((entry) => ({
+  const { timeline } = useContent();
+  const entries = (timeline ?? []).map((entry) => ({
     id: entry.id,
     title: entry.title,
     date: String(entry.year),
