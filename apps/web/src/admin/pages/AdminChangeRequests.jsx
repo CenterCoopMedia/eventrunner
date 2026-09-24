@@ -62,6 +62,14 @@ const STATUS_TONE = Object.freeze({
   declined: 'dead',
 });
 
+/** The line a successful change states, by the status it set. */
+const STATUS_RESULTS = Object.freeze({
+  new: 'Request reopened.',
+  in_progress: 'Request marked in progress.',
+  done: 'Request marked done.',
+  declined: 'Request declined.',
+});
+
 /** The row's one next step, by status. */
 const NEXT_STEP = Object.freeze({
   new: { status: 'in_progress', label: 'Mark in progress' },
@@ -220,8 +228,19 @@ export default function AdminChangeRequests() {
   const [pending, setPending] = useState(null);
   // A failed action, stated on its row until the next try.
   const [rowError, setRowError] = useState(null);
-  const [removal, setRemoval] = useState('');
+  // The result of the last status change or removal, stated in place.
+  const [result, setResult] = useState('');
   const headingRef = useRef(null);
+
+  // When the control the reader pressed is gone, or its row has left the
+  // filter, the keyboard goes to the list's own heading rather than to the
+  // page body. Focus the reader has already moved elsewhere is left alone.
+  const focusListFrom = useCallback((pressed) => {
+    const active = typeof document === 'undefined' ? null : document.activeElement;
+    if (!active || active === document.body || active === pressed || !active.isConnected) {
+      headingRef.current?.focus();
+    }
+  }, []);
 
   useEffect(() => subscribeAdminCollection(
     'change_requests',
@@ -246,13 +265,18 @@ export default function AdminChangeRequests() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  async function changeStatus(row, status, control) {
+  async function changeStatus(row, status, control, pressed) {
     if (pending) return;
     setPending({ id: row.id, control });
     setRowError(null);
-    setRemoval('');
+    setResult('');
     try {
       await call('updateChangeRequestStatus', { id: row.id, status });
+      setResult(STATUS_RESULTS[status]);
+      // The next-step control stays on the row with its new words; a
+      // Decline goes, and a row whose new status the filter leaves out goes
+      // with the settled call.
+      if (control !== 'next' || !matches({ status }, filter)) focusListFrom(pressed);
     } catch (err) {
       setRowError({ id: row.id, message: `This did not save. ${err.message}` });
     } finally {
@@ -264,10 +288,10 @@ export default function AdminChangeRequests() {
     if (pending) return;
     setPending({ id: row.id, control: 'remove' });
     setRowError(null);
-    setRemoval('');
+    setResult('');
     try {
       await call('deleteChangeRequest', { id: row.id });
-      setRemoval('Request removed.');
+      setResult('Request removed.');
       // The row and its controls leave with the next snapshot, so the
       // keyboard goes to the list's own heading rather than to the page.
       headingRef.current?.focus();
@@ -317,7 +341,7 @@ export default function AdminChangeRequests() {
           Requests
         </h2>
         {rows !== null ? <p role="status" className="text-admin-sm text-admin-ink-secondary">{countLine(shown.length, rows.length)}</p> : null}
-        {removal ? <SaveStatus message={removal} /> : null}
+        {result ? <SaveStatus message={result} /> : null}
 
         {listError ? (
           <Notice
@@ -382,7 +406,7 @@ export default function AdminChangeRequests() {
                           <button
                             type="button"
                             className={secondaryButtonClass}
-                            onClick={() => changeStatus(row, next.status, 'next')}
+                            onClick={(event) => changeStatus(row, next.status, 'next', event.currentTarget)}
                             disabled={locked && busy?.control !== 'next'}
                             aria-busy={busy?.control === 'next' ? 'true' : undefined}
                           >
@@ -392,7 +416,7 @@ export default function AdminChangeRequests() {
                             <button
                               type="button"
                               className={linkButtonClass}
-                              onClick={() => changeStatus(row, 'declined', 'decline')}
+                              onClick={(event) => changeStatus(row, 'declined', 'decline', event.currentTarget)}
                               disabled={locked && busy?.control !== 'decline'}
                               aria-busy={busy?.control === 'decline' ? 'true' : undefined}
                             >

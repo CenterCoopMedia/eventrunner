@@ -275,6 +275,81 @@ describe('AdminChangeRequests: status changes', () => {
     await act(async () => { settle({}); });
   });
 
+  // Review finding 1: a status change states its result, and when the
+  // row leaves the filter or the pressed control goes, the keyboard lands on
+  // the list heading, never on the page body.
+  const heading = () => screen.getByRole('heading', { level: 2, name: 'Requests' });
+
+  async function press(rowId, name) {
+    const control = within(rowFor(rowId)).getByRole('button', { name });
+    control.focus();
+    fireEvent.click(control);
+    await flush();
+    return control;
+  }
+
+  for (const [label, path, stored, name, status, result] of [
+    ['Mark done under Open', '/admin/change-requests', 'in_progress', 'Mark done', 'done', 'Request marked done.'],
+    ['Decline under Open', '/admin/change-requests', 'new', 'Decline', 'declined', 'Request declined.'],
+    ['Mark in progress under New', '/admin/change-requests?status=new', 'new', 'Mark in progress', 'in_progress', 'Request marked in progress.'],
+    ['Reopen under Done', '/admin/change-requests?status=done', 'done', 'Reopen', 'new', 'Request reopened.'],
+    ['Decline under All', '/admin/change-requests?status=all', 'in_progress', 'Decline', 'declined', 'Request declined.'],
+  ]) {
+    it(`${label}: states the result and moves focus to the list heading`, async () => {
+      callMock.mockResolvedValueOnce({ id: 'one', status });
+      renderPage(path);
+      pushRows([request('one', { status: stored }), request('two', { status: stored, createdAt: new Date('2026-08-01T00:00:00Z') })]);
+
+      await press('one', name);
+
+      expect(callMock).toHaveBeenCalledWith('updateChangeRequestStatus', { id: 'one', status });
+      expect(heading()).toHaveFocus();
+      expect(screen.getByText(result)).toHaveAttribute('role', 'status');
+      // And the snapshot that follows leaves the keyboard there.
+      pushRows([request('one', { status }), request('two', { status: stored, createdAt: new Date('2026-08-01T00:00:00Z') })]);
+      expect(heading()).toHaveFocus();
+    });
+  }
+
+  it('the same, when the new status arrives before the answer', async () => {
+    let settle;
+    callMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
+    renderPage();
+    pushRows([request('one', { status: 'in_progress' })]);
+    within(rowFor('one')).getByRole('button', { name: 'Mark done' }).focus();
+    fireEvent.click(within(rowFor('one')).getByRole('button', { name: 'Mark done' }));
+    pushRows([request('one', { status: 'done' })]);
+
+    await act(async () => { settle({}); });
+
+    expect(rowFor('one')).toBeUndefined();
+    expect(heading()).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByText('Request marked done.')).toBeInTheDocument();
+  });
+
+  it('keeps focus on the pressed control when the row and the control stay', async () => {
+    callMock.mockResolvedValueOnce({ id: 'one', status: 'in_progress' });
+    renderPage('/admin/change-requests?status=all');
+    pushRows([request('one')]);
+
+    const pressed = await press('one', 'Mark in progress');
+    pushRows([request('one', { status: 'in_progress' })]);
+
+    expect(pressed).toHaveFocus();
+    expect(pressed).toHaveTextContent('Mark done');
+    expect(screen.getByText('Request marked in progress.')).toHaveAttribute('role', 'status');
+  });
+
+  it('states nothing and moves nothing when the change fails', async () => {
+    callMock.mockRejectedValueOnce(new Error('Admin access required.'));
+    renderPage();
+    pushRows([request('one')]);
+    const pressed = await press('one', 'Decline');
+    expect(pressed).toHaveFocus();
+    expect(screen.queryByText('Request declined.')).toBeNull();
+  });
+
   it('states a failed change on its row until the next try', async () => {
     callMock.mockRejectedValueOnce(new Error('Admin access required.'));
     renderPage();
