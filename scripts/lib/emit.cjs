@@ -22,6 +22,7 @@
  */
 
 const { buildTokenCss } = require('./tokens.cjs');
+const { publicContentDoc } = require('shared/seed');
 
 /** Publish-model and seed bookkeeping stripped from every emitted doc. */
 const STRIPPED_FIELDS = Object.freeze([
@@ -86,10 +87,15 @@ function jsValue(value, depth = 0) {
   throw new TypeError(`Cannot emit value of type ${typeof value}`);
 }
 
-/** @param {object} doc @returns {object} doc without STRIPPED_FIELDS */
+/**
+ * @param {object} doc
+ * @returns {object} the doc without STRIPPED_FIELDS, its `seeded` flag
+ *   stated by the public rule (shared/seed): a document an operator
+ *   published is not the seed's, whatever flag it still carries
+ */
 function stripBookkeeping(doc) {
   const out = {};
-  for (const [k, v] of Object.entries(doc)) {
+  for (const [k, v] of Object.entries(publicContentDoc(doc))) {
     if (!STRIPPED_FIELDS.includes(k)) out[k] = v;
   }
   return out;

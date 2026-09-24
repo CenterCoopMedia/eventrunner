@@ -50,6 +50,8 @@ test('generation does not depend on the order docs come back from Firestore', ()
 });
 
 test('publish bookkeeping is stripped, and seeded is kept', () => {
+  // Published by the seed's own actor: the flag stays. A doc another actor
+  // published loses it, which the test below holds.
   const base = demoSnapshot();
   const noisy = {
     ...base,
@@ -58,13 +60,33 @@ test('publish bookkeeping is stripped, and seeded is kept', () => {
       revision: 7,
       status: 'clean',
       publishedAt: new Date(0),
-      publishedBy: 'someone',
+      publishedBy: 'init-event-script',
       basedOnRevision: 6,
     })),
   };
   const out = emitAll(noisy)['siteContent.js'];
   assert.doesNotMatch(out, /revision|publishedAt|publishedBy|basedOnRevision|seededAt/);
   assert.match(out, /seeded: true/);
+});
+
+test('a flagged block another actor published loses its seeded flag in the snapshot', () => {
+  // The public site reads `seeded` to show sample-content chips and to keep
+  // the home page's When fact live; a deployment from before the CMS cleared
+  // the flag on edit holds edited blocks that still carry it, and who
+  // published decides (adversarial review, 2026-09-24).
+  const base = demoSnapshot();
+  const [first, second] = base.content;
+  const out = emitAll({
+    ...base,
+    content: [
+      { ...first, seeded: true, publishedBy: 'init-event-script' },
+      { ...second, seeded: true, publishedBy: 'admin-uid' },
+    ],
+  })['siteContent.js'];
+  const block = (id) => out.slice(out.indexOf(`${id}: {`), out.indexOf('\n  },', out.indexOf(`${id}: {`)));
+  assert.match(block(first.id), /seeded: true/);
+  assert.doesNotMatch(block(second.id), /seeded/);
+  assert.doesNotMatch(out, /publishedBy/);
 });
 
 test('a session carries its recording link into the generated snapshot', () => {

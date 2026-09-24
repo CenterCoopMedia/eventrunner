@@ -152,3 +152,21 @@ test('a bootstrap document from before the split (no staffEmails) merges to an e
   assert.equal(decision.action, 'skip');
   assert.deepEqual(decision.value.staffEmails, []);
 });
+
+test('a flagged doc another actor published or drafted is the client’s', () => {
+  // Deployments from before the CMS cleared the flag on edit (adversarial
+  // review, 2026-09-24) hold edited documents that still say seeded: true.
+  // Who wrote the revision decides: the seed's own actor, or nobody
+  // recorded, keeps it the seed's; anyone else makes it the client's.
+  assert.equal(decideSeedWrite({ seeded: true, publishedBy: 'admin-uid' }).action, 'skip');
+  assert.equal(decideSeedWrite({ seeded: true, publishedBy: 'admin-uid' }, { force: true }).action, 'skip');
+  assert.equal(decideSeedWrite({ seeded: true, publishedBy: 'init-event-script' }).action, 'overwrite');
+  assert.equal(
+    decideSeedWrite({ seeded: true }, { draft: { seeded: true, updatedBy: 'editor@example.org', status: 'clean' } }).action,
+    'skip',
+  );
+  assert.equal(
+    decideSeedWrite({ seeded: true }, { draft: { seeded: true, updatedBy: 'init-event-script', status: 'clean' } }).action,
+    'overwrite',
+  );
+});

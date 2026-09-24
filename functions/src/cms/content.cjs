@@ -34,6 +34,7 @@ const {
   internals: storeInternals,
 } = require('./store.cjs');
 const { validateSpeakerReferences } = require('../speakers/references.cjs');
+const { publicContentDoc } = require('shared/seed');
 const {
   validateSessionStructure,
   normalizeSessionRecordingUrl,
@@ -55,6 +56,26 @@ const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
  * value.
  */
 const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
+
+/**
+ * The seed's own bookkeeping, cleared by every admin write (ADR 0001 §5.4:
+ * "editing a block clears the flag"). The merge below starts from the
+ * stored document, flag included, and carrying the flag through an edit
+ * left every edited block reading as the seed's — init overwrote it on a
+ * re-run, and the home page kept replacing an operator's When fact with the
+ * live range (adversarial review, 2026-09-24). A create never seeds either,
+ * whatever the payload claims.
+ */
+const SEED_FIELDS = Object.freeze(['seeded', 'seededAt']);
+
+/** @param {object} fields @returns {object} the fields without the seed's bookkeeping */
+function withoutSeedFlag(fields) {
+  const out = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (!SEED_FIELDS.includes(key)) out[key] = value;
+  }
+  return out;
+}
 
 /**
  * Drop every key in `fields` whose value is DELETE_FIELD_SENTINEL. Applied
@@ -306,7 +327,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
           db,
           tx,
           collection,
-          fields: omitDeletedFields({ ...checked.fields, ...extraFields }),
+          fields: omitDeletedFields(withoutSeedFlag({ ...checked.fields, ...extraFields })),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
 
@@ -393,7 +414,7 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
           db,
           tx,
           collection,
-          fields: omitDeletedFields({ ...base, ...checked.fields, ...extraFields }),
+          fields: omitDeletedFields(withoutSeedFlag({ ...base, ...checked.fields, ...extraFields })),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
 
@@ -494,8 +515,10 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
  * rules make these docs anonymously readable anyway (spec §8.4). Live docs
  * carry publishedBy as an actor UID (never an email — store.publishDocs
  * keeps the address on the admin-only cmsVersionHistory row); the response
- * still omits it as a harmless belt-and-braces strip, since it is
- * publish-model bookkeeping, not site content.
+ * omits it, and states `seeded` by the one public rule (shared/seed): a
+ * block the seed published and nobody edited, and never a block an operator
+ * published, whatever flag a deployment from before the edit cleared it
+ * still carries.
  *
  * @param {{ db, log?: Console }} deps
  */
@@ -504,10 +527,7 @@ function createGetSiteContentHandler({ db, log = console }) {
     if (req.method !== 'GET') return methodNotAllowed(res, ['GET']);
     try {
       const snap = await db.collection('cmsContent').where('visible', '==', true).get();
-      const content = snap.docs.map((d) => {
-        const { publishedBy, ...data } = d.data();
-        return { id: d.id, ...data };
-      });
+      const content = snap.docs.map((d) => ({ id: d.id, ...publicContentDoc(d.data()) }));
       res.status(200).json({ content });
     } catch (err) {
       log.error('getSiteContent read failed', err);

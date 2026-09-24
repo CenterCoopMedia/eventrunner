@@ -13,6 +13,30 @@ const {
   defaultPages, buildSeedContent, OBSOLETE_CONTENT_IDS, REPLACED_CONTENT_IDS,
 } = require('./seed.cjs');
 const { buildConfigDocs } = require('./answers.cjs');
+const { createCmsUpdateContentHandler } = require('../../functions/src/cms/content.cjs');
+
+/** The operator, as the admin gate sees them and as the publish records them. */
+const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
+
+/**
+ * An edit through the REAL admin write path (the same handler the admin
+ * calls), so these tests hold for what the CMS writes rather than for a
+ * `seeded: false` a test wrote by hand (adversarial review, 2026-09-24).
+ */
+async function adminEdit(db, { section, field, fields }, now) {
+  const res = {
+    statusCode: null, body: null,
+    set() { return this; },
+    status(code) { this.statusCode = code; return this; },
+    json(body) { this.body = body; return this; },
+  };
+  await createCmsUpdateContentHandler({
+    db, now, log: { warn() {}, error() {} },
+    auth: { async verifyIdToken() { return ADMIN; } },
+    getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN.email] } }),
+  })({ method: 'POST', headers: { authorization: 'Bearer t' }, body: { section, field, visible: true, fields } }, res);
+  assert.equal(res.statusCode, 200, `the admin edit was accepted: ${JSON.stringify(res.body)}`);
+}
 
 const TIER_A = { publicUrl: 'https://example.org', emailProvider: 'console', ticketingProvider: 'none' };
 
@@ -36,6 +60,11 @@ function docs() {
 }
 
 const now = () => 1_700_000_000_000;
+
+/** A fake project whose admin gate knows the operator. */
+function makeAdminDb() {
+  return makeFakeDb({ 'config/bootstrap': { adminEmails: [ADMIN.email] } });
+}
 
 test('seeding writes a published live doc AND a clean draft, like an admin save + publish', async () => {
   const db = makeFakeDb();
@@ -553,15 +582,13 @@ test('upgrading a site whose venue lines are still the seed’s replaces them wi
 });
 
 test('upgrading a launched site keeps the client’s venue lines and creates neither the duplicate fact nor a new placeholder', async () => {
-  const db = makeFakeDb();
+  const db = makeAdminDb();
   const config = docs();
   await seedCollection({ db, store, collection: 'cmsContent', docs: baseReleaseKeyFacts(), now });
-  // The client filled the venue line and published it, so the CMS cleared
-  // its seeded flag (§5.4); the address line beside it is still the seed's.
-  await db.collection('cmsContent').doc('info__where_venue').set({
-    section: 'info', field: 'where_venue', blockType: 'list_item', text: 'Venue: Test Hall',
-    visible: true, order: 1, seeded: false, revision: 2,
-  });
+  // The client filled the venue line through the admin and published it;
+  // the address line beside it is still the seed's.
+  await adminEdit(db, { section: 'info', field: 'where_venue', fields: { text: 'Venue: Test Hall' } }, now);
+  await store.publishDocs({ db, collection: 'cmsContent', docIds: ['info__where_venue'], actor: ADMIN, now });
 
   const { upgrade, seeded, obsolete } = await upgradeKeyFacts(db, config);
 
@@ -584,14 +611,11 @@ test('upgrading a launched site keeps the client’s venue lines and creates nei
 });
 
 test('withholdUpgradeSeeds reads the draft revision: an unpublished edit to a predecessor protects it', async () => {
-  const db = makeFakeDb();
+  const db = makeAdminDb();
   const config = docs();
   await seedCollection({ db, store, collection: 'cmsContent', docs: baseReleaseKeyFacts(), now });
-  await store.writeDraft({
-    db, collection: 'cmsContent', docId: 'info__where_address', visible: true, now,
-    fields: { section: 'info', field: 'where_address', blockType: 'list_item', text: 'Address: 1 Test Way', seeded: false },
-    actor: { uid: 'editor', email: 'editor@example.org' },
-  });
+  // Edited in the admin, not yet published: the work exists only in the draft.
+  await adminEdit(db, { section: 'info', field: 'where_address', fields: { text: 'Address: 1 Test Way' } }, now);
 
   const { upgrade } = await withholdUpgradeSeeds({
     db, collection: 'cmsContent', docs: keyFactsSeed(config), replacedBy: REPLACED_CONTENT_IDS,
@@ -624,4 +648,26 @@ test('a fresh site gets every key fact, placeholder included', async () => {
   const { upgrade, seeded } = await upgradeKeyFacts(db, config);
   assert.deepEqual(upgrade.withheld, []);
   assert.deepEqual(seeded.created.sort(), ['info__when', 'info__where', 'info__where_transit', 'info__who']);
+});
+
+test('upgrading a site from before the CMS cleared the flag still keeps the client’s venue line', async () => {
+  // Such a site holds the operator's line with `seeded: true` still on it
+  // and the operator's uid as its publisher (adversarial review,
+  // 2026-09-24). Who published decides, so the line is the client's and the
+  // replacement waits.
+  const db = makeFakeDb();
+  const config = docs();
+  await seedCollection({ db, store, collection: 'cmsContent', docs: baseReleaseKeyFacts(), now });
+  await db.collection('cmsContent').doc('info__where_venue').set({
+    section: 'info', field: 'where_venue', blockType: 'list_item', text: 'Venue: Test Hall',
+    visible: true, order: 1, seeded: true, seededAt: 'T0', revision: 2, publishedBy: ADMIN.uid,
+  });
+
+  const { upgrade, seeded, obsolete } = await upgradeKeyFacts(db, config);
+
+  assert.deepEqual(upgrade.withheld.map((w) => w.id).sort(), ['info__where', 'info__who']);
+  assert.equal(seeded.created.length, 0);
+  assert.deepEqual(obsolete.removed, []);
+  assert.equal((await db.collection('cmsContent').doc('info__where_venue').get()).data().text, 'Venue: Test Hall');
+  assert.equal((await db.collection('cmsContent').doc('info__where').get()).exists, false);
 });

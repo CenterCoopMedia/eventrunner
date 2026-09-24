@@ -43,6 +43,8 @@ function Probe() {
       <span data-testid="source">{source}</span>
       <span data-testid="hero-title">{heroTitle?.value ?? ''}</span>
       <span data-testid="hero-title-via-getblock">{getBlock('hero', 'title')?.value ?? ''}</span>
+      <span data-testid="hero-title-seeded">{String(getBlock('hero', 'title')?.seeded ?? 'absent')}</span>
+      <span data-testid="hero-title-publisher">{String(getBlock('hero', 'title')?.publishedBy ?? 'absent')}</span>
       <span data-testid="hero-block-count">{getSectionBlocks('hero').length}</span>
       <span data-testid="page-count">{pages.length}</span>
       <span data-testid="faq-page-label">{getPage('faq')?.label ?? ''}</span>
@@ -205,6 +207,30 @@ describe('ContentProvider', () => {
     expect(screen.getByTestId('hero-title')).toHaveTextContent('Live headline');
     // Wholesale replace: the snapshot's other hero blocks are gone.
     expect(screen.getByTestId('hero-block-count')).toHaveTextContent('1');
+  });
+
+  it('reads a live block’s seeded flag by who published it, and drops the publisher', () => {
+    // The live listener hands the page raw documents. A deployment from
+    // before the CMS cleared the flag on edit holds edited blocks that still
+    // say seeded: true; the operator's publish decides (shared/seed).
+    render(
+      <ContentProvider>
+        <Probe />
+      </ContentProvider>,
+    );
+    const block = {
+      id: 'hero__title', section: 'hero', field: 'title', blockType: 'text',
+      value: 'Our real headline', visible: true, order: 0, seeded: true,
+    };
+    act(() => {
+      subscriptions.get('cmsContent').onNext([{ ...block, publishedBy: 'admin-uid' }]);
+    });
+    expect(screen.getByTestId('hero-title-seeded')).toHaveTextContent('absent');
+    expect(screen.getByTestId('hero-title-publisher')).toHaveTextContent('absent');
+    act(() => {
+      subscriptions.get('cmsContent').onNext([{ ...block, publishedBy: 'init-event-script' }]);
+    });
+    expect(screen.getByTestId('hero-title-seeded')).toHaveTextContent('true');
   });
 
   it('keeps the snapshot before any live result has arrived (pre-connection null)', () => {

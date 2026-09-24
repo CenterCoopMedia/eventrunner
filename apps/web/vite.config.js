@@ -38,6 +38,7 @@ export default defineConfig({
       'shared/urlSafety',
       'shared/venue',
       'shared/update',
+      'shared/seed',
     ],
   },
   resolve: {

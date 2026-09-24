@@ -405,6 +405,25 @@ test('cmsSavePage writes the DRAFT collection only, never live', async () => {
   assert.equal(d.store.deletes.length, 0);
 });
 
+test('a page save can carry no seed flag: the validator refuses it, and a save writes the page whole', async () => {
+  // Content blocks merge an edit onto the stored document, which is how an
+  // edited block once kept `seeded: true` (adversarial review, 2026-09-24).
+  // A page does not merge: the admin sends the whole page, the validator
+  // names `seeded` and `seededAt` as unknown fields, and the draft is
+  // written as sent — so a saved page is the operator's by construction.
+  const d = deps();
+  const refused = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: { ...validPage(), seeded: true, seededAt: 'T0' } }), refused);
+  assert.equal(refused.statusCode, 400);
+  assert.match(refused.body.error.message, /seeded: unknown field/);
+  assert.equal(d.store.writes.length, 0);
+
+  const saved = fakeRes();
+  await createSavePageHandler(d)(adminReq({ page: validPage() }), saved);
+  assert.equal(saved.statusCode, 200);
+  assert.ok(!('seeded' in d.store.writes[0].fields));
+});
+
 test('cmsSavePage rejects an invalid page with 400 naming the block', async () => {
   const d = deps();
   const res = fakeRes();

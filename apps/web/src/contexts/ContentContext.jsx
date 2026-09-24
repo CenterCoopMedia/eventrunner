@@ -44,6 +44,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { publicContentDoc } from 'shared/seed';
 import snapshotSiteContent from '@generated/siteContent.js';
 import snapshotScheduleData, { speakers as snapshotSpeakers } from '@generated/scheduleData.js';
 import snapshotOrganizationsData from '@generated/organizationsData.js';
@@ -161,11 +162,16 @@ export function ContentProvider({ readSource = 'published', children }) {
     // overlay slot is no longer null, and that includes an empty array
     // (staff unpublished the last doc). Only "no result yet" (still null)
     // falls back to the snapshot.
+    // The listener hands over raw documents; the page gets the public shape
+    // (shared/seed publicContentDoc), the same one the snapshot and the
+    // public endpoint give: `seeded` states ownership by who published, so
+    // an operator's edit wins on a deployment from before the CMS cleared
+    // the flag, and the publisher's uid stays off the page.
     const siteContent =
       overlay.cmsContent != null
-        ? Object.fromEntries(overlay.cmsContent.map((doc) => [doc.id, doc]))
+        ? Object.fromEntries(overlay.cmsContent.map((doc) => [doc.id, publicContentDoc(doc)]))
         : snapshotSiteContent;
-    const pages = (overlay.cmsPages != null ? overlay.cmsPages : snapshotPages)
+    const pages = (overlay.cmsPages != null ? overlay.cmsPages.map(publicContentDoc) : snapshotPages)
       .slice()
       .sort(byOrder);
     const updates = (overlay.cmsUpdates ?? []).slice().sort(byOrder);

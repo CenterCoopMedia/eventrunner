@@ -21,8 +21,10 @@
 const { decideSeedWrite, decideConfigWrite } = require('./idempotency.cjs');
 const { draftCollectionFor } = require('../../functions/src/cms/blockTypes.cjs');
 
-/** Actor recorded on seeded writes; not a person, and deliberately visible. */
-const SEED_ACTOR = Object.freeze({ uid: 'init-event-script', email: 'init-event-script' });
+// The actor recorded on seeded writes; not a person, and deliberately
+// visible. Defined once in shared/seed, because the functions and the web
+// read it back to decide whose a document is (adversarial review, 2026-09-24).
+const { SEED_ACTOR } = require('shared/seed');
 
 /**
  * Write the `config/*` documents (§5.1 steps b–c).

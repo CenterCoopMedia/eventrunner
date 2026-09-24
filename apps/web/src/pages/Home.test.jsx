@@ -50,6 +50,42 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 }));
 
 import Home from './Home.jsx';
+import { publicContentDoc } from 'shared/seed';
+import { makeFakeDb } from '../../../../functions/src/cms/firestoreFake.cjs';
+import { createCmsUpdateContentHandler } from '../../../../functions/src/cms/content.cjs';
+import * as store from '../../../../functions/src/cms/store.cjs';
+import { seedCollection } from '../../../../scripts/lib/write.cjs';
+
+/**
+ * The home page's When fact as the public site receives it: seeded by init,
+ * then, if asked, edited through the REAL admin write path and published by
+ * an operator, and finally shaped by the same rule every public boundary
+ * applies (shared/seed publicContentDoc). A hand-written `seeded: false` is
+ * a state the CMS never wrote (adversarial review, 2026-09-24).
+ */
+async function whenFactFromTheCms({ editedTo } = {}) {
+  const ADMIN = { uid: 'admin1', email: 'admin@example.org', email_verified: true };
+  const db = makeFakeDb({ 'config/bootstrap': { adminEmails: [ADMIN.email] } });
+  const now = () => 1_750_000_000_000;
+  await seedCollection({
+    db, store, collection: 'cmsContent', now,
+    docs: [{
+      id: 'info__when', section: 'info', field: 'when', blockType: 'fact', label: 'When',
+      value: 'October 14–16, 2026', visible: true, order: 0, seeded: true, seededAt: 'T0',
+    }],
+  });
+  if (editedTo) {
+    const res = { statusCode: null, body: null, set() { return this; }, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
+    await createCmsUpdateContentHandler({
+      db, now, log: { warn() {}, error() {} },
+      auth: { async verifyIdToken() { return ADMIN; } },
+      getConfig: async () => ({ bootstrap: { adminEmails: [ADMIN.email] } }),
+    })({ method: 'POST', headers: { authorization: 'Bearer t' }, body: { section: 'info', field: 'when', fields: { value: editedTo } } }, res);
+    if (res.statusCode !== 200) throw new Error(`edit failed: ${JSON.stringify(res.body)}`);
+    await store.publishDocs({ db, collection: 'cmsContent', docIds: ['info__when'], actor: ADMIN, now });
+  }
+  return { id: 'info__when', ...publicContentDoc(db.read('cmsContent', 'info__when')) };
+}
 
 const LEAD = {
   section: 'hero',
@@ -259,7 +295,7 @@ describe('Home key facts', () => {
   // configuration (adversarial review of the 2026-09-10 wave): while the
   // fact is still the seed's, its value is the range config/event states
   // now, not the range init copied in.
-  it('reads the seeded When fact’s dates from the event settings, so a moved day never goes stale', () => {
+  it('reads the seeded When fact’s dates from the event settings, so a moved day never goes stale', async () => {
     eventConfig = {
       name: 'Demo Event',
       timezone: 'UTC',
@@ -268,24 +304,42 @@ describe('Home key facts', () => {
         { id: 'day-2', label: 'Day two', date: '2026-10-22', startTime: '09:00', endTime: '17:00' },
       ],
     };
-    infoBlocks = [
-      { section: 'info', field: 'when', blockType: 'fact', label: 'When', value: 'October 14–16, 2026', seeded: true },
-    ];
+    infoBlocks = [await whenFactFromTheCms()];
     render(<Home />);
     // The hero states the range too; the card is the <dd>.
     expect(screen.getByText('October 21–22, 2026', { selector: 'dd' })).toBeInTheDocument();
     expect(screen.queryByText('October 14–16, 2026')).toBeNull();
   });
 
-  it('shows an edited When fact as the operator wrote it', () => {
+  it('shows a When fact the operator edited and published as the operator wrote it', async () => {
+    // The edit goes through the real admin write path and the real publish,
+    // so this holds for what the CMS writes and not for a state a test
+    // invented.
     eventConfig = {
       name: 'Demo Event',
       timezone: 'UTC',
       days: [{ id: 'day-1', label: 'Day one', date: '2026-10-21', startTime: '09:00', endTime: '17:00' }],
     };
-    infoBlocks = [
-      { section: 'info', field: 'when', blockType: 'fact', label: 'When', value: 'The third week of October', seeded: false },
-    ];
+    infoBlocks = [await whenFactFromTheCms({ editedTo: 'The third week of October' })];
+    render(<Home />);
+    expect(screen.getByText('The third week of October').tagName).toBe('DD');
+    expect(screen.queryByText('October 21, 2026', { selector: 'dd' })).toBeNull();
+  });
+
+  it('shows an edited When fact as written on a site from before the CMS cleared the flag', () => {
+    // Such a site holds the operator's fact with `seeded: true` still on it
+    // and the operator's uid as its publisher; the public boundary judges by
+    // the publisher (shared/seed), so the page receives no flag.
+    eventConfig = {
+      name: 'Demo Event',
+      timezone: 'UTC',
+      days: [{ id: 'day-1', label: 'Day one', date: '2026-10-21', startTime: '09:00', endTime: '17:00' }],
+    };
+    const stale = {
+      id: 'info__when', section: 'info', field: 'when', blockType: 'fact', label: 'When',
+      value: 'The third week of October', visible: true, order: 0, seeded: true, revision: 3, publishedBy: 'admin1',
+    };
+    infoBlocks = [publicContentDoc(stale)];
     render(<Home />);
     expect(screen.getByText('The third week of October').tagName).toBe('DD');
   });

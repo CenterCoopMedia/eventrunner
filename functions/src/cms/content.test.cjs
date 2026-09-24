@@ -12,6 +12,7 @@ const {
   internals,
 } = require('./content.cjs');
 const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
+const { publishDocs } = require('./store.cjs');
 
 // requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
 // #186 review: it fails closed on an absent document), so every fake this
@@ -1003,4 +1004,70 @@ test('mutation handlers admit a staff admin — content is staff work', async ()
   );
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.equal(db.read('cmsContent_drafts', 'hero__title').updatedBy, 'staff@example.org');
+});
+
+// --- the seed flag (ADR 0001 §5.4; adversarial review 2026-09-24) -----------
+
+test('an admin edit clears the seed flag, and the publish carries the cleared flag live', async () => {
+  // The merge base is the stored document, flag included; an edit that kept
+  // the flag left every edited block reading as the seed's, so init
+  // overwrote it and the home page replaced the operator's When fact.
+  const db = makeFakeDb({
+    'cmsContent/info__when': {
+      section: 'info', field: 'when', blockType: 'fact', label: 'When', value: 'October 14–16, 2026',
+      visible: true, order: 0, seeded: true, seededAt: '1970-01-01T00:00:00.000Z',
+      revision: 1, publishedBy: 'init-event-script',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'info', field: 'when', fields: { value: 'October 13–16, 2026' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsContent_drafts', 'info__when');
+  assert.equal(draft.value, 'October 13–16, 2026');
+  assert.equal('seeded' in draft, false, 'the edit clears the flag');
+  assert.equal('seededAt' in draft, false, 'and the seed stamp with it');
+  assert.equal(draft.label, 'When', 'the other fields still merge');
+
+  await publishDocs({ db, collection: 'cmsContent', docIds: ['info__when'], actor: ADMIN, now });
+  const live = db.read('cmsContent', 'info__when');
+  assert.equal('seeded' in live, false, 'the publish carries the cleared flag');
+  assert.equal(live.publishedBy, ADMIN.uid);
+});
+
+test('an admin create never seeds, whatever the payload claims', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: { section: 'hero', field: 'note', fields: { blockType: 'text', value: 'x', seeded: true, seededAt: 'T' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const draft = db.read('cmsContent_drafts', 'hero__note');
+  assert.equal('seeded' in draft, false);
+  assert.equal('seededAt' in draft, false);
+});
+
+test('getSiteContent states seeded only for a block the seed published, and never the publisher', async () => {
+  // A deployment from before the edit cleared the flag holds edited blocks
+  // that still carry it; the public read judges by who published.
+  const db = makeFakeDb({
+    'cmsContent/hero__title': {
+      section: 'hero', field: 'title', blockType: 'text', value: '[Replace] Event name headline.',
+      visible: true, order: 0, seeded: true, revision: 1, publishedBy: 'init-event-script',
+    },
+    'cmsContent/hero__subtitle': {
+      section: 'hero', field: 'subtitle', blockType: 'text', value: 'Our real subtitle',
+      visible: true, order: 1, seeded: true, revision: 2, publishedBy: ADMIN.uid,
+    },
+  });
+  const res = fakeRes();
+  await createGetSiteContentHandler({ db, log: { error() {} } })({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 200);
+  const byId = Object.fromEntries(res.body.content.map((doc) => [doc.id, doc]));
+  assert.equal(byId.hero__title.seeded, true);
+  assert.equal('seeded' in byId.hero__subtitle, false, 'an operator’s publish wins over the stale flag');
+  for (const doc of res.body.content) assert.equal('publishedBy' in doc, false);
 });

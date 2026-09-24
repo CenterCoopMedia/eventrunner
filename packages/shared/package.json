@@ -20,6 +20,7 @@
     "./page": { "require": "./src/page.cjs", "import": "./src/page.mjs" },
     "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" },
     "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
-    "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" }
+    "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" },
+    "./seed": { "require": "./src/seed.cjs", "import": "./src/seed.mjs" }
   }
 }

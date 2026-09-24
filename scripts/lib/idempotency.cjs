@@ -29,6 +29,8 @@
  * Pure: decides, never writes.
  */
 
+const { isSeedOwned } = require('shared/seed');
+
 /** @typedef {'create'|'overwrite'|'skip'} SeedAction */
 
 /**
@@ -42,6 +44,12 @@
  * then publish the placeholder over it, destroying work that was never
  * visible to this script's live-doc check.
  *
+ * THE FLAG AND THE WRITER (adversarial review, 2026-09-24). The CMS once
+ * carried `seeded: true` through an edit, so a deployment from then holds
+ * edited documents that still say seeded. `isSeedOwned` (shared/seed) asks
+ * who wrote the revision as well: the seed's own actor, or nobody recorded,
+ * keeps it the seed's; an operator's uid or email makes it the client's.
+ *
  * @param {object|null|undefined} existing the live doc, or null when absent
  * @param {{ force?: boolean, draft?: object|null }} [opts] `force` still
  *   respects client edits; it only relaxes the whole-run refusal.
@@ -52,11 +60,11 @@ function decideSeedWrite(existing, opts = {}) {
   // An edited draft protects the document whether or not the live copy
   // still looks seeded — including the case where no live doc exists yet
   // (a seeded page whose first draft was rewritten before any publish).
-  if (draft != null && draft.seeded !== true) {
+  if (draft != null && !isSeedOwned(draft)) {
     return { action: 'skip', reason: 'unpublished editor draft' };
   }
   if (existing == null) return { action: 'create', reason: 'absent' };
-  if (existing.seeded === true) {
+  if (isSeedOwned(existing)) {
     return { action: 'overwrite', reason: 'still seeded (unedited)' };
   }
   if (opts.force === true) {
