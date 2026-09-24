@@ -100,7 +100,7 @@ export default function AdminUpdateEditor({ mode }) {
   const { showToast } = useToast();
   const { features, eventConfig } = useEventConfig();
   const timeZone = eventConfig?.timezone;
-  const { rows, loading, findRow } = useAdminUpdates();
+  const { rows, ready, error: listenerError, findRow } = useAdminUpdates();
   const categoryListId = useId();
   const row = mode === 'edit' ? findRow(updateId) : null;
 
@@ -119,15 +119,21 @@ export default function AdminUpdateEditor({ mode }) {
   const [createdId, setCreatedId] = useState(null);
   const newIdRef = useRef(null);
   if (newIdRef.current === null) newIdRef.current = mintUpdateId();
+  // The record the form was filled from. It is filled once, and only after
+  // BOTH listeners have reported: they report in no fixed order, and a row
+  // built before the drafts arrive is the live doc alone, so a form filled
+  // from it and saved would replace the unpublished draft with the live
+  // values.
+  const [adoptedId, setAdoptedId] = useState(null);
   const errorRef = useRef(null);
   const formRef = useRef(null);
-  const adoptedRef = useRef(false);
 
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !row) return;
-    adoptedRef.current = true;
+    if (mode !== 'edit' || !ready || !row) return;
+    if (adoptedId === updateId || createdId === updateId) return;
+    setAdoptedId(updateId);
     setForm(toUpdateForm(row, timeZone));
-  }, [mode, row, timeZone]);
+  }, [mode, ready, row, updateId, adoptedId, createdId, timeZone]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -173,10 +179,7 @@ export default function AdminUpdateEditor({ mode }) {
         update: toUpdatePayload(form, row, timeZone),
         visible: form.visible,
       });
-      if (mode === 'create') {
-        adoptedRef.current = true;
-        setCreatedId(id);
-      }
+      if (mode === 'create') setCreatedId(id);
       let message = 'Draft saved. It is not live until you publish it.';
       if (publish) {
         stage = 'publish';
@@ -221,14 +224,27 @@ export default function AdminUpdateEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && !row && createdId !== updateId) {
-    if (loading) return <AdminLoadingState label="Loading update…" />;
-    return (
-      <AdminEmptyState
-        title="No such update"
-        description="That update does not exist. It may have been deleted."
-      />
-    );
+  if (mode === 'edit' && adoptedId !== updateId && createdId !== updateId) {
+    if (ready && !row) {
+      return (
+        <AdminEmptyState
+          title="No such update"
+          description="That update does not exist. It may have been deleted."
+        />
+      );
+    }
+    // A listener failed before both had reported. The form stays closed
+    // rather than opening on one revision; the listener retries, and the
+    // form opens when both are in.
+    if (!ready && listenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load this update and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading update…" />;
   }
 
   const extras = extrasSentence(extrasOf(row));

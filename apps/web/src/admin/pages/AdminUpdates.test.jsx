@@ -6,12 +6,14 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const adminSubscriptions = new Map();
+const adminErrors = new Map();
 // When false, a listener reports only when a test pushes to it, so the
 // loading state can be read.
 let reportAtOnce = true;
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (name, onNext) => {
+  subscribeAdminCollection: (name, onNext, onError) => {
     adminSubscriptions.set(name, onNext);
+    adminErrors.set(name, onError);
     if (reportAtOnce) onNext([]);
     return () => adminSubscriptions.delete(name);
   },
@@ -98,6 +100,7 @@ const NEVER_PUBLISHED = { id: 'fresh', title: 'Not out yet', body: 'Soon.', publ
 
 beforeEach(() => {
   adminSubscriptions.clear();
+  adminErrors.clear();
   configSubscriptions.clear();
   reportAtOnce = true;
   currentPath = null;
@@ -305,6 +308,59 @@ describe('the update editor', () => {
     fireEvent.submit(title.form);
     await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
     expect(callsTo('cmsPublish')).toHaveLength(0);
+  });
+
+  // Review round, finding 1: the two listeners report in no fixed order.
+  // An update that is Live with unpublished changes must open with its
+  // DRAFT, never with the live values that happened to arrive first.
+  it('waits for both revisions before it fills the form, so a save keeps the unpublished draft', async () => {
+    reportAtOnce = false;
+    await renderAt('/admin/updates/edited');
+    await waitFor(() => expect(adminSubscriptions.has('cmsUpdates_drafts')).toBe(true));
+    const draft = { ...EDITED_DRAFT, body: 'New unpublished text.', category: 'Travel', featured: true };
+
+    act(() => adminSubscriptions.get('cmsUpdates')([EDITED_LIVE]));
+    // Only the live revision is in: no form yet, so nothing can be saved
+    // from the live values.
+    expect(screen.getByRole('status', { name: 'Loading update…' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).toBeNull();
+
+    act(() => adminSubscriptions.get('cmsUpdates_drafts')([draft]));
+    expect(await screen.findByRole('heading', { level: 1, name: 'New wording' })).toBeInTheDocument();
+    expect(screen.getByText('Live with unpublished changes', { selector: '[data-record-state]' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toHaveValue('New wording');
+    expect(screen.getByLabelText('Text')).toHaveValue('New unpublished text.');
+    expect(screen.getByLabelText('Category')).toHaveValue('Travel');
+    expect(screen.getByLabelText('Feature this update at the head of the list')).toBeChecked();
+
+    fetch.mockResolvedValueOnce(response({ id: 'edited', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
+    expect(bodyOf(callsTo('cmsSaveUpdate')[0]).update).toMatchObject({
+      title: 'New wording',
+      body: 'New unpublished text.',
+      category: 'Travel',
+      featured: true,
+    });
+  });
+
+  it('does not open the form from the live revision alone when the drafts listener fails, and says why', async () => {
+    reportAtOnce = false;
+    await renderAt('/admin/updates/edited');
+    await waitFor(() => expect(adminSubscriptions.has('cmsUpdates_drafts')).toBe(true));
+    act(() => adminSubscriptions.get('cmsUpdates')([EDITED_LIVE]));
+    act(() => adminErrors.get('cmsUpdates_drafts')(new Error('unavailable')));
+
+    expect(screen.getByText(
+      'We could not load this update and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again.',
+    )).toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'No such update' })).toBeNull();
+
+    // The listener's retry reports: the form opens with the draft.
+    act(() => adminSubscriptions.get('cmsUpdates_drafts')([EDITED_DRAFT]));
+    expect(await screen.findByLabelText('Title')).toHaveValue('New wording');
+    expect(screen.queryByText(/We could not load this update/)).toBeNull();
   });
 
   it('opens an update whose id is `new` at /admin/updates/new, not the create form', async () => {

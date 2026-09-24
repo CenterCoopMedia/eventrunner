@@ -55,8 +55,14 @@ describe('mergeUpdateRevisions', () => {
     expect(rows.map((row) => row.id)).toEqual(['a', 'b']);
   });
 
-  it('answers an empty list while either listener has not reported', () => {
+  it('answers an empty list when neither listener has reported, and the live rows alone when only one has', () => {
     expect(mergeUpdateRevisions(null, null)).toEqual([]);
+    // With the drafts still out, a row is built from its live doc alone.
+    // That is why the editor opens a record only once both listeners have
+    // reported (useAdminUpdates `ready`).
+    const [row] = mergeUpdateRevisions([DIRTY_LIVE], null);
+    expect(row.current.title).toBe('Old');
+    expect(row.draft).toBeNull();
   });
 });
 

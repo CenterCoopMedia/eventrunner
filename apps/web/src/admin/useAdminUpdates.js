@@ -39,6 +39,10 @@ export function useAdminUpdates() {
     // and with only the drafts in, a live update reads as a draft. An
     // errored listener ends the wait.
     loading: (live === null || drafts === null) && !error,
+    // Both listeners have reported at least once. `loading` ends on an
+    // error too, so the list can show the rows it has; the editor fills a
+    // form only once this is true, so it never opens on one revision.
+    ready: live !== null && drafts !== null,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,
   };
