@@ -85,7 +85,7 @@ Each device below lands as one tier 3 contract in `design/tokens/components.json
 | Drop cap | The opening of a long read | One per page. An option on the Long read template: drop cap, standfirst, or plain. Broadsheet and Field Guide default to the cap; Zine and Atlas default to plain. |
 | Definition list | Term and description pairs: venue, dates, format, room | A real `<dl>`, ruled between pairs. This is the answer to a non-numeric fact (#234): a fact is a term and a description, never a stat block. |
 | Timeline | Dated entries in order: past editions, key dates, milestones | An ordered list with a spine, the same spine the updates feed draws. Numbers are years and dates, never sequence ornaments. |
-| Ruled table | Rows and columns a reader compares | A real `<table>` with row rules, tabular figures, sticky head, and a horizontal scroll region at narrow widths. A sortable head holds a `<button>` that sorts, and the `<th>` carries `aria-sort`. |
+| Ruled table | Rows and columns a reader compares | A real `<table>` with row rules, tabular figures, and a horizontal scroll region at narrow widths that is the table's own scroll container, so the page never scrolls sideways; the head is read once rather than pinned (a head pinned inside a region that scrolls only sideways pins to nothing; corrected 2026-09-24). A sortable head holds a `<button>` that sorts, and the `<th>` carries `aria-sort`. |
 
 ### 3.2 Feedback and state devices
 
