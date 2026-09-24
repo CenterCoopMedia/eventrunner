@@ -817,6 +817,23 @@ describe('Home section edit links', () => {
     );
   });
 
+  // Codex review on #290: a key facts section with no card still draws the
+  // row's dates, in its own place, so it keeps its one link.
+  it('keeps the key facts link after the row when the section draws dates but no card', () => {
+    eventConfig = { name: 'Demo Event', days: [{ id: 'day-1', label: 'Day one', date: '2026-10-01' }] };
+    infoBlocks = [{ section: 'info', field: 'note', blockType: 'richtext', value: '<p>Not a card.</p>' }];
+    pageDoc = { ...pageDoc, sections: [{ id: 'info', label: 'Key facts' }] };
+    renderAs({ adminStatus: 'admin', adminTier: 'staff' });
+    expect(screen.getByRole('heading', { level: 2, name: 'Dates' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Key facts' })).toBeNull();
+    const link = screen.getByRole('link', { name: 'Edit section: Key facts' });
+    expect(link).toHaveAttribute('href', '/admin/content/home/info');
+    // After the row, never inside one of its cells.
+    const row = screen.getByRole('heading', { level: 2, name: 'Dates' }).closest('.stage-row');
+    expect(row.contains(link)).toBe(false);
+    expect(row.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('draws no hero link where the page states no hero section', () => {
     pageDoc = { ...pageDoc, sections: pageDoc.sections.filter((section) => section.id !== 'hero') };
     renderAs({ adminStatus: 'admin' });

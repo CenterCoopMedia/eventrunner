@@ -36,18 +36,23 @@ import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
  * or of one where the event has not recorded its days or the operator has
  * not written the facts. A row with no cell at all draws nothing.
  *
+ * `action` is the control of the section the row stands for (issue #198):
+ * it sits in the facts cell's head, or after the row when that cell is not
+ * drawn, so the row keeps it either way.
+ *
  * @param {{
  *   days: object[],
  *   timezone?: string,
  *   eventConfig: object,
  *   facts: { id: string, title: string, cards: object[], action?: import('react').ReactNode } | null,
+ *   action?: import('react').ReactNode,
  *   className?: string,
  * }} props
  */
-export function SummaryRow({ days, timezone, eventConfig, facts, className = '' }) {
+export function SummaryRow({ days, timezone, eventConfig, facts, action = null, className = '' }) {
   const clock = countdownDraws(eventConfig);
   if (days.length === 0 && !facts && !clock) return null;
-  return (
+  const row = (
     <div className={['stage-row', className].filter(Boolean).join(' ')}>
       {/* The dates as a ruled list, not a set of cards: the label in the
           heading face, the day's date and hours in the mono face so the
@@ -85,6 +90,13 @@ export function SummaryRow({ days, timezone, eventConfig, facts, className = '' 
       ) : null}
       <EventCountdown eventConfig={eventConfig} />
     </div>
+  );
+  if (facts || !action) return row;
+  return (
+    <>
+      {row}
+      {action}
+    </>
   );
 }
 
@@ -175,7 +187,8 @@ export default function Home() {
   // did before, and any of these deleted from the page document is simply
   // gone, like any other deleted section.
   // Each receives the section's edit link (issue #198) and draws it in its
-  // own head, the way the default draw does.
+  // own head, the way the default draw does. The key facts row with no card
+  // has no head of its own, so its link sits after the row.
   const renderHomeSection = (section, blocks, editLink) => {
     if (section.id === 'info') {
       // Grouped before the section is opened, because a section whose
@@ -195,6 +208,9 @@ export default function Home() {
           timezone={eventConfig.timezone}
           eventConfig={eventConfig}
           facts={cards.length ? { id: `section-${section.id}`, title: section.label, cards, action: editLink } : null}
+          action={
+            <SectionEditLink pageId={page.id} sectionId={section.id} label={section.label} className="mt-sm" />
+          }
         />
       );
     }
