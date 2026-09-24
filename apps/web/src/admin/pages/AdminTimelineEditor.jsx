@@ -1,5 +1,5 @@
-// The timeline entry editor (issue #194): create or edit one past edition
-// of the event through the generic content endpoints, and publish it
+// The timeline entry editor (issue #194): create or edit one entry, a past
+// edition of the event, through the generic content endpoints, and publish it
 // through cmsPublish like every other editor.
 //
 //   Save draft        → cmsCreateContent (the first save) or cmsUpdateContent
@@ -16,7 +16,7 @@
 // with no display name from it to /profile, so a preview link could land an
 // admin somewhere else.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';
@@ -183,6 +183,11 @@ export default function AdminTimelineEditor({ mode }) {
       <AdminEmptyState
         title="No such entry"
         description="That entry does not exist. It may have been deleted."
+        action={
+          <Link to={TIMELINE_LIST} className={primaryButtonClass}>
+            Open the timeline list
+          </Link>
+        }
       />
     );
   }
@@ -225,7 +230,7 @@ export default function AdminTimelineEditor({ mode }) {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel title="Past edition">
+      <Panel title="Entry">
         <div className="flex flex-col gap-sm">
           <TextField
             label="Year"
@@ -240,7 +245,7 @@ export default function AdminTimelineEditor({ mode }) {
           />
           <TextField
             label="Title"
-            hint="What that edition is remembered for, in a few words. Leave the year out; the site shows it."
+            hint="What the event is remembered for that year, in a few words. Leave the year out; the site shows it."
             value={form.title}
             onChange={(value) => set('title', value)}
             error={errorFor('title')}

@@ -134,7 +134,17 @@ export default function AdminTimelineList() {
       {hasHistorySection ? null : (
         <Notice
           tone="caution"
-          message="The home page has no section with the id history, so published entries do not appear on the site. Add one to the home page under Pages."
+          message={
+            <>
+              The home page has no section with the id{' '}
+              {/* A value the operator types into the page editor, so it is
+                  set in the data face. */}
+              <code className="rounded-admin-small bg-admin-ground-soft px-2xs py-3xs font-admin-data text-admin-xs text-admin-ink-data">
+                history
+              </code>
+              , so published entries do not appear on the site. Add one to the home page under Pages.
+            </>
+          }
         />
       )}
 
@@ -150,7 +160,7 @@ export default function AdminTimelineList() {
       ) : rows.length === 0 ? (
         <AdminEmptyState
           title="No timeline entries yet"
-          description="Add the first past edition. It stays a draft until you publish it."
+          description="Add the first entry. It stays a draft until you publish it."
           action={addLink}
         />
       ) : (

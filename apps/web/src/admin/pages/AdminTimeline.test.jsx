@@ -144,7 +144,11 @@ describe('the timeline list', () => {
   it('offers the first entry when there is none', async () => {
     await renderAt('/admin/timeline');
     expect(await screen.findByRole('heading', { name: 'No timeline entries yet' })).toBeInTheDocument();
-    expect(screen.getByText('Add the first past edition. It stays a draft until you publish it.')).toBeInTheDocument();
+    expect(screen.getByText('Add the first entry. It stays a draft until you publish it.')).toBeInTheDocument();
+    // One noun for the record: "past editions" only says what the entries are.
+    const main = screen.getByRole('main');
+    expect(main.textContent.match(/edition/gi)).toEqual(['edition']);
+    expect(within(main).getByText(/^Past editions of the event\./)).toBeInTheDocument();
     const add = screen.getAllByRole('link', { name: 'Add an entry' });
     expect(add.length).toBeGreaterThan(0);
     for (const link of add) expect(link).toHaveAttribute('href', '/admin/timeline/new/entry');
@@ -191,7 +195,9 @@ describe('the timeline list', () => {
   it('says so when the live home page has no History section, and not while it has one', async () => {
     await renderAt('/admin/timeline');
     await screen.findByRole('heading', { level: 1, name: 'Timeline' });
-    const warning = 'The home page has no section with the id history, so published entries do not appear on the site. Add one to the home page under Pages.';
+    const warning = (_content, element) =>
+      element?.tagName === 'P'
+      && element.textContent === 'The home page has no section with the id history, so published entries do not appear on the site. Add one to the home page under Pages.';
     // The snapshot's home page has the section.
     expect(screen.queryByText(warning)).toBeNull();
 
@@ -203,7 +209,10 @@ describe('the timeline list', () => {
           : page)),
       );
     });
-    expect(screen.getByText(warning)).toBeInTheDocument();
+    const notice = screen.getByText(warning);
+    // The id is a value the operator types, so it is set in the data face.
+    const id = within(notice).getByText('history', { selector: 'code' });
+    expect(id).toHaveClass('font-admin-data');
   });
 });
 
@@ -303,6 +312,13 @@ describe('the timeline entry editor', () => {
     expect(screen.getByRole('button', { name: 'Save and publish' })).toBeEnabled();
   });
 
+  it('names the record an entry in every control, heading and hint', async () => {
+    await openNewEntry();
+    const form = screen.getByLabelText('Year').closest('form');
+    expect(within(form).getByRole('heading', { level: 2, name: 'Entry' })).toBeInTheDocument();
+    expect(form.textContent).not.toMatch(/edition/i);
+  });
+
   it('keeps a pasted five-digit year in the field and refuses it before any call', async () => {
     await openNewEntry();
     fillNewEntry({ year: '20245' });
@@ -352,6 +368,8 @@ describe('the timeline entry editor', () => {
     await openEntry('nobody');
     expect(await screen.findByRole('heading', { name: 'No such entry' })).toBeInTheDocument();
     expect(screen.getByText('That entry does not exist. It may have been deleted.')).toBeInTheDocument();
+    // One next action, a verb first.
+    expect(screen.getByRole('link', { name: 'Open the timeline list' })).toHaveAttribute('href', '/admin/timeline');
   });
 
   it('deletes after the confirmation names what goes', async () => {
