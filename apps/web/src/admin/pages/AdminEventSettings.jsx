@@ -675,7 +675,7 @@ export default function AdminEventSettings() {
             value={form.registration.goal}
             onChange={(value) => setGroup('registration', { goal: value })}
             error={errorFor('registration.goal')}
-            hint="The number of approved attendees you are aiming for. The overview compares the approved count with it. Leave it empty for no goal."
+            hint="The number of approved attendees you are aiming for. Anyone can read it. The overview compares the approved count with it. Leave it empty for no goal."
             className="font-admin-data"
           />
         </div>

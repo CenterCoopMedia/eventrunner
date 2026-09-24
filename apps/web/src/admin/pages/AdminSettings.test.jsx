@@ -951,6 +951,8 @@ describe('milestones and the registration goal', () => {
     expect(screen.getByLabelText('Milestone 1 name')).toHaveValue('Proposals close');
     expect(screen.getByLabelText('Milestone 2 date')).toHaveValue('2026-09-01');
     expect(screen.getByText(/Anyone can read these dates and names/)).toBeInTheDocument();
+    // The goal is stored beside them on the public config/event, so its field says so too.
+    expect(screen.getByLabelText('Registration goal')).toHaveAccessibleDescription(/Anyone can read it\./);
 
     // Add moves focus into the new row's name field.
     fireEvent.click(screen.getByRole('button', { name: 'Add milestone' }));
@@ -1010,6 +1012,9 @@ describe('milestones and the registration goal', () => {
     expect(add).toHaveAttribute('aria-disabled', 'true');
     expect(add).not.toBeDisabled();
     expect(add).toHaveAccessibleDescription('An event can list 20 milestones. Remove one to add another.');
+    // Drawn as unavailable too: the disabled ink on the alternate ground, and
+    // no hover tint (interface guidelines, Interaction states, Disabled).
+    expect(add).toHaveClass('aria-disabled:bg-admin-ground-soft', 'aria-disabled:text-admin-ink-disabled');
     add.focus();
     fireEvent.click(add);
     expect(screen.queryByLabelText('Milestone 21 name')).toBeNull();

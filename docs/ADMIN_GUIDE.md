@@ -74,10 +74,10 @@ The admin opens here, for staff and operators alike. The page states how the eve
 
 | Sentence | What it counts |
 |---|---|
-| Accounts | Every account, then the accounts at each registration status: pending, ticketed, approved, and revoked. |
+| Accounts | Every account, then the accounts at each registration status: Pending, ticketed, approved, and revoked. |
 | Profiles complete | The accounts with a complete profile, out of all accounts. |
 | Tickets | Every ticket record, then valid, refunded, cancelled, and waiting for details. A ticket is one ticket record, not one seat. |
-| Speakers | Every speaker record, by stage: draft, invited, accepted, approved, and removed. |
+| Speakers | Every speaker record, by stage: Draft, invited, accepted, approved, and removed. |
 | Sessions | The sessions on the site, and the sessions with unpublished changes. A new session that was never published counts as one with unpublished changes. |
 | Unresolved errors | The count only. Operators read the errors themselves on the System errors page. |
 
@@ -327,11 +327,11 @@ Select **Add account**. Focus moves to the new row's **Service** field. Each acc
 
 The **Milestones** panel lists the dates the Overview counts down to, such as the day proposals close or the day the programme is announced. The Overview shows them in date order, each with its date and the days left: **In 12 days**, **Today**, or **3 days ago** once it has passed.
 
-**Anyone can read the milestones.** They are stored with the event settings, which the public site reads, so every name and date is public. Keep private notes out of them.
+**Anyone can read the milestones and the goal.** They are stored with the event settings, which the public site reads, so every name, date, and goal is public. Keep private notes out of them.
 
 Select **Add milestone**. Focus moves to the new row's name field. Each milestone has a name, at most 80 characters, and a date. An event can list 20 milestones; at 20, **Add milestone** does nothing and says so until you remove one. **Remove milestone** moves focus to the milestone that takes its place, or to the one before it when you removed the last, or to **Add milestone** when none is left. A milestone goes when you save. A milestone with no name or no date is refused when you save, and focus moves to the field that needs it.
 
-**Registration goal** is in the **Registration** panel: The number of approved attendees you are aiming for. The Overview sets the approved count against it, as a sentence and a bar. Leave it empty for no goal. It must be a whole number from 1 to 1,000,000; the server refuses anything else and names the field.
+**Registration goal** is in the **Registration** panel: The number of approved attendees you are aiming for. Anyone can read it. The Overview sets the approved count against it, as a sentence and a bar. Leave it empty for no goal. It must be a whole number from 1 to 1,000,000; the server refuses anything else and names the field.
 
 With no milestones and no goal, the Overview shows no milestone panel at all.
 

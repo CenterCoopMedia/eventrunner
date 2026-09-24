@@ -33,6 +33,7 @@ import {
   dangerButtonClass,
   fieldHintClass,
   secondaryButtonClass,
+  unavailableButtonClass,
 } from './formControls.jsx';
 
 const EMPTY_MILESTONES = Object.freeze([]);
@@ -143,7 +144,7 @@ export default function MilestonesEditor({ milestones, onChange, errorFor }) {
         <button
           ref={addRef}
           type="button"
-          className={secondaryButtonClass}
+          className={`${secondaryButtonClass} ${unavailableButtonClass}`}
           onClick={addRow}
           aria-disabled={full || undefined}
           aria-describedby={full ? limitId : undefined}

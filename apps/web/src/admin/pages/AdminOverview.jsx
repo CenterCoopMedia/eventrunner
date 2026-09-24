@@ -172,7 +172,7 @@ export default function AdminOverview() {
       <AdminPageHeader
         title="Overview"
         identifiers={readAt ? `Read at ${readAt}` : null}
-        description="How the event is going: accounts, tickets, speakers, the schedule, and errors, counted on the server."
+        description="How the event is going: Accounts, tickets, speakers, the schedule, and errors, counted on the server."
         actions={
           <button
             type="button"
