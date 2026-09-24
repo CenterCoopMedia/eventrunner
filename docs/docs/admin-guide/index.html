@@ -285,6 +285,38 @@
           <li><strong>Revoked</strong> → Approve. That is the only way out of revoked.</li>
           </ul>
           <p>Approve and revoke always go through the server endpoints. Every registration field involved is server-owned and not editable directly, even for the account&#39;s own owner.</p>
+          <p><strong>Export the list.</strong> The button in the title band reads <strong>Export 42 attendees</strong>, where the number is the rows on screen after your search and status filter. It saves a CSV file with one row per account, in the order the page lists them. The file has nine columns, and nothing else leaves the site:</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Column</th><th>What it holds</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Name</td><td>The display name</td></tr>
+          <tr><td>Email</td><td>The sign-in address</td></tr>
+          <tr><td>Organization</td><td>The organization on the profile</td></tr>
+          <tr><td>Role</td><td>The role on the profile (the job title, not an access level)</td></tr>
+          <tr><td>Registration status</td><td>The stored value: <code>pending</code>, <code>ticketed</code>, <code>approved</code>, or <code>revoked</code></td></tr>
+          <tr><td>Badges</td><td>The configured badge labels, then the custom badges while that feature is on</td></tr>
+          <tr><td>Past attendance</td><td>The editions an organizer recorded on the account</td></tr>
+          <tr><td>Social handles</td><td><code>label: handle</code> pairs, sorted by label</td></tr>
+          <tr><td>Profile visibility</td><td>The stored value: <code>public</code>, <code>attendees_only</code>, or <code>private</code></td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>A cell with more than one entry joins them with a semicolon. The file carries no account id, pronouns, bio, photo, or dates. The status and visibility columns keep the stored words, so a spreadsheet filter on them stays stable.</p>
+          <p><strong>Formulas stay text.</strong> A spreadsheet runs a cell that starts with <code>=</code>, <code>+</code>, <code>-</code>, or <code>@</code> as a formula. In the file, such a cell starts with an apostrophe, and so does a cell that starts with a tab or a carriage return, or with spaces and then one of those four characters. The spreadsheet shows the value as text.</p>
+          <p><strong>Every export is recorded.</strong> The server writes an admin log entry with your address, the number of rows, the status filter, and whether a search narrowed the list. It never records the search text, because that text can name a person. If the entry cannot be written, the server refuses the export and makes no file. The server keeps no copy of the file. One export holds at most 10,000 attendees.</p>
+          <p><strong>Past attendance.</strong> Select <strong>Edit record</strong> on a row to open that account&#39;s record. <strong>Past attendance</strong> takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select <strong>Save record</strong> to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.</p>
+          <p><strong>Delete an account.</strong> In the record, select <strong>Delete account</strong>, read what the delete removes, and select <strong>Delete this account</strong>. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session&#39;s saved count), the private notes, and the profile photo. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.</p>
+          <p>The server refuses a delete in four cases, and says why:</p>
+          <ul>
+          <li>Your own account.</li>
+          <li>An account with operator or staff access. An operator removes that access on the Access page first.</li>
+          <li>An account linked to a speaker. Delete the speaker record first, in Speakers.</li>
+          <li>An account that holds more than 496 claimed tickets. The refusal names the count, because one delete can release at most 496.</li>
+          </ul>
+          <p><strong>If a delete stops part way.</strong> When the account has left the directory but some of its data did not clear, the page keeps a notice with <strong>Try the delete again</strong>. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. For up to an hour after the delete, the person&#39;s open session can still claim a ticket; a retry also releases a ticket claim made after the delete. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.</p>
           <h2 id="ticketing">Ticketing<a class="heading-anchor" href="#ticketing" aria-label="Link to this section">#</a></h2>
           <p>Provider status, CSV import, and a searchable ticket list. What is here depends on the client&#39;s provider choice (<a href="/eventrunner/docs/client-onboarding/"><code>CLIENT_ONBOARDING.md</code></a> §3 item 5):</p>
           <ul>

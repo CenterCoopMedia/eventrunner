@@ -182,6 +182,21 @@
           says &quot;No session has been saved yet.&quot; when none has, says so when saving sessions is switched
           off, and keeps the last counts under a notice if the listener fails. <code>useBookmarkCounts</code> now
           also answers <code>ready</code> and <code>error</code>.</li>
+          <li>Attendee export (#184). The Attendees page saves the rows on screen as a CSV file through the
+          staff-tier <code>exportAttendees</code> endpoint. The file carries exactly the approved field set: name,
+          email, organization, role, registration status, badges, past attendance, social handles, and
+          profile visibility. A cell that a spreadsheet would run as a formula starts with an apostrophe.
+          Every export writes an <code>admin_logs</code> row with the actor, the row count, the status filter, and
+          whether a search was used, never the search text; the server refuses the file when that row
+          cannot be written, and keeps no copy of it.</li>
+          <li>Attendee records and a guarded account delete (#185). <strong>Edit record</strong> on an Attendees row opens
+          the organizer-owned past attendance list, saved through the staff-tier <code>updateAttendee</code>
+          endpoint; the rules deny the field to every client, its owner included. The same panel deletes
+          an account through <code>deleteAttendee</code>: one transaction checks that the account is not the
+          caller&#39;s, not an admin&#39;s, and not linked to a speaker, then removes the account, its directory
+          profile, and its schedule share, releases its ticket claims, and writes the audit row. The
+          sign-in, saved sessions, notes, and profile photos are cleared after it, and a part-way delete
+          keeps a &quot;Try the delete again&quot; action that resumes it. Approve and revoke are unchanged.</li>
           </ul>
           <ul>
           <li>A <code>fact</code> block for a fact that is not a number (#234): The term, the fact itself, and one
