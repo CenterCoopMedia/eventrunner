@@ -5,12 +5,14 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const adminSubscriptions = new Map();
+const adminErrors = new Map();
 // When true, the admin listeners attach but deliver nothing yet: the window
 // in which a page is still loading.
 let holdAdminCollections = false;
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (name, onNext) => {
+  subscribeAdminCollection: (name, onNext, onError) => {
     adminSubscriptions.set(name, onNext);
+    adminErrors.set(name, onError);
     if (!holdAdminCollections) onNext([]);
     return () => adminSubscriptions.delete(name);
   },
@@ -124,6 +126,7 @@ async function openEntry(id = 'edition-2024') {
 
 beforeEach(() => {
   adminSubscriptions.clear();
+  adminErrors.clear();
   contentSubscriptions.clear();
   holdAdminCollections = false;
   currentPath = '';
@@ -190,6 +193,44 @@ describe('the timeline list', () => {
     expect(endpointOf(0)).toBe('cmsPublish');
     expect(bodyOf(0)).toEqual({ collection: 'cmsTimeline', docIds: ['edition-2019', 'edition-2025'] });
     expect(await screen.findAllByText('Published. The public site picks it up live.')).not.toHaveLength(0);
+  });
+
+  // Codex review on #288, the same flaw #281 found in the organizations
+  // list: a resumed run is reported against the ids the failed run asked
+  // for, not the drafts that are dirty now.
+  it('reports a resumed publish against the ids the failed run asked for', async () => {
+    await renderAt('/admin/timeline');
+    await screen.findByRole('heading', { level: 1, name: 'Timeline' });
+    pushTimeline(LIVE, DRAFTS);
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { code: 'publish-failed', message: 'Publish failed part-way.' }, queueId: 'queue-7' }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (2)' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+
+    // A third entry gains a draft after the failed run.
+    pushTimeline(LIVE, [...DRAFTS.filter((doc) => doc.id !== 'edition-2024'), { ...DRAFTS[1], title: 'The first meeting, again', status: 'dirty' }]);
+    fetch.mockResolvedValueOnce(published(['edition-2019', 'edition-2025']));
+    fireEvent.click(resume);
+    expect(await screen.findByText('Published. The public site picks it up live.', { selector: 'p[role="status"]' })).toBeInTheDocument();
+    expect(bodyOf(1)).toEqual({ queueId: 'queue-7' });
+  });
+
+  // Codex review on #288: one listener's delivery must not clear the other's
+  // failure.
+  it('keeps the drafts listener’s failure while the live listener reports', async () => {
+    await renderAt('/admin/timeline');
+    await screen.findByRole('heading', { level: 1, name: 'Timeline' });
+    pushTimeline(LIVE, DRAFTS);
+    const lost = 'We lost the connection to the timeline; showing the last values we received and retrying.';
+    act(() => adminErrors.get('cmsTimeline_drafts')(new Error('unavailable')));
+    expect(screen.getByText(lost)).toBeInTheDocument();
+    act(() => adminSubscriptions.get('cmsTimeline')(LIVE));
+    expect(screen.getByText(lost)).toBeInTheDocument();
+    act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS));
+    expect(screen.queryByText(lost)).toBeNull();
   });
 
   it('says so when the live home page has no History section, and not while it has one', async () => {
@@ -362,6 +403,41 @@ describe('the timeline entry editor', () => {
       visible: false,
       fields: { year: 2025, title: 'Two workshop tracks, edited', description: 'Practice and planning.' },
     });
+  });
+
+  // Codex review on #288, the race #281 found in the organizations editor.
+  it('waits for both revisions before it fills the form, so a save keeps the unpublished draft', async () => {
+    holdAdminCollections = true;
+    await renderAt('/admin/timeline/edition-2025');
+    await waitFor(() => expect(adminSubscriptions.has('cmsTimeline_drafts')).toBe(true));
+
+    act(() => adminSubscriptions.get('cmsTimeline')(LIVE));
+    // Only the live revision is in: no form yet, so nothing can be saved
+    // from the live values.
+    expect(screen.getByRole('status', { name: 'Loading entry…' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).toBeNull();
+
+    act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS));
+    expect(await screen.findByLabelText('Title')).toHaveValue('Two workshop tracks, edited');
+    fetch.mockResolvedValueOnce(response({ ok: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields).toMatchObject({ title: 'Two workshop tracks, edited' });
+  });
+
+  it('does not open the form from the live revision alone when the drafts listener fails, and says why', async () => {
+    holdAdminCollections = true;
+    await renderAt('/admin/timeline/edition-2025');
+    await waitFor(() => expect(adminSubscriptions.has('cmsTimeline_drafts')).toBe(true));
+    act(() => adminSubscriptions.get('cmsTimeline')(LIVE));
+    act(() => adminErrors.get('cmsTimeline_drafts')(new Error('unavailable')));
+
+    expect(screen.getByText(
+      'We could not load this entry and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again.',
+    )).toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).toBeNull();
+    act(() => adminSubscriptions.get('cmsTimeline_drafts')(DRAFTS));
+    expect(await screen.findByLabelText('Title')).toHaveValue('Two workshop tracks, edited');
   });
 
   it('says so when an address names no entry', async () => {

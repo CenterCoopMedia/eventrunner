@@ -26,6 +26,7 @@ import { focusFirstError } from '../../lib/focusFirstError.js';
 import {
   CheckboxField,
   DestructiveConfirm,
+  Notice,
   Panel,
   SaveStatus,
   ServerErrorSummary,
@@ -67,7 +68,7 @@ export default function AdminTimelineEditor({ mode }) {
   const navigate = useNavigate();
   const call = useAdminApi();
   const { showToast } = useToast();
-  const { loading, findRow } = useAdminTimeline();
+  const { ready, error: listenerError, findRow } = useAdminTimeline();
   const [form, setForm] = useState(EMPTY);
   // Minted once per form, on the first render in create mode.
   const [newId] = useState(() => (mode === 'create' ? mintId() : null));
@@ -87,11 +88,14 @@ export default function AdminTimelineEditor({ mode }) {
   const docId = mode === 'edit' ? entryId : (createdId ?? newId);
   const row = mode === 'edit' || createdId ? findRow(docId) : null;
 
+  // The form is filled once, from the merged row, and only after both the
+  // live and the draft listener have reported: filled from the live
+  // revision alone, a save would replace the unpublished draft.
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !row) return;
+    if (mode !== 'edit' || adoptedRef.current || !ready || !row) return;
     adoptedRef.current = true;
     setForm(toForm(row));
-  }, [mode, row]);
+  }, [mode, ready, row]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -177,8 +181,21 @@ export default function AdminTimelineEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && !createdId && loading) return <AdminLoadingState label="Loading entry…" />;
-  if (mode === 'edit' && !createdId && !row && !loading) {
+  if (mode === 'edit' && !createdId && !ready) {
+    // A listener failed before both had reported. The form stays closed
+    // rather than opening on one revision; the listener retries, and the
+    // form opens when both are in.
+    if (listenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load this entry and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading entry…" />;
+  }
+  if (mode === 'edit' && !createdId && !row) {
     return (
       <AdminEmptyState
         title="No such entry"
