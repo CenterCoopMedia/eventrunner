@@ -80,4 +80,12 @@ describe('SponsorPackageBlock', () => {
     expect(entries[0].className).toContain('border-t-rule-hairline');
     expect(entries.map((entry) => within(entry).getByRole('heading', { level: 3 }).textContent)).toEqual(['First', 'Second']);
   });
+
+  // Review round (c2, finding 5): a heading takes the base text-wrap:
+  // balance (index.css, h1 to h4); `pretty` is for descriptions.
+  it('leaves the package heading to the base balance', () => {
+    render(<SponsorPackageBlock block={PACKAGE} />);
+    const heading = screen.getByRole('heading', { level: 3, name: 'Coffee break' });
+    expect(heading.className).not.toMatch(/\btext-pretty\b/);
+  });
 });

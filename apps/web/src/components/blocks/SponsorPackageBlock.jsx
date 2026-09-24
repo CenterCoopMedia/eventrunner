@@ -33,7 +33,7 @@ export default function SponsorPackageBlock({ block }) {
   const benefits = sanitizeHtml(block.benefits);
   return (
     <article>
-      <h3 className="font-heading text-h3 font-semibold text-text-primary text-pretty">{text(block.name)}</h3>
+      <h3 className="font-heading text-h3 font-semibold text-text-primary">{text(block.name)}</h3>
       {price || openTo ? (
         <dl className="definition-list mt-xs">
           {price ? <DefinitionPair term="Price">{price}</DefinitionPair> : null}
