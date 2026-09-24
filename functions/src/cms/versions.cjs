@@ -97,11 +97,29 @@ function leavesOf(fields) {
   return out;
 }
 
-/** An instant leaves as milliseconds; everything else as stored. */
-const leafValue = (value) => (isInstant(value) ? toMillis(value) : value);
+/**
+ * An instant leaves as milliseconds; so does a time string on the other
+ * side of an instant, so both cells of the change read as dates. Anything
+ * else leaves as stored.
+ */
+function leafValue(value, time) {
+  if (isInstant(value)) return toMillis(value);
+  if (time && typeof value === 'string') return toMillis(value) ?? value;
+  return value;
+}
 
+/**
+ * When either side is a time, the two are the same when they name the
+ * same instant. The demo seed stores cmsUpdates.publishAt as an ISO
+ * string and cmsSaveUpdate stores a Date, so a string and a Timestamp of
+ * one instant are no change.
+ */
 function sameLeaf(a, b) {
-  if (isInstant(a) || isInstant(b)) return isInstant(a) && isInstant(b) && toMillis(a) === toMillis(b);
+  if (isInstant(a) || isInstant(b)) {
+    const left = toMillis(a);
+    const right = toMillis(b);
+    return left !== null && right !== null && left === right;
+  }
   return isDeepStrictEqual(a, b);
 }
 
@@ -122,8 +140,9 @@ function comparePaths(a, b) {
 }
 
 function change(path, kind, before, after) {
-  const entry = { path, kind, before: leafValue(before), after: leafValue(after) };
-  if (isInstant(before) || isInstant(after)) entry.time = true;
+  const time = isInstant(before) || isInstant(after);
+  const entry = { path, kind, before: leafValue(before, time), after: leafValue(after, time) };
+  if (time) entry.time = true;
   return entry;
 }
 

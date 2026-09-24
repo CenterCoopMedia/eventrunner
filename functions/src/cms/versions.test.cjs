@@ -365,6 +365,28 @@ test('describeChanges: an instant is one value in milliseconds, marked as a time
   ]);
 });
 
+test('describeChanges: a time the seed stored as a string equals the Timestamp of the same instant', () => {
+  // The demo seed writes cmsUpdates.publishAt as an ISO string; the first
+  // save through cmsSaveUpdate stores a Date, which reads back as a
+  // Timestamp. The instant did not move, so nothing changed.
+  const { Timestamp } = require('firebase-admin/firestore');
+  const ISO = '2026-09-12T13:00:00.000Z';
+  const MS = Date.parse(ISO);
+  assert.deepEqual(
+    describeChanges(row({ title: 'A', publishAt: ISO }), row({ title: 'A', publishAt: Timestamp.fromMillis(MS) })).changes,
+    [],
+  );
+  // A real move reads as a time on both sides, in milliseconds.
+  assert.deepEqual(
+    describeChanges(row({ publishAt: ISO }), row({ publishAt: Timestamp.fromMillis(MS + 3_600_000) })).changes,
+    [{ path: 'publishAt', kind: 'changed', before: MS, after: MS + 3_600_000, time: true }],
+  );
+  // A string that is not a time stays as written.
+  assert.deepEqual(describeChanges(row({ publishAt: 'soon' }), row({ publishAt: new Date(MS) })).changes, [
+    { path: 'publishAt', kind: 'changed', before: 'soon', after: MS, time: true },
+  ]);
+});
+
 test('cmsGetVersionHistory: every entry diffs against the row before it, across pages', async () => {
   const db = seedHistory();
   const docPath = 'cmsContent/hero__title';
