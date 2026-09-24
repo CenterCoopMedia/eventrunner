@@ -387,7 +387,7 @@ describe('AdminChangeRequests: removal', () => {
 
     fireEvent.click(within(rowFor('one')).getByRole('button', { name: 'Remove' }));
     expect(callMock).not.toHaveBeenCalled();
-    expect(within(rowFor('one')).getByText(/The request and its text are deleted\. The audit log keeps who sent it and when\. This cannot be undone\./)).toBeInTheDocument();
+    expect(within(rowFor('one')).getByText(/The request and its text are deleted\. The admin log keeps who sent it and when\. This cannot be undone\./)).toBeInTheDocument();
     expect(within(rowFor('one')).getByRole('button', { name: 'Keep it' })).toBeInTheDocument();
 
     fireEvent.click(within(rowFor('one')).getByRole('button', { name: 'Remove this request' }));

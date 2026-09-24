@@ -161,7 +161,7 @@ test.describe.serial('change requests', () => {
     expect((await ref.get()).data().updatedBy).toBe(STAFF_EMAIL);
 
     await row.getByRole('button', { name: 'Remove' }).click();
-    await expect(row.getByText('The request and its text are deleted. The audit log keeps who sent it and when. This cannot be undone.')).toBeVisible();
+    await expect(row.getByText('The request and its text are deleted. The admin log keeps who sent it and when. This cannot be undone.')).toBeVisible();
     await row.getByRole('button', { name: 'Remove this request' }).click();
     await expect(staff.getByText('Request removed.')).toBeVisible();
     await expect(staff.getByRole('listitem').filter({ hasText: message })).toHaveCount(0);

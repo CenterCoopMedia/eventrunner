@@ -436,7 +436,7 @@ export default function AdminChangeRequests() {
                             trigger="Remove"
                             title="Remove this request"
                             confirmLabel="Remove this request"
-                            consequence="The request and its text are deleted. The audit log keeps who sent it and when."
+                            consequence="The request and its text are deleted. The admin log keeps who sent it and when."
                             permanence="This cannot be undone."
                             // While any action runs, an open confirm is disabled
                             // rather than live and silent (DestructiveConfirm
