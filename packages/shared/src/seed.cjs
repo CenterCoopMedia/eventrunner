@@ -29,6 +29,14 @@
 /** The actor recorded on every seeded write; not a person, and deliberately visible. */
 const SEED_ACTOR = Object.freeze({ uid: 'init-event-script', email: 'init-event-script' });
 
+/**
+ * What the seeded When fact says when the event states no dates. The seed
+ * writes it (scripts/lib/seed.cjs), and the home page shows it for a
+ * seed-owned When fact whose live day list holds no date, so the card never
+ * keeps a range the settings no longer state.
+ */
+const SEED_WHEN_PLACEHOLDER = '[Replace] The dates the event runs.';
+
 /** Whether a recorded writer is the seed. Absent counts as the seed's. */
 function wroteAsSeed(who) {
   return who == null || who === SEED_ACTOR.uid || who === SEED_ACTOR.email;
@@ -63,4 +71,4 @@ function publicContentDoc(doc) {
   return isSeedOwned(doc) ? { ...rest, seeded: true } : rest;
 }
 
-module.exports = { SEED_ACTOR, isSeedOwned, publicContentDoc };
+module.exports = { SEED_ACTOR, SEED_WHEN_PLACEHOLDER, isSeedOwned, publicContentDoc };

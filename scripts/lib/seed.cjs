@@ -28,6 +28,7 @@
  */
 
 const { VENUE_MAP_SECTION_ID } = require('shared/venue');
+const { SEED_WHEN_PLACEHOLDER } = require('shared/seed');
 const { buildLegalContent } = require('./legal.cjs');
 const { getDefaultTemplate } = require('../../functions/src/email/templates.cjs');
 
@@ -570,7 +571,7 @@ const CONFIG_SEEDS = Object.freeze({
   // withLiveDates), so a moved day never leaves a stale fact.
   'info.when': ({ event }) => ({
     label: 'When',
-    value: eventDateRange(event) || '[Replace] The dates the event runs.',
+    value: eventDateRange(event) || SEED_WHEN_PLACEHOLDER,
   }),
   'info.where': ({ event }) => {
     const address = venueAddress(event.venue);

@@ -17,6 +17,7 @@ import RegistrationAction, {
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
 import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
+import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
 
 /**
  * The one composed moment on the first screen: three equal cells across the
@@ -103,7 +104,12 @@ export function SummaryRow({ days, timezone, eventConfig, facts, className = '' 
 export function withLiveDates(block, eventConfig) {
   if (block?.blockType !== 'fact' || block.seeded !== true || block.field !== 'when') return block;
   const live = eventDateRangeLabel(eventConfig);
-  return live ? { ...block, value: live } : block;
+  if (live) return { ...block, value: live };
+  // The settings state a day list that holds no date: the dates are not
+  // set, so the card says what the seed would write now, never the range
+  // init copied in (connector review of PR 270). Settings with no day list
+  // at all keep the stored value.
+  return Array.isArray(eventConfig?.days) ? { ...block, value: SEED_WHEN_PLACEHOLDER } : block;
 }
 
 export default function Home() {

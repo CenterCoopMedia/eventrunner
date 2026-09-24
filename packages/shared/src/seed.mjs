@@ -1,1 +1,1 @@
-export { SEED_ACTOR, isSeedOwned, publicContentDoc } from './seed.cjs';
+export { SEED_ACTOR, SEED_WHEN_PLACEHOLDER, isSeedOwned, publicContentDoc } from './seed.cjs';

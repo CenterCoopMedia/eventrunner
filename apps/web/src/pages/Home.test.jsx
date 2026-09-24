@@ -50,7 +50,7 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 }));
 
 import Home from './Home.jsx';
-import { publicContentDoc } from 'shared/seed';
+import { SEED_WHEN_PLACEHOLDER, publicContentDoc } from 'shared/seed';
 import { makeFakeDb } from '../../../../functions/src/cms/firestoreFake.cjs';
 import { createCmsUpdateContentHandler } from '../../../../functions/src/cms/content.cjs';
 import * as store from '../../../../functions/src/cms/store.cjs';
@@ -308,6 +308,17 @@ describe('Home key facts', () => {
     render(<Home />);
     // The hero states the range too; the card is the <dd>.
     expect(screen.getByText('October 21–22, 2026', { selector: 'dd' })).toBeInTheDocument();
+    expect(screen.queryByText('October 14–16, 2026')).toBeNull();
+  });
+
+  it('drops the seeded dates when the event settings list no day, as the seed would (connector review of PR 270)', async () => {
+    // A valid empty day list means the dates are not set. The seed writes
+    // its own placeholder in that case, so the card says the same thing the
+    // seed would write now, never the range init copied in.
+    eventConfig = { name: 'Demo Event', timezone: 'UTC', days: [] };
+    infoBlocks = [await whenFactFromTheCms()];
+    render(<Home />);
+    expect(screen.getByText(SEED_WHEN_PLACEHOLDER, { selector: 'dd' })).toBeInTheDocument();
     expect(screen.queryByText('October 14–16, 2026')).toBeNull();
   });
 
