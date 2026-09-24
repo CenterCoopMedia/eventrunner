@@ -80,7 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unpublished changes, under Content, for staff and operators: every page, content block, session,
   organization, update, and timeline entry that is saved and not yet on the site, in one ruled
   table per collection with its state, when it was saved, and by whom. **Publish all** and a
-  publish per table call `cmsPublish`. Under the tables, **Recent publishes** lists the last 10
+  publish per table call `cmsPublish`; a table's button waits while the list cannot be refreshed,
+  so a stale row is never published twice. Under the tables, **Recent publishes** lists the last 10
   publish runs and the 20 newest runs still marked Failed, with **Resume publish** on a failed
   run. A banner above every other admin page states the same count in one sentence and links to
   the page. The banner and the page read one live source, the dirty drafts of each collection,

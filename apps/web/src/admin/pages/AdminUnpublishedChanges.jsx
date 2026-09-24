@@ -61,6 +61,8 @@ const RECENT_RUNS = 10;
 const FAILED_RUNS = 20;
 
 export const COUNT_ERROR = 'We could not count the unpublished changes. We will try again.';
+const STALE_LIST =
+  'The list could not be refreshed. Until it is, the buttons on each table wait. Publish all reads the current list. It will try again.';
 const PART_WAY =
   'The publish stopped part-way. Its run is marked Failed under Recent publishes. Resume it there.';
 const STILL_RUNNING =
@@ -322,8 +324,10 @@ export default function AdminUnpublishedChanges() {
         publish(event, key, { all: true }, summarizeAll);
       } else if (key.startsWith('collection:')) {
         const group = groups.find((candidate) => `collection:${candidate.choice.id}` === key);
-        // Past the server's cap the control refuses every press.
-        if (!group || group.rows.length > MAX_COLLECTION_IDS) return;
+        // Past the server's cap the control refuses every press. So does a
+        // stale list: cmsPublish publishes any draft it is sent, so an id
+        // another admin has published since would go live a second time.
+        if (!group || group.rows.length > MAX_COLLECTION_IDS || error) return;
         const ids = group.rows.map((row) => row.id);
         publish(event, key, { collection: group.choice.id, docIds: ids }, (response) =>
           summarizePublish(response, group.choice.id, ids, group.choice.plural),
@@ -336,11 +340,13 @@ export default function AdminUnpublishedChanges() {
 
   /**
    * Every publish control: one handler, unavailable while any call runs,
-   * or always when `unavailable` (a collection past the server's cap).
+   * or always when `unavailable` (a collection past the server's cap). A
+   * collection's control also waits while the list is stale; Publish all
+   * and a resume do not, because the server reads what they publish.
    */
   function controlProps(key, className, unavailable = false) {
     const pressed = busyKey === key;
-    const held = unavailable || busyKey !== null;
+    const held = unavailable || busyKey !== null || (Boolean(error) && key.startsWith('collection:'));
     return {
       className: held && !pressed ? `${className} ${unavailableButtonClass}` : className,
       onClick: onPress(key),
@@ -378,7 +384,7 @@ export default function AdminUnpublishedChanges() {
         )
       ) : (
         <>
-          {error ? <Notice tone="caution" message="The list could not be refreshed. It will try again." /> : null}
+          {error ? <Notice tone="caution" message={STALE_LIST} /> : null}
           {total === 0 ? (
             <AdminEmptyState
               title="Nothing is waiting to be published"
