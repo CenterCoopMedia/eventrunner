@@ -486,7 +486,9 @@ test('requireAttendeeAccess: registrationStatus approved → ok', async () => {
     },
     reqWithAuth('Bearer good'),
   );
-  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+  // Admitted through the account document, which a write that must not
+  // outlive the account re-reads in its transaction (bookmarks.cjs).
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org', viaAccount: true });
 });
 
 test('requireAttendeeAccess: a linked speaker profile grants access even when pending', async () => {
@@ -526,7 +528,7 @@ test('requireAttendeeAccess: a bootstrap admin passes even with a pending, non-s
     },
     reqWithAuth('Bearer good'),
   );
-  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org', viaAccount: false });
 });
 
 test('requireAttendeeAccess: a staff admin passes too — attendee access is the floor under every admin', async () => {
@@ -538,7 +540,7 @@ test('requireAttendeeAccess: a staff admin passes too — attendee access is the
     },
     reqWithAuth('Bearer good'),
   );
-  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org' });
+  assert.deepEqual(verdict, { ok: true, uid: 'u9', email: 'attendee@example.org', viaAccount: false });
 });
 
 test('requireAttendeeAccess: a bootstrap admin with no users/{uid} doc at all still passes', async () => {

@@ -308,7 +308,15 @@ async function requireAttendeeAccess({ auth, db, getConfig }, req) {
       message: 'Attendee access required.',
     };
   }
-  return { ok: true, uid: decoded.uid, email: typeof decoded.email === 'string' ? decoded.email : null };
+  // viaAccount: admitted through users/{uid} rather than the bootstrap list.
+  // A write that must not outlive the account (a bookmark, which an account
+  // delete sweeps) re-reads that document inside its own transaction.
+  return {
+    ok: true,
+    uid: decoded.uid,
+    email: typeof decoded.email === 'string' ? decoded.email : null,
+    viaAccount: !isBootstrapAdmin,
+  };
 }
 
 /**
