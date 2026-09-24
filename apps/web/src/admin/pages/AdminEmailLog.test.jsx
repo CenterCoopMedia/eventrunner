@@ -225,6 +225,26 @@ describe('AdminEmailLog', () => {
     }
   });
 
+  it('says what Complained and Suppressed mean under the word', async () => {
+    await renderPage('/admin/email-log', {
+      lists: [{
+        rows: [
+          message({ id: 'spam', to: 'spam@example.test', deliveryStatus: 'complained' }),
+          message({ id: 'blocked', to: 'blocked@example.test', deliveryStatus: 'suppressed', bounceReason: 'Previously bounced' }),
+        ],
+        nextCursor: null,
+        scanned: 2,
+      }],
+    });
+    const spam = rowOf('spam@example.test');
+    expect(within(spam).getByText('Complained')).toBeInTheDocument();
+    expect(within(spam).getByText('The recipient marked it as spam.')).toBeInTheDocument();
+    const blocked = rowOf('blocked@example.test');
+    expect(within(blocked).getByText('Suppressed')).toBeInTheDocument();
+    expect(within(blocked).getByText('The mail provider did not send it, because the address is on its block list.')).toBeInTheDocument();
+    expect(within(blocked).getByText('Previously bounced')).toBeInTheDocument();
+  });
+
   it('shows a source or a delivery state it does not know as data, never as an object key’s value', async () => {
     await renderPage('/admin/email-log', {
       lists: [{

@@ -68,12 +68,20 @@ export const SOURCE_LABELS = Object.freeze({
   'ticketing-registration-prompt': 'Ticket prompt',
 });
 
-/** A delivery event the provider reported, as a word and the tone that agrees with it. */
+/**
+ * A delivery event the provider reported, as a word and the tone that
+ * agrees with it. The two words a reader may not know carry a short gloss,
+ * the same one docs/ADMIN_GUIDE.md gives.
+ */
 const DELIVERY_WORDS = Object.freeze({
   delivered: { label: 'Delivered', tone: 'ok' },
   bounced: { label: 'Bounced', tone: 'error' },
-  complained: { label: 'Complained', tone: 'caution' },
-  suppressed: { label: 'Suppressed', tone: 'caution' },
+  complained: { label: 'Complained', tone: 'caution', gloss: 'The recipient marked it as spam.' },
+  suppressed: {
+    label: 'Suppressed',
+    tone: 'caution',
+    gloss: 'The mail provider did not send it, because the address is on its block list.',
+  },
 });
 
 /**
@@ -199,9 +207,11 @@ function StatusCell({ row }) {
   else if (row.status === 'sent') word = <span className={quietWordClass}>Sent</span>;
   else word = <span className="font-admin-data text-admin-ink-data">{row.status ?? 'Unknown'}</span>;
   const reason = row.status === 'failed' ? row.error : row.bounceReason;
+  const gloss = row.status !== 'failed' ? delivery?.gloss : null;
   return (
     <>
       {word}
+      {gloss ? <p className="mt-3xs max-w-[28ch] text-admin-xs text-admin-ink-secondary">{gloss}</p> : null}
       {reason ? (
         <p className="mt-3xs max-w-[28ch] break-words text-admin-xs text-admin-ink-secondary">{reason}</p>
       ) : null}
