@@ -144,6 +144,39 @@
           leave the deployment with no operator, including an operator removing their own last grant.</li>
           </ul>
           <ul>
+          <li>A <code>fact</code> block for a fact that is not a number (#234): The term, the fact itself, and one
+          optional line under it. It renders through the new definition list device, a real <code>&lt;dl&gt;</code> ruled
+          between pairs, and it asks for none of the evidence parts a statistic must carry. The home page&#39;s
+          key facts now seed as three facts (when, where, who) with the dates and the venue taken from the
+          event settings; the stat block&#39;s six-part contract is unchanged, and a statistic can still open a
+          card. A <code>quote</code> block renders a quoted sentence and its attribution through the new pull quote
+          device, whose sentence is Zine&#39;s handwritten callout in every style and whose frame each style
+          remaps. Both blocks are in the admin palette with a hint under each field.</li>
+          <li>Four more devices of the design vocabulary&#39;s second wave, each with a tier 3 contract every
+          site style remaps and a figure in the specimen book: a timeline (an ordered list on the same
+          spine the updates feed draws, dated by real dates), a ruled table (a real table with row rules,
+          tabular figures, a horizontal scroll region at narrow widths, and a sortable head whose button
+          sorts while the column carries <code>aria-sort</code>), a progress device (a
+          native <code>&lt;progress&gt;</code> with &quot;3 of 5 tasks done&quot; stated beside it, never a ring), and a notice bar (a
+          ruled band with a level as a word and a rule weight, <code>status</code> or <code>alert</code>, with a dismiss control
+          remembered per browser).</li>
+          <li>The rest of the second wave&#39;s devices: a dropzone (a ruled region around a real file input, with a
+          stated progress line and a sent list with a state word per file), a repeater (rows a person adds
+          and removes, each field labelled, focus following the change), an avatar (square on the brand
+          radius, the initial in the heading face; the attendee photo now draws through it), a count and a
+          figure sentence (figures in tabular numerals with their label, in place of a badge or a tile), a
+          legend (one line at the head of a list), a session state marker (a word with an ink change and a
+          rule; a finished session takes the back-issue ink), a standfirst, a byline and a dateline, and the
+          long read opening (a drop cap, a standfirst, or plain, on the first paragraph of a Long read page).
+          Each has a tier 3 contract, a rule set, a specimen, and a remap in the styles whose story differs.</li>
+          <li>Five option groups on every site style, under Advanced: Long read opening, Quote device,
+          Directory style, Section boundary and Table rules. A group remaps tokens the style already
+          declares, and a choice may now move a component face too, which is how Zine&#39;s toner-block quote
+          drops the script face. The updates feed&#39;s spine and the speaker shelf&#39;s rule read the new
+          <code>timeline</code> and <code>directory</code> contracts, so the option reaches them.</li>
+          <li>The tabs and the segmented control take an unavailable state. An unavailable tab or segment stays
+          in its row with <code>aria-disabled</code>, so the arrow keys can land on it and a reader hears why; it opens
+          nothing and is never chosen, and the tests prove it.</li>
           <li>A specimen book at <code>/specimen</code>: every device the system has, drawn in the site style and display
           mode the page is set to, with the component file and the tier 3 contract beside each one.
           Thirteen sections cover type, colour, rules and spacing, layout, headers, editorial devices,
@@ -182,8 +215,43 @@
           on a side also becomes the app icon. An end-to-end test asks Chromium whether the default site is
           installable (#218).</li>
           </ul>
+          <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>The second wave&#39;s devices, after an adversarial review of the branch. The ruled table&#39;s scroll
+          region carries its own overflow, so a wide table scrolls inside it and the page never scrolls
+          sideways; the head no longer claims to stick, because a head pinned inside a region that scrolls
+          only sideways pins to nothing. A notice bar keys its dismissal to the notice it is showing now, so
+          a new or urgent notice in the same slot shows after an earlier one was dismissed, and it hands
+          focus to the main landmark rather than the body. One pull quote per page is enforced at render:
+          the first quote block in reading order is the pull quote and any later one is set as a plain
+          quotation, and every site style draws quotation marks (the large opening mark or an inline pair).
+          An unavailable tab or segment holds the row&#39;s one tab stop while it has focus, takes a dashed rule
+          a sighted reader sees, and shows its reason under the row while it has focus or the pointer. The
+          dropzone says it is busy while files go, announces its progress and its sent list through one
+          status region, draws the strong rule in the danger ink on a refusal, and invites the drop in one
+          sentence with the control&#39;s own label beside it. The repeater keeps its add control at the cap,
+          unavailable and named with the limit. Zine&#39;s urgent notice doubles the rule and Zine&#39;s and Atlas&#39;s
+          dropzone widens it while a file is held over it, so neither state is colour alone. An update&#39;s
+          dateline is formatted on the event&#39;s clock, not the reader&#39;s. The home page&#39;s seeded When fact
+          reads the dates live from the event settings for as long as it is still the seed&#39;s.</li>
+          <li>Upgrading a launched site to the fact block (#234) no longer states the venue twice or publishes a
+          new placeholder onto the home page: a seeded replacement is withheld while the blocks it replaces
+          survive as the client&#39;s (and those blocks are kept whole), and a placeholder is not created in a
+          section the client has already written. Both are reported by init as kept.</li>
+          </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The admin loads the Branding page and the block editor when someone opens them, not with the
+          rest of the admin. Together with the tiers work, the wave 2 block forms had pushed the admin
+          entry chunk past its 50,000-byte gzip ceiling; it is now about 35,000.</li>
+          <li>The preset catalog is split by who needs it. <code>shared/presetCatalog</code> carries the palettes, the
+          type maps and every option group&#39;s default and choice ids; <code>shared/presetRemaps</code> carries what a
+          style moves (its own token remaps, what each choice moves, and the component defaults a style
+          change resets), and only a path that resolves a style at runtime loads it: the web app fetches it
+          as a lazy chunk when a live theme overlay, the demo style switcher, the admin or the specimen book
+          asks, and a Node caller requires it once. The chunk every visitor downloads for first paint no
+          longer carries the remaps of every style, and the resolver refuses to resolve a style&#39;s tokens or
+          picks until the remaps are loaded rather than dropping a choice silently.</li>
           <li>Every control on the public site now answers the same ten interaction states: rest, hover, focus,
           press, selected, disabled, busy, error, success and empty. The hover, press and selected tints
           come from a new <code>state</code> family in the design tokens, so a site style retunes every control at
@@ -265,7 +333,7 @@
           instead of the retired brand-* utility names. Rendered colour is pixel-identical in every site
           style and mode (#247).</li>
           </ul>
-          <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
+          <h3 id="fixed-1">Fixed<a class="heading-anchor" href="#fixed-1" aria-label="Link to this section">#</a></h3>
           <ul>
           <li>Shared schedules no longer survive account deletion or regain public visibility after a
           concurrent privacy change. Owners can revoke sharing after losing attendee access (#172).</li>
@@ -405,7 +473,7 @@
           <code>title</code> beside its <code>label</code>, which is what heads the page, titles the browser tab, and titles a
           shared link; the four whose short label reads oddly as a heading state one.</li>
           </ul>
-          <h3 id="fixed-1">Fixed<a class="heading-anchor" href="#fixed-1" aria-label="Link to this section">#</a></h3>
+          <h3 id="fixed-2">Fixed<a class="heading-anchor" href="#fixed-2" aria-label="Link to this section">#</a></h3>
           <ul>
           <li>Firebase deployment validation no longer requires <code>VITE_FIREBASE_MEASUREMENT_ID</code> when Google Analytics is disabled (#101).</li>
           <li>The admin sessions list showed a day&#39;s raw document id (&quot;day-2&quot;) as its heading whenever the day
