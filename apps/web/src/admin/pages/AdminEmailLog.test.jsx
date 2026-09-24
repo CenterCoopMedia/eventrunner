@@ -4,7 +4,7 @@
 // getSentEmail calls. A location probe beside the page reads what the router
 // holds, because the search text must never reach it.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const callMock = vi.fn();
@@ -284,6 +284,85 @@ describe('AdminEmailLog', () => {
     expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(newPreview));
     expect(screen.getByText(/^6 messages shown/)).toBeInTheDocument();
+  });
+
+  describe('while a search is running', () => {
+    const FEEDBACK_ROW = message({ id: 'fb', to: 'feedback-row@example.test', source: 'feedback' });
+    const OLDER_ROW = message({ id: 'older', to: 'older@example.test' });
+    const cursor = { sentAt: SENT_AT, id: 'delivered' };
+
+    /**
+     * The first read answers at once with a next page. Every later read is
+     * held until the test releases it, and answers by what it asked for:
+     * the feedback filter gets the feedback row, a page after the cursor
+     * gets the older row, and anything else gets the first rows again.
+     */
+    function serveHeld() {
+      const held = [];
+      callMock.mockImplementation((name, body) => {
+        if (name !== 'listSentEmails') return Promise.reject(new Error(`unexpected call ${name}`));
+        if (held.length === 0 && callMock.mock.calls.length === 1) {
+          return Promise.resolve({ rows: ROWS, nextCursor: cursor, scanned: 5 });
+        }
+        let answer;
+        if (body.source === 'feedback') answer = { rows: [FEEDBACK_ROW], nextCursor: null, scanned: 1 };
+        else if (body.cursor) answer = { rows: [OLDER_ROW], nextCursor: null, scanned: 1 };
+        else answer = { rows: ROWS, nextCursor: cursor, scanned: 5 };
+        return new Promise((resolve) => held.push(() => resolve(answer)));
+      });
+      return held;
+    }
+
+    async function startFeedbackSearch() {
+      const held = serveHeld();
+      render(
+        <MemoryRouter initialEntries={['/admin/email-log']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes>
+            <Route path="/admin/email-log" element={<><AdminEmailLog /><LocationProbe /></>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await screen.findByText('plain@example.test');
+      fireEvent.change(screen.getByRole('combobox', { name: 'Source' }), { target: { value: 'feedback' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+      await waitFor(() => expect(listCalls()).toHaveLength(2));
+      return held;
+    }
+
+    async function releaseAll(held) {
+      await act(async () => {
+        for (const release of held) release();
+        await Promise.resolve();
+      });
+    }
+
+    it('refuses Load more until the search answers, so the new search’s rows win and match the URL', async () => {
+      const held = await startFeedbackSearch();
+      const more = screen.getByRole('button', { name: 'Load more' });
+      expect(more).toHaveAttribute('aria-disabled', 'true');
+      fireEvent.click(more);
+      await releaseAll(held);
+
+      expect(await screen.findByText('feedback-row@example.test')).toBeInTheDocument();
+      expect(listCalls()).toEqual([{ limit: 25 }, { limit: 25, source: 'feedback' }]);
+      expect(screen.queryByText('older@example.test')).toBeNull();
+      expect(screen.queryByText('plain@example.test')).toBeNull();
+      expect(location()).toBe('/admin/email-log?source=feedback');
+      expect(screen.getByRole('combobox', { name: 'Source' })).toHaveValue('feedback');
+      expect(screen.getByRole('status')).toHaveTextContent(/^1 message shown/);
+    });
+
+    it('refreshes the search that is running, not the rows it will replace', async () => {
+      const held = await startFeedbackSearch();
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      await waitFor(() => expect(listCalls()).toHaveLength(3));
+      expect(listCalls()[2]).toEqual({ limit: 25, source: 'feedback' });
+      await releaseAll(held);
+
+      expect(await screen.findByText('feedback-row@example.test')).toBeInTheDocument();
+      expect(screen.queryByText('plain@example.test')).toBeNull();
+      expect(location()).toBe('/admin/email-log?source=feedback');
+    });
   });
 
   it('opens a preview in an empty sandbox under the content policy, and reads each body once', async () => {

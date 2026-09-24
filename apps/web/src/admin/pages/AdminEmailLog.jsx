@@ -299,6 +299,9 @@ export default function AdminEmailLog() {
   const [focusTarget, setFocusTarget] = useState(null);
 
   const requestRef = useRef(0);
+  // The search the page asked for last. While it runs, the rows on screen
+  // belong to the one before it, so Refresh repeats this one.
+  const latestSearchRef = useRef(null);
   // The filter pair this page last wrote to the URL, so a write of its own
   // does not read back as a navigation.
   const writtenKeyRef = useRef(null);
@@ -310,6 +313,7 @@ export default function AdminEmailLog() {
 
   const runSearch = useCallback(async (search, kind) => {
     const requestId = (requestRef.current += 1);
+    latestSearchRef.current = search;
     setPending(kind);
     try {
       const response = await call('listSentEmails', requestBody(search));
@@ -377,11 +381,16 @@ export default function AdminEmailLog() {
   }
 
   function refresh() {
-    runSearch(result?.applied ?? { q: '', ...urlFilters }, 'refresh');
+    runSearch(latestSearchRef.current ?? { q: '', ...urlFilters }, 'refresh');
   }
 
+  // Load more pages the rows on screen. While a search or a refresh runs,
+  // those rows are about to be replaced, so the pager refuses: paging them
+  // would take the newer request and drop the answer the page asked for.
+  const pagerRefused = pending === 'search' || pending === 'refresh';
+
   async function loadMore() {
-    if (!result?.nextCursor) return;
+    if (!result?.nextCursor || pending !== null) return;
     const requestId = (requestRef.current += 1);
     const { applied, nextCursor } = result;
     setPending('more');
@@ -669,9 +678,10 @@ export default function AdminEmailLog() {
               <button
                 ref={pagerRef}
                 type="button"
-                className={secondaryButtonClass}
+                className={`${secondaryButtonClass} aria-disabled:cursor-not-allowed aria-disabled:opacity-60`}
                 onClick={loadMore}
                 aria-busy={pending === 'more' ? 'true' : undefined}
+                aria-disabled={pagerRefused ? 'true' : undefined}
               >
                 {pending === 'more' ? 'Loading more…' : rows.length === 0 ? 'Search older messages' : 'Load more'}
               </button>
