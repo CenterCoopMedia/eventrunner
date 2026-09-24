@@ -144,8 +144,12 @@ describe('formatPublishedAt', () => {
   });
 
   it('falls back to the reader’s clock with no zone or an unknown one', () => {
+    // Whatever zone the machine runs in: the reader's own clock, as Intl
+    // writes it, then that zone's label.
     const reader = formatPublishedAt(NOW);
-    expect(reader).toMatch(/^Sep 2[34], 2026, \d{1,2}:02 [AP]M\b/);
+    const clock = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(NOW));
+    expect(reader.startsWith(`${clock} `)).toBe(true);
+    expect(reader.length).toBeGreaterThan(clock.length + 1);
     expect(formatPublishedAt(NOW, 'Not/AZone')).toBe(reader);
     expect(formatPublishedAt(null, 'America/New_York')).toBeNull();
   });
