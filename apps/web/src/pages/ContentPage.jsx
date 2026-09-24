@@ -406,8 +406,9 @@ export default function ContentPage() {
                     block of the first section of a page that STATES the
                     Long read template takes the style's opening — a drop
                     cap, a standfirst-sized line, or nothing. Never inferred
-                    from the layout values, and never on any later section. */}
-                <LongReadOpening active={isLongRead && index === 0}>
+                    from the layout values, and never on any later section,
+                    even when a keyword filter leaves it first. */}
+                <LongReadOpening active={isLongRead && section.id === baseSections[0]?.section.id}>
                   <SectionBlocks blocks={blocks} />
                 </LongReadOpening>
                 {page.id === 'travel' && section.id === 'travel_local' ? <AreaMap url={eventConfig.venue?.mapUrl} /> : null}

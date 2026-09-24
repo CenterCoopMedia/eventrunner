@@ -491,6 +491,25 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(plain[0].textContent).toContain('The second quote, further down the page.');
   });
 
+  // The long read opening belongs to the page's first section, not to
+  // whichever section a keyword filter happens to leave first (connector
+  // review of PR 270).
+  it('keeps the long read opening on the first section, never on the first match of a filter', async () => {
+    renderAt('/long-sections');
+    pushPage({ ...LONG_SECTIONS_PAGE, template: 'long-read' });
+    pushContent(LONG_SECTIONS_BLOCKS);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Long sections fixture' })).toBeInTheDocument();
+    const openings = () => document.querySelectorAll('.long-read-opening');
+    expect(openings()).toHaveLength(1);
+    expect(openings()[0].textContent).toContain('Welcome to the fixture page');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter by keyword' }), {
+      target: { value: 'Zzyzx' },
+    });
+    expect(screen.getByText(/Zzyzx, a word that appears nowhere else/)).toBeInTheDocument();
+    expect(openings()).toHaveLength(0);
+  });
+
   it('shows a filter box and a section index once a page crosses the section-count threshold', async () => {
     renderLongSectionsPage();
     expect(
