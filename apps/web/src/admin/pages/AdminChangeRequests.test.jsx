@@ -229,6 +229,52 @@ describe('AdminChangeRequests: status changes', () => {
     expect(screen.getByRole('button', { name: 'Decline' })).toBeEnabled();
   });
 
+  // Review finding 4: the listener can deliver the committed status before
+  // the HTTP answer. The pressed control must stay the pressed control,
+  // "Saving…" and aria-busy, until the call settles.
+  it('keeps Saving… on the pressed control when the new status arrives before the answer', async () => {
+    let settle;
+    callMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
+    renderPage();
+    pushRows([request('one', { status: 'in_progress' })]);
+    const pressed = screen.getByRole('button', { name: 'Mark done' });
+    pressed.focus();
+    fireEvent.click(pressed);
+
+    // The snapshot lands first: under Open, a done row would leave the list.
+    pushRows([request('one', { status: 'done' })]);
+    const saving = screen.getByRole('button', { name: 'Saving…' });
+    expect(saving).toBe(pressed);
+    expect(saving).toHaveAttribute('aria-busy', 'true');
+    expect(saving).toBeEnabled();
+    expect(saving).toHaveFocus();
+    expect(screen.queryByRole('button', { name: 'Reopen' })).toBeNull();
+
+    await act(async () => { settle({}); });
+    expect(screen.queryByRole('button', { name: 'Saving…' })).toBeNull();
+  });
+
+  it('keeps a pressed Decline in place, saving, when the declined status arrives first', async () => {
+    let settle;
+    callMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
+    renderPage('/admin/change-requests?status=all');
+    pushRows([request('one')]);
+    const pressed = screen.getByRole('button', { name: 'Decline' });
+    pressed.focus();
+    fireEvent.click(pressed);
+
+    pushRows([request('one', { status: 'declined' })]);
+    expect(pressed).toBeInTheDocument();
+    expect(pressed).toHaveTextContent('Saving…');
+    expect(pressed).toHaveAttribute('aria-busy', 'true');
+    expect(pressed).toHaveFocus();
+    // The following step is drawn, but it is not the pressed control.
+    expect(screen.getByRole('button', { name: 'Reopen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reopen' })).not.toHaveAttribute('aria-busy');
+
+    await act(async () => { settle({}); });
+  });
+
   it('states a failed change on its row until the next try', async () => {
     callMock.mockRejectedValueOnce(new Error('Admin access required.'));
     renderPage();

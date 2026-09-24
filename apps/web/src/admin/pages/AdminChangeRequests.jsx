@@ -213,7 +213,10 @@ export default function AdminChangeRequests() {
 
   const [rows, setRows] = useState(null);
   const [listError, setListError] = useState(null);
-  // The action in flight: { id, kind: 'status', status } or { id, kind: 'remove' }.
+  // The action in flight, keyed to the control that was pressed:
+  // { id, control: 'next' | 'decline' | 'remove' }. The listener can deliver
+  // the committed status before the HTTP answer, so the pressed control, not
+  // the status it asked for, carries "Saving…" until the call settles.
   const [pending, setPending] = useState(null);
   // A failed action, stated on its row until the next try.
   const [rowError, setRowError] = useState(null);
@@ -228,10 +231,13 @@ export default function AdminChangeRequests() {
 
   const shown = useMemo(() => {
     if (!rows) return [];
+    // The row an action is in flight on stays on screen until the call
+    // settles, even when its new status leaves the filter, so the pressed
+    // control does not vanish from under the keyboard.
     return rows
-      .filter((row) => matches(row, filter))
+      .filter((row) => matches(row, filter) || row.id === pending?.id)
       .sort((a, b) => (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0));
-  }, [rows, filter]);
+  }, [rows, filter, pending]);
 
   const setFilter = useCallback((value) => {
     const next = new URLSearchParams(searchParams);
@@ -240,9 +246,9 @@ export default function AdminChangeRequests() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  async function changeStatus(row, status) {
+  async function changeStatus(row, status, control) {
     if (pending) return;
-    setPending({ id: row.id, kind: 'status', status });
+    setPending({ id: row.id, control });
     setRowError(null);
     setRemoval('');
     try {
@@ -256,7 +262,7 @@ export default function AdminChangeRequests() {
 
   async function remove(row) {
     if (pending) return;
-    setPending({ id: row.id, kind: 'remove' });
+    setPending({ id: row.id, control: 'remove' });
     setRowError(null);
     setRemoval('');
     try {
@@ -376,21 +382,21 @@ export default function AdminChangeRequests() {
                           <button
                             type="button"
                             className={secondaryButtonClass}
-                            onClick={() => changeStatus(row, next.status)}
-                            disabled={locked && !(busy?.kind === 'status' && busy.status === next.status)}
-                            aria-busy={busy?.kind === 'status' && busy.status === next.status ? 'true' : undefined}
+                            onClick={() => changeStatus(row, next.status, 'next')}
+                            disabled={locked && busy?.control !== 'next'}
+                            aria-busy={busy?.control === 'next' ? 'true' : undefined}
                           >
-                            {busy?.kind === 'status' && busy.status === next.status ? 'Saving…' : next.label}
+                            {busy?.control === 'next' ? 'Saving…' : next.label}
                           </button>
-                          {OPEN_STATUSES.includes(status) ? (
+                          {OPEN_STATUSES.includes(status) || busy?.control === 'decline' ? (
                             <button
                               type="button"
                               className={linkButtonClass}
-                              onClick={() => changeStatus(row, 'declined')}
-                              disabled={locked && !(busy?.kind === 'status' && busy.status === 'declined')}
-                              aria-busy={busy?.kind === 'status' && busy.status === 'declined' ? 'true' : undefined}
+                              onClick={() => changeStatus(row, 'declined', 'decline')}
+                              disabled={locked && busy?.control !== 'decline'}
+                              aria-busy={busy?.control === 'decline' ? 'true' : undefined}
                             >
-                              {busy?.kind === 'status' && busy.status === 'declined' ? 'Saving…' : 'Decline'}
+                              {busy?.control === 'decline' ? 'Saving…' : 'Decline'}
                             </button>
                           ) : null}
                           <DestructiveConfirm
@@ -400,8 +406,8 @@ export default function AdminChangeRequests() {
                             consequence="The request and its text are deleted. The audit log keeps who sent it and when."
                             permanence="This cannot be undone."
                             busyLabel="Removing…"
-                            busy={busy?.kind === 'remove'}
-                            disabled={locked && busy?.kind !== 'remove'}
+                            busy={busy?.control === 'remove'}
+                            disabled={locked && busy?.control !== 'remove'}
                             onConfirm={() => remove(row)}
                           />
                         </div>
