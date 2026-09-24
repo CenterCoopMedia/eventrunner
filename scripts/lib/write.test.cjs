@@ -671,3 +671,24 @@ test('upgrading a site from before the CMS cleared the flag still keeps the clie
   assert.equal((await db.collection('cmsContent').doc('info__where_venue').get()).data().text, 'Venue: Test Hall');
   assert.equal((await db.collection('cmsContent').doc('info__where').get()).exists, false);
 });
+
+test('a withheld replacement protects only the predecessors the site actually holds', async () => {
+  // Protecting every predecessor in the map made init print "kept" for a
+  // document that does not exist (adversarial review, 2026-09-24). Here the
+  // client has the venue line and never had the address line.
+  const db = makeAdminDb();
+  const config = docs();
+  await seedCollection({
+    db, store, collection: 'cmsContent', now,
+    docs: baseReleaseKeyFacts().filter((doc) => doc.id !== 'info__where_address'),
+  });
+  await adminEdit(db, { section: 'info', field: 'where_venue', fields: { text: 'Venue: Test Hall' } }, now);
+  await store.publishDocs({ db, collection: 'cmsContent', docIds: ['info__where_venue'], actor: ADMIN, now });
+
+  const upgrade = await withholdUpgradeSeeds({
+    db, collection: 'cmsContent', docs: keyFactsSeed(config), replacedBy: REPLACED_CONTENT_IDS,
+  });
+
+  assert.ok(upgrade.withheld.some((w) => w.id === 'info__where'));
+  assert.deepEqual(upgrade.protected, ['info__where_venue']);
+});

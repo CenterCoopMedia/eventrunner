@@ -289,11 +289,17 @@ async function withholdUpgradeSeeds({ db, collection, docs, replacedBy = {} }) {
       continue;
     }
     const survivors = [];
+    const held = [];
     for (const predecessor of replacedBy[id] ?? []) {
-      if (clientOwned(await readBoth(predecessor))) survivors.push(predecessor);
+      const both = await readBoth(predecessor);
+      if (present(both)) held.push(predecessor);
+      if (clientOwned(both)) survivors.push(predecessor);
     }
     if (survivors.length > 0) {
-      for (const predecessor of replacedBy[id]) protectedIds.add(predecessor);
+      // Every predecessor the site holds stays, edited or not — but only
+      // those it holds, or init would report "kept" for a document that
+      // does not exist.
+      for (const predecessor of held) protectedIds.add(predecessor);
       withheld.push({
         id,
         reason: `replaces ${survivors.join(' and ')}, which the client has edited`,
