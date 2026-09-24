@@ -429,8 +429,12 @@ export default function AdminChangeRequests() {
                             confirmLabel="Remove this request"
                             consequence="The request and its text are deleted. The audit log keeps who sent it and when."
                             permanence="This cannot be undone."
-                            busyLabel="Removing…"
-                            busy={busy?.control === 'remove'}
+                            // While any action runs, an open confirm is disabled
+                            // rather than live and silent (DestructiveConfirm
+                            // disables its buttons while `busy`); only the row
+                            // being removed reads "Removing…".
+                            busyLabel={busy?.control === 'remove' ? 'Removing…' : undefined}
+                            busy={locked}
                             disabled={locked && busy?.control !== 'remove'}
                             onConfirm={() => remove(row)}
                           />

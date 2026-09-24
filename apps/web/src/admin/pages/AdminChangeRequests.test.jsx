@@ -391,6 +391,33 @@ describe('AdminChangeRequests: removal', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Requests' })).toHaveFocus();
   });
 
+  // Review finding 2: an open confirm on one row must not be a live control
+  // that silently does nothing while another row's action runs.
+  it('an open Remove confirm cannot be pressed while another row saves, and says nothing false', async () => {
+    let settle;
+    renderPage();
+    pushRows([request('a', { createdAt: new Date('2026-09-02T00:00:00Z') }), request('b')]);
+    fireEvent.click(within(rowFor('a')).getByRole('button', { name: 'Remove' }));
+    const confirm = within(rowFor('a')).getByRole('button', { name: 'Remove this request' });
+
+    callMock.mockImplementationOnce(() => new Promise((resolve) => { settle = resolve; }));
+    fireEvent.click(within(rowFor('b')).getByRole('button', { name: 'Mark in progress' }));
+
+    expect(confirm).toBeDisabled();
+    // Only the row being removed ever reads "Removing…".
+    expect(confirm).toHaveTextContent('Remove this request');
+    fireEvent.click(confirm);
+    expect(callMock).toHaveBeenCalledTimes(1);
+    expect(callMock).not.toHaveBeenCalledWith('deleteChangeRequest', expect.anything());
+
+    await act(async () => { settle({}); });
+    expect(confirm).toBeEnabled();
+    callMock.mockResolvedValueOnce({ id: 'a', deleted: true });
+    fireEvent.click(confirm);
+    await flush();
+    expect(callMock).toHaveBeenLastCalledWith('deleteChangeRequest', { id: 'a' });
+  });
+
   it('Keep it closes the moment and removes nothing', () => {
     renderPage();
     pushRows([request('one')]);
