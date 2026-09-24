@@ -563,6 +563,11 @@ export default function AdminMaterialsTab() {
     [shownFiles, selected],
   );
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  // A file that leaves the rows on screen leaves the selection for good, so
+  // a later list that brings it back cannot put it in an archive unasked.
+  useEffect(() => {
+    setSelected((current) => (current.size === selectedIds.length ? current : new Set(selectedIds)));
+  }, [selectedIds]);
   const allShownSelected = shownFiles.length > 0 && selectedIds.length === shownFiles.length;
   const someShownSelected = selectedIds.length > 0 && !allShownSelected;
 

@@ -22,7 +22,7 @@ const {
   createDownloadSessionMaterialsArchiveHandler,
   handlers,
   internals: {
-    MAX_LIST_ROWS, MAX_ARCHIVE_BYTES, ARCHIVE_ACTION,
+    MAX_LIST_ROWS, MAX_ARCHIVE_FILES, MAX_ARCHIVE_BYTES, STREAMING_RESPONSE_CAP, ARCHIVE_ACTION,
     readMaterialIds, cleanNamePart, entryNames, parseSize, listRow, streamArchive,
   },
 } = require('./bulk.cjs');
@@ -430,11 +430,13 @@ test('one name in its composed and decomposed forms is one name: NFC, and the se
     { sessionId: 'se\u0301ance', filename: 'a.pdf' },
     { sessionId: 's\u00e9ance', filename: 'a.pdf' },
   ]);
+  // The two session ids are two sessions, so the second keeps a folder of
+  // its own (Codex review on #277); both folder names are still composed.
   assert.deepEqual(names, [
     's1/Pr\u00e4sentation.pdf',
     's1/Pr\u00e4sentation (2).pdf',
     's\u00e9ance/a.pdf',
-    's\u00e9ance/a (2).pdf',
+    's\u00e9ance (2)/a.pdf',
   ]);
   for (const name of names) assert.equal(name, name.normalize('NFC'));
 });
@@ -511,6 +513,27 @@ test('a Windows device name is prefixed, with or without an extension, and a lon
     '_CON.pdf', '_nul', '_Com3.tar.gz', '_lpt9', '_aux .txt', '_PRN', 'console.pdf', 'lpt10.txt', 'com.pdf', 'con-notes',
   ]);
   assert.deepEqual(entryNames([{ sessionId: 'con', filename: 'aux.pdf' }]), ['_con/_aux.pdf']);
+});
+
+// Codex review on #277: session ids may hold any character but a slash, so
+// two ids can clean to one folder name. Each id keeps a folder of its own,
+// so an archive always says which session sent each file.
+test('distinct sessions whose folder names clean or fold to one name each keep a folder of their own', () => {
+  assert.deepEqual(entryNames([
+    { sessionId: 'talk:one', filename: 'a.pdf' },
+    { sessionId: 'talk?one', filename: 'b.pdf' },
+    { sessionId: 'talk:one', filename: 'c.pdf' },
+    { sessionId: 'Talk', filename: 'd.pdf' },
+    { sessionId: 'talk', filename: 'e.pdf' },
+    { sessionId: 'talk?one', filename: 'f.pdf' },
+  ]), [
+    'talk-one/a.pdf',
+    'talk-one (2)/b.pdf',
+    'talk-one/c.pdf',
+    'Talk/d.pdf',
+    'talk (2)/e.pdf',
+    'talk-one (2)/f.pdf',
+  ]);
 });
 
 test('parseSize reads the decimal string Storage sends, and nothing else', () => {
@@ -660,7 +683,39 @@ test('the archive refuses a missing Storage object by name, and a size Storage d
   assert.equal(res.body.error.message, 'materialIds: the size of a.pdf could not be read.');
 });
 
-test('sizes given as strings are parsed and summed: past 200 MiB is 413 too-large, at the limit passes', async () => {
+// Codex review on #277: a 2nd-gen HTTP function caps a streamed response at
+// 10 MB (Cloud Functions quotas), and this archive streams. The largest
+// archive the limits allow, with the longest names, must fit under it.
+test('the largest archive the limits allow fits the 10 MB streaming response cap', STREAMED, async () => {
+  assert.ok(STREAMING_RESPONSE_CAP <= 10_000_000, 'the cap is read as 10,000,000 bytes, the smaller reading');
+  const sessionId = 'ä'.repeat(130);
+  const each = Math.floor(MAX_ARCHIVE_BYTES / MAX_ARCHIVE_FILES);
+  const materials = {};
+  const objects = {};
+  for (let index = 0; index < MAX_ARCHIVE_FILES; index += 1) {
+    const filename = `${'ü'.repeat(130)}${index}.pdf`;
+    const size = index === MAX_ARCHIVE_FILES - 1 ? MAX_ARCHIVE_BYTES - each * (MAX_ARCHIVE_FILES - 1) : each;
+    materials[`m${index}`] = fileMaterial(sessionId, filename);
+    objects[`session-materials/${sessionId}/${filename}`] = { bytes: Buffer.alloc(size) };
+  }
+  const db = makeDb({ materials });
+  const server = await serve(createDownloadSessionMaterialsArchiveHandler({
+    db, auth, getConfig, bucket: makeBucket(objects), now, log: QUIET,
+  }), []);
+  try {
+    const response = await post(server.port, { materialIds: Object.keys(materials) });
+    assert.equal(response.status, 200);
+    assert.equal(readZip(response.body).length, MAX_ARCHIVE_FILES);
+    assert.ok(
+      response.body.length <= STREAMING_RESPONSE_CAP,
+      `${response.body.length} bytes is over the ${STREAMING_RESPONSE_CAP}-byte streaming cap`,
+    );
+  } finally {
+    await server.close();
+  }
+});
+
+test('sizes given as strings are parsed and summed: past 9 MiB is 413 too-large, at the limit passes', async () => {
   const half = String(MAX_ARCHIVE_BYTES / 2);
   const materials = { m1: fileMaterial('s1', 'a.pdf'), m2: fileMaterial('s1', 'b.pdf') };
   const res = await refuse(materials, {
@@ -671,7 +726,7 @@ test('sizes given as strings are parsed and summed: past 200 MiB is 413 too-larg
   assert.equal(res.body.error.code, 'too-large');
   assert.equal(
     res.body.error.message,
-    'materialIds: the selected files come to 200.0 MB. An archive holds at most 200 MB. Select fewer files.',
+    'materialIds: the selected files come to 9.0 MB. An archive holds at most 9 MB. Select fewer files.',
   );
 
   // Two strings that reach the cap exactly are summed as numbers, not joined as text.

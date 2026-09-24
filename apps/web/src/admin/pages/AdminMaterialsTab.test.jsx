@@ -298,6 +298,28 @@ describe('AdminMaterialsTab: selection and the archive', () => {
     expect(countLine()).toHaveTextContent('1 file selected');
   });
 
+  // Codex review on #277: a selected file that leaves the list on one load
+  // (a truncation, another admin's change) is unselected for good, so a
+  // later load that brings it back cannot put it in an archive unasked.
+  it('a selected file that leaves the list and comes back is not selected again', async () => {
+    await renderLoaded();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Slides.pdf' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Workshop.zip' }));
+    expect(countLine()).toHaveTextContent('2 files selected');
+
+    handlers.listAllSessionMaterials = () => ok({ materials: MATERIALS.filter((m) => m.id !== 'm1'), truncated: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(screen.queryByText('Slides.pdf', { selector: 'td p' })).toBeNull());
+    expect(countLine()).toHaveTextContent('1 file selected');
+
+    handlers.listAllSessionMaterials = () => ok({ materials: MATERIALS, truncated: false });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await screen.findByText('Slides.pdf', { selector: 'td p' });
+    expect(screen.getByRole('checkbox', { name: 'Select Slides.pdf' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Workshop.zip' })).toBeChecked();
+    expect(countLine()).toHaveTextContent('1 file selected');
+  });
+
   it('posts the selected ids, keeps focus on the busy button, then states the result', async () => {
     let finish;
     handlers.downloadSessionMaterialsArchive = () => new Promise((resolve) => { finish = resolve; });
@@ -355,7 +377,7 @@ describe('AdminMaterialsTab: selection and the archive', () => {
   });
 
   it('shows a 413 refusal in the server’s words', async () => {
-    const message = 'materialIds: the selected files come to 250.3 MB. An archive holds at most 200 MB. Select fewer files.';
+    const message = 'materialIds: the selected files come to 12.3 MB. An archive holds at most 9 MB. Select fewer files.';
     handlers.downloadSessionMaterialsArchive = () => refusal(413, 'too-large', message);
     await renderLoaded();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Slides.pdf' }));

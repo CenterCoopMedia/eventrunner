@@ -24,7 +24,11 @@
  * already compressed. Each file is added with `addReadStreamLazy`, so yazl
  * opens a file's Storage read stream only when it reaches that entry, and
  * one read stream is open at a time. The body goes out chunked, with no
- * Content-Length: Cloud Run caps a response that is not chunked at 32 MiB.
+ * Content-Length. A 2nd-gen HTTP function caps a streamed response at 10 MB
+ * (Cloud Functions quotas, "Max uncompressed HTTP response size"), so the
+ * files in one archive come to at most 9 MiB: with 50 entries under the
+ * longest names, the zip's own headers add under 60 KB, and the whole body
+ * stays under 10,000,000 bytes, the smaller reading of "10 MB".
  *
  * Everything that can refuse runs before the first byte: the ids, the
  * documents, the Storage objects, the sizes, and the audit rows. The rows
@@ -54,8 +58,11 @@ const MAX_LIST_ROWS = 2000;
 /** Most files one archive holds. */
 const MAX_ARCHIVE_FILES = 50;
 
-/** Most bytes one archive holds, summed over its files: 200 MiB. */
-const MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
+/** The platform's cap on a streamed response, read as decimal megabytes. */
+const STREAMING_RESPONSE_CAP = 10_000_000;
+
+/** Most bytes one archive holds, summed over its files: 9 MiB, under the cap with the zip's headers. */
+const MAX_ARCHIVE_BYTES = 9 * 1024 * 1024;
 
 /** The name the browser saves the archive under. Fixed ASCII: nothing a person typed reaches a header. */
 const ARCHIVE_FILENAME = 'session-materials.zip';
@@ -229,7 +236,10 @@ function cleanNamePart(part) {
 
 /**
  * The entry name for each file, in order: `{sessionId}/{filename}`, each
- * part cleaned. A repeat name in one folder, compared without case, takes
+ * part cleaned. Each session keeps one folder of its own: two ids that clean
+ * to one name (`talk:one` and `talk?one`), or differ only in case, give the
+ * later one ` (2)`, ` (3)`, so the archive always says which session sent a
+ * file. A repeat file name in one folder, compared without case, takes
  * ` (2)`, ` (3)` before its extension, so no entry replaces another when
  * the archive is opened.
  *
@@ -237,9 +247,22 @@ function cleanNamePart(part) {
  * @returns {string[]}
  */
 function entryNames(files) {
+  const folders = new Map();
+  const foldersTaken = new Set();
+  const folderOf = (sessionId) => {
+    if (folders.has(sessionId)) return folders.get(sessionId);
+    const cleaned = cleanNamePart(sessionId);
+    let folder = cleaned;
+    for (let copy = 2; foldersTaken.has(folder.toLowerCase()); copy += 1) {
+      folder = fitName(cleaned, ` (${copy})`);
+    }
+    foldersTaken.add(folder.toLowerCase());
+    folders.set(sessionId, folder);
+    return folder;
+  };
   const taken = new Set();
   return files.map(({ sessionId, filename }) => {
-    const folder = cleanNamePart(sessionId);
+    const folder = folderOf(sessionId);
     const name = cleanNamePart(filename);
     let candidate = `${folder}/${name}`;
     if (taken.has(candidate.toLowerCase())) {
@@ -588,6 +611,7 @@ module.exports = {
     MAX_LIST_ROWS,
     MAX_ARCHIVE_FILES,
     MAX_ARCHIVE_BYTES,
+    STREAMING_RESPONSE_CAP,
     ARCHIVE_FILENAME,
     ARCHIVE_ACTION,
     MAX_NAME_BYTES,

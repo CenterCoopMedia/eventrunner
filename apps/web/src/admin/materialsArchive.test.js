@@ -54,7 +54,7 @@ describe('downloadMaterialsArchive', () => {
   });
 
   it('turns a JSON refusal into an AdminApiError with the server message, and saves nothing', async () => {
-    const message = 'materialIds: the selected files come to 250.0 MB. An archive holds at most 200 MB. Select fewer files.';
+    const message = 'materialIds: the selected files come to 12.0 MB. An archive holds at most 9 MB. Select fewer files.';
     fetch.mockResolvedValueOnce({
       ok: false,
       status: 413,
