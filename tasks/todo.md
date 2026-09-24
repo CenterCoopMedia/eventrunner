@@ -151,8 +151,8 @@ requests stay stable.
 |---|---|---|---|
 | #270 | `joe/confident-gates-gy99ip-6-design-wave-2` | #234, refs #249 | Four Codex P2 findings fixed (`d5f0806`, `5d73f7d`, `4d874f6`, `ccc43b7`), threads resolved, all checks green locally |
 | #272 | `joe/confident-gates-gy99ip-7-admin-overview` | #178 to #182 | Built on #270 in `/home/user/wt-int2`. `762afcb` points the overview shell test at the `useAdminApi` mock a4 added. `4f82523` returns the speaker and session editors to their lists: `navigate('..')` went to the admin index, which the speaker delete test only saw under load |
-| next | `joe/confident-gates-gy99ip-8-email-log` | #183 | Built on #272 in `/home/user/wt-int`, with `f8cd76d` (the email log shell test through the admin call mock) and `c572626` (`signIn` clears `auth_rate_limits` first; without it the full E2E run failed WebMCP at the code field) |
-| after | `joe/confident-gates-gy99ip-9-attendees` | #184, #185 | b3 commits and fixes from `trial/stack-a3-b3` |
+| #273 | `joe/confident-gates-gy99ip-8-email-log` | #183 | Built on #272 in `/home/user/wt-int`, with `f8cd76d` (the email log shell test through the admin call mock) and `c572626` (`signIn` clears `auth_rate_limits` first; without it the full E2E run failed WebMCP at the code field) |
+| next | `joe/confident-gates-gy99ip-9-attendees` | #184, #185 | Built on #273 in `/home/user/wt-int2` from the b3 commits and fixes |
 | after | `…-10-change-requests` | #188 | b4 (`/home/user/wt-b4`, `cf22061`, `2d151c8`); review `wf_4b4740d1-d07` running. Drop `0a4092a` (its own copy of the shell test fix) |
 | after | `…-11-materials` | #189 | b5 (`/home/user/wt-b5`, `65c48fd`, `492e90d`); review `wf_bbd1885b-80a` running |
 
