@@ -806,6 +806,17 @@ describe('Home section edit links', () => {
     expect(screen.queryByRole('link', { name: 'Edit section: Nothing yet' })).toBeNull();
   });
 
+  it('gives the History section its link in its own head, like every other drawn section', () => {
+    timeline = [{ id: 'edition-2024', year: 2024, title: 'The first meeting', description: null, visible: true }];
+    pageDoc = { ...pageDoc, sections: [{ id: 'history', label: 'History' }] };
+    renderAs({ adminStatus: 'admin', adminTier: 'staff' });
+    const head = screen.getByRole('heading', { level: 2, name: 'History' }).parentElement;
+    expect(within(head).getByRole('link', { name: 'Edit section: History' })).toHaveAttribute(
+      'href',
+      '/admin/content/home/history',
+    );
+  });
+
   it('draws no hero link where the page states no hero section', () => {
     pageDoc = { ...pageDoc, sections: pageDoc.sections.filter((section) => section.id !== 'hero') };
     renderAs({ adminStatus: 'admin' });

@@ -19,10 +19,10 @@ const EDITIONS = [
   { id: 'b', year: 2025, title: 'Two tracks', description: 'The second edition.', visible: true },
 ];
 
-function draw(blocks) {
+function draw(blocks, action) {
   return render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <HistorySection id="section-history" title="History" blocks={blocks} arrangement="grid" />
+      <HistorySection id="section-history" title="History" blocks={blocks} arrangement="grid" action={action} />
     </MemoryRouter>,
   );
 }
@@ -66,4 +66,11 @@ describe('HistorySection', () => {
     expect(screen.queryByRole('heading', { name: 'History' })).toBeNull();
   });
 
+  it('draws the section’s action in its head, after the heading (issue 198)', () => {
+    timeline = EDITIONS;
+    draw([], <a href="/admin/content/home/history">Edit section</a>);
+    const heading = screen.getByRole('heading', { level: 2, name: 'History' });
+    const link = within(heading.parentElement).getByRole('link', { name: 'Edit section' });
+    expect(heading.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 });

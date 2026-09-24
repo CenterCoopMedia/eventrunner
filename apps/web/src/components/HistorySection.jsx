@@ -22,9 +22,10 @@ import Timeline from './editorial/Timeline.jsx';
  *   title: string,                    // the section's own label
  *   blocks: object[],                 // the section's visible blocks, in order
  *   arrangement: 'grid' | 'list',     // the page's arrangement
+ *   action?: import('react').ReactNode, // the section's edit link (issue #198)
  * }} props
  */
-export default function HistorySection({ id, title, blocks, arrangement }) {
+export default function HistorySection({ id, title, blocks, arrangement, action = null }) {
   const { timeline } = useContent();
   const entries = (timeline ?? []).map((entry) => ({
     id: entry.id,
@@ -36,7 +37,7 @@ export default function HistorySection({ id, title, blocks, arrangement }) {
   if (blocks.length === 0 && entries.length === 0) return null;
   return (
     <section aria-labelledby={id} className="page-section">
-      <SectionHead level={2} id={id} title={title} />
+      <SectionHead level={2} id={id} title={title} action={action} />
       {/* The same wrapper the default section draws, so the operator's
           blocks keep the width the page's arrangement gives them. */}
       <div className={arrangement === 'grid' ? 'mt-md' : 'measure mt-md'}>

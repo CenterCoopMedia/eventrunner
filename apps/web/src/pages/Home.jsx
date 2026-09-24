@@ -228,6 +228,7 @@ export default function Home() {
           title={section.label}
           blocks={blocks}
           arrangement={resolvePageLayout(page).arrangement}
+          action={editLink}
         />
       );
     }
