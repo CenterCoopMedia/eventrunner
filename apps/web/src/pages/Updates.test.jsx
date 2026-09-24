@@ -133,6 +133,18 @@ describe('Updates', () => {
     expect(screen.getByText('November 1, 2026').tagName).toBe('TIME');
   });
 
+  it('shows a published update dated in the future: the date is display scheduling only (issue 190)', () => {
+    // publishAt never gates the publish action, and it never hides a
+    // published post either. A post dated a year ahead is on the page, at
+    // the top of the dated runs, under its own month.
+    const future = { id: 'u-future', title: 'Next year’s dates', publishAt: '2027-10-15T16:00:00Z', visible: true };
+    renderUpdates({ updates: [NEWER, future], eventConfig: { timezone: 'America/New_York' } });
+    const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/updates/'));
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/updates/u-future', '/updates/update-newer']);
+    expect(screen.getByRole('heading', { level: 2, name: 'October 2027' })).toBeInTheDocument();
+    expect(screen.getByText('October 15, 2027').tagName).toBe('TIME');
+  });
+
   it('puts the title before the date, so the date never stacks above the heading', () => {
     // The eyebrow ban is absolute and holds at every size (design brief
     // §2.4). An entry on the spine is one column at every width, so the

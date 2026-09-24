@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leading `/`, or `..`) is refused with the field named, and nothing is written. The server does
   not check that the logo file exists. The public site still drops a malformed organization that
   reaches the collection another way (#192).
+- The updates editor, under Content, for staff and operators: a list of every post on the site's
+  Updates page with its state in the admin's three words, its date on the event's clock, and
+  whether it is pinned or hidden, and an editor for the title, the text, the date, the pin, and
+  whether the post shows. Save writes a draft through `cmsSaveUpdate`, and **Save and publish**
+  then calls `cmsPublish`, as every other editor does. The date is display scheduling only: a date
+  in the future never holds a publish back. A new update's id is made in the browser once per
+  form, so a retry after a failed publish rewrites the same draft. A post's picture and content
+  blocks are kept as they are on every save (#190).
 - The email log, under Operations, for staff and operators: every message the site sent, newest
   first, in a ruled table with the recipient, the subject, the kind of message, and its state as a
   word. Search looks in the recipient and the subject across the 500 most recent messages at a

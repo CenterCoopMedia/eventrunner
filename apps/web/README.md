@@ -267,7 +267,9 @@ attempting a network fetch.
 repo-root [`e2e/`](../../e2e/) Playwright suite (`npm run test:e2e`, spec
 §8.1, issue #38) covers that plus the other three critical journeys — admin
 CMS edit → publish → public, speaker invite → accept → wizard, ticket claim
-→ approved → bookmark — against the same emulator/dev-server combination,
+→ approved → bookmark — and the updates editor (issue #190: an update
+written and saved as a draft in the admin stays off the public Updates page
+until the editor publishes it) against the same emulator/dev-server combination,
 seeded from `scripts/init-event.cjs` + `scripts/seed-demo-event.cjs`. See
 [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) for the full test command
 table.

@@ -11,7 +11,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -171,6 +171,20 @@ Filling in what a page's blocks say is a separate step from shaping the page: Pi
 **A sponsor package is one thing a sponsor can support.** The **sponsor package** block carries a name and what the package includes, both required, and an optional price and limit. Write the price as it should read, with its currency. The limit is how many sponsors can take the package, as a whole number of 1 or more: The page shows "Open to 3 sponsors", and shows nothing for no limit. The save refuses any other number. The Sponsors page seeds one section for packages, **Sponsorship packages**, after the logo wall. It is not shown until it holds a package, so an empty section never reaches a visitor. A site whose Sponsors page was edited before this section existed keeps its own sections; add the section in Pages if you want it.
 
 **A statistic needs four things**, and the editor will not save one without them: The finding in words ("Two thirds of sessions are workshops", not "Session types"), what the number counts and over what period, where the number came from and the date you read it, and a line describing the finding for a screen reader. A stat block saved before this rule existed keeps working; the next time you edit one, you will be asked to fill the four parts in.
+
+## Updates
+
+The posts on the site's Updates page. Each row gives the post's title, its state in the three words every editor uses, its date, and its place in the list: **Pinned** or **By date**. A post that is not shown when published also carries **Hidden**. The list is in the order the public page uses: pinned posts first, then the newest date first, and undated posts last. Short notices for the dashboard card are a different feed, under **Live updates**.
+
+**Write an update** opens an empty editor. Give it a title and the text. **Save draft** writes a draft: The public page does not show it. **Save and publish** saves and then publishes it, and the public page shows it at once. **Publish all** on the list publishes every update with a saved draft that is not live. Press Enter in a one-line field to save a draft.
+
+**The date is the date readers see, on the event's clock.** It is set in the event's time zone (Settings → Event settings), the same clock the public page uses for the date under the title. Leave it empty for an undated post; an undated post goes after every dated one. The date does not delay publishing. A post dated next month goes live when you publish it, and it shows next month's date.
+
+**Pin** a post to hold it at the top of the list, above newer posts. Clear **Show this update when it is published** to publish a post that the public page does not show.
+
+**A picture and content blocks.** A post can also carry a picture and content blocks. This editor does not change them. When a post has them, the editor says so, and a save keeps them as they are.
+
+**Delete this update** removes the live post and its draft together. Its version history stays. If *Updates* is off under Features, the list and the editor say so, because the public site does not show the page. Only an operator can turn it on.
 
 ## Media
 

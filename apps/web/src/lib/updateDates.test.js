@@ -5,7 +5,7 @@
 // of the page would drag August's month head above October's. Pinned is not
 // a date, so it is its own named run. These pin that.
 import { describe, expect, it } from 'vitest';
-import { groupUpdates, publishDateLabel, publishMonthLabel, sortUpdates } from './updateDates.js';
+import { compareUpdates, groupUpdates, publishDateLabel, publishMonthLabel, sortUpdates } from './updateDates.js';
 
 const post = (id, publishAt, extra = {}) => ({ id, title: id, publishAt, ...extra });
 
@@ -84,5 +84,28 @@ describe('groupUpdates', () => {
 
   it('makes no runs at all from an empty feed', () => {
     expect(groupUpdates([])).toEqual([]);
+  });
+});
+
+// The one order the feed and the admin's updates list share (issue #190).
+describe('compareUpdates', () => {
+  it('puts pinned first, then newest first, then the undated', () => {
+    const shuffled = [
+      post('undated', null),
+      post('old', '2026-09-01T12:00:00Z'),
+      post('pinned-old', '2026-08-01T12:00:00Z', { pinned: true }),
+      post('new', '2026-10-01T12:00:00Z'),
+    ];
+    expect(shuffled.slice().sort(compareUpdates).map((u) => u.id)).toEqual(['pinned-old', 'new', 'old', 'undated']);
+  });
+
+  it('is the order sortUpdates uses, and a date a year ahead is simply the newest', () => {
+    const list = [post('now', '2026-10-01T12:00:00Z'), post('next-year', '2027-10-01T12:00:00Z')];
+    expect(sortUpdates(list).map((u) => u.id)).toEqual(list.slice().sort(compareUpdates).map((u) => u.id));
+    expect(sortUpdates(list)[0].id).toBe('next-year');
+  });
+
+  it('reads a pin only when it is true, and ties two undated posts', () => {
+    expect(compareUpdates(post('a', null, { pinned: 'yes' }), post('b', null))).toBe(0);
   });
 });

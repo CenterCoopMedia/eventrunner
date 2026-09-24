@@ -72,6 +72,9 @@ const AdminMaterialsTab = lazy(() => import('./pages/AdminMaterialsTab.jsx'));
 // The organizations list and editor (issue #192) load the same way.
 const AdminOrganizationsList = lazy(() => import('./pages/AdminOrganizationsList.jsx'));
 const AdminOrganizationEditor = lazy(() => import('./pages/AdminOrganizationEditor.jsx'));
+// The updates list and editor (issue #190), loaded the same way.
+const AdminUpdatesList = lazy(() => import('./pages/AdminUpdatesList.jsx'));
+const AdminUpdateEditor = lazy(() => import('./pages/AdminUpdateEditor.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -165,6 +168,20 @@ export default function AdminApp() {
           <Route path="speakers" element={<AdminSpeakersList />} />
           <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
+          <Route
+            path="updates"
+            element={<DeferredAdminPage label="updates"><AdminUpdatesList /></DeferredAdminPage>}
+          />
+          {/* 'new/update', not 'new': `new` is a valid update id, and the
+              edit route for it would always open this creation form. */}
+          <Route
+            path="updates/new/update"
+            element={<DeferredAdminPage label="update"><AdminUpdateEditor mode="create" /></DeferredAdminPage>}
+          />
+          <Route
+            path="updates/:updateId"
+            element={<DeferredAdminPage label="update"><AdminUpdateEditor mode="edit" /></DeferredAdminPage>}
+          />
           <Route path="content" element={<AdminContentPages />} />
           <Route path="content/:pageId" element={<AdminContentSections />} />
           <Route path="content/:pageId/:sectionId" element={<AdminContentSection />} />

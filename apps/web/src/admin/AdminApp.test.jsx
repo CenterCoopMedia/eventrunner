@@ -169,6 +169,7 @@ describe('admin route gating', () => {
       'Pages',
       'Sessions',
       'Content',
+      'Updates',
       'Event',
       'Features',
       'Badges',
@@ -240,7 +241,7 @@ describe('admin route gating', () => {
     // page they meet is one they may open.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
-    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Media', 'Materials', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Feedback', 'Email log', 'Change requests', 'Event']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -312,6 +313,24 @@ describe('admin route gating', () => {
     await renderAt('/admin/pages/new');
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+  });
+
+  it('opens the update editor for a staff admin, and its save goes through the admin call (issue 190)', async () => {
+    operatorProbeShouldSucceed = false;
+    currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
+    await renderAt('/admin/updates/new/update');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'New update' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Staff post' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'Written by staff.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(adminCall).toHaveBeenCalledWith(
+      'cmsSaveUpdate',
+      expect.objectContaining({ update: expect.objectContaining({ title: 'Staff post' }), visible: true }),
+    ));
+    expect(adminCall.mock.calls.filter(([name]) => name === 'cmsPublish')).toHaveLength(0);
   });
 
   it('waits for the tier probe too, so the docket never draws the staff set and then grows', async () => {
@@ -428,7 +447,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Updates, Media, Materials, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

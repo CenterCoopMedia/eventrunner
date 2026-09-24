@@ -48,24 +48,35 @@ export function publishDateLabel(publishAt, timeZone) {
 }
 
 /**
- * Sort updates pinned-first, then newest publishAt first. Updates without a
- * resolvable publishAt sort after every dated one (within the same pinned
- * bucket) rather than floating to the top as "newest".
+ * The feed's order for two updates: pinned first, then newest publishAt
+ * first. An update without a resolvable publishAt sorts after every dated
+ * one (within the same pinned bucket) rather than floating to the top as
+ * "newest". The admin's updates list orders its rows with this too
+ * (admin/updatesDoc.js), so the two lists agree (issue #190).
+ *
+ * @param {object} a
+ * @param {object} b
+ * @returns {number}
+ */
+export function compareUpdates(a, b) {
+  const pinDiff = (b?.pinned === true ? 1 : 0) - (a?.pinned === true ? 1 : 0);
+  if (pinDiff !== 0) return pinDiff;
+  const aDate = toPublishDate(a?.publishAt);
+  const bDate = toPublishDate(b?.publishAt);
+  if (aDate && bDate) return bDate.getTime() - aDate.getTime();
+  if (aDate) return -1;
+  if (bDate) return 1;
+  return 0;
+}
+
+/**
+ * Sort updates in the feed's order (compareUpdates).
  *
  * @param {Array<object>} updates
  * @returns {Array<object>}
  */
 export function sortUpdates(updates) {
-  return updates.slice().sort((a, b) => {
-    const pinDiff = (b?.pinned === true ? 1 : 0) - (a?.pinned === true ? 1 : 0);
-    if (pinDiff !== 0) return pinDiff;
-    const aDate = toPublishDate(a?.publishAt);
-    const bDate = toPublishDate(b?.publishAt);
-    if (aDate && bDate) return bDate.getTime() - aDate.getTime();
-    if (aDate) return -1;
-    if (bDate) return 1;
-    return 0;
-  });
+  return updates.slice().sort(compareUpdates);
 }
 
 /**

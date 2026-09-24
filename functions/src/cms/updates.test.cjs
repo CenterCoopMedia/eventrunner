@@ -22,10 +22,15 @@ function validUpdate(overrides = {}) {
   };
 }
 
+// The update endpoints are staff work (issue #186), and the editor that
+// calls them is a staff page (issue #190), so the bootstrap names both
+// tiers.
+const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] };
+
 function fakeDb(seed = {}) {
   // requireAdmin reads config/bootstrap live from this db (fails closed on
   // an absent document), so every fake carries the admin the tests use.
-  const docs = new Map(Object.entries({ 'config/bootstrap': { adminEmails: ['admin@example.org'] }, ...seed }));
+  const docs = new Map(Object.entries({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed }));
   const added = [];
   return {
     docs,
@@ -77,12 +82,16 @@ function fakeRes() {
 }
 
 const ADMIN_TOKEN = 'admin-token';
+const STAFF_TOKEN = 'staff-token';
 const NON_ADMIN_TOKEN = 'user-token';
 
 const fakeAuth = {
   async verifyIdToken(token) {
     if (token === ADMIN_TOKEN) {
       return { uid: 'admin1', email: 'admin@example.org', email_verified: true };
+    }
+    if (token === STAFF_TOKEN) {
+      return { uid: 'staff1', email: 'staff@example.org', email_verified: true };
     }
     if (token === NON_ADMIN_TOKEN) {
       return { uid: 'user1', email: 'user@example.org', email_verified: true };
@@ -93,8 +102,8 @@ const fakeAuth = {
 
 const getConfig = async () => ({ bootstrap: { adminEmails: ['admin@example.org'] } });
 
-function adminReq(body) {
-  return { method: 'POST', headers: { authorization: `Bearer ${ADMIN_TOKEN}` }, body };
+function adminReq(body, token = ADMIN_TOKEN) {
+  return { method: 'POST', headers: { authorization: `Bearer ${token}` }, body };
 }
 
 function deps(overrides = {}) {
@@ -285,7 +294,7 @@ test('rich updates survive draft, publish, and version history', async () => {
   const store = require('./store.cjs');
   // The real fake, so publishDocs runs; requireAdmin reads config/bootstrap
   // live from it, so the admin the handler expects is seeded.
-  const db = makeFakeDb({ 'config/bootstrap': { adminEmails: ['admin@example.org'] } });
+  const db = makeFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC });
   const actor = { uid: 'admin1', email: 'admin@example.org' };
   const featuredImage = { url: 'demo/summit-gathering.webp', alt: 'Summit scene' };
   const content = [{ type: 'columns', columns: [
@@ -301,4 +310,53 @@ test('rich updates survive draft, publish, and version history', async () => {
   assert.deepEqual(db.read('cmsUpdates', 'rich-post').content, content);
   const history = db.writes.find((write) => write.path.startsWith('cmsVersionHistory/'));
   assert.deepEqual(db.read('cmsVersionHistory', history.path.split('/')[1]).fields.content, content);
+});
+
+// ------------------------------------------------ the editor's path (#190)
+
+test('a staff account saves and deletes an update; a signed-in non-admin is refused', async () => {
+  const d = deps({ db: fakeDb({ 'cmsUpdates_drafts/staff-post': { title: 't' } }) });
+  let res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'staff-post', update: validUpdate() }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(d.store.writes[0].actor, { uid: 'staff1', email: 'staff@example.org' });
+  res = fakeRes();
+  await createDeleteUpdateHandler(d)(adminReq({ id: 'staff-post' }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(d.store.deletes.length, 1);
+
+  for (const create of [createSaveUpdateHandler, createDeleteUpdateHandler]) {
+    res = fakeRes();
+    await create(d)(adminReq({ id: 'staff-post', update: validUpdate() }, NON_ADMIN_TOKEN), res);
+    assert.equal(res.statusCode, 403);
+  }
+  assert.equal(d.store.writes.length, 1);
+  assert.equal(d.store.deletes.length, 1);
+});
+
+test('a future publishAt never gates publish: the saved draft goes live at once', async () => {
+  // The editor's two calls, in order, on one database: cmsSaveUpdate, then
+  // cmsPublish for that id. The date is a year ahead; publishAt is display
+  // scheduling, and nothing in the publish path reads it.
+  const { makeFakeDb } = require('./firestoreFake.cjs');
+  const store = require('./store.cjs');
+  const { createCmsPublishHandler } = require('./publish.cjs');
+  const db = makeFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC });
+  const d = { ...deps(), db, store };
+  const nextYear = new Date(1700000000000 + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+  let res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'next-year', update: validUpdate({ publishAt: nextYear }), visible: true }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsUpdates', 'next-year'), undefined, 'a save writes the draft only');
+  assert.equal(db.read('cmsUpdates_drafts', 'next-year').status, 'dirty');
+
+  res = fakeRes();
+  await createCmsPublishHandler(d)(adminReq({ collection: 'cmsUpdates', docIds: ['next-year'] }, STAFF_TOKEN), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.results.cmsUpdates.published, ['next-year']);
+  const live = db.read('cmsUpdates', 'next-year');
+  assert.equal(live.visible, true);
+  assert.equal(live.title, 'Venue change');
+  assert.equal(new Date(live.publishAt).toISOString(), nextYear);
 });

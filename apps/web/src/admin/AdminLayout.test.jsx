@@ -136,10 +136,12 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Four links above the base's sixteen (the Overview, issue #179, the
-    // Email log, issue #183, Change requests, issue #188, and Organizations,
-    // issue #192), every one a word. No icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(20);
+    // Five links above the base's sixteen (the Overview, issue #179, the
+    // Email log, issue #183, Change requests, issue #188, Organizations,
+    // issue #192, and Updates, issue #190), every one a word. No icon rail,
+    // no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(21);
+    expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(nav.querySelector('svg')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
@@ -203,7 +205,7 @@ describe('the admin shell', () => {
     expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
       'overview',
-      'pages', 'sessions', 'organizations', 'content', 'media', 'materials',
+      'pages', 'sessions', 'organizations', 'content', 'updates', 'media', 'materials',
       'speakers', 'attendees', 'badges',
       'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
       'settings',
@@ -224,6 +226,9 @@ describe('the admin shell', () => {
     // The organizations list and editor are content, so staff work (#192).
     expect(sectionTier('/admin/organizations')).toBe('staff');
     expect(sectionTier('/admin/organizations/new/organization')).toBe('staff');
+    // Updates is content work (issue #190), its editors included.
+    expect(sectionTier('/admin/updates')).toBe('staff');
+    expect(sectionTier('/admin/updates/new/update')).toBe('staff');
     expect(sectionTier('/admin')).toBeNull();
     expect(sectionTier('/admin/')).toBeNull();
   });

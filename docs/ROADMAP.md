@@ -172,7 +172,7 @@ An organizer can see how the event is going and act on it without leaving the ad
 
 Every collection the site renders can be edited and published from the admin.
 
-- [ ] Add the updates editor (#190)
+- [x] Add the updates editor (#190)
 - [ ] Add an update category and featured flag (#191)
 - [x] Add the organizations editor (#192)
 - [x] Add a sponsor detail page and package blocks (#193)
