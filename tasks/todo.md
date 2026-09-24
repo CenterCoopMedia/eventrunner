@@ -115,7 +115,7 @@ builder branches first if the container may be reclaimed.
 
 | Id | Worktree / branch | Head | State |
 |---|---|---|---|
-| a4 | `/home/user/wt-a4`, `…-b-a4` | round 3 running | #186, #187. Round 2 review found escalation paths (seo.defaultOgImagePath, speaker headshotPath, sender byte and sub-key compare, staff Media page); the builder is fixing them. Review the round 3 diff before it joins. |
+| a4 | `/home/user/wt-a4`, `…-b-a4` | opened as #269 | #186, #187. Round 2 review found escalation paths (seo.defaultOgImagePath, speaker headshotPath, sender byte and sub-key compare, staff Media page); the builder is fixing them. Review the round 3 diff before it joins. |
 | a3 | `/home/user/wt-a3`, `…-b-a3` | `cc66c0a` | Wave 2 of #249, #234, and the catalog split. Round 1 fixed; round 2 review stopped: resume `wf_ed110ad7-e40`. The design record §3.1 still says "sticky head"; the table dropped it, so correct the record when a3 lands. |
 | b1 | `/home/user/wt-b1`, `…-b-b1` | `bd2ac01` | #178 to #182. Review stopped: resume `wf_1c382032-f25`. |
 | b2 | `/home/user/wt-b2`, `…-b-b2` | `63c1862` | #183. Review stopped: resume `wf_54fd8612-e0b`. |
