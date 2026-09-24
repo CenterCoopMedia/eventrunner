@@ -10,20 +10,14 @@
 // It is imported by the two lazy version pages only, so none of it rides in
 // the admin entry chunk (scripts/ci/bundle-budget.json).
 import { zoneLabel } from '../lib/eventTime.js';
+import { COLLECTION_CHOICES } from './collectionWords.js';
 
 /**
- * The six publishable collections (functions/src/cms/blockTypes.cjs
- * PUBLISHABLE_COLLECTIONS), in the order the rail names their editors, with
- * the words each one takes in a sentence.
+ * The six publishable collections and their words, from the one list the
+ * unpublished changes page and its banner read (collectionWords.js, issue
+ * #196), so the two pages cannot name a collection two ways.
  */
-export const COLLECTION_CHOICES = Object.freeze([
-  { id: 'cmsContent', label: 'Content blocks', singular: 'content block', plural: 'content blocks' },
-  { id: 'cmsPages', label: 'Pages', singular: 'page', plural: 'pages' },
-  { id: 'cmsSchedule', label: 'Sessions', singular: 'session', plural: 'sessions' },
-  { id: 'cmsOrganizations', label: 'Organizations', singular: 'organization', plural: 'organizations' },
-  { id: 'cmsUpdates', label: 'Updates', singular: 'update', plural: 'updates' },
-  { id: 'cmsTimeline', label: 'Timeline', singular: 'timeline entry', plural: 'timeline entries' },
-]);
+export { COLLECTION_CHOICES };
 
 /** The collection the list opens on when the URL names none it knows. */
 export const DEFAULT_COLLECTION = 'cmsContent';
