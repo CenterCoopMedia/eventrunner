@@ -44,7 +44,9 @@ export default function AdminTimelineList() {
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [resumeQueueId, setResumeQueueId] = useState(null);
+  // A failed run's queue and the ids it asked for. A resume is reported
+  // against those ids, not the drafts that are dirty when it is pressed.
+  const [resume, setResume] = useState(null);
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
   const home = getPage('home') ?? getPage('/');
   const hasHistorySection = (home?.sections ?? []).some((section) => section?.id === 'history');
@@ -55,34 +57,36 @@ export default function AdminTimelineList() {
     showToast(verdict.message, verdict.ok ? { announce: false } : { tone: 'error', announce: false });
   }
 
-  function reportFailure(err) {
+  function reportFailure(err, ids) {
     setNotice({ tone: 'error', message: err.message });
     showToast(err.message, { tone: 'error', announce: false });
-    if (err?.queueId) setResumeQueueId(err.queueId);
+    if (err?.queueId) setResume({ queueId: err.queueId, ids });
   }
 
   async function publishAll() {
     const ids = pendingIds;
     setPublishing('all');
     setNotice(null);
-    setResumeQueueId(null);
+    setResume(null);
     try {
       reportPublish(await call('cmsPublish', { collection: COLLECTION, docIds: ids }), ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, ids);
     } finally {
       setPublishing(null);
     }
   }
 
   async function resumePublish() {
+    if (!resume) return;
+    const { queueId, ids } = resume;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId: resumeQueueId });
-      setResumeQueueId(null);
-      reportPublish(response, pendingIds);
+      const response = await call('cmsPublish', { queueId });
+      setResume(null);
+      reportPublish(response, ids);
     } catch (err) {
-      reportFailure(err);
+      reportFailure(err, ids);
     } finally {
       setPublishing(null);
     }
@@ -102,7 +106,7 @@ export default function AdminTimelineList() {
         description="Past editions of the event. The home page's History section lists them, oldest first."
         actions={
           <>
-            {resumeQueueId ? (
+            {resume ? (
               <button
                 type="button"
                 className={secondaryButtonClass}

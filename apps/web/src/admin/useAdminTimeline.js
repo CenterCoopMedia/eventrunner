@@ -6,18 +6,21 @@ import { mergeTimelineRevisions } from './timelineDoc.js';
 export function useAdminTimeline() {
   const [live, setLive] = useState(null);
   const [drafts, setDrafts] = useState(null);
-  const [error, setError] = useState(null);
+  // One error per listener: a delivery from one clears only its own, so a
+  // failure the other still has stays stated.
+  const [liveError, setLiveError] = useState(null);
+  const [draftsError, setDraftsError] = useState(null);
 
   useEffect(() => {
     const unsubscribers = [
       subscribeAdminCollection('cmsTimeline', (docs) => {
         setLive(docs);
-        setError(null);
-      }, setError),
+        setLiveError(null);
+      }, setLiveError),
       subscribeAdminCollection('cmsTimeline_drafts', (docs) => {
         setDrafts(docs);
-        setError(null);
-      }, setError),
+        setDraftsError(null);
+      }, setDraftsError),
     ];
     return () => {
       for (const unsubscribe of unsubscribers) unsubscribe?.();
@@ -26,9 +29,15 @@ export function useAdminTimeline() {
 
   const rows = useMemo(() => mergeTimelineRevisions(live, drafts), [live, drafts]);
 
+  const error = liveError ?? draftsError ?? null;
+  // Both listeners have reported at least once. The editor fills its form
+  // only then, so it never opens on one revision and saves it over the other.
+  const ready = live !== null && drafts !== null;
+
   return {
     rows,
-    loading: (live === null || drafts === null) && !error,
+    loading: !ready && !error,
+    ready,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,
   };
