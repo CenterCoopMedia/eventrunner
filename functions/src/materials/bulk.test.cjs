@@ -14,7 +14,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const zlib = require('node:zlib');
-const { Readable } = require('node:stream');
+const { Readable, Writable } = require('node:stream');
 const { ZipFile } = require('yazl');
 
 const {
@@ -23,7 +23,7 @@ const {
   handlers,
   internals: {
     MAX_LIST_ROWS, MAX_ARCHIVE_BYTES, ARCHIVE_ACTION, MAX_NAME_LENGTH,
-    readMaterialIds, cleanNamePart, entryNames, parseSize, listRow,
+    readMaterialIds, cleanNamePart, entryNames, parseSize, listRow, streamArchive,
   },
 } = require('./bulk.cjs');
 
@@ -54,7 +54,7 @@ const getConfig = async () => ({ bootstrap: BOOTSTRAP });
  * session_materials by id and by limit(), getAll, and one batch shape.
  * `events` records 'commit' so a test can order it against the first byte.
  */
-function makeDb({ materials = {}, failCommit = false, failList = false, events = [] } = {}) {
+function makeDb({ materials = {}, failCommit = false, failList = false, events = [], commitGate = null } = {}) {
   const docs = new Map(Object.entries(materials));
   let autoId = 0;
   const db = {
@@ -100,6 +100,7 @@ function makeDb({ materials = {}, failCommit = false, failList = false, events =
           rows.push({ path: `${ref._col}/${ref.id}`, data });
         },
         async commit() {
+          if (commitGate) await commitGate;
           events.push('commit');
           if (failCommit) throw new Error('commit failed');
           db.logs.push(...rows);
@@ -116,15 +117,18 @@ function makeDb({ materials = {}, failCommit = false, failList = false, events =
  *
  * spec: { bytes: Buffer, size?: string|number, exists?: boolean,
  *         failAfterFirstChunk?: boolean, stallAfterFirstChunk?: boolean }
+ * `existsGate`, when given, holds every exists() until it resolves.
  */
-function makeBucket(objects) {
-  const state = { open: 0, maxOpen: 0, streams: [], reads: [] };
+function makeBucket(objects, { existsGate = null } = {}) {
+  const state = { open: 0, maxOpen: 0, streams: [], reads: [], existsCalls: 0 };
   return {
     state,
     file(path) {
       const spec = objects[path];
       return {
         async exists() {
+          state.existsCalls += 1;
+          if (existsGate) await existsGate;
           return [Boolean(spec) && spec.exists !== false];
         },
         async getMetadata() {
@@ -208,9 +212,11 @@ function req(token, body, method = 'POST') {
 /**
  * Serve `handler` on a free port with the three Express methods it uses.
  * `trace` records 'write', 'end' and 'destroy' on each response, in order,
- * next to the db's 'commit'.
+ * next to the db's 'commit'. `handled` counts the handler calls that have
+ * settled, so a test can see a handler that never returns.
  */
 async function serve(handler, trace) {
+  const state = { started: 0, handled: 0 };
   const server = http.createServer((request, response) => {
     let raw = '';
     request.on('data', (chunk) => { raw += chunk; });
@@ -229,13 +235,17 @@ async function serve(handler, trace) {
       response.write = (...args) => { trace.push('write'); return write(...args); };
       response.end = (...args) => { trace.push('end'); return end(...args); };
       response.destroy = (...args) => { trace.push('destroy'); return destroy(...args); };
-      handler(request, response).catch((err) => trace.push(`handler threw: ${err.message}`));
+      state.started += 1;
+      handler(request, response)
+        .catch((err) => trace.push(`handler threw: ${err.message}`))
+        .finally(() => { state.handled += 1; });
     });
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address();
   return {
     port,
+    state,
     close: () => new Promise((resolve) => {
       server.closeAllConnections();
       server.close(resolve);
@@ -247,7 +257,7 @@ async function serve(handler, trace) {
  * POST and collect the whole body. Rejects when the server cuts the body
  * off, the way a browser's `response.blob()` rejects.
  */
-function post(port, body, { token = 'staff', onFirstChunk } = {}) {
+function post(port, body, { token = 'staff', onFirstChunk, abortAfterMs } = {}) {
   return new Promise((resolve, reject) => {
     const request = http.request({
       host: '127.0.0.1',
@@ -271,6 +281,7 @@ function post(port, body, { token = 'staff', onFirstChunk } = {}) {
     request.on('error', reject);
     // A body that never settles is a failure, not a hung run.
     request.setTimeout(5000, () => request.destroy(new Error('the response did not settle')));
+    if (abortAfterMs !== undefined) setTimeout(() => request.destroy(new Error('the admin left')), abortAfterMs);
     request.end(JSON.stringify(body));
   });
 }
@@ -755,6 +766,83 @@ test('when the admin leaves mid-archive, the open Storage stream is destroyed', 
   } finally {
     await server.close();
   }
+});
+
+test('when the admin leaves while the files are checked, no Storage read starts, no row is written, and the handler returns', STREAMED, async () => {
+  const trace = [];
+  let openGate;
+  const existsGate = new Promise((resolve) => { openGate = resolve; });
+  const db = makeDb({ materials: { m1: fileMaterial('s1', 'a.pdf') }, events: trace });
+  const bucket = makeBucket({ 'session-materials/s1/a.pdf': { bytes: Buffer.from('alpha') } }, { existsGate });
+  const server = await serve(createDownloadSessionMaterialsArchiveHandler({ db, auth, getConfig, bucket, now, log: QUIET }), trace);
+  try {
+    const leaving = post(server.port, { materialIds: ['m1'] }, { abortAfterMs: 50 });
+    await until(() => bucket.state.existsCalls === 1, 'the file check to start');
+    await assert.rejects(leaving);
+    // The response is closed while exists() is still waiting.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    openGate();
+    await until(() => server.state.handled === 1, 'the handler to return');
+    assert.deepEqual(bucket.state.reads, []);
+    assert.deepEqual(db.logs, []);
+    assert.ok(!trace.includes('write'));
+  } finally {
+    openGate();
+    await server.close();
+  }
+});
+
+test('when the admin leaves while the audit rows commit, no Storage read starts and the handler returns', STREAMED, async () => {
+  const trace = [];
+  let openGate;
+  const commitGate = new Promise((resolve) => { openGate = resolve; });
+  const db = makeDb({ materials: { m1: fileMaterial('s1', 'a.pdf') }, events: trace, commitGate });
+  const bucket = makeBucket({ 'session-materials/s1/a.pdf': { bytes: Buffer.from('alpha') } });
+  const server = await serve(createDownloadSessionMaterialsArchiveHandler({ db, auth, getConfig, bucket, now, log: QUIET }), trace);
+  try {
+    const leaving = post(server.port, { materialIds: ['m1'] }, { abortAfterMs: 50 });
+    await assert.rejects(leaving);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    openGate();
+    await until(() => server.state.handled === 1, 'the handler to return');
+    // The rows were already on their way; the archive is not built.
+    assert.deepEqual(bucket.state.reads, []);
+    assert.equal(bucket.state.open, 0);
+    assert.ok(!trace.includes('write'));
+  } finally {
+    openGate();
+    await server.close();
+  }
+});
+
+test('once the archive has stopped, the next entry opens no Storage read', STREAMED, async () => {
+  const res = new Writable({ write(_chunk, _encoding, callback) { callback(); } });
+  res.status = () => res;
+  res.set = () => res;
+  const bucket = makeBucket({
+    'session-materials/s1/a.pdf': { bytes: Buffer.from('first') },
+    'session-materials/s1/b.pdf': { bytes: Buffer.from('second') },
+  });
+  const first = bucket.file('session-materials/s1/a.pdf');
+  const open = first.createReadStream;
+  // The admin leaves the moment the first file has been read, before yazl
+  // asks for the second.
+  first.createReadStream = () => {
+    const stream = open();
+    stream.on('end', () => res.emit('close'));
+    return stream;
+  };
+  const mtime = new Date(T0);
+  await streamArchive({
+    entries: [
+      { file: first, size: 5, name: 's1/a.pdf', mtime },
+      { file: bucket.file('session-materials/s1/b.pdf'), size: 6, name: 's1/b.pdf', mtime },
+    ],
+    res,
+    log: QUIET,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.deepEqual(bucket.state.reads, ['session-materials/s1/a.pdf']);
 });
 
 // --- the deployed wrappers -----------------------------------------------------------

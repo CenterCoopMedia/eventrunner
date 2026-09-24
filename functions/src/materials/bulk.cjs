@@ -349,6 +349,11 @@ async function recordArchive({ db, entries, actor, at }) {
  */
 function streamArchive({ entries, res, log = console }) {
   return new Promise((resolve) => {
+    // The admin may already have left; nothing is read for a closed response.
+    if (responseClosed(res)) {
+      resolve();
+      return;
+    }
     const zip = new ZipFile();
     let current = null;
     let settled = false;
@@ -383,6 +388,12 @@ function streamArchive({ entries, res, log = console }) {
 
     for (const entry of entries) {
       zip.addReadStreamLazy(entry.name, { compress: false, size: entry.size, mtime: entry.mtime }, (callback) => {
+        // Once the archive has settled (failed, or the admin left), the next
+        // entry opens no Storage read.
+        if (settled) {
+          callback(new Error('the archive has stopped'));
+          return;
+        }
         const stream = entry.file.createReadStream();
         current = stream;
         // yazl listens for errors only on the streams it opens itself.
@@ -401,6 +412,15 @@ function streamArchive({ entries, res, log = console }) {
     res.set('Cache-Control', 'private, max-age=0, no-store');
     zip.outputStream.pipe(res);
   });
+}
+
+/**
+ * Whether the response can no longer reach the admin: they closed the tab
+ * or the network dropped. The server sets `destroyed` when the connection
+ * closes before the response ends.
+ */
+function responseClosed(res) {
+  return res?.destroyed === true || res?.writableEnded === true;
 }
 
 /**
@@ -438,6 +458,15 @@ function createListAllSessionMaterialsHandler({ db, auth, getConfig, log = conso
 function createDownloadSessionMaterialsArchiveHandler({ db, auth, getConfig, bucket, now = Date.now, log = console }) {
   return async function downloadSessionMaterialsArchive(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    // Watched from the first line: the checks and the audit commit below can
+    // take seconds, and an admin who leaves in that time must not start a
+    // Storage read that nothing will ever drain.
+    let left = false;
+    res.on?.('close', () => {
+      left = true;
+    });
+    const gone = () => left || responseClosed(res);
+
     const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
@@ -452,12 +481,20 @@ function createDownloadSessionMaterialsArchiveHandler({ db, auth, getConfig, buc
       return internal(res, 'The archive could not be prepared. Try again.');
     }
     if (!plan.ok) return sendError(res, plan.status, plan.code, plan.message);
+    if (gone()) {
+      log.info?.('downloadSessionMaterialsArchive: the admin left before the archive was recorded');
+      return;
+    }
 
     try {
       await recordArchive({ db, entries: plan.entries, actor: gate, at: new Date(now()) });
     } catch (err) {
       log.error('downloadSessionMaterialsArchive: the admin_logs rows could not be written; nothing was sent', err);
       return internal(res, 'The archive could not be recorded, so it was not built.');
+    }
+    if (gone()) {
+      log.info?.('downloadSessionMaterialsArchive: the admin left before the archive was built');
+      return;
     }
 
     await streamArchive({ entries: plan.entries, res, log });
