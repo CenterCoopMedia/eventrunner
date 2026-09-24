@@ -167,6 +167,20 @@ describe('Updates', () => {
     expect(within(row).getByText('Travel').className).not.toContain('rounded-full');
   });
 
+  it('draws the Pinned tag only for a real true, and a truthy value stays in its month (review round)', () => {
+    const odd = [
+      { ...NEWER, id: 'u-yes', title: 'Pinned as a word', pinned: 'yes', publishAt: '2026-10-12T12:00:00Z' },
+      { ...NEWER, id: 'u-one', title: 'Pinned as a number', pinned: 1, publishAt: '2026-10-11T12:00:00Z' },
+    ];
+    const { container } = renderUpdates({ updates: odd });
+    expect(screen.queryByText('Pinned')).toBeNull();
+    const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent.trim());
+    expect(heads).toEqual(['October 2026']);
+    for (const entry of container.querySelectorAll('.update-feed__entry')) {
+      expect(entry.querySelector('h3').parentElement.querySelectorAll('span')).toHaveLength(0);
+    }
+  });
+
   it('draws no tag for a stored category that breaks the rule, and the page still renders', () => {
     const bad = [
       { ...NEWER, id: 'u-long', title: 'Long', category: 'x'.repeat(25) },
