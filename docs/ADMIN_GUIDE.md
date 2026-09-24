@@ -268,7 +268,7 @@ Requests for a change to the site, from signed-in visitors and from staff. Both 
 - **Remove** deletes the request and its text. It cannot be undone.
 - **The admin log records every request, status change, and removal**, with the account that did it and the request's record. The log never holds the text of a request.
 
-Only admins can read a request. The sender cannot read it back, and no email is sent. When an account is deleted in Attendees, the change requests it sent are deleted too.
+Only admins can read a request. The sender cannot read it back, and no email is sent. When an account is deleted in Attendees, the change requests it sent are deleted too, and the server refuses a new request from that account's open session.
 
 ## Materials
 

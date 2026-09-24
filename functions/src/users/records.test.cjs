@@ -59,8 +59,11 @@ function makeAuth(signIns = { 'uid-ada': 'ada@example.com' }) {
     users,
     failDeleteOnce: false,
     deleted: [],
-    async verifyIdToken(token) {
+    async verifyIdToken(token, checkRevoked = false) {
       if (!TOKENS[token]) throw new Error('invalid token');
+      // A token outlives its deleted sign-in unless the caller asks Auth to
+      // check the account, as submitChangeRequest does.
+      if (checkRevoked && !users.has(TOKENS[token].uid)) throw notFoundError();
       return TOKENS[token];
     },
     async getUser(uid) {
@@ -734,9 +737,11 @@ test('a claim made while the sweep runs is released in the same call and counted
 
 // Issue #188: a change request is free text, so it must not outlive the
 // account it was stored against. The requests here go through the real
-// submitChangeRequest endpoint, and one the deleted session sends after the
-// delete (its token stays valid for up to an hour) is cleared by the retry.
-test('a delete clears the account’s change requests and rate-limit window, and a retry clears one sent after the delete', async () => {
+// submitChangeRequest endpoint. After the delete, the deleted session's
+// token is still valid, and the endpoint refuses it (review finding 6). A
+// request that was stored in the moment before the sign-in went is cleared
+// by the retry.
+test('a delete clears the account’s change requests and rate-limit window, and the deleted session cannot send another', async () => {
   const { createSubmitChangeRequestHandler } = require('../admin/changeRequests.cjs');
   const d = deps(await fullySeeded());
   await d.db.collection('config').doc('features').set({ changeRequests: true });
@@ -762,16 +767,21 @@ test('a delete clears the account’s change requests and rate-limit window, and
   // The audit rows stay: the submission's row and the delete's.
   assert.deepEqual(adminLogs(d.db).map((row) => row.action).sort(), ['deleteAttendee', 'submitChangeRequest']);
 
-  // The deleted session, its token still valid, sends one more.
-  assert.equal((await send('ada-request-2')).statusCode, 201);
+  // The deleted session, its token still valid, tries to send one more.
+  const late = await send('ada-request-2');
+  assert.equal(late.statusCode, 401);
+  assert.deepEqual(d.db.ids('change_requests'), ['cr-bo-1']);
+  assert.equal(d.db.read('change_request_rate_limits', 'uid-ada'), undefined);
+  assert.equal(adminLogs(d.db).length, 2);
 
+  // A request stored just before the sign-in was deleted, and committed
+  // after the sweep passed, is cleared by the retry.
+  await d.db.collection('change_requests').doc('ada-request-race').set({ message: 'x', uid: 'uid-ada' });
   const retry = await remove(d);
 
   assert.equal(retry.statusCode, 200, JSON.stringify(retry.body));
   assert.equal(retry.body.removed.changeRequests, 1);
-  assert.equal(retry.body.removed.changeRequestLimits, 1);
   assert.deepEqual(d.db.ids('change_requests'), ['cr-bo-1']);
-  assert.equal(d.db.read('change_request_rate_limits', 'uid-ada'), undefined);
   assert.deepEqual(adminLogs(d.db).find((row) => row.details)?.details, { resumed: true });
   // Nothing of the account remains, so the call after that is a 404.
   assert.equal((await remove(d)).statusCode, 404);

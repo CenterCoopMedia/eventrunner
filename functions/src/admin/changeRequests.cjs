@@ -25,7 +25,11 @@
  *
  * IDENTITY comes from the verified ID token, never from the body: no free
  * text is stored against a signed-out identity (parity plan, gap table), and
- * a sender cannot be forged. No mail is sent and no notifier fires, so no
+ * a sender cannot be forged. The token is verified WITH the revocation
+ * check, which asks Firebase Auth for the account: an ID token outlives its
+ * sign-in by up to an hour, and an account delete (users/records.cjs)
+ * removes the account's change requests, so a deleted account's open
+ * session must not store a new one. No mail is sent and no notifier fires, so no
  * personal data leaves the deployment.
  *
  * ONE TRANSACTION PER WRITE, WITH ITS AUDIT ROW. Every submission, status
@@ -44,7 +48,7 @@
  */
 
 const crypto = require('node:crypto');
-const { requireAdmin, verifyAuthToken } = require('../core/auth.cjs');
+const { requireAdmin, internals: { extractBearerToken } } = require('../core/auth.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
@@ -159,6 +163,25 @@ function bodyBytes(body) {
 }
 
 /**
+ * The sender's decoded ID token, checked against Firebase Auth so a
+ * deleted, disabled, or revoked sign-in is refused; null for no token or a
+ * token that does not pass. Never throws.
+ *
+ * @param {{ auth: { verifyIdToken: (t: string, checkRevoked?: boolean) => Promise<object> } }} deps
+ * @param {object} req
+ * @returns {Promise<object|null>}
+ */
+async function verifySender({ auth }, req) {
+  const token = extractBearerToken(req);
+  if (!token) return null;
+  try {
+    return await auth.verifyIdToken(token, true);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Whether the flag is on, read live. Throws when the read fails; the caller
  * refuses the submission.
  */
@@ -229,7 +252,7 @@ function createSubmitChangeRequestHandler({ db, auth, now = Date.now, log = cons
     }
     if (!enabled) return notFound(res, FLAG_OFF_MESSAGE);
 
-    const decoded = await verifyAuthToken({ auth }, req);
+    const decoded = await verifySender({ auth }, req);
     if (!decoded?.uid) {
       return sendError(res, 401, 'unauthorized', 'Sign in to send a change request.');
     }

@@ -42,8 +42,20 @@ const TOKENS = {
   unverified: { uid: 'uid-cy', email: 'cy@example.com', email_verified: false },
   'no-email': { uid: 'uid-di', email_verified: true },
 };
+// 'deleted' is a token whose sign-in was deleted after it was issued: it
+// still verifies, as a real ID token does for up to an hour, unless the
+// caller asks Firebase Auth to check the account (checkRevoked).
+const DELETED = { uid: 'uid-gone', email: 'gone@example.com', email_verified: true };
 const auth = {
-  async verifyIdToken(token) {
+  revocationChecks: [],
+  async verifyIdToken(token, checkRevoked = false) {
+    auth.revocationChecks.push(checkRevoked);
+    if (token === 'deleted') {
+      if (!checkRevoked) return DELETED;
+      const err = new Error('There is no user record corresponding to the provided identifier.');
+      err.code = 'auth/user-not-found';
+      throw err;
+    }
     if (!TOKENS[token]) throw new Error('invalid token');
     return TOKENS[token];
   },
@@ -179,6 +191,22 @@ test('no token or a bad token is 401; an unverified or missing email is 403; not
   assert.match(unverified.body.error.message, /verified email/);
   assert.equal((await submit(db, { token: 'no-email' })).statusCode, 403);
   assert.deepEqual(written(db), []);
+});
+
+// Review finding 6: an account delete removes the account's change
+// requests, so the deleted person's open session must not store a new one.
+test('a token whose sign-in was deleted is refused with 401 and stores nothing', async () => {
+  const db = makeFakeDb();
+  auth.revocationChecks.length = 0;
+  const res = await submit(db, { token: 'deleted' });
+  assert.equal(res.statusCode, 401);
+  assert.deepEqual(written(db), []);
+  assert.deepEqual(auth.revocationChecks, [true]);
+
+  // A live account is checked the same way, and goes through.
+  auth.revocationChecks.length = 0;
+  assert.equal((await submit(db)).statusCode, 201);
+  assert.deepEqual(auth.revocationChecks, [true]);
 });
 
 test('a body over 8 KiB is 413 and writes nothing', async () => {

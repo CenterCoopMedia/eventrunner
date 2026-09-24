@@ -8,7 +8,8 @@
 // and a staff account finds it on the admin page, moves it on, and removes
 // it; every step leaves its admin_logs row, read back with the Admin SDK.
 // The rate limit is driven against the real endpoint with the visitor's own
-// token. Turning the flag off again refuses the very next request.
+// token. Turning the flag off again refuses the very next request, and once
+// staff delete the visitor's account, its still-valid token is refused.
 //
 // config/bootstrap and config/features are restored when the file is done,
 // because later specs sign in as the seeded operator and read the flags.
@@ -216,5 +217,24 @@ test.describe.serial('change requests', () => {
     const refused = await callFunction('submitChangeRequest', { message: 'After the flag.', submissionKey: `after${stamp}` }, visitorToken);
     expect(refused.status).toBe(404);
     expect((await adminDb().collection('change_requests').doc(`after${stamp}`).get()).exists).toBe(false);
+  });
+
+  // Review finding 6: deleting an account removes its change requests, so
+  // the deleted person's open session, whose token is still valid, must not
+  // store a new one. The Auth emulator refuses a deleted user's token even
+  // without the revocation check, so this pins the surface; the unit test in
+  // changeRequests.test.cjs pins that the endpoint asks for the check.
+  test('a deleted account’s open session cannot send a request', async () => {
+    await setFlag(true);
+    const staffToken = await idTokenFor(await ensureUser(STAFF_EMAIL));
+    const deleted = await callFunction('deleteAttendee', { uid: visitorUid }, staffToken);
+    expect(deleted.status, JSON.stringify(deleted.body)).toBe(200);
+
+    const refused = await callFunction('submitChangeRequest', { message: 'After the delete.', submissionKey: `gone${stamp}` }, visitorToken);
+    expect(refused.status).toBe(401);
+    expect((await adminDb().collection('change_requests').doc(`gone${stamp}`).get()).exists).toBe(false);
+    const left = await adminDb().collection('change_requests').where('uid', '==', visitorUid).get();
+    expect(left.size).toBe(0);
+    await setFlag(false);
   });
 });
