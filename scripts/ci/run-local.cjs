@@ -39,25 +39,30 @@ function snapshot(base) {
   return { base, head, tree: git('rev-parse', 'HEAD^{tree}') };
 }
 
-function runChecks(base, report) {
-  if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22 for local CI');
-  const before = snapshot(base);
-  const { jobs } = classifyEvent({ eventName: 'pull_request', base, head: before.head });
-  const env = {
-    ...process.env,
-    CI: 'true',
+function checkEnvironment(name, inherited = process.env) {
+  const env = { ...inherited, CI: 'true' };
+  // Match the hosted jobs: only the production build needs dummy client config.
+  if (name === 'build') Object.assign(env, {
     VITE_FIREBASE_API_KEY: 'ci-dummy-api-key',
     VITE_FIREBASE_AUTH_DOMAIN: 'ci-dummy.firebaseapp.com',
     VITE_FIREBASE_PROJECT_ID: 'ci-dummy',
     VITE_FIREBASE_STORAGE_BUCKET: 'ci-dummy.appspot.com',
     VITE_FIREBASE_MESSAGING_SENDER_ID: '000000000000',
     VITE_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000000000',
-  };
+  });
+  return env;
+}
+
+function runChecks(base, report) {
+  if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22 for local CI');
+  const before = snapshot(base);
+  const { jobs } = classifyEvent({ eventName: 'pull_request', base, head: before.head });
   const receipt = { version: 1, ...before, startedAt: new Date().toISOString(), results: {} };
   fs.writeFileSync(report, `${JSON.stringify(receipt, null, 2)}\n`);
   for (const name of JOB_NAMES) {
     if (!jobs[name]) continue;
     console.log(`Local CI: ${name}`);
+    const env = checkEnvironment(name);
     for (const [command, ...args] of CHECKS[name]) {
       execFileSync(command, args, { env, stdio: 'inherit' });
     }
@@ -119,4 +124,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { CHECKS, publishResult, runChecks, snapshot, validateReceipt };
+module.exports = { CHECKS, checkEnvironment, publishResult, runChecks, snapshot, validateReceipt };

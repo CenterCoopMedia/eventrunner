@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validateReceipt } = require('./run-local.cjs');
+const { checkEnvironment, validateReceipt } = require('./run-local.cjs');
 
 const current = { base: 'a'.repeat(40), head: 'b'.repeat(40), tree: 'c'.repeat(40) };
 const jobs = { unit: true, build: true };
@@ -27,4 +27,10 @@ test('requires every selected suite to pass on the exact base, head, and tree', 
 
 test('a stale receipt cannot be republished as a fresh result', () => {
   assert.throws(() => verify({ ...receipt, startedAt: '2026-09-30T13:00:00Z' }), /expired/);
+});
+
+test('dummy build config does not enter web unit tests', () => {
+  const inherited = { PATH: '/opt/node/bin' };
+  assert.equal(checkEnvironment('build', inherited).VITE_FIREBASE_PROJECT_ID, 'ci-dummy');
+  assert.deepEqual(checkEnvironment('unitWeb', inherited), { ...inherited, CI: 'true' });
 });
