@@ -61,6 +61,18 @@ beforeEach(() => {
 });
 
 describe('SpeakerSessionHub', () => {
+  it('separates a known day from the missing-time message', () => {
+    render(
+      <SpeakerSessionHub
+        eventConfig={EVENT}
+        scheduleData={[{ ...SESSIONS[0], startTime: null, endTime: null }]}
+        speakerId="speaker-own"
+      />,
+    );
+
+    expect(screen.getByText('Time').nextElementSibling).toHaveTextContent('Thursday · To be announced');
+  });
+
   it('changes between the speaker own sessions and renders description as text', () => {
     const { container } = render(
       <SpeakerSessionHub
