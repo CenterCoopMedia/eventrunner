@@ -32,6 +32,11 @@
     "globals": "^16.3.0",
     "vitest": "^3.2.4"
   },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.13.6"
+    }
+  },
   "engines": {
     "node": ">=22"
   }
