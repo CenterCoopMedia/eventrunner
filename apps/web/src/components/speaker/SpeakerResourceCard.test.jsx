@@ -143,6 +143,22 @@ describe('SpeakerResourceCard', () => {
     expect(document.getElementById('section-travel_map')).not.toBeNull();
   });
 
+  it('links a configured map on a legacy travel page using its configured alt text', () => {
+    contentValue = {
+      getPublicPage: publicPage([{ ...TRAVEL, sections: [] }]),
+    };
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SpeakerResourceCard />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Venue floor plan' })).toHaveAttribute(
+      'href',
+      '/travel#section-travel_map',
+    );
+  });
+
   it('routes the venue map to the page anchor with HashRouter', async () => {
     window.history.replaceState(null, '', '/#/speaker/dashboard');
     render(

@@ -30,15 +30,18 @@ export function buildSpeakerResources({ eventConfig, features, getPublicPage }) 
   const mapSection = Array.isArray(travel?.sections)
     ? travel.sections.find((section) => section?.id === VENUE_MAP_SECTION_ID)
     : null;
+  const venueMap = resolveVenueMap(eventConfig);
+  const mapLabel = typeof mapSection?.label === 'string' && mapSection.label.trim()
+    ? mapSection.label.trim()
+    : venueMap?.alt;
   if (
-    resolveVenueMap(eventConfig)
+    venueMap
     && isCanonicalPagePath(travel?.path)
-    && typeof mapSection?.label === 'string'
-    && mapSection.label.trim()
+    && mapLabel
   ) {
     pages.push({
       key: 'venue-map',
-      label: mapSection.label.trim(),
+      label: mapLabel,
       to: { pathname: travel.path, hash: `#section-${VENUE_MAP_SECTION_ID}` },
     });
   }
