@@ -83,10 +83,13 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../../App.jsx';
+import { subscribePendingCounts } from '../pendingCountsSource.js';
 import { unavailableButtonClass } from '../components/formControls.jsx';
 import { markTourDone } from '../tourState.js';
 
 const ALL = ['cmsContent', 'cmsPages', 'cmsSchedule', 'cmsOrganizations', 'cmsUpdates', 'cmsTimeline'];
+let sendCounts;
+const countDoc = (values = {}) => Object.fromEntries(ALL.map((id) => [id, values[id] ?? 0]));
 
 function ok(body) {
   return { ok: true, status: 200, json: async () => body };
@@ -174,6 +177,11 @@ function expectPageAgrees() {
 }
 
 beforeEach(() => {
+  vi.mocked(subscribePendingCounts).mockImplementation((_initialize, onNext) => {
+    sendCounts = onNext;
+    onNext(countDoc());
+    return () => { sendCounts = null; };
+  });
   // The editor tour (issue #198) opens on a first visit and states the
   // record words this file reads; the account has already ended it.
   markTourDone('admin-1');
@@ -364,7 +372,7 @@ describe('the Unpublished changes page', () => {
     expect(await within(main()).findByText('Published 3 changes. The public site picks them up live.')).toBeInTheDocument();
   });
 
-  it('(d) never lets the figure, the rows, the panel buttons and the banner disagree', async () => {
+  it('(d) derives the page count from its rows and closes their listeners on other pages', async () => {
     await renderAt('/admin/unpublished');
     pushPages();
     const snapshots = [
@@ -378,6 +386,9 @@ describe('the Unpublished changes page', () => {
         cmsTimeline: [{ id: 't1', status: 'dirty' }],
       },
     ];
+    // A count-document delivery can arrive before the row snapshots. It
+    // must not become the figure beside rows from a different delivery.
+    act(() => sendCounts(countDoc({ cmsPages: 91 })));
     let total = 0;
     for (const snapshot of snapshots) {
       pushDrafts(snapshot);
@@ -390,14 +401,19 @@ describe('the Unpublished changes page', () => {
     expect(total).toBe(4);
     const sentence = figure().textContent;
 
-    // Every other screen shows the same count in the banner.
+    // Other screens read only the count document for their banner.
     fireEvent.click(screen.getByRole('link', { name: 'Pages' }));
     await screen.findByRole('heading', { level: 1, name: 'Pages' });
+    expect(drafts.size).toBe(0);
+    act(() => sendCounts(countDoc({ cmsContent: 1, cmsPages: 1, cmsSchedule: 1, cmsTimeline: 1 })));
     const banner = screen.getByRole('complementary', { name: 'Unpublished changes' });
     expect(banner).toHaveAttribute('data-pending-total', String(total));
     expect(banner.querySelector('p').firstChild.textContent).toBe(sentence);
     fireEvent.click(within(banner).getByRole('link', { name: 'Review unpublished changes' }));
     await screen.findByRole('heading', { level: 1, name: 'Unpublished changes' });
+    expect(drafts.size).toBe(6);
+    expect(figure()).toBeNull();
+    pushDrafts({ ...snapshots.at(-1), cmsSchedule: [{ id: 's1', title: 'One', status: 'dirty' }] });
     expect(figure()).toHaveAttribute('data-pending-total', String(total));
   });
 

@@ -1,69 +1,37 @@
-// One count of unpublished changes for the whole admin (issue #196).
-//
-// The shell mounts this provider once, and the banner and the Unpublished
-// changes page only READ it: one listener per publishable collection's
-// dirty drafts, one value, so the banner's figure, the page's figure and the
-// page's rows cannot disagree. Neither reader counts anything of its own.
-//
-// It holds the documents and the counts. Grouping and formatting happen in
-// the page, which is a lazy chunk; this file stays small because it rides in
-// the admin entry chunk.
+// The shell reads one server-maintained count document. The Unpublished
+// changes page loads its own rows only while it is open.
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAdminApi } from './adminApi.js';
 import { COLLECTION_CHOICES, pendingSentence } from './collectionWords.js';
-import { subscribeDirtyDrafts } from './pendingChangesSource.js';
+import { subscribePendingCounts } from './pendingCountsSource.js';
 
 const PendingChangesContext = createContext(null);
-
 const OUTSIDE = { ready: false, total: 0 };
 
 export function PendingChangesProvider({ children }) {
-  // collection id → its dirty drafts; a collection is absent until its
-  // listener has delivered once.
-  const [docsByCollection, setDocsByCollection] = useState(() => ({}));
-  // collection id → the listener's last error, cleared by its next delivery.
-  const [errors, setErrors] = useState(() => ({}));
+  const call = useAdminApi();
+  const [state, setState] = useState({ counts: null, error: null });
 
   useEffect(() => {
-    const unsubscribers = COLLECTION_CHOICES.map(({ id }) =>
-      subscribeDirtyDrafts(
-        id,
-        (docs) => {
-          setDocsByCollection((current) => ({ ...current, [id]: docs }));
-          setErrors((current) => (current[id] ? { ...current, [id]: null } : current));
-        },
-        (error) => setErrors((current) => ({ ...current, [id]: error ?? true })),
-      ),
+    setState({ counts: null, error: null });
+    return subscribePendingCounts(
+      () => call('cmsEnsurePendingCounts', {}),
+      (counts) => setState({ counts, error: null }),
+      (error) => setState((current) => ({ ...current, error })),
     );
-    return () => {
-      for (const unsubscribe of unsubscribers) {
-        if (typeof unsubscribe === 'function') unsubscribe();
-      }
-    };
-  }, []);
+  }, [call]);
 
-  const value = useMemo(() => {
-    const counts = {};
-    let total = 0;
-    // Every listener has answered once. Before that a count is a guess.
-    let ready = true;
-    let error = null;
-    for (const { id } of COLLECTION_CHOICES) {
-      const docs = docsByCollection[id];
-      if (!Array.isArray(docs)) ready = false;
-      counts[id] = docs?.length ?? 0;
-      total += counts[id];
-      error = error || errors[id] || null;
-    }
-    return { ready, error, docsByCollection, total, sentence: pendingSentence(counts) };
-  }, [docsByCollection, errors]);
+  const value = useMemo(() => ({
+    ready: state.counts !== null,
+    error: state.error,
+    total: COLLECTION_CHOICES.reduce((total, { id }) => total + (state.counts?.[id] ?? 0), 0),
+    sentence: pendingSentence(state.counts),
+  }), [state]);
 
   return <PendingChangesContext.Provider value={value}>{children}</PendingChangesContext.Provider>;
 }
 
-/**
- * The shared count: `{ ready, error, docsByCollection, total, sentence }`.
- * Outside a provider it is never ready and counts nothing.
- */
+/** The banner's count; outside a provider it is never ready. */
 export function usePendingChanges() {
   return useContext(PendingChangesContext) ?? OUTSIDE;
 }
