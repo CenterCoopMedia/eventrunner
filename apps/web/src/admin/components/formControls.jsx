@@ -385,6 +385,7 @@ export function Notice({ tone = 'info', message, children }) {
  * @param {string} [props.busyLabel] shown while the call is in flight
  * @param {boolean} [props.busy]
  * @param {string} [props.title] heading for the moment
+ * @param {boolean} [props.initiallyOpen] open the warning when the trigger was already confirmed elsewhere
  */
 export function DestructiveConfirm({
   trigger,
@@ -397,8 +398,9 @@ export function DestructiveConfirm({
   busyLabel,
   title,
   className = '',
+  initiallyOpen = false,
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const headingId = useId();
 
   if (!open) {
@@ -429,7 +431,7 @@ export function DestructiveConfirm({
         <button
           type="button"
           className={dangerButtonClass}
-          disabled={busy}
+          disabled={busy || disabled}
           onClick={() => onConfirm()}
         >
           {busy ? (busyLabel ?? confirmLabel) : confirmLabel}

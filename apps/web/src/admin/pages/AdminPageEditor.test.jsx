@@ -7,7 +7,7 @@
 //   • Server 400   → surfaced VERBATIM, including each `field: reason`.
 //   • System page  → delete refused in the UI, matching cmsDeletePage.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
@@ -30,8 +30,12 @@ let listenerError = null;
 // Collections listed here never report — the window in which one revision is
 // known and the other is not.
 let silentCollections = [];
+const adminSubscriptions = new Map();
+const adminErrors = new Map();
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
+    adminSubscriptions.set(name, onNext);
+    adminErrors.set(name, onError);
     if (!silentCollections.includes(name)) {
       onNext(name === 'cmsPages' ? liveDocs : draftDocs);
     }
@@ -98,7 +102,7 @@ function errorResponse(status, code, message) {
   return { ok: false, status, json: async () => ({ error: { code, message } }) };
 }
 
-async function renderAt(path) {
+async function renderAt(path, { waitForHeading = true } = {}) {
   const result = render(
     <MemoryRouter
       initialEntries={[path]}
@@ -121,7 +125,7 @@ async function renderAt(path) {
     // outrun the default budget on a loaded machine.
     { timeout: 5000 },
   );
-  await screen.findByRole('heading', { level: 1 });
+  if (waitForHeading) await screen.findByRole('heading', { level: 1 });
   return result;
 }
 
@@ -141,6 +145,8 @@ beforeEach(() => {
   draftDocs = [];
   listenerError = null;
   silentCollections = [];
+  adminSubscriptions.clear();
+  adminErrors.clear();
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -196,6 +202,50 @@ describe('page list', () => {
 });
 
 describe('page editor', () => {
+  it('waits for both revisions before it fills the form and saves the draft values', async () => {
+    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, label: 'Old live label', status: undefined, revision: 2 }];
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, label: 'Unpublished label' }];
+    silentCollections = ['cmsPages_drafts'];
+    await renderAt('/admin/pages/scholarships', { waitForHeading: false });
+    await waitFor(() => expect(adminSubscriptions.has('cmsPages_drafts')).toBe(true));
+
+    expect(screen.getByRole('status', { name: 'Loading page…' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Navigation label')).toBeNull();
+
+    act(() => adminSubscriptions.get('cmsPages_drafts')(draftDocs));
+    expect(await screen.findByLabelText('Navigation label')).toHaveValue('Unpublished label');
+
+    fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.label).toBe('Unpublished label');
+  });
+
+  it('keeps the form closed when the drafts listener fails before it reports', async () => {
+    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined }];
+    silentCollections = ['cmsPages_drafts'];
+    await renderAt('/admin/pages/scholarships', { waitForHeading: false });
+    await waitFor(() => expect(adminErrors.has('cmsPages_drafts')).toBe(true));
+
+    act(() => adminErrors.get('cmsPages_drafts')(new Error('permission denied')));
+
+    expect(await screen.findByText(/could not load this page and its saved draft/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Navigation label')).toBeNull();
+  });
+
+  it('closes an adopted editor when another admin deletes the live page', async () => {
+    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined }];
+    await renderAt('/admin/pages/scholarships');
+    expect(await screen.findByLabelText('Navigation label')).toHaveValue('Scholarships');
+
+    act(() => adminSubscriptions.get('cmsPages')([]));
+
+    expect(await screen.findByRole('heading', { name: 'No such page' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Navigation label')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('creates a page and saves it as a draft only (issue #13 done-when)', async () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/new');
@@ -718,6 +768,50 @@ describe('page editor', () => {
 });
 
 describe('publish results and recovery', () => {
+  it('reports a resumed list publish against the ids the failed run asked for', async () => {
+    const latePage = {
+      ...SCHOLARSHIPS_DRAFT,
+      id: 'late-page',
+      label: 'Late page',
+      path: '/late-page',
+      status: undefined,
+    };
+    liveDocs = [latePage];
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: { code: 'publish-failed', message: 'Publish failed part-way.' },
+        queueId: 'queue-list',
+      }),
+    });
+    await renderAt('/admin/pages');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+
+    // A page outside the failed run gains a draft before the operator
+    // resumes. It remains pending, but it was not one of the attempted ids.
+    act(() => adminSubscriptions.get('cmsPages_drafts')([
+      SCHOLARSHIPS_DRAFT,
+      { ...latePage, label: 'Late unpublished edit', status: 'dirty' },
+    ]));
+    expect(screen.getByRole('button', { name: 'Publish all (2)' })).toBeInTheDocument();
+
+    fetch.mockResolvedValueOnce(okResponse({
+      results: { cmsPages: { published: ['scholarships'], skipped: [] } },
+    }));
+    fireEvent.click(resume);
+
+    expect(await screen.findByText(
+      'Published. The public site picks it up live.',
+      { selector: 'p[role="status"]' },
+    )).toBeInTheDocument();
+    expect(bodyOf(1)).toEqual({ queueId: 'queue-list' });
+    expect(screen.queryByText(/late-page was skipped/)).toBeNull();
+  });
+
   it('waits for BOTH revisions before judging publish state', async () => {
     // With only the live listener in, a draft-only page reads as "no such
     // page" and a clean draft reads as never published — which Publish all

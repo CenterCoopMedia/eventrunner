@@ -111,7 +111,7 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | `node scripts/check-dco.cjs <base> <head>` | Every non-merge commit in the pull request's range carries a DCO `Signed-off-by` trailer — see [Sign your commits](#sign-your-commits-dco) |
 | `node scripts/dev/login-smoke.mjs` | Live Playwright smoke test of the emailed-code sign-in flow against the Functions/Firestore/Auth emulators (dev tool, not run by CI) |
 
-CI runs the trust checks and selected tiers on every pull request, credential-free. Every push to `main` runs the full matrix. Fork PRs must be able to run every check without credentials.
+CI runs the trust checks and selected tiers on every pull request, credential-free. A manual CI run checks the full matrix. Fork PRs run on GitHub-hosted runners without credentials.
 
 ### Proportional CI
 
@@ -119,9 +119,48 @@ Pull requests run the trust checks (DCO and secret scanning) plus the smallest
 path-selected tier. The repository-owned `scripts/ci/classify-changes.cjs`
 classifier emits the selections; mixed changes take the union of their tiers.
 The `CI gate` job is the stable aggregate check for branch protection. A job
-that the classifier did not select is expected to be skipped. Pushes to `main`
-fail open to the full matrix. All tiers remain credential-free so fork pull
-requests can run them without secrets.
+that the classifier did not select is expected to be skipped. Merges do not
+repeat the matrix that passed on the pull request. Deployment verification
+still runs. All tiers remain credential-free.
+
+### Local CI on operator machines
+
+Run expensive checks on an operator machine before opening a PR. Use Node 22,
+Java 21, and Playwright Chromium with its sandbox enabled. The runner packs the
+shared package and installs the locked dependencies before testing. The emulator tests bind
+to localhost and use synthetic data. Run them in an isolated checkout with no
+production credentials. Keep concurrent emulator jobs on separate machines.
+
+Commit the change and regenerate required output first. With a clean worktree
+that contains its base commit, run:
+
+```sh
+node scripts/ci/run-local.cjs --base <full-base-sha> --report /tmp/eventrunner-ci.json
+```
+
+The runner selects the same tiers as Actions, records each successful check,
+and refuses a receipt if the worktree changes during the run. Keep its output
+and receipt with the task record. Push the tested branch, then publish the
+receipt before creating the PR:
+
+```sh
+node scripts/ci/run-local.cjs --base <full-base-sha> --report /tmp/eventrunner-ci.json \
+  --publish --repo CenterCoopMedia/eventrunner
+```
+
+The repository variable `LOCAL_CI_ACTOR_ID` identifies the trusted status
+publisher by its numeric GitHub user ID. For a same-repository PR, Actions
+checks the newest status on the exact head, with the full base SHA in its
+context. The result must come from that publisher and be less than 24 hours
+old. The verifier is read from the PR's base. Missing, stale, conflicting, or
+untrusted results use the hosted checks. Fork PRs always use hosted checks.
+An updated base or head needs a new local run. A manual workflow run always
+uses the hosted matrix. Superseded PR runs are canceled.
+
+GitHub still runs DCO, secret scanning, and the required `CI gate`. Branch
+protection and review requirements stay in force. The local publisher is a
+trusted operator attestation; it is not the independent credential boundary
+tracked in [issue #259](https://github.com/CenterCoopMedia/eventrunner/issues/259).
 
 The documentation check validates local links and the Pages entrypoint's basic
 metadata. Generated pages under `docs/docs/**` must also carry an SVG favicon,

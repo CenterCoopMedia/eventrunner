@@ -21,8 +21,12 @@ vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => 
 let sources = {};
 let listenerError = null;
 let silentCollections = [];
+const adminSubscriptions = new Map();
+const adminErrors = new Map();
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
+    adminSubscriptions.set(name, onNext);
+    adminErrors.set(name, onError);
     if (!silentCollections.includes(name)) onNext(sources[name] ?? []);
     if (listenerError) onError?.(listenerError);
     return () => {};
@@ -153,6 +157,8 @@ beforeEach(() => {
   sources = { cmsPages: [], cmsPages_drafts: [], cmsContent: [], cmsContent_drafts: [] };
   listenerError = null;
   silentCollections = [];
+  adminSubscriptions.clear();
+  adminErrors.clear();
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -202,6 +208,22 @@ describe('content browsing', () => {
     expect(screen.getAllByRole('status').some((el) => /lost the connection/i.test(el.textContent))).toBe(true);
   });
 
+  it.each(['cmsContent_drafts', 'cmsPages_drafts'])('blocks creation until the failed %s listener recovers', async (collection) => {
+    sources.cmsPages = [SCHOLARSHIPS_PAGE];
+    silentCollections = [collection];
+    await renderAt('/admin/content/scholarships/intro');
+
+    act(() => adminErrors.get(collection)(new Error('draft listener failed')));
+    for (const button of screen.getAllByRole('button', { name: 'Add a block' })) {
+      expect(button).toBeDisabled();
+    }
+
+    act(() => adminSubscriptions.get(collection)([]));
+    await waitFor(() => {
+      expect(screen.getAllByRole('link', { name: 'Add a block' }).length).toBeGreaterThan(0);
+    });
+  });
+
   it('reports no such page/section cleanly instead of crashing', async () => {
     await renderAt('/admin/content/nope');
     expect(await screen.findByText('No such page')).toBeInTheDocument();
@@ -211,7 +233,7 @@ describe('content browsing', () => {
     expect(await screen.findByText('No such section')).toBeInTheDocument();
   });
 
-  it('does not adopt a live-only doc while the drafts listener is still silent', async () => {
+  it('waits for both revisions before it fills the form and saves the draft values', async () => {
     // If the live listener reports before cmsContent_drafts, `existingRow`
     // is already truthy (live-only) while the real dirty draft is still in
     // flight. Adopting from the stale live content here — and never
@@ -220,12 +242,34 @@ describe('content browsing', () => {
     // changes with it.
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, value: '<p>STALE live content</p>', status: undefined }];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT];
     silentCollections = ['cmsContent_drafts'];
 
     await renderAt('/admin/content/scholarships/intro/body');
 
     expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
     expect(screen.queryByDisplayValue(/STALE live content/)).toBeNull();
+
+    act(() => adminSubscriptions.get('cmsContent_drafts')(sources.cmsContent_drafts));
+    expect(await screen.findByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
+
+    fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__body', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields.value).toBe('<p>Scholarships open in spring.</p>');
+  });
+
+  it('keeps the form closed when the content drafts listener fails before it reports', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, value: '<p>STALE live content</p>', status: undefined }];
+    silentCollections = ['cmsContent_drafts'];
+
+    await renderAt('/admin/content/scholarships/intro/body');
+    await waitFor(() => expect(adminErrors.has('cmsContent_drafts')).toBe(true));
+    act(() => adminErrors.get('cmsContent_drafts')(new Error('permission denied')));
+
+    expect(await screen.findByText(/could not load this block and its saved draft/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^value/)).toBeNull();
   });
 
   it('keeps a field literally named "new" editable — the create route uses a different segment', async () => {
@@ -261,6 +305,7 @@ describe('creating and editing a block', () => {
     expect(urlOf(0)).toMatch(/\/cmsCreateContent$/);
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer id-token');
     expect(bodyOf(0)).toEqual({
+      pageId: 'scholarships',
       section: 'intro',
       field: 'body',
       fields: { blockType: 'richtext', value: '<p>Hello</p>' },

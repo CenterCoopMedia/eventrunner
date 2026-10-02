@@ -23,7 +23,7 @@
 
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { draftCollectionFor, statContractErrors } = require('./blockTypes.cjs');
+const { draftCollectionFor, requiredBlockErrors } = require('./blockTypes.cjs');
 const {
   writeDraft,
   deleteBoth,
@@ -50,6 +50,10 @@ const {
 const { TIMELINE_COLLECTION, validateTimelineFields } = require('./timeline.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const PAGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const PAGES_COLLECTION = 'cmsPages';
+const PAGES_DRAFTS = 'cmsPages_drafts';
+const CONTENT_SECTION_LOCKS = 'cmsContentSectionLocks';
 
 /**
  * Sentinel value a caller may set on a `fields` key to explicitly drop that
@@ -245,12 +249,9 @@ async function checkSessionStructure({ db, tx = null, collection, docId, fields 
 /**
  * Block-shape contracts at the content-write seam (design brief §2.1.1).
  *
- * These generic endpoints deliberately validate no block shape — the
- * registry describes fields, and the editor fills them in — with ONE
- * exception, and it is a design rule rather than a data-integrity one: a
- * stat block must carry its four parts. A number presented as evidence with
- * no finding, no period, no source, and no alt text is the pattern the brief
- * rejects, and from PR3 on it fails validation as well as review.
+ * Required fields come from the block registry, and the stat block keeps
+ * its more specific evidence contract. This is the server boundary shared
+ * by an editor save, a restore, and a direct endpoint call.
  *
  * The check runs over the RESULT of the merge, exactly like the speaker
  * reference check: what matters is the block that ends up stored, not the
@@ -282,9 +283,80 @@ function sponsorPackageErrors(fields) {
 
 function checkBlockContract({ collection, fields }) {
   if (collection !== 'cmsContent') return { ok: true };
-  const errors = [...statContractErrors(fields), ...sponsorPackageErrors(fields)];
+  const errors = [...requiredBlockErrors(fields), ...sponsorPackageErrors(fields)];
   if (errors.length > 0) return { ok: false, message: errors.join('; ') };
   return { ok: true };
+}
+
+/**
+ * Read and enforce the owning page section's create rules in the caller's
+ * transaction. The returned lock is written after all reads. Every create
+ * for one section reads and writes that same document, so concurrent creates
+ * serialize and the retry sees the first create before applying maxBlocks.
+ */
+async function checkContentCreateSection({ db, tx, collection, pageId, sectionId, blockType }) {
+  if (collection !== 'cmsContent') return { ok: true, lock: null };
+  if (!PAGE_ID_RE.test(pageId ?? '')) {
+    return { ok: false, message: 'pageId: must name the page that owns this content section.' };
+  }
+
+  // Content rows are keyed and counted by sectionId alone. The lock must use
+  // that same namespace, or two pages that name the same section can pass the
+  // count concurrently while reading and writing different lock documents.
+  const lockRef = db.collection(CONTENT_SECTION_LOCKS).doc(sectionId);
+  const [draftPage, livePage, lockSnap] = await tx.getAll(
+    db.collection(PAGES_DRAFTS).doc(pageId),
+    db.collection(PAGES_COLLECTION).doc(pageId),
+    lockRef,
+  );
+  const page = draftPage.exists ? draftPage.data() : livePage.exists ? livePage.data() : null;
+  const section = Array.isArray(page?.sections)
+    ? page.sections.find((entry) => entry?.id === sectionId)
+    : null;
+  if (!section) {
+    return {
+      ok: false,
+      message: `section: "${sectionId}" does not exist on page "${pageId}".`,
+    };
+  }
+  if (!Array.isArray(section.allowedBlocks) || !section.allowedBlocks.includes(blockType)) {
+    return {
+      ok: false,
+      message: `allowedBlocks: section "${sectionId}" does not allow block type "${String(blockType)}".`,
+    };
+  }
+  if (!Number.isInteger(section.maxBlocks) || section.maxBlocks < 1) {
+    return {
+      ok: false,
+      message: `maxBlocks: section "${sectionId}" has no valid block limit.`,
+    };
+  }
+
+  const [liveBlocks, draftBlocks] = await Promise.all([
+    tx.get(db.collection('cmsContent').where('section', '==', sectionId)),
+    tx.get(db.collection('cmsContent_drafts').where('section', '==', sectionId)),
+  ]);
+  const ids = new Set([
+    ...liveBlocks.docs.map((doc) => doc.id),
+    ...draftBlocks.docs.map((doc) => doc.id),
+  ]);
+  if (ids.size >= section.maxBlocks) {
+    return {
+      ok: false,
+      message: `maxBlocks: section "${sectionId}" already has its maximum of ${section.maxBlocks} blocks.`,
+    };
+  }
+
+  const priorSequence = lockSnap.exists && Number.isSafeInteger(lockSnap.data()?.sequence)
+    ? lockSnap.data().sequence
+    : 0;
+  return {
+    ok: true,
+    lock: {
+      ref: lockRef,
+      data: { pageId, sectionId, sequence: priorSequence + 1 },
+    },
+  };
 }
 
 /**
@@ -412,6 +484,16 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
         const contract = checkBlockContract({ collection, fields: references.fields });
         if (!contract.ok) throw new RequestError(400, 'bad-request', contract.message);
 
+        const sectionRule = await checkContentCreateSection({
+          db,
+          tx,
+          collection,
+          pageId: req.body?.pageId,
+          sectionId: extraFields.section,
+          blockType: references.fields.blockType,
+        });
+        if (!sectionRule.ok) throw new RequestError(400, 'bad-request', sectionRule.message);
+
         const organization = checkOrganizationFields({
           collection,
           fields: references.fields,
@@ -446,6 +528,7 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
           now,
           createOnly: true,
         });
+        if (sectionRule.lock) tx.set(sectionRule.lock.ref, sectionRule.lock.data);
         return written.docPath;
       });
     } catch (err) {
@@ -701,6 +784,7 @@ module.exports = {
     checkSpeakerReferences,
     checkSessionStructure,
     checkBlockContract,
+    checkContentCreateSection,
     checkOrganizationFields,
     isValidDocId,
     SECTION_FIELD_RE,

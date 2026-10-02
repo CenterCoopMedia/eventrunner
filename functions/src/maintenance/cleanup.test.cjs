@@ -3,10 +3,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { sweepStrandedPublishRows, internals } = require('./cleanup.cjs');
+const { sweepExpiredSentEmails, sweepStrandedPublishRows, internals } = require('./cleanup.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 
-const { strandedParts, strandedPatch, toMillis, STRANDED_AFTER_MS } = internals;
+const {
+  strandedParts,
+  strandedPatch,
+  toMillis,
+  STRANDED_AFTER_MS,
+  SENT_EMAIL_RETENTION_MS,
+} = internals;
 
 const NOW = 1_750_000_000_000;
 const now = () => NOW;
@@ -209,4 +215,41 @@ test('a caller-supplied timeout is honoured', async () => {
     { timeoutMs: 5 * 60_000 },
   );
   assert.equal(result.publishFailed, 1);
+});
+
+// --- sent-email retention ----------------------------------------------------
+
+test('sent-email retention deletes older rows and keeps the cutoff and recent rows', async () => {
+  const cutoff = NOW - SENT_EMAIL_RETENTION_MS;
+  const db = makeFakeDb({
+    'sent_emails/older': { sentAt: new Date(cutoff - 1), to: 'old@example.test' },
+    'sent_emails/cutoff': { sentAt: new Date(cutoff), to: 'boundary@example.test' },
+    'sent_emails/recent': { sentAt: new Date(cutoff + 1), to: 'recent@example.test' },
+  });
+
+  assert.deepEqual(await sweepExpiredSentEmails({ db, now }), { deleted: 1 });
+  assert.deepEqual(db.ids('sent_emails').sort(), ['cutoff', 'recent']);
+});
+
+test('sent-email retention drains in batches, stops at its bound, and is idempotent', async () => {
+  const old = new Date(NOW - SENT_EMAIL_RETENTION_MS - 1);
+  const db = makeFakeDb(Object.fromEntries(
+    Array.from({ length: 5 }, (_, index) => [`sent_emails/old-${index}`, { sentAt: old }]),
+  ));
+
+  const bounded = await sweepExpiredSentEmails({ db, now, batchLimit: 2, maxBatches: 2 });
+  assert.deepEqual(bounded, { deleted: 4 });
+  assert.equal(db.ids('sent_emails').length, 1);
+  assert.equal(db.commitCount, 2);
+
+  assert.deepEqual(
+    await sweepExpiredSentEmails({ db, now, batchLimit: 2, maxBatches: 2 }),
+    { deleted: 1 },
+  );
+  const writesAfterDrain = db.writes.length;
+  assert.deepEqual(
+    await sweepExpiredSentEmails({ db, now, batchLimit: 2, maxBatches: 2 }),
+    { deleted: 0 },
+  );
+  assert.equal(db.writes.length, writesAfterDrain);
 });

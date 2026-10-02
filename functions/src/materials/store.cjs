@@ -47,6 +47,12 @@
 
 const { scrubLinkLabel, isSafeUrl } = require('shared/urlSafety');
 const {
+  MaterialFileTooLargeError,
+  MaterialFileSizeUnavailableError,
+  isSessionMaterialStoragePath,
+  requireAllowedMaterialFileSize,
+} = require('./policy.cjs');
+const {
   sendError,
   badRequest,
   notFound,
@@ -110,6 +116,22 @@ class MaterialCapExceededError extends Error {
   }
 }
 
+/** Thrown when a file is not under its session's Storage folder. */
+class InvalidStoragePathError extends Error {
+  constructor(sessionId) {
+    super(`storagePath: must be inside session-materials/${sessionId}/`);
+    this.name = 'InvalidStoragePathError';
+  }
+}
+
+/** Thrown when registration names no object in Storage. */
+class MaterialFileNotFoundError extends Error {
+  constructor() {
+    super('storagePath: no file exists at this path.');
+    this.name = 'MaterialFileNotFoundError';
+  }
+}
+
 /** True when `speakerId` appears in the session doc's `speakerIds` array. */
 function isSpeakerOfSession(sessionData, speakerId) {
   if (!speakerId || !sessionData) return false;
@@ -148,17 +170,32 @@ async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = 
 
 /**
  * Register metadata for a file material whose bytes already exist at
- * `storagePath` (uploaded through the media library, issue #24 — this
- * function never writes Storage). File material filenames are NOT scrubbed
+ * `storagePath` (this function verifies but never writes the Storage
+ * object). File material filenames are NOT scrubbed
  * (spec §4.4): a URL-shaped filename like `slides.pdf` is a display label,
  * not a secret, because the bytes are always signed-URL gated.
  *
- * @param {{ db: object, sessionId: string, storagePath: string, filename: string,
+ * @param {{ db: object, bucket: object, sessionId: string, storagePath: string, filename: string,
  *           actor: { uid: string, isAdmin: boolean, speakerId: string|null },
  *           now?: () => number }} args
  * @returns {Promise<{ id: string, material: object }>}
  */
-async function uploadSessionMaterial({ db, sessionId, storagePath, filename, actor, now = Date.now }) {
+async function uploadSessionMaterial({ db, bucket, sessionId, storagePath, filename, actor, now = Date.now }) {
+  if (!isSessionMaterialStoragePath(storagePath, sessionId)) {
+    throw new InvalidStoragePathError(sessionId);
+  }
+  // Check authorization before Storage so a caller cannot use registration
+  // errors to probe files for a session they do not own. The transaction
+  // below repeats this check so a session change cannot race the write.
+  const sessionSnap = await db.collection(SESSIONS).doc(sessionId).get();
+  assertMaterialCreateAllowed({ sessionSnap, sessionId, actor });
+
+  const file = bucket.file(storagePath);
+  const [exists] = await file.exists();
+  if (!exists) throw new MaterialFileNotFoundError();
+  const [metadata] = await file.getMetadata();
+  requireAllowedMaterialFileSize(metadata?.size);
+
   return createMaterial({
     db,
     sessionId,
@@ -171,23 +208,26 @@ async function uploadSessionMaterial({ db, sessionId, storagePath, filename, act
   });
 }
 
+function assertMaterialCreateAllowed({ sessionSnap, sessionId, actor }) {
+  if (!sessionSnap.exists) throw new SessionNotFoundError(sessionId);
+  const sessionData = sessionSnap.data() || {};
+  if (!actor.isAdmin && !isSpeakerOfSession(sessionData, actor.speakerId)) {
+    throw new NotAuthorizedError();
+  }
+  const currentCount = typeof sessionData.materialCount === 'number' ? sessionData.materialCount : 0;
+  if (currentCount >= MAX_MATERIALS_PER_SESSION) {
+    throw new MaterialCapExceededError(sessionId);
+  }
+  return { sessionData, currentCount };
+}
+
 async function createMaterial({ db, sessionId, actor, now, type, url, storagePath, filename }) {
   const sessionRef = db.collection(SESSIONS).doc(sessionId);
   const materialRef = db.collection(MATERIALS).doc();
 
   return db.runTransaction(async (tx) => {
     const sessionSnap = await tx.get(sessionRef);
-    if (!sessionSnap.exists) throw new SessionNotFoundError(sessionId);
-    const sessionData = sessionSnap.data() || {};
-
-    if (!actor.isAdmin && !isSpeakerOfSession(sessionData, actor.speakerId)) {
-      throw new NotAuthorizedError();
-    }
-
-    const currentCount = typeof sessionData.materialCount === 'number' ? sessionData.materialCount : 0;
-    if (currentCount >= MAX_MATERIALS_PER_SESSION) {
-      throw new MaterialCapExceededError(sessionId);
-    }
+    const { currentCount } = assertMaterialCreateAllowed({ sessionSnap, sessionId, actor });
 
     const at = new Date(now());
     const material = {
@@ -325,8 +365,16 @@ function sendStoreError(res, err, log) {
   if (err instanceof NotAuthorizedError) {
     return forbidden(res, err.message);
   }
-  if (err instanceof InvalidUrlError || err instanceof MaterialCapExceededError) {
+  if (
+    err instanceof InvalidUrlError
+    || err instanceof InvalidStoragePathError
+    || err instanceof MaterialFileNotFoundError
+    || err instanceof MaterialCapExceededError
+  ) {
     return badRequest(res, err.message);
+  }
+  if (err instanceof MaterialFileTooLargeError) {
+    return sendError(res, 413, 'too-large', `storagePath: ${err.message}`);
   }
   log.error('materials store operation failed', err);
   return internal(res, 'The material could not be saved.');
@@ -346,7 +394,12 @@ function buildHandlers() {
     const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
     const db = getDb();
-    return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }) };
+    return {
+      db,
+      auth: getAuth(),
+      getConfig: () => getEventConfig({ db }),
+      getBucket: () => require('firebase-admin/storage').getStorage().bucket(),
+    };
   };
 
   const withCors = (handler) => async (req, res) => {
@@ -397,7 +450,7 @@ function buildHandlers() {
     uploadSessionMaterial: onRequest(
       { region },
       withCors(
-        withActor(async (req, res, { db }, actor) => {
+        withActor(async (req, res, { db, getBucket }, actor) => {
           const { sessionId, storagePath, filename } = req.body || {};
           if (typeof sessionId !== 'string' || !sessionId) {
             return badRequest(res, 'sessionId: must be a non-empty string');
@@ -408,6 +461,7 @@ function buildHandlers() {
           try {
             const result = await uploadSessionMaterial({
               db,
+              bucket: getBucket(),
               sessionId,
               storagePath,
               filename: typeof filename === 'string' ? filename : '',
@@ -476,11 +530,16 @@ module.exports = {
     MaterialNotFoundError,
     NotAuthorizedError,
     InvalidUrlError,
+    InvalidStoragePathError,
+    MaterialFileNotFoundError,
+    MaterialFileTooLargeError,
+    MaterialFileSizeUnavailableError,
     MaterialCapExceededError,
     isSpeakerOfSession,
     SESSIONS,
     MATERIALS,
     MATERIALS_PUBLIC,
     MAX_MATERIALS_PER_SESSION,
+    sendStoreError,
   },
 };

@@ -11,6 +11,7 @@ function passingEnvironment() {
     CHANGES_RESULT: 'success',
     DCO_RESULT: 'success',
     SECRETS_RESULT: 'success',
+    LOCAL_VALIDATED: 'false',
   };
   for (const { selected, result } of JOBS) {
     env[selected] = 'false';
@@ -47,10 +48,31 @@ test('requires success for selected jobs and skipped for unselected jobs', () =>
   assert.throws(() => verifyGate(unselectedRun), /docs was not selected but finished with success/);
 });
 
-test('rejects an event type outside the pull request and push contract', () => {
+test('rejects an event type outside the pull request and manual contract', () => {
   const env = passingEnvironment();
-  env.EVENT_NAME = 'workflow_dispatch';
+  env.EVENT_NAME = 'push';
   env.DCO_RESULT = 'skipped';
 
-  assert.throws(() => verifyGate(env), /EVENT_NAME must be pull_request or push/);
+  assert.throws(() => verifyGate(env), /EVENT_NAME must be pull_request or workflow_dispatch/);
+});
+
+test('local evidence replaces selected tiers but retains the trust checks', () => {
+  const env = passingEnvironment();
+  env.LOCAL_VALIDATED = 'true';
+  env.DOCS_SELECTED = 'true';
+  assert.doesNotThrow(() => verifyGate(env));
+  env.SECRETS_RESULT = 'skipped';
+  assert.throws(() => verifyGate(env), /SECRETS_RESULT must be success/);
+});
+
+test('missing local decision fails closed and manual runs cannot use local results', () => {
+  const env = passingEnvironment();
+  delete env.LOCAL_VALIDATED;
+  assert.throws(() => verifyGate(env), /LOCAL_VALIDATED/);
+  env.LOCAL_VALIDATED = 'true';
+  env.EVENT_NAME = 'workflow_dispatch';
+  env.DCO_RESULT = 'skipped';
+  assert.throws(() => verifyGate(env), /Only pull requests/);
+  env.LOCAL_VALIDATED = 'false';
+  assert.doesNotThrow(() => verifyGate(env));
 });

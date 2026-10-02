@@ -19,10 +19,10 @@
  * stands. The predecessor of every entry is the next row of the same
  * query: the query already reads one row past the page to decide
  * nextCursor, so the last entry on a full page has its predecessor too,
- * at no extra read. Every instant leaves as milliseconds, in `publishedAt`
- * and in a change: a Firestore Timestamp has no toJSON and would otherwise
- * serialize as its internal `{ _seconds, _nanoseconds }`. The stored
- * snapshot itself is not sent; the page reads the changes only.
+ * at no extra read. Every instant leaves as milliseconds in `publishedAt`
+ * and in a change. In the stored snapshot it leaves as an ISO string, which
+ * the normal save endpoints accept. A Firestore Timestamp has no toJSON and
+ * would otherwise serialize as its internal `{ _seconds, _nanoseconds }`.
  */
 
 const { isDeepStrictEqual } = require('node:util');
@@ -32,6 +32,9 @@ const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+// Snapshot fields must remain complete for restore. Large histories use
+// smaller pages so repeating those fields in the diff cannot overflow HTTP.
+const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 /** The most changes one entry lists; `moreChanges` counts the rest. */
 const MAX_CHANGES = 50;
 /**
@@ -184,6 +187,21 @@ function describeChanges(previous, current) {
   };
 }
 
+/** A stored snapshot that survives JSON and can be sent to a save endpoint. */
+function jsonSafe(value) {
+  if (isInstant(value)) {
+    const ms = toMillis(value);
+    return ms === null ? null : new Date(ms).toISOString();
+  }
+  if (Array.isArray(value)) return value.map(jsonSafe);
+  if (isPlainObject(value)) {
+    const out = {};
+    for (const [key, item] of Object.entries(value)) out[key] = jsonSafe(item);
+    return out;
+  }
+  return value;
+}
+
 /**
  * One history row shaped for the page, named fields only.
  *
@@ -198,6 +216,7 @@ function toEntry(doc, previousDoc) {
     id: doc.id,
     docPath: data.docPath,
     revision: data.revision,
+    fields: jsonSafe(isPlainObject(data.fields) ? data.fields : {}),
     visible: data.visible !== false,
     publishedAt: toMillis(data.publishedAt),
     publishedBy: typeof data.publishedBy === 'string' ? data.publishedBy : null,
@@ -260,10 +279,36 @@ function createGetVersionHistoryHandler({ db, auth, getConfig, log = console }) 
       return internal(res, 'Version history is temporarily unavailable.');
     }
 
-    const entries = snap.docs
-      .slice(0, pageSize)
-      .map((d, index) => toEntry(d, snap.docs[index + 1] ?? null));
-    const nextCursor = snap.docs.length > pageSize ? entries[entries.length - 1].revision : null;
+    const entries = [];
+    let entryBytes = 0;
+    let nextCursor = null;
+    for (let index = 0; index < Math.min(snap.docs.length, pageSize); index += 1) {
+      let entry = toEntry(snap.docs[index], snap.docs[index + 1] ?? null);
+      const cursorAfterEntry = snap.docs.length > index + 1 ? entry.revision : null;
+      // The empty envelope already contains both array brackets. Add each
+      // serialized entry and one comma per existing entry for the exact size.
+      const envelopeBytes = Buffer.byteLength(JSON.stringify({ entries: [], nextCursor: cursorAfterEntry }), 'utf8');
+      let bytes = Buffer.byteLength(JSON.stringify(entry), 'utf8');
+      if (entries.length === 0 && envelopeBytes + bytes > MAX_RESPONSE_BYTES) {
+        entry = {
+          ...entry,
+          changeValuesOmitted: true,
+          moreChanges: entry.moreChanges + entry.changes.length,
+          changes: [],
+        };
+        bytes = Buffer.byteLength(JSON.stringify(entry), 'utf8');
+        // A valid Firestore snapshot fits even under worst-case JSON escaping.
+        // Fail closed for malformed imports instead of sending an oversized body.
+        if (envelopeBytes + bytes > MAX_RESPONSE_BYTES) {
+          log.error('Version snapshot exceeds response budget', { docPath, revision: entry.revision });
+          return internal(res, 'This version is too large to load.');
+        }
+      }
+      if (envelopeBytes + entryBytes + bytes + entries.length > MAX_RESPONSE_BYTES) break;
+      entries.push(entry);
+      entryBytes += bytes;
+      nextCursor = cursorAfterEntry;
+    }
     res.status(200).json({ entries, nextCursor });
   };
 }
@@ -305,6 +350,7 @@ module.exports = {
     toMillis,
     DEFAULT_LIMIT,
     MAX_LIMIT,
+    MAX_RESPONSE_BYTES,
     MAX_CHANGES,
   },
 };

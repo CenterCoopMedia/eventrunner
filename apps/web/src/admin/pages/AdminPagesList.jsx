@@ -40,7 +40,9 @@ export default function AdminPagesList() {
   const { showToast } = useToast();
   const [publishing, setPublishing] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [resumeQueueId, setResumeQueueId] = useState(null);
+  // A failed run's queue and the ids it asked for. A resume is reported
+  // against those ids, never the drafts that are dirty now.
+  const [resume, setResume] = useState(null);
   // Rows that published in THIS session. Their proof tint resolves to the
   // base ground rather than vanishing: the row is the same row, and the
   // operator watched it change (moment 1).
@@ -49,24 +51,25 @@ export default function AdminPagesList() {
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
 
   async function publishAll() {
+    const ids = pendingIds;
     setPublishing('all');
     setNotice(null);
-    setResumeQueueId(null);
+    setResume(null);
     try {
       // Only the pages with something to publish: cmsPublish republishes any
       // doc that has a draft, bumping its revision, so sending clean pages
       // would churn revisions for no change.
       const response = await call('cmsPublish', {
         collection: 'cmsPages',
-        docIds: pendingIds,
+        docIds: ids,
       });
-      reportPublish(response, pendingIds);
+      reportPublish(response, ids);
     } catch (err) {
       showToast(err.message, { tone: 'error' });
       setNotice({ tone: 'error', message: err.message });
       // A part-way failure names the queue row a retry must resume from,
       // so committed chunks are not published a second time.
-      if (err?.queueId) setResumeQueueId(err.queueId);
+      if (err?.queueId) setResume({ queueId: err.queueId, ids });
     } finally {
       setPublishing(null);
     }
@@ -84,15 +87,17 @@ export default function AdminPagesList() {
 
   /** Resume a part-way publish; { queueId } skips the committed chunks. */
   async function resumePublish() {
+    if (!resume) return;
+    const { queueId, ids } = resume;
     setPublishing('resume');
     try {
-      const response = await call('cmsPublish', { queueId: resumeQueueId });
-      setResumeQueueId(null);
-      reportPublish(response, pendingIds);
+      const response = await call('cmsPublish', { queueId });
+      setResume(null);
+      reportPublish(response, ids);
     } catch (err) {
       showToast(err.message, { tone: 'error' });
       setNotice({ tone: 'error', message: err.message });
-      if (err?.queueId) setResumeQueueId(err.queueId);
+      if (err?.queueId) setResume({ queueId: err.queueId, ids });
     } finally {
       setPublishing(null);
     }
@@ -108,7 +113,7 @@ export default function AdminPagesList() {
         identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
         actions={
           <>
-            {resumeQueueId ? (
+            {resume ? (
               <button
                 type="button"
                 className={secondaryButtonClass}

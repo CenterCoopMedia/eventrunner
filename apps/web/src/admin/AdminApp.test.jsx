@@ -56,7 +56,12 @@ let pendingProbe = null;
 let pendingOperatorProbe = null;
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, name) => ({ name })),
+  onSnapshot: vi.fn((_ref, onNext) => {
+    onNext({ docs: [] });
+    return () => {};
+  }),
   query: vi.fn((ref) => ref),
+  where: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn((ref) => {
     if (ref?.name === 'admin_logs') {
@@ -498,7 +503,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Feedback, Email log, Change requests and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });

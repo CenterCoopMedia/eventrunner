@@ -19,7 +19,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -319,6 +319,10 @@ Provider status, CSV import, and a searchable ticket list. What is here depends 
 
 Ticket records are server-only in Firestore. Every list, search, and import here goes through an admin-gated endpoint.
 
+## Announcements
+
+Create, edit, and remove the ruled message bands shown across the public site. Choose **Notice** or **Urgent**, then set the start and end time. You can add one absolute `http` or `https` link and its visible label. A save is live immediately. The site shows the announcement only during that window, and a visitor who dismisses it does not see that same record again in that browser.
+
 ## Live updates
 
 Compose, edit, and delete entries in the live-updates feed shown on the public site. There is no draft/publish step here, unlike the CMS content tabs — a save is live immediately. This is an admin-authored feed only; nothing ingests from Slack or any other external source.
@@ -329,7 +333,7 @@ Every submission from the public feedback modal, newest first, with a mark-revie
 
 ## Email log
 
-Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here.
+Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
 
 - **Search** looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers **Search older messages**, which reads the next 500.
 - **Source** picks one kind of message. **Status** picks **Sent** or **Failed**, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed. **Bounced** means the recipient's mail server refused the message. **Complained** means the recipient marked it as spam. **Suppressed** means the mail provider did not send it, because the address is on the provider's block list.
@@ -356,7 +360,7 @@ Only admins can read a request. The sender cannot read it back, and no email is 
 
 ## Materials
 
-Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions. Staff and operators both use this page.
+Session materials review — upload or link files against a session, with an optional embargo that holds the material until the session ends. One file can be at most 9 MiB. Prefer a real label ("Slides") over a bare URL as the link text a viewer sees. This collection is fully server-only, even for an admin's direct read, so every action here goes through Cloud Functions. Staff and operators both use this page.
 
 **The table.** One table lists the materials for every session, hidden sessions included. It shows at most 2,000 materials. Past that, a notice above the table says that some materials are not shown. Each row gives the file name, the word **File** or **Link** with its storage path or address, the session, the review state as a word, and when the material last changed. Select **Material**, **Session**, or **Changed** at the top of a column to sort by it; the button states the order in words, such as **A to Z** or **Newest first**. The table opens in schedule order. Under **Show**, the **Session** and **Review** filters narrow the rows. **Add a link** appears when one session is chosen. **Refresh** reads the list again and says **Refreshing…** until the list arrives. If the list does not load, the table stays as it was and the page says so.
 

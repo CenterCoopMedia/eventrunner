@@ -3,10 +3,13 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 
 const adminSubscriptions = new Map();
+const adminErrors = new Map();
+let reportAdminCollectionsAtOnce = true;
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (name, onNext) => {
+  subscribeAdminCollection: (name, onNext, onError) => {
     adminSubscriptions.set(name, onNext);
-    onNext([]);
+    adminErrors.set(name, onError);
+    if (reportAdminCollectionsAtOnce) onNext([]);
     return () => adminSubscriptions.delete(name);
   },
 }));
@@ -85,6 +88,8 @@ function bodyOf(index) {
 
 beforeEach(() => {
   adminSubscriptions.clear();
+  adminErrors.clear();
+  reportAdminCollectionsAtOnce = true;
   configSubscriptions.clear();
   bookmarkCounts.onNext = null;
   bookmarkCounts.onError = null;
@@ -93,6 +98,65 @@ beforeEach(() => {
 });
 
 describe('admin Sessions workspace', () => {
+  it('waits for both revisions before it fills the form and saves the draft values', async () => {
+    reportAdminCollectionsAtOnce = false;
+    await renderAt('/admin/sessions/keynote');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    const live = {
+      id: 'keynote', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
+      title: 'Old live title', description: 'Old live description.', visible: true,
+    };
+    const draft = {
+      ...live, title: 'Unpublished title', description: 'Unpublished description.', status: 'dirty',
+    };
+
+    act(() => adminSubscriptions.get('cmsSchedule')([live]));
+    expect(screen.getByRole('status', { name: 'Loading session…' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Public title')).toBeNull();
+
+    act(() => adminSubscriptions.get('cmsSchedule_drafts')([draft]));
+    expect(await screen.findByLabelText('Public title')).toHaveValue('Unpublished title');
+
+    fetch.mockResolvedValueOnce(response({ docId: 'keynote', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields).toMatchObject({
+      title: 'Unpublished title',
+      description: 'Unpublished description.',
+    });
+  });
+
+  it('keeps the form closed when the drafts listener fails before it reports', async () => {
+    reportAdminCollectionsAtOnce = false;
+    await renderAt('/admin/sessions/keynote');
+    await waitFor(() => expect(adminErrors.has('cmsSchedule_drafts')).toBe(true));
+    act(() => adminSubscriptions.get('cmsSchedule')([{
+      id: 'keynote', dayId: 'day-1', title: 'Live title', description: 'Live description.',
+    }]));
+    act(() => adminErrors.get('cmsSchedule_drafts')(new Error('permission denied')));
+
+    expect(await screen.findByText(/could not load this session and its saved draft/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Public title')).toBeNull();
+  });
+
+  it('closes an adopted editor when another admin deletes the live session', async () => {
+    reportAdminCollectionsAtOnce = false;
+    await renderAt('/admin/sessions/keynote');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    pushSessions([{
+      id: 'keynote', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
+      title: 'Keynote', description: 'Opening remarks.', visible: true,
+    }], []);
+    expect(await screen.findByLabelText('Public title')).toHaveValue('Keynote');
+
+    act(() => adminSubscriptions.get('cmsSchedule')([]));
+
+    expect(await screen.findByRole('heading', { name: 'No such session' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Public title')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('groups by day and keeps a child directly below its parent', async () => {
     await renderAt('/admin/sessions');
     await screen.findByRole('heading', { name: 'Sessions' });

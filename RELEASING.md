@@ -90,10 +90,12 @@ deploy time — it has to be rebuilt and committed by hand whenever its inputs c
 - **Rebuild and commit `docs/demo/` before tagging** whenever a PR touched `apps/web/src/**` or
   `apps/web/src/generated/**` since the last rebuild: `npm run build:demo`, review the diff, commit
   it (a normal DCO-signed commit, same as any other change).
-- **CI catches a forgotten rebuild for you** — the `demo` job (`.github/workflows/ci.yml`) runs
-  `node scripts/build-demo.cjs --check` on every push and PR and fails if a fresh build differs
-  from the committed `docs/demo/` (issue #94). Treat a red `demo` job as "rebuild and commit",
-  never as a reason to touch `docs/demo/` by hand.
+- **CI catches a forgotten rebuild for you** — the selected demo tier runs
+  `node scripts/build-demo.cjs --check` and fails if a fresh build differs from
+  the committed `docs/demo/` (issue #94). A trusted local result satisfies this
+  tier. Otherwise, the `demo` job runs on GitHub. Manual CI runs use GitHub.
+  Treat a failed demo check as "rebuild and commit", never as a reason to edit
+  `docs/demo/` by hand.
 - **The build is deterministic**: repeated builds of unchanged input, including Vite's
   content-hashed asset filenames, come out byte-for-byte identical (verified by hand; see
   `scripts/build-demo.test.cjs` for the directory-diff logic `--check` is built on). That is what

@@ -10,6 +10,7 @@ You edit the site. You do not deploy it. CCM (or another operator) handles Fireb
 - Attendees and the public directory
 - Sponsors and organizations
 - Live updates (from the admin form, not from Slack)
+- Site-wide announcements with active windows and optional links
 - Theme: colors and the bundled font sets
 - Badges from the predefined list and moderation of optional custom badges
 
@@ -41,7 +42,7 @@ Change requests are off by default. An operator turns them on in Features. Then 
 
 Upload or link files on the session. Embargo holds them until the session ends. Prefer a real label ("Slides") over a raw URL as the link text.
 
-The Materials page lists every session's files and links in one table. Tick files and select **Download as archive** to save them as one zip file, at most 50 files and 200 MB at a time. Every archive is recorded in the admin log with your address. The **Coverage** panel names the sessions and speakers that have no materials yet, so you know whom to ask.
+The Materials page lists every session's files and links in one table. One file can be at most 9 MiB. Tick files and select **Download as archive** to save them as one zip file, at most 50 files and 9 MiB at a time. Every archive is recorded in the admin log with your address. The **Coverage** panel names the sessions and speakers that have no materials yet, so you know whom to ask.
 
 ## Tickets
 

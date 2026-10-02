@@ -526,6 +526,7 @@ describe("server-only collections stay deny-all", () => {
     "email_templates",
     // The change request rate limit (issue #188), one document per account.
     "change_request_rate_limits",
+    "cmsContentSectionLocks",
     "speaker_slugs",
     "speaker_invites",
     // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
@@ -1399,6 +1400,31 @@ describe("live_updates dashboard feed", () => {
     await assertFails(setDoc(doc(admin(), "live_updates/u1"), { message: "hacked" }));
     await assertFails(setDoc(doc(nonAdmin(), "live_updates/u1"), { message: "hacked" }));
     await assertFails(deleteDoc(doc(admin(), "live_updates/u1")));
+  });
+});
+
+describe("site-wide announcements", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "announcements/a1"), {
+        message: "Use the east entrance.",
+        level: "info",
+        startsAt: new Date(),
+        endsAt: new Date(Date.now() + 60_000),
+      });
+    });
+  });
+
+  it("allows anyone to read one row and list the collection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "announcements/a1")));
+    await assertSucceeds(getDocs(collection(anon(), "announcements")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "announcements/a1")));
+  });
+
+  it("denies every client write, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "announcements/a1"), { message: "changed" }));
+    await assertFails(setDoc(doc(nonAdmin(), "announcements/a2"), { message: "new" }));
+    await assertFails(deleteDoc(doc(admin(), "announcements/a1")));
   });
 });
 

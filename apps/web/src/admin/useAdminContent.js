@@ -14,18 +14,19 @@ import { mergePageRevisions } from './pageDoc.js';
 export function useAdminContent() {
   const [live, setLive] = useState(null);
   const [drafts, setDrafts] = useState(null);
-  const [error, setError] = useState(null);
+  const [liveError, setLiveError] = useState(null);
+  const [draftsError, setDraftsError] = useState(null);
 
   useEffect(() => {
     const unsubscribers = [
       subscribeAdminCollection('cmsContent', (docs) => {
         setLive(docs);
-        setError(null);
-      }, setError),
+        setLiveError(null);
+      }, setLiveError),
       subscribeAdminCollection('cmsContent_drafts', (docs) => {
         setDrafts(docs);
-        setError(null);
-      }, setError),
+        setDraftsError(null);
+      }, setDraftsError),
     ];
     return () => {
       for (const unsubscribe of unsubscribers) {
@@ -35,13 +36,16 @@ export function useAdminContent() {
   }, []);
 
   const rows = useMemo(() => mergePageRevisions(live, drafts), [live, drafts]);
+  const error = liveError ?? draftsError ?? null;
+  const ready = live !== null && drafts !== null;
 
   return {
     rows,
     // BOTH listeners must report before the list is trustworthy — see
     // useAdminPages.js for why (a draft-only doc otherwise reads as absent,
     // and a clean draft otherwise reads as never-published).
-    loading: (live === null || drafts === null) && !error,
+    loading: !ready && !error,
+    ready,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,
     forSection: (sectionId) => rows.filter((row) => row.current?.section === sectionId),

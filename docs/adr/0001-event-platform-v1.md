@@ -607,6 +607,10 @@ interface EmailProvider {
 - Write exactly one `sent_emails` row per `send()` call, whatever the outcome. Fields:
   `{ to, from, subject, templateId, providerMessageId, status, providerStatus, error, retries,
   bodyStored: boolean, html, text, source, sentAt }`.
+- Keep each `sent_emails` row for 90 days from `sentAt`. The scheduled maintenance function deletes
+  rows older than that cutoff in bounded batches; a row exactly at the cutoff stays until the next
+  run. This fixed period covers event-time delivery diagnosis without keeping recipient addresses
+  and rendered bodies for the life of the deployment.
 - **Never persist rendered content for auth mail.** The current implementation suppresses body
   storage for `sendCustomMagicLink` / `sendCustomOtpCode` because `sent_emails` is admin-readable and
   the body carries a bearer secret. Ported as a template-level flag (`storeRendered: false` on

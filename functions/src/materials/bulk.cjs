@@ -47,6 +47,11 @@ const { ZipFile } = require('yazl');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
+const {
+  MAX_MATERIAL_FILE_BYTES,
+  isSessionMaterialStoragePath,
+  parseStorageSize,
+} = require('./policy.cjs');
 
 const MATERIALS = 'session_materials';
 const ADMIN_LOGS = 'admin_logs';
@@ -62,7 +67,7 @@ const MAX_ARCHIVE_FILES = 50;
 const STREAMING_RESPONSE_CAP = 10_000_000;
 
 /** Most bytes one archive holds, summed over its files: 9 MiB, under the cap with the zip's headers. */
-const MAX_ARCHIVE_BYTES = 9 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES = MAX_MATERIAL_FILE_BYTES;
 
 /** The name the browser saves the archive under. Fixed ASCII: nothing a person typed reaches a header. */
 const ARCHIVE_FILENAME = 'session-materials.zip';
@@ -284,12 +289,7 @@ function entryNames(files) {
  * @param {unknown} raw
  * @returns {number|null}
  */
-function parseSize(raw) {
-  let size = NaN;
-  if (typeof raw === 'number') size = raw;
-  else if (typeof raw === 'string' && /^\d+$/u.test(raw.trim())) size = Number(raw.trim());
-  return Number.isSafeInteger(size) && size >= 0 ? size : null;
-}
+const parseSize = parseStorageSize;
 
 /** "250.3" for 262,458,573 bytes. */
 function megabytes(bytes) {
@@ -334,9 +334,7 @@ async function planArchive({ db, bucket, ids, now = Date.now }) {
       refused.push(`materialIds: ${id} is a link. Only files go in an archive.`);
       continue;
     }
-    const prefix = typeof data.sessionId === 'string' && data.sessionId ? `session-materials/${data.sessionId}/` : null;
-    const path = typeof data.storagePath === 'string' ? data.storagePath : '';
-    if (!prefix || !path.startsWith(prefix) || path.length === prefix.length) {
+    if (!isSessionMaterialStoragePath(data.storagePath, data.sessionId)) {
       refused.push(`materialIds: ${id} is not stored in its session’s folder.`);
     }
   }

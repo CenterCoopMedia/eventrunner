@@ -45,8 +45,14 @@
  * via a local object URL.
  */
 
-const { badRequest, notFound, forbidden, methodNotAllowed, internal } =
+const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } =
   require('../core/errors.cjs');
+const {
+  MaterialFileTooLargeError,
+  MaterialFileSizeUnavailableError,
+  isSessionMaterialStoragePath,
+  requireAllowedMaterialFileSize,
+} = require('./policy.cjs');
 
 /** Strip characters that would break a Content-Disposition header value
  * (quotes, CR/LF) rather than reject the whole filename — this is a
@@ -61,7 +67,7 @@ function sanitizeForHeader(filename) {
  * Stream one Storage object to an HTTP response.
  *
  * @param {{ file: { exists: () => Promise<[boolean]>,
- *                    getMetadata: () => Promise<[{contentType?: string}]>,
+ *                    getMetadata: () => Promise<[{contentType?: string, size?: string|number}]>,
  *                    createReadStream: () => import('stream').Readable },
  *           res: import('express').Response, filename: string,
  *           log?: { error: Function } }} args
@@ -71,7 +77,8 @@ async function streamMaterialFile({ file, res, filename, log = console }) {
   const [exists] = await file.exists();
   if (!exists) return false;
 
-  const [metadata] = await file.getMetadata().catch(() => [{}]);
+  const [metadata] = await file.getMetadata();
+  requireAllowedMaterialFileSize(metadata?.size);
   const contentType = typeof metadata?.contentType === 'string' && metadata.contentType
     ? metadata.contentType
     : 'application/octet-stream';
@@ -101,6 +108,72 @@ async function streamMaterialFile({ file, res, filename, log = console }) {
   return true;
 }
 
+/**
+ * @param {{ db: object, auth: object, getConfig: () => Promise<object>, bucket: object | (() => object),
+ *           resolveActorOptional?: Function, resolveMaterialAccess?: Function,
+ *           accessErrors?: object, log?: Pick<Console, 'error'> }} deps
+ */
+function createDownloadSessionMaterialHandler({
+  db,
+  auth,
+  getConfig,
+  bucket,
+  resolveActorOptional = require('./actor.cjs').resolveActorOptional,
+  resolveMaterialAccess = require('./access.cjs').resolveMaterialAccess,
+  accessErrors = require('./access.cjs').internals,
+  log = console,
+}) {
+  return async function downloadSessionMaterial(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const actor = await resolveActorOptional({ db, auth, getConfig }, req);
+
+    const { materialId } = req.body || {};
+    if (typeof materialId !== 'string' || !materialId) {
+      return badRequest(res, 'materialId: must be a non-empty string');
+    }
+
+    let material;
+    try {
+      ({ material } = await resolveMaterialAccess({ db, materialId, actor, getConfig }));
+    } catch (err) {
+      if (err instanceof accessErrors.MaterialNotFoundError || err instanceof accessErrors.SessionNotFoundError) {
+        return notFound(res, 'Material not found.');
+      }
+      if (err instanceof accessErrors.EmbargoedError) return forbidden(res, err.message);
+      log.error('downloadSessionMaterial failed', err);
+      return internal(res, 'The material could not be retrieved.');
+    }
+
+    if (material.type !== 'file') {
+      return badRequest(res, 'This material is a link, not a downloadable file.');
+    }
+    if (!isSessionMaterialStoragePath(material.storagePath, material.sessionId)) {
+      return badRequest(res, 'storagePath: material is not stored in its session’s folder.');
+    }
+
+    const file = (typeof bucket === 'function' ? bucket() : bucket).file(material.storagePath);
+    let served;
+    try {
+      served = await streamMaterialFile({ file, res, filename: material.filename, log });
+    } catch (err) {
+      if (err instanceof MaterialFileTooLargeError) {
+        return sendError(res, 413, 'too-large', err.message);
+      }
+      if (err instanceof MaterialFileSizeUnavailableError) {
+        log.error('downloadSessionMaterial: Storage did not state a valid file size', err);
+        return internal(res, 'The file size could not be checked.');
+      }
+      if (!res.headersSent) {
+        log.error('downloadSessionMaterial: Storage could not be read', err);
+        return internal(res, 'The underlying file could not be read.');
+      }
+      // streamMaterialFile already ended a response whose stream failed.
+      return;
+    }
+    if (!served) return notFound(res, 'The underlying file could not be found.');
+  };
+}
+
 /** Deployable export: downloadSessionMaterial. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
@@ -113,55 +186,24 @@ function buildHandlers() {
         allowedOrigins: parseAllowedOrigins(process.env.EVENT_ALLOWED_ORIGINS),
       });
       if (handled) return;
-      if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
       const { getDb } = require('../core/firestore.cjs');
       const { getAuth } = require('firebase-admin/auth');
       const { getStorage } = require('firebase-admin/storage');
       const { getEventConfig } = require('../core/config.cjs');
-      const { resolveActorOptional } = require('./actor.cjs');
-      const { resolveMaterialAccess, internals } = require('./access.cjs');
-
       const db = getDb();
-      const deps = { db, auth: getAuth(), getConfig: () => getEventConfig({ db }) };
-      const actor = await resolveActorOptional(deps, req);
-
-      const { materialId } = req.body || {};
-      if (typeof materialId !== 'string' || !materialId) {
-        return badRequest(res, 'materialId: must be a non-empty string');
-      }
-
-      let material;
-      try {
-        ({ material } = await resolveMaterialAccess({ db, materialId, actor, getConfig: deps.getConfig }));
-      } catch (err) {
-        if (err instanceof internals.MaterialNotFoundError || err instanceof internals.SessionNotFoundError) {
-          return notFound(res, 'Material not found.');
-        }
-        if (err instanceof internals.EmbargoedError) return forbidden(res, err.message);
-        console.error('downloadSessionMaterial failed', err);
-        return internal(res, 'The material could not be retrieved.');
-      }
-
-      if (material.type !== 'file') {
-        return badRequest(res, 'This material is a link, not a downloadable file.');
-      }
-
-      const bucket = getStorage().bucket();
-      const file = bucket.file(material.storagePath);
-      let served;
-      try {
-        served = await streamMaterialFile({ file, res, filename: material.filename });
-      } catch {
-        // streamMaterialFile already responded/ended on a stream error.
-        return;
-      }
-      if (!served) return notFound(res, 'The underlying file could not be found.');
+      await createDownloadSessionMaterialHandler({
+        db,
+        auth: getAuth(),
+        getConfig: () => getEventConfig({ db }),
+        bucket: () => getStorage().bucket(),
+      })(req, res);
     }),
   };
 }
 
 module.exports = {
+  createDownloadSessionMaterialHandler,
   streamMaterialFile,
   get handlers() {
     return buildHandlers();

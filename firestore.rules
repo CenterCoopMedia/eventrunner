@@ -122,6 +122,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Site-wide messages are public content. Staff mutations go through
+    // saveAnnouncement/deleteAnnouncement so each one has an admin log.
+    match /announcements/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Publish bookkeeping: admin-readable for the CMS UI, written only by
     // the Admin SDK.
     match /cmsVersionHistory/{docId} {
@@ -503,6 +510,9 @@ service cloud.firestore {
     match /email_templates/{docId} { allow read, write: if false; }
     match /feedback_rate_limits/{docId} { allow read, write: if false; }
     match /change_request_rate_limits/{docId} { allow read, write: if false; }
+    // Per-section transaction locks serialize content creates so maxBlocks
+    // cannot be exceeded by two requests that arrive together.
+    match /cmsContentSectionLocks/{lockId} { allow read, write: if false; }
     // Slug reservations (`speaker_slugs/{slug}` → `{ speakerId }`), the
     // deterministic-id lock that makes speaker slug uniqueness atomic
     // (functions/src/speakers/profile.cjs). Pure bookkeeping: nothing

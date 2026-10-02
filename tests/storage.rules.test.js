@@ -33,6 +33,9 @@ const OTHER = "attendee-2";
 /** A 2 MiB budget with a little headroom either side of the rule's limit. */
 const TWO_MIB = 2 * 1024 * 1024;
 
+/** The server's inclusive cap for one session material. */
+const NINE_MIB = 9 * 1024 * 1024;
+
 /** Objects seeded before the suite so read assertions are not vacuous. */
 const SEEDED = [
   `profile-photos/${OWNER}/avatar.png`,
@@ -214,12 +217,15 @@ describe("session-materials — closed on both verbs", () => {
     await assertFails(getBytes(ref(asUser(OTHER), "session-materials/session-1/slides.pdf")));
   });
 
-  it("denies writes", async () => {
-    await assertFails(
-      put(asUser(OTHER), "session-materials/session-1/slides.pdf", {
-        contentType: "application/pdf",
-      }),
-    );
+  it("denies writes below, at, and above the server file-size cap", async () => {
+    for (const size of [8, NINE_MIB, NINE_MIB + 1]) {
+      await assertFails(
+        put(asUser(OTHER), `session-materials/session-1/${size}.pdf`, {
+          contentType: "application/pdf",
+          size,
+        }),
+      );
+    }
   });
 });
 

@@ -32,7 +32,7 @@
 // system page's route already checks). ONE ITEM IS NOT A PAGE: the account
 // control closes the list, and it is the shell's own (see ACCOUNT_SIGNED_OUT
 // below) because no page document describes a route that changes with who
-// is reading.
+// is reading or whether their account is linked to a speaker.
 //
 // WHERE THE PLACEMENT COMES FROM, IN ORDER — THE PAGE, THEN THE SITE.
 //
@@ -60,10 +60,12 @@ import { listSocialAccounts } from 'shared/config';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc } from '../lib/mediaSource.js';
+import { isSpeakerDashboardEligible } from '../lib/speakerDashboardEligibility.js';
 import BackToTop from './BackToTop.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
@@ -72,7 +74,8 @@ import RegistrationAction from './RegistrationAction.jsx';
 import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
 import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
-import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
+import AnnouncementBanners from './AnnouncementBanners.jsx';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 // The feedback dialog and the change request dialog (issue #188) each sit
 // behind a flag that is off by default and open only on a press, so they
@@ -86,8 +89,29 @@ function onDemand(importer) {
     }),
   );
 }
+
+export function optionalOnDemand(importer, label) {
+  return lazy(() =>
+    importer()
+      .then((module) => {
+        clearReloadFlag();
+        return module;
+      })
+      .catch((error) => {
+        console.warn(`Optional ${label} could not load.`, error);
+        return { default: () => null };
+      }),
+  );
+}
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
+// The public model tools are optional and render no interface. Keep their
+// definitions and registration machinery out of the initial site bundle,
+// then load them only for the demo or a deployment that enables the flag.
+const PublicWebMcpRegistration = optionalOnDemand(
+  () => import('../webmcp/PublicWebMcpRegistration.jsx'),
+  'public model tools',
+);
 
 /**
  * The page's own header, read into the theme's vocabulary.
@@ -124,13 +148,12 @@ function navClass({ isActive }) {
   ].join(' ');
 }
 
-// THE ACCOUNT CONTROL: ONE CONTROL, TWO DESTINATIONS (M7 issue 2).
+// THE ACCOUNT CONTROL: ONE CONTROL, A DESTINATION FOR THIS ACCOUNT.
 //
-// A reader who is not signed in is offered the sign-in page; a reader who is
-// gets their own profile. There is no third state and no second control —
-// signing out lives on the sign-in page itself, where the account it ends is
-// named, rather than as a header button that logs a reader out of a site
-// they were only reading.
+// A reader who is not signed in is offered the sign-in page. A signed-in
+// attendee gets the attendee dashboard, while a linked speaker gets the
+// speaker dashboard (issue #210). There is still one control: signing out
+// lives on the sign-in page itself, where the account it ends is named.
 //
 // It is the LAST ITEM OF THE NAV, not a separate control beside it, so it
 // inherits everything the nav already settled: one landmark, one keyboard
@@ -167,6 +190,7 @@ const ACCOUNT_SIGNED_OUT = Object.freeze({ to: '/signin', label: 'Sign in', end:
 // was not: the day the dashboard grows children, an end match would quietly
 // stop marking the control while the reader is inside the section it names.
 const ACCOUNT_SIGNED_IN = Object.freeze({ to: '/dashboard', label: 'Dashboard', end: false });
+const ACCOUNT_SPEAKER = Object.freeze({ to: '/speaker/dashboard', label: 'Dashboard', end: false });
 
 /**
  * Tailwind's font-weight utilities by name. Deliberately a closed list and
@@ -207,6 +231,56 @@ function accountClass({ isActive }) {
     : quietActionClass;
 }
 
+function useSpeakerDashboardEligibility({
+  authLoading,
+  user,
+  accountStatus,
+  speakerId,
+  navigationKey,
+}) {
+  const identity = !authLoading && user && accountStatus === 'ready' && speakerId
+    ? `${user.uid}:${speakerId}`
+    : null;
+  const [result, setResult] = useState({ identity: null, eligible: false });
+
+  useEffect(() => {
+    let current = true;
+    const storeResult = (eligible) => {
+      setResult((previous) => (
+        previous.identity === identity && previous.eligible === eligible
+          ? previous
+          : { identity, eligible }
+      ));
+    };
+    if (!identity) {
+      storeResult(false);
+      return () => {
+        current = false;
+      };
+    }
+
+    // speakerProfileApi carries the authenticated endpoint client and media
+    // helpers. Load it only for a linked account so the public shell's first
+    // bundle does not pay for a speaker-only read.
+    import('../lib/speakerProfileApi.js')
+      .then(({ getOwnSpeakerProfile }) => getOwnSpeakerProfile({ user, speakerId }))
+      .then(
+        (speaker) => {
+          if (current) storeResult(isSpeakerDashboardEligible(speaker));
+        },
+        () => {
+          if (current) storeResult(false);
+        },
+      );
+
+    return () => {
+      current = false;
+    };
+  }, [identity, navigationKey, speakerId, user]);
+
+  return result.identity === identity && result.eligible;
+}
+
 // The banner at the top of the shell, named so the back-to-top control can
 // move focus to it (M7 issue 6). Landing there puts the keyboard at the top
 // of the page, with the identity and the whole navigation still ahead of it
@@ -233,7 +307,16 @@ export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage } = useContent();
   const { user, loading: authLoading } = useAuth();
-  const { pathname } = useLocation();
+  const { profile, status: accountStatus } = useProfile();
+  const { pathname, key: navigationKey } = useLocation();
+  const speakerId = profile?.speakerId ?? null;
+  const speakerDashboardEligible = useSpeakerDashboardEligibility({
+    authLoading,
+    user,
+    accountStatus,
+    speakerId,
+    navigationKey,
+  });
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
   // bundle) or an uploaded asset (`branding/{assetId}/{name}`, which exists
@@ -298,9 +381,17 @@ export default function Layout() {
   // tells two accounts on one service apart.
   const socialLinks = useMemo(() => listSocialAccounts(eventConfig?.social), [eventConfig?.social]);
 
-  // Two destinations, one control. An unfinished handshake is the
-  // signed-out answer, said explicitly (see ACCOUNT_SIGNED_OUT above).
-  const account = !authLoading && user ? ACCOUNT_SIGNED_IN : ACCOUNT_SIGNED_OUT;
+  // One control, routed from the owner-checked canonical speaker record. A
+  // linked draft or removed record stays on the attendee dashboard; the
+  // server-owned speakerId identifies the record but does not establish
+  // dashboard eligibility.
+  // An unfinished auth handshake and an account still being seeded retain
+  // the existing signed-out and attendee answers (see ACCOUNT_SIGNED_OUT).
+  const account = !authLoading && user
+    ? speakerDashboardEligible
+      ? ACCOUNT_SPEAKER
+      : ACCOUNT_SIGNED_IN
+    : ACCOUNT_SIGNED_OUT;
 
   // One nav, placed two ways. The list, its labels, its landmark, and its
   // position in the document are identical either way — `side` only moves
@@ -394,7 +485,11 @@ export default function Layout() {
 
   return (
     <div className="page-surface flex min-h-screen flex-col">
-      <PublicWebMcpRegistration />
+      {IS_DEMO || features.webmcpPublic === true ? (
+        <Suspense fallback={null}>
+          <PublicWebMcpRegistration />
+        </Suspense>
+      ) : null}
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -434,6 +529,7 @@ export default function Layout() {
           </Header>
         </div>
       </header>
+      <AnnouncementBanners />
       {navPlacement === 'side' ? (
         // The rail and the page it serves share one stage, so the nav
         // sits at the leading edge of the page rather than at the edge of

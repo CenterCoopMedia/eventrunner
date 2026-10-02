@@ -200,10 +200,12 @@
           <li><strong>Rebuild and commit <code>docs/demo/</code> before tagging</strong> whenever a PR touched <code>apps/web/src/**</code> or
           <code>apps/web/src/generated/**</code> since the last rebuild: <code>npm run build:demo</code>, review the diff, commit
           it (a normal DCO-signed commit, same as any other change).</li>
-          <li><strong>CI catches a forgotten rebuild for you</strong> — the <code>demo</code> job (<code>.github/workflows/ci.yml</code>) runs
-          <code>node scripts/build-demo.cjs --check</code> on every push and PR and fails if a fresh build differs
-          from the committed <code>docs/demo/</code> (issue #94). Treat a red <code>demo</code> job as &quot;rebuild and commit&quot;,
-          never as a reason to touch <code>docs/demo/</code> by hand.</li>
+          <li><strong>CI catches a forgotten rebuild for you</strong> — the selected demo tier runs
+          <code>node scripts/build-demo.cjs --check</code> and fails if a fresh build differs from
+          the committed <code>docs/demo/</code> (issue #94). A trusted local result satisfies this
+          tier. Otherwise, the <code>demo</code> job runs on GitHub. Manual CI runs use GitHub.
+          Treat a failed demo check as &quot;rebuild and commit&quot;, never as a reason to edit
+          <code>docs/demo/</code> by hand.</li>
           <li><strong>The build is deterministic</strong>: repeated builds of unchanged input, including Vite&#39;s
           content-hashed asset filenames, come out byte-for-byte identical (verified by hand; see
           <code>scripts/build-demo.test.cjs</code> for the directory-diff logic <code>--check</code> is built on). That is what

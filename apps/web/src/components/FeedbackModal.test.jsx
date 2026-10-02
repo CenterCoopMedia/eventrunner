@@ -9,7 +9,7 @@ vi.mock('../lib/feedbackApi.js', () => ({
   submitFeedback: (...args) => submitFeedbackMock(...args),
 }));
 
-import FeedbackModal from './FeedbackModal.jsx';
+import FeedbackModal, { MAX_MESSAGE_LENGTH } from './FeedbackModal.jsx';
 
 beforeEach(() => {
   submitFeedbackMock.mockReset();
@@ -63,7 +63,11 @@ describe('FeedbackModal', () => {
       expect(field).toHaveAttribute('aria-invalid', 'true');
       const describedBy = field.getAttribute('aria-describedby');
       expect(describedBy).toBeTruthy();
-      expect(document.getElementById(describedBy)).toHaveTextContent('Please enter a message.');
+      const description = describedBy
+        .split(/\s+/)
+        .map((id) => document.getElementById(id)?.textContent)
+        .join(' ');
+      expect(description).toContain('Please enter a message.');
       expect(field).toHaveFocus();
       // And nothing states it a second time at the head of the form. One
       // result is announced once, and the focus move is the announcement.
@@ -241,6 +245,68 @@ describe('FeedbackModal', () => {
     expect(typeof firstKey).toBe('string');
     expect(firstKey.length).toBeGreaterThanOrEqual(8);
     expect(secondKey).toBe(firstKey);
+  });
+
+  it('refuses an over-limit edit after a failed send, then reuses the key for the original boundary payload', async () => {
+    submitFeedbackMock
+      .mockResolvedValueOnce({ ok: false, error: 'network blip' })
+      .mockResolvedValueOnce({ ok: true, id: 'f1' });
+    render(<FeedbackModal onClose={() => {}} />);
+
+    const field = screen.getByLabelText('Message');
+    const boundaryMessage = 'm'.repeat(MAX_MESSAGE_LENGTH);
+    expect(field).toHaveAttribute('maxLength', String(MAX_MESSAGE_LENGTH));
+    expect(screen.getByText(`Up to ${MAX_MESSAGE_LENGTH.toLocaleString('en-US')} characters.`)).toBeVisible();
+
+    fireEvent.change(field, { target: { value: boundaryMessage } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+    const firstKey = submitFeedbackMock.mock.calls[0][0].submissionKey;
+
+    // Browser input enforces maxLength. This direct state event covers a
+    // programmatic fill and ensures the modal still never sends text that
+    // the server would silently truncate under a different retry key.
+    fireEvent.change(field, { target: { value: `${boundaryMessage}x` } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    expect(submitFeedbackMock).toHaveBeenCalledTimes(1);
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Please keep your message to 4,000 characters.')).toBeVisible();
+
+    fireEvent.change(field, { target: { value: boundaryMessage } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('status');
+
+    expect(submitFeedbackMock).toHaveBeenCalledTimes(2);
+    expect(submitFeedbackMock.mock.calls[1][0].message).toBe(boundaryMessage);
+    expect(submitFeedbackMock.mock.calls[1][0].submissionKey).toBe(firstKey);
+  });
+
+  it('takes a new submissionKey when a normalized feedback field changes after a failure', async () => {
+    submitFeedbackMock
+      .mockResolvedValueOnce({ ok: false, error: 'network blip' })
+      .mockResolvedValueOnce({ ok: false, error: 'network blip' })
+      .mockResolvedValueOnce({ ok: false, error: 'network blip' })
+      .mockResolvedValueOnce({ ok: true, id: 'f1' });
+    render(<FeedbackModal onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+
+    fireEvent.change(screen.getByLabelText('Email (optional)'), { target: { value: 'reader@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+
+    fireEvent.change(screen.getByLabelText('What is this about?'), { target: { value: 'bug' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello again' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('status');
+
+    const keys = submitFeedbackMock.mock.calls.map(([payload]) => payload.submissionKey);
+    expect(new Set(keys).size).toBe(4);
   });
 
   it('omits the confirmation mention entirely when no email was given', async () => {

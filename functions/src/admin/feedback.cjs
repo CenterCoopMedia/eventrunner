@@ -40,14 +40,11 @@
  * a dropped response — the write landed, but the caller never saw the 201 —
  * created a second row AND, because onceKey was derived from that random id,
  * a second confirmation email. `submissionKey` fixes this: FeedbackModal.jsx
- * generates one per form-open session and resends it unchanged on every
- * retry of the same submission, this handler uses it AS the doc id (so the
- * onceKey derived from it is stable too), and the write goes through
- * `.create()` — a retry that lands after the first one already committed
- * gets Firestore's ALREADY_EXISTS rather than silently overwriting a row an
- * admin may have already reviewed. A missing or malformed submissionKey
- * falls back to a random id (older/non-conforming callers keep working,
- * just without retry-safety).
+ * binds one key to each normalized submission, and this handler uses it as
+ * the doc id. A transaction compares an existing row's message, email, and
+ * category before any write: an equivalent retry returns 201, while changed
+ * text under a used key returns 409. A missing submissionKey falls back to a
+ * random id (older/non-conforming callers keep working without retry safety).
  *
  * Telegram triage from the reference implementation is explicitly cut (spec
  * §9): the review surface is this module's admin endpoint plus the plain
@@ -59,10 +56,6 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { internals: clientErrorInternals } = require('../telemetry/clientErrors.cjs');
-// Reused rather than re-implemented: send.cjs already owns the canonical
-// Firestore ALREADY_EXISTS check (gRPC code 6) for its own onceKey claims.
-const { isAlreadyExists } = require('../email/send.cjs').internals;
-
 const { extractClientIp, hashIp } = clientErrorInternals;
 
 const FEEDBACK_COLLECTION = 'feedback';
@@ -97,6 +90,15 @@ function truncateString(value, max) {
   return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
 }
 
+/** Keep only rate-limit timestamps in the active window. */
+function feedbackRateLimitWindow(stored, nowMs) {
+  const requests = (Array.isArray(stored) ? stored : [])
+    .filter((timestamp) => typeof timestamp === 'number' && nowMs - timestamp < RATE_LIMIT_WINDOW_MS);
+  if (requests.length < RATE_LIMIT_MAX) return { limited: false, requests };
+  const oldest = Math.min(...requests);
+  return { limited: true, retryAfterMs: Math.max(0, oldest + RATE_LIMIT_WINDOW_MS - nowMs) };
+}
+
 /**
  * Check and record one feedback rate-limit slot atomically — same
  * transactional sliding-window shape as clientErrors.cjs's
@@ -111,16 +113,45 @@ async function takeFeedbackRateLimitSlot({ db, ipHash, now = Date.now }) {
   const nowMs = now();
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const stored = snap.exists ? snap.data()?.requests : null;
-    const requests = (Array.isArray(stored) ? stored : [])
-      .filter((t) => typeof t === 'number' && nowMs - t < RATE_LIMIT_WINDOW_MS);
-    if (requests.length >= RATE_LIMIT_MAX) {
-      const oldest = Math.min(...requests);
-      return { limited: true, retryAfterMs: Math.max(0, oldest + RATE_LIMIT_WINDOW_MS - nowMs) };
-    }
-    requests.push(nowMs);
-    tx.set(ref, { requests, updatedAt: new Date(nowMs) });
+    const window = feedbackRateLimitWindow(snap.exists ? snap.data()?.requests : null, nowMs);
+    if (window.limited) return window;
+    tx.set(ref, { requests: [...window.requests, nowMs], updatedAt: new Date(nowMs) });
     return { limited: false };
+  });
+}
+
+/** Store one feedback row and its rate-limit slot atomically. */
+async function storeFeedback({ db, id, message, email, category, ipHash, userAgent, nowMs }) {
+  const ref = db.collection(FEEDBACK_COLLECTION).doc(id);
+  const limitRef = db.collection(RATE_LIMIT_COLLECTION).doc(ipHash);
+  return db.runTransaction(async (tx) => {
+    const limitSnap = await tx.get(limitRef);
+    const window = feedbackRateLimitWindow(limitSnap.exists ? limitSnap.data()?.requests : null, nowMs);
+    if (window.limited) return { outcome: 'limited', retryAfterMs: window.retryAfterMs };
+
+    const snap = await tx.get(ref);
+    const at = new Date(nowMs);
+    tx.set(limitRef, { requests: [...window.requests, nowMs], updatedAt: at });
+    if (snap.exists) {
+      const stored = snap.data() || {};
+      if (stored.message !== message
+          || (stored.email ?? null) !== email
+          || stored.category !== category) {
+        return { outcome: 'changed' };
+      }
+    }
+    if (snap.exists) return { outcome: 'replayed' };
+
+    tx.create(ref, {
+      message,
+      email,
+      category,
+      status: 'new',
+      ipHash,
+      userAgent,
+      createdAt: at,
+    });
+    return { outcome: 'stored' };
   });
 }
 
@@ -205,45 +236,35 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
     }
 
     const clientIpHash = hashIp(extractClientIp(req));
-    const slot = await takeFeedbackRateLimitSlot({ db, ipHash: clientIpHash, now });
-    if (slot.limited) {
-      const retryAfterSeconds = slot.retryAfterMs ? Math.ceil(slot.retryAfterMs / 1000) : null;
+    const docId = rawSubmissionKey !== undefined ? String(rawSubmissionKey) : crypto.randomUUID();
+    const ref = db.collection(FEEDBACK_COLLECTION).doc(docId);
+    let result;
+    try {
+      result = await storeFeedback({
+        db,
+        id: docId,
+        message,
+        email,
+        category,
+        ipHash: clientIpHash,
+        userAgent,
+        nowMs,
+      });
+    } catch (err) {
+      log.error('feedback write failed', err);
+      res.status(500).json({ error: { code: 'internal', message: 'Your feedback could not be saved. Try again.' } });
+      return;
+    }
+    if (result.outcome === 'limited') {
+      const retryAfterSeconds = result.retryAfterMs ? Math.ceil(result.retryAfterMs / 1000) : null;
       if (retryAfterSeconds) res.set('Retry-After', String(retryAfterSeconds));
       res.status(429).json({
         error: { code: 'rate-limited', message: 'Too many submissions. Try again later.', retryAfterSeconds },
       });
       return;
     }
-
-    // A validated submissionKey becomes the doc id (and, below, the onceKey
-    // base) so a retry of the SAME submission after a dropped response lands
-    // on the SAME doc instead of minting a new one; absent one, fall back to
-    // a random id (no retry-safety, but every other check still applies).
-    const docId = rawSubmissionKey !== undefined ? String(rawSubmissionKey) : crypto.randomUUID();
-    const ref = db.collection(FEEDBACK_COLLECTION).doc(docId);
-    try {
-      // .create(), not .set(): a retry that lands after the first attempt
-      // already committed must not silently overwrite a row an admin may
-      // have already reviewed — it should look like the ORIGINAL write,
-      // not a second one.
-      await ref.create({
-        message,
-        email,
-        category,
-        status: 'new',
-        ipHash: clientIpHash,
-        userAgent,
-        createdAt: new Date(nowMs),
-      });
-    } catch (err) {
-      if (!isAlreadyExists(err)) {
-        log.error('feedback write failed', err);
-        res.status(500).json({ error: { code: 'internal', message: 'Your feedback could not be saved. Try again.' } });
-        return;
-      }
-      // Idempotent retry of an already-durable submission: fall through to
-      // the (onceKey-protected) email step and answer 201 exactly as the
-      // original request would have — a caller cannot tell the difference.
+    if (result.outcome === 'changed') {
+      return sendError(res, 409, 'conflict', 'submissionKey: already used. Open the form again.');
     }
 
     // Confirmation email is best-effort and onceKey-gated on the doc id: a

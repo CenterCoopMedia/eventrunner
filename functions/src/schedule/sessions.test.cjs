@@ -17,7 +17,14 @@ const {
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 
 function session(overrides = {}) {
-  return { dayId: 'day-2', title: 'Workshop', startTime: '13:30', ...overrides };
+  return {
+    dayId: 'day-2',
+    title: 'Workshop',
+    description: 'A practical workshop.',
+    startTime: '13:30',
+    endTime: '14:30',
+    ...overrides,
+  };
 }
 
 /** An event that defines the tracks named, plus whatever else is seeded. */
@@ -47,6 +54,47 @@ test('the reserved-id check runs through validateSessionStructure too, and repor
   const result = await validateSessionStructure({ db, docId: 'mine', fields: session() });
   assert.equal(result.ok, false);
   assert.match(result.message, /docId: "mine" is reserved/);
+});
+
+test('a session requires its public text, day, and times in order', () => {
+  const { ok, errors } = validateSessionShape(session({
+    title: ' ',
+    description: '',
+    dayId: null,
+    startTime: '15:00',
+    endTime: '14:00',
+  }), 'session-1');
+  assert.equal(ok, false);
+  assert.deepEqual(errors.slice(0, 5), [
+    'title: must be a non-empty public title',
+    'description: must be a non-empty public description',
+    'dayId: must name an event day',
+    'endTime: must be after startTime',
+  ]);
+});
+
+test('legacy 12-hour session clocks compare by time instead of by string', () => {
+  assert.equal(validateSessionShape(session({
+    startTime: '9:00 AM',
+    endTime: '10:00 AM',
+  }), 'session-1').ok, true);
+
+  const reversed = validateSessionShape(session({
+    startTime: '10:00 AM',
+    endTime: '9:00 AM',
+  }), 'session-1');
+  assert.equal(reversed.ok, false);
+  assert.ok(reversed.errors.includes('endTime: must be after startTime'));
+});
+
+test('malformed session clocks are rejected by field name', () => {
+  const result = validateSessionShape(session({
+    startTime: '25:00',
+    endTime: '12:99 AM',
+  }), 'session-1');
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('startTime: must be a valid clock time'));
+  assert.ok(result.errors.includes('endTime: must be a valid clock time'));
 });
 
 // --- track (design brief §4.6) ----------------------------------------------

@@ -700,6 +700,10 @@
           <li>Write exactly one <code>sent_emails</code> row per <code>send()</code> call, whatever the outcome. Fields:
           <code>{ to, from, subject, templateId, providerMessageId, status, providerStatus, error, retries,
           bodyStored: boolean, html, text, source, sentAt }</code>.</li>
+          <li>Keep each <code>sent_emails</code> row for 90 days from <code>sentAt</code>. The scheduled maintenance function deletes
+          rows older than that cutoff in bounded batches; a row exactly at the cutoff stays until the next
+          run. This fixed period covers event-time delivery diagnosis without keeping recipient addresses
+          and rendered bodies for the life of the deployment.</li>
           <li><strong>Never persist rendered content for auth mail.</strong> The current implementation suppresses body
           storage for <code>sendCustomMagicLink</code> / <code>sendCustomOtpCode</code> because <code>sent_emails</code> is admin-readable and
           the body carries a bearer secret. Ported as a template-level flag (<code>storeRendered: false</code> on

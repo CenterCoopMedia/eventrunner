@@ -16,4 +16,5 @@ module.exports = {
   ...require('./speaker.cjs'),
   ...require('./urlSafety.cjs'),
   ...require('./routing.cjs'),
+  ...require('./announcement.cjs'),
 };

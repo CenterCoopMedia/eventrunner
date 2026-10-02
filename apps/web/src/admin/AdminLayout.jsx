@@ -121,6 +121,7 @@ export const DOCKET = Object.freeze([
     id: 'operations',
     label: 'Operations',
     items: [
+      { to: 'announcements', label: 'Announcements', tier: 'staff' },
       { to: 'live-updates', label: 'Live updates', tier: 'staff' },
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
       { to: 'feedback', label: 'Feedback', tier: 'staff' },

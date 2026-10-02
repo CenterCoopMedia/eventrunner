@@ -43,6 +43,7 @@ import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
   CheckboxField,
   DestructiveConfirm,
+  Notice,
   Panel,
   SaveStatus,
   SelectField,
@@ -183,7 +184,11 @@ export default function AdminContentBlockEditor({ mode }) {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { findRow: findPage, loading: pagesLoading } = useAdminPages();
-  const { rows: contentRows, loading: contentLoading } = useAdminContent();
+  const {
+    rows: contentRows,
+    ready: contentReady,
+    error: contentListenerError,
+  } = useAdminContent();
 
   const page = findPage(pageId);
   const section = (page?.current?.sections ?? []).find((candidate) => candidate.id === sectionId);
@@ -223,7 +228,7 @@ export default function AdminContentBlockEditor({ mode }) {
     // never be revisited once the draft lands (the key guard below is a
     // one-shot), so a later "Save draft" would overwrite the operator's
     // real unpublished changes with the stale published content.
-    if (contentLoading) return;
+    if (!contentReady) return;
     const key = `${sectionId}__${fieldParam}`;
     if (loadedKeyRef.current === key) return;
     if (!existingRow) return;
@@ -232,7 +237,7 @@ export default function AdminContentBlockEditor({ mode }) {
     setFieldId(doc?.field ?? fieldParam ?? '');
     setContent(toEditableContent(doc, doc?.blockType));
     savedBlockTypeRef.current = doc?.blockType ?? null;
-  }, [mode, sectionId, fieldParam, existingRow, contentLoading]);
+  }, [mode, sectionId, fieldParam, existingRow, contentReady]);
 
   useEffect(() => {
     // A brand-new block starts with no type chosen; once the section's
@@ -271,8 +276,18 @@ export default function AdminContentBlockEditor({ mode }) {
   // is truthy, which the live listener alone can satisfy while the dirty
   // draft is still in flight (see the adoption effect above).
   const adopted = loadedKeyRef.current === `${sectionId}__${fieldParam}`;
-  if (mode === 'edit' && (pagesLoading || contentLoading) && !adopted) {
-    return <AdminLoadingState label="Loading block…" />;
+  if (mode === 'edit' && !adopted) {
+    if (!contentReady && contentListenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load this block and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+        />
+      );
+    }
+    if (pagesLoading || !contentReady || existingRow) {
+      return <AdminLoadingState label="Loading block…" />;
+    }
   }
   if (!pagesLoading && (!page || !section)) {
     return (
@@ -287,7 +302,7 @@ export default function AdminContentBlockEditor({ mode }) {
       />
     );
   }
-  if (mode === 'edit' && !pagesLoading && !contentLoading && !existingRow) {
+  if (mode === 'edit' && !pagesLoading && contentReady && !existingRow) {
     return (
       <AdminEmptyState
         title="No such block"
@@ -320,12 +335,8 @@ export default function AdminContentBlockEditor({ mode }) {
     setError(null);
     setStatus('');
     setResumeQueueId(null);
-    // The generic content endpoints validate only reserved keys, never
-    // block shape (unlike cmsSavePage's BLOCK_TYPES-aware validator for
-    // cmsPages) — so a required registry field (an image's alt text, a
-    // cta's url) would otherwise save and publish empty. Check it here,
-    // before EITHER a draft-only save or a publish, and report it the same
-    // way a server rejection would (ServerErrorSummary + per-field errors).
+    // Give immediate field feedback before the server repeats the same
+    // required-field contract at the write boundary.
     const validationErrors = validateRequiredContent(content);
     if (validationErrors.length > 0) {
       setError({
@@ -346,13 +357,15 @@ export default function AdminContentBlockEditor({ mode }) {
       ...toContentFields(content),
       ...staleFieldDeletions(savedBlockTypeRef.current, content.blockType),
     };
+    const request = {
+      section: sectionId,
+      fields,
+      field: currentFieldId,
+      visible: content.visible,
+    };
+    if (!isExisting) request.pageId = pageId;
     try {
-      const response = await call(endpoint, {
-        section: sectionId,
-        field: currentFieldId,
-        fields,
-        visible: content.visible,
-      });
+      const response = await call(endpoint, request);
       const docId = response.docId ?? `${sectionId}__${currentFieldId}`;
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt — the same reasoning AdminPageEditor applies:

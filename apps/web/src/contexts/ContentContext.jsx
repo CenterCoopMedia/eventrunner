@@ -284,6 +284,7 @@ export function ContentProvider({ readSource = 'published', children }) {
     return {
       readSource,
       source: live ? 'live' : 'snapshot',
+      contentSource: overlay.cmsContent != null ? 'live' : 'snapshot',
       siteContent,
       pages,
       updates,

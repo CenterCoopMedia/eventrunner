@@ -13,12 +13,25 @@ const {
 } = require('./content.cjs');
 const { makeFakeDb: makeBareFakeDb } = require('./firestoreFake.cjs');
 const { publishDocs } = require('./store.cjs');
+const { BLOCK_TYPES } = require('./blockTypes.cjs');
 
 // requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
 // #186 review: it fails closed on an absent document), so every fake this
 // file builds carries the document the file's getConfig describes.
 const BOOTSTRAP_DOC = { adminEmails: ['admin@example.org'], staffEmails: ['staff@example.org'] };
-const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
+const TEST_PAGE = {
+  id: 'test-page',
+  sections: ['hero', 'faq', 'info', 'sponsor_packages', 'stats'].map((id) => ({
+    id,
+    allowedBlocks: Object.keys(BLOCK_TYPES),
+    maxBlocks: 100,
+  })),
+};
+const makeFakeDb = (seed = {}) => makeBareFakeDb({
+  'config/bootstrap': BOOTSTRAP_DOC,
+  'cmsPages/test-page': TEST_PAGE,
+  ...seed,
+});
 
 const NOW = 1_750_000_000_000;
 const now = () => NOW;
@@ -37,11 +50,32 @@ function fakeAuth() {
 
 const getConfig = async () => ({ bootstrap: { adminEmails: ['admin@example.org'] } });
 
-function req({ method = 'POST', token = 'admin-token', body = {} } = {}) {
+const VALID_SESSION_FIELDS = Object.freeze({
+  title: 'Test session',
+  description: 'Test description',
+  dayId: 'day-2',
+  startTime: '09:00',
+  endTime: '10:00',
+});
+
+function req({ method = 'POST', token = 'admin-token', body = {}, rawBody = false } = {}) {
+  let requestBody = body;
+  if (!rawBody) {
+    const collection = body.collection ?? 'cmsContent';
+    requestBody = {
+      ...body,
+      ...(collection === 'cmsContent' && body.section && body.fields && !body.pageId
+        ? { pageId: 'test-page' }
+        : {}),
+      ...(collection === 'cmsSchedule' && body.fields
+        ? { fields: { ...VALID_SESSION_FIELDS, ...body.fields } }
+        : {}),
+    };
+  }
   return {
     method,
     headers: token ? { authorization: `Bearer ${token}` } : {},
-    body,
+    body: requestBody,
   };
 }
 
@@ -126,7 +160,7 @@ test('cmsCreateContent writes a dirty draft only — never the live collection',
   const db = makeFakeDb();
   const res = fakeRes();
   await createCmsCreateContentHandler(deps(db))(
-    req({ body: { section: 'hero', field: 'title', fields: { value: 'Welcome' }, visible: true } }),
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'Welcome' }, visible: true } }),
     res,
   );
   assert.equal(res.statusCode, 200);
@@ -158,7 +192,7 @@ test('cmsCreateContent → 409 when a draft or live doc already exists', async (
   const db = makeFakeDb({ 'cmsContent_drafts/hero__title': { value: 'x', status: 'dirty', visible: true } });
   let res = fakeRes();
   await createCmsCreateContentHandler(deps(db))(
-    req({ body: { section: 'hero', field: 'title', fields: { value: 'y' } } }),
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'y' } } }),
     res,
   );
   assert.equal(res.statusCode, 409);
@@ -167,7 +201,7 @@ test('cmsCreateContent → 409 when a draft or live doc already exists', async (
   const db2 = makeFakeDb({ 'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 } });
   res = fakeRes();
   await createCmsCreateContentHandler(deps(db2))(
-    req({ body: { section: 'hero', field: 'title', fields: { value: 'y' } } }),
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'y' } } }),
     res,
   );
   assert.equal(res.statusCode, 409);
@@ -197,7 +231,7 @@ test('cmsCreateContent: two racing creates → one 200, one 409, first draft int
     };
   };
   const handler = createCmsCreateContentHandler(deps(db));
-  const body = { section: 'hero', field: 'title', fields: { value: 'first' } };
+  const body = { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'first' } };
 
   const res1 = fakeRes();
   await handler(req({ body }), res1);
@@ -205,10 +239,196 @@ test('cmsCreateContent: two racing creates → one 200, one 409, first draft int
 
   winnerLanded = true; // second request read "no doc" before the first wrote
   const res2 = fakeRes();
-  await handler(req({ body: { ...body, fields: { value: 'second' } } }), res2);
+  await handler(req({ body: { ...body, fields: { blockType: 'text', value: 'second' } } }), res2);
   assert.equal(res2.statusCode, 409);
   assert.equal(res2.body.error.code, 'already-exists');
   assert.equal(db.read('cmsContent_drafts', 'hero__title').value, 'first');
+});
+
+test('cmsCreateContent refuses a missing page, a removed section, and a disallowed block type by rule', async () => {
+  for (const [body, rule] of [
+    [{ section: 'hero', field: 'missing-page', fields: { blockType: 'text', value: 'x' } }, /^pageId:/],
+    [{ pageId: 'test-page', section: 'removed', field: 'x', fields: { blockType: 'text', value: 'x' } }, /^section:/],
+    [{
+      pageId: 'text-page',
+      section: 'body',
+      field: 'image',
+      fields: { blockType: 'image', url: 'https://example.org/image.jpg', alt: 'Example' },
+    }, /^allowedBlocks:/],
+  ]) {
+    const db = makeFakeDb({
+      'cmsPages/text-page': {
+        id: 'text-page',
+        sections: [{ id: 'body', allowedBlocks: ['text'], maxBlocks: 2 }],
+      },
+    });
+    const res = fakeRes();
+    await createCmsCreateContentHandler(deps(db))(req({ body, rawBody: true }), res);
+    assert.equal(res.statusCode, 400, JSON.stringify(res.body));
+    assert.match(res.body.error.message, rule);
+    assert.equal(db.ids('cmsContent_drafts').length, 0);
+  }
+});
+
+test('cmsCreateContent uses the current page draft for section rules', async () => {
+  const db = makeFakeDb({
+    'cmsPages/test-page': {
+      id: 'test-page',
+      sections: [{ id: 'hero', allowedBlocks: ['image'], maxBlocks: 2 }],
+    },
+    'cmsPages_drafts/test-page': {
+      id: 'test-page',
+      sections: [{ id: 'hero', allowedBlocks: ['text'], maxBlocks: 1 }],
+      status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        pageId: 'test-page',
+        section: 'hero',
+        field: 'image',
+        fields: { blockType: 'image', url: 'https://example.org/image.jpg', alt: 'Example' },
+      },
+      rawBody: true,
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^allowedBlocks:/);
+});
+
+test('cmsCreateContent serializes concurrent creates at maxBlocks', async () => {
+  const db = makeFakeDb({
+    'cmsPages_drafts/test-page': {
+      id: 'test-page',
+      sections: [{ id: 'hero', allowedBlocks: ['text'], maxBlocks: 1 }],
+      status: 'dirty',
+    },
+  });
+  const handler = createCmsCreateContentHandler(deps(db));
+  const first = fakeRes();
+  const second = fakeRes();
+  db.beforeCommit = async () => {
+    await handler(req({ body: {
+      pageId: 'test-page', section: 'hero', field: 'second',
+      fields: { blockType: 'text', value: 'Second' },
+    }, rawBody: true }), second);
+  };
+
+  await handler(req({ body: {
+    pageId: 'test-page', section: 'hero', field: 'first',
+    fields: { blockType: 'text', value: 'First' },
+  }, rawBody: true }), first);
+
+  assert.equal(second.statusCode, 200);
+  assert.equal(first.statusCode, 400);
+  assert.match(first.body.error.message, /^maxBlocks:/);
+  assert.deepEqual(db.ids('cmsContent_drafts'), ['hero__second']);
+});
+
+test('cmsCreateContent serializes one section namespace across different pages', async () => {
+  const section = { id: 'hero', allowedBlocks: ['text'], maxBlocks: 1 };
+  const db = makeFakeDb({
+    'cmsPages/page-a': { id: 'page-a', sections: [section] },
+    'cmsPages/page-b': { id: 'page-b', sections: [section] },
+  });
+  const handler = createCmsCreateContentHandler(deps(db));
+  const first = fakeRes();
+  const second = fakeRes();
+  db.beforeCommit = async () => {
+    await handler(req({ body: {
+      pageId: 'page-b', section: 'hero', field: 'second',
+      fields: { blockType: 'text', value: 'Second' },
+    }, rawBody: true }), second);
+  };
+
+  await handler(req({ body: {
+    pageId: 'page-a', section: 'hero', field: 'first',
+    fields: { blockType: 'text', value: 'First' },
+  }, rawBody: true }), first);
+
+  assert.equal(second.statusCode, 200);
+  assert.equal(first.statusCode, 400);
+  assert.match(first.body.error.message, /^maxBlocks:/);
+  assert.deepEqual(db.ids('cmsContent_drafts'), ['hero__second']);
+});
+
+test('content create and update enforce required block fields on the server', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/hero__image': {
+      section: 'hero', field: 'image', blockType: 'image',
+      url: 'https://example.org/image.jpg', alt: 'Example', status: 'clean',
+    },
+  });
+  let res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: {
+      pageId: 'test-page', section: 'hero', field: 'new-image',
+      fields: { blockType: 'image', url: 'https://example.org/image.jpg', alt: '' },
+    }, rawBody: true }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^alt: is required for block type "image"/);
+
+  res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: {
+      section: 'hero', field: 'image', fields: { alt: DELETE_FIELD_SENTINEL },
+    }, rawBody: true }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^alt: is required for block type "image"/);
+  assert.equal(db.read('cmsContent_drafts', 'hero__image').alt, 'Example');
+});
+
+test('a direct session create is refused when its end is not after its start', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({ body: {
+      collection: 'cmsSchedule',
+      docId: 'backwards',
+      fields: {
+        title: 'Backwards', description: 'Invalid time order.', dayId: 'day-1',
+        startTime: '12:00', endTime: '11:00',
+      },
+    }, rawBody: true }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^endTime: must be after startTime/);
+  assert.equal(db.read('cmsSchedule_drafts', 'backwards'), undefined);
+});
+
+test('an unrelated session edit preserves valid legacy 12-hour clocks', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/legacy': {
+      title: 'Legacy session',
+      description: 'Before the edit.',
+      dayId: 'day-1',
+      startTime: '9:00 AM',
+      endTime: '10:00 AM',
+      status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: {
+      collection: 'cmsSchedule',
+      docId: 'legacy',
+      fields: { description: 'After the edit.' },
+    }, rawBody: true }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsSchedule_drafts', 'legacy').startTime, '9:00 AM');
+  assert.equal(db.read('cmsSchedule_drafts', 'legacy').endTime, '10:00 AM');
+  assert.equal(db.read('cmsSchedule_drafts', 'legacy').description, 'After the edit.');
 });
 
 test('cmsCreateContent → 400 on unknown collection, bad keys, reserved fields', async () => {
@@ -253,7 +473,7 @@ test('cmsUpdateContent merges fields onto the existing draft; live stays untouch
   });
   const res = fakeRes();
   await createCmsUpdateContentHandler(deps(db))(
-    req({ body: { section: 'hero', field: 'title', fields: { value: 'edited' } } }),
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'edited' } } }),
     res,
   );
   assert.equal(res.statusCode, 200);
@@ -302,7 +522,7 @@ test('cmsCreateContent also honors DELETE_FIELD_SENTINEL (defensive; no base to 
       body: {
         section: 'hero',
         field: 'title',
-        fields: { value: 'Welcome', extra: DELETE_FIELD_SENTINEL },
+        fields: { blockType: 'text', value: 'Welcome', extra: DELETE_FIELD_SENTINEL },
       },
     }),
     res,
@@ -319,7 +539,7 @@ test('cmsUpdateContent forks a draft from the live doc when only the live doc ex
   });
   const res = fakeRes();
   await createCmsUpdateContentHandler(deps(db))(
-    req({ body: { section: 'hero', field: 'title', fields: { value: 'edited' } } }),
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'edited' } } }),
     res,
   );
   assert.equal(res.statusCode, 200);
@@ -490,7 +710,7 @@ test('a failed admin_logs write never fails the mutation', async () => {
   };
   const res = fakeRes();
   await createCmsCreateContentHandler(deps(db))(
-    req({ body: { section: 'hero', field: 'title', fields: { value: 'v' } } }),
+    req({ body: { section: 'hero', field: 'title', fields: { blockType: 'text', value: 'v' } } }),
     res,
   );
   assert.equal(res.statusCode, 200);
@@ -691,7 +911,7 @@ test('collections without speaker references are untouched by the seam', async (
   const res = fakeRes();
   // cmsContent has no speakers; a stray speakerIds field is ordinary content.
   await createCmsCreateContentHandler(deps(db))(
-    req({ body: { section: 'hero', field: 'blurb', fields: { speakerIds: ['ghost'] } } }),
+    req({ body: { section: 'hero', field: 'blurb', fields: { blockType: 'text', value: 'x', speakerIds: ['ghost'] } } }),
     res,
   );
   assert.equal(res.statusCode, 200);
@@ -999,7 +1219,7 @@ test('mutation handlers admit a staff admin — content is staff work', async ()
   const db = makeFakeDb();
   const res = fakeRes();
   await createCmsCreateContentHandler(staffDeps(db))(
-    req({ token: 'staff-token', body: { collection: 'cmsContent', section: 'hero', field: 'title', fields: { value: 'Set by staff' } } }),
+    req({ token: 'staff-token', body: { collection: 'cmsContent', section: 'hero', field: 'title', fields: { blockType: 'text', value: 'Set by staff' } } }),
     res,
   );
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));

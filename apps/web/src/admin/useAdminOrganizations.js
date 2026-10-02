@@ -6,18 +6,19 @@ import { mergeOrganizationRevisions } from './organizationDoc.js';
 export function useAdminOrganizations() {
   const [live, setLive] = useState(null);
   const [drafts, setDrafts] = useState(null);
-  const [error, setError] = useState(null);
+  const [liveError, setLiveError] = useState(null);
+  const [draftsError, setDraftsError] = useState(null);
 
   useEffect(() => {
     const unsubscribers = [
       subscribeAdminCollection('cmsOrganizations', (docs) => {
         setLive(docs);
-        setError(null);
-      }, setError),
+        setLiveError(null);
+      }, setLiveError),
       subscribeAdminCollection('cmsOrganizations_drafts', (docs) => {
         setDrafts(docs);
-        setError(null);
-      }, setError),
+        setDraftsError(null);
+      }, setDraftsError),
     ];
     return () => {
       for (const unsubscribe of unsubscribers) unsubscribe?.();
@@ -25,13 +26,15 @@ export function useAdminOrganizations() {
   }, []);
 
   const rows = useMemo(() => mergeOrganizationRevisions(live, drafts), [live, drafts]);
+  const error = liveError ?? draftsError ?? null;
+  const ready = live !== null && drafts !== null;
 
   return {
     rows,
     // Both listeners have reported. They report in no fixed order, and a row
     // built before the drafts arrive is the live doc alone.
-    ready: live !== null && drafts !== null,
-    loading: (live === null || drafts === null) && !error,
+    ready,
+    loading: !ready && !error,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,
   };

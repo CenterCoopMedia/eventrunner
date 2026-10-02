@@ -45,6 +45,7 @@ export default defineConfig({
   globalSetup: './e2e/global-setup.mjs',
   use: {
     baseURL: APP_URL,
+    launchOptions: { chromiumSandbox: true },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

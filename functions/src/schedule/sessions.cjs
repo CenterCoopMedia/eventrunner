@@ -62,6 +62,7 @@
  */
 
 const { TRACK_LETTER_RE } = require('shared/config');
+const { CLOCK_TIME_RE } = require('shared/time');
 const { PLACE_ID_RE } = require('shared/venue');
 const { isSafeUrl, safeUrlHref } = require('shared/urlSafety');
 const { isValidDocId } = require('../cms/store.cjs');
@@ -73,6 +74,32 @@ const SESSIONS_DRAFTS = 'cmsSchedule_drafts';
 /** Where the event's track definitions live (shared/config validates them). */
 const CONFIG_COLLECTION = 'config';
 const CONFIG_EVENT_DOC = 'event';
+
+/** The current stored clock shape. Legacy rows may use CLOCK_TIME_RE instead. */
+const TIME_24H_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Parse either stored 24-hour time or the shared legacy 12-hour grammar to
+ * minutes after midnight. A number gives validateSessionShape one canonical
+ * basis for both validity and chronological comparison.
+ */
+function sessionClockMinutes(value) {
+  if (typeof value !== 'string') return null;
+  const clock = value.trim();
+  if (TIME_24H_RE.test(clock)) {
+    const [hour, minute] = clock.split(':').map(Number);
+    return hour * 60 + minute;
+  }
+  if (!CLOCK_TIME_RE.test(clock)) return null;
+  const match = clock.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = match[2] ? Number(match[2]) : 0;
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
 
 /** The letter a field states, or null for "this session names no track". */
 function statedTrack(value) {
@@ -118,6 +145,32 @@ function validateSessionShape(fields, docId) {
       'and cannot be used as a session id',
     );
   }
+
+  for (const [field, message] of [
+    ['title', 'must be a non-empty public title'],
+    ['description', 'must be a non-empty public description'],
+    ['dayId', 'must name an event day'],
+    ['startTime', 'must be a non-empty start time'],
+    ['endTime', 'must be a non-empty end time'],
+  ]) {
+    if (typeof fields?.[field] !== 'string' || fields[field].trim().length === 0) {
+      errors.push(`${field}: ${message}`);
+    }
+  }
+  const hasStart = typeof fields?.startTime === 'string' && fields.startTime.trim().length > 0;
+  const hasEnd = typeof fields?.endTime === 'string' && fields.endTime.trim().length > 0;
+  const startMinutes = hasStart ? sessionClockMinutes(fields.startTime) : null;
+  const endMinutes = hasEnd ? sessionClockMinutes(fields.endTime) : null;
+  if (hasStart && startMinutes === null) {
+    errors.push('startTime: must be a valid clock time');
+  }
+  if (hasEnd && endMinutes === null) {
+    errors.push('endTime: must be a valid clock time');
+  }
+  if (startMinutes !== null && endMinutes !== null && startMinutes >= endMinutes) {
+    errors.push('endTime: must be after startTime');
+  }
+
   const track = fields?.track;
   if (track !== undefined && track !== null && track !== '') {
     if (typeof track !== 'string' || !TRACK_LETTER_RE.test(track)) {
