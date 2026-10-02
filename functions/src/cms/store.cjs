@@ -337,13 +337,6 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
       const liveRefs = chunkIds.map((id) => db.collection(collection).doc(id));
       const draftSnaps = await db.getAll(...draftRefs);
       const liveSnaps = await db.getAll(...liveRefs);
-      const [metaSnap] = await db.getAll(metaRef);
-      const counts = metaSnap.exists ? parsePendingCounts(metaSnap.data()) : null;
-      if (!counts) {
-        if (attempt >= MAX_CHUNK_ATTEMPTS) throw new Error('Pending counts could not be repaired.');
-        await ensurePendingCounts({ db, now, force: true });
-        continue;
-      }
 
       const batch = db.batch();
       const chunkPublished = [];
@@ -413,6 +406,16 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
         chunkPublished.push(docId);
       }
 
+      // Read the one global counter only after every awaited per-document
+      // history lookup. This keeps unrelated draft transitions from holding
+      // up a large chunk during its slow preparation work.
+      const [metaSnap] = await db.getAll(metaRef);
+      const counts = metaSnap.exists ? parsePendingCounts(metaSnap.data()) : null;
+      if (!counts) {
+        if (attempt >= MAX_CHUNK_ATTEMPTS) throw new Error('Pending counts could not be repaired.');
+        await ensurePendingCounts({ db, now, force: true });
+        continue;
+      }
       const nextCounts = countsAfterPublish(counts, collection, dirtyPublished);
       if (!nextCounts) {
         if (attempt >= MAX_CHUNK_ATTEMPTS) throw new Error(`Pending count underflow for ${collection}.`);
