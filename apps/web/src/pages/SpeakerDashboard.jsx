@@ -17,6 +17,7 @@ import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import SpeakerSessionHub from '../components/speaker/SpeakerSessionHub.jsx';
+import SpeakerResourceCard from '../components/speaker/SpeakerResourceCard.jsx';
 import SpeakerStatusHeader from '../components/speaker/SpeakerStatusHeader.jsx';
 import { secondaryActionClass } from '../components/controlClasses.js';
 import { getOwnSpeakerProfile } from '../lib/speakerProfileApi.js';
@@ -143,6 +144,8 @@ export default function SpeakerDashboard() {
         scheduleData={scheduleData}
         speakerId={speakerId}
       />
+
+      <SpeakerResourceCard />
 
       <div className="mt-xl grid items-start gap-lg lg:grid-cols-2">
         <section aria-labelledby="speaker-status-heading" className={statusCardClass}>

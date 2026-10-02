@@ -193,6 +193,43 @@ describe('event settings', () => {
     // than failing as a flake somebody has to re-run to understand.
   }, 20000);
 
+  it('round-trips and clears the optional speaker slide template without replacing other config', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      speakerResources: {
+        slideTemplate: {
+          label: 'Presentation template',
+          url: 'https://slides.example.org/old',
+        },
+      },
+    });
+
+    expect(screen.getByLabelText('Slide template label')).toHaveValue('Presentation template');
+    expect(screen.getByLabelText('Slide template URL')).toHaveValue('https://slides.example.org/old');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.change(screen.getByLabelText('Slide template URL'), {
+      target: { value: 'https://slides.example.org/current' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.speakerResources).toEqual({
+      slideTemplate: {
+        label: 'Presentation template',
+        url: 'https://slides.example.org/current',
+      },
+    });
+    expect(bodyOf(0).event).toHaveProperty('venue');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.change(screen.getByLabelText('Slide template label'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Slide template URL'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).event.speakerResources).toEqual({ slideTemplate: null });
+  }, 20000);
+
   it('lets a staff admin save the content and leaves the sender out, shown read-only (issue 186)', async () => {
     operatorProbeShouldSucceed = false;
     await renderAt('/admin/settings');

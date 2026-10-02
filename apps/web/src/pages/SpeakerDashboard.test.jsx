@@ -45,6 +45,9 @@ vi.mock('../components/speaker/SpeakerSessionHub.jsx', () => ({
     </section>
   ),
 }));
+vi.mock('../components/speaker/SpeakerResourceCard.jsx', () => ({
+  default: () => <div data-testid="speaker-resources-fixture" />,
+}));
 
 const { default: SpeakerDashboard } = await import('./SpeakerDashboard.jsx');
 
