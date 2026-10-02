@@ -210,6 +210,33 @@ function statContractErrors(fields) {
 }
 
 /**
+ * Required fields for any content block, derived from the same registry the
+ * page and editor use. This runs at the server write boundary so an editor,
+ * a restore, and a direct endpoint call all meet the same rule.
+ *
+ * The stat contract keeps its more useful field-specific wording. Every
+ * other block type uses the registry's `required` flags directly.
+ *
+ * @param {object} fields the block's fields as they will be stored
+ * @returns {string[]}
+ */
+function requiredBlockErrors(fields) {
+  const blockType = fields?.blockType;
+  if (!isKnownBlockType(blockType)) {
+    return ['blockType: must name a known block type.'];
+  }
+  if (blockType === 'stat') return statContractErrors(fields);
+  return BLOCK_TYPES[blockType].fields
+    .filter((entry) => entry.required && entry.type !== 'boolean')
+    .filter((entry) => (
+      fields[entry.id] === undefined
+      || fields[entry.id] === null
+      || String(fields[entry.id]).trim().length === 0
+    ))
+    .map((entry) => `${entry.id}: is required for block type "${blockType}".`);
+}
+
+/**
  * True only for ids defined in BLOCK_TYPES. Own-property check, so
  * prototype names ('toString') and non-strings are never "known".
  *
@@ -248,6 +275,7 @@ function draftCollectionFor(name) {
 module.exports = {
   BLOCK_TYPES,
   isKnownBlockType,
+  requiredBlockErrors,
   statContractErrors,
   PUBLISHABLE_COLLECTIONS,
   draftCollectionFor,

@@ -305,6 +305,7 @@ describe('creating and editing a block', () => {
     expect(urlOf(0)).toMatch(/\/cmsCreateContent$/);
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer id-token');
     expect(bodyOf(0)).toEqual({
+      pageId: 'scholarships',
       section: 'intro',
       field: 'body',
       fields: { blockType: 'richtext', value: '<p>Hello</p>' },

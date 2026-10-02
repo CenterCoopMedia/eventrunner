@@ -118,6 +118,28 @@ function validateSessionShape(fields, docId) {
       'and cannot be used as a session id',
     );
   }
+
+  for (const [field, message] of [
+    ['title', 'must be a non-empty public title'],
+    ['description', 'must be a non-empty public description'],
+    ['dayId', 'must name an event day'],
+    ['startTime', 'must be a non-empty start time'],
+    ['endTime', 'must be a non-empty end time'],
+  ]) {
+    if (typeof fields?.[field] !== 'string' || fields[field].trim().length === 0) {
+      errors.push(`${field}: ${message}`);
+    }
+  }
+  if (
+    typeof fields?.startTime === 'string'
+    && fields.startTime.trim().length > 0
+    && typeof fields?.endTime === 'string'
+    && fields.endTime.trim().length > 0
+    && fields.startTime >= fields.endTime
+  ) {
+    errors.push('endTime: must be after startTime');
+  }
+
   const track = fields?.track;
   if (track !== undefined && track !== null && track !== '') {
     if (typeof track !== 'string' || !TRACK_LETTER_RE.test(track)) {

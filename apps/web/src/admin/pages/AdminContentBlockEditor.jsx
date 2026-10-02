@@ -335,12 +335,8 @@ export default function AdminContentBlockEditor({ mode }) {
     setError(null);
     setStatus('');
     setResumeQueueId(null);
-    // The generic content endpoints validate only reserved keys, never
-    // block shape (unlike cmsSavePage's BLOCK_TYPES-aware validator for
-    // cmsPages) — so a required registry field (an image's alt text, a
-    // cta's url) would otherwise save and publish empty. Check it here,
-    // before EITHER a draft-only save or a publish, and report it the same
-    // way a server rejection would (ServerErrorSummary + per-field errors).
+    // Give immediate field feedback before the server repeats the same
+    // required-field contract at the write boundary.
     const validationErrors = validateRequiredContent(content);
     if (validationErrors.length > 0) {
       setError({
@@ -363,6 +359,7 @@ export default function AdminContentBlockEditor({ mode }) {
     };
     try {
       const response = await call(endpoint, {
+        ...(isExisting ? {} : { pageId }),
         section: sectionId,
         field: currentFieldId,
         fields,

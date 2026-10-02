@@ -3,11 +3,9 @@
 // A cmsContent doc is keyed `<section>__<field>` (functions/src/cms/
 // content.cjs) and carries `section`, `field`, and `blockType` as ordinary
 // content fields plus whatever value fields that block type's registry
-// entry (blockTypes.js) declares. Unlike cmsPages, the generic content
-// endpoints do not validate those value fields by name or type — they only
-// guard reserved keys — so this module's job is purely to give the editor a
-// stable, typed form shape; the server's own rejections (reserved keys,
-// bad section/field shape, 404/409) still travel back verbatim.
+// entry (blockTypes.js) declares. This module gives the editor a stable,
+// typed form shape and immediate field feedback. The server repeats the
+// required-field contract at the write boundary.
 import { blockTypeFor } from './blockTypes.js';
 
 /**
@@ -149,12 +147,10 @@ export function staleFieldDeletions(priorBlockTypeId, nextBlockTypeId) {
 
 /**
  * Client-side required-field check for the chosen block type's value
- * fields. The generic content endpoints validate only reserved keys, not
- * block shape (functions/src/cms/content.cjs has no BLOCK_TYPES-aware
- * validator the way cmsSavePage does for cmsPages), so without this an
- * operator can publish e.g. an image block with no alt text. Booleans are
- * skipped: a checkbox always holds a definite true/false, so "required"
- * has no empty state to catch.
+ * fields. The server applies the same registry contract, but this check
+ * keeps an operator on the field instead of waiting for a request to fail.
+ * Booleans are skipped: a checkbox always holds a definite true/false, so
+ * "required" has no empty state to catch.
  *
  * @param {{ blockType: string, values: object }} content
  * @returns {Array<{ field: string, message: string }>}
