@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import Quill from 'quill/core.js';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
 vi.mock('../../lib/contentSource.js', () => ({
@@ -153,6 +154,23 @@ function urlOf(callIndex) {
   return String(fetch.mock.calls[callIndex][0]);
 }
 
+async function findRichText(name = 'value') {
+  return screen.findByRole('textbox', { name });
+}
+
+async function replaceRichText(editor, html, text) {
+  const quill = Quill.find(editor.parentElement);
+  quill.setSelection(0, Math.max(0, quill.getLength() - 1), 'silent');
+  fireEvent.paste(editor, {
+    clipboardData: {
+      getData(type) {
+        return type === 'text/html' ? html : text;
+      },
+    },
+  });
+  await waitFor(() => expect(editor.innerHTML).toBe(html));
+}
+
 beforeEach(() => {
   sources = { cmsPages: [], cmsPages_drafts: [], cmsContent: [], cmsContent_drafts: [] };
   listenerError = null;
@@ -248,10 +266,10 @@ describe('content browsing', () => {
     await renderAt('/admin/content/scholarships/intro/body');
 
     expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
-    expect(screen.queryByDisplayValue(/STALE live content/)).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'value' })).toBeNull();
 
     act(() => adminSubscriptions.get('cmsContent_drafts')(sources.cmsContent_drafts));
-    expect(await screen.findByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
+    expect((await findRichText()).innerHTML).toBe('<p>Scholarships open in spring.</p>');
 
     fetch.mockResolvedValueOnce(okResponse({ docId: 'intro__body', status: 'dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -269,7 +287,7 @@ describe('content browsing', () => {
     act(() => adminErrors.get('cmsContent_drafts')(new Error('permission denied')));
 
     expect(await screen.findByText(/could not load this block and its saved draft/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/^value/)).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'value' })).toBeNull();
   });
 
   it('keeps a field literally named "new" editable — the create route uses a different segment', async () => {
@@ -282,7 +300,7 @@ describe('content browsing', () => {
 
     await renderAt('/admin/content/scholarships/intro/new');
 
-    expect(await screen.findByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
+    expect((await findRichText()).innerHTML).toBe('<p>Scholarships open in spring.</p>');
     expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
     expect(screen.getByRole('button', { name: 'Delete this block' })).toBeInTheDocument();
   });
@@ -296,9 +314,7 @@ describe('creating and editing a block', () => {
     await renderAt('/admin/content/scholarships/intro/_new');
 
     fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'body' } });
-    fireEvent.change(await screen.findByLabelText(/^value/), {
-      target: { value: '<p>Hello</p>' },
-    });
+    await replaceRichText(await findRichText(), '<p>Hello</p>', 'Hello');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -328,10 +344,10 @@ describe('creating and editing a block', () => {
     });
 
     // Switching the block type swaps the value fields the registry declares.
-    expect(await screen.findByLabelText(/^value/)).toBeInTheDocument();
+    expect(await findRichText()).toBeInTheDocument();
     fireEvent.change(picker, { target: { value: 'stat' } });
     expect(screen.getByLabelText(/^label/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^value/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'value' })).toBeInTheDocument();
     // stat declares its own registry 'order' field, but the editor renders
     // exactly one shared Order control (the Block panel's) rather than a
     // second, divergent one from the per-type value fields.
@@ -346,10 +362,9 @@ describe('creating and editing a block', () => {
 
     await renderAt('/admin/content/scholarships/intro/body');
 
-    expect(await screen.findByLabelText(/^value/)).toHaveValue('<p>Scholarships open in spring.</p>');
-    fireEvent.change(screen.getByLabelText(/^value/), {
-      target: { value: '<p>Updated copy.</p>' },
-    });
+    const editor = await findRichText();
+    expect(editor.innerHTML).toBe('<p>Scholarships open in spring.</p>');
+    await replaceRichText(editor, '<p>Updated copy.</p>', 'Updated copy.');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -504,7 +519,7 @@ describe('server errors and publish skips', () => {
     // Fill the required value field so this reaches the network call at
     // all — an empty one is caught by client-side validation first, which
     // has its own test.
-    fireEvent.change(await screen.findByLabelText(/^value/), { target: { value: '<p>Hi</p>' } });
+    await replaceRichText(await findRichText(), '<p>Hi</p>', 'Hi');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
