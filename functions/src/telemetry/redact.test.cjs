@@ -21,6 +21,13 @@ test('redacts multiple emails', () => {
   );
 });
 
+test('redacts a percent-encoded email address embedded in text', () => {
+  assert.equal(
+    redactText('GET /search?email=jane.doe%2Btest%40example.org&day=1'),
+    'GET /search?email=[redacted-email]&day=1',
+  );
+});
+
 test('redacts a Bearer token', () => {
   assert.equal(
     redactText('request failed: Authorization: Bearer abc123.def-456_GHI'),
@@ -97,6 +104,24 @@ test('redacts multiple credential-shaped params on an absolute URL', () => {
   assert.equal(parsed.searchParams.get('access_token'), '[redacted]');
   assert.equal(parsed.searchParams.get('session'), '[redacted]');
   assert.equal(parsed.searchParams.get('keep'), 'me');
+});
+
+test('redacts plain and encoded emails in URL query values while keeping the URL readable', () => {
+  for (const email of ['jane.doe+test@example.org', 'jane.doe%2Btest%40example.org']) {
+    const out = redactUrl(`https://events.example.org/schedule?email=${email}&day=1`);
+    const parsed = new URL(out);
+    assert.equal(parsed.searchParams.get('email'), '[redacted-email]');
+    assert.equal(parsed.searchParams.get('day'), '1');
+    assert.equal(parsed.origin + parsed.pathname, 'https://events.example.org/schedule');
+  }
+});
+
+test('redacts an email beside a credential query param', () => {
+  const out = redactUrl('https://events.example.org/search?email=reader%40example.org&token=test-token&track=news');
+  const parsed = new URL(out);
+  assert.equal(parsed.searchParams.get('email'), '[redacted-email]');
+  assert.equal(parsed.searchParams.get('token'), '[redacted]');
+  assert.equal(parsed.searchParams.get('track'), 'news');
 });
 
 test('falls back to text-level scrub for a relative or malformed URL', () => {

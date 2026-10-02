@@ -16,7 +16,7 @@
  * into `[redacted-token]`) is the safe failure mode; under-redaction is not.
  */
 
-const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const EMAIL_RE = /[A-Za-z0-9._%+-]+(?:@|%40)[A-Za-z0-9.-]+\.[A-Za-z]{2,}/gi;
 
 // Three dot-separated base64url segments — the JWT shape, regardless of
 // whether it decodes to anything meaningful.
