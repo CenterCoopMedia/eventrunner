@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let report;
 vi.mock('../adminSource.js', () => ({
@@ -13,6 +13,24 @@ import AdminAnnouncements from './AdminAnnouncements.jsx';
 
 describe('AdminAnnouncements', () => {
   beforeEach(() => call.mockReset());
+  afterEach(() => vi.useRealTimers());
+
+  it('refreshes status at the start and end boundaries', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-02T13:00:00Z'));
+    render(<AdminAnnouncements />);
+    act(() => report([{
+      id: 'a1', message: 'Doors are open.', level: 'info',
+      startsAt: new Date('2026-10-02T13:00:01Z'), endsAt: new Date('2026-10-02T13:00:02Z'),
+      link: null,
+    }]));
+
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(screen.getByText('Ended')).toBeInTheDocument();
+  });
 
   it('creates a bounded announcement through the admin endpoint', async () => {
     call.mockResolvedValueOnce({ id: 'a1' });

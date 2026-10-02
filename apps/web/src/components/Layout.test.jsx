@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Suspense } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -61,7 +62,7 @@ vi.mock('../webmcp/PublicWebMcpRegistration.jsx', () => ({
   },
 }));
 
-const { default: Layout } = await import('./Layout.jsx');
+const { default: Layout, optionalOnDemand } = await import('./Layout.jsx');
 
 const FIXTURE_EVENT = {
   name: '[Fixture] Example Conference 2027',
@@ -128,6 +129,30 @@ describe('Layout public model tools', () => {
     });
 
     await waitFor(() => expect(renderPublicWebMcpRegistration).toHaveBeenCalled());
+  });
+
+  it('keeps the shell visible when the optional module fails to load', async () => {
+    const error = new Error('chunk failed');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const FailedRegistration = optionalOnDemand(
+      () => Promise.reject(error),
+      'public model tools',
+    );
+
+    render(
+      <>
+        <span>Event shell</span>
+        <Suspense fallback={null}><FailedRegistration /></Suspense>
+      </>,
+    );
+
+    expect(screen.getByText('Event shell')).toBeInTheDocument();
+    await waitFor(() => expect(warn).toHaveBeenCalledWith(
+      'Optional public model tools could not load.',
+      error,
+    ));
+    expect(screen.getByText('Event shell')).toBeInTheDocument();
+    warn.mockRestore();
   });
 });
 

@@ -157,6 +157,54 @@ test('cmsGetVersionHistory clamps a silly limit to the default', async () => {
   assert.equal(res.body.entries.length, 5); // default (20) covers all rows
 });
 
+test('cmsGetVersionHistory bounds large snapshots and paginates every revision without gaps', async () => {
+  const docPath = 'cmsContent/hero__title';
+  const seed = {};
+  for (let revision = 1; revision <= 20; revision += 1) {
+    seed[`cmsVersionHistory/large-${revision}`] = {
+      docPath, revision, fields: { value: `${revision}:${'x'.repeat(900_000)}` },
+    };
+  }
+  const db = makeFakeDb(seed);
+  const seen = [];
+  let cursor;
+  do {
+    const res = fakeRes();
+    await handler(db)(req({ body: { docPath, ...(cursor === undefined ? {} : { cursor }) } }), res);
+    assert.equal(res.statusCode, 200);
+    assert.ok(Buffer.byteLength(JSON.stringify(res.body), 'utf8') <= 8 * 1024 * 1024);
+    assert.ok(res.body.entries.length > 0);
+    assert.ok(res.body.entries.length < 20);
+    for (const item of res.body.entries) {
+      seen.push(item.revision);
+      assert.equal(item.fields.value, seed[`cmsVersionHistory/large-${item.revision}`].fields.value);
+    }
+    cursor = res.body.nextCursor;
+    if (cursor !== null) assert.equal(cursor, res.body.entries.at(-1).revision);
+  } while (cursor !== null);
+  assert.deepEqual(seen, Array.from({ length: 20 }, (_, index) => 20 - index));
+});
+
+test('an individually large diff keeps the full restore snapshot and omits only its change details', async () => {
+  const docPath = 'cmsContent/hero__title';
+  const current = '\u0000'.repeat(900_000);
+  const previous = '\u0001'.repeat(900_000);
+  const db = makeFakeDb({
+    'cmsVersionHistory/large-2': { docPath, revision: 2, fields: { value: current } },
+    'cmsVersionHistory/large-1': { docPath, revision: 1, fields: { value: previous } },
+  });
+  const res = fakeRes();
+  await handler(db)(req({ body: { docPath } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.ok(Buffer.byteLength(JSON.stringify(res.body), 'utf8') <= 8 * 1024 * 1024);
+  assert.equal(res.body.entries.length, 1);
+  assert.equal(res.body.entries[0].fields.value, current);
+  assert.equal(res.body.entries[0].changeValuesOmitted, true);
+  assert.deepEqual(res.body.entries[0].changes, []);
+  assert.equal(res.body.entries[0].moreChanges, 1);
+  assert.equal(res.body.nextCursor, 2);
+});
+
 test('the (docPath ASC, revision DESC) composite index is declared for deploy', () => {
   // The where('docPath','==')+orderBy('revision','desc') query needs this
   // composite index in real Firestore; the in-memory fake cannot catch a
