@@ -23,6 +23,7 @@ import {
 import Layout from '../components/Layout.jsx';
 import AuthContext from './AuthContext.jsx';
 import ContentContext from './ContentContext.jsx';
+import ProfileContext from './ProfileContext.jsx';
 import {
   eventConfig as snapshotEventConfig,
   theme as snapshotTheme,
@@ -217,7 +218,9 @@ describe('Layout nav', () => {
             {/* The shell's account control reads the auth state (M7 issue
                 2); nobody is signed in in these tests. */}
             <AuthContext.Provider value={{ user: null, loading: false }}>
-              <Layout />
+              <ProfileContext.Provider value={{ profile: null, status: 'signed-out' }}>
+                <Layout />
+              </ProfileContext.Provider>
             </AuthContext.Provider>
           </ContentContext.Provider>
         </EventConfigProvider>
