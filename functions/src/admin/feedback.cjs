@@ -128,11 +128,11 @@ async function storeFeedback({ db, id, message, email, category, ipHash, userAge
     const [snap, limitSnap] = await Promise.all([tx.get(ref), tx.get(limitRef)]);
     if (snap.exists) {
       const stored = snap.data() || {};
-      return stored.message === message
-        && (stored.email ?? null) === email
-        && stored.category === category
-        ? { outcome: 'replayed' }
-        : { outcome: 'changed' };
+      if (stored.message !== message
+          || (stored.email ?? null) !== email
+          || stored.category !== category) {
+        return { outcome: 'changed' };
+      }
     }
 
     const window = feedbackRateLimitWindow(limitSnap.exists ? limitSnap.data()?.requests : null, nowMs);
@@ -140,6 +140,8 @@ async function storeFeedback({ db, id, message, email, category, ipHash, userAge
 
     const at = new Date(nowMs);
     tx.set(limitRef, { requests: [...window.requests, nowMs], updatedAt: at });
+    if (snap.exists) return { outcome: 'replayed' };
+
     tx.create(ref, {
       message,
       email,

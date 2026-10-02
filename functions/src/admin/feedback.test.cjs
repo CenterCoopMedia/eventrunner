@@ -251,7 +251,7 @@ test('uses a valid submissionKey as the feedback doc id', async () => {
   assert.ok(db.store.has(`feedback/${key}`));
 });
 
-test('an equivalent retry with the same submissionKey writes no data and sends one confirmation', async () => {
+test('an equivalent retry leaves its feedback row unchanged, takes another rate slot, and sends one confirmation', async () => {
   const db = fakeDb();
   const attemptedOnceKeys = [];
   const deliveredOnceKeys = new Set();
@@ -280,7 +280,7 @@ test('an equivalent retry with the same submissionKey writes no data and sends o
   await handler(fakeReq({ body }), res1);
   assert.equal(res1.statusCode, 201);
   assert.equal(feedbackRows().length, 1);
-  const storedAfterFirstAttempt = [...db.store.entries()];
+  const storedAfterFirstAttempt = structuredClone(db.store.get(`feedback/${submissionKey}`));
 
   // Simulate the client never seeing res1 (e.g. the connection dropped) and
   // retrying the same normalized submission.
@@ -294,12 +294,52 @@ test('an equivalent retry with the same submissionKey writes no data and sends o
   assert.equal(res2.statusCode, 201);
   assert.equal(res2.body.id, res1.body.id);
   assert.equal(feedbackRows().length, 1, 'the retry must not create a second row');
-  assert.deepEqual([...db.store.entries()], storedAfterFirstAttempt, 'the retry must not consume another rate-limit slot');
+  assert.deepEqual(db.store.get(`feedback/${submissionKey}`), storedAfterFirstAttempt);
+  const [, rateLimit] = [...db.store.entries()].find(([key]) => key.startsWith('feedback_rate_limits/'));
+  assert.equal(rateLimit.requests.length, 2, 'the retry must consume another rate-limit slot');
 
   // The retry reaches the email core so a dropped first send can recover,
   // but the stable onceKey lets that core deliver only one confirmation.
   assert.equal(attemptedOnceKeys.length, 2);
   assert.equal(attemptedOnceKeys[0], attemptedOnceKeys[1]);
+  assert.equal(deliveredOnceKeys.size, 1);
+});
+
+test('identical retries are rate-limited after five requests without another row or email', async () => {
+  const db = fakeDb();
+  const attemptedOnceKeys = [];
+  const deliveredOnceKeys = new Set();
+  const handler = createSubmitFeedbackHandler({
+    db,
+    now: () => NOW,
+    sendEmail: async (mail) => {
+      attemptedOnceKeys.push(mail.onceKey);
+      if (deliveredOnceKeys.has(mail.onceKey)) return { status: 'duplicate' };
+      deliveredOnceKeys.add(mail.onceKey);
+      return { status: 'sent' };
+    },
+    getConfig: async () => ({ event: { name: 'Test Summit', sender: {} } }),
+  });
+  const submissionKey = 'bounded-retry-0123456789';
+  const body = realBody({ submissionKey, email: 'attendee@example.org' });
+
+  for (let i = 0; i < internals.RATE_LIMIT_MAX; i += 1) {
+    const accepted = fakeRes();
+    await handler(fakeReq({ body }), accepted);
+    assert.equal(accepted.statusCode, 201, `request ${i + 1} should succeed`);
+  }
+  const storedAfterAcceptedRequests = structuredClone(db.store.get(`feedback/${submissionKey}`));
+
+  const limited = fakeRes();
+  await handler(fakeReq({ body }), limited);
+
+  assert.equal(limited.statusCode, 429);
+  assert.equal(limited.body.error.code, 'rate-limited');
+  assert.deepEqual(db.store.get(`feedback/${submissionKey}`), storedAfterAcceptedRequests);
+  assert.equal([...db.store.keys()].filter((key) => key.startsWith('feedback/')).length, 1);
+  const [, rateLimit] = [...db.store.entries()].find(([key]) => key.startsWith('feedback_rate_limits/'));
+  assert.equal(rateLimit.requests.length, internals.RATE_LIMIT_MAX);
+  assert.equal(attemptedOnceKeys.length, internals.RATE_LIMIT_MAX);
   assert.equal(deliveredOnceKeys.size, 1);
 });
 
