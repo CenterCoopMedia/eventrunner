@@ -22,6 +22,7 @@
     "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
     "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" },
     "./announcement": { "require": "./src/announcement.cjs", "import": "./src/announcement.mjs" },
+    "./richText": { "require": "./src/richText.cjs", "import": "./src/richText.mjs" },
     "./seed": { "require": "./src/seed.cjs", "import": "./src/seed.mjs" }
   }
 }

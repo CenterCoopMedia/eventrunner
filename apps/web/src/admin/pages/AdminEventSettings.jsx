@@ -61,6 +61,7 @@ function toForm(eventConfig) {
   const legal = c.legal ?? {};
   const seo = c.seo ?? {};
   const social = c.social ?? {};
+  const slideTemplate = c.speakerResources?.slideTemplate ?? {};
   return {
     name: c.name ?? '',
     shortName: c.shortName ?? '',
@@ -113,6 +114,12 @@ function toForm(eventConfig) {
       organizerUrl: seo.organizerUrl ?? '',
     },
     social: { hashtag: social.hashtag ?? '', handles: normalizeSocialHandles(social) },
+    speakerResources: {
+      slideTemplate: {
+        label: slideTemplate.label ?? '',
+        url: slideTemplate.url ?? '',
+      },
+    },
   };
 }
 
@@ -203,6 +210,16 @@ function toPayload(form, { includeSender = true } = {}) {
     social: {
       hashtag: orNull(form.social.hashtag),
       handles: socialHandlesPayload(form.social.handles),
+    },
+    speakerResources: {
+      slideTemplate:
+        orNull(form.speakerResources.slideTemplate.label) === null
+        && orNull(form.speakerResources.slideTemplate.url) === null
+          ? null
+          : {
+            label: orNull(form.speakerResources.slideTemplate.label),
+            url: orNull(form.speakerResources.slideTemplate.url),
+          },
     },
   };
 }
@@ -315,6 +332,14 @@ export default function AdminEventSettings() {
 
   const setGroup = (group, patch) =>
     setForm((current) => ({ ...current, [group]: { ...current[group], ...patch } }));
+  const setSlideTemplate = (patch) =>
+    setForm((current) => ({
+      ...current,
+      speakerResources: {
+        ...current.speakerResources,
+        slideTemplate: { ...current.speakerResources.slideTemplate, ...patch },
+      },
+    }));
   const setDay = (index, patch) =>
     setForm((current) => ({
       ...current,
@@ -621,6 +646,28 @@ export default function AdminEventSettings() {
         errorFor={errorFor}
         placeUsage={placeUsage}
       />
+
+      <Panel
+        title="Speaker resources"
+        description="Set the external slide template link shown on the speaker dashboard. Leave both fields empty to omit it."
+      >
+        <div className="grid gap-sm sm:grid-cols-2">
+          <TextField
+            label="Slide template label"
+            value={form.speakerResources.slideTemplate.label}
+            onChange={(value) => setSlideTemplate({ label: value })}
+            error={errorFor('speakerResources.slideTemplate.label')}
+          />
+          <TextField
+            label="Slide template URL"
+            type="url"
+            value={form.speakerResources.slideTemplate.url}
+            onChange={(value) => setSlideTemplate({ url: value })}
+            error={errorFor('speakerResources.slideTemplate.url')}
+            hint="Use an absolute http:// or https:// link."
+          />
+        </div>
+      </Panel>
 
       <Panel
         title="Registration"

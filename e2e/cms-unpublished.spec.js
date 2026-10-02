@@ -61,12 +61,27 @@ test.describe.serial('unpublished changes', () => {
     await saveSubtitle(page, pageId, subtitle);
     await expect(banner(page)).toHaveAttribute('data-pending-total', '1');
     await expect(banner(page)).toContainText('1 unpublished change: 1 content block.');
+    const countRef = adminDb().collection('cmsMeta').doc('pending');
+    expect((await countRef.get()).data().counts.cmsContent).toBe(1);
+    // An existing deployment can have dirty drafts before the count store
+    // exists. The mounted client asks the authenticated server to rebuild
+    // it, without downloading those draft rows into the shell.
+    await countRef.delete();
+    await expect.poll(async () => (await countRef.get()).data()?.counts?.cmsContent).toBe(1);
+    // An older function during rollout can leave a valid overcount. The
+    // authenticated repair rebuilds it without changing any draft.
+    await countRef.update({ 'counts.cmsContent': 8 });
+    await expect(banner(page)).toHaveAttribute('data-pending-total', '8');
+    const repaired = await callFunction('cmsEnsurePendingCounts', { force: true }, await adminIdToken());
+    expect(repaired.status, JSON.stringify(repaired.body)).toBe(200);
+    await expect(banner(page)).toHaveAttribute('data-pending-total', '1');
+    expect((await countRef.get()).data().counts.cmsContent).toBe(1);
     // Above the title band, never under it.
     const bannerBox = await banner(page).boundingBox();
     const bandBox = await page.locator('main header.admin-job-line').boundingBox();
     expect(bannerBox.y + bannerBox.height).toBeLessThanOrEqual(bandBox.y + 0.5);
 
-    // (d) The page states the same count, from the same source.
+    // (d) The page derives the same count from the committed draft rows.
     const bannerText = await banner(page).locator('p').evaluate((node) => node.firstChild.textContent);
     await banner(page).getByRole('link', { name: 'Review unpublished changes' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Unpublished changes' })).toBeVisible();
@@ -84,6 +99,7 @@ test.describe.serial('unpublished changes', () => {
     await page.getByRole('button', { name: 'Publish 1 content block' }).click();
     await expect(page.getByRole('heading', { name: 'Nothing is waiting to be published' })).toBeVisible();
     await expect(page.locator('main').getByText('Published. The public site picks it up live.')).toBeVisible();
+    expect((await countRef.get()).data().counts.cmsContent).toBe(0);
     await expect(figure(page)).toHaveCount(0);
     await page.getByRole('link', { name: 'Pages', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Pages' })).toBeVisible();

@@ -32,6 +32,7 @@
  */
 
 const { scrubLinkLabel } = require('shared/urlSafety');
+const { isSessionMaterialStoragePath } = require('./policy.cjs');
 
 const MATERIALS = 'session_materials';
 const MATERIALS_PUBLIC = 'session_materials_public';
@@ -100,6 +101,53 @@ function sameProjection(a, b) {
   );
 }
 
+/**
+ * Remove the private object behind a deleted browser upload. Legacy file
+ * registrations can share an operator-managed object, so only the new
+ * byte-upload path sets `managedStorageObject`. The current canonical doc
+ * is checked first because Firestore events can arrive late: a delete event
+ * must not remove bytes used by a record recreated at the same id. A
+ * Storage failure rejects so the retrying trigger can try again; deleting
+ * an already-absent object remains successful.
+ */
+async function cleanupDeletedMaterialFile({ db, bucket, materialId, deletedMaterial, log = console }) {
+  if (
+    !deletedMaterial
+    || deletedMaterial.type !== 'file'
+    || deletedMaterial.managedStorageObject !== true
+  ) {
+    return { action: 'unchanged' };
+  }
+  const current = await db.collection(MATERIALS).doc(materialId).get();
+  if (current.exists) return { action: 'unchanged' };
+
+  const { sessionId, storagePath } = deletedMaterial;
+  if (!isSessionMaterialStoragePath(storagePath, sessionId)) {
+    log.error('Deleted file material carried an invalid Storage path; refusing cleanup', {
+      materialId,
+      sessionId,
+    });
+    return { action: 'invalid-path' };
+  }
+  await bucket.file(storagePath).delete({ ignoreNotFound: true });
+  return { action: 'deleted', storagePath };
+}
+
+function createHandleSessionMaterialWritten({ db, bucket, log = console }) {
+  const sync = createSyncSessionMaterialPublic({ db, log });
+  return async ({ materialId, before }) => {
+    const projection = await sync({ materialId });
+    const file = await cleanupDeletedMaterialFile({
+      db,
+      bucket,
+      materialId,
+      deletedMaterial: before,
+      log,
+    });
+    return { projection, file };
+  };
+}
+
 /** Deployable export (spec §1.3 materials/): the projection trigger. */
 function buildHandlers() {
   const { onDocumentWritten } = require('firebase-functions/v2/firestore');
@@ -107,12 +155,14 @@ function buildHandlers() {
 
   return {
     syncSessionMaterialPublic: onDocumentWritten(
-      { region, document: 'session_materials/{materialId}' },
+      { region, document: 'session_materials/{materialId}', retry: true },
       async (event) => {
         const { getDb } = require('../core/firestore.cjs');
+        const { getStorage } = require('firebase-admin/storage');
         const db = getDb();
-        const handler = createSyncSessionMaterialPublic({ db });
-        await handler({ materialId: event.params.materialId });
+        const handler = createHandleSessionMaterialWritten({ db, bucket: getStorage().bucket() });
+        const before = event.data?.before?.exists ? event.data.before.data() : null;
+        await handler({ materialId: event.params.materialId, before });
       },
     ),
   };
@@ -120,6 +170,8 @@ function buildHandlers() {
 
 module.exports = {
   createSyncSessionMaterialPublic,
+  cleanupDeletedMaterialFile,
+  createHandleSessionMaterialWritten,
   get handlers() {
     return buildHandlers();
   },

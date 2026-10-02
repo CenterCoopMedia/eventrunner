@@ -8,6 +8,7 @@ const {
   validateBadgesConfig,
   validateFeatures,
   MAX_SOCIAL_LABEL_LENGTH,
+  MAX_SPEAKER_RESOURCE_LABEL_LENGTH,
   MAX_MILESTONES,
   MAX_MILESTONE_LABEL_LENGTH,
   MAX_REGISTRATION_GOAL,
@@ -718,6 +719,58 @@ test('validateEventConfig refuses a malformed social block and hashtag by name',
   for (const social of ['x', [], 3]) {
     const bad = validateEventConfig({ ...VALID_EVENT, social });
     assert.ok(bad.errors.includes('social: must be an object or null'), JSON.stringify(social));
+  }
+});
+
+test('validateEventConfig accepts an optional speaker slide template link', () => {
+  const configured = validateEventConfig({
+    ...VALID_EVENT,
+    speakerResources: {
+      slideTemplate: {
+        label: 'Presentation template',
+        url: 'https://slides.example.org/template',
+      },
+    },
+  });
+  assert.deepEqual(configured, { ok: true, errors: [] });
+
+  for (const speakerResources of [undefined, null, {}, { slideTemplate: null }]) {
+    assert.equal(
+      validateEventConfig({ ...VALID_EVENT, speakerResources }).ok,
+      true,
+      JSON.stringify(speakerResources),
+    );
+  }
+});
+
+test('validateEventConfig names unsafe or malformed speaker resource fields', () => {
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    speakerResources: {
+      slideTemplate: {
+        label: 'x'.repeat(MAX_SPEAKER_RESOURCE_LABEL_LENGTH + 1),
+        url: 'javascript:alert(1)',
+        icon: 'slides',
+      },
+      privateNotes: true,
+    },
+  });
+  assert.equal(result.ok, false);
+  for (const prefix of [
+    'speakerResources.privateNotes: unknown speaker resource field',
+    `speakerResources.slideTemplate.label: must be at most ${MAX_SPEAKER_RESOURCE_LABEL_LENGTH} characters`,
+    'speakerResources.slideTemplate.url: must be an absolute http:// or https:// link',
+    'speakerResources.slideTemplate.icon: unknown resource link field',
+  ]) {
+    assert.ok(result.errors.some((error) => error.startsWith(prefix)), prefix);
+  }
+
+  for (const speakerResources of ['x', [], { slideTemplate: [] }]) {
+    assert.equal(
+      validateEventConfig({ ...VALID_EVENT, speakerResources }).ok,
+      false,
+      JSON.stringify(speakerResources),
+    );
   }
 });
 

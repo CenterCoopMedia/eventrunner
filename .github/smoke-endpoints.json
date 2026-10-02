@@ -11,6 +11,7 @@
     "cmsSavePage",
     "cmsDeletePage",
     "cmsPublish",
+    "cmsEnsurePendingCounts",
     "cmsGetPublishQueue",
     "cmsUpdatePublishStatus",
     "cmsSaveUpdate",

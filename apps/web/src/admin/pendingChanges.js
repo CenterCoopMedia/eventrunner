@@ -1,8 +1,7 @@
 // The Unpublished changes page's pure helpers (issue #196). Imported by the
 // lazy page only, so none of this rides in the admin entry chunk.
 //
-// The rows come from the shell's one count (PendingChangesContext): the
-// dirty drafts of each publishable collection. The runs are the
+// The rows are loaded by the page's useDirtyDrafts hook. The runs are the
 // cmsPublishQueue rows cmsPublish writes (functions/src/cms/publish.cjs),
 // read as the progress and failure record beside them.
 import { zoneLabel } from '../lib/eventTime.js';
@@ -114,7 +113,7 @@ export function draftStateOf(draft) {
 /**
  * The page's rows: per collection in the admin's order, every dirty draft,
  * newest save first and then by id. Nothing is filtered, so each
- * collection's row count is its share of the shell's count. `name` is cut
+ * collection's row count is its share of the page's count. `name` is cut
  * at 80 characters for the row; `fullName` is the whole name, for readers.
  *
  * @param {Record<string, Array<object>>} docsByCollection

@@ -12,10 +12,12 @@ import { Link, MemoryRouter } from 'react-router-dom';
 // cmsPages overlay (a stale /p/... doc, a doc under a reserved prefix) that
 // could never round-trip through cmsSavePage today, matching data already
 // sitting in Firestore from before issue #52.
-const { subscriptions, subscribeContentCollection } = vi.hoisted(() => {
+const { subscriptions, configSubscriptions, subscribeContentCollection } = vi.hoisted(() => {
   const subscriptions = new Map();
+  const configSubscriptions = new Map();
   return {
     subscriptions,
+    configSubscriptions,
     subscribeContentCollection: vi.fn((name, readSource, onNext) => {
       subscriptions.set(name, onNext);
       return () => subscriptions.delete(name);
@@ -23,7 +25,10 @@ const { subscriptions, subscribeContentCollection } = vi.hoisted(() => {
   };
 });
 vi.mock('../lib/configSource.js', () => ({
-  subscribeConfigDoc: () => () => {},
+  subscribeConfigDoc: (docId, onNext) => {
+    configSubscriptions.set(docId, onNext);
+    return () => configSubscriptions.delete(docId);
+  },
 }));
 vi.mock('../lib/contentSource.js', () => ({
   subscribeContentCollection,
@@ -239,6 +244,26 @@ describe('ContentPage (catch-all route)', () => {
     expect(headings.at(-1)).toHaveTextContent('Venue map');
     expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
     expect(screen.getByText(eventConfig.venue.places[0].name)).toBeInTheDocument();
+  });
+
+  it('keeps an area-map section when it has no CMS blocks', async () => {
+    renderAt('/travel');
+    const blocksWithoutLocalLinks = Object.entries(siteContent)
+      .map(([id, block]) => ({ id, ...block }))
+      .filter((block) => block.section !== 'travel_local');
+    act(() => {
+      subscriptions.get('cmsContent')(blocksWithoutLocalLinks);
+      configSubscriptions.get('event')({
+        ...eventConfig,
+        venue: { ...eventConfig.venue, map: null },
+      });
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Around the venue' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'OpenStreetMap of the area around the venue' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Nothing here yet')).toBeNull();
   });
 
   it('404s cleanly on an unknown path', async () => {

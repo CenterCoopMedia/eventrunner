@@ -1038,6 +1038,64 @@ test('milestones are editable on config/event and merge over the stored doc', as
   assert.equal(internals.EVENT_EDITABLE_KEYS.includes('milestones'), true);
 });
 
+test('speaker resources persist as a nested partial, preserve other config, and clear with null', async () => {
+  const stored = validEvent({
+    tagline: 'Keep this event copy.',
+    social: { hashtag: '#Example', handles: [] },
+  });
+  const deps = makeDeps({ 'config/event': stored });
+  const saved = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({
+      event: {
+        speakerResources: {
+          slideTemplate: {
+            label: 'Presentation template',
+            url: 'https://slides.example.org/template',
+          },
+        },
+      },
+    }),
+    saved,
+  );
+  assert.equal(saved.statusCode, 200, JSON.stringify(saved.body));
+  const written = deps.db.docs.get('config/event');
+  assert.deepEqual(written.speakerResources.slideTemplate, {
+    label: 'Presentation template',
+    url: 'https://slides.example.org/template',
+  });
+  assert.equal(written.tagline, stored.tagline);
+  assert.deepEqual(written.social, stored.social);
+
+  const cleared = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({ event: { speakerResources: { slideTemplate: null } } }),
+    cleared,
+  );
+  assert.equal(cleared.statusCode, 200, JSON.stringify(cleared.body));
+  assert.equal(deps.db.docs.get('config/event').speakerResources.slideTemplate, null);
+});
+
+test('an unsafe speaker resource is refused without changing the stored config', async () => {
+  const stored = validEvent();
+  const deps = makeDeps({ 'config/event': stored });
+  const res = makeRes();
+  await createUpdateEventConfigHandler(deps)(
+    makeReq({
+      event: {
+        speakerResources: {
+          slideTemplate: { label: 'Slides', url: 'javascript:alert(1)' },
+        },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /speakerResources\.slideTemplate\.url/);
+  assert.equal(deps.db.writes.length, 0);
+  assert.equal(deps.db.docs.get('config/event').speakerResources, undefined);
+});
+
 test('an empty milestone list clears the stored one', async () => {
   const deps = makeDeps({ 'config/event': { ...validEvent(), milestones: MILESTONES } });
   const res = makeRes();

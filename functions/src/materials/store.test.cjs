@@ -2,10 +2,14 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const { Storage } = require('@google-cloud/storage');
 
 const {
   addSessionMaterialLink,
   uploadSessionMaterial,
+  uploadSessionMaterialBytes,
+  uploadSessionMaterialRequest,
   updateSessionMaterial,
   deleteSessionMaterial,
   deleteMaterialsForSession,
@@ -15,11 +19,13 @@ const {
     NotAuthorizedError,
     InvalidUrlError,
     InvalidStoragePathError,
+    InvalidMaterialUploadError,
     MaterialFileNotFoundError,
     MaterialFileTooLargeError,
     MaterialFileSizeUnavailableError,
     MaterialCapExceededError,
     MAX_MATERIALS_PER_SESSION,
+    decodeMaterialUpload,
     sendStoreError,
   },
 } = require('./store.cjs');
@@ -55,7 +61,10 @@ function fakeDb(seed = {}) {
       return {
         doc: (id) => docRef(name, id ?? `auto-${++counter}`),
         where(field, _op, value) {
-          return {
+          const query = {
+            limit() {
+              return query;
+            },
             async get() {
               const rows = [...docs.entries()]
                 .filter(([k]) => k.startsWith(`${name}/`))
@@ -64,6 +73,7 @@ function fakeDb(seed = {}) {
               return { empty: rows.length === 0, docs: rows };
             },
           };
+          return query;
         },
       };
     },
@@ -122,6 +132,86 @@ function fakeBucket({ exists = true, size = MAX_MATERIAL_FILE_BYTES } = {}) {
         async getMetadata() {
           state.metadataCalls += 1;
           return [{ size }];
+        },
+      };
+    },
+  };
+}
+
+function fakeWritableBucket() {
+  const state = {
+    paths: [],
+    savedBytes: null,
+    saveOptions: null,
+    deletedPaths: [],
+    deleteOptions: [],
+  };
+  return {
+    state,
+    file(path) {
+      state.paths.push(path);
+      return {
+        async save(bytes, options) {
+          state.savedBytes = bytes;
+          state.saveOptions = options;
+        },
+        async exists() {
+          return [state.savedBytes != null && !state.deletedPaths.includes(path)];
+        },
+        async getMetadata() {
+          return [{
+            size: state.savedBytes?.length,
+            generation: '1',
+            metadata: state.saveOptions?.metadata?.metadata,
+          }];
+        },
+        async delete(options) {
+          state.deletedPaths.push(path);
+          state.deleteOptions.push(options);
+        },
+      };
+    },
+  };
+}
+
+function fakeRejectedSaveBucket({ error, createsObject, existingObject = null }) {
+  const state = {
+    object: existingObject,
+    deletedPaths: [],
+    deleteOptions: [],
+    metadataCalls: 0,
+  };
+  return {
+    state,
+    file(path) {
+      return {
+        async save(bytes, options) {
+          if (createsObject) {
+            state.object = {
+              bytes,
+              generation: '7',
+              metadata: options.metadata?.metadata,
+            };
+          }
+          throw error;
+        },
+        async getMetadata() {
+          state.metadataCalls += 1;
+          if (!state.object) {
+            const notFound = new Error('not found');
+            notFound.code = 404;
+            throw notFound;
+          }
+          return [{
+            size: state.object.bytes.length,
+            generation: state.object.generation,
+            metadata: state.object.metadata,
+          }];
+        },
+        async delete(options) {
+          state.deletedPaths.push(path);
+          state.deleteOptions.push(options);
+          state.object = null;
         },
       };
     },
@@ -261,6 +351,7 @@ test('uploadSessionMaterial: file materials are never scrubbed even when URL-sha
   });
   assert.equal(material.filename, 'slides.pdf');
   assert.equal(material.type, 'file');
+  assert.equal(Object.hasOwn(material, 'managedStorageObject'), false);
 });
 
 test('uploadSessionMaterial: refuses a path outside the material session before any write', async () => {
@@ -365,6 +456,419 @@ test('uploadSessionMaterial: checks session authorization before reading Storage
   assert.equal(bucket.state.fileCalls, 0);
 });
 
+test('uploadSessionMaterial: validates registered filenames but keeps the missing-name fallback', async () => {
+  for (const filename of [`${'a'.repeat(241)}.pdf`, 'slides\u0000.pdf']) {
+    const db = fakeDb(seedSession('s1'));
+    const bucket = fakeBucket();
+    await assert.rejects(
+      uploadSessionMaterial({
+        db,
+        bucket,
+        sessionId: 's1',
+        storagePath: 'session-materials/s1/slides.pdf',
+        filename,
+        actor: ADMIN,
+        now,
+      }),
+      InvalidMaterialUploadError,
+    );
+    assert.equal(bucket.state.fileCalls, 0);
+    assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false);
+  }
+
+  const db = fakeDb(seedSession('s1'));
+  const { material } = await uploadSessionMaterial({
+    db,
+    bucket: fakeBucket(),
+    sessionId: 's1',
+    storagePath: 'session-materials/s1/slides.pdf',
+    filename: '   ',
+    actor: ADMIN,
+    now,
+  });
+  assert.equal(material.filename, 'Untitled file');
+});
+
+// ------------------------------------------------------- browser byte uploads
+
+test('uploadSessionMaterialBytes: own-session bytes use a fresh server path and register pending', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const bucket = fakeWritableBucket();
+  const { id, material } = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+  });
+
+  assert.match(material.storagePath, /^session-materials\/s1\/auto-\d+$/);
+  assert.equal(material.type, 'file');
+  assert.equal(material.reviewStatus, 'pending');
+  assert.equal(material.submittedBySpeakerId, 'spk-1');
+  assert.equal(material.managedStorageObject, true);
+  assert.equal(bucket.state.savedBytes.toString(), 'synthetic slides');
+  const uploadAttempt = bucket.state.saveOptions.metadata.metadata.eventrunnerUploadAttempt;
+  assert.deepEqual(bucket.state.saveOptions, {
+    resumable: false,
+    preconditionOpts: { ifGenerationMatch: 0 },
+    metadata: {
+      contentType: 'application/pdf',
+      cacheControl: 'private, max-age=0, no-store',
+      metadata: {
+        uploadedBy: 'speaker-uid',
+        eventrunnerUploadAttempt: uploadAttempt,
+      },
+    },
+  });
+  assert.match(uploadAttempt, /^[\da-f-]{36}$/u);
+  assert.notEqual(uploadAttempt, material.storagePath.split('/').at(-1));
+  assert.equal(db.docs.get(`session_materials/${id}`).storagePath, material.storagePath);
+  assert.equal(db.docs.get(`session_materials/${id}`).managedStorageObject, true);
+  assert.equal(db.docs.get('cmsSchedule/s1').materialCount, 1);
+});
+
+test('uploadSessionMaterialBytes: a foreign speaker is refused before bytes are decoded or Storage is read', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const bucket = fakeWritableBucket();
+  await assert.rejects(
+    uploadSessionMaterialBytes({
+      db,
+      bucket,
+      sessionId: 's1',
+      data: 'not base64',
+      contentType: 'application/pdf',
+      filename: 'slides.pdf',
+      actor: speaker('spk-2'),
+      now,
+    }),
+    NotAuthorizedError,
+  );
+  assert.deepEqual(bucket.state.paths, []);
+});
+
+test('uploadSessionMaterialBytes: a transaction-time authorization loss removes only the new object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const runTransaction = db.runTransaction;
+  db.runTransaction = (fn) => {
+    db.docs.set('cmsSchedule/s1', { title: 'Fixture session', speakerIds: ['spk-2'] });
+    return runTransaction(fn);
+  };
+  const bucket = fakeWritableBucket();
+  await assert.rejects(
+    uploadSessionMaterialBytes({
+      db,
+      bucket,
+      sessionId: 's1',
+      data: Buffer.from('synthetic slides').toString('base64'),
+      contentType: 'application/pdf',
+      filename: 'slides.pdf',
+      actor: speaker('spk-1'),
+      now,
+    }),
+    NotAuthorizedError,
+  );
+  assert.equal(bucket.state.deletedPaths.length, 1);
+  assert.match(bucket.state.deletedPaths[0], /^session-materials\/s1\/auto-\d+$/);
+  assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false);
+});
+
+test('uploadSessionMaterialBytes: a lost registration response keeps bytes referenced by the committed row', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const registrationError = new Error('Firestore lost the commit response');
+  const runTransaction = db.runTransaction;
+  db.runTransaction = async (fn) => {
+    await runTransaction(fn);
+    throw registrationError;
+  };
+  const bucket = fakeWritableBucket();
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() {} },
+  }).catch((caught) => caught);
+
+  const storedMaterials = [...db.docs.entries()]
+    .filter(([key]) => key.startsWith('session_materials/'));
+  assert.equal(error, registrationError);
+  assert.equal(storedMaterials.length, 1);
+  assert.equal(storedMaterials[0][1].storagePath, bucket.state.paths[0]);
+  assert.deepEqual(bucket.state.deletedPaths, []);
+});
+
+test('uploadSessionMaterialBytes: an unavailable registration check preserves the uploaded object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const registrationError = new Error('Firestore transaction failed');
+  db.runTransaction = async () => { throw registrationError; };
+  const collection = db.collection.bind(db);
+  db.collection = (name) => {
+    const ref = collection(name);
+    if (name !== 'session_materials') return ref;
+    return {
+      ...ref,
+      where() {
+        const query = {
+          limit() { return query; },
+          async get() { throw new Error('Firestore unavailable'); },
+        };
+        return query;
+      },
+    };
+  };
+  const bucket = fakeWritableBucket();
+  let logged = 0;
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() { logged += 1; } },
+  }).catch((caught) => caught);
+
+  assert.equal(error, registrationError);
+  assert.deepEqual(bucket.state.deletedPaths, []);
+  assert.equal(logged, 1);
+});
+
+test('uploadSessionMaterialBytes: an ambiguous save failure removes only this attempt\'s object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const saveError = new Error('Storage lost the response after writing');
+  const bucket = fakeRejectedSaveBucket({ error: saveError, createsObject: true });
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() {} },
+  }).catch((caught) => caught);
+
+  assert.equal(error, saveError);
+  assert.equal(bucket.state.object, null);
+  assert.equal(bucket.state.deletedPaths.length, 1);
+  assert.match(bucket.state.deletedPaths[0], /^session-materials\/s1\/auto-\d+$/);
+  assert.deepEqual(bucket.state.deleteOptions, [{
+    ignoreNotFound: true,
+    ifGenerationMatch: '7',
+  }]);
+});
+
+test('uploadSessionMaterialBytes: the installed SDK sends the cleanup generation precondition', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const saveError = new Error('Storage lost the response after writing');
+  const file = new Storage({ projectId: 'demo-eventrunner' })
+    .bucket('eventrunner-fixture')
+    .file('session-materials/s1/sdk-fixture');
+  let savedMetadata;
+  file.save = async (_bytes, options) => {
+    savedMetadata = options.metadata.metadata;
+    throw saveError;
+  };
+  file.getMetadata = async () => [{
+    size: 1,
+    generation: '11',
+    metadata: savedMetadata,
+  }];
+
+  const serviceObjectPrototype = Object.getPrototypeOf(Object.getPrototypeOf(file));
+  const originalRequest = serviceObjectPrototype.request;
+  let deleteRequest;
+  serviceObjectPrototype.request = function request(options, callback) {
+    deleteRequest = options;
+    callback(null, {}, {});
+  };
+  try {
+    const error = await uploadSessionMaterialBytes({
+      db,
+      bucket: { file() { return file; } },
+      sessionId: 's1',
+      data: Buffer.from('x').toString('base64'),
+      contentType: 'application/pdf',
+      filename: 'slides.pdf',
+      actor: speaker('spk-1'),
+      now,
+      log: { error() {} },
+    }).catch((caught) => caught);
+    assert.equal(error, saveError);
+  } finally {
+    serviceObjectPrototype.request = originalRequest;
+  }
+
+  assert.equal(deleteRequest.method, 'DELETE');
+  assert.equal(deleteRequest.qs.ifGenerationMatch, '11');
+  assert.equal(Object.hasOwn(deleteRequest.qs, 'preconditionOpts'), false);
+});
+
+test('uploadSessionMaterialBytes: an SDK retry 412 removes this attempt\'s persisted object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const file = new Storage({ projectId: 'demo-eventrunner' })
+    .bucket('eventrunner-fixture')
+    .file('session-materials/s1/sdk-retry-fixture');
+  file.storage.retryOptions.maxRetries = 1;
+  file.storage.retryOptions.retryDelayMultiplier = 1;
+  file.storage.retryOptions.maxRetryDelay = 1;
+  file.storage.retryOptions.totalTimeout = 5;
+  file.storage.retryOptions.retryableErrorFn = (error) => error.code === 500;
+
+  let attempts = 0;
+  let storedMetadata;
+  let objectExists = false;
+  let preconditionError;
+  file.createWriteStream = (options) => {
+    attempts += 1;
+    storedMetadata = options.metadata.metadata;
+    const stream = new EventEmitter();
+    stream.end = () => {
+      queueMicrotask(() => {
+        if (attempts === 1) {
+          objectExists = true;
+          const responseLost = new Error('response lost after write');
+          responseLost.code = 500;
+          stream.emit('error', responseLost);
+          return;
+        }
+        preconditionError = new Error('object already exists');
+        preconditionError.code = 412;
+        stream.emit('error', preconditionError);
+      });
+      return stream;
+    };
+    return stream;
+  };
+  file.getMetadata = async () => [{
+    size: 1,
+    generation: '13',
+    metadata: storedMetadata,
+  }];
+  let deleteOptions;
+  file.delete = async (options) => {
+    deleteOptions = options;
+    objectExists = false;
+  };
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket: { file() { return file; } },
+    sessionId: 's1',
+    data: Buffer.from('x').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() {} },
+  }).catch((caught) => caught);
+
+  assert.equal(error, preconditionError);
+  assert.equal(attempts, 2);
+  assert.equal(objectExists, false);
+  assert.deepEqual(deleteOptions, { ignoreNotFound: true, ifGenerationMatch: '13' });
+});
+
+test('uploadSessionMaterialBytes: a create precondition failure never deletes the existing object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const saveError = new Error('At least one of the preconditions failed');
+  saveError.code = 412;
+  const existingObject = {
+    bytes: Buffer.from('existing bytes'),
+    generation: '3',
+    metadata: { eventrunnerUploadAttempt: 'another-attempt' },
+  };
+  const bucket = fakeRejectedSaveBucket({
+    error: saveError,
+    createsObject: false,
+    existingObject,
+  });
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() {} },
+  }).catch((caught) => caught);
+
+  assert.equal(error, saveError);
+  assert.equal(bucket.state.object, existingObject);
+  assert.equal(bucket.state.metadataCalls, 1);
+  assert.deepEqual(bucket.state.deletedPaths, []);
+});
+
+test('uploadSessionMaterialRequest: rejects mixed byte and storage-path variants without touching Storage', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const bucket = fakeWritableBucket();
+  await assert.rejects(
+    uploadSessionMaterialRequest({
+      db,
+      bucket,
+      body: {
+        sessionId: 's1',
+        storagePath: '',
+        data: Buffer.from('synthetic slides').toString('base64'),
+        filename: 'slides.pdf',
+      },
+      actor: speaker('spk-1'),
+      now,
+    }),
+    /Send data or storagePath, not both/,
+  );
+  assert.deepEqual(bucket.state.paths, []);
+});
+
+test('decodeMaterialUpload: accepts the exact decoded cap and rejects one byte more', () => {
+  const exact = Buffer.alloc(MAX_MATERIAL_FILE_BYTES).toString('base64');
+  assert.equal(decodeMaterialUpload(exact).length, MAX_MATERIAL_FILE_BYTES);
+  const tooLarge = Buffer.alloc(MAX_MATERIAL_FILE_BYTES + 1).toString('base64');
+  assert.throws(() => decodeMaterialUpload(tooLarge), MaterialFileTooLargeError);
+});
+
+test('uploadSessionMaterialBytes: rejects invalid filenames and media types before writing', async () => {
+  const bodies = [
+    { filename: 'slides\n.pdf', contentType: 'application/pdf' },
+    { filename: 'a'.repeat(241), contentType: 'application/pdf' },
+    { filename: 'slides.pdf', contentType: 'not a media type' },
+  ];
+  for (const body of bodies) {
+    const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+    const bucket = fakeWritableBucket();
+    await assert.rejects(
+      uploadSessionMaterialBytes({
+        db,
+        bucket,
+        sessionId: 's1',
+        data: Buffer.from('synthetic slides').toString('base64'),
+        ...body,
+        actor: speaker('spk-1'),
+        now,
+      }),
+      /must be/,
+    );
+    assert.deepEqual(bucket.state.paths, []);
+  }
+});
+
 // ------------------------------------------------------------ updateSessionMaterial
 
 test('updateSessionMaterial: admin can update filename with re-scrub applied', async () => {
@@ -389,6 +893,34 @@ test('updateSessionMaterial: the submitting speaker may edit their own pending m
     db, materialId: id, patch: { filename: 'Updated deck' }, actor: speaker('spk-1'), now,
   });
   assert.equal(material.filename, 'Updated deck');
+});
+
+test('updateSessionMaterial: invalid file renames leave the stored row unchanged', async () => {
+  for (const filename of ['   ', 'a'.repeat(241), 'slides\u0000.pdf']) {
+    const db = fakeDb({
+      'session_materials/file-1': {
+        sessionId: 's1',
+        type: 'file',
+        filename: 'slides.pdf',
+        storagePath: 'session-materials/s1/file-1',
+        reviewStatus: 'pending',
+        submittedBySpeakerId: 'spk-1',
+      },
+    });
+    const before = structuredClone(db.docs.get('session_materials/file-1'));
+
+    await assert.rejects(
+      updateSessionMaterial({
+        db,
+        materialId: 'file-1',
+        patch: { filename },
+        actor: speaker('spk-1'),
+        now,
+      }),
+      InvalidMaterialUploadError,
+    );
+    assert.deepEqual(db.docs.get('session_materials/file-1'), before);
+  }
 });
 
 test('updateSessionMaterial: a speaker may not edit a material once it is no longer pending', async () => {

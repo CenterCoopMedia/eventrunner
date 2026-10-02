@@ -2045,6 +2045,85 @@
     outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
     outline-offset: var(--admin-focus-offset);
   }
+
+  /* The Quill core editor carries only the CMS rich-text allowlist. These
+     rules replace Quill's broad theme CSS with the admin room's tokens and
+     cover only the formats RichTextEditor registers. */
+  .ql-container {
+    position: relative;
+  }
+  .ql-clipboard {
+    position: absolute;
+    left: -100000px;
+    top: 50%;
+    height: 1px;
+    overflow-y: hidden;
+  }
+  .admin-rich-text {
+    @apply min-h-48 overflow-y-auto px-sm py-xs font-admin-ui text-admin-base text-admin-ink;
+    outline: none;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+  .admin-rich-text > * {
+    cursor: text;
+  }
+  .admin-rich-text p,
+  .admin-rich-text ol,
+  .admin-rich-text blockquote,
+  .admin-rich-text .ql-code-block-container {
+    @apply mt-xs first:mt-0;
+  }
+  .admin-rich-text ol {
+    @apply ps-lg;
+  }
+  .admin-rich-text li {
+    @apply mt-2xs;
+    display: list-item;
+  }
+  .admin-rich-text li[data-list='bullet'] {
+    list-style-type: disc;
+  }
+  .admin-rich-text li[data-list='ordered'] {
+    list-style-type: decimal;
+  }
+  .admin-rich-text li > .ql-ui {
+    display: none;
+  }
+  .admin-rich-text h2,
+  .admin-rich-text h3,
+  .admin-rich-text h4 {
+    @apply mt-sm font-admin-ui font-bold text-admin-ink first:mt-0;
+  }
+  .admin-rich-text h2 {
+    @apply text-admin-xl;
+  }
+  .admin-rich-text h3 {
+    @apply text-admin-lg;
+  }
+  .admin-rich-text h4 {
+    @apply text-admin-base;
+  }
+  .admin-rich-text a {
+    @apply text-admin-ink-link underline underline-offset-2;
+  }
+  .admin-rich-text blockquote {
+    @apply border-s-admin-strong border-admin-rule-strong ps-sm text-admin-ink-secondary;
+  }
+  .admin-rich-text code,
+  .admin-rich-text .ql-code-block-container {
+    @apply rounded-admin-small bg-admin-ground-soft px-2xs py-3xs font-admin-data text-admin-sm;
+  }
+  .admin-rich-text .ql-code-block-container {
+    @apply overflow-x-auto p-sm;
+  }
+  .admin-rich-text hr {
+    @apply my-sm border-t-admin-hairline border-admin-rule-strong;
+  }
+  .admin-rich-text.ql-blank::before {
+    @apply pointer-events-none absolute start-sm end-sm italic text-admin-ink-data;
+    content: attr(data-placeholder);
+  }
   /* And one on the rail, where the action blue would sink into the ground. */
   .admin-rail :focus-visible {
     outline-color: rgb(var(--admin-focus-ring-rail-rgb));

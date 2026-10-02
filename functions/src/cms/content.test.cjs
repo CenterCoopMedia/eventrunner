@@ -188,6 +188,49 @@ test('cmsCreateContent writes a dirty draft only — never the live collection',
   });
 });
 
+test('cmsCreateContent sanitizes rich text before validation and storage', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        section: 'info',
+        field: 'body',
+        fields: {
+          blockType: 'richtext',
+          value: '<p onclick="bad()"><strong>Kept</strong> <a href="javascript:bad()">link</a></p>' +
+            '<img src="data:image/png;base64,abc"><iframe class="ql-video">gone</iframe>' +
+            '<span class="ql-formula" data-value="x"></span>',
+        },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(
+    db.read('cmsContent_drafts', 'info__body').value,
+    '<p><strong>Kept</strong> <a>link</a></p>',
+  );
+});
+
+test('cmsCreateContent rejects required rich text emptied by sanitization', async () => {
+  const db = makeFakeDb();
+  const res = fakeRes();
+  await createCmsCreateContentHandler(deps(db))(
+    req({
+      body: {
+        section: 'info',
+        field: 'body',
+        fields: { blockType: 'richtext', value: '<img src="x"><video>gone</video>' },
+      },
+    }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^value: is required/);
+  assert.equal(db.read('cmsContent_drafts', 'info__body'), undefined);
+});
+
 test('cmsCreateContent → 409 when a draft or live doc already exists', async () => {
   const db = makeFakeDb({ 'cmsContent_drafts/hero__title': { value: 'x', status: 'dirty', visible: true } });
   let res = fakeRes();
@@ -486,6 +529,48 @@ test('cmsUpdateContent merges fields onto the existing draft; live stays untouch
   assert.equal(db.writes.some((w) => w.path.startsWith('cmsContent/')), false);
 });
 
+test('cmsUpdateContent sanitizes a merged legacy rich-text value even when another field changes', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/faq__answer': {
+      section: 'faq',
+      field: 'answer',
+      blockType: 'faq_item',
+      question: 'What changed?',
+      answer: '<p onclick="bad()">The answer.</p><script>bad()</script>',
+      status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'faq', field: 'answer', fields: { question: 'What is new?' } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const draft = db.read('cmsContent_drafts', 'faq__answer');
+  assert.equal(draft.question, 'What is new?');
+  assert.equal(draft.answer, '<p>The answer.</p>');
+});
+
+test('cmsUpdateContent applies rich-text deletion before required validation and keeps the prior draft on refusal', async () => {
+  const original = {
+    section: 'faq',
+    field: 'answer',
+    blockType: 'faq_item',
+    question: 'What changed?',
+    answer: '<p>The answer.</p>',
+    status: 'dirty',
+  };
+  const db = makeFakeDb({ 'cmsContent_drafts/faq__answer': original });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: { section: 'faq', field: 'answer', fields: { answer: DELETE_FIELD_SENTINEL } } }),
+    res,
+  );
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /^answer: is required/);
+  assert.deepEqual(db.read('cmsContent_drafts', 'faq__answer'), original);
+});
+
 test('cmsUpdateContent drops a field explicitly marked with DELETE_FIELD_SENTINEL', async () => {
   // A cmsContent block switching type (apps/web/src/admin) needs to clear
   // the OLD type's now-irrelevant fields, which the merge-onto-the-prior-
@@ -561,7 +646,7 @@ test('cmsUpdateContent → 404 when neither draft nor live doc exists', async ()
 
 // --- cmsDeleteContent ---------------------------------------------------------
 
-test('cmsDeleteContent removes live and draft in one batch and logs the action', async () => {
+test('cmsDeleteContent removes live and draft in one transaction and logs the action', async () => {
   const db = makeFakeDb({
     'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 },
     'cmsContent_drafts/hero__title': { value: 'draft', visible: true, status: 'clean', basedOnRevision: 1 },
@@ -575,7 +660,7 @@ test('cmsDeleteContent removes live and draft in one batch and logs the action',
   assert.deepEqual(res.body.deleted, ['cmsContent/hero__title', 'cmsContent_drafts/hero__title']);
   assert.equal(db.read('cmsContent', 'hero__title'), undefined);
   assert.equal(db.read('cmsContent_drafts', 'hero__title'), undefined);
-  assert.equal(db.commitCount, 1);
+  assert.equal(db.commitCount, 0, 'deleteBoth owns one transaction, not a write batch');
   assert.equal(db.ids('admin_logs').length, 1);
 });
 

@@ -82,10 +82,14 @@ vi.mock('firebase/firestore', () => {
   };
 });
 
-// The admin shell counts unpublished changes on every screen (issue #196)
-// through its own seam. By default each read answers once with nothing, so
-// a shell test sees zero changes and needs no mock of its own; a test that
-// steers the count overrides this with vi.mocked(...) or its own vi.mock.
+// The shell reads one count document; full draft rows load on their page.
+vi.mock('@/admin/pendingCountsSource.js', () => ({
+  subscribePendingCounts: vi.fn((_initialize, onNext) => {
+    onNext({ cmsContent: 0, cmsPages: 0, cmsSchedule: 0, cmsOrganizations: 0, cmsUpdates: 0, cmsTimeline: 0 });
+    return () => {};
+  }),
+}));
+// Empty page rows are the default unless a test steers the subscription.
 vi.mock('@/admin/pendingChangesSource.js', () => ({
   subscribeDirtyDrafts: vi.fn((_collection, onNext) => {
     onNext([]);

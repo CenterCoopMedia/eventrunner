@@ -155,6 +155,18 @@ describe('validateRequiredContent', () => {
     expect(validateRequiredContent(content)).toEqual([]);
   });
 
+  it('treats empty editor markup as an empty required rich-text field', () => {
+    for (const value of ['', '<p><br></p>', '<p>&nbsp;</p>']) {
+      expect(validateRequiredContent({ blockType: 'richtext', values: { value } })).toEqual([
+        { field: 'value', message: 'value: is required.' },
+      ]);
+    }
+    expect(validateRequiredContent({
+      blockType: 'richtext',
+      values: { value: '<p><strong>Formatted words</strong></p>' },
+    })).toEqual([]);
+  });
+
   it('requires a block type to be chosen at all', () => {
     expect(validateRequiredContent(blankContent(''))).toEqual([
       { field: 'blockType', message: 'blockType: choose a block type before saving.' },

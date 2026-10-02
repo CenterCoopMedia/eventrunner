@@ -48,6 +48,7 @@ const {
   validateOrganizationFields,
 } = require('./organizations.cjs');
 const { TIMELINE_COLLECTION, validateTimelineFields } = require('./timeline.cjs');
+const { sanitizeRichTextFields } = require('./richText.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const PAGE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -477,7 +478,9 @@ function createCmsCreateContentHandler({ db, auth, getConfig, now = Date.now, lo
           db,
           tx,
           collection,
-          fields: omitDeletedFields(withoutSeedFlag({ ...checked.fields, ...extraFields })),
+          fields: sanitizeRichTextFields(
+            omitDeletedFields(withoutSeedFlag({ ...checked.fields, ...extraFields })),
+          ),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
 
@@ -589,7 +592,9 @@ function createCmsUpdateContentHandler({ db, auth, getConfig, now = Date.now, lo
           db,
           tx,
           collection,
-          fields: omitDeletedFields(withoutSeedFlag({ ...base, ...checked.fields, ...extraFields })),
+          fields: sanitizeRichTextFields(
+            omitDeletedFields(withoutSeedFlag({ ...base, ...checked.fields, ...extraFields })),
+          ),
         });
         if (!references.ok) throw new RequestError(400, 'bad-request', references.message);
 

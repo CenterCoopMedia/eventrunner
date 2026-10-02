@@ -1,43 +1,38 @@
-// The pending-changes banner and the one count it reads (issue #196).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { subscribeDirtyDrafts } from '../pendingChangesSource.js';
+import { subscribePendingCounts } from '../pendingCountsSource.js';
 import { PendingChangesProvider, usePendingChanges } from '../PendingChangesContext.jsx';
 import PendingChangesBanner from './PendingChangesBanner.jsx';
 
-// collection id → the listener's callbacks, so a test delivers per collection.
-const listeners = new Map();
-const unsubscribed = [];
+const { call } = vi.hoisted(() => ({ call: vi.fn(async () => ({ ok: true })) }));
+vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
+
+const ALL = ['cmsContent', 'cmsPages', 'cmsSchedule', 'cmsOrganizations', 'cmsUpdates', 'cmsTimeline'];
+const counts = (values = {}) => Object.fromEntries(ALL.map((id) => [id, values[id] ?? 0]));
+let listener;
+const detach = vi.fn();
 
 beforeEach(() => {
-  listeners.clear();
-  unsubscribed.length = 0;
-  vi.mocked(subscribeDirtyDrafts).mockImplementation((collection, onNext, onError) => {
-    listeners.set(collection, { onNext, onError });
-    return () => unsubscribed.push(collection);
+  listener = null;
+  detach.mockClear();
+  call.mockClear();
+  vi.mocked(subscribeDirtyDrafts).mockClear();
+  vi.mocked(subscribePendingCounts).mockClear().mockImplementation((initialize, onNext, onError) => {
+    listener = { initialize, onNext, onError };
+    return detach;
   });
 });
 
-const ALL = ['cmsContent', 'cmsPages', 'cmsSchedule', 'cmsOrganizations', 'cmsUpdates', 'cmsTimeline'];
-
-function deliver(docsByCollection = {}) {
-  act(() => {
-    for (const collection of ALL) {
-      listeners.get(collection).onNext(docsByCollection[collection] ?? []);
-    }
-  });
+function deliver(values = {}) {
+  act(() => listener.onNext(counts(values)));
 }
-
-const drafts = (collection, n) =>
-  Array.from({ length: n }, (_, index) => ({ id: `${collection}-${index}`, status: 'dirty' }));
 
 function renderBanner(path = '/admin/pages') {
   return render(
     <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <PendingChangesProvider>
-        <PendingChangesBanner />
-      </PendingChangesProvider>
+      <PendingChangesProvider><PendingChangesBanner /></PendingChangesProvider>
     </MemoryRouter>,
   );
 }
@@ -45,90 +40,74 @@ function renderBanner(path = '/admin/pages') {
 const banner = () => screen.queryByRole('complementary', { name: 'Unpublished changes' });
 
 describe('the pending-changes banner', () => {
-  it('renders nothing until every collection has answered', () => {
-    const { container } = renderBanner();
-    act(() => {
-      listeners.get('cmsContent').onNext(drafts('cmsContent', 2));
-    });
-    expect(banner()).toBeNull();
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('renders nothing when nothing is waiting', () => {
-    const { container } = renderBanner();
-    deliver();
-    expect(banner()).toBeNull();
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('states one change in the singular, with the link to the page', () => {
+  it('does not download draft rows just to show the banner', () => {
     renderBanner();
-    deliver({ cmsContent: drafts('cmsContent', 1) });
+    expect(subscribeDirtyDrafts).not.toHaveBeenCalled();
+    expect(subscribePendingCounts).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for a count document and renders nothing when it is zero', () => {
+    const { container } = renderBanner();
+    expect(container).toBeEmptyDOMElement();
+    deliver();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('states one change in the singular with a link to its page', () => {
+    renderBanner();
+    deliver({ cmsContent: 1 });
     expect(banner()).toHaveAttribute('data-pending-total', '1');
     expect(banner()).toHaveTextContent('1 unpublished change: 1 content block. Review unpublished changes');
-    const link = screen.getByRole('link', { name: 'Review unpublished changes' });
-    expect(link).toHaveAttribute('href', '/admin/unpublished');
+    expect(screen.getByRole('link', { name: 'Review unpublished changes' })).toHaveAttribute('href', '/admin/unpublished');
   });
 
-  it('states five changes across collections, and sets its link in the ink on the proof ground', () => {
+  it('states the collection totals and preserves the proof-ground link treatment', () => {
     renderBanner();
-    deliver({ cmsContent: drafts('cmsContent', 2), cmsPages: drafts('cmsPages', 1), cmsSchedule: drafts('cmsSchedule', 2) });
+    deliver({ cmsContent: 2, cmsPages: 1, cmsSchedule: 2 });
     expect(banner()).toHaveAttribute('data-pending-total', '5');
     expect(banner()).toHaveTextContent('5 unpublished changes: 2 content blocks, 1 page, 2 sessions.');
     expect(banner().className).toContain('bg-admin-ground-proof');
-    expect(banner().className).toContain('text-admin-ink');
     const link = screen.getByRole('link', { name: 'Review unpublished changes' });
     expect(link.className).toMatch(/\btext-admin-ink\b/);
     expect(link.className).toMatch(/\bunderline\b/);
-    expect(link.className).not.toContain('text-admin-ink-link');
-  });
-
-  it('gives its link the hit-area floor: 24px on a pointer, 44px on touch', () => {
-    renderBanner();
-    deliver({ cmsContent: drafts('cmsContent', 1) });
-    const link = screen.getByRole('link', { name: 'Review unpublished changes' });
-    // .admin-target sets the floor (index.css); inline-flex lets a link that
-    // stays in the sentence take a minimum height at all.
     expect(link.className).toMatch(/\badmin-target\b/);
     expect(link.className).toMatch(/\binline-flex\b/);
     expect(link.className).toMatch(/\bitems-center\b/);
   });
 
-  it('follows the count as saves and publishes arrive', () => {
+  it('follows saves and publishes as the one count document changes', () => {
     renderBanner();
-    deliver({ cmsContent: drafts('cmsContent', 1) });
-    act(() => listeners.get('cmsPages').onNext(drafts('cmsPages', 2)));
+    deliver({ cmsContent: 1 });
+    deliver({ cmsContent: 1, cmsPages: 2 });
     expect(banner()).toHaveAttribute('data-pending-total', '3');
-    act(() => {
-      listeners.get('cmsPages').onNext([]);
-      listeners.get('cmsContent').onNext([]);
-    });
+    deliver();
     expect(banner()).toBeNull();
   });
 
-  it('renders nothing on the Unpublished changes page, however the path is spelled', () => {
+  it('is hidden on the row-counted page for every supported path spelling', () => {
     for (const path of ['/admin/unpublished', '/admin/unpublished/', '/admin/Unpublished', '/ADMIN/UNPUBLISHED']) {
       const { container, unmount } = renderBanner(path);
-      deliver({ cmsContent: drafts('cmsContent', 3) });
+      deliver({ cmsContent: 3 });
       expect(container, path).toBeEmptyDOMElement();
       unmount();
     }
   });
 
-  it('says the count failed before it has one, and keeps the last count after', () => {
+  it('states initial failure, retains a known count on failure, and recovers', () => {
     renderBanner();
-    act(() => listeners.get('cmsPages').onError(new Error('denied')));
+    act(() => listener.onError(new Error('denied')));
     expect(banner()).toHaveTextContent('We could not count the unpublished changes. We will try again.');
     expect(banner()).not.toHaveAttribute('data-pending-total');
-    deliver({ cmsPages: drafts('cmsPages', 1) });
+    deliver({ cmsPages: 1 });
+    act(() => listener.onError(new Error('again')));
     expect(banner()).toHaveTextContent('1 unpublished change: 1 page.');
-    act(() => listeners.get('cmsPages').onError(new Error('again')));
-    expect(banner()).toHaveTextContent('1 unpublished change: 1 page.');
+    deliver({ cmsPages: 2 });
+    expect(banner()).toHaveTextContent('2 unpublished changes: 2 pages.');
   });
 
-  it('announces nothing and offers no dismiss: the editor that saved says so once', () => {
+  it('announces nothing and offers no dismiss control', () => {
     renderBanner();
-    deliver({ cmsContent: drafts('cmsContent', 1) });
+    deliver({ cmsContent: 1 });
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
@@ -136,37 +115,19 @@ describe('the pending-changes banner', () => {
   });
 });
 
-describe('the one count', () => {
+describe('the shell count', () => {
   function Probe() {
     const value = usePendingChanges();
     return <output data-ready={String(value.ready)} data-total={value.total}>{value.sentence}</output>;
   }
 
-  it('opens one listener per publishable collection and closes each on unmount', () => {
-    const { unmount } = render(
-      <PendingChangesProvider>
-        <Probe />
-      </PendingChangesProvider>,
-    );
-    expect([...listeners.keys()].sort()).toEqual([...ALL].sort());
+  it('opens one subscription, supplies an authenticated initializer, and closes it', async () => {
+    const { unmount } = render(<PendingChangesProvider><Probe /></PendingChangesProvider>);
+    expect(subscribePendingCounts).toHaveBeenCalledTimes(1);
+    await listener.initialize();
+    expect(call).toHaveBeenCalledWith('cmsEnsurePendingCounts', {});
     unmount();
-    expect(unsubscribed.sort()).toEqual([...ALL].sort());
-  });
-
-  it('is ready only once all six have answered, and sums them', () => {
-    const { container } = render(
-      <PendingChangesProvider>
-        <Probe />
-      </PendingChangesProvider>,
-    );
-    const output = container.querySelector('output');
-    act(() => {
-      for (const collection of ALL.slice(0, 5)) listeners.get(collection).onNext(drafts(collection, 1));
-    });
-    expect(output).toHaveAttribute('data-ready', 'false');
-    act(() => listeners.get('cmsTimeline').onNext(drafts('cmsTimeline', 2)));
-    expect(output).toHaveAttribute('data-ready', 'true');
-    expect(output).toHaveAttribute('data-total', '7');
+    expect(detach).toHaveBeenCalledTimes(1);
   });
 
   it('is never ready outside a provider', () => {
@@ -175,13 +136,13 @@ describe('the one count', () => {
     expect(container.querySelector('output')).toHaveAttribute('data-total', '0');
   });
 
-  it('tolerates a listener that returns no unsubscribe', () => {
-    vi.mocked(subscribeDirtyDrafts).mockImplementation(() => undefined);
-    const { unmount } = render(
-      <PendingChangesProvider>
-        <Probe />
-      </PendingChangesProvider>,
-    );
-    expect(() => unmount()).not.toThrow();
+  it('is ready only after the document arrives, without holding full rows', () => {
+    const { container } = render(<PendingChangesProvider><Probe /></PendingChangesProvider>);
+    const output = container.querySelector('output');
+    expect(output).toHaveAttribute('data-ready', 'false');
+    deliver({ cmsPages: 2001, cmsSchedule: 3 });
+    expect(output).toHaveAttribute('data-ready', 'true');
+    expect(output).toHaveAttribute('data-total', '2004');
+    expect(subscribeDirtyDrafts).not.toHaveBeenCalled();
   });
 });

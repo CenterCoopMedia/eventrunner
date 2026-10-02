@@ -2,10 +2,9 @@
 // site, per collection, with the publish actions beside it and the publish
 // runs under it.
 //
-// TWO RECORDS, KEPT APART. The rows are the dirty drafts of each publishable
-// collection, read from the shell's one count (PendingChangesContext), so
-// this page's figure, its rows and the banner on every other screen are the
-// same number. The publish runs (cmsPublishQueue) are a different thing:
+// The page loads dirty draft rows only while it is open and derives its
+// figure from those rows. The shell's count-document banner is hidden here.
+// The publish runs (cmsPublishQueue) are a different thing:
 // the progress and failure record of each cmsPublish call. They sit in
 // their own panel and never count unpublished work.
 //
@@ -24,7 +23,7 @@ import { Link } from 'react-router-dom';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
-import { usePendingChanges } from '../PendingChangesContext.jsx';
+import { useDirtyDrafts } from '../useDirtyDrafts.js';
 import { subscribeFailedPublishRuns, subscribeRecentPublishRuns } from '../publishRunsSource.js';
 import { countWords } from '../collectionWords.js';
 import { summarizePublish } from '../publishResult.js';
@@ -268,7 +267,7 @@ function usePublishRuns() {
 }
 
 export default function AdminUnpublishedChanges() {
-  const { ready, error, docsByCollection, total, sentence } = usePendingChanges();
+  const { ready, error, docsByCollection, total, sentence } = useDirtyDrafts();
   const { rows: pages } = useAdminPages();
   const { eventConfig } = useEventConfig();
   const timeZone = typeof eventConfig?.timezone === 'string' && eventConfig.timezone ? eventConfig.timezone : undefined;

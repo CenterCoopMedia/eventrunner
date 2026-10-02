@@ -77,6 +77,10 @@ const SOCIAL_KEYS = Object.freeze(['hashtag', 'handles']);
  * on one service apart in the site footer.
  */
 const SOCIAL_HANDLE_KEYS = Object.freeze(['platform', 'handle', 'url']);
+/** Keys `config/event.speakerResources` may carry. */
+const SPEAKER_RESOURCE_KEYS = Object.freeze(['slideTemplate']);
+/** Keys one configured speaker resource link may carry. */
+const SPEAKER_RESOURCE_LINK_KEYS = Object.freeze(['label', 'url']);
 /**
  * The longest service name, and the longest handle, one social account may
  * carry: the same 40 speaker.cjs caps a speaker's social label at (a test
@@ -85,6 +89,7 @@ const SOCIAL_HANDLE_KEYS = Object.freeze(['platform', 'handle', 'url']);
  * module is not.
  */
 const MAX_SOCIAL_LABEL_LENGTH = 40;
+const MAX_SPEAKER_RESOURCE_LABEL_LENGTH = 80;
 // A hashtag is one word. A space would end it wherever it is posted.
 const HASHTAG_RE = /^\S+$/;
 
@@ -761,6 +766,50 @@ function validateEventConfig(event) {
     }
   }
 
+  // THE SPEAKER RESOURCE BLOCK (issue #215): optional links supplied by an
+  // operator. Seeded CMS pages provide their own labels and paths; this
+  // block only carries resources that have no CMS page of their own.
+  //
+  // The URL uses the same shared safety rule as every other operator link.
+  // Both this validator and the renderer call safeUrlHref, so the browser is
+  // sent to the exact canonical href that passed validation.
+  const speakerResources = event.speakerResources;
+  if (speakerResources != null) {
+    if (typeof speakerResources !== 'object' || Array.isArray(speakerResources)) {
+      errors.push('speakerResources: must be an object or null');
+    } else {
+      for (const key of Object.keys(speakerResources)) {
+        if (!SPEAKER_RESOURCE_KEYS.includes(key)) {
+          errors.push(`speakerResources.${key}: unknown speaker resource field`);
+        }
+      }
+      const slideTemplate = speakerResources.slideTemplate;
+      if (slideTemplate != null) {
+        if (typeof slideTemplate !== 'object' || Array.isArray(slideTemplate)) {
+          errors.push('speakerResources.slideTemplate: must be an object or null');
+        } else {
+          for (const key of Object.keys(slideTemplate)) {
+            if (!SPEAKER_RESOURCE_LINK_KEYS.includes(key)) {
+              errors.push(`speakerResources.slideTemplate.${key}: unknown resource link field`);
+            }
+          }
+          if (!isNonEmptyString(slideTemplate.label)) {
+            errors.push('speakerResources.slideTemplate.label: must be a nonempty string');
+          } else if (slideTemplate.label.trim().length > MAX_SPEAKER_RESOURCE_LABEL_LENGTH) {
+            errors.push(
+              `speakerResources.slideTemplate.label: must be at most ${MAX_SPEAKER_RESOURCE_LABEL_LENGTH} characters`,
+            );
+          }
+          if (!safeUrlHref(slideTemplate.url)) {
+            errors.push(
+              'speakerResources.slideTemplate.url: must be an absolute http:// or https:// link',
+            );
+          }
+        }
+      }
+    }
+  }
+
   return { ok: errors.length === 0, errors };
 }
 
@@ -1100,6 +1149,9 @@ module.exports = {
   SOCIAL_KEYS,
   SOCIAL_HANDLE_KEYS,
   MAX_SOCIAL_LABEL_LENGTH,
+  SPEAKER_RESOURCE_KEYS,
+  SPEAKER_RESOURCE_LINK_KEYS,
+  MAX_SPEAKER_RESOURCE_LABEL_LENGTH,
   MILESTONE_KEYS,
   MAX_MILESTONES,
   MAX_MILESTONE_LABEL_LENGTH,

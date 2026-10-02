@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 let authValue;
 let configValue;
+let contentValue;
 let profileValue;
 
 vi.mock('../contexts/AuthContext.jsx', () => ({
@@ -11,6 +12,9 @@ vi.mock('../contexts/AuthContext.jsx', () => ({
 }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => configValue,
+}));
+vi.mock('../contexts/ContentContext.jsx', () => ({
+  useContent: () => contentValue,
 }));
 vi.mock('../contexts/ProfileContext.jsx', () => ({
   useProfile: () => profileValue,
@@ -26,6 +30,23 @@ vi.mock('../components/LiveUpdatesCard.jsx', () => ({
 }));
 vi.mock('../components/SignInPanel.jsx', () => ({
   default: () => <div>Sign in panel fixture</div>,
+}));
+vi.mock('../components/speaker/SpeakerStatusHeader.jsx', () => ({
+  default: ({ scheduleData, speakerId }) => (
+    <section aria-label="Speaker event status fixture">
+      {speakerId}:{scheduleData.length}
+    </section>
+  ),
+}));
+vi.mock('../components/speaker/SpeakerSessionHub.jsx', () => ({
+  default: ({ scheduleData, speakerId }) => (
+    <section aria-label="Speaker session hub fixture">
+      {speakerId}:{scheduleData.length}
+    </section>
+  ),
+}));
+vi.mock('../components/speaker/SpeakerResourceCard.jsx', () => ({
+  default: () => <div data-testid="speaker-resources-fixture" />,
 }));
 
 const { default: SpeakerDashboard } = await import('./SpeakerDashboard.jsx');
@@ -64,7 +85,8 @@ function renderPage(initialEntry) {
 
 beforeEach(() => {
   authValue = { user: { uid: 'u1', getIdToken: async () => 'token' }, loading: false };
-  configValue = { features: { liveUpdates: true } };
+  configValue = { eventConfig: {}, features: { liveUpdates: true } };
+  contentValue = { scheduleData: [{ id: 'session-one' }] };
   profileValue = {
     profile: { speakerId: 'rae-okonkwo', displayName: 'Rae Okonkwo' },
     status: 'ready',
@@ -84,6 +106,12 @@ describe('the speaker dashboard shell', () => {
       '/speaker/profile',
     );
     expect(screen.getByText('Live updates')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Speaker event status fixture' })).toHaveTextContent(
+      'rae-okonkwo:1',
+    );
+    expect(screen.getByRole('region', { name: 'Speaker session hub fixture' })).toHaveTextContent(
+      'rae-okonkwo:1',
+    );
     expect(getOwnSpeakerProfileMock).toHaveBeenCalledWith({
       user: authValue.user,
       speakerId: 'rae-okonkwo',
@@ -157,7 +185,7 @@ describe('the speaker dashboard shell', () => {
   });
 
   it('leaves the updates area out when the event disables it', async () => {
-    configValue = { features: { liveUpdates: false } };
+    configValue = { eventConfig: {}, features: { liveUpdates: false } };
     renderPage();
     expect(await screen.findByText('Accepted')).toBeInTheDocument();
     expect(screen.queryByText('Live updates')).toBeNull();

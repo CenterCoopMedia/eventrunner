@@ -1,5 +1,7 @@
 'use strict';
 
+const { hasRichTextContent } = require('shared/richText');
+
 /**
  * Code-resident CMS registries (spec §5.2, §8.4).
  *
@@ -228,11 +230,12 @@ function requiredBlockErrors(fields) {
   if (blockType === 'stat') return statContractErrors(fields);
   return BLOCK_TYPES[blockType].fields
     .filter((entry) => entry.required && entry.type !== 'boolean')
-    .filter((entry) => (
-      fields[entry.id] === undefined
-      || fields[entry.id] === null
-      || String(fields[entry.id]).trim().length === 0
-    ))
+    .filter((entry) => {
+      if (entry.type === 'richtext') return !hasRichTextContent(fields[entry.id]);
+      return fields[entry.id] === undefined
+        || fields[entry.id] === null
+        || String(fields[entry.id]).trim().length === 0;
+    })
     .map((entry) => `${entry.id}: is required for block type "${blockType}".`);
 }
 

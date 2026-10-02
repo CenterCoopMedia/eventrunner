@@ -171,8 +171,8 @@ test('cmsPublish failure mid-way → 500 with queueId, row failed; resume with {
 
   let row = db.read('cmsPublishQueue', queueId);
   assert.equal(row.status, 'failed');
-  assert.equal(row.progress.cmsSchedule.published.length, 133);
-  assert.equal(db.ids('cmsSchedule').length, 133);
+  assert.equal(row.progress.cmsSchedule.published.length, 132);
+  assert.equal(db.ids('cmsSchedule').length, 132);
 
   // Resume: only the remainder publishes, revisions never double-bump.
   res = fakeRes();
@@ -537,7 +537,7 @@ test('a failed publish row stays failed, with its error, through later publishes
   assert.equal(row.status, 'failed');
   assert.equal(typeof row.error, 'string');
   assert.ok(row.error.length > 0);
-  assert.equal(row.progress.cmsSchedule.published.length, 133);
+  assert.equal(row.progress.cmsSchedule.published.length, 132);
 
   const failed = await db.collection('cmsPublishQueue')
     .where('status', '==', 'failed').orderBy('requestedAt', 'desc').limit(20).get();

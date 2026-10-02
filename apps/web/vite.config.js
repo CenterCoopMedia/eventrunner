@@ -28,6 +28,7 @@ export default defineConfig({
       'shared/time',
       'shared/registration',
       'shared/announcement',
+      'shared/richText',
       'shared/config',
       'shared/routing',
       'shared/page',

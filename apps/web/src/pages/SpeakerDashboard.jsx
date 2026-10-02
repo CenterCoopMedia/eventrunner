@@ -9,12 +9,16 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
+import SpeakerSessionHub from '../components/speaker/SpeakerSessionHub.jsx';
+import SpeakerResourceCard from '../components/speaker/SpeakerResourceCard.jsx';
+import SpeakerStatusHeader from '../components/speaker/SpeakerStatusHeader.jsx';
 import { secondaryActionClass } from '../components/controlClasses.js';
 import { getOwnSpeakerProfile } from '../lib/speakerProfileApi.js';
 import { isSpeakerDashboardEligible } from '../lib/speakerDashboardEligibility.js';
@@ -35,7 +39,8 @@ const statusCardClass =
 
 export default function SpeakerDashboard() {
   const { user, loading: authLoading } = useAuth();
-  const { features } = useEventConfig();
+  const { eventConfig, features } = useEventConfig();
+  const { scheduleData } = useContent();
   const { profile, status: accountStatus } = useProfile();
   const speakerId = profile?.speakerId ?? null;
   const [load, setLoad] = useState({ status: 'idle', speaker: null, error: null });
@@ -127,6 +132,20 @@ export default function SpeakerDashboard() {
           Welcome back{name ? `, ${name}` : ''}. This is your place at the event.
         </p>
       </header>
+
+      <SpeakerStatusHeader
+        eventConfig={eventConfig}
+        scheduleData={scheduleData}
+        speakerId={speakerId}
+      />
+
+      <SpeakerSessionHub
+        eventConfig={eventConfig}
+        scheduleData={scheduleData}
+        speakerId={speakerId}
+      />
+
+      <SpeakerResourceCard />
 
       <div className="mt-xl grid items-start gap-lg lg:grid-cols-2">
         <section aria-labelledby="speaker-status-heading" className={statusCardClass}>
