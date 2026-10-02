@@ -25,6 +25,7 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({
 
 import AdminVersionHistory from './AdminVersionHistory.jsx';
 import { unavailableButtonClass } from '../components/formControls.jsx';
+import { DELETE_FIELD_SENTINEL } from '../contentDoc.js';
 
 const DOC_PATH = 'cmsContent/hero__subtitle';
 // 2:02 PM on Sep 23, 2026 in New York.
@@ -73,7 +74,7 @@ function serverError(status, code, text) {
  * repeats); an Error entry is thrown, and a function entry is called for
  * a promise the test controls. The page calls no other endpoint.
  */
-function serve({ pages = [{ entries: [EDITED, SEEDED], nextCursor: null }] } = {}) {
+function serve({ pages = [{ entries: [EDITED, SEEDED], nextCursor: null }], others = {} } = {}) {
   let n = 0;
   callMock.mockImplementation((name, body) => {
     if (name === 'cmsGetVersionHistory') {
@@ -83,6 +84,9 @@ function serve({ pages = [{ entries: [EDITED, SEEDED], nextCursor: null }] } = {
       if (answer instanceof Error) return Promise.reject(answer);
       return Promise.resolve(answer);
     }
+    const answer = others[name];
+    if (answer instanceof Error) return Promise.reject(answer);
+    if (answer !== undefined) return Promise.resolve(answer);
     return Promise.reject(new Error(`unexpected call ${name}`));
   });
 }
@@ -104,6 +108,13 @@ function reportRecord({ live = [LIVE], drafts = [CLEAN_DRAFT] } = {}) {
   act(() => {
     listeners.get('cmsContent').onNext(live);
     listeners.get('cmsContent_drafts').onNext(drafts);
+  });
+}
+
+function reportPages({ live = [{ id: 'home', sections: [{ id: 'hero', allowedBlocks: ['text'] }] }], drafts = [] } = {}) {
+  act(() => {
+    listeners.get('cmsPages').onNext(live);
+    listeners.get('cmsPages_drafts').onNext(drafts);
   });
 }
 
@@ -156,9 +167,8 @@ describe('one record’s versions', () => {
       'Four days of workshops.',
     ]);
     expect(screen.getByText('This is the published version.')).toBeInTheDocument();
-    // Read only: nothing on the page changes or restores a version, and it
-    // calls nothing but the history read.
-    expect(screen.queryByRole('button', { name: /restore/i })).toBeNull();
+    // Merely reading the page does not write anything.
+    expect(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' })).toBeInTheDocument();
     expect(new Set(callMock.mock.calls.map(([name]) => name))).toEqual(new Set(['cmsGetVersionHistory']));
   });
 
@@ -432,5 +442,155 @@ describe('one record’s versions', () => {
     await renderPage(undefined, { pages: [serverError(403, 'forbidden', 'Admin access required.')] });
     expect(screen.getByRole('heading', { name: 'You don’t have access to version history' })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('restoring a version', () => {
+  it('offers a past version and not the version already live with no pending draft', async () => {
+    await renderPage();
+    expect(screen.queryByRole('button', { name: /Restore version/ })).toBeNull();
+    reportRecord();
+    expect(within(versionItem(2)).queryByRole('button', { name: /Restore/ })).toBeNull();
+    expect(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' })).toBeInTheDocument();
+  });
+
+  it('uses the destructive confirmation with the required warning when a dirty draft will be lost', async () => {
+    await renderPage();
+    reportRecord({ drafts: [{ ...CLEAN_DRAFT, value: 'Unpublished idea', status: 'dirty' }] });
+    fireEvent.click(within(versionItem(2)).getByRole('button', { name: 'Restore version 2' }));
+    const confirm = screen.getByRole('region', { name: 'Restore version 2?' });
+    expect(confirm).toHaveTextContent('The unpublished changes in the current draft go, and no version keeps them.');
+    expect(confirm).toHaveTextContent('This cannot be undone.');
+    expect(within(confirm).getByRole('button', { name: 'Keep it' })).toBeInTheDocument();
+    expect(callMock.mock.calls.filter(([name]) => name !== 'cmsGetVersionHistory')).toEqual([]);
+  });
+
+  it('uses a plain confirmation when no unpublished work will be lost, and Cancel returns focus', async () => {
+    await renderPage();
+    reportRecord();
+    const trigger = within(versionItem(1)).getByRole('button', { name: 'Restore version 1' });
+    fireEvent.click(trigger);
+    const confirm = screen.getByRole('region', { name: 'Restore version 1?' });
+    expect(within(confirm).getByRole('heading', { name: 'Restore version 1?' })).toHaveFocus();
+    expect(confirm).toHaveTextContent('Version 1 becomes the draft of this record. The site does not change until you publish.');
+    expect(confirm).not.toHaveTextContent('cannot be undone');
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('region', { name: 'Restore version 1?' })).toBeNull();
+    expect(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' })).toHaveFocus();
+  });
+
+  it('switches an open plain confirmation to the destructive warning when the draft becomes dirty', async () => {
+    await renderPage();
+    reportRecord();
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    expect(screen.getByRole('region', { name: 'Restore version 1?' })).toHaveTextContent(
+      'The site does not change until you publish.',
+    );
+
+    reportRecord({ drafts: [{ ...CLEAN_DRAFT, value: 'Another admin’s unpublished idea', status: 'dirty' }] });
+
+    const confirm = screen.getByRole('region', { name: 'Restore version 1?' });
+    expect(confirm).toHaveTextContent('The unpublished changes in the current draft go, and no version keeps them.');
+    expect(confirm).toHaveTextContent('This cannot be undone.');
+    expect(callMock.mock.calls.filter(([name]) => name !== 'cmsGetVersionHistory')).toEqual([]);
+  });
+
+  it('saves through the normal draft endpoint, then publishes only on request', async () => {
+    await renderPage(undefined, {
+      pages: [
+        { entries: [EDITED, SEEDED], nextCursor: null },
+        {
+          entries: [
+            entry(3, { changes: [{ path: 'value', kind: 'changed', before: 'Four days of workshops.', after: 'Three days of workshops.' }] }),
+            EDITED,
+            SEEDED,
+          ],
+          nextCursor: null,
+        },
+      ],
+      others: {
+        cmsUpdateContent: { status: 'dirty' },
+        cmsPublish: { queueId: 'q1', status: 'done', results: { cmsContent: { published: ['hero__subtitle'], skipped: [] } } },
+      },
+    });
+    reportRecord({ drafts: [{ ...CLEAN_DRAFT, order: 4 }] });
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Version 1 is now the draft. The site still shows version 2 until you publish.')).toBeInTheDocument(),
+    );
+    expect(callMock).toHaveBeenCalledWith('cmsUpdateContent', {
+      collection: 'cmsContent',
+      section: 'hero',
+      field: 'subtitle',
+      fields: {
+        section: 'hero', field: 'subtitle', blockType: 'text', value: 'Three days of workshops.', order: DELETE_FIELD_SENTINEL,
+      },
+      visible: true,
+    });
+    expect(callMock.mock.calls.some(([name]) => name === 'cmsPublish')).toBe(false);
+    expect(screen.getByText(/is now the draft/).closest('[tabindex="-1"]')).toHaveFocus();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish now' }));
+    await waitFor(() => expect(screen.getByText('Published. The public site picks it up live.')).toBeInTheDocument());
+    expect(callMock).toHaveBeenCalledWith('cmsPublish', { collection: 'cmsContent', docIds: ['hero__subtitle'] });
+    await waitFor(() => expect(screen.getAllByRole('heading', { level: 2 })[0]).toHaveTextContent('Version 3'));
+  });
+
+  it('keeps a refused destructive restore open, shows its rule, and clears the busy state', async () => {
+    await renderPage(undefined, {
+      others: { cmsUpdateContent: serverError(400, 'bad-request', 'title: enter a public title') },
+    });
+    reportRecord({ drafts: [{ ...CLEAN_DRAFT, value: 'Unpublished idea', status: 'dirty' }] });
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    const confirm = screen.getByRole('region', { name: 'Restore version 1?' });
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Restore as draft' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('title: enter a public title');
+    expect(alert.parentElement).toHaveFocus();
+    expect(screen.getByRole('region', { name: 'Restore version 1?' })).toBeInTheDocument();
+    expect(within(confirm).getByRole('button', { name: 'Restore as draft' })).toBeEnabled();
+  });
+
+  it('keeps Publish now available when publishing the restored draft is refused', async () => {
+    await renderPage(undefined, {
+      others: {
+        cmsUpdateContent: { status: 'dirty' },
+        cmsPublish: { queueId: 'q1', status: 'done', results: { cmsContent: { published: [], skipped: [{ docId: 'hero__subtitle', reason: 'conflict' }] } } },
+      },
+    });
+    reportRecord();
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish now' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Nothing was published'));
+    expect(screen.getByRole('button', { name: 'Publish now' })).toBeInTheDocument();
+  });
+
+  it('recreates a deleted content block as a draft with its owning page id', async () => {
+    await renderPage(undefined, { others: { cmsCreateContent: { status: 'dirty' } } });
+    reportRecord({ live: [], drafts: [] });
+    reportPages();
+    fireEvent.click(within(versionItem(2)).getByRole('button', { name: 'Restore version 2' }));
+    expect(screen.getByRole('region', { name: 'Restore version 2?' })).toHaveTextContent('The record is saved again as a draft.');
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    await waitFor(() => expect(screen.getByText('Version 2 is now the draft. Nothing is on the site until you publish.')).toBeInTheDocument());
+    expect(callMock).toHaveBeenCalledWith('cmsCreateContent', {
+      collection: 'cmsContent',
+      pageId: 'home',
+      section: 'hero',
+      field: 'subtitle',
+      fields: EDITED.fields,
+      visible: true,
+    });
+  });
+
+  it('names the section rule when a deleted block no longer has an owning page', async () => {
+    await renderPage();
+    reportRecord({ live: [], drafts: [] });
+    reportPages({ live: [{ id: 'home', sections: [{ id: 'other' }] }] });
+    expect(within(versionItem(2)).queryByRole('button', { name: /Restore/ })).toBeNull();
+    expect(versionItem(2)).toHaveTextContent('This version cannot be restored because its section is no longer on a page.');
   });
 });

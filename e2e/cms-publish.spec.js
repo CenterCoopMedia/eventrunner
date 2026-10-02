@@ -20,11 +20,13 @@ import { RETRY_DELAY_MS } from '../apps/web/src/lib/retrySubscription.js';
 const CONTENT_TIMEOUT_MS = RETRY_DELAY_MS + 15_000;
 
 test.describe.serial('CMS edit -> publish -> public visibility', () => {
-  const newSubtitle = `E2E edited subtitle ${Date.now()}`;
+  let newSubtitle;
   // Read from the database before the edit, and when the publish answered,
   // for the version history cases below.
   let oldSubtitle;
-  let publishedAt;
+  let oldRevision;
+  let publishStartedAt;
+  let publishFinishedAt;
 
   const subtitleDoc = () => adminDb().collection('cmsContent').doc('hero__subtitle');
 
@@ -56,9 +58,16 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
     await expect(subtitle).toBeVisible();
     const before = await subtitle.textContent();
-    expect(before).not.toBe(newSubtitle);
-    oldSubtitle = (await subtitleDoc().get()).data()?.value;
+    const original = (await subtitleDoc().get()).data();
+    oldSubtitle = original?.value;
+    oldRevision = original?.revision;
     expect(typeof oldSubtitle, 'the seeded subtitle holds a stored value').toBe('string');
+    expect(typeof oldRevision, 'the seeded subtitle holds a revision').toBe('number');
+    expect(before).toBe(oldSubtitle);
+    // Include the starting revision so a CI retry that resumes from an
+    // earlier attempt always writes a fresh value.
+    newSubtitle = `E2E edited subtitle ${Date.now()} from version ${oldRevision}`;
+    expect(before).not.toBe(newSubtitle);
 
     // Edit the hero subtitle block. This writes the DRAFT revision only —
     // the two-revision model (spec §8.4) — so the live/public doc, and this
@@ -85,12 +94,13 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
 
     // Publish the draft (spec §8.4 step 3) — a Firestore revision copy, not
     // a deploy.
+    publishStartedAt = Date.now();
     const published = await callFunction('cmsPublish', {
       collection: 'cmsContent',
       docIds: ['hero__subtitle'],
     }, idToken);
+    publishFinishedAt = Date.now();
     expect(published.status, `cmsPublish answered 200 (${JSON.stringify(published.body)})`).toBe(200);
-    publishedAt = Date.now();
 
     // The public page — a fresh navigation, no admin session, no
     // ?preview=1 — now shows the published change.
@@ -120,10 +130,12 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     await expect(latest.getByRole('heading', { level: 2 })).toHaveText(`Version ${live.revision}`);
     await expect(latest).toContainText(`by ${ADMIN_EMAIL}`);
 
-    // When: an instant within five minutes of the publish. A Timestamp sent
-    // unconverted would give no parseable time here.
+    // When: an instant inside the observed publish request. Capture both
+    // bounds so scheduler delay cannot make the assertion race the server.
     const dateTime = await latest.locator('time').getAttribute('dateTime');
-    expect(Math.abs(Date.parse(dateTime) - publishedAt)).toBeLessThan(5 * 60_000);
+    const versionPublishedAt = Date.parse(dateTime);
+    expect(versionPublishedAt).toBeGreaterThanOrEqual(publishStartedAt);
+    expect(versionPublishedAt).toBeLessThanOrEqual(publishFinishedAt);
 
     // What changed: the one field, the stored text before and after.
     const table = latest.getByRole('table', { name: `What changed in version ${live.revision}` });
@@ -131,6 +143,47 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     await expect(change).toHaveCount(1);
     await expect(change.getByRole('cell').nth(0)).toHaveText(oldSubtitle);
     await expect(change.getByRole('cell').nth(1)).toHaveText(newSubtitle);
+  });
+
+  test('an admin restores the older version, publishes it, and the public page gets the old value', async ({ page, browser }) => {
+    test.setTimeout(90_000);
+    const liveBeforeRestore = (await subtitleDoc().get()).data();
+    expect(liveBeforeRestore.revision).toBe(oldRevision + 1);
+    expect(liveBeforeRestore.value).toBe(newSubtitle);
+
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/versions/cmsContent/hero__subtitle');
+    await expect(page.getByRole('heading', { level: 1, name: 'hero › subtitle' })).toBeVisible();
+    const versions = page.getByRole('list', { name: 'Versions' });
+    const older = versions.getByRole('listitem').filter({
+      has: page.getByRole('heading', { level: 2, name: `Version ${oldRevision}` }),
+    });
+    await older.getByRole('button', { name: `Restore version ${oldRevision}` }).click();
+    const confirm = page.getByRole('region', { name: `Restore version ${oldRevision}?` });
+    await expect(confirm).toContainText('The site does not change until you publish.');
+    await confirm.getByRole('button', { name: 'Restore as draft' }).click();
+    await expect(page.getByText(
+      `Version ${oldRevision} is now the draft. The site still shows version ${oldRevision + 1} until you publish.`,
+    )).toBeVisible();
+
+    const visitor = await browser.newContext();
+    try {
+      const publicPage = await visitor.newPage();
+      const liveContent = publicPage.locator('article[data-cms-content-source="live"]');
+      const subtitle = publicPage.locator('article[data-content-source] > section').first().locator('p').last();
+      await publicPage.goto('/');
+      await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
+      await expect(subtitle).toHaveText(newSubtitle);
+
+      await page.getByRole('button', { name: 'Publish now' }).click();
+      await expect(page.getByText('Published. The public site picks it up live.')).toBeVisible();
+
+      await publicPage.reload();
+      await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
+      await expect(subtitle).toHaveText(oldSubtitle, { timeout: CONTENT_TIMEOUT_MS });
+    } finally {
+      await visitor.close();
+    }
   });
 });
 

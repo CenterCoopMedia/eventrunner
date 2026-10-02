@@ -1,1 +1,0 @@
-import{b as n,r as o}from"./index-DT3Vi-4V.js";import{s as c}from"./bookmarksSource-BggWst8l.js";function k(){const{user:s}=n(),[t,r]=o.useState(new Set),[u,e]=o.useState(!!s);return o.useEffect(()=>(e(!!s),c(s?.uid,a=>{r(a),e(!1)},()=>e(!1))),[s?.uid]),{bookmarkedIds:t,loading:u}}export{k as u};

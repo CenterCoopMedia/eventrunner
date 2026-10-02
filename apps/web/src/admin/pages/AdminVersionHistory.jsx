@@ -6,14 +6,15 @@
 // one docPath, 20 versions a call, and renders what the server answers: the
 // server compares each version with the one before it, so this page never
 // diffs anything itself. It reads the record's live and draft documents too
-// (useAdminRecords), for its name and its state.
-//
-// READ ONLY. A version cannot be changed or restored here: the page reads
-// history and writes nothing.
+// (useAdminRecords), for its name, its state, and what a restore replaces.
 //
 // STORED VALUES ARE TEXT. Every value, path and account is a React text
 // node. Rich text shows its tags; nothing is parsed, and a stored URL is
 // never made a link, so a `javascript:` value cannot run here.
+//
+// RESTORE. A past version can become the record's draft again. The page
+// sends the version's fields through the record's normal save endpoint, so
+// its validation and admin log still apply. Restoring never publishes.
 //
 // LATE ANSWERS. Every call takes a sequence number. An answer from a call
 // that Refresh, another record, or leaving the page has overtaken is
@@ -22,7 +23,7 @@
 //
 // FOCUS. Load older versions moves focus to the first new version's
 // heading.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -32,19 +33,24 @@ import AdminPageHeader, {
   RecordState,
 } from '../components/adminChrome.jsx';
 import {
+  DestructiveConfirm,
   Notice,
   Panel,
+  primaryButtonClass,
   secondaryButtonClass,
   unavailableButtonClass,
 } from '../components/formControls.jsx';
+import { summarizePublish } from '../publishResult.js';
 import { deadMatter } from '../recordState.js';
 import { useAdminRecords } from '../useAdminRecords.js';
 import {
   collectionChoice,
   formatClock,
   formatPublishedAt,
+  pageIdForSection,
   pathText,
   recordNameOf,
+  restoreRequestFor,
   valueText,
 } from '../versionHistory.js';
 
@@ -133,6 +139,39 @@ function ChangeTable({ entry, timeZone }) {
   );
 }
 
+/** A non-destructive restore confirmation when no unpublished work is lost. */
+function RestoreConfirm({ entry, removed, busy, error, onConfirm, onCancel, headingRef, errorRef }) {
+  const headingId = useId();
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-soft px-md py-sm"
+    >
+      <h3 id={headingId} ref={headingRef} tabIndex={-1} className="font-admin-ui text-admin-base font-bold text-admin-ink">
+        {`Restore version ${entry.revision}?`}
+      </h3>
+      <p className="max-w-[65ch] text-admin-sm text-admin-ink">
+        {`Version ${entry.revision} becomes the draft of this record.`}
+        {removed ? ' The record is saved again as a draft.' : ''}
+        {' The site does not change until you publish.'}
+      </p>
+      {error ? (
+        <div ref={errorRef} tabIndex={-1}>
+          <Notice tone="error" message={error.message} />
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-xs">
+        <button type="button" className={primaryButtonClass} disabled={busy} onClick={onConfirm}>
+          {busy ? 'Restoring…' : 'Restore as draft'}
+        </button>
+        <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export default function AdminVersionHistory() {
   const { collection, docId } = useParams();
   const choice = collectionChoice(collection);
@@ -141,6 +180,7 @@ export default function AdminVersionHistory() {
   const { eventConfig } = useEventConfig();
   const timeZone = typeof eventConfig?.timezone === 'string' && eventConfig.timezone ? eventConfig.timezone : undefined;
   const records = useAdminRecords(choice ? choice.id : null);
+  const pages = useAdminRecords(choice?.id === 'cmsContent' ? 'cmsPages' : null);
   const row = records.ready ? records.findRow(docId) : null;
 
   const [stored, setResult] = useState(null);
@@ -151,6 +191,14 @@ export default function AdminVersionHistory() {
   const [pending, setPending] = useState(null); // 'load' | 'refresh' | 'more' | null
   const [error, setError] = useState(null);
   const [focusRevision, setFocusRevision] = useState(null);
+  const [confirming, setConfirming] = useState(null);
+  const [restoringRevision, setRestoringRevision] = useState(null);
+  const [restoreError, setRestoreError] = useState(null);
+  const [restoreReset, setRestoreReset] = useState(0);
+  const [notice, setNotice] = useState(null);
+  const [publishing, setPublishing] = useState(false);
+  const [noticeFocus, setNoticeFocus] = useState(0);
+  const [returnFocus, setReturnFocus] = useState(null);
 
   const requestRef = useRef(0);
   // The latest call, read when a read starts: a new token-bound callback
@@ -158,6 +206,11 @@ export default function AdminVersionHistory() {
   const callRef = useRef(call);
   callRef.current = call;
   const headingRefs = useRef(new Map());
+  const restoreButtonRefs = useRef(new Map());
+  const confirmHeadingRef = useRef(null);
+  const confirmErrorRef = useRef(null);
+  const dirtyErrorRef = useRef(null);
+  const noticeRef = useRef(null);
 
   const load = useCallback(
     async (kind) => {
@@ -188,6 +241,9 @@ export default function AdminVersionHistory() {
     if (!docPath) return undefined;
     setResult(null);
     setError(null);
+    setConfirming(null);
+    setRestoreError(null);
+    setNotice(null);
     load('load');
     return () => {
       requestRef.current += 1;
@@ -199,6 +255,33 @@ export default function AdminVersionHistory() {
     headingRefs.current.get(focusRevision)?.focus();
     setFocusRevision(null);
   }, [focusRevision]);
+
+  useEffect(() => {
+    if (confirming !== null) confirmHeadingRef.current?.focus();
+  }, [confirming]);
+
+  // A clean draft can become dirty while the plain confirmation is open.
+  // Close that path; the destructive confirmation below stays open and names
+  // the unpublished work that the restore will replace.
+  useEffect(() => {
+    if (confirming !== null && row?.draft?.status === 'dirty') setConfirming(null);
+  }, [confirming, row?.draft?.status]);
+
+  useEffect(() => {
+    if (!restoreError) return;
+    if (confirming === restoreError.revision) confirmErrorRef.current?.focus();
+    else dirtyErrorRef.current?.focus();
+  }, [confirming, restoreError]);
+
+  useEffect(() => {
+    if (noticeFocus > 0) noticeRef.current?.focus();
+  }, [noticeFocus]);
+
+  useEffect(() => {
+    if (returnFocus === null) return;
+    restoreButtonRefs.current.get(returnFocus)?.focus();
+    setReturnFocus(null);
+  }, [returnFocus]);
 
   function refresh() {
     load('refresh');
@@ -234,6 +317,67 @@ export default function AdminVersionHistory() {
       if (requestId === requestRef.current) setError(err);
     } finally {
       if (requestId === requestRef.current) setPending(null);
+    }
+  }
+
+  function requestFor(entry) {
+    const pageId =
+      choice.id === 'cmsContent' && !row
+        ? pageIdForSection(pages.rows, entry?.fields?.section)
+        : null;
+    return restoreRequestFor(choice.id, docId, entry, row?.current ?? null, { pageId });
+  }
+
+  function openRestore(revision) {
+    setRestoreError(null);
+    setConfirming(revision);
+  }
+
+  function cancelRestore() {
+    setReturnFocus(confirming);
+    setConfirming(null);
+    setRestoreError(null);
+  }
+
+  async function restore(entry) {
+    const request = requestFor(entry);
+    if (!request || restoringRevision !== null) return;
+    setRestoringRevision(entry.revision);
+    setRestoreError(null);
+    try {
+      await callRef.current(request.endpoint, request.body);
+      setConfirming(null);
+      setRestoreReset((value) => value + 1);
+      setNotice({
+        kind: 'restored',
+        revision: entry.revision,
+        liveRevision: typeof row?.live?.revision === 'number' ? row.live.revision : null,
+      });
+      setNoticeFocus((value) => value + 1);
+    } catch (err) {
+      setRestoreError({ revision: entry.revision, error: err });
+    } finally {
+      setRestoringRevision(null);
+    }
+  }
+
+  async function publishRestored() {
+    if (publishing) return;
+    setPublishing(true);
+    try {
+      const response = await callRef.current('cmsPublish', { collection: choice.id, docIds: [docId] });
+      const verdict = summarizePublish(response, choice.id, [docId], choice.plural);
+      if (verdict.ok) {
+        setNotice({ kind: 'published', message: verdict.message });
+        load('refresh');
+      } else {
+        setNotice((current) => ({ ...current, publishError: verdict.message }));
+      }
+    } catch (err) {
+      setNotice((current) => ({ ...current, publishError: err.message }));
+    } finally {
+      setPublishing(false);
+      setNoticeFocus((value) => value + 1);
     }
   }
 
@@ -297,7 +441,45 @@ export default function AdminVersionHistory() {
     }
   }
 
+  let noticeBody = null;
+  if (notice?.kind === 'restored') {
+    const site =
+      notice.liveRevision === null
+        ? 'Nothing is on the site until you publish.'
+        : `The site still shows version ${notice.liveRevision} until you publish.`;
+    noticeBody = (
+      <div className="flex flex-col items-start gap-xs">
+        <Notice tone="info" message={`Version ${notice.revision} is now the draft. ${site}`} />
+        <button
+          type="button"
+          className={primaryButtonClass}
+          disabled={publishing}
+          aria-busy={publishing ? 'true' : undefined}
+          onClick={publishRestored}
+        >
+          {publishing ? 'Publishing…' : 'Publish now'}
+        </button>
+        {notice.publishError ? <Notice tone="error" message={notice.publishError} /> : null}
+      </div>
+    );
+  } else if (notice?.kind === 'published') {
+    noticeBody = <Notice tone="ok" message={notice.message} />;
+  }
+
   const liveRevision = typeof row?.live?.revision === 'number' ? row.live.revision : null;
+  const restoreOffered = (entry) => {
+    if (!records.ready) return false;
+    if (choice.id === 'cmsContent' && !row && !pages.ready) return false;
+    if (requestFor(entry) === null) return false;
+    return !(row?.state?.id === 'live' && liveRevision === entry.revision);
+  };
+  const sectionWasRemoved = (entry) =>
+    choice.id === 'cmsContent' &&
+    records.ready &&
+    !row &&
+    pages.ready &&
+    typeof entry?.fields?.section === 'string' &&
+    pageIdForSection(pages.rows, entry.fields.section) === null;
 
   let body = null;
   if (denied) {
@@ -367,6 +549,58 @@ export default function AdminVersionHistory() {
                   ) : null}
                 </div>
                 <ChangeTable entry={entry} timeZone={timeZone} />
+                {restoreOffered(entry) && row?.draft?.status === 'dirty' ? (
+                  <div className="flex flex-col items-start gap-xs">
+                    <DestructiveConfirm
+                      key={`${entry.revision}:${restoreReset}`}
+                      trigger={`Restore version ${entry.revision}`}
+                      title={`Restore version ${entry.revision}?`}
+                      confirmLabel="Restore as draft"
+                      busyLabel="Restoring…"
+                      disabled={restoringRevision !== null && restoringRevision !== entry.revision}
+                      busy={restoringRevision === entry.revision}
+                      consequence="The unpublished changes in the current draft go, and no version keeps them."
+                      permanence="This cannot be undone."
+                      initiallyOpen={confirming === entry.revision}
+                      onConfirm={() => restore(entry)}
+                    />
+                    {restoreError?.revision === entry.revision ? (
+                      <div ref={dirtyErrorRef} tabIndex={-1}>
+                        <Notice tone="error" message={restoreError.error.message} />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : confirming === entry.revision ? (
+                  <RestoreConfirm
+                    entry={entry}
+                    removed={!row}
+                    busy={restoringRevision === entry.revision}
+                    error={restoreError?.revision === entry.revision ? restoreError.error : null}
+                    onConfirm={() => restore(entry)}
+                    onCancel={cancelRestore}
+                    headingRef={confirmHeadingRef}
+                    errorRef={confirmErrorRef}
+                  />
+                ) : restoreOffered(entry) ? (
+                  <div>
+                    <button
+                      type="button"
+                      ref={(node) => {
+                        if (node) restoreButtonRefs.current.set(entry.revision, node);
+                        else restoreButtonRefs.current.delete(entry.revision);
+                      }}
+                      className={secondaryButtonClass}
+                      disabled={restoringRevision !== null}
+                      onClick={() => openRestore(entry.revision)}
+                    >
+                      {`Restore version ${entry.revision}`}
+                    </button>
+                  </div>
+                ) : sectionWasRemoved(entry) ? (
+                  <p className="text-admin-sm font-semibold text-admin-state-caution">
+                    This version cannot be restored because its section is no longer on a page.
+                  </p>
+                ) : null}
               </li>
             );
           })}
@@ -398,6 +632,12 @@ export default function AdminVersionHistory() {
       />
 
       {errorNotice}
+
+      {noticeBody ? (
+        <div ref={noticeRef} tabIndex={-1}>
+          {noticeBody}
+        </div>
+      ) : null}
 
       {result && entries.length > 0 && !denied ? (
         <p role="status" className="text-admin-sm text-admin-ink-secondary">

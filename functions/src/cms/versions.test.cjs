@@ -136,6 +136,7 @@ test('cmsGetVersionHistory scopes strictly to the requested docPath', async () =
   const res = fakeRes();
   await handler(db)(req({ body: { docPath: 'cmsContent/hero__subtitle' } }), res);
   assert.equal(res.body.entries.length, 1);
+  assert.equal(res.body.entries[0].fields.value, 'other');
   assert.deepEqual(res.body.entries[0].changes, [{ path: 'value', kind: 'added', before: null, after: 'other' }]);
   assert.equal(res.body.nextCursor, null);
 });
@@ -408,12 +409,12 @@ test('cmsGetVersionHistory: every entry diffs against the row before it, across 
   assert.equal(one.revision, 1);
   assert.equal(one.previousRevision, null);
   assert.deepEqual(one.changes, [{ path: 'value', kind: 'added', before: null, after: 'v1' }]);
-  // Named fields only, and the time in milliseconds.
-  // The stored snapshot is not sent: the page reads the changes only.
+  // Named fields only, with the snapshot needed for a normal editor save.
   assert.deepEqual(Object.keys(one).sort(), [
-    'changes', 'docPath', 'id', 'moreChanges', 'previousRevision', 'publishedAt',
+    'changes', 'docPath', 'fields', 'id', 'moreChanges', 'previousRevision', 'publishedAt',
     'publishedBy', 'publishedByUid', 'revision', 'visible',
   ]);
+  assert.deepEqual(one.fields, { value: 'v1' });
   assert.equal(one.publishedAt, 1000);
   assert.equal(one.publishedBy, 'admin@example.org');
   assert.equal(one.publishedByUid, null);
@@ -450,6 +451,7 @@ test('cmsGetVersionHistory sends a real Timestamp as milliseconds, never as its 
   assert.deepEqual(entry.changes, [
     { path: 'publishAt', kind: 'changed', before: PUBLISHED, after: PUBLISHED + 60_000, time: true },
   ]);
+  assert.equal(entry.fields.publishAt, new Date(PUBLISHED + 60_000).toISOString());
   const wire = JSON.stringify(res.body);
   assert.doesNotMatch(wire, /_seconds/);
   assert.equal(res.body.nextCursor, 2);

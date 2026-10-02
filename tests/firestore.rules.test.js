@@ -526,6 +526,7 @@ describe("server-only collections stay deny-all", () => {
     "email_templates",
     // The change request rate limit (issue #188), one document per account.
     "change_request_rate_limits",
+    "cmsContentSectionLocks",
     "speaker_slugs",
     "speaker_invites",
     // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
