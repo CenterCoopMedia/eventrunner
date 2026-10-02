@@ -315,14 +315,20 @@ intent and log clarity, not as a gate. `bootstrap: true` is the actual gate: it 
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).
 
-**Upgrade order for unpublished counts.** Deploy Firestore rules and Functions first. Do not create
-`cmsMeta/pending` with zero counts. On an existing site, the authenticated staff endpoint
-`cmsEnsurePendingCounts` counts all six dirty draft collections in one transaction. A draft save,
-publish, or delete also prepares a missing or invalid document before it changes the count, so this
-release needs no separate data migration. Run only the upgraded `init-event.cjs` or
-`seed-demo-event.cjs` after this deploy; each script prepares the count before its first CMS write
-and then uses the same atomic save and publish paths. This keeps existing unpublished edits counted
-and leaves a dry run read-only.
+**Upgrade order for unpublished counts.** Pause CMS saves, publishes, deletes, and seed jobs during
+the first upgrade. Deploy Firestore rules and all Functions, then wait for the deploy and any older
+in-flight CMS requests to finish. Before deploying the count-reading UI or resuming edits, make an
+authenticated staff-admin POST to `cmsEnsurePendingCounts` with JSON body `{"force":true}`. Require
+HTTP 200 with `{"ok":true}` and verify `cmsMeta/pending` against the Unpublished changes page. This
+recounts all six dirty draft collections in one transaction, including any drift caused by old and
+new function versions overlapping during deployment. Never initialize an existing site's count to
+zero. The same forced request repairs a count that is too high after an out-of-band data edit.
+
+Ordinary requests to `cmsEnsurePendingCounts` with `{}` leave a valid summary unchanged. Draft
+saves, publishes, and deletes also prepare a missing or invalid summary before changing the count.
+Run only the upgraded `init-event.cjs` or `seed-demo-event.cjs` after the deploy; each prepares the
+count before its first CMS write and uses the atomic save and publish paths. Existing unpublished
+edits remain counted, and a seed dry run remains read-only.
 
 **Step 2 — seed content**, from an operator's machine, once the bootstrap dispatch succeeds:
 
