@@ -73,6 +73,30 @@ test('a session requires its public text, day, and times in order', () => {
   ]);
 });
 
+test('legacy 12-hour session clocks compare by time instead of by string', () => {
+  assert.equal(validateSessionShape(session({
+    startTime: '9:00 AM',
+    endTime: '10:00 AM',
+  }), 'session-1').ok, true);
+
+  const reversed = validateSessionShape(session({
+    startTime: '10:00 AM',
+    endTime: '9:00 AM',
+  }), 'session-1');
+  assert.equal(reversed.ok, false);
+  assert.ok(reversed.errors.includes('endTime: must be after startTime'));
+});
+
+test('malformed session clocks are rejected by field name', () => {
+  const result = validateSessionShape(session({
+    startTime: '25:00',
+    endTime: '12:99 AM',
+  }), 'session-1');
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('startTime: must be a valid clock time'));
+  assert.ok(result.errors.includes('endTime: must be a valid clock time'));
+});
+
 // --- track (design brief §4.6) ----------------------------------------------
 
 test('a session may carry no track at all', () => {

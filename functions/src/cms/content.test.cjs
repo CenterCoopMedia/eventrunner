@@ -328,6 +328,33 @@ test('cmsCreateContent serializes concurrent creates at maxBlocks', async () => 
   assert.deepEqual(db.ids('cmsContent_drafts'), ['hero__second']);
 });
 
+test('cmsCreateContent serializes one section namespace across different pages', async () => {
+  const section = { id: 'hero', allowedBlocks: ['text'], maxBlocks: 1 };
+  const db = makeFakeDb({
+    'cmsPages/page-a': { id: 'page-a', sections: [section] },
+    'cmsPages/page-b': { id: 'page-b', sections: [section] },
+  });
+  const handler = createCmsCreateContentHandler(deps(db));
+  const first = fakeRes();
+  const second = fakeRes();
+  db.beforeCommit = async () => {
+    await handler(req({ body: {
+      pageId: 'page-b', section: 'hero', field: 'second',
+      fields: { blockType: 'text', value: 'Second' },
+    }, rawBody: true }), second);
+  };
+
+  await handler(req({ body: {
+    pageId: 'page-a', section: 'hero', field: 'first',
+    fields: { blockType: 'text', value: 'First' },
+  }, rawBody: true }), first);
+
+  assert.equal(second.statusCode, 200);
+  assert.equal(first.statusCode, 400);
+  assert.match(first.body.error.message, /^maxBlocks:/);
+  assert.deepEqual(db.ids('cmsContent_drafts'), ['hero__second']);
+});
+
 test('content create and update enforce required block fields on the server', async () => {
   const db = makeFakeDb({
     'cmsContent_drafts/hero__image': {
@@ -375,6 +402,33 @@ test('a direct session create is refused when its end is not after its start', a
   assert.equal(res.statusCode, 400);
   assert.match(res.body.error.message, /^endTime: must be after startTime/);
   assert.equal(db.read('cmsSchedule_drafts', 'backwards'), undefined);
+});
+
+test('an unrelated session edit preserves valid legacy 12-hour clocks', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule_drafts/legacy': {
+      title: 'Legacy session',
+      description: 'Before the edit.',
+      dayId: 'day-1',
+      startTime: '9:00 AM',
+      endTime: '10:00 AM',
+      status: 'dirty',
+    },
+  });
+  const res = fakeRes();
+  await createCmsUpdateContentHandler(deps(db))(
+    req({ body: {
+      collection: 'cmsSchedule',
+      docId: 'legacy',
+      fields: { description: 'After the edit.' },
+    }, rawBody: true }),
+    res,
+  );
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('cmsSchedule_drafts', 'legacy').startTime, '9:00 AM');
+  assert.equal(db.read('cmsSchedule_drafts', 'legacy').endTime, '10:00 AM');
+  assert.equal(db.read('cmsSchedule_drafts', 'legacy').description, 'After the edit.');
 });
 
 test('cmsCreateContent → 400 on unknown collection, bad keys, reserved fields', async () => {
