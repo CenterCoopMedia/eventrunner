@@ -96,7 +96,7 @@ test.describe.serial('speaker session materials', () => {
     await signIn(page, email);
     await page.goto('/speaker/dashboard');
     await expect(page.getByRole('heading', { name: 'Speaker dashboard' })).toBeVisible();
-    await expect(page.getByLabel('Session')).toHaveValue(sessionId);
+    await expect(page.getByRole('combobox', { name: 'Session', exact: true })).toHaveValue(sessionId);
 
     await page.getByRole('tab', { name: 'Materials' }).click();
     await expect(page.getByText('No materials have been sent for this session.')).toBeVisible();
