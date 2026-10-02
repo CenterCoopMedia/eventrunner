@@ -58,6 +58,10 @@ function fakeDb() {
       return fn({
         get: async (ref) => ref.get(),
         set: (ref, data) => { store.set(key(ref.__c, ref.__id), data); },
+        create: (ref, data) => {
+          if (store.has(key(ref.__c, ref.__id))) throw new Error(`ALREADY_EXISTS: document ${ref.__c}/${ref.__id} already exists`);
+          store.set(key(ref.__c, ref.__id), data);
+        },
       });
     },
   };
@@ -247,37 +251,97 @@ test('uses a valid submissionKey as the feedback doc id', async () => {
   assert.ok(db.store.has(`feedback/${key}`));
 });
 
-test('a retry with the same submissionKey after the original write committed does not duplicate the row', async () => {
+test('an equivalent retry with the same submissionKey writes no data and sends one confirmation', async () => {
   const db = fakeDb();
-  const sent = [];
-  const sendEmail = async (m) => { sent.push(m); return { status: 'sent' }; };
+  const attemptedOnceKeys = [];
+  const deliveredOnceKeys = new Set();
+  const sendEmail = async (mail) => {
+    attemptedOnceKeys.push(mail.onceKey);
+    if (deliveredOnceKeys.has(mail.onceKey)) return { status: 'duplicate' };
+    deliveredOnceKeys.add(mail.onceKey);
+    return { status: 'sent' };
+  };
   const handler = createSubmitFeedbackHandler({
     db,
     now: () => NOW,
     sendEmail,
     getConfig: async () => ({ event: { name: 'Test Summit', sender: {} } }),
   });
-  const body = realBody({ submissionKey: 'retry-key-0123456789', email: 'attendee@example.org' });
+  const submissionKey = 'retry-key-0123456789';
+  const body = realBody({
+    submissionKey,
+    message: '  The registration link is broken.  ',
+    email: 'ATTENDEE@Example.org',
+    category: 'unknown',
+  });
   const feedbackRows = () => [...db.store.keys()].filter((k) => k.startsWith('feedback/'));
 
   const res1 = fakeRes();
   await handler(fakeReq({ body }), res1);
   assert.equal(res1.statusCode, 201);
   assert.equal(feedbackRows().length, 1);
+  const storedAfterFirstAttempt = [...db.store.entries()];
 
   // Simulate the client never seeing res1 (e.g. the connection dropped) and
-  // retrying the identical submission.
+  // retrying the same normalized submission.
   const res2 = fakeRes();
-  await handler(fakeReq({ body }), res2);
+  await handler(fakeReq({ body: realBody({
+    submissionKey,
+    message: 'The registration link is broken.',
+    email: 'attendee@example.org',
+    category: 'feedback',
+  }) }), res2);
   assert.equal(res2.statusCode, 201);
   assert.equal(res2.body.id, res1.body.id);
   assert.equal(feedbackRows().length, 1, 'the retry must not create a second row');
+  assert.deepEqual([...db.store.entries()], storedAfterFirstAttempt, 'the retry must not consume another rate-limit slot');
 
-  // Both attempts derive the same onceKey from the same doc id — the real
-  // email core's email_claims store is what actually dedupes the send; this
-  // pins that both calls would present the SAME claim key to it.
-  assert.equal(sent.length, 2);
-  assert.equal(sent[0].onceKey, sent[1].onceKey);
+  // The retry reaches the email core so a dropped first send can recover,
+  // but the stable onceKey lets that core deliver only one confirmation.
+  assert.equal(attemptedOnceKeys.length, 2);
+  assert.equal(attemptedOnceKeys[0], attemptedOnceKeys[1]);
+  assert.equal(deliveredOnceKeys.size, 1);
+});
+
+test('a used submissionKey with a changed normalized field returns 409 and writes nothing', async (t) => {
+  const changes = [
+    ['message', 'A different message.'],
+    ['email', 'other@example.org'],
+    ['category', 'bug'],
+  ];
+
+  for (const [field, value] of changes) {
+    await t.test(field, async () => {
+      const db = fakeDb();
+      const sent = [];
+      const handler = createSubmitFeedbackHandler({
+        db,
+        now: () => NOW,
+        sendEmail: async (mail) => { sent.push(mail); return { status: 'sent' }; },
+        getConfig: async () => ({ event: { name: 'Test Summit', sender: {} } }),
+      });
+      const submissionKey = `conflict-${field}-0123456789`;
+      const original = realBody({
+        submissionKey,
+        message: 'The registration link is broken.',
+        email: 'attendee@example.org',
+        category: 'feedback',
+      });
+      const first = fakeRes();
+      await handler(fakeReq({ body: original }), first);
+      assert.equal(first.statusCode, 201);
+      assert.equal(sent.length, 1);
+      const storedAfterFirstAttempt = [...db.store.entries()];
+
+      const conflict = fakeRes();
+      await handler(fakeReq({ body: { ...original, [field]: value } }), conflict);
+
+      assert.equal(conflict.statusCode, 409);
+      assert.equal(conflict.body.error.code, 'conflict');
+      assert.deepEqual([...db.store.entries()], storedAfterFirstAttempt);
+      assert.equal(sent.length, 1);
+    });
+  }
 });
 
 test('a submission with no submissionKey still works (older/non-conforming callers)', async () => {

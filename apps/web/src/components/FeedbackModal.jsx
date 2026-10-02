@@ -5,12 +5,9 @@
 //     tells the server this submission is scripted.
 //   - `startedAt` (captured on mount) is the client half of the server's
 //     minimum-time gate — how long the form was open before submit.
-//   - `submissionKey` (generated once per form-open session, below) is an
-//     idempotency token: it stays the SAME across every retry of the same
-//     submission (a "Send feedback" click after a network error retries
-//     with the identical key), so a retry after a dropped response updates
-//     the same server-side doc/email claim instead of creating a duplicate
-//     row and a duplicate confirmation email (Codex P2 finding).
+//   - `submissionKey` is bound to the normalized message, email, and category.
+//     An identical retry keeps the key, while an edit takes a new key, so a
+//     dropped response cannot duplicate or silently replace the submission.
 // None of these checks are enforced here: the server is the actual gate,
 // and this modal just carries the signals it needs. Fails soft — a
 // submission error is shown inline; it never throws out of the component.
@@ -52,6 +49,7 @@
 // is what announces it.
 import { useEffect, useId, useRef, useState } from 'react';
 import { submitFeedback } from '../lib/feedbackApi.js';
+import { createSubmissionKey } from '../lib/submissionKey.js';
 import { focusFirstError, SelectField, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 
@@ -76,15 +74,7 @@ const CATEGORY_OPTIONS = [
 export default function FeedbackModal({ onClose }) {
   const titleId = useId();
   const startedAtRef = useRef(Date.now());
-  // One id per form-open session, resent unchanged on every retry — see the
-  // module comment. crypto.randomUUID() output (36 chars incl. hyphens)
-  // satisfies the server's SUBMISSION_KEY_RE (8-128 of [A-Za-z0-9_-]) once
-  // the hyphens are stripped, so the server never sees a shape it rejects.
-  const submissionKeyRef = useRef(
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID().replace(/-/g, '')
-      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`,
-  );
+  const [submissionKey] = useState(createSubmissionKey);
 
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
@@ -133,13 +123,16 @@ export default function FeedbackModal({ onClose }) {
     setSubmitting(true);
     setError(null);
     setMessageError(null);
-    const result = await submitFeedback({
+    const payload = {
       message: message.trim(),
-      email: email.trim() || undefined,
+      email: email.trim().toLowerCase() || undefined,
       category,
+    };
+    const result = await submitFeedback({
+      ...payload,
       honeypot: website,
       startedAt: startedAtRef.current,
-      submissionKey: submissionKeyRef.current,
+      submissionKey: submissionKey.keyFor(payload),
     });
     setSubmitting(false);
     if (!result.ok) {

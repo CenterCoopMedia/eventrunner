@@ -243,6 +243,34 @@ describe('FeedbackModal', () => {
     expect(secondKey).toBe(firstKey);
   });
 
+  it('takes a new submissionKey when a normalized feedback field changes after a failure', async () => {
+    submitFeedbackMock
+      .mockResolvedValueOnce({ ok: false, error: 'network blip' })
+      .mockResolvedValueOnce({ ok: false, error: 'network blip' })
+      .mockResolvedValueOnce({ ok: false, error: 'network blip' })
+      .mockResolvedValueOnce({ ok: true, id: 'f1' });
+    render(<FeedbackModal onClose={() => {}} />);
+
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+
+    fireEvent.change(screen.getByLabelText('Email (optional)'), { target: { value: 'reader@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+
+    fireEvent.change(screen.getByLabelText('What is this about?'), { target: { value: 'bug' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('alert');
+
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello again' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send feedback' }));
+    await screen.findByRole('status');
+
+    const keys = submitFeedbackMock.mock.calls.map(([payload]) => payload.submissionKey);
+    expect(new Set(keys).size).toBe(4);
+  });
+
   it('omits the confirmation mention entirely when no email was given', async () => {
     submitFeedbackMock.mockResolvedValueOnce({ ok: true, id: 'f1' });
     render(<FeedbackModal onClose={() => {}} />);
