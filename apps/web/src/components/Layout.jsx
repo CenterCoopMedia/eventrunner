@@ -73,7 +73,7 @@ import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
 import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import AnnouncementBanners from './AnnouncementBanners.jsx';
-import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 // The feedback dialog and the change request dialog (issue #188) each sit
 // behind a flag that is off by default and open only on a press, so they
@@ -89,6 +89,10 @@ function onDemand(importer) {
 }
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
+// The public model tools are optional and render no interface. Keep their
+// definitions and registration machinery out of the initial site bundle,
+// then load them only for the demo or a deployment that enables the flag.
+const PublicWebMcpRegistration = onDemand(() => import('../webmcp/PublicWebMcpRegistration.jsx'));
 
 /**
  * The page's own header, read into the theme's vocabulary.
@@ -395,7 +399,11 @@ export default function Layout() {
 
   return (
     <div className="page-surface flex min-h-screen flex-col">
-      <PublicWebMcpRegistration />
+      {IS_DEMO || features.webmcpPublic === true ? (
+        <Suspense fallback={null}>
+          <PublicWebMcpRegistration />
+        </Suspense>
+      ) : null}
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>

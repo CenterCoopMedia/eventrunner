@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 
@@ -51,6 +51,14 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 // who is reading (M7 issue 2), so the shell reads the auth state too.
 vi.mock('../contexts/AuthContext.jsx', () => ({
   useAuth: () => ({ user: authUser, loading: authLoading }),
+}));
+
+const renderPublicWebMcpRegistration = vi.fn();
+vi.mock('../webmcp/PublicWebMcpRegistration.jsx', () => ({
+  default: () => {
+    renderPublicWebMcpRegistration();
+    return null;
+  },
 }));
 
 const { default: Layout } = await import('./Layout.jsx');
@@ -104,6 +112,24 @@ function renderShell(
     </MemoryRouter>,
   );
 }
+
+describe('Layout public model tools', () => {
+  it('does not load the optional registration module when the feature is off', async () => {
+    renderPublicWebMcpRegistration.mockClear();
+    renderShell({});
+
+    await waitFor(() => expect(renderPublicWebMcpRegistration).not.toHaveBeenCalled());
+  });
+
+  it('loads the optional registration module when the feature is on', async () => {
+    renderPublicWebMcpRegistration.mockClear();
+    renderShell({}, {
+      featureFlags: { ...FIXTURE_FEATURES, webmcpPublic: true },
+    });
+
+    await waitFor(() => expect(renderPublicWebMcpRegistration).toHaveBeenCalled());
+  });
+});
 
 describe('Layout branding mark', () => {
   it('serves a seeded flat path from the bundle', () => {
