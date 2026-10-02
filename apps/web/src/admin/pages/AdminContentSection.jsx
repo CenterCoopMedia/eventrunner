@@ -34,8 +34,8 @@ export default function AdminContentSection() {
   const { pageId, sectionId } = useParams();
   const call = useAdminApi();
   const { showToast } = useToast();
-  const { findRow: findPage, loading: pagesLoading } = useAdminPages();
-  const { rows: contentRows, loading: contentLoading, error: contentError } = useAdminContent();
+  const { findRow: findPage, loading: pagesLoading, ready: pagesReady } = useAdminPages();
+  const { rows: contentRows, loading: contentLoading, ready: contentReady, error: contentError } = useAdminContent();
   const [busyId, setBusyId] = useState(null);
   const [notice, setNotice] = useState(null);
   // Blocks published in THIS session: their proof tint resolves to the base
@@ -53,7 +53,7 @@ export default function AdminContentSection() {
   // yet) — treating that as "under the cap" would let an operator start a
   // create past maxBlocks on a slow connection. Block the action instead of
   // guessing until both listeners have actually reported.
-  const atMax = contentLoading || blocks.length >= maxBlocks;
+  const atMax = !pagesReady || !contentReady || blocks.length >= maxBlocks;
 
   if ((pagesLoading || contentLoading) && !section) {
     return <AdminLoadingState label="Loading section…" />;
@@ -110,8 +110,8 @@ export default function AdminContentSection() {
         className={primaryButtonClass}
         disabled
         title={
-          contentLoading
-            ? 'Loading this section’s blocks…'
+          !pagesReady || !contentReady
+            ? 'Waiting for this section and its draft blocks…'
             : `This section already has its maximum of ${maxBlocks} blocks.`
         }
       >
