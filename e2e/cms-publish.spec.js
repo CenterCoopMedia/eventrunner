@@ -234,7 +234,25 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
       await publicPage.goto('/faq');
       await expect(publicPage.getByText(question, { exact: true })).toHaveCount(0);
 
+      // Save and publish makes two sequential requests: it first updates the
+      // draft, then publishes that exact revision. Wait for both responses
+      // to finish before starting the UI assertion's normal 10 second
+      // budget. A loaded emulator can spend most of that budget returning
+      // these small JSON responses even though both operations succeed.
+      const updateFinished = page.waitForResponse((response) =>
+        response.url().endsWith('/cmsUpdateContent') && response.request().method() === 'POST',
+      ).then(async (response) => {
+        expect(await response.finished()).toBeNull();
+        expect(response.ok()).toBe(true);
+      });
+      const publishFinished = page.waitForResponse((response) =>
+        response.url().endsWith('/cmsPublish') && response.request().method() === 'POST',
+      ).then(async (response) => {
+        expect(await response.finished()).toBeNull();
+        expect(response.ok()).toBe(true);
+      });
       await page.getByRole('button', { name: 'Save and publish' }).click();
+      await Promise.all([updateFinished, publishFinished]);
       await expect(page.locator('#admin-content').getByRole('status').filter({
         hasText: 'Published. The public site picks it up live.',
       })).toBeVisible();
