@@ -47,6 +47,7 @@ const { ZipFile } = require('yazl');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
+const { isSessionMaterialStoragePath } = require('./policy.cjs');
 
 const MATERIALS = 'session_materials';
 const ADMIN_LOGS = 'admin_logs';
@@ -334,9 +335,7 @@ async function planArchive({ db, bucket, ids, now = Date.now }) {
       refused.push(`materialIds: ${id} is a link. Only files go in an archive.`);
       continue;
     }
-    const prefix = typeof data.sessionId === 'string' && data.sessionId ? `session-materials/${data.sessionId}/` : null;
-    const path = typeof data.storagePath === 'string' ? data.storagePath : '';
-    if (!prefix || !path.startsWith(prefix) || path.length === prefix.length) {
+    if (!isSessionMaterialStoragePath(data.storagePath, data.sessionId)) {
       refused.push(`materialIds: ${id} is not stored in its session’s folder.`);
     }
   }

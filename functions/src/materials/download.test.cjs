@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 
 const {
+  createDownloadSessionMaterialHandler,
   streamMaterialFile,
   internals: { sanitizeForHeader },
 } = require('./download.cjs');
@@ -38,18 +39,63 @@ function fakeFile({ exists = true, contentType = 'application/pdf', bytes = 'fak
 function fakeRes() {
   const headers = {};
   return {
+    statusCode: null,
+    body: null,
     headersSent: false,
     set(name, value) {
       headers[name] = value;
     },
     write() {},
     end() {},
-    status() {
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
       return this;
     },
     headers,
   };
 }
+
+class MaterialNotFoundError extends Error {}
+class SessionNotFoundError extends Error {}
+class EmbargoedError extends Error {}
+
+function downloadHandler(material, bucket) {
+  return createDownloadSessionMaterialHandler({
+    db: {},
+    auth: {},
+    getConfig: async () => ({}),
+    bucket,
+    resolveActorOptional: async () => ({ uid: 'admin', isAdmin: true, speakerId: null }),
+    resolveMaterialAccess: async () => ({ material }),
+    accessErrors: { MaterialNotFoundError, SessionNotFoundError, EmbargoedError },
+    log: { error() {} },
+  });
+}
+
+test('downloadSessionMaterial: refuses a legacy path outside its session before any Storage read', async () => {
+  for (const storagePath of [
+    'branding/logo.png',
+    'session-materials/s2/slides.pdf',
+    'session-materials/s1',
+    'session-materials/s1/',
+  ]) {
+    let fileCalls = 0;
+    const handler = downloadHandler(
+      { sessionId: 's1', type: 'file', storagePath, filename: 'slides.pdf' },
+      { file() { fileCalls += 1; return fakeFile(); } },
+    );
+    const res = fakeRes();
+    await handler({ method: 'POST', body: { materialId: 'm1' } }, res);
+    assert.equal(res.statusCode, 400, storagePath);
+    assert.equal(res.body.error.code, 'bad-request', storagePath);
+    assert.match(res.body.error.message, /^storagePath:/, storagePath);
+    assert.equal(fileCalls, 0, storagePath);
+  }
+});
 
 test('streamMaterialFile: returns false without touching the response when the object does not exist', async () => {
   const file = fakeFile({ exists: false });

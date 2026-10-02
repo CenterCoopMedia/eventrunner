@@ -46,6 +46,7 @@
  */
 
 const { scrubLinkLabel, isSafeUrl } = require('shared/urlSafety');
+const { isSessionMaterialStoragePath } = require('./policy.cjs');
 const {
   sendError,
   badRequest,
@@ -110,6 +111,14 @@ class MaterialCapExceededError extends Error {
   }
 }
 
+/** Thrown when a file is not under its session's Storage folder. */
+class InvalidStoragePathError extends Error {
+  constructor(sessionId) {
+    super(`storagePath: must be inside session-materials/${sessionId}/`);
+    this.name = 'InvalidStoragePathError';
+  }
+}
+
 /** True when `speakerId` appears in the session doc's `speakerIds` array. */
 function isSpeakerOfSession(sessionData, speakerId) {
   if (!speakerId || !sessionData) return false;
@@ -159,6 +168,9 @@ async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = 
  * @returns {Promise<{ id: string, material: object }>}
  */
 async function uploadSessionMaterial({ db, sessionId, storagePath, filename, actor, now = Date.now }) {
+  if (!isSessionMaterialStoragePath(storagePath, sessionId)) {
+    throw new InvalidStoragePathError(sessionId);
+  }
   return createMaterial({
     db,
     sessionId,
@@ -325,7 +337,7 @@ function sendStoreError(res, err, log) {
   if (err instanceof NotAuthorizedError) {
     return forbidden(res, err.message);
   }
-  if (err instanceof InvalidUrlError || err instanceof MaterialCapExceededError) {
+  if (err instanceof InvalidUrlError || err instanceof InvalidStoragePathError || err instanceof MaterialCapExceededError) {
     return badRequest(res, err.message);
   }
   log.error('materials store operation failed', err);
@@ -476,6 +488,7 @@ module.exports = {
     MaterialNotFoundError,
     NotAuthorizedError,
     InvalidUrlError,
+    InvalidStoragePathError,
     MaterialCapExceededError,
     isSpeakerOfSession,
     SESSIONS,

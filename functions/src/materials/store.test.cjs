@@ -14,6 +14,7 @@ const {
     MaterialNotFoundError,
     NotAuthorizedError,
     InvalidUrlError,
+    InvalidStoragePathError,
     MaterialCapExceededError,
     MAX_MATERIALS_PER_SESSION,
   },
@@ -218,6 +219,24 @@ test('uploadSessionMaterial: file materials are never scrubbed even when URL-sha
   });
   assert.equal(material.filename, 'slides.pdf');
   assert.equal(material.type, 'file');
+});
+
+test('uploadSessionMaterial: refuses a path outside the material session before any write', async () => {
+  for (const storagePath of [
+    'branding/logo.png',
+    'session-materials/s2/slides.pdf',
+    'session-materials/s1',
+    'session-materials/s1/',
+  ]) {
+    const db = fakeDb(seedSession('s1'));
+    await assert.rejects(
+      uploadSessionMaterial({ db, sessionId: 's1', storagePath, filename: 'slides.pdf', actor: ADMIN, now }),
+      (err) => err instanceof InvalidStoragePathError && err.message.startsWith('storagePath:'),
+      storagePath,
+    );
+    assert.equal(db.docs.get('cmsSchedule/s1').materialCount, undefined, storagePath);
+    assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false, storagePath);
+  }
 });
 
 // ------------------------------------------------------------ updateSessionMaterial
