@@ -71,6 +71,13 @@ const CONTENT_TYPE_RE = /^[a-z0-9!#$%&'*+.^_`|~-]+\/[a-z0-9!#$%&'*+.^_`|~-]+$/i;
 const PRIVATE_CACHE_CONTROL = 'private, max-age=0, no-store';
 const MAX_MATERIAL_FILENAME_LENGTH = 240;
 
+function hasControlCharacter(value) {
+  return [...value].some((character) => {
+    const code = character.codePointAt(0);
+    return code <= 31 || code === 127;
+  });
+}
+
 /**
  * Per-session cap on the number of materials (spec: "the per-session cap
  * moves to a materialCount field", §4.4 — the ADR names the field but not
@@ -311,7 +318,7 @@ async function uploadSessionMaterialBytes({
   if (
     !normalizedFilename
     || normalizedFilename.length > MAX_MATERIAL_FILENAME_LENGTH
-    || /[\u0000-\u001f\u007f]/u.test(normalizedFilename)
+    || hasControlCharacter(normalizedFilename)
   ) {
     throw new InvalidMaterialUploadError(
       `filename: must be 1-${MAX_MATERIAL_FILENAME_LENGTH} characters without control characters.`,
