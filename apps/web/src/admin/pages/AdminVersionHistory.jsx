@@ -260,6 +260,13 @@ export default function AdminVersionHistory() {
     if (confirming !== null) confirmHeadingRef.current?.focus();
   }, [confirming]);
 
+  // A clean draft can become dirty while the plain confirmation is open.
+  // Close that path; the destructive confirmation below stays open and names
+  // the unpublished work that the restore will replace.
+  useEffect(() => {
+    if (confirming !== null && row?.draft?.status === 'dirty') setConfirming(null);
+  }, [confirming, row?.draft?.status]);
+
   useEffect(() => {
     if (!restoreError) return;
     if (confirming === restoreError.revision) confirmErrorRef.current?.focus();
@@ -542,18 +549,7 @@ export default function AdminVersionHistory() {
                   ) : null}
                 </div>
                 <ChangeTable entry={entry} timeZone={timeZone} />
-                {confirming === entry.revision ? (
-                  <RestoreConfirm
-                    entry={entry}
-                    removed={!row}
-                    busy={restoringRevision === entry.revision}
-                    error={restoreError?.revision === entry.revision ? restoreError.error : null}
-                    onConfirm={() => restore(entry)}
-                    onCancel={cancelRestore}
-                    headingRef={confirmHeadingRef}
-                    errorRef={confirmErrorRef}
-                  />
-                ) : restoreOffered(entry) && row?.draft?.status === 'dirty' ? (
+                {restoreOffered(entry) && row?.draft?.status === 'dirty' ? (
                   <div className="flex flex-col items-start gap-xs">
                     <DestructiveConfirm
                       key={`${entry.revision}:${restoreReset}`}
@@ -565,6 +561,7 @@ export default function AdminVersionHistory() {
                       busy={restoringRevision === entry.revision}
                       consequence="The unpublished changes in the current draft go, and no version keeps them."
                       permanence="This cannot be undone."
+                      initiallyOpen={confirming === entry.revision}
                       onConfirm={() => restore(entry)}
                     />
                     {restoreError?.revision === entry.revision ? (
@@ -573,6 +570,17 @@ export default function AdminVersionHistory() {
                       </div>
                     ) : null}
                   </div>
+                ) : confirming === entry.revision ? (
+                  <RestoreConfirm
+                    entry={entry}
+                    removed={!row}
+                    busy={restoringRevision === entry.revision}
+                    error={restoreError?.revision === entry.revision ? restoreError.error : null}
+                    onConfirm={() => restore(entry)}
+                    onCancel={cancelRestore}
+                    headingRef={confirmHeadingRef}
+                    errorRef={confirmErrorRef}
+                  />
                 ) : restoreOffered(entry) ? (
                   <div>
                     <button

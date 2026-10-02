@@ -479,6 +479,22 @@ describe('restoring a version', () => {
     expect(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' })).toHaveFocus();
   });
 
+  it('switches an open plain confirmation to the destructive warning when the draft becomes dirty', async () => {
+    await renderPage();
+    reportRecord();
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    expect(screen.getByRole('region', { name: 'Restore version 1?' })).toHaveTextContent(
+      'The site does not change until you publish.',
+    );
+
+    reportRecord({ drafts: [{ ...CLEAN_DRAFT, value: 'Another admin’s unpublished idea', status: 'dirty' }] });
+
+    const confirm = screen.getByRole('region', { name: 'Restore version 1?' });
+    expect(confirm).toHaveTextContent('The unpublished changes in the current draft go, and no version keeps them.');
+    expect(confirm).toHaveTextContent('This cannot be undone.');
+    expect(callMock.mock.calls.filter(([name]) => name !== 'cmsGetVersionHistory')).toEqual([]);
+  });
+
   it('saves through the normal draft endpoint, then publishes only on request', async () => {
     await renderPage(undefined, {
       pages: [
