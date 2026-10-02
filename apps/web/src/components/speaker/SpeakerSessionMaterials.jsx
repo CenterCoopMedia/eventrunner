@@ -94,7 +94,7 @@ function MaterialRow({ material, speakerId, user, onSaved }) {
             {material.filename || (material.type === 'link' ? 'External link' : 'Untitled file')}
           </p>
           <p className="mt-3xs font-data text-caption text-text-secondary">
-            {material.type === 'link' ? 'Link' : 'File'}{ownMaterial ? ' · Submitted by you' : ' · Submitted by a co-speaker'}
+            {material.type === 'link' ? 'Link' : 'File'}{ownMaterial ? ' · Submitted by you' : ' · Submitted for this session'}
           </p>
         </div>
         <ReviewStatus value={material.reviewStatus} />

@@ -48,8 +48,8 @@ describe('SpeakerSessionMaterials', () => {
         reviewStatus: 'approved', submittedBySpeakerId: 'speaker-one',
       },
       {
-        id: 'pending-other', type: 'link', filename: 'Co-speaker notes', url: 'https://example.org/notes',
-        reviewStatus: 'pending', submittedBySpeakerId: 'speaker-two',
+        id: 'pending-other', type: 'link', filename: 'Session notes', url: 'https://example.org/notes',
+        reviewStatus: 'pending', submittedBySpeakerId: null,
       },
     ]);
 
@@ -61,7 +61,7 @@ describe('SpeakerSessionMaterials', () => {
     expect(screen.getByText('Approved')).toBeInTheDocument();
     expect(screen.getByText(/organizer has reviewed this item/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
-    expect(screen.getAllByText(/Submitted by a co-speaker/i)).toHaveLength(1);
+    expect(screen.getAllByText(/Submitted for this session/i)).toHaveLength(1);
   });
 
   it('adds a link and uploads a synthetic file to the selected own session', async () => {
