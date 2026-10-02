@@ -38,6 +38,13 @@ vi.mock('../components/speaker/SpeakerStatusHeader.jsx', () => ({
     </section>
   ),
 }));
+vi.mock('../components/speaker/SpeakerSessionHub.jsx', () => ({
+  default: ({ scheduleData, speakerId }) => (
+    <section aria-label="Speaker session hub fixture">
+      {speakerId}:{scheduleData.length}
+    </section>
+  ),
+}));
 
 const { default: SpeakerDashboard } = await import('./SpeakerDashboard.jsx');
 
@@ -97,6 +104,9 @@ describe('the speaker dashboard shell', () => {
     );
     expect(screen.getByText('Live updates')).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Speaker event status fixture' })).toHaveTextContent(
+      'rae-okonkwo:1',
+    );
+    expect(screen.getByRole('region', { name: 'Speaker session hub fixture' })).toHaveTextContent(
       'rae-okonkwo:1',
     );
     expect(getOwnSpeakerProfileMock).toHaveBeenCalledWith({

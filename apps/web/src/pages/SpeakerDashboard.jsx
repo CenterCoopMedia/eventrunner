@@ -16,6 +16,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
+import SpeakerSessionHub from '../components/speaker/SpeakerSessionHub.jsx';
 import SpeakerStatusHeader from '../components/speaker/SpeakerStatusHeader.jsx';
 import { secondaryActionClass } from '../components/controlClasses.js';
 import { getOwnSpeakerProfile } from '../lib/speakerProfileApi.js';
@@ -132,6 +133,12 @@ export default function SpeakerDashboard() {
       </header>
 
       <SpeakerStatusHeader
+        eventConfig={eventConfig}
+        scheduleData={scheduleData}
+        speakerId={speakerId}
+      />
+
+      <SpeakerSessionHub
         eventConfig={eventConfig}
         scheduleData={scheduleData}
         speakerId={speakerId}
