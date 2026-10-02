@@ -19,10 +19,10 @@
  * stands. The predecessor of every entry is the next row of the same
  * query: the query already reads one row past the page to decide
  * nextCursor, so the last entry on a full page has its predecessor too,
- * at no extra read. Every instant leaves as milliseconds, in `publishedAt`
- * and in a change: a Firestore Timestamp has no toJSON and would otherwise
- * serialize as its internal `{ _seconds, _nanoseconds }`. The stored
- * snapshot itself is not sent; the page reads the changes only.
+ * at no extra read. Every instant leaves as milliseconds in `publishedAt`
+ * and in a change. In the stored snapshot it leaves as an ISO string, which
+ * the normal save endpoints accept. A Firestore Timestamp has no toJSON and
+ * would otherwise serialize as its internal `{ _seconds, _nanoseconds }`.
  */
 
 const { isDeepStrictEqual } = require('node:util');
@@ -184,6 +184,21 @@ function describeChanges(previous, current) {
   };
 }
 
+/** A stored snapshot that survives JSON and can be sent to a save endpoint. */
+function jsonSafe(value) {
+  if (isInstant(value)) {
+    const ms = toMillis(value);
+    return ms === null ? null : new Date(ms).toISOString();
+  }
+  if (Array.isArray(value)) return value.map(jsonSafe);
+  if (isPlainObject(value)) {
+    const out = {};
+    for (const [key, item] of Object.entries(value)) out[key] = jsonSafe(item);
+    return out;
+  }
+  return value;
+}
+
 /**
  * One history row shaped for the page, named fields only.
  *
@@ -198,6 +213,7 @@ function toEntry(doc, previousDoc) {
     id: doc.id,
     docPath: data.docPath,
     revision: data.revision,
+    fields: jsonSafe(isPlainObject(data.fields) ? data.fields : {}),
     visible: data.visible !== false,
     publishedAt: toMillis(data.publishedAt),
     publishedBy: typeof data.publishedBy === 'string' ? data.publishedBy : null,

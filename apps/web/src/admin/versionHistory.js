@@ -10,6 +10,7 @@
 // It is imported by the two lazy version pages only, so none of it rides in
 // the admin entry chunk (scripts/ci/bundle-budget.json).
 import { zoneLabel } from '../lib/eventTime.js';
+import { DELETE_FIELD_SENTINEL } from './contentDoc.js';
 import { COLLECTION_CHOICES } from './collectionWords.js';
 
 /**
@@ -166,4 +167,81 @@ export function pathText(path) {
     .split('.')
     .map((segment) => (/^\d+$/.test(segment) ? `item ${Number(segment) + 1}` : segment))
     .join(' › ');
+}
+
+/** Publish-model and listener bookkeeping that never belongs to content. */
+const NOT_CONTENT = Object.freeze([
+  'id',
+  'visible',
+  'status',
+  'revision',
+  'basedOnRevision',
+  'updatedAt',
+  'updatedBy',
+  'publishedAt',
+  'publishedBy',
+  'materialCount',
+]);
+
+/** Seed bookkeeping is removed by every normal editor save. */
+const SEED_FIELDS = Object.freeze(['seeded', 'seededAt']);
+
+function withoutSeedFields(fields) {
+  const out = {};
+  for (const [key, value] of Object.entries(fields ?? {})) {
+    if (!SEED_FIELDS.includes(key)) out[key] = value;
+  }
+  return out;
+}
+
+/** The current page that owns a content section, or null. */
+export function pageIdForSection(rows, sectionId) {
+  if (!nonEmpty(sectionId)) return null;
+  const owner = (rows ?? []).find((page) =>
+    Array.isArray(page?.current?.sections) && page.current.sections.some((section) => section?.id === sectionId));
+  return owner?.id ?? null;
+}
+
+/**
+ * Build the ordinary editor save that makes a published version a draft.
+ * Generic updates merge fields, so current-only content fields are sent as
+ * deletions. A deleted content block also needs its owning page id because
+ * cmsCreateContent enforces that page's section rules atomically.
+ */
+export function restoreRequestFor(collection, docId, entry, current, { pageId = null } = {}) {
+  const fields = withoutSeedFields(entry?.fields);
+  const visible = entry?.visible !== false;
+  if (collection === 'cmsPages') {
+    return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible } } };
+  }
+  if (collection === 'cmsUpdates') {
+    return { endpoint: 'cmsSaveUpdate', body: { id: docId, update: fields, visible } };
+  }
+
+  let target;
+  if (collection === 'cmsContent') {
+    const { section, field } = fields;
+    if (!nonEmpty(section) || !nonEmpty(field) || `${section}__${field}` !== docId) return null;
+    target = { section, field };
+  } else {
+    target = { docId };
+  }
+
+  if (!current) {
+    if (collection === 'cmsContent' && !nonEmpty(pageId)) return null;
+    return {
+      endpoint: 'cmsCreateContent',
+      body: { collection, ...target, ...(collection === 'cmsContent' ? { pageId } : {}), fields, visible },
+    };
+  }
+
+  const cleared = {};
+  for (const key of Object.keys(current)) {
+    if (NOT_CONTENT.includes(key) || SEED_FIELDS.includes(key)) continue;
+    if (!Object.hasOwn(fields, key)) cleared[key] = DELETE_FIELD_SENTINEL;
+  }
+  return {
+    endpoint: 'cmsUpdateContent',
+    body: { collection, ...target, fields: { ...fields, ...cleared }, visible },
+  };
 }
