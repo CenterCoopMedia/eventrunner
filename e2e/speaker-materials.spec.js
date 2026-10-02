@@ -101,13 +101,13 @@ test.describe.serial('speaker session materials', () => {
     await page.getByRole('tab', { name: 'Materials' }).click();
     await expect(page.getByText('No materials have been sent for this session.')).toBeVisible();
 
-    await page.getByLabel('Link URL').fill('https://example.org/speaker-slides');
-    await page.getByLabel('Display name').fill('Speaker slides');
+    await page.getByLabel('Link URL', { exact: true }).fill('https://example.org/speaker-slides');
+    await page.getByLabel('Display name', { exact: true }).fill('Speaker slides');
     await page.getByRole('button', { name: 'Send link' }).click();
     await expect(page.getByText('Link sent for organizer review.')).toBeVisible();
     await expect(page.getByText('Speaker slides')).toBeVisible();
 
-    await page.getByLabel('File').setInputFiles({
+    await page.getByLabel('File', { exact: true }).setInputFiles({
       name: 'speaker-handout.txt',
       mimeType: 'text/plain',
       buffer: syntheticBytes,
