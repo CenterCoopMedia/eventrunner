@@ -27,6 +27,7 @@ export default defineConfig({
     include: [
       'shared/time',
       'shared/registration',
+      'shared/announcement',
       'shared/config',
       'shared/routing',
       'shared/page',
