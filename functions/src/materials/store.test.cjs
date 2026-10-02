@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
 const { Storage } = require('@google-cloud/storage');
 
 const {
@@ -60,7 +61,10 @@ function fakeDb(seed = {}) {
       return {
         doc: (id) => docRef(name, id ?? `auto-${++counter}`),
         where(field, _op, value) {
-          return {
+          const query = {
+            limit() {
+              return query;
+            },
             async get() {
               const rows = [...docs.entries()]
                 .filter(([k]) => k.startsWith(`${name}/`))
@@ -69,6 +73,7 @@ function fakeDb(seed = {}) {
               return { empty: rows.length === 0, docs: rows };
             },
           };
+          return query;
         },
       };
     },
@@ -571,6 +576,75 @@ test('uploadSessionMaterialBytes: a transaction-time authorization loss removes 
   assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false);
 });
 
+test('uploadSessionMaterialBytes: a lost registration response keeps bytes referenced by the committed row', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const registrationError = new Error('Firestore lost the commit response');
+  const runTransaction = db.runTransaction;
+  db.runTransaction = async (fn) => {
+    await runTransaction(fn);
+    throw registrationError;
+  };
+  const bucket = fakeWritableBucket();
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() {} },
+  }).catch((caught) => caught);
+
+  const storedMaterials = [...db.docs.entries()]
+    .filter(([key]) => key.startsWith('session_materials/'));
+  assert.equal(error, registrationError);
+  assert.equal(storedMaterials.length, 1);
+  assert.equal(storedMaterials[0][1].storagePath, bucket.state.paths[0]);
+  assert.deepEqual(bucket.state.deletedPaths, []);
+});
+
+test('uploadSessionMaterialBytes: an unavailable registration check preserves the uploaded object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const registrationError = new Error('Firestore transaction failed');
+  db.runTransaction = async () => { throw registrationError; };
+  const collection = db.collection.bind(db);
+  db.collection = (name) => {
+    const ref = collection(name);
+    if (name !== 'session_materials') return ref;
+    return {
+      ...ref,
+      where() {
+        const query = {
+          limit() { return query; },
+          async get() { throw new Error('Firestore unavailable'); },
+        };
+        return query;
+      },
+    };
+  };
+  const bucket = fakeWritableBucket();
+  let logged = 0;
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() { logged += 1; } },
+  }).catch((caught) => caught);
+
+  assert.equal(error, registrationError);
+  assert.deepEqual(bucket.state.deletedPaths, []);
+  assert.equal(logged, 1);
+});
+
 test('uploadSessionMaterialBytes: an ambiguous save failure removes only this attempt\'s object', async () => {
   const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
   const saveError = new Error('Storage lost the response after writing');
@@ -644,6 +718,71 @@ test('uploadSessionMaterialBytes: the installed SDK sends the cleanup generation
   assert.equal(Object.hasOwn(deleteRequest.qs, 'preconditionOpts'), false);
 });
 
+test('uploadSessionMaterialBytes: an SDK retry 412 removes this attempt\'s persisted object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const file = new Storage({ projectId: 'demo-eventrunner' })
+    .bucket('eventrunner-fixture')
+    .file('session-materials/s1/sdk-retry-fixture');
+  file.storage.retryOptions.maxRetries = 1;
+  file.storage.retryOptions.retryDelayMultiplier = 1;
+  file.storage.retryOptions.maxRetryDelay = 1;
+  file.storage.retryOptions.totalTimeout = 5;
+  file.storage.retryOptions.retryableErrorFn = (error) => error.code === 500;
+
+  let attempts = 0;
+  let storedMetadata;
+  let objectExists = false;
+  let preconditionError;
+  file.createWriteStream = (options) => {
+    attempts += 1;
+    storedMetadata = options.metadata.metadata;
+    const stream = new EventEmitter();
+    stream.end = () => {
+      queueMicrotask(() => {
+        if (attempts === 1) {
+          objectExists = true;
+          const responseLost = new Error('response lost after write');
+          responseLost.code = 500;
+          stream.emit('error', responseLost);
+          return;
+        }
+        preconditionError = new Error('object already exists');
+        preconditionError.code = 412;
+        stream.emit('error', preconditionError);
+      });
+      return stream;
+    };
+    return stream;
+  };
+  file.getMetadata = async () => [{
+    size: 1,
+    generation: '13',
+    metadata: storedMetadata,
+  }];
+  let deleteOptions;
+  file.delete = async (options) => {
+    deleteOptions = options;
+    objectExists = false;
+  };
+
+  const error = await uploadSessionMaterialBytes({
+    db,
+    bucket: { file() { return file; } },
+    sessionId: 's1',
+    data: Buffer.from('x').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+    log: { error() {} },
+  }).catch((caught) => caught);
+
+  assert.equal(error, preconditionError);
+  assert.equal(attempts, 2);
+  assert.equal(objectExists, false);
+  assert.deepEqual(deleteOptions, { ignoreNotFound: true, ifGenerationMatch: '13' });
+});
+
 test('uploadSessionMaterialBytes: a create precondition failure never deletes the existing object', async () => {
   const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
   const saveError = new Error('At least one of the preconditions failed');
@@ -673,7 +812,7 @@ test('uploadSessionMaterialBytes: a create precondition failure never deletes th
 
   assert.equal(error, saveError);
   assert.equal(bucket.state.object, existingObject);
-  assert.equal(bucket.state.metadataCalls, 0);
+  assert.equal(bucket.state.metadataCalls, 1);
   assert.deepEqual(bucket.state.deletedPaths, []);
 });
 
