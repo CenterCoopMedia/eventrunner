@@ -398,14 +398,19 @@
           <code>content</code> (and, transitively, <code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code>) on this run. A dispatch run always deploys
           functions regardless of <code>bootstrap</code>, because a fresh project has none yet and gating that on a paths
           filter would provision an empty, broken deployment (spec §8.1).</p>
-          <p><strong>Upgrade order for unpublished counts.</strong> Deploy Firestore rules and Functions first. Do not create
-          <code>cmsMeta/pending</code> with zero counts. On an existing site, the authenticated staff endpoint
-          <code>cmsEnsurePendingCounts</code> counts all six dirty draft collections in one transaction. A draft save,
-          publish, or delete also prepares a missing or invalid document before it changes the count, so this
-          release needs no separate data migration. Run only the upgraded <code>init-event.cjs</code> or
-          <code>seed-demo-event.cjs</code> after this deploy; each script prepares the count before its first CMS write
-          and then uses the same atomic save and publish paths. This keeps existing unpublished edits counted
-          and leaves a dry run read-only.</p>
+          <p><strong>Upgrade order for unpublished counts.</strong> Pause CMS saves, publishes, deletes, and seed jobs during
+          the first upgrade. Deploy Firestore rules and all Functions, then wait for the deploy and any older
+          in-flight CMS requests to finish. Before deploying the count-reading UI or resuming edits, make an
+          authenticated staff-admin POST to <code>cmsEnsurePendingCounts</code> with JSON body <code>{&quot;force&quot;:true}</code>. Require
+          HTTP 200 with <code>{&quot;ok&quot;:true}</code> and verify <code>cmsMeta/pending</code> against the Unpublished changes page. This
+          recounts all six dirty draft collections in one transaction, including any drift caused by old and
+          new function versions overlapping during deployment. Never initialize an existing site&#39;s count to
+          zero. The same forced request repairs a count that is too high after an out-of-band data edit.</p>
+          <p>Ordinary requests to <code>cmsEnsurePendingCounts</code> with <code>{}</code> leave a valid summary unchanged. Draft
+          saves, publishes, and deletes also prepare a missing or invalid summary before changing the count.
+          Run only the upgraded <code>init-event.cjs</code> or <code>seed-demo-event.cjs</code> after the deploy; each prepares the
+          count before its first CMS write and uses the atomic save and publish paths. Existing unpublished
+          edits remain counted, and a seed dry run remains read-only.</p>
           <p><strong>Step 2 — seed content</strong>, from an operator&#39;s machine, once the bootstrap dispatch succeeds:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">export FIRESTORE_EMULATOR_HOST=  # unset — this targets the real project
           export EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID&gt;

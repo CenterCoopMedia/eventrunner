@@ -101,8 +101,8 @@ function fakeAuth() {
   };
 }
 
-function req({ method = 'POST', token = 'staff-token' } = {}) {
-  return { method, headers: token ? { authorization: `Bearer ${token}` } : {}, body: {} };
+function req({ method = 'POST', token = 'staff-token', body = {} } = {}) {
+  return { method, headers: token ? { authorization: `Bearer ${token}` } : {}, body };
 }
 
 function res() {
@@ -142,4 +142,48 @@ test('cmsEnsurePendingCounts is staff-admin-only and returns only the stable wir
   response = res();
   await handler(req({ method: 'GET' }), response);
   assert.equal(response.statusCode, 405);
+});
+
+test('staff can force a rebuild after an older writer leaves a valid overcount', async () => {
+  const db = makeFakeDb({
+    'config/bootstrap': { adminEmails: [], staffEmails: ['staff@example.org'] },
+    'cmsMeta/pending': { schemaVersion: 1, counts: zeros({ cmsContent: 8 }) },
+    'cmsContent_drafts/published': { status: 'clean' },
+    'cmsContent_drafts/waiting': { status: 'dirty' },
+  });
+  const handler = createEnsurePendingCountsHandler({
+    db, auth: fakeAuth(), getConfig: async () => ({}), now: () => NOW,
+    log: { error() {} },
+  });
+
+  const normal = res();
+  await handler(req(), normal);
+  assert.equal(normal.statusCode, 200);
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 8);
+
+  const denied = res();
+  await handler(req({ token: 'user-token', body: { force: true } }), denied);
+  assert.equal(denied.statusCode, 403);
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 8);
+
+  const repaired = res();
+  await handler(req({ body: { force: true } }), repaired);
+  assert.equal(repaired.statusCode, 200);
+  assert.deepEqual(repaired.body, { ok: true });
+  assert.deepEqual(db.read('cmsMeta', 'pending').counts, zeros({ cmsContent: 1 }));
+  assert.equal(db.read('cmsContent', 'published'), undefined);
+  assert.equal(db.read('cmsContent_drafts', 'waiting').status, 'dirty');
+});
+
+test('the rebuild endpoint rejects a non-boolean force option without writing', async () => {
+  const db = makeFakeDb({
+    'config/bootstrap': { adminEmails: [], staffEmails: ['staff@example.org'] },
+  });
+  const handler = createEnsurePendingCountsHandler({
+    db, auth: fakeAuth(), getConfig: async () => ({}), log: { error() {} },
+  });
+  const response = res();
+  await handler(req({ body: { force: 'true' } }), response);
+  assert.equal(response.statusCode, 400);
+  assert.equal(db.read('cmsMeta', 'pending'), undefined);
 });
