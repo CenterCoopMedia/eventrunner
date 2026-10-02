@@ -205,7 +205,10 @@ export function mailFileSize() {
 /** The six-digit sign-in code most recently emailed to `email`. */
 export function waitForOtpCode(since, email, timeoutMs) {
   return waitForMail(since, email, (mail) => {
-    const match = `${mail.text || ''} ${mail.html || ''}`.match(/\b(\d{6})\b/);
+    if (mail.tag !== 'auth.otp' || typeof mail.text !== 'string') return null;
+    // Account creation can send ticket mail after the OTP. Read the code
+    // from the OTP's required plain-text body; HTML also has color values.
+    const match = mail.text.match(/\b(\d{6})\b/);
     return match ? match[1] : null;
   }, timeoutMs);
 }
