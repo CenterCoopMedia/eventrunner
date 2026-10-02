@@ -208,6 +208,22 @@ describe('content browsing', () => {
     expect(screen.getAllByRole('status').some((el) => /lost the connection/i.test(el.textContent))).toBe(true);
   });
 
+  it.each(['cmsContent_drafts', 'cmsPages_drafts'])('blocks creation until the failed %s listener recovers', async (collection) => {
+    sources.cmsPages = [SCHOLARSHIPS_PAGE];
+    silentCollections = [collection];
+    await renderAt('/admin/content/scholarships/intro');
+
+    act(() => adminErrors.get(collection)(new Error('draft listener failed')));
+    for (const button of screen.getAllByRole('button', { name: 'Add a block' })) {
+      expect(button).toBeDisabled();
+    }
+
+    act(() => adminSubscriptions.get(collection)([]));
+    await waitFor(() => {
+      expect(screen.getAllByRole('link', { name: 'Add a block' }).length).toBeGreaterThan(0);
+    });
+  });
+
   it('reports no such page/section cleanly instead of crashing', async () => {
     await renderAt('/admin/content/nope');
     expect(await screen.findByText('No such page')).toBeInTheDocument();

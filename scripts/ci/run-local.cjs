@@ -59,6 +59,11 @@ function runChecks(base, report) {
   const { jobs } = classifyEvent({ eventName: 'pull_request', base, head: before.head });
   const receipt = { version: 1, ...before, startedAt: new Date().toISOString(), results: {} };
   fs.writeFileSync(report, `${JSON.stringify(receipt, null, 2)}\n`);
+  // Recreate ignored dependencies from this snapshot, including the vendored
+  // shared package. A clean Git tree alone cannot prove an installed version.
+  const installOptions = { env: checkEnvironment('install'), stdio: 'inherit' };
+  execFileSync('npm', ['run', 'prepare:functions'], installOptions);
+  execFileSync('npm', ['ci'], installOptions);
   for (const name of JOB_NAMES) {
     if (!jobs[name]) continue;
     console.log(`Local CI: ${name}`);
