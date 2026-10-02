@@ -11,8 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Suspense } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 
@@ -59,6 +59,11 @@ vi.mock('../contexts/ProfileContext.jsx', () => ({
   useProfile: () => ({ profile: accountProfile, status: accountStatus }),
 }));
 
+const getOwnSpeakerProfileMock = vi.fn();
+vi.mock('../lib/speakerProfileApi.js', () => ({
+  getOwnSpeakerProfile: (...args) => getOwnSpeakerProfileMock(...args),
+}));
+
 const renderPublicWebMcpRegistration = vi.fn();
 vi.mock('../webmcp/PublicWebMcpRegistration.jsx', () => ({
   default: () => {
@@ -87,6 +92,13 @@ const FIXTURE_PAGES = [
 ];
 
 const FIXTURE_FEATURES = { schedule: true };
+
+beforeEach(() => {
+  getOwnSpeakerProfileMock.mockReset().mockResolvedValue({
+    speakerId: 'rae-okonkwo',
+    status: 'accepted',
+  });
+});
 
 function renderShell(
   logos,
@@ -428,14 +440,80 @@ describe('Layout account control', () => {
     expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(0);
   });
 
-  it('offers the speaker dashboard after the linked account record loads', () => {
+  it('offers the speaker dashboard after the linked canonical record is eligible', async () => {
     const { container } = renderShell({}, {
       user: { uid: 'u1' },
       profile: { speakerId: 'rae-okonkwo' },
     });
-    const link = accountLink(container);
-    expect(link).toHaveAttribute('href', '/speaker/dashboard');
-    expect(link.textContent).toBe('Dashboard');
+    await waitFor(() => expect(accountLink(container)).toHaveAttribute('href', '/speaker/dashboard'));
+    expect(accountLink(container).textContent).toBe('Dashboard');
+  });
+
+  it('keeps a linked canonical draft on the attendee dashboard route', async () => {
+    getOwnSpeakerProfileMock.mockResolvedValue({
+      speakerId: 'rae-okonkwo',
+      status: 'draft',
+    });
+    const { container } = renderShell({}, {
+      user: { uid: 'u1' },
+      profile: { speakerId: 'rae-okonkwo' },
+    });
+
+    await waitFor(() => expect(getOwnSpeakerProfileMock).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await getOwnSpeakerProfileMock.mock.results[0].value;
+    });
+    expect(accountLink(container)).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('rechecks canonical eligibility after navigation', async () => {
+    getOwnSpeakerProfileMock
+      .mockResolvedValueOnce({ speakerId: 'rae-okonkwo', status: 'accepted' })
+      .mockResolvedValueOnce({ speakerId: 'rae-okonkwo', status: 'draft' });
+    const { container } = renderShell({}, {
+      user: { uid: 'u1' },
+      profile: { speakerId: 'rae-okonkwo' },
+    });
+    await waitFor(() => expect(accountLink(container)).toHaveAttribute('href', '/speaker/dashboard'));
+
+    fireEvent.click(within(container.querySelector('nav[aria-label="Main"]')).getByRole('link', { name: 'Schedule' }));
+
+    await waitFor(() => expect(getOwnSpeakerProfileMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(accountLink(container)).toHaveAttribute('href', '/dashboard'));
+  });
+
+  it('ignores a canonical response for the previous linked identity', async () => {
+    let resolveFirst;
+    const first = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+    getOwnSpeakerProfileMock
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce({ speakerId: 'second-speaker', status: 'approved' });
+    const view = renderShell({}, {
+      user: { uid: 'u1' },
+      profile: { speakerId: 'first-speaker' },
+    });
+    await waitFor(() => expect(getOwnSpeakerProfileMock).toHaveBeenCalledTimes(1));
+
+    authUser = { uid: 'u2' };
+    accountProfile = { speakerId: 'second-speaker' };
+    view.rerender(
+      <MemoryRouter
+        initialEntries={['/']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <Layout />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(getOwnSpeakerProfileMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(accountLink(view.container)).toHaveAttribute('href', '/speaker/dashboard'));
+
+    await act(async () => {
+      resolveFirst({ speakerId: 'first-speaker', status: 'draft' });
+      await first;
+    });
+    expect(accountLink(view.container)).toHaveAttribute('href', '/speaker/dashboard');
   });
 
   it('keeps the attendee route while the linked account record is loading', () => {
@@ -507,13 +585,13 @@ describe('Layout account control', () => {
     expect(accountLink(container)).toHaveAttribute('aria-current', 'page');
   });
 
-  it('marks the speaker dashboard in view for a linked speaker', () => {
+  it('marks the speaker dashboard in view for an eligible linked speaker', async () => {
     const { container } = renderShell({}, {
       path: '/speaker/dashboard',
       user: { uid: 'u1' },
       profile: { speakerId: 'rae-okonkwo' },
     });
-    expect(accountLink(container)).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(accountLink(container)).toHaveAttribute('aria-current', 'page'));
   });
 
   it('stays marked on a route below the dashboard', () => {

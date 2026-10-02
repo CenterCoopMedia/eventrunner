@@ -65,6 +65,7 @@ import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc } from '../lib/mediaSource.js';
+import { isSpeakerDashboardEligible } from '../lib/speakerDashboardEligibility.js';
 import BackToTop from './BackToTop.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
@@ -230,6 +231,56 @@ function accountClass({ isActive }) {
     : quietActionClass;
 }
 
+function useSpeakerDashboardEligibility({
+  authLoading,
+  user,
+  accountStatus,
+  speakerId,
+  navigationKey,
+}) {
+  const identity = !authLoading && user && accountStatus === 'ready' && speakerId
+    ? `${user.uid}:${speakerId}`
+    : null;
+  const [result, setResult] = useState({ identity: null, eligible: false });
+
+  useEffect(() => {
+    let current = true;
+    const storeResult = (eligible) => {
+      setResult((previous) => (
+        previous.identity === identity && previous.eligible === eligible
+          ? previous
+          : { identity, eligible }
+      ));
+    };
+    if (!identity) {
+      storeResult(false);
+      return () => {
+        current = false;
+      };
+    }
+
+    // speakerProfileApi carries the authenticated endpoint client and media
+    // helpers. Load it only for a linked account so the public shell's first
+    // bundle does not pay for a speaker-only read.
+    import('../lib/speakerProfileApi.js')
+      .then(({ getOwnSpeakerProfile }) => getOwnSpeakerProfile({ user, speakerId }))
+      .then(
+        (speaker) => {
+          if (current) storeResult(isSpeakerDashboardEligible(speaker));
+        },
+        () => {
+          if (current) storeResult(false);
+        },
+      );
+
+    return () => {
+      current = false;
+    };
+  }, [identity, navigationKey, speakerId, user]);
+
+  return result.identity === identity && result.eligible;
+}
+
 // The banner at the top of the shell, named so the back-to-top control can
 // move focus to it (M7 issue 6). Landing there puts the keyboard at the top
 // of the page, with the identity and the whole navigation still ahead of it
@@ -257,7 +308,15 @@ export default function Layout() {
   const { pages, getPage } = useContent();
   const { user, loading: authLoading } = useAuth();
   const { profile, status: accountStatus } = useProfile();
-  const { pathname } = useLocation();
+  const { pathname, key: navigationKey } = useLocation();
+  const speakerId = profile?.speakerId ?? null;
+  const speakerDashboardEligible = useSpeakerDashboardEligibility({
+    authLoading,
+    user,
+    accountStatus,
+    speakerId,
+    navigationKey,
+  });
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
   // bundle) or an uploaded asset (`branding/{assetId}/{name}`, which exists
@@ -322,12 +381,14 @@ export default function Layout() {
   // tells two accounts on one service apart.
   const socialLinks = useMemo(() => listSocialAccounts(eventConfig?.social), [eventConfig?.social]);
 
-  // One control, routed from the account record. An unfinished auth
-  // handshake is the signed-out answer; an account record still being
-  // seeded uses the attendee dashboard until its server-owned speakerId is
-  // available (see ACCOUNT_SIGNED_OUT above).
+  // One control, routed from the owner-checked canonical speaker record. A
+  // linked draft or removed record stays on the attendee dashboard; the
+  // server-owned speakerId identifies the record but does not establish
+  // dashboard eligibility.
+  // An unfinished auth handshake and an account still being seeded retain
+  // the existing signed-out and attendee answers (see ACCOUNT_SIGNED_OUT).
   const account = !authLoading && user
-    ? accountStatus === 'ready' && profile?.speakerId
+    ? speakerDashboardEligible
       ? ACCOUNT_SPEAKER
       : ACCOUNT_SIGNED_IN
     : ACCOUNT_SIGNED_OUT;

@@ -14,8 +14,10 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import LoadingState from '../components/LoadingState.jsx';
+import SignInPanel from '../components/SignInPanel.jsx';
 import { secondaryActionClass } from '../components/controlClasses.js';
 import { getOwnSpeakerProfile } from '../lib/speakerProfileApi.js';
+import { isSpeakerDashboardEligible } from '../lib/speakerDashboardEligibility.js';
 
 const SPEAKER_STATUS = Object.freeze({
   accepted: {
@@ -70,7 +72,22 @@ export default function SpeakerDashboard() {
     );
   }
 
-  if (!user) return <Navigate to="/signin" replace />;
+  if (!user) {
+    // Keep the deep link mounted through authentication. AuthContext updates
+    // this branch in place after SignInPanel succeeds, and the dashboard then
+    // resumes its owner-checked load without losing the requested URL.
+    return (
+      <article className="mx-auto max-w-md">
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in to continue</h1>
+        <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
+          Your speaker dashboard is part of your account. Sign in below to continue where you left off.
+        </p>
+        <div className="mt-lg">
+          <SignInPanel />
+        </div>
+      </article>
+    );
+  }
   if (accountStatus === 'ready' && !speakerId) return <Navigate to="/dashboard" replace />;
 
   if (load.status === 'error') {
@@ -95,8 +112,8 @@ export default function SpeakerDashboard() {
     );
   }
 
-  const status = SPEAKER_STATUS[load.speaker?.status];
-  if (!status) return <Navigate to="/dashboard" replace />;
+  if (!isSpeakerDashboardEligible(load.speaker)) return <Navigate to="/dashboard" replace />;
+  const status = SPEAKER_STATUS[load.speaker.status];
 
   const name = [load.speaker.firstName, load.speaker.lastName]
     .filter((part) => typeof part === 'string' && part.trim())

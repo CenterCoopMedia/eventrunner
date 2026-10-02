@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 let authValue;
 let configValue;
@@ -24,6 +24,9 @@ vi.mock('../lib/speakerProfileApi.js', () => ({
 vi.mock('../components/LiveUpdatesCard.jsx', () => ({
   default: () => <section aria-label="Live updates fixture">Live updates</section>,
 }));
+vi.mock('../components/SignInPanel.jsx', () => ({
+  default: () => <div>Sign in panel fixture</div>,
+}));
 
 const { default: SpeakerDashboard } = await import('./SpeakerDashboard.jsx');
 
@@ -34,19 +37,29 @@ const SPEAKER = {
   status: 'accepted',
 };
 
-function renderPage() {
-  return render(
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="Current route">{location.pathname}{location.search}</output>;
+}
+
+function PageFixture({ initialEntry = '/speaker/dashboard' }) {
+  return (
     <MemoryRouter
-      initialEntries={['/speaker/dashboard']}
+      initialEntries={[initialEntry]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
+      <LocationProbe />
       <Routes>
         <Route path="speaker/dashboard" element={<SpeakerDashboard />} />
         <Route path="dashboard" element={<h1>Attendee dashboard fixture</h1>} />
         <Route path="signin" element={<h1>Sign in fixture</h1>} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderPage(initialEntry) {
+  return render(<PageFixture initialEntry={initialEntry} />);
 }
 
 beforeEach(() => {
@@ -105,11 +118,29 @@ describe('the speaker dashboard shell', () => {
     expect(getOwnSpeakerProfileMock).not.toHaveBeenCalled();
   });
 
-  it('sends a signed-out visitor to sign in', async () => {
+  it('keeps a direct dashboard route mounted through sign-in', async () => {
     authValue = { user: null, loading: false };
     profileValue = { profile: null, status: 'signed-out' };
-    renderPage();
-    expect(await screen.findByRole('heading', { name: 'Sign in fixture' })).toBeInTheDocument();
+    const view = renderPage('/speaker/dashboard?returnNonce=fixture');
+
+    expect(screen.getByRole('heading', { name: 'Sign in to continue' })).toBeInTheDocument();
+    expect(screen.getByText('Sign in panel fixture')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading your speaker dashboard…' })).toBeNull();
+    expect(screen.getByRole('status', { name: 'Current route' })).toHaveTextContent(
+      '/speaker/dashboard?returnNonce=fixture',
+    );
+
+    authValue = { user: { uid: 'u1', getIdToken: async () => 'token' }, loading: false };
+    profileValue = {
+      profile: { speakerId: 'rae-okonkwo', displayName: 'Rae Okonkwo' },
+      status: 'ready',
+    };
+    view.rerender(<PageFixture initialEntry="/speaker/dashboard?returnNonce=fixture" />);
+
+    expect(await screen.findByRole('heading', { name: 'Speaker dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Current route' })).toHaveTextContent(
+      '/speaker/dashboard?returnNonce=fixture',
+    );
   });
 
   it('keeps a failed owner read visible and retries instead of treating it as a denial', async () => {
