@@ -10,8 +10,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Suspense } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 
@@ -53,7 +54,15 @@ vi.mock('../contexts/AuthContext.jsx', () => ({
   useAuth: () => ({ user: authUser, loading: authLoading }),
 }));
 
-const { default: Layout } = await import('./Layout.jsx');
+const renderPublicWebMcpRegistration = vi.fn();
+vi.mock('../webmcp/PublicWebMcpRegistration.jsx', () => ({
+  default: () => {
+    renderPublicWebMcpRegistration();
+    return null;
+  },
+}));
+
+const { default: Layout, optionalOnDemand } = await import('./Layout.jsx');
 
 const FIXTURE_EVENT = {
   name: '[Fixture] Example Conference 2027',
@@ -104,6 +113,48 @@ function renderShell(
     </MemoryRouter>,
   );
 }
+
+describe('Layout public model tools', () => {
+  it('does not load the optional registration module when the feature is off', async () => {
+    renderPublicWebMcpRegistration.mockClear();
+    renderShell({});
+
+    await waitFor(() => expect(renderPublicWebMcpRegistration).not.toHaveBeenCalled());
+  });
+
+  it('loads the optional registration module when the feature is on', async () => {
+    renderPublicWebMcpRegistration.mockClear();
+    renderShell({}, {
+      featureFlags: { ...FIXTURE_FEATURES, webmcpPublic: true },
+    });
+
+    await waitFor(() => expect(renderPublicWebMcpRegistration).toHaveBeenCalled());
+  });
+
+  it('keeps the shell visible when the optional module fails to load', async () => {
+    const error = new Error('chunk failed');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const FailedRegistration = optionalOnDemand(
+      () => Promise.reject(error),
+      'public model tools',
+    );
+
+    render(
+      <>
+        <span>Event shell</span>
+        <Suspense fallback={null}><FailedRegistration /></Suspense>
+      </>,
+    );
+
+    expect(screen.getByText('Event shell')).toBeInTheDocument();
+    await waitFor(() => expect(warn).toHaveBeenCalledWith(
+      'Optional public model tools could not load.',
+      error,
+    ));
+    expect(screen.getByText('Event shell')).toBeInTheDocument();
+    warn.mockRestore();
+  });
+});
 
 describe('Layout branding mark', () => {
   it('serves a seeded flat path from the bundle', () => {

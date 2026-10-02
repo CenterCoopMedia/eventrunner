@@ -71,6 +71,27 @@ describe('AnnouncementBanners', () => {
     fireEvent.click(firstBar.querySelector('button'));
     expect(screen.queryByText('First notice')).toBeNull();
     expect(screen.getByText('Second notice')).toBeInTheDocument();
-    expect(localStorage.getItem('notice-dismissed:first')).toBe('1');
+    expect(localStorage.length).toBe(1);
+  });
+
+  it('shows an edited announcement while the unchanged revision stays dismissed', () => {
+    const original = {
+      id: 'same-record', message: 'Use the east entrance.', level: 'info',
+      startsAt: '2026-10-02T13:00:00.000Z', endsAt: '2026-10-02T15:00:00.000Z',
+      link: null,
+    };
+    render(<AnnouncementBanners />);
+    act(() => report([original]));
+    fireEvent.click(screen.getByText(original.message).closest('[role="status"]').querySelector('button'));
+
+    act(() => report([{ ...original }]));
+    expect(screen.queryByText(original.message)).toBeNull();
+
+    act(() => report([{
+      ...original,
+      message: 'Use the west entrance.',
+      level: 'urgent',
+    }]));
+    expect(screen.getByRole('alert')).toHaveTextContent('Use the west entrance.');
   });
 });

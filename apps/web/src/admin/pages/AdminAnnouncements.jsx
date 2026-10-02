@@ -51,6 +51,7 @@ export default function AdminAnnouncements() {
   const call = useAdminApi();
   const { showToast } = useToast();
   const [rows, setRows] = useState(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [listError, setListError] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -63,6 +64,19 @@ export default function AdminAnnouncements() {
     (docs) => { setRows(docs); setListError(null); },
     setListError,
   ), []);
+
+  useEffect(() => {
+    const nextBoundary = (rows ?? [])
+      .flatMap((row) => [announcementTimeMs(row.startsAt), announcementTimeMs(row.endsAt)])
+      .filter((value) => value !== null && value > nowMs)
+      .sort((a, b) => a - b)[0];
+    if (nextBoundary === undefined) return undefined;
+    const timeout = setTimeout(
+      () => setNowMs(Date.now()),
+      Math.min(Math.max(nextBoundary - Date.now(), 1), 2_147_483_647),
+    );
+    return () => clearTimeout(timeout);
+  }, [nowMs, rows]);
 
   const ordered = useMemo(() => [...(rows ?? [])].sort(
     (a, b) => (announcementTimeMs(b.startsAt) ?? 0) - (announcementTimeMs(a.startsAt) ?? 0),
@@ -204,7 +218,7 @@ export default function AdminAnnouncements() {
                 <div className="flex flex-wrap items-start justify-between gap-sm px-md py-sm">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
-                      <StatusBadge tone={stateOf(row) === 'Active' ? 'ok' : 'info'}>{stateOf(row)}</StatusBadge>
+                      <StatusBadge tone={stateOf(row, nowMs) === 'Active' ? 'ok' : 'info'}>{stateOf(row, nowMs)}</StatusBadge>
                       <span className="font-admin-data text-admin-xs text-admin-ink-secondary">
                         {localInputValue(row.startsAt).replace('T', ' ')}–{localInputValue(row.endsAt).replace('T', ' ')}
                       </span>
