@@ -7,7 +7,7 @@
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
-const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { sendError, methodNotAllowed, badRequest, internal } = require('../core/errors.cjs');
 const { PUBLISHABLE_COLLECTIONS, draftCollectionFor } = require('./blockTypes.cjs');
 
 const META_COLLECTION = 'cmsMeta';
@@ -119,8 +119,12 @@ function createEnsurePendingCountsHandler({ db, auth, getConfig, now = Date.now,
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const actor = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
     if (!actor.ok) return sendError(res, actor.status, actor.code, actor.message);
+    const force = req.body?.force;
+    if (force !== undefined && typeof force !== 'boolean') {
+      return badRequest(res, 'force: must be a boolean');
+    }
     try {
-      await ensurePendingCounts({ db, now });
+      await ensurePendingCounts({ db, now, force: force === true });
     } catch (err) {
       log.error('cmsEnsurePendingCounts failed', err);
       return internal(res, 'The unpublished count could not be prepared.');
