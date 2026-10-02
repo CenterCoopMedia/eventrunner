@@ -235,20 +235,21 @@ export default function AdminPageEditor({ mode }) {
   }, [error]);
   const errorFor = (field) => fieldErrors.get(field);
 
+  if (mode === 'edit' && ready && !row) {
+    return (
+      <AdminEmptyState
+        title="No such page"
+        description="That page id has neither a published nor a draft revision."
+        action={
+          <Link to=".." relative="path" className={primaryButtonClass}>
+            Back to pages
+          </Link>
+        }
+      />
+    );
+  }
+
   if (mode === 'edit' && loadedIdRef.current !== pageId) {
-    if (ready && !row) {
-      return (
-        <AdminEmptyState
-          title="No such page"
-          description="That page id has neither a published nor a draft revision."
-          action={
-            <Link to=".." relative="path" className={primaryButtonClass}>
-              Back to pages
-            </Link>
-          }
-        />
-      );
-    }
     if (!ready && listenerError) {
       return (
         <Notice

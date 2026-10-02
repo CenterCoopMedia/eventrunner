@@ -233,6 +233,19 @@ describe('page editor', () => {
     expect(screen.queryByLabelText('Navigation label')).toBeNull();
   });
 
+  it('closes an adopted editor when another admin deletes the live page', async () => {
+    liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined }];
+    await renderAt('/admin/pages/scholarships');
+    expect(await screen.findByLabelText('Navigation label')).toHaveValue('Scholarships');
+
+    act(() => adminSubscriptions.get('cmsPages')([]));
+
+    expect(await screen.findByRole('heading', { name: 'No such page' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Navigation label')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('creates a page and saves it as a draft only (issue #13 done-when)', async () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/new');

@@ -139,6 +139,24 @@ describe('admin Sessions workspace', () => {
     expect(screen.queryByLabelText('Public title')).toBeNull();
   });
 
+  it('closes an adopted editor when another admin deletes the live session', async () => {
+    reportAdminCollectionsAtOnce = false;
+    await renderAt('/admin/sessions/keynote');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    pushSessions([{
+      id: 'keynote', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
+      title: 'Keynote', description: 'Opening remarks.', visible: true,
+    }], []);
+    expect(await screen.findByLabelText('Public title')).toHaveValue('Keynote');
+
+    act(() => adminSubscriptions.get('cmsSchedule')([]));
+
+    expect(await screen.findByRole('heading', { name: 'No such session' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Public title')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('groups by day and keeps a child directly below its parent', async () => {
     await renderAt('/admin/sessions');
     await screen.findByRole('heading', { name: 'Sessions' });

@@ -245,15 +245,16 @@ export default function AdminSessionEditor({ mode }) {
     }
   }
 
+  if (mode === 'edit' && ready && !row) {
+    return (
+      <AdminEmptyState
+        title="No such session"
+        description="That session does not exist. It may have been deleted."
+      />
+    );
+  }
+
   if (mode === 'edit' && !adoptedRef.current) {
-    if (ready && !row) {
-      return (
-        <AdminEmptyState
-          title="No such session"
-          description="That session does not exist. It may have been deleted."
-        />
-      );
-    }
     if (!ready && listenerError) {
       return (
         <Notice
