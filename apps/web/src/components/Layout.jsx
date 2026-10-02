@@ -72,6 +72,7 @@ import RegistrationAction from './RegistrationAction.jsx';
 import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
 import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
+import AnnouncementBanners from './AnnouncementBanners.jsx';
 import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
 
 // The feedback dialog and the change request dialog (issue #188) each sit
@@ -434,6 +435,7 @@ export default function Layout() {
           </Header>
         </div>
       </header>
+      <AnnouncementBanners />
       {navPlacement === 'side' ? (
         // The rail and the page it serves share one stage, so the nav
         // sits at the leading edge of the page rather than at the edge of

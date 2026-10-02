@@ -10,6 +10,7 @@ You edit the site. You do not deploy it. CCM (or another operator) handles Fireb
 - Attendees and the public directory
 - Sponsors and organizations
 - Live updates (from the admin form, not from Slack)
+- Site-wide announcements with active windows and optional links
 - Theme: colors and the bundled font sets
 - Badges from the predefined list and moderation of optional custom badges
 

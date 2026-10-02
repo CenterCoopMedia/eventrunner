@@ -129,6 +129,7 @@
               <li><a href="#speakers">Speakers</a></li>
               <li><a href="#attendees">Attendees</a></li>
               <li><a href="#ticketing">Ticketing</a></li>
+              <li><a href="#announcements">Announcements</a></li>
               <li><a href="#live-updates">Live updates</a></li>
               <li><a href="#feedback">Feedback</a></li>
               <li><a href="#email-log">Email log</a></li>
@@ -158,7 +159,7 @@
           </thead>
           <tbody>
           <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, and System errors</td><td>The person who set the site up and answers for the deployment</td></tr>
-          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings</td><td>The people who run the event day to day</td></tr>
+          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
           </div>
@@ -377,6 +378,8 @@
           <li><strong>None</strong>: Nothing to configure.</li>
           </ul>
           <p>Ticket records are server-only in Firestore. Every list, search, and import here goes through an admin-gated endpoint.</p>
+          <h2 id="announcements">Announcements<a class="heading-anchor" href="#announcements" aria-label="Link to this section">#</a></h2>
+          <p>Create, edit, and remove the ruled message bands shown across the public site. Choose <strong>Notice</strong> or <strong>Urgent</strong>, then set the start and end time. You can add one absolute <code>http</code> or <code>https</code> link and its visible label. A save is live immediately. The site shows the announcement only during that window, and a visitor who dismisses it does not see that same record again in that browser.</p>
           <h2 id="live-updates">Live updates<a class="heading-anchor" href="#live-updates" aria-label="Link to this section">#</a></h2>
           <p>Compose, edit, and delete entries in the live-updates feed shown on the public site. There is no draft/publish step here, unlike the CMS content tabs — a save is live immediately. This is an admin-authored feed only; nothing ingests from Slack or any other external source.</p>
           <h2 id="feedback">Feedback<a class="heading-anchor" href="#feedback" aria-label="Link to this section">#</a></h2>

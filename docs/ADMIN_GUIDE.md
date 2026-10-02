@@ -19,7 +19,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -318,6 +318,10 @@ Provider status, CSV import, and a searchable ticket list. What is here depends 
 - **None**: Nothing to configure.
 
 Ticket records are server-only in Firestore. Every list, search, and import here goes through an admin-gated endpoint.
+
+## Announcements
+
+Create, edit, and remove the ruled message bands shown across the public site. Choose **Notice** or **Urgent**, then set the start and end time. You can add one absolute `http` or `https` link and its visible label. A save is live immediately. The site shows the announcement only during that window, and a visitor who dismisses it does not see that same record again in that browser.
 
 ## Live updates
 

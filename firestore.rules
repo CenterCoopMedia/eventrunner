@@ -122,6 +122,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Site-wide messages are public content. Staff mutations go through
+    // saveAnnouncement/deleteAnnouncement so each one has an admin log.
+    match /announcements/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Publish bookkeeping: admin-readable for the CMS UI, written only by
     // the Admin SDK.
     match /cmsVersionHistory/{docId} {
