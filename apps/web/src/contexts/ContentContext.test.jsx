@@ -35,13 +35,14 @@ import snapshotOrganizationsData from '@generated/organizationsData.js';
 import snapshotTimelineData from '@generated/timelineData.js';
 
 function Probe() {
-  const { source, getBlock, getSectionBlocks, scheduleData, organizationsData, speakers, loading } =
+  const { source, contentSource, getBlock, getSectionBlocks, scheduleData, organizationsData, speakers, loading } =
     useContent();
   const heroTitle = useContent('hero', 'title');
   const { pages, getPage, getPublicPage } = usePages();
   return (
     <>
       <span data-testid="source">{source}</span>
+      <span data-testid="content-source">{contentSource}</span>
       <span data-testid="hero-title">{heroTitle?.value ?? ''}</span>
       <span data-testid="hero-title-via-getblock">{getBlock('hero', 'title')?.value ?? ''}</span>
       <span data-testid="hero-title-seeded">{String(getBlock('hero', 'title')?.seeded ?? 'absent')}</span>
@@ -67,6 +68,21 @@ beforeEach(() => {
 });
 
 describe('ContentProvider', () => {
+  it('reports content readiness only after the content listener delivers', () => {
+    const { rerender } = render(<ContentProvider><Probe /></ContentProvider>);
+    expect(screen.getByTestId('content-source')).toHaveTextContent('snapshot');
+
+    act(() => subscriptions.get('cmsPages').onNext([]));
+    expect(screen.getByTestId('source')).toHaveTextContent('live');
+    expect(screen.getByTestId('content-source')).toHaveTextContent('snapshot');
+
+    act(() => subscriptions.get('cmsContent').onNext([]));
+    expect(screen.getByTestId('content-source')).toHaveTextContent('live');
+
+    rerender(<ContentProvider readSource="draft"><Probe /></ContentProvider>);
+    expect(screen.getByTestId('content-source')).toHaveTextContent('snapshot');
+  });
+
   it('serves the snapshot first and subscribes to the runtime collections', () => {
     render(
       <ContentProvider>

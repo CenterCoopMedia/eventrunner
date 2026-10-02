@@ -3,21 +3,24 @@ name: CI
 # Credential-free by design (spec §8.1): no secrets, no Firebase project.
 # Every job must be runnable from a fork PR.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
+  statuses: read
 
 jobs:
   changes:
     name: Classify changed paths
     runs-on: ubuntu-latest
-    # The classifier is repository-owned so path selection is reviewable with
-    # the rest of the change. Pushes to main fail open to the full matrix;
-    # only pull requests use the path-specific tiers.
+    # Manual runs use the full matrix. PRs select tiers by changed paths.
     outputs:
+      local: ${{ steps.local.outputs.verified }}
       docs: ${{ steps.classify.outputs.docs }}
       demo: ${{ steps.classify.outputs.demo }}
       lint: ${{ steps.classify.outputs.lint }}
@@ -32,6 +35,34 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Check for trusted local results
+        id: local
+        uses: actions/github-script@v7
+        env:
+          LOCAL_CI_ACTOR_ID: ${{ vars.LOCAL_CI_ACTOR_ID }}
+        with:
+          script: |
+            core.setOutput('verified', 'false');
+            const pr = context.payload.pull_request;
+            if (!pr || pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
+            const fs = require('node:fs');
+            const path = require('node:path');
+            const { execFileSync } = require('node:child_process');
+            // Load the verifier from the PR's base, never its proposed replacement.
+            // Its first rollout uses the hosted checks until this file is in the base.
+            const verifier = path.join(process.env.RUNNER_TEMP, 'local-results.cjs');
+            try {
+              fs.writeFileSync(verifier, execFileSync('git', ['show', `${pr.base.sha}:scripts/ci/local-results.cjs`]));
+              const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
+                ...context.repo, ref: pr.head.sha, per_page: 100,
+              });
+              const { hasTrustedResult } = require(verifier);
+              core.setOutput('verified', String(hasTrustedResult({
+                statuses, base: pr.base.sha, actorId: process.env.LOCAL_CI_ACTOR_ID,
+              })));
+            } catch (error) {
+              core.warning(`Local results unavailable; using hosted checks: ${error.message}`);
+            }
       - name: Classify the changed paths
         id: classify
         env:
@@ -72,7 +103,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Full history: this job also runs on push to main, and a shallow
+          # Full history: manual runs scan all history, and a shallow
           # checkout would only ever scan the tip commit.
           fetch-depth: 0
       - name: Install gitleaks
@@ -88,13 +119,13 @@ jobs:
           ./gitleaks detect --source . --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" \
             --redact -v
       - name: gitleaks (full history)
-        if: github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch'
         run: ./gitleaks detect --source . --log-opts="--all" --redact -v
 
   docs:
     name: Documentation checks
     needs: changes
-    if: needs.changes.outputs.docs == 'true'
+    if: needs.changes.outputs.docs == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     # This tier intentionally uses only the runner's Node installation. It
     # checks local links and generated Pages HTML without an npm install.
@@ -114,7 +145,7 @@ jobs:
   lint:
     name: Lint
     needs: changes
-    if: needs.changes.outputs.lint == 'true'
+    if: needs.changes.outputs.lint == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -134,7 +165,7 @@ jobs:
   audit:
     name: Dependency audit policy
     needs: changes
-    if: needs.changes.outputs.audit == 'true'
+    if: needs.changes.outputs.audit == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     # Credential-free (spec §8.1): `npm audit` reads the committed lockfiles
     # against the public npm advisory database, no token or project needed,
@@ -160,7 +191,7 @@ jobs:
   unit:
     name: Shared package tests
     needs: changes
-    if: needs.changes.outputs.unit == 'true'
+    if: needs.changes.outputs.unit == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -178,7 +209,7 @@ jobs:
   unit-web:
     name: Web unit tests
     needs: changes
-    if: needs.changes.outputs.unitWeb == 'true'
+    if: needs.changes.outputs.unitWeb == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -196,7 +227,7 @@ jobs:
   build:
     name: Web build
     needs: changes
-    if: needs.changes.outputs.build == 'true'
+    if: needs.changes.outputs.build == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     # Credential-free (spec §8.1): the committed synthetic snapshot in
     # apps/web/src/generated/ feeds the build, and VITE_FIREBASE_* values are
@@ -228,7 +259,7 @@ jobs:
   hygiene:
     name: Generated-content hygiene
     needs: changes
-    if: needs.changes.outputs.hygiene == 'true'
+    if: needs.changes.outputs.hygiene == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     # Regenerates apps/web/src/generated/* from the synthetic demo fixture
     # (spec §8.6) and fails on any byte-for-byte difference, so the
@@ -251,7 +282,7 @@ jobs:
   demo:
     name: Demo build hygiene
     needs: changes
-    if: needs.changes.outputs.demo == 'true'
+    if: needs.changes.outputs.demo == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     # Rebuilds the static demo (spec issue #94) and fails on any byte-for-byte
     # difference from the committed docs/demo/, so the GitHub Pages demo
@@ -283,7 +314,7 @@ jobs:
   rules:
     name: Security rules on emulators
     needs: changes
-    if: needs.changes.outputs.rules == 'true'
+    if: needs.changes.outputs.rules == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -311,7 +342,7 @@ jobs:
   e2e:
     name: E2E on emulators
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     # Credential-free (spec §8.1, issue #38): Playwright drives the real app
     # against the full emulator suite (auth, firestore, storage, functions)
@@ -386,13 +417,13 @@ jobs:
     runs-on: ubuntu-latest
     # Keep this job's name stable and require it in branch protection. The
     # selected jobs must pass; skipped jobs are acceptable only when the
-    # classifier explicitly did not select them. DCO is intentionally skipped
-    # on pushes to main because it already ran on the merged pull request.
+    # classifier explicitly did not select them. DCO is skipped on manual runs, which have no pull request range.
     steps:
       - uses: actions/checkout@v4
       - name: Verify the selected CI tiers passed
         env:
           EVENT_NAME: ${{ github.event_name }}
+          LOCAL_VALIDATED: ${{ needs.changes.outputs.local }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           DCO_RESULT: ${{ needs.dco.result }}
           SECRETS_RESULT: ${{ needs.secrets.result }}

@@ -129,7 +129,7 @@ export function withLiveDates(block, eventConfig) {
 
 export default function Home() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { getPage, getSectionBlocks, getBlock, source } = useContent();
+  const { getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
 
   const page = getPage('home') ?? getPage('/');
   const title = getBlock('hero', 'title');
@@ -259,13 +259,8 @@ export default function Home() {
   const plate = buildNameplate(eventConfig);
 
   return (
-    // data-content-source mirrors ContentContext's own `source` field
-    // ('snapshot' | 'live') — inert everywhere except the e2e suite
-    // (e2e/cms-publish.spec.js), which has no other DOM-observable way to
-    // tell "the build-time snapshot is still rendering" apart from "the
-    // runtime cmsContent listener has delivered its first live batch",
-    // since a freshly-seeded project's live content and the committed demo
-    // snapshot render identical text by construction (spec §8.6 hygiene).
+    // The content-specific signal distinguishes the cmsContent listener
+    // from other live collections that may still show snapshot text.
     //
     // The lead is the core (brief §6.2), so the `hero` section is the core's
     // own and never renders again as a slot section. It is the only one:
@@ -276,6 +271,7 @@ export default function Home() {
       exclude={['hero']}
       renderSection={renderHomeSection}
       data-content-source={source}
+      data-cms-content-source={contentSource}
     >
       <section
         {...(leadTitle ? { 'aria-labelledby': 'hero-title' } : { 'aria-label': 'Introduction' })}

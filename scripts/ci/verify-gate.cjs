@@ -24,17 +24,24 @@ function verifyGate(env = process.env) {
   requireResult(env, 'SECRETS_RESULT', 'success');
   if (env.EVENT_NAME === 'pull_request') {
     requireResult(env, 'DCO_RESULT', 'success');
-  } else if (env.EVENT_NAME === 'push') {
+  } else if (env.EVENT_NAME === 'workflow_dispatch') {
     requireResult(env, 'DCO_RESULT', 'skipped');
   } else {
-    throw new Error('EVENT_NAME must be pull_request or push');
+    throw new Error('EVENT_NAME must be pull_request or workflow_dispatch');
+  }
+
+  if (!['true', 'false'].includes(env.LOCAL_VALIDATED)) {
+    throw new Error('LOCAL_VALIDATED must be exactly true or false');
+  }
+  if (env.LOCAL_VALIDATED === 'true' && env.EVENT_NAME !== 'pull_request') {
+    throw new Error('Only pull requests can use local results');
   }
 
   for (const { label, selected, result } of JOBS) {
     if (env[selected] !== 'true' && env[selected] !== 'false') {
       throw new Error(`${selected} must be exactly true or false`);
     }
-    const expected = env[selected] === 'true' ? 'success' : 'skipped';
+    const expected = env[selected] === 'true' && env.LOCAL_VALIDATED !== 'true' ? 'success' : 'skipped';
     if (env[result] !== expected) {
       throw new Error(`${label} was ${env[selected] === 'true' ? 'selected' : 'not selected'} but finished with ${env[result] || 'missing'}`);
     }

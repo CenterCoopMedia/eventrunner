@@ -15,6 +15,9 @@
 // version with its time, its account, and the one field it changed.
 import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
+import { RETRY_DELAY_MS } from '../apps/web/src/lib/retrySubscription.js';
+
+const CONTENT_TIMEOUT_MS = RETRY_DELAY_MS + 15_000;
 
 test.describe.serial('CMS edit -> publish -> public visibility', () => {
   const newSubtitle = `E2E edited subtitle ${Date.now()}`;
@@ -26,16 +29,11 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
   const subtitleDoc = () => adminDb().collection('cmsContent').doc('hero__subtitle');
 
   test('an admin edit is invisible on the public page until published, then appears', async ({ page }) => {
+    test.setTimeout(90_000);
     const idToken = await adminIdToken();
-    // ContentContext.jsx's own `source` ('snapshot' | 'live'), surfaced as
-    // a data attribute on Home.jsx's root element purely for this spec
-    // (see that file's comment). Both the committed build-time snapshot and
-    // a freshly-seeded project's live cmsContent render IDENTICAL text —
-    // seed-demo-event.cjs layers the exact same fixture generate-content.cjs
-    // --demo bakes into the snapshot (spec §8.6 hygiene) — so no text on
-    // this page can tell "still on the snapshot" apart from "the runtime
-    // listener resolved" the way this attribute can.
-    const liveContent = page.locator('article[data-content-source="live"]');
+    // Other collections may report before cmsContent. Wait for this
+    // listener even when the snapshot happens to contain the same text.
+    const liveContent = page.locator('article[data-cms-content-source="live"]');
     // Home.jsx's lead section is always the FIRST <section> under the
     // content article, and the hero subtitle is always the LAST <p> inside
     // it — an optional tagline paragraph (present here as an empty <p>,
@@ -55,7 +53,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     // not just whatever the build-time snapshot happens to render on first
     // paint — before trusting anything read off this page as "live".
     await page.goto('/');
-    await expect(liveContent).toBeVisible();
+    await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
     await expect(subtitle).toBeVisible();
     const before = await subtitle.textContent();
     expect(before).not.toBe(newSubtitle);
@@ -82,7 +80,7 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     // cmsContent listener (which is what would actually leak a draft, if
     // isolation were broken) ever having reported in.
     await page.reload();
-    await expect(liveContent).toBeVisible();
+    await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
     await expect(subtitle).toHaveText(before);
 
     // Publish the draft (spec §8.4 step 3) — a Firestore revision copy, not
@@ -97,7 +95,8 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
     // The public page — a fresh navigation, no admin session, no
     // ?preview=1 — now shows the published change.
     await page.goto('/');
-    await expect(subtitle).toHaveText(newSubtitle);
+    await expect(liveContent).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
+    await expect(subtitle).toHaveText(newSubtitle, { timeout: CONTENT_TIMEOUT_MS });
   });
 
   test('the edit and the publish read back as a version: what changed, when, and by which account', async ({ page }) => {
