@@ -144,7 +144,7 @@ function ChangeTable({ entry, timeZone }) {
 }
 
 /** A non-destructive restore confirmation when no unpublished work is lost. */
-function RestoreConfirm({ entry, removed, busy, error, onConfirm, onCancel, headingRef, errorRef }) {
+function RestoreConfirm({ entry, removed, busy, disabled, error, onConfirm, onCancel, headingRef, errorRef }) {
   const headingId = useId();
   return (
     <section
@@ -165,7 +165,7 @@ function RestoreConfirm({ entry, removed, busy, error, onConfirm, onCancel, head
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="button" className={primaryButtonClass} disabled={busy} onClick={onConfirm}>
+        <button type="button" className={primaryButtonClass} disabled={busy || disabled} onClick={onConfirm}>
           {busy ? 'Restoring…' : 'Restore as draft'}
         </button>
         <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
@@ -206,9 +206,9 @@ export default function AdminVersionHistory() {
   const [returnFocus, setReturnFocus] = useState(null);
 
   const requestRef = useRef(0);
-  // A route change or unmount invalidates writes as well as reads. A late
-  // restore must never put another record's Publish now action on this page.
-  const mutationRef = useRef(0);
+  // Only one restore or publish may run for this record. The token also
+  // invalidates its completion after navigation or unmount.
+  const mutationRef = useRef(null);
   const currentDocPath = useRef(docPath);
   currentDocPath.current = docPath;
   // The latest call, read when a read starts: a new token-bound callback
@@ -259,7 +259,7 @@ export default function AdminVersionHistory() {
     load('load');
     return () => {
       requestRef.current += 1;
-      mutationRef.current += 1;
+      mutationRef.current = null;
     };
   }, [docPath, load]);
 
@@ -342,6 +342,7 @@ export default function AdminVersionHistory() {
   }
 
   function openRestore(revision) {
+    if (mutationRef.current) return;
     setRestoreError(null);
     setConfirming(revision);
   }
@@ -354,9 +355,10 @@ export default function AdminVersionHistory() {
 
   async function restore(entry) {
     const request = requestFor(entry);
-    if (!request || restoringRevision !== null || currentDocPath.current !== docPath) return;
-    const mutationId = ++mutationRef.current;
-    const isCurrent = () => mutationId === mutationRef.current && currentDocPath.current === docPath;
+    if (!request || mutationRef.current || currentDocPath.current !== docPath) return;
+    const mutation = { docPath };
+    mutationRef.current = mutation;
+    const isCurrent = () => mutation === mutationRef.current && currentDocPath.current === docPath;
     setRestoringRevision(entry.revision);
     setRestoreError(null);
     try {
@@ -374,14 +376,18 @@ export default function AdminVersionHistory() {
     } catch (err) {
       if (isCurrent()) setRestoreError({ revision: entry.revision, error: err });
     } finally {
-      if (isCurrent()) setRestoringRevision(null);
+      if (isCurrent()) {
+        mutationRef.current = null;
+        setRestoringRevision(null);
+      }
     }
   }
 
   async function publishRestored() {
-    if (publishing || notice?.kind !== 'restored' || currentDocPath.current !== docPath) return;
-    const mutationId = ++mutationRef.current;
-    const isCurrent = () => mutationId === mutationRef.current && currentDocPath.current === docPath;
+    if (mutationRef.current || notice?.kind !== 'restored' || currentDocPath.current !== docPath) return;
+    const mutation = { docPath };
+    mutationRef.current = mutation;
+    const isCurrent = () => mutation === mutationRef.current && currentDocPath.current === docPath;
     setPublishing(true);
     try {
       const response = await callRef.current('cmsPublish', { collection: choice.id, docIds: [docId] });
@@ -397,6 +403,7 @@ export default function AdminVersionHistory() {
       if (isCurrent()) setNotice((current) => ({ ...current, publishError: err.message }));
     } finally {
       if (isCurrent()) {
+        mutationRef.current = null;
         setPublishing(false);
         setNoticeFocus((value) => value + 1);
       }
@@ -475,7 +482,7 @@ export default function AdminVersionHistory() {
         <button
           type="button"
           className={primaryButtonClass}
-          disabled={publishing}
+          disabled={publishing || restoringRevision !== null}
           aria-busy={publishing ? 'true' : undefined}
           onClick={publishRestored}
         >
@@ -579,7 +586,7 @@ export default function AdminVersionHistory() {
                       title={`Restore version ${entry.revision}?`}
                       confirmLabel="Restore as draft"
                       busyLabel="Restoring…"
-                      disabled={restoringRevision !== null && restoringRevision !== entry.revision}
+                      disabled={publishing || (restoringRevision !== null && restoringRevision !== entry.revision)}
                       busy={restoringRevision === entry.revision}
                       consequence="The unpublished changes in the current draft go, and no version keeps them."
                       permanence="This cannot be undone."
@@ -597,6 +604,7 @@ export default function AdminVersionHistory() {
                     entry={entry}
                     removed={!row}
                     busy={restoringRevision === entry.revision}
+                    disabled={publishing || (restoringRevision !== null && restoringRevision !== entry.revision)}
                     error={restoreError?.revision === entry.revision ? restoreError.error : null}
                     onConfirm={() => restore(entry)}
                     onCancel={cancelRestore}
@@ -612,7 +620,7 @@ export default function AdminVersionHistory() {
                         else restoreButtonRefs.current.delete(entry.revision);
                       }}
                       className={secondaryButtonClass}
-                      disabled={restoringRevision !== null}
+                      disabled={publishing || restoringRevision !== null}
                       onClick={() => openRestore(entry.revision)}
                     >
                       {`Restore version ${entry.revision}`}
