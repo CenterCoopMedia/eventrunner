@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import * as blockTypesCjs from '../../../../functions/src/cms/blockTypes.cjs';
 import * as storeCjs from '../../../../functions/src/cms/store.cjs';
+import * as timelineCjs from '../../../../functions/src/cms/timeline.cjs';
 import { DELETE_FIELD_SENTINEL } from './contentDoc.js';
 import {
   COLLECTION_CHOICES,
@@ -22,6 +23,7 @@ import {
 
 const { PUBLISHABLE_COLLECTIONS } = blockTypesCjs.default ?? blockTypesCjs;
 const { internals: storeInternals } = storeCjs.default ?? storeCjs;
+const { validateTimelineFields } = timelineCjs.default ?? timelineCjs;
 
 // 2:02 PM on Sep 23, 2026 in New York (EDT, UTC-4).
 const PUBLISHED = Date.UTC(2026, 8, 23, 18, 2);
@@ -187,6 +189,16 @@ describe('restoreRequestFor', () => {
       endpoint: 'cmsCreateContent',
       body: { collection: 'cmsTimeline', docId: 't1', fields: { year: 2020, title: 'First' }, visible: true },
     });
+  });
+
+  it('restores timeline fields without sending stored-only legacy keys', () => {
+    const current = { id: 't1', year: 2025, title: 'Now', description: 'Remove this', legacyColor: 'blue' };
+    const request = restoreRequestFor('cmsTimeline', 't1', entry({ year: 2020, title: 'Then', oldLink: 'legacy' }), current);
+    expect(request.body.fields).toEqual({ year: 2020, title: 'Then', description: DELETE_FIELD_SENTINEL });
+    const merged = { ...current, ...request.body.fields };
+    delete merged.description;
+    const checked = validateTimelineFields(merged, request.body.fields);
+    expect(checked).toEqual({ ok: true, fields: { year: 2020, title: 'Then', description: null } });
   });
 
   it('sends a page and update through their whole-record save endpoints', () => {

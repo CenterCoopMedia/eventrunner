@@ -88,12 +88,29 @@ function onDemand(importer) {
     }),
   );
 }
+
+export function optionalOnDemand(importer, label) {
+  return lazy(() =>
+    importer()
+      .then((module) => {
+        clearReloadFlag();
+        return module;
+      })
+      .catch((error) => {
+        console.warn(`Optional ${label} could not load.`, error);
+        return { default: () => null };
+      }),
+  );
+}
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 // The public model tools are optional and render no interface. Keep their
 // definitions and registration machinery out of the initial site bundle,
 // then load them only for the demo or a deployment that enables the flag.
-const PublicWebMcpRegistration = onDemand(() => import('../webmcp/PublicWebMcpRegistration.jsx'));
+const PublicWebMcpRegistration = optionalOnDemand(
+  () => import('../webmcp/PublicWebMcpRegistration.jsx'),
+  'public model tools',
+);
 
 /**
  * The page's own header, read into the theme's vocabulary.

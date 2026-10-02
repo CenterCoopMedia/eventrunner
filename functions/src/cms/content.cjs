@@ -300,7 +300,10 @@ async function checkContentCreateSection({ db, tx, collection, pageId, sectionId
     return { ok: false, message: 'pageId: must name the page that owns this content section.' };
   }
 
-  const lockRef = db.collection(CONTENT_SECTION_LOCKS).doc(`${pageId.length}:${pageId}:${sectionId}`);
+  // Content rows are keyed and counted by sectionId alone. The lock must use
+  // that same namespace, or two pages that name the same section can pass the
+  // count concurrently while reading and writing different lock documents.
+  const lockRef = db.collection(CONTENT_SECTION_LOCKS).doc(sectionId);
   const [draftPage, livePage, lockSnap] = await tx.getAll(
     db.collection(PAGES_DRAFTS).doc(pageId),
     db.collection(PAGES_COLLECTION).doc(pageId),

@@ -65,6 +65,9 @@ import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
 export const DIALOG_FRAME_CLASS =
   'w-full max-w-lg border-strong border-rule-strong bg-surface p-lg';
 
+/** The server's stored-message limit (functions/src/admin/feedback.cjs). */
+export const MAX_MESSAGE_LENGTH = 4000;
+
 const CATEGORY_OPTIONS = [
   { value: 'feedback', label: 'General feedback' },
   { value: 'bug', label: 'Something is broken' },
@@ -107,7 +110,8 @@ export default function FeedbackModal({ onClose }) {
 
   async function submit(event) {
     event.preventDefault();
-    if (!message.trim()) {
+    const normalizedMessage = message.trim();
+    if (!normalizedMessage) {
       // The field says it, and the reader is put in front of the field.
       setMessageError('Please enter a message.');
       // A rejection from the server, if one is still standing, goes now:
@@ -120,11 +124,17 @@ export default function FeedbackModal({ onClose }) {
       window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
+    if (normalizedMessage.length > MAX_MESSAGE_LENGTH) {
+      setMessageError(`Please keep your message to ${MAX_MESSAGE_LENGTH.toLocaleString('en-US')} characters.`);
+      setError(null);
+      window.setTimeout(() => focusFirstError(formRef.current), 0);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     setMessageError(null);
     const payload = {
-      message: message.trim(),
+      message: normalizedMessage,
       email: email.trim().toLowerCase() || undefined,
       category,
     };
@@ -205,10 +215,14 @@ export default function FeedbackModal({ onClose }) {
               // only whitespace has not answered it, so the mark stays.
               onChange={(next) => {
                 setMessage(next);
-                if (messageError && next.trim()) setMessageError(null);
+                if (messageError && next.trim() && next.trim().length <= MAX_MESSAGE_LENGTH) {
+                  setMessageError(null);
+                }
               }}
               error={messageError}
+              hint={`Up to ${MAX_MESSAGE_LENGTH.toLocaleString('en-US')} characters.`}
               rows={5}
+              maxLength={MAX_MESSAGE_LENGTH}
               autoFocus
             />
             <TextField
