@@ -185,6 +185,9 @@ const NOT_CONTENT = Object.freeze([
 
 /** Seed bookkeeping is removed by every normal editor save. */
 const SEED_FIELDS = Object.freeze(['seeded', 'seededAt']);
+// The timeline save seam drops stored-only legacy fields and rejects them
+// in a request. Restore only the same three fields its normal editor sends.
+const TIMELINE_FIELDS = Object.freeze(['year', 'title', 'description']);
 
 function withoutSeedFields(fields) {
   const out = {};
@@ -209,7 +212,10 @@ export function pageIdForSection(rows, sectionId) {
  * cmsCreateContent enforces that page's section rules atomically.
  */
 export function restoreRequestFor(collection, docId, entry, current, { pageId = null } = {}) {
-  const fields = withoutSeedFields(entry?.fields);
+  const snapshot = withoutSeedFields(entry?.fields);
+  const fields = collection === 'cmsTimeline'
+    ? Object.fromEntries(Object.entries(snapshot).filter(([key]) => TIMELINE_FIELDS.includes(key)))
+    : snapshot;
   const visible = entry?.visible !== false;
   if (collection === 'cmsPages') {
     return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible } } };
@@ -238,6 +244,7 @@ export function restoreRequestFor(collection, docId, entry, current, { pageId = 
   const cleared = {};
   for (const key of Object.keys(current)) {
     if (NOT_CONTENT.includes(key) || SEED_FIELDS.includes(key)) continue;
+    if (collection === 'cmsTimeline' && !TIMELINE_FIELDS.includes(key)) continue;
     if (!Object.hasOwn(fields, key)) cleared[key] = DELETE_FIELD_SENTINEL;
   }
   return {

@@ -3,7 +3,7 @@
 // what changed from the version before it.
 //
 // The page reads cmsGetVersionHistory (functions/src/cms/versions.cjs) for
-// one docPath, 20 versions a call, and renders what the server answers: the
+// one docPath, up to 20 versions a call, and renders what the server answers: the
 // server compares each version with the one before it, so this page never
 // diffs anything itself. It reads the record's live and draft documents too
 // (useAdminRecords), for its name, its state, and what a restore replaces.
@@ -93,7 +93,11 @@ function ChangeTable({ entry, timeZone }) {
           {entry.revision === 1 ? 'First published.' : 'Earliest version on record.'}
         </p>
       ) : null}
-      {changes.length === 0 ? (
+      {entry.changeValuesOmitted ? (
+        <p className="text-admin-sm text-admin-ink">
+          Change details are too large to show. This version can still be restored.
+        </p>
+      ) : changes.length === 0 ? (
         <p className="text-admin-sm text-admin-ink">No field changed in this publish.</p>
       ) : (
         <table className="w-full table-fixed border-collapse text-admin-sm">
@@ -130,7 +134,7 @@ function ChangeTable({ entry, timeZone }) {
           </tbody>
         </table>
       )}
-      {more > 0 ? (
+      {more > 0 && !entry.changeValuesOmitted ? (
         <p className="text-admin-sm text-admin-ink-secondary">
           {`${plural(more, 'more change is', 'more changes are')} not listed.`}
         </p>
@@ -195,12 +199,18 @@ export default function AdminVersionHistory() {
   const [restoringRevision, setRestoringRevision] = useState(null);
   const [restoreError, setRestoreError] = useState(null);
   const [restoreReset, setRestoreReset] = useState(0);
-  const [notice, setNotice] = useState(null);
+  const [storedNotice, setNotice] = useState(null);
+  const notice = storedNotice?.docPath === docPath ? storedNotice : null;
   const [publishing, setPublishing] = useState(false);
   const [noticeFocus, setNoticeFocus] = useState(0);
   const [returnFocus, setReturnFocus] = useState(null);
 
   const requestRef = useRef(0);
+  // A route change or unmount invalidates writes as well as reads. A late
+  // restore must never put another record's Publish now action on this page.
+  const mutationRef = useRef(0);
+  const currentDocPath = useRef(docPath);
+  currentDocPath.current = docPath;
   // The latest call, read when a read starts: a new token-bound callback
   // (useAdminApi follows the signed-in user) must not restart the reads.
   const callRef = useRef(call);
@@ -243,10 +253,13 @@ export default function AdminVersionHistory() {
     setError(null);
     setConfirming(null);
     setRestoreError(null);
+    setRestoringRevision(null);
+    setPublishing(false);
     setNotice(null);
     load('load');
     return () => {
       requestRef.current += 1;
+      mutationRef.current += 1;
     };
   }, [docPath, load]);
 
@@ -341,43 +354,52 @@ export default function AdminVersionHistory() {
 
   async function restore(entry) {
     const request = requestFor(entry);
-    if (!request || restoringRevision !== null) return;
+    if (!request || restoringRevision !== null || currentDocPath.current !== docPath) return;
+    const mutationId = ++mutationRef.current;
+    const isCurrent = () => mutationId === mutationRef.current && currentDocPath.current === docPath;
     setRestoringRevision(entry.revision);
     setRestoreError(null);
     try {
       await callRef.current(request.endpoint, request.body);
+      if (!isCurrent()) return;
       setConfirming(null);
       setRestoreReset((value) => value + 1);
       setNotice({
+        docPath,
         kind: 'restored',
         revision: entry.revision,
         liveRevision: typeof row?.live?.revision === 'number' ? row.live.revision : null,
       });
       setNoticeFocus((value) => value + 1);
     } catch (err) {
-      setRestoreError({ revision: entry.revision, error: err });
+      if (isCurrent()) setRestoreError({ revision: entry.revision, error: err });
     } finally {
-      setRestoringRevision(null);
+      if (isCurrent()) setRestoringRevision(null);
     }
   }
 
   async function publishRestored() {
-    if (publishing) return;
+    if (publishing || notice?.kind !== 'restored' || currentDocPath.current !== docPath) return;
+    const mutationId = ++mutationRef.current;
+    const isCurrent = () => mutationId === mutationRef.current && currentDocPath.current === docPath;
     setPublishing(true);
     try {
       const response = await callRef.current('cmsPublish', { collection: choice.id, docIds: [docId] });
+      if (!isCurrent()) return;
       const verdict = summarizePublish(response, choice.id, [docId], choice.plural);
       if (verdict.ok) {
-        setNotice({ kind: 'published', message: verdict.message });
+        setNotice({ docPath, kind: 'published', message: verdict.message });
         load('refresh');
       } else {
         setNotice((current) => ({ ...current, publishError: verdict.message }));
       }
     } catch (err) {
-      setNotice((current) => ({ ...current, publishError: err.message }));
+      if (isCurrent()) setNotice((current) => ({ ...current, publishError: err.message }));
     } finally {
-      setPublishing(false);
-      setNoticeFocus((value) => value + 1);
+      if (isCurrent()) {
+        setPublishing(false);
+        setNoticeFocus((value) => value + 1);
+      }
     }
   }
 

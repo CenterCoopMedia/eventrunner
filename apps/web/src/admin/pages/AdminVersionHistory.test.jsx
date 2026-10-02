@@ -95,10 +95,12 @@ const historyCalls = () => callMock.mock.calls.filter(([name]) => name === 'cmsG
 
 function deferred() {
   let resolve;
-  const promise = new Promise((r) => {
+  let reject;
+  const promise = new Promise((r, fail) => {
     resolve = r;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 const LIVE = { id: 'hero__subtitle', section: 'hero', field: 'subtitle', blockType: 'text', value: 'Four days of workshops.', visible: true, revision: 2 };
@@ -135,6 +137,37 @@ async function renderPage(path = `/admin/versions/${DOC_PATH}`, options) {
 
 const versionItem = (revision) =>
   screen.getByRole('heading', { level: 2, name: `Version ${revision}` }).closest('li');
+
+async function renderNavigablePage(options) {
+  serve({
+    pages: [
+      { entries: [EDITED, SEEDED], nextCursor: null },
+      {
+        entries: [2, 1].map((revision) => entry(revision, {
+          docPath: 'cmsContent/hero__title',
+          fields: { section: 'hero', field: 'title', blockType: 'text', value: `Title ${revision}` },
+        })),
+        nextCursor: null,
+      },
+    ],
+    ...options,
+  });
+  let navigate;
+  function Navigator() {
+    navigate = useNavigate();
+    return null;
+  }
+  render(
+    <MemoryRouter initialEntries={[`/admin/versions/${DOC_PATH}`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <Navigator />
+      <Routes>
+        <Route path="/admin/versions/:collection/:docId" element={<AdminVersionHistory />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await screen.findByRole('heading', { name: 'Version 1' });
+  return navigate;
+}
 
 beforeEach(() => {
   callMock.mockReset();
@@ -446,6 +479,58 @@ describe('one record’s versions', () => {
 });
 
 describe('restoring a version', () => {
+  it.each(['success', 'error'])('ignores a late restore %s after navigating to another record', async (outcome) => {
+    const restore = deferred();
+    const navigate = await renderNavigablePage({ others: { cmsUpdateContent: restore.promise } });
+    reportRecord();
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    await waitFor(() => expect(callMock).toHaveBeenCalledWith('cmsUpdateContent', expect.any(Object)));
+
+    await act(async () => navigate('/admin/versions/cmsContent/hero__title'));
+    reportRecord({
+      live: [{ ...LIVE, id: 'hero__title', field: 'title' }],
+      drafts: [{ ...CLEAN_DRAFT, id: 'hero__title', field: 'title', status: 'dirty' }],
+    });
+    await act(async () => {
+      if (outcome === 'success') restore.resolve({ status: 'dirty' });
+      else restore.reject(new Error('The old record could not be restored.'));
+    });
+
+    expect(screen.queryByRole('button', { name: 'Publish now' })).toBeNull();
+    expect(screen.queryByText(/is now the draft/)).toBeNull();
+    expect(screen.queryByText('The old record could not be restored.')).toBeNull();
+    expect(callMock.mock.calls.some(([name]) => name === 'cmsPublish')).toBe(false);
+  });
+
+  it('ignores a late publish result and does not refresh the previous record after navigation', async () => {
+    const publish = deferred();
+    const navigate = await renderNavigablePage({
+      others: { cmsUpdateContent: { status: 'dirty' }, cmsPublish: publish.promise },
+    });
+    reportRecord();
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish now' }));
+    await act(async () => navigate('/admin/versions/cmsContent/hero__title'));
+    const reads = historyCalls().length;
+    await act(async () => publish.resolve({
+      status: 'done', results: { cmsContent: { published: ['hero__subtitle'], skipped: [] } },
+    }));
+    expect(historyCalls()).toHaveLength(reads);
+    expect(screen.queryByText('Published. The public site picks it up live.')).toBeNull();
+  });
+
+  it('keeps a full snapshot restorable when its change details are omitted for size', async () => {
+    await renderPage(undefined, {
+      pages: [{ entries: [entry(1, { changes: [], moreChanges: 2, changeValuesOmitted: true })], nextCursor: null }],
+    });
+    reportRecord();
+    expect(screen.getByText('Change details are too large to show. This version can still be restored.')).toBeInTheDocument();
+    expect(screen.queryByText('No field changed in this publish.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Restore version 1' })).toBeEnabled();
+  });
+
   it('offers a past version and not the version already live with no pending draft', async () => {
     await renderPage();
     expect(screen.queryByRole('button', { name: /Restore version/ })).toBeNull();

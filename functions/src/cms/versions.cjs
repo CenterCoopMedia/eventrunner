@@ -32,6 +32,9 @@ const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+// Snapshot fields must remain complete for restore. Large histories use
+// smaller pages so repeating those fields in the diff cannot overflow HTTP.
+const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 /** The most changes one entry lists; `moreChanges` counts the rest. */
 const MAX_CHANGES = 50;
 /**
@@ -276,10 +279,36 @@ function createGetVersionHistoryHandler({ db, auth, getConfig, log = console }) 
       return internal(res, 'Version history is temporarily unavailable.');
     }
 
-    const entries = snap.docs
-      .slice(0, pageSize)
-      .map((d, index) => toEntry(d, snap.docs[index + 1] ?? null));
-    const nextCursor = snap.docs.length > pageSize ? entries[entries.length - 1].revision : null;
+    const entries = [];
+    let entryBytes = 0;
+    let nextCursor = null;
+    for (let index = 0; index < Math.min(snap.docs.length, pageSize); index += 1) {
+      let entry = toEntry(snap.docs[index], snap.docs[index + 1] ?? null);
+      const cursorAfterEntry = snap.docs.length > index + 1 ? entry.revision : null;
+      // The empty envelope already contains both array brackets. Add each
+      // serialized entry and one comma per existing entry for the exact size.
+      const envelopeBytes = Buffer.byteLength(JSON.stringify({ entries: [], nextCursor: cursorAfterEntry }), 'utf8');
+      let bytes = Buffer.byteLength(JSON.stringify(entry), 'utf8');
+      if (entries.length === 0 && envelopeBytes + bytes > MAX_RESPONSE_BYTES) {
+        entry = {
+          ...entry,
+          changeValuesOmitted: true,
+          moreChanges: entry.moreChanges + entry.changes.length,
+          changes: [],
+        };
+        bytes = Buffer.byteLength(JSON.stringify(entry), 'utf8');
+        // A valid Firestore snapshot fits even under worst-case JSON escaping.
+        // Fail closed for malformed imports instead of sending an oversized body.
+        if (envelopeBytes + bytes > MAX_RESPONSE_BYTES) {
+          log.error('Version snapshot exceeds response budget', { docPath, revision: entry.revision });
+          return internal(res, 'This version is too large to load.');
+        }
+      }
+      if (envelopeBytes + entryBytes + bytes + entries.length > MAX_RESPONSE_BYTES) break;
+      entries.push(entry);
+      entryBytes += bytes;
+      nextCursor = cursorAfterEntry;
+    }
     res.status(200).json({ entries, nextCursor });
   };
 }
@@ -321,6 +350,7 @@ module.exports = {
     toMillis,
     DEFAULT_LIMIT,
     MAX_LIMIT,
+    MAX_RESPONSE_BYTES,
     MAX_CHANGES,
   },
 };
