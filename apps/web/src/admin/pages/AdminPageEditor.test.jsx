@@ -755,6 +755,50 @@ describe('page editor', () => {
 });
 
 describe('publish results and recovery', () => {
+  it('reports a resumed list publish against the ids the failed run asked for', async () => {
+    const latePage = {
+      ...SCHOLARSHIPS_DRAFT,
+      id: 'late-page',
+      label: 'Late page',
+      path: '/late-page',
+      status: undefined,
+    };
+    liveDocs = [latePage];
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({
+        error: { code: 'publish-failed', message: 'Publish failed part-way.' },
+        queueId: 'queue-list',
+      }),
+    });
+    await renderAt('/admin/pages');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish all (1)' }));
+    const resume = await screen.findByRole('button', { name: 'Resume publish' });
+
+    // A page outside the failed run gains a draft before the operator
+    // resumes. It remains pending, but it was not one of the attempted ids.
+    act(() => adminSubscriptions.get('cmsPages_drafts')([
+      SCHOLARSHIPS_DRAFT,
+      { ...latePage, label: 'Late unpublished edit', status: 'dirty' },
+    ]));
+    expect(screen.getByRole('button', { name: 'Publish all (2)' })).toBeInTheDocument();
+
+    fetch.mockResolvedValueOnce(okResponse({
+      results: { cmsPages: { published: ['scholarships'], skipped: [] } },
+    }));
+    fireEvent.click(resume);
+
+    expect(await screen.findByText(
+      'Published. The public site picks it up live.',
+      { selector: 'p[role="status"]' },
+    )).toBeInTheDocument();
+    expect(bodyOf(1)).toEqual({ queueId: 'queue-list' });
+    expect(screen.queryByText(/late-page was skipped/)).toBeNull();
+  });
+
   it('waits for BOTH revisions before judging publish state', async () => {
     // With only the live listener in, a draft-only page reads as "no such
     // page" and a clean draft reads as never published — which Publish all
