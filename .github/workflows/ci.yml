@@ -76,8 +76,8 @@ jobs:
     runs-on: ubuntu-latest
     # Credential-free (spec §8.1, §1.5): reads only the checked-out git
     # range from the PR event payload — no token, no third-party action, so
-    # a fork PR runs it exactly like a same-repo PR. Skipped on push (a
-    # merge to main has already passed this check as a PR).
+    # a fork PR runs it exactly like a same-repo PR. Manual runs have no PR
+    # commit range and skip this job.
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
@@ -416,8 +416,8 @@ jobs:
     needs: [changes, dco, secrets, docs, demo, lint, audit, unit, unit-web, build, hygiene, rules, e2e]
     runs-on: ubuntu-latest
     # Keep this job's name stable and require it in branch protection. The
-    # selected jobs must pass; skipped jobs are acceptable only when the
-    # classifier explicitly did not select them. DCO is skipped on manual runs, which have no pull request range.
+    # Selected tiers must pass locally or on GitHub. DCO and secret scanning
+    # remain hosted; manual runs skip DCO because they have no PR range.
     steps:
       - uses: actions/checkout@v4
       - name: Verify the selected CI tiers passed

@@ -201,7 +201,7 @@
           <code>apps/web/src/generated/**</code> since the last rebuild: <code>npm run build:demo</code>, review the diff, commit
           it (a normal DCO-signed commit, same as any other change).</li>
           <li><strong>CI catches a forgotten rebuild for you</strong> — the <code>demo</code> job (<code>.github/workflows/ci.yml</code>) runs
-          <code>node scripts/build-demo.cjs --check</code> on every push and PR and fails if a fresh build differs
+          <code>node scripts/build-demo.cjs --check</code> for pull requests and manual CI runs and fails if a fresh build differs
           from the committed <code>docs/demo/</code> (issue #94). Treat a red <code>demo</code> job as &quot;rebuild and commit&quot;,
           never as a reason to touch <code>docs/demo/</code> by hand.</li>
           <li><strong>The build is deterministic</strong>: repeated builds of unchanged input, including Vite&#39;s

@@ -91,7 +91,7 @@ deploy time — it has to be rebuilt and committed by hand whenever its inputs c
   `apps/web/src/generated/**` since the last rebuild: `npm run build:demo`, review the diff, commit
   it (a normal DCO-signed commit, same as any other change).
 - **CI catches a forgotten rebuild for you** — the `demo` job (`.github/workflows/ci.yml`) runs
-  `node scripts/build-demo.cjs --check` on every push and PR and fails if a fresh build differs
+  `node scripts/build-demo.cjs --check` for pull requests and manual CI runs and fails if a fresh build differs
   from the committed `docs/demo/` (issue #94). Treat a red `demo` job as "rebuild and commit",
   never as a reason to touch `docs/demo/` by hand.
 - **The build is deterministic**: repeated builds of unchanged input, including Vite's
