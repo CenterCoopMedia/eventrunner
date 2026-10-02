@@ -425,7 +425,7 @@ jobs:
     if: always()
     needs: [changes, dco, secrets, docs, demo, lint, audit, unit, unit-web, build, hygiene, rules, e2e]
     runs-on: ubuntu-latest
-    # Keep this job's name stable and require it in branch protection. The
+    # Keep this job's name stable and require it in branch protection.
     # Selected tiers must pass locally or on GitHub. DCO and secret scanning
     # remain hosted; manual runs skip DCO because they have no PR range.
     steps:
