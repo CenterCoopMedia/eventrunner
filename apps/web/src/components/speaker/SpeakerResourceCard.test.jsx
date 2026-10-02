@@ -159,6 +159,57 @@ describe('SpeakerResourceCard', () => {
     );
   });
 
+  it('links the existing area map when no uploaded map is configured', () => {
+    contentValue = {
+      getPublicPage: publicPage([
+        {
+          ...TRAVEL,
+          sections: [{ id: 'travel_local', label: 'Around the venue' }],
+        },
+      ]),
+    };
+    configValue = {
+      features: {},
+      eventConfig: {
+        venue: {
+          mapUrl: 'https://www.openstreetmap.org/?mlat=40.74&mlon=-74.17',
+        },
+      },
+    };
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SpeakerResourceCard />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: 'Around the venue' })).toHaveAttribute(
+      'href',
+      '/travel#section-travel_local',
+    );
+  });
+
+  it('omits an unsafe area-map URL', () => {
+    contentValue = {
+      getPublicPage: publicPage([
+        {
+          ...TRAVEL,
+          sections: [{ id: 'travel_local', label: 'Around the venue' }],
+        },
+      ]),
+    };
+    configValue = {
+      features: {},
+      eventConfig: { venue: { mapUrl: 'https://example.org/map' } },
+    };
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SpeakerResourceCard />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('link', { name: 'Around the venue' })).toBeNull();
+  });
+
   it('routes the venue map to the page anchor with HashRouter', async () => {
     window.history.replaceState(null, '', '/#/speaker/dashboard');
     render(
