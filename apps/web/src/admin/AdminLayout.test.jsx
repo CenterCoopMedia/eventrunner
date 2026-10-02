@@ -142,12 +142,13 @@ describe('the admin shell', () => {
         );
       }
     }
-    // Eight links above the base's sixteen (the Overview, issue #179, the
+    // Nine links above the base's sixteen (the Overview, issue #179, the
     // Email log, issue #183, Change requests, issue #188, Organizations,
     // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
-    // issue #195, and Unpublished changes, issue #196), every one a word. No
+    // issue #195, Unpublished changes, issue #196, and Announcements,
+    // issue #199), every one a word. No
     // icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(24);
+    expect(nav.querySelectorAll('a')).toHaveLength(25);
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
       'href',
@@ -219,7 +220,7 @@ describe('the admin shell', () => {
       'pages', 'sessions', 'organizations', 'content', 'updates', 'timeline', 'media', 'materials',
       'versions', 'unpublished',
       'speakers', 'attendees', 'badges',
-      'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
+      'announcements', 'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
       'settings',
     ]);
   });
@@ -228,6 +229,7 @@ describe('the admin shell', () => {
     expect(sectionTier('/admin/branding')).toBe('operator');
     expect(sectionTier('/admin/overview')).toBe('staff');
     expect(sectionTier('/admin/pages')).toBe('staff');
+    expect(sectionTier('/admin/announcements')).toBe('staff');
     // The email log is staff visible (issue #183).
     expect(sectionTier('/admin/email-log')).toBe('staff');
     // Change requests are staff work (issue #188). An undeclared item would

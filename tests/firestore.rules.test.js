@@ -1402,6 +1402,31 @@ describe("live_updates dashboard feed", () => {
   });
 });
 
+describe("site-wide announcements", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "announcements/a1"), {
+        message: "Use the east entrance.",
+        level: "info",
+        startsAt: new Date(),
+        endsAt: new Date(Date.now() + 60_000),
+      });
+    });
+  });
+
+  it("allows anyone to read one row and list the collection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "announcements/a1")));
+    await assertSucceeds(getDocs(collection(anon(), "announcements")));
+    await assertSucceeds(getDoc(doc(nonAdmin(), "announcements/a1")));
+  });
+
+  it("denies every client write, admin included", async () => {
+    await assertFails(setDoc(doc(admin(), "announcements/a1"), { message: "changed" }));
+    await assertFails(setDoc(doc(nonAdmin(), "announcements/a2"), { message: "new" }));
+    await assertFails(deleteDoc(doc(admin(), "announcements/a1")));
+  });
+});
+
 describe("feedback inbox", () => {
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
