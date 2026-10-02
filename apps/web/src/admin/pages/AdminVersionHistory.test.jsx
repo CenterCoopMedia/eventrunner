@@ -85,6 +85,7 @@ function serve({ pages = [{ entries: [EDITED, SEEDED], nextCursor: null }], othe
       return Promise.resolve(answer);
     }
     const answer = others[name];
+    if (typeof answer === 'function') return answer(body);
     if (answer instanceof Error) return Promise.reject(answer);
     if (answer !== undefined) return Promise.resolve(answer);
     return Promise.reject(new Error(`unexpected call ${name}`));
@@ -479,6 +480,53 @@ describe('one record’s versions', () => {
 });
 
 describe('restoring a version', () => {
+  it('refuses publishing while another restore is in flight and clears its busy state afterward', async () => {
+    const pendingRestore = deferred();
+    let restores = 0;
+    await renderPage(undefined, {
+      others: {
+        cmsUpdateContent: () => ++restores === 1 ? Promise.resolve({ status: 'dirty' }) : pendingRestore.promise,
+        cmsPublish: { status: 'done', results: { cmsContent: { published: ['hero__subtitle'], skipped: [] } } },
+      },
+    });
+    reportRecord();
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    await screen.findByRole('button', { name: 'Publish now' });
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    const publish = screen.getByRole('button', { name: 'Publish now' });
+    expect(publish).toBeDisabled();
+    fireEvent.click(publish);
+    expect(callMock.mock.calls.some(([name]) => name === 'cmsPublish')).toBe(false);
+    await act(async () => pendingRestore.resolve({ status: 'dirty' }));
+    expect(screen.getByRole('button', { name: 'Publish now' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Restore version 1' })).toBeEnabled();
+  });
+
+  it.each([false, true])('refuses an open restore confirmation during publish (dirty: %s)', async (dirty) => {
+    const pendingPublish = deferred();
+    await renderPage(undefined, {
+      others: { cmsUpdateContent: { status: 'dirty' }, cmsPublish: pendingPublish.promise },
+    });
+    reportRecord();
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore as draft' }));
+    const publish = await screen.findByRole('button', { name: 'Publish now' });
+    if (dirty) reportRecord({ drafts: [{ ...CLEAN_DRAFT, status: 'dirty' }] });
+    fireEvent.click(within(versionItem(1)).getByRole('button', { name: 'Restore version 1' }));
+    fireEvent.click(publish);
+    const restore = screen.getByRole('button', { name: 'Restore as draft' });
+    expect(restore).toBeDisabled();
+    fireEvent.click(restore);
+    expect(callMock.mock.calls.filter(([name]) => name === 'cmsUpdateContent')).toHaveLength(1);
+    await act(async () => pendingPublish.resolve({
+      status: 'done', results: { cmsContent: { published: ['hero__subtitle'], skipped: [] } },
+    }));
+    expect(screen.queryByRole('button', { name: 'Publishing…' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Restore as draft' })).toBeEnabled();
+  });
+
   it.each(['success', 'error'])('ignores a late restore %s after navigating to another record', async (outcome) => {
     const restore = deferred();
     const navigate = await renderNavigablePage({ others: { cmsUpdateContent: restore.promise } });
