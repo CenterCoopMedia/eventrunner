@@ -282,11 +282,8 @@ jobs:
       - name: Deploy functions
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
-        run: >-
-          npx firebase deploy
-          --only functions
-          --project "$EVENT_FIREBASE_PROJECT_ID"
-          --non-interactive
+          EVENT_BOOTSTRAP: ${{ inputs.bootstrap }}
+        run: node scripts/deploy-functions.cjs
 
   publisher:
     name: Provision the site-publisher Cloud Run job

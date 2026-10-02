@@ -92,6 +92,13 @@ test('functions deployment writes both OTP abuse-control variables with safe def
   );
 });
 
+test('functions deployment delegates the bootstrap-only force decision to the inventory guard', () => {
+  const deploy = step('Deploy functions');
+  assert.match(deploy, /EVENT_BOOTSTRAP: \$\{\{ inputs\.bootstrap \}\}/);
+  assert.match(deploy, /run: node scripts\/deploy-functions\.cjs/);
+  assert.doesNotMatch(deploy, /--force/);
+});
+
 test('web deployment passes the App Check site key and excludes the debug token', () => {
   const build = step('Build the web app against the generated snapshot');
   assert.match(
