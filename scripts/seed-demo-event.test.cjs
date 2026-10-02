@@ -64,6 +64,36 @@ test('a dry run writes no speakers and no reservations', async () => {
   assert.deepEqual(db.ids('speaker_slugs'), []);
 });
 
+test('normal and forced demo reseeds leave real bootstrap access unchanged', async (t) => {
+  const bootstrap = {
+    adminEmails: ['real-operator@example.org'],
+    staffEmails: ['real-staff@example.org'],
+    permissions: { publish: ['real-operator@example.org'] },
+    grants: { 'real-staff@example.org': ['content', 'schedule'] },
+    createdAt: new Date('2025-11-01T00:00:00Z'),
+    updatedAt: new Date('2025-12-01T00:00:00Z'),
+    updatedBy: 'real-operator@example.org',
+  };
+
+  for (const [name, args] of [['normal', {}], ['forced', { force: true }]]) {
+    await t.test(name, async () => {
+      const db = makeFakeDb({ 'config/bootstrap': bootstrap });
+      await runSeed(db, args);
+      assert.deepEqual(db.read('config', 'bootstrap'), bootstrap);
+    });
+  }
+});
+
+test('normal and forced demo reseeds do not create bootstrap access', async (t) => {
+  for (const [name, args] of [['normal', {}], ['forced', { force: true }]]) {
+    await t.test(name, async () => {
+      const db = makeFakeDb();
+      await runSeed(db, args);
+      assert.equal(db.read('config', 'bootstrap'), undefined);
+    });
+  }
+});
+
 test('a missing or blank project id is never a demo project', () => {
   assert.equal(isDemoProject(''), false);
   assert.equal(isDemoProject(undefined), false);

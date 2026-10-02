@@ -97,7 +97,10 @@ async function seedDemo({ db, store, args, now = Date.now }) {
   // AND what the project now holds. Destructuring matters: iterating the
   // wrapper object threw "configResults is not iterable" and took the whole
   // seed run down before it reached a single collection.
-  const { results: configResults } = await writeConfigDocs({ db, docs: demo.config, force, dryRun, now });
+  // The fixture's bootstrap accounts are for static demo generation only;
+  // the deployed project's real access document belongs to its operators.
+  const { bootstrap, ...cloudConfig } = demo.config;
+  const { results: configResults } = await writeConfigDocs({ db, docs: cloudConfig, force, dryRun, now });
   for (const r of configResults) console.log(`  config/${r.docId.padEnd(9)} ${r.action} (${r.reason})`);
 
   const collections = [

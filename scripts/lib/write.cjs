@@ -43,8 +43,9 @@ const { SEED_ACTOR } = require('shared/seed');
  * removed or demoted one of those addresses on the admin's Access page
  * since, and a re-run must never quietly put it back (issue #187 review).
  * The bootstrap result row carries `added` so the caller can say exactly
- * what a re-run granted. Omit it to keep the older additive behaviour
- * (the demo seed does).
+ * what a re-run granted. Omitting it keeps the older behavior of applying
+ * every proposed bootstrap entry to an existing document; deployment seed
+ * callers should pass explicit additions or omit the bootstrap document.
  *
  * @param {{ db: object, docs: object, force?: boolean, dryRun?: boolean,
  *           now?: () => number,
