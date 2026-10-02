@@ -63,6 +63,8 @@
     "resolveSystemErrors",
     "saveLiveUpdate",
     "deleteLiveUpdate",
+    "saveAnnouncement",
+    "deleteAnnouncement",
     "submitFeedback",
     "updateFeedbackStatus",
     "submitChangeRequest",

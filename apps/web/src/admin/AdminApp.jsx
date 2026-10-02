@@ -29,6 +29,7 @@ import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
+import AdminAnnouncements from './pages/AdminAnnouncements.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
 import AdminTicketing from './pages/AdminTicketing.jsx';
@@ -259,6 +260,7 @@ export default function AdminApp() {
           />
           <Route path="ticketing" element={<AdminTicketing />} />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
+          <Route path="announcements" element={<AdminAnnouncements />} />
           <Route path="feedback" element={<AdminFeedback />} />
           <Route
             path="email-log"
