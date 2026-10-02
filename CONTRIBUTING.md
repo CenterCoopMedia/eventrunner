@@ -126,8 +126,8 @@ still runs. All tiers remain credential-free.
 ### Local CI on operator machines
 
 Run expensive checks on an operator machine before opening a PR. Use Node 22,
-Java 21, and Playwright Chromium with its sandbox enabled. Install dependencies
-with `npm run prepare:functions` followed by `npm ci`. The emulator tests bind
+Java 21, and Playwright Chromium with its sandbox enabled. The runner packs the
+shared package and installs the locked dependencies before testing. The emulator tests bind
 to localhost and use synthetic data. Run them in an isolated checkout with no
 production credentials. Keep concurrent emulator jobs on separate machines.
 
