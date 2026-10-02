@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
   HashRouter,
   MemoryRouter,
@@ -10,6 +10,11 @@ import {
 
 let contentValue;
 let configValue;
+let pendingImages;
+let deferImages;
+
+const { assetUrl } = vi.hoisted(() => ({ assetUrl: vi.fn() }));
+vi.mock('../../lib/mediaSource.js', () => ({ assetUrl }));
 
 vi.mock('../../contexts/ContentContext.jsx', () => ({
   useContent: () => contentValue,
@@ -59,6 +64,16 @@ function ResourceRoute() {
 }
 
 beforeEach(() => {
+  pendingImages = [];
+  deferImages = false;
+  assetUrl.mockImplementation((path) => `https://storage.example/${path}`);
+  vi.stubGlobal('Image', class {
+    set src(value) {
+      this.url = value;
+      pendingImages.push(this);
+      if (!deferImages) this.onload?.();
+    }
+  });
   contentValue = { getPublicPage: publicPage([GUIDELINES, TRAVEL]) };
   configValue = {
     features: {},
@@ -75,7 +90,73 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/');
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe('SpeakerResourceCard', () => {
+  it('omits an uploaded map whose image URL cannot be resolved', () => {
+    assetUrl.mockReturnValue(null);
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SpeakerResourceCard />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('link', { name: 'Venue map' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Travel' })).toBeInTheDocument();
+  });
+
+  it('uses the area map while an uploaded image is loading or fails', () => {
+    deferImages = true;
+    configValue.eventConfig.venue = {
+      ...configValue.eventConfig.venue,
+      mapUrl: 'https://www.openstreetmap.org/?mlat=40.74&mlon=-74.17',
+    };
+    contentValue.getPublicPage = publicPage([
+      { ...TRAVEL, sections: [...TRAVEL.sections, { id: 'travel_local', label: 'Around the venue' }] },
+    ]);
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SpeakerResourceCard />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole('link', { name: 'Venue map' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Around the venue' })).toHaveAttribute(
+      'href', '/travel#section-travel_local',
+    );
+    act(() => pendingImages[0].onerror());
+    expect(screen.queryByRole('link', { name: 'Venue map' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Around the venue' })).toBeInTheDocument();
+  });
+
+  it('shows an uploaded map only after that image loads and ignores a stale load', () => {
+    deferImages = true;
+    const card = (
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SpeakerResourceCard />
+      </MemoryRouter>
+    );
+    const { rerender } = render(card);
+    expect(screen.queryByRole('link', { name: 'Venue map' })).toBeNull();
+    const previousLoad = pendingImages[0].onload;
+
+    configValue = {
+      ...configValue,
+      eventConfig: { venue: { map: { ...VENUE_MAP.venue.map, image: 'cms-images/new-map.png' } } },
+    };
+    rerender(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SpeakerResourceCard />
+      </MemoryRouter>,
+    );
+    act(() => previousLoad());
+    expect(screen.queryByRole('link', { name: 'Venue map' })).toBeNull();
+    act(() => pendingImages[1].onload());
+    expect(screen.getByRole('link', { name: 'Venue map' })).toHaveAttribute(
+      'href', '/travel#section-travel_map',
+    );
+  });
+
   it('renders visible page, venue-map, and canonical slide links with native focus access', () => {
     render(
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

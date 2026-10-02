@@ -5,6 +5,7 @@
 // its own seeded section. The slide template supplies both values through
 // config/event. A missing, hidden, or unsafe resource is omitted, and an empty
 // set draws nothing.
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isCanonicalPagePath } from 'shared/routing';
 import { safeUrlHref } from 'shared/urlSafety';
@@ -13,6 +14,7 @@ import { useContent } from '../../contexts/ContentContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { openStreetMapCoordinates } from '../AreaMap.jsx';
 import ExternalLink from '../ExternalLink.jsx';
+import { useVenueMapImage } from '../VenueMap.jsx';
 
 const PAGE_IDS = Object.freeze(['guidelines', 'travel']);
 const AREA_MAP_SECTION_ID = 'travel_local';
@@ -25,7 +27,7 @@ function pageResource(page) {
   return { key: `page:${page.id}`, label: page.label.trim(), to: page.path };
 }
 
-export function buildSpeakerResources({ eventConfig, features, getPublicPage }) {
+export function buildSpeakerResources({ eventConfig, features, getPublicPage, venueMap }) {
   if (typeof getPublicPage !== 'function') return [];
 
   const pages = PAGE_IDS.map((id) => pageResource(getPublicPage(id, features))).filter(Boolean);
@@ -33,7 +35,6 @@ export function buildSpeakerResources({ eventConfig, features, getPublicPage }) 
   const mapSection = Array.isArray(travel?.sections)
     ? travel.sections.find((section) => section?.id === VENUE_MAP_SECTION_ID)
     : null;
-  const venueMap = resolveVenueMap(eventConfig);
   const mapLabel = typeof mapSection?.label === 'string' && mapSection.label.trim()
     ? mapSection.label.trim()
     : venueMap?.alt;
@@ -81,7 +82,33 @@ export function buildSpeakerResources({ eventConfig, features, getPublicPage }) 
 export default function SpeakerResourceCard() {
   const { getPublicPage } = useContent();
   const { eventConfig, features } = useEventConfig();
-  const resources = buildSpeakerResources({ eventConfig, features, getPublicPage });
+  const venueMap = resolveVenueMap(eventConfig);
+  const { src: mapSrc, onError: onMapError } = useVenueMapImage(venueMap) ?? {};
+  const [loadedMapSrc, setLoadedMapSrc] = useState(null);
+
+  // ContentPage removes the map section when its image fails. Verify the
+  // same image before offering a link to that section.
+  useEffect(() => {
+    setLoadedMapSrc(null);
+    if (!mapSrc) return undefined;
+    let active = true;
+    const image = new Image();
+    image.onload = () => { if (active) setLoadedMapSrc(mapSrc); };
+    image.onerror = () => { if (active) onMapError(); };
+    image.src = mapSrc;
+    return () => {
+      active = false;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [mapSrc, onMapError]);
+
+  const resources = buildSpeakerResources({
+    eventConfig,
+    features,
+    getPublicPage,
+    venueMap: mapSrc && loadedMapSrc === mapSrc ? venueMap : null,
+  });
 
   if (resources.length === 0) return null;
 
