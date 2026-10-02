@@ -19,7 +19,7 @@
 // own ids and deletes them when it is done, so no later spec meets them.
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, mailFileSize, waitForOtpCode,
+  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, signIn,
 } from './helpers.mjs';
 
 const STRANGER_EMAIL = 'e2e-stats-stranger@example.test';
@@ -32,17 +32,6 @@ const PUBLISHABLE_COLLECTIONS = ['cmsContent', 'cmsSchedule', 'cmsOrganizations'
 async function countDocs(collection, predicate = () => true) {
   const snap = await adminDb().collection(collection).get();
   return snap.docs.filter((doc) => predicate(doc.data())).length;
-}
-
-async function signIn(page, email) {
-  const since = mailFileSize();
-  await page.goto('/signin');
-  await page.locator('#signin-email').fill(email);
-  await page.getByRole('button', { name: /email me a code/i }).click();
-  await expect(page.locator('#signin-code')).toBeVisible();
-  await page.locator('#signin-code').fill(await waitForOtpCode(since, email, 30_000));
-  await page.getByRole('button', { name: /^sign in$/i }).click();
-  await page.waitForURL((url) => url.pathname !== '/signin');
 }
 
 const one = (count, singular, pluralWord) => (count === 1 ? singular : pluralWord);

@@ -15,76 +15,21 @@
 // the same one that will interpret the output, so there is no parse
 // differential to smuggle markup through.
 
-const ALLOWED_TAGS = new Set([
-  'p',
-  'br',
-  'hr',
-  'strong',
-  'em',
-  'b',
-  'i',
-  'u',
-  's',
-  'a',
-  'ul',
-  'ol',
-  'li',
-  'h2',
-  'h3',
-  'h4',
-  'blockquote',
-  'code',
-  'pre',
-]);
+import {
+  RICH_TEXT_ALLOWED_TAGS,
+  RICH_TEXT_DROP_WITH_CONTENT_TAGS,
+  isSafeRichTextHref,
+} from 'shared/richText';
+
+const ALLOWED_TAGS = new Set(RICH_TEXT_ALLOWED_TAGS);
 
 // Removed entirely, contents included — script bodies and iframe fallbacks
 // must not leak into the page as text.
-const DROP_WITH_CONTENT = new Set([
-  'script',
-  'style',
-  'iframe',
-  'frame',
-  'frameset',
-  'object',
-  'embed',
-  'applet',
-  'link',
-  'meta',
-  'base',
-  'title',
-  'svg',
-  'math',
-  'template',
-  'noscript',
-  'form',
-  'input',
-  'button',
-  'textarea',
-  'select',
-  'option',
-  'dialog',
-  'canvas',
-  'audio',
-  'video',
-  'source',
-  'track',
-  'slot',
-]);
-
-const SAFE_HREF_PROTOCOL = /^(https?:|mailto:|tel:)/i;
+const DROP_WITH_CONTENT = new Set(RICH_TEXT_DROP_WITH_CONTENT_TAGS);
 
 /** True for hrefs we allow on <a>: relative paths, fragments, http(s), mailto, tel. */
 export function isSafeHref(value) {
-  if (typeof value !== 'string') return false;
-  const href = value.trim();
-  if (href === '') return false;
-  if (/^[#/]/.test(href) || href.startsWith('./') || href.startsWith('../')) {
-    return true;
-  }
-  // Anything else with a scheme-ish prefix must match the allowlist; a bare
-  // word without ':' is treated as a relative path and allowed.
-  if (!href.includes(':')) return true;
-  return SAFE_HREF_PROTOCOL.test(href);
+  return isSafeRichTextHref(value);
 }
 
 // Defensive cap on total elements walked. A ~1MB Firestore doc could in

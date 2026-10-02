@@ -109,6 +109,17 @@ async function renderAt(path) {
   return result;
 }
 
+async function pasteHtml(editor, html, text) {
+  fireEvent.paste(editor, {
+    clipboardData: {
+      getData(type) {
+        return type === 'text/html' ? html : text;
+      },
+    },
+  });
+  await waitFor(() => expect(editor).toHaveTextContent(text));
+}
+
 beforeEach(() => {
   pagesLive = [HOME_PAGE];
   pagesDrafts = [];
@@ -206,7 +217,7 @@ describe('AdminContentBlockEditor value fields', () => {
     fireEvent.change(screen.getByLabelText(/^field id/i), { target: { value: 'coffee' } });
     fireEvent.change(screen.getByLabelText('name'), { target: { value: 'Coffee break' } });
     fireEvent.change(limit, { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText('benefits'), { target: { value: '<p>Signs</p>' } });
+    await pasteHtml(await screen.findByRole('textbox', { name: 'benefits' }), '<p>Signs</p>', 'Signs');
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
@@ -217,6 +228,86 @@ describe('AdminContentBlockEditor value fields', () => {
       limit: 2,
       benefits: '<p>Signs</p>',
     });
+  });
+
+  it('saves a formatted value from the richtext block editor', async () => {
+    pagesLive = [{
+      id: 'about',
+      label: 'About',
+      path: '/about',
+      icon: null,
+      order: 1,
+      visible: true,
+      systemPage: false,
+      sections: [{
+        id: 'intro',
+        label: 'Introduction',
+        description: 'Opening copy.',
+        allowedBlocks: ['richtext'],
+        maxBlocks: 2,
+        reorderable: true,
+        defaultBlocks: [],
+      }],
+    }];
+    await renderAt('/admin/content/about/intro/_new');
+    fireEvent.change(screen.getByLabelText(/^field id/i), { target: { value: 'body' } });
+    const editor = await screen.findByRole('textbox', { name: 'value' });
+    await pasteHtml(editor, '<p><strong>Formatted</strong> body</p>', 'Formatted body');
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
+    expect(JSON.parse(call[1].body).fields.value).toBe('<p><strong>Formatted</strong> body</p>');
+  });
+
+  it('loads and saves the FAQ rich-text answer from the existing draft', async () => {
+    pagesLive = [{
+      id: 'faq',
+      label: 'FAQ',
+      path: '/faq',
+      icon: null,
+      order: 2,
+      visible: true,
+      systemPage: false,
+      sections: [{
+        id: 'faq_items',
+        label: 'Questions',
+        description: 'Frequently asked questions.',
+        allowedBlocks: ['faq_item'],
+        maxBlocks: 20,
+        reorderable: true,
+        defaultBlocks: [],
+      }],
+    }];
+    contentLive = [{
+      id: 'faq_items__what_is_this',
+      section: 'faq_items',
+      field: 'what_is_this',
+      blockType: 'faq_item',
+      question: 'What is this?',
+      answer: '<p>Published answer.</p>',
+      visible: true,
+    }];
+    contentDrafts = [{
+      id: 'faq_items__what_is_this',
+      section: 'faq_items',
+      field: 'what_is_this',
+      blockType: 'faq_item',
+      question: 'What is this?',
+      answer: '<p><strong>Saved draft answer.</strong></p>',
+      visible: true,
+      status: 'dirty',
+    }];
+    await renderAt('/admin/content/faq/faq_items/what_is_this');
+    const editor = await screen.findByRole('textbox', { name: 'answer' });
+    expect(editor).toHaveTextContent('Saved draft answer.');
+    expect(editor.querySelector('strong')).toHaveTextContent('Saved draft answer.');
+    expect(editor).not.toHaveTextContent('Published answer.');
+
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
+    expect(JSON.parse(call[1].body).fields.answer).toBe('<p><strong>Saved draft answer.</strong></p>');
   });
 
   // Review round (c2, finding 1): "Leave it empty for no limit" has to hold

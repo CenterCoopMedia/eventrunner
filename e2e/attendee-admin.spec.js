@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { getStorage } from 'firebase-admin/storage';
 import {
-  PROJECT_ID, adminApp, adminAuth, adminDb, ensureUser, mailFileSize, waitForOtpCode,
+  PROJECT_ID, adminApp, adminAuth, adminDb, ensureUser, signIn,
 } from './helpers.mjs';
 
 const HEADER = [
@@ -59,17 +59,6 @@ function parseCsv(text) {
     row = [];
   }
   return rows;
-}
-
-async function signIn(page, email) {
-  const since = mailFileSize();
-  await page.goto('/signin');
-  await page.locator('#signin-email').fill(email);
-  await page.getByRole('button', { name: /email me a code/i }).click();
-  await expect(page.locator('#signin-code')).toBeVisible();
-  await page.locator('#signin-code').fill(await waitForOtpCode(since, email, 30_000));
-  await page.getByRole('button', { name: /^sign in$/i }).click();
-  await page.waitForURL((url) => url.pathname !== '/signin');
 }
 
 function bucket() {

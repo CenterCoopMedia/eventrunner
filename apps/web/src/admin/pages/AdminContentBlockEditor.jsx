@@ -15,7 +15,7 @@
 // allows (widening to show a mismatched existing type, same pattern
 // AdminPageEditor's block-type picker uses), and a section already at its
 // cap has no "Add block" link pointing here in the first place.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -48,7 +48,6 @@ import {
   SaveStatus,
   SelectField,
   ServerErrorSummary,
-  TextAreaField,
   TextField,
   linkButtonClass,
   primaryButtonClass,
@@ -59,6 +58,11 @@ import AdminPageHeader, {
   AdminLoadingState,
   RecordState,
 } from '../components/adminChrome.jsx';
+
+// Quill stays outside both the public entry and the general content-editor
+// route. It loads only when the registry says this particular field is rich
+// text, which keeps the existing public and lazy-chunk budgets intact.
+const RichTextEditor = lazy(() => import('../components/RichTextEditor.jsx'));
 
 /**
  * What to write in this field, where the system has something to say. The
@@ -110,14 +114,21 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
         if (field.type === 'richtext') {
           return (
             <div key={field.id} className="sm:col-span-2">
-              <TextAreaField
-                label={label}
-                value={value}
-                onChange={(next) => onChange(field.id, next)}
-                error={error}
-                rows={6}
-                hint="Formatted HTML rendered through the rich-text allowlist (headings, links, lists, emphasis)."
-              />
+              <Suspense
+                fallback={(
+                  <p role="status" className="text-admin-sm text-admin-ink-secondary">
+                    Loading formatted text editor…
+                  </p>
+                )}
+              >
+                <RichTextEditor
+                  label={label}
+                  value={value}
+                  onChange={(next) => onChange(field.id, next)}
+                  error={error}
+                  required={field.required}
+                />
+              </Suspense>
             </div>
           );
         }

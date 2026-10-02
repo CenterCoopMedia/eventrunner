@@ -56,6 +56,18 @@ describe('sanitizeHtml', () => {
     expect(sanitizeHtml(input)).toBe(input);
   });
 
+  it('rejects image, video, and formula markup the editor does not register', () => {
+    const out = sanitizeHtml(
+      '<p>Before</p><img src="data:image/png;base64,abc">' +
+      '<video class="ql-video"><source src="https://example.org/video">fallback</video>' +
+      '<span class="ql-formula" data-value="x"></span><p>After</p>',
+    );
+    expect(out).toBe('<p>Before</p><p>After</p>');
+    expect(out).not.toContain('img');
+    expect(out).not.toContain('video');
+    expect(out).not.toContain('formula');
+  });
+
   it('returns empty string for non-strings and empty input', () => {
     expect(sanitizeHtml(null)).toBe('');
     expect(sanitizeHtml(undefined)).toBe('');

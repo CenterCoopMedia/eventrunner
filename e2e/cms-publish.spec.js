@@ -187,6 +187,71 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
   });
 });
 
+// Issue #197 done-when: A staff member formats body copy in the real editor,
+// saves and publishes it through the normal CMS flow, and a signed-out
+// browser receives the same formatting from the live collection.
+test.describe.serial('rich text editor -> publish -> public formatting', () => {
+  const stamp = Date.now();
+  const field = `formatted-answer-${stamp}`;
+  const docId = `faq_items__${field}`;
+  const question = `Does formatted text round trip ${stamp}?`;
+  const answer = `Yes, formatting survives ${stamp}.`;
+  let idToken;
+
+  test.beforeAll(async () => {
+    idToken = await adminIdToken();
+  });
+
+  test.afterAll(async () => {
+    await callFunction('cmsDeleteContent', {
+      collection: 'cmsContent',
+      docId,
+    }, idToken);
+  });
+
+  test('a formatted FAQ answer survives draft save, publish, and public render', async ({ page, browser }) => {
+    test.setTimeout(90_000);
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/content/faq/faq_items/_new');
+    await expect(page.getByRole('heading', { level: 1, name: 'New content block' })).toBeVisible();
+    await page.getByLabel(/^Field id/).fill(field);
+    await page.getByLabel('question').fill(question);
+
+    const editor = page.getByRole('textbox', { name: 'answer' });
+    await editor.fill(answer);
+    await editor.press('Control+A');
+    await page.getByRole('button', { name: 'Bold' }).click();
+    await expect(editor.locator('strong')).toHaveText(answer);
+
+    await page.getByRole('button', { name: 'Save draft' }).click();
+    await expect(page.getByText('Draft saved. It is not public until you publish.')).toBeVisible();
+    const draft = (await adminDb().collection('cmsContent_drafts').doc(docId).get()).data();
+    expect(draft.answer).toBe(`<p><strong>${answer}</strong></p>`);
+
+    const visitor = await browser.newContext();
+    try {
+      const publicPage = await visitor.newPage();
+      await publicPage.goto('/faq');
+      await expect(publicPage.getByText(question, { exact: true })).toHaveCount(0);
+
+      await page.getByRole('button', { name: 'Save and publish' }).click();
+      await expect(page.locator('#admin-content').getByRole('status').filter({
+        hasText: 'Published. The public site picks it up live.',
+      })).toBeVisible();
+
+      await publicPage.reload();
+      const disclosure = publicPage.locator('details').filter({
+        has: publicPage.getByText(question, { exact: true }),
+      });
+      await expect(disclosure).toHaveCount(1, { timeout: CONTENT_TIMEOUT_MS });
+      await disclosure.getByText(question, { exact: true }).click();
+      await expect(disclosure.locator('strong')).toHaveText(answer);
+    } finally {
+      await visitor.close();
+    }
+  });
+});
+
 // The organizations editor (issue #192) and the sponsor page (issue #193),
 // on the real surface: the seeded operator signs in through the sign-in
 // page, creates an organization in the admin editor and publishes it from

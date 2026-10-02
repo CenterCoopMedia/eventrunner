@@ -1331,6 +1331,21 @@ code's `BLOCK_TYPES` registry and reject unknown ids. The admin CMS reads `cmsPa
 `getMaxBlocks`, and `findFieldLocation` keep their signatures and take the pages collection as input
 instead of closing over the constant.
 
+**Rich text has one stored vocabulary (issue #197).** `packages/shared/src/richText.cjs` defines the
+allowed tags, link schemes, and elements whose contents must be dropped. The browser applies that
+policy when it loads, pastes, exports, and renders rich text. `cmsCreateContent` and
+`cmsUpdateContent` apply the same policy after they merge the stored record and remove deleted
+fields, then validate and write the result. Version restore uses `cmsUpdateContent`, so it crosses
+the same authoritative boundary. This protects old records and partial updates as well as new
+editor output.
+
+The visual editor uses Quill core 2.0.3 and loads only for a registry field whose type is
+`richtext`; it does not enter the public bundle or the general content-editor route. The editor
+registers only the formats in the shared allowlist. It does not import or register image, video, or
+formula blots. This excludes the video and formula export paths affected by the
+[Diomedes advisory](https://fluidattacks.com/advisories/diomedes), while the client and server
+sanitizers remain the security boundary for all stored HTML.
+
 **Generic pages route at their own root-level `path`, not a `/p/:slug` prefix (issue #52).** A
 non-system page's admin-set `path` (e.g. `/scholarships`) IS its URL — there is no separate slug
 namespace. `apps/web/src/App.jsx` mounts every system route (`schedule`, `speakers`, `sponsors`,
