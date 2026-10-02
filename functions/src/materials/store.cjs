@@ -191,7 +191,8 @@ async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = 
 /**
  * Register metadata for a file material whose bytes already exist at
  * `storagePath` (this function verifies but never writes the Storage
- * object). File material filenames are NOT scrubbed
+ * object). These objects stay operator-managed when the material is
+ * deleted. File material filenames are NOT scrubbed
  * (spec §4.4): a URL-shaped filename like `slides.pdf` is a display label,
  * not a secret, because the bytes are always signed-URL gated.
  *
@@ -200,7 +201,16 @@ async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = 
  *           now?: () => number }} args
  * @returns {Promise<{ id: string, material: object }>}
  */
-async function uploadSessionMaterial({ db, bucket, sessionId, storagePath, filename, actor, now = Date.now }) {
+async function uploadSessionMaterial({
+  db,
+  bucket,
+  sessionId,
+  storagePath,
+  filename,
+  actor,
+  now = Date.now,
+  managedStorageObject = false,
+}) {
   if (!isSessionMaterialStoragePath(storagePath, sessionId)) {
     throw new InvalidStoragePathError(sessionId);
   }
@@ -225,6 +235,7 @@ async function uploadSessionMaterial({ db, bucket, sessionId, storagePath, filen
     url: null,
     storagePath,
     filename: typeof filename === 'string' && filename.trim() ? filename.trim() : 'Untitled file',
+    managedStorageObject,
   });
 }
 
@@ -289,9 +300,11 @@ async function uploadSessionMaterialRequest({ db, bucket, body, actor, now = Dat
 
 /**
  * Store browser-supplied bytes at a server-derived path, then register the
- * material through the existing transactional create path. Registration
- * re-checks session ownership and the per-session cap. If that check loses
- * a race, the just-written object is removed before the error is returned.
+ * material through the existing transactional create path. The stored row
+ * marks the object as server-managed so the projection trigger removes it
+ * when the row is deleted. Registration re-checks session ownership and
+ * the per-session cap. If that check loses a race, the just-written object
+ * is removed before the error is returned.
  */
 async function uploadSessionMaterialBytes({
   db,
@@ -348,6 +361,7 @@ async function uploadSessionMaterialBytes({
       filename: normalizedFilename,
       actor,
       now,
+      managedStorageObject: true,
     });
   } catch (err) {
     try {
@@ -372,7 +386,17 @@ function assertMaterialCreateAllowed({ sessionSnap, sessionId, actor }) {
   return { sessionData, currentCount };
 }
 
-async function createMaterial({ db, sessionId, actor, now, type, url, storagePath, filename }) {
+async function createMaterial({
+  db,
+  sessionId,
+  actor,
+  now,
+  type,
+  url,
+  storagePath,
+  filename,
+  managedStorageObject = false,
+}) {
   const sessionRef = db.collection(SESSIONS).doc(sessionId);
   const materialRef = db.collection(MATERIALS).doc();
 
@@ -393,6 +417,7 @@ async function createMaterial({ db, sessionId, actor, now, type, url, storagePat
       createdAt: at,
       updatedAt: at,
     };
+    if (managedStorageObject) material.managedStorageObject = true;
     tx.set(materialRef, material);
     tx.update(sessionRef, { materialCount: currentCount + 1 });
     return { id: materialRef.id, material };

@@ -294,6 +294,7 @@ test('uploadSessionMaterial: file materials are never scrubbed even when URL-sha
   });
   assert.equal(material.filename, 'slides.pdf');
   assert.equal(material.type, 'file');
+  assert.equal(Object.hasOwn(material, 'managedStorageObject'), false);
 });
 
 test('uploadSessionMaterial: refuses a path outside the material session before any write', async () => {
@@ -418,6 +419,7 @@ test('uploadSessionMaterialBytes: own-session bytes use a fresh server path and 
   assert.equal(material.type, 'file');
   assert.equal(material.reviewStatus, 'pending');
   assert.equal(material.submittedBySpeakerId, 'spk-1');
+  assert.equal(material.managedStorageObject, true);
   assert.equal(bucket.state.savedBytes.toString(), 'synthetic slides');
   assert.deepEqual(bucket.state.saveOptions, {
     resumable: false,
@@ -429,6 +431,7 @@ test('uploadSessionMaterialBytes: own-session bytes use a fresh server path and 
     },
   });
   assert.equal(db.docs.get(`session_materials/${id}`).storagePath, material.storagePath);
+  assert.equal(db.docs.get(`session_materials/${id}`).managedStorageObject, true);
   assert.equal(db.docs.get('cmsSchedule/s1').materialCount, 1);
 });
 
