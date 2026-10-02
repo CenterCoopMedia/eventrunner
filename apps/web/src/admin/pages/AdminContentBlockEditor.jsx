@@ -357,14 +357,15 @@ export default function AdminContentBlockEditor({ mode }) {
       ...toContentFields(content),
       ...staleFieldDeletions(savedBlockTypeRef.current, content.blockType),
     };
+    const request = {
+      section: sectionId,
+      fields,
+      field: currentFieldId,
+      visible: content.visible,
+    };
+    if (!isExisting) request.pageId = pageId;
     try {
-      const response = await call(endpoint, {
-        ...(isExisting ? {} : { pageId }),
-        section: sectionId,
-        field: currentFieldId,
-        fields,
-        visible: content.visible,
-      });
+      const response = await call(endpoint, request);
       const docId = response.docId ?? `${sectionId}__${currentFieldId}`;
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt — the same reasoning AdminPageEditor applies:
