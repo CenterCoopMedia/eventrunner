@@ -55,6 +55,7 @@ import {
   CheckboxField,
   DestructiveConfirm,
   FieldError,
+  Notice,
   Panel,
   SaveStatus,
   SelectField,
@@ -185,7 +186,7 @@ export default function AdminPageEditor({ mode }) {
   const navigate = useNavigate();
   const call = useAdminApi();
   const { showToast } = useToast();
-  const { rows, loading, findRow } = useAdminPages();
+  const { rows, ready, error: listenerError, findRow } = useAdminPages();
   // What the site is set to, so the "follow the site" option can say what
   // following it means instead of sending the operator to another tab to
   // find out.
@@ -213,12 +214,13 @@ export default function AdminPageEditor({ mode }) {
 
   useEffect(() => {
     if (mode !== 'edit') return;
+    if (!ready) return;
     if (loadedIdRef.current === pageId) return;
     const found = rows.find((candidate) => candidate.id === pageId);
     if (!found) return;
     loadedIdRef.current = pageId;
     setPage(toEditablePage(found.draft ?? found.live));
-  }, [mode, pageId, rows]);
+  }, [mode, pageId, ready, rows]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -233,21 +235,29 @@ export default function AdminPageEditor({ mode }) {
   }, [error]);
   const errorFor = (field) => fieldErrors.get(field);
 
-  if (mode === 'edit' && loading && !row) {
+  if (mode === 'edit' && loadedIdRef.current !== pageId) {
+    if (ready && !row) {
+      return (
+        <AdminEmptyState
+          title="No such page"
+          description="That page id has neither a published nor a draft revision."
+          action={
+            <Link to=".." relative="path" className={primaryButtonClass}>
+              Back to pages
+            </Link>
+          }
+        />
+      );
+    }
+    if (!ready && listenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load this page and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+        />
+      );
+    }
     return <AdminLoadingState label="Loading page…" />;
-  }
-  if (mode === 'edit' && !loading && !row) {
-    return (
-      <AdminEmptyState
-        title="No such page"
-        description="That page id has neither a published nor a draft revision."
-        action={
-          <Link to=".." relative="path" className={primaryButtonClass}>
-            Back to pages
-          </Link>
-        }
-      />
-    );
   }
 
   const update = (patch) => setPage((current) => ({ ...current, ...patch }));

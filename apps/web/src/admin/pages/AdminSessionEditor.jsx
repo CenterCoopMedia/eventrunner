@@ -17,6 +17,7 @@ import { NewTabNote } from '../../components/ExternalLink.jsx';
 import {
   CheckboxField,
   DestructiveConfirm,
+  Notice,
   Panel,
   SaveStatus,
   SelectField,
@@ -102,7 +103,7 @@ export default function AdminSessionEditor({ mode }) {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { eventConfig } = useEventConfig();
-  const { rows, loading, findRow } = useAdminSessions();
+  const { rows, ready, error: listenerError, findRow } = useAdminSessions();
   const row = mode === 'edit' ? findRow(sessionId) : null;
   const [form, setForm] = useState(EMPTY);
   const [idTouched, setIdTouched] = useState(false);
@@ -114,10 +115,10 @@ export default function AdminSessionEditor({ mode }) {
   const adoptedRef = useRef(false);
 
   useEffect(() => {
-    if (mode !== 'edit' || adoptedRef.current || !row) return;
+    if (mode !== 'edit' || adoptedRef.current || !ready || !row) return;
     adoptedRef.current = true;
     setForm(toForm(row));
-  }, [mode, row]);
+  }, [mode, ready, row]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -244,14 +245,24 @@ export default function AdminSessionEditor({ mode }) {
     }
   }
 
-  if (mode === 'edit' && loading) return <AdminLoadingState label="Loading session…" />;
-  if (mode === 'edit' && !row && !loading) {
-    return (
-      <AdminEmptyState
-        title="No such session"
-        description="That session does not exist. It may have been deleted."
-      />
-    );
+  if (mode === 'edit' && !adoptedRef.current) {
+    if (ready && !row) {
+      return (
+        <AdminEmptyState
+          title="No such session"
+          description="That session does not exist. It may have been deleted."
+        />
+      );
+    }
+    if (!ready && listenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load this session and its saved draft. The editor opens when both have loaded, so a save cannot replace a draft it has not read. We are trying again."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading session…" />;
   }
 
   return (

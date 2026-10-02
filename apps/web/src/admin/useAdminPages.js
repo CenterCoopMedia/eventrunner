@@ -12,18 +12,19 @@ import { mergePageRevisions } from './pageDoc.js';
 export function useAdminPages() {
   const [live, setLive] = useState(null);
   const [drafts, setDrafts] = useState(null);
-  const [error, setError] = useState(null);
+  const [liveError, setLiveError] = useState(null);
+  const [draftsError, setDraftsError] = useState(null);
 
   useEffect(() => {
     const unsubscribers = [
       subscribeAdminCollection('cmsPages', (docs) => {
         setLive(docs);
-        setError(null);
-      }, setError),
+        setLiveError(null);
+      }, setLiveError),
       subscribeAdminCollection('cmsPages_drafts', (docs) => {
         setDrafts(docs);
-        setError(null);
-      }, setError),
+        setDraftsError(null);
+      }, setDraftsError),
     ];
     return () => {
       for (const unsubscribe of unsubscribers) {
@@ -33,6 +34,8 @@ export function useAdminPages() {
   }, []);
 
   const rows = useMemo(() => mergePageRevisions(live, drafts), [live, drafts]);
+  const error = liveError ?? draftsError ?? null;
+  const ready = live !== null && drafts !== null;
 
   return {
     rows,
@@ -43,7 +46,8 @@ export function useAdminPages() {
     // never published and Publish all would republish it. An errored
     // listener resolves the wait instead of spinning forever (fail soft: the
     // rows we do have keep rendering while the subscription retries).
-    loading: (live === null || drafts === null) && !error,
+    loading: !ready && !error,
+    ready,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,
   };

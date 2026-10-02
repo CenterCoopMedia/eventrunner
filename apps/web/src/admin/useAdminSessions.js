@@ -7,18 +7,19 @@ export function useAdminSessions() {
   const { eventConfig } = useEventConfig();
   const [live, setLive] = useState(null);
   const [drafts, setDrafts] = useState(null);
-  const [error, setError] = useState(null);
+  const [liveError, setLiveError] = useState(null);
+  const [draftsError, setDraftsError] = useState(null);
 
   useEffect(() => {
     const unsubscribers = [
       subscribeAdminCollection('cmsSchedule', (docs) => {
         setLive(docs);
-        setError(null);
-      }, setError),
+        setLiveError(null);
+      }, setLiveError),
       subscribeAdminCollection('cmsSchedule_drafts', (docs) => {
         setDrafts(docs);
-        setError(null);
-      }, setError),
+        setDraftsError(null);
+      }, setDraftsError),
     ];
     return () => {
       for (const unsubscribe of unsubscribers) unsubscribe?.();
@@ -30,11 +31,14 @@ export function useAdminSessions() {
     [live, drafts, eventConfig.days, eventConfig.timezone],
   );
   const rows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
+  const error = liveError ?? draftsError ?? null;
+  const ready = live !== null && drafts !== null;
 
   return {
     groups,
     rows,
-    loading: (live === null || drafts === null) && !error,
+    loading: !ready && !error,
+    ready,
     error,
     findRow: (id) => rows.find((row) => row.id === id) ?? null,
   };
