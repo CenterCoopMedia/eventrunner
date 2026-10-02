@@ -345,9 +345,9 @@ jobs:
     if: needs.changes.outputs.e2e == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
     env:
-      # The hosted image includes Chrome's root-owned SUID helper. Chromium
+      # Install the helper from the pinned Playwright browser below. Chromium
       # can use it while Ubuntu keeps its user-namespace restrictions enabled.
-      CHROME_DEVEL_SANDBOX: /opt/google/chrome/chrome-sandbox
+      CHROME_DEVEL_SANDBOX: /opt/eventrunner-chromium-sandbox
     # Credential-free (spec §8.1, issue #38): Playwright drives the real app
     # against the full emulator suite (auth, firestore, storage, functions)
     # with the console email provider and manual ticketing — no secrets, no
@@ -392,8 +392,12 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: firebase-emulators-${{ runner.os }}-
-      - name: Verify the hosted Chromium sandbox helper
-        run: test -u "$CHROME_DEVEL_SANDBOX"
+      - name: Install the pinned Chromium sandbox helper
+        run: |
+          helper="$(node -e "const path = require('node:path'); console.log(path.join(path.dirname(require('@playwright/test').chromium.executablePath()), 'chrome_sandbox'))")"
+          test -f "$helper"
+          sudo install -o root -g root -m 4755 "$helper" "$CHROME_DEVEL_SANDBOX"
+          test -u "$CHROME_DEVEL_SANDBOX"
       - name: Run e2e tests
         # Invoke the script directly rather than through `npm run test:e2e`
         # (which is just this same script — see package.json) so local and
