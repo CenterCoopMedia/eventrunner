@@ -59,6 +59,7 @@ let adminProbeShouldSucceed = true;
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
   query: vi.fn(() => ({})),
+  where: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() =>
     adminProbeShouldSucceed
