@@ -27,6 +27,8 @@ let features;
 let pages;
 let authUser;
 let authLoading;
+let accountProfile;
+let accountStatus;
 
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({
@@ -51,6 +53,9 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
 // who is reading (M7 issue 2), so the shell reads the auth state too.
 vi.mock('../contexts/AuthContext.jsx', () => ({
   useAuth: () => ({ user: authUser, loading: authLoading }),
+}));
+vi.mock('../contexts/ProfileContext.jsx', () => ({
+  useProfile: () => ({ profile: accountProfile, status: accountStatus }),
 }));
 
 const { default: Layout } = await import('./Layout.jsx');
@@ -86,6 +91,8 @@ function renderShell(
     featureFlags = FIXTURE_FEATURES,
     user = null,
     loading = false,
+    profile = null,
+    profileStatus = user ? 'ready' : 'signed-out',
   } = {},
 ) {
   theme = { logos, header, ...themeDoc };
@@ -95,6 +102,8 @@ function renderShell(
   features = featureFlags;
   authUser = user;
   authLoading = loading;
+  accountProfile = profile;
+  accountStatus = profileStatus;
   return render(
     <MemoryRouter
       initialEntries={[path]}
@@ -340,15 +349,15 @@ describe('Layout navigation (built from page documents)', () => {
   });
 });
 
-// THE ACCOUNT CONTROL (M7 issue 2). One control at the end of the
-// navigation, with two destinations and no third: sign in when nobody is
-// signed in, and the reader's own profile when somebody is. It is a nav
-// item, so it inherits the nav's placement, its landmark, and its keyboard
-// path rather than being a second control the shell has to place twice.
+// THE ACCOUNT CONTROL (M7 issue 2, speaker routing in issue #210). One
+// control at the end of the navigation: sign in when nobody is signed in,
+// the attendee dashboard for an attendee, and the speaker dashboard for a
+// linked speaker. It inherits the nav's placement, landmark, and keyboard
+// path rather than making the shell place a second control.
 describe('Layout account control', () => {
   const accountLink = (root) =>
     root.querySelector(
-      'nav[aria-label="Main"] a[href="/signin"], nav[aria-label="Main"] a[href="/dashboard"]',
+      'nav[aria-label="Main"] a[href="/signin"], nav[aria-label="Main"] a[href="/dashboard"], nav[aria-label="Main"] a[href="/speaker/dashboard"]',
     );
 
   it('offers sign-in to a visitor who is not signed in', () => {
@@ -366,6 +375,24 @@ describe('Layout account control', () => {
     expect(link).toHaveAttribute('href', '/dashboard');
     expect(link.textContent).toBe('Dashboard');
     expect(container.querySelectorAll('nav[aria-label="Main"] a[href="/signin"]')).toHaveLength(0);
+  });
+
+  it('offers the speaker dashboard after the linked account record loads', () => {
+    const { container } = renderShell({}, {
+      user: { uid: 'u1' },
+      profile: { speakerId: 'rae-okonkwo' },
+    });
+    const link = accountLink(container);
+    expect(link).toHaveAttribute('href', '/speaker/dashboard');
+    expect(link.textContent).toBe('Dashboard');
+  });
+
+  it('keeps the attendee route while the linked account record is loading', () => {
+    const { container } = renderShell({}, {
+      user: { uid: 'u1' },
+      profileStatus: 'pending-account',
+    });
+    expect(accountLink(container)).toHaveAttribute('href', '/dashboard');
   });
 
   it('offers sign-in while the auth handshake is still in flight', () => {
@@ -426,6 +453,15 @@ describe('Layout account control', () => {
 
   it('marks the dashboard in view for a signed-in reader', () => {
     const { container } = renderShell({}, { path: '/dashboard', user: { uid: 'u1' } });
+    expect(accountLink(container)).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('marks the speaker dashboard in view for a linked speaker', () => {
+    const { container } = renderShell({}, {
+      path: '/speaker/dashboard',
+      user: { uid: 'u1' },
+      profile: { speakerId: 'rae-okonkwo' },
+    });
     expect(accountLink(container)).toHaveAttribute('aria-current', 'page');
   });
 

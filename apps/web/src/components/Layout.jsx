@@ -32,7 +32,7 @@
 // system page's route already checks). ONE ITEM IS NOT A PAGE: the account
 // control closes the list, and it is the shell's own (see ACCOUNT_SIGNED_OUT
 // below) because no page document describes a route that changes with who
-// is reading.
+// is reading or whether their account is linked to a speaker.
 //
 // WHERE THE PLACEMENT COMES FROM, IN ORDER — THE PAGE, THEN THE SITE.
 //
@@ -60,6 +60,7 @@ import { listSocialAccounts } from 'shared/config';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
@@ -73,7 +74,7 @@ import ChunkErrorBoundary from './ChunkErrorBoundary.jsx';
 import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import AnnouncementBanners from './AnnouncementBanners.jsx';
-import PublicWebMcpRegistration from '../webmcp/PublicWebMcpRegistration.jsx';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 // The feedback dialog and the change request dialog (issue #188) each sit
 // behind a flag that is off by default and open only on a press, so they
@@ -89,6 +90,10 @@ function onDemand(importer) {
 }
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
+// The public model tools are optional and render no interface. Keep their
+// definitions and registration machinery out of the initial site bundle,
+// then load them only for the demo or a deployment that enables the flag.
+const PublicWebMcpRegistration = onDemand(() => import('../webmcp/PublicWebMcpRegistration.jsx'));
 
 /**
  * The page's own header, read into the theme's vocabulary.
@@ -125,13 +130,12 @@ function navClass({ isActive }) {
   ].join(' ');
 }
 
-// THE ACCOUNT CONTROL: ONE CONTROL, TWO DESTINATIONS (M7 issue 2).
+// THE ACCOUNT CONTROL: ONE CONTROL, A DESTINATION FOR THIS ACCOUNT.
 //
-// A reader who is not signed in is offered the sign-in page; a reader who is
-// gets their own profile. There is no third state and no second control —
-// signing out lives on the sign-in page itself, where the account it ends is
-// named, rather than as a header button that logs a reader out of a site
-// they were only reading.
+// A reader who is not signed in is offered the sign-in page. A signed-in
+// attendee gets the attendee dashboard, while a linked speaker gets the
+// speaker dashboard (issue #210). There is still one control: signing out
+// lives on the sign-in page itself, where the account it ends is named.
 //
 // It is the LAST ITEM OF THE NAV, not a separate control beside it, so it
 // inherits everything the nav already settled: one landmark, one keyboard
@@ -168,6 +172,7 @@ const ACCOUNT_SIGNED_OUT = Object.freeze({ to: '/signin', label: 'Sign in', end:
 // was not: the day the dashboard grows children, an end match would quietly
 // stop marking the control while the reader is inside the section it names.
 const ACCOUNT_SIGNED_IN = Object.freeze({ to: '/dashboard', label: 'Dashboard', end: false });
+const ACCOUNT_SPEAKER = Object.freeze({ to: '/speaker/dashboard', label: 'Dashboard', end: false });
 
 /**
  * Tailwind's font-weight utilities by name. Deliberately a closed list and
@@ -234,6 +239,7 @@ export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage } = useContent();
   const { user, loading: authLoading } = useAuth();
+  const { profile, status: accountStatus } = useProfile();
   const { pathname } = useLocation();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
@@ -299,9 +305,15 @@ export default function Layout() {
   // tells two accounts on one service apart.
   const socialLinks = useMemo(() => listSocialAccounts(eventConfig?.social), [eventConfig?.social]);
 
-  // Two destinations, one control. An unfinished handshake is the
-  // signed-out answer, said explicitly (see ACCOUNT_SIGNED_OUT above).
-  const account = !authLoading && user ? ACCOUNT_SIGNED_IN : ACCOUNT_SIGNED_OUT;
+  // One control, routed from the account record. An unfinished auth
+  // handshake is the signed-out answer; an account record still being
+  // seeded uses the attendee dashboard until its server-owned speakerId is
+  // available (see ACCOUNT_SIGNED_OUT above).
+  const account = !authLoading && user
+    ? accountStatus === 'ready' && profile?.speakerId
+      ? ACCOUNT_SPEAKER
+      : ACCOUNT_SIGNED_IN
+    : ACCOUNT_SIGNED_OUT;
 
   // One nav, placed two ways. The list, its labels, its landmark, and its
   // position in the document are identical either way — `side` only moves
@@ -395,7 +407,11 @@ export default function Layout() {
 
   return (
     <div className="page-surface flex min-h-screen flex-col">
-      <PublicWebMcpRegistration />
+      {IS_DEMO || features.webmcpPublic === true ? (
+        <Suspense fallback={null}>
+          <PublicWebMcpRegistration />
+        </Suspense>
+      ) : null}
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
