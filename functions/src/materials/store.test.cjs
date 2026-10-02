@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { Storage } = require('@google-cloud/storage');
 
 const {
   addSessionMaterialLink,
@@ -593,8 +594,54 @@ test('uploadSessionMaterialBytes: an ambiguous save failure removes only this at
   assert.match(bucket.state.deletedPaths[0], /^session-materials\/s1\/auto-\d+$/);
   assert.deepEqual(bucket.state.deleteOptions, [{
     ignoreNotFound: true,
-    preconditionOpts: { ifGenerationMatch: '7' },
+    ifGenerationMatch: '7',
   }]);
+});
+
+test('uploadSessionMaterialBytes: the installed SDK sends the cleanup generation precondition', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const saveError = new Error('Storage lost the response after writing');
+  const file = new Storage({ projectId: 'demo-eventrunner' })
+    .bucket('eventrunner-fixture')
+    .file('session-materials/s1/sdk-fixture');
+  let savedMetadata;
+  file.save = async (_bytes, options) => {
+    savedMetadata = options.metadata.metadata;
+    throw saveError;
+  };
+  file.getMetadata = async () => [{
+    size: 1,
+    generation: '11',
+    metadata: savedMetadata,
+  }];
+
+  const serviceObjectPrototype = Object.getPrototypeOf(Object.getPrototypeOf(file));
+  const originalRequest = serviceObjectPrototype.request;
+  let deleteRequest;
+  serviceObjectPrototype.request = function request(options, callback) {
+    deleteRequest = options;
+    callback(null, {}, {});
+  };
+  try {
+    const error = await uploadSessionMaterialBytes({
+      db,
+      bucket: { file() { return file; } },
+      sessionId: 's1',
+      data: Buffer.from('x').toString('base64'),
+      contentType: 'application/pdf',
+      filename: 'slides.pdf',
+      actor: speaker('spk-1'),
+      now,
+      log: { error() {} },
+    }).catch((caught) => caught);
+    assert.equal(error, saveError);
+  } finally {
+    serviceObjectPrototype.request = originalRequest;
+  }
+
+  assert.equal(deleteRequest.method, 'DELETE');
+  assert.equal(deleteRequest.qs.ifGenerationMatch, '11');
+  assert.equal(Object.hasOwn(deleteRequest.qs, 'preconditionOpts'), false);
 });
 
 test('uploadSessionMaterialBytes: a create precondition failure never deletes the existing object', async () => {
