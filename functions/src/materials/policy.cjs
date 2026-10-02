@@ -2,6 +2,8 @@
 
 /** A single streamed material stays under the platform's 10,000,000-byte response limit. */
 const MAX_MATERIAL_FILE_BYTES = 9 * 1024 * 1024;
+/** Bound stored and downloaded display names without rejecting Unicode. */
+const MAX_MATERIAL_FILENAME_LENGTH = 240;
 
 /** Storage returns object sizes as decimal strings. Test fakes may use numbers. */
 function parseStorageSize(raw) {
@@ -49,6 +51,7 @@ function isSessionMaterialStoragePath(storagePath, sessionId) {
 
 module.exports = {
   MAX_MATERIAL_FILE_BYTES,
+  MAX_MATERIAL_FILENAME_LENGTH,
   MaterialFileTooLargeError,
   MaterialFileSizeUnavailableError,
   isSessionMaterialStoragePath,
