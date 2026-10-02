@@ -48,6 +48,7 @@
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } =
   require('../core/errors.cjs');
 const {
+  MAX_MATERIAL_FILENAME_LENGTH,
   MaterialFileTooLargeError,
   MaterialFileSizeUnavailableError,
   isSessionMaterialStoragePath,
@@ -55,12 +56,20 @@ const {
 } = require('./policy.cjs');
 
 /** Strip characters that would break a Content-Disposition header value
- * (quotes, CR/LF) rather than reject the whole filename — this is a
+ * (quotes and controls) rather than reject the whole filename — this is a
  * display label (spec §4.4: file filenames are never scrubbed for
  * URL-shape), so the goal is a SAFE header, not a rejected upload. */
 function sanitizeForHeader(filename) {
-  const cleaned = String(filename ?? 'download').replace(/["\r\n]/g, '');
-  return cleaned.trim() || 'download';
+  const cleaned = [...String(filename ?? 'download').toWellFormed()]
+    .filter((character) => {
+      const code = character.codePointAt(0);
+      return character !== '"' && code > 31 && code !== 127;
+    })
+    .join('');
+  const trimmed = cleaned.trim() || 'download';
+  if (trimmed.length <= MAX_MATERIAL_FILENAME_LENGTH) return trimmed;
+  const shortened = trimmed.slice(0, MAX_MATERIAL_FILENAME_LENGTH);
+  return /[\uD800-\uDBFF]$/u.test(shortened) ? shortened.slice(0, -1) : shortened;
 }
 
 /**
@@ -83,8 +92,11 @@ async function streamMaterialFile({ file, res, filename, log = console }) {
     ? metadata.contentType
     : 'application/octet-stream';
 
+  // Express delegates to content-disposition, which emits an ASCII fallback
+  // plus RFC 5987 filename* for Unicode. Set the authoritative Storage MIME
+  // type afterwards because attachment() first guesses from the extension.
+  res.attachment(sanitizeForHeader(filename));
   res.set('Content-Type', contentType);
-  res.set('Content-Disposition', `attachment; filename="${sanitizeForHeader(filename)}"`);
   res.set('Cache-Control', 'private, max-age=0, no-store');
 
   await new Promise((resolve, reject) => {

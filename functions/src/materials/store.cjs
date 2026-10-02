@@ -1,5 +1,7 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
+
 /**
  * Session materials — canonical CRUD (spec §4.4, issue #23).
  *
@@ -47,6 +49,7 @@
 const { scrubLinkLabel, isSafeUrl } = require('shared/urlSafety');
 const {
   MAX_MATERIAL_FILE_BYTES,
+  MAX_MATERIAL_FILENAME_LENGTH,
   MaterialFileTooLargeError,
   MaterialFileSizeUnavailableError,
   isSessionMaterialStoragePath,
@@ -69,13 +72,50 @@ const MATERIALS_PUBLIC = 'session_materials_public';
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const CONTENT_TYPE_RE = /^[a-z0-9!#$%&'*+.^_`|~-]+\/[a-z0-9!#$%&'*+.^_`|~-]+$/i;
 const PRIVATE_CACHE_CONTROL = 'private, max-age=0, no-store';
-const MAX_MATERIAL_FILENAME_LENGTH = 240;
+const UPLOAD_ATTEMPT_METADATA_KEY = 'eventrunnerUploadAttempt';
 
 function hasControlCharacter(value) {
   return [...value].some((character) => {
     const code = character.codePointAt(0);
     return code <= 31 || code === 127;
   });
+}
+
+function normalizeFileMaterialFilename(filename, { fallback } = {}) {
+  const normalized = typeof filename === 'string' ? filename.trim() : '';
+  if (!normalized && fallback) return fallback;
+  if (
+    !normalized
+    || normalized.length > MAX_MATERIAL_FILENAME_LENGTH
+    || hasControlCharacter(normalized)
+  ) {
+    throw new InvalidMaterialUploadError(
+      `filename: must be 1-${MAX_MATERIAL_FILENAME_LENGTH} characters without control characters.`,
+    );
+  }
+  return normalized;
+}
+
+function storageErrorHasStatus(error, status) {
+  return Number(error?.code) === status || Number(error?.response?.status) === status;
+}
+
+async function removeOwnedUpload({ file, uploadAttempt, log }) {
+  try {
+    const [metadata] = await file.getMetadata();
+    if (metadata?.metadata?.[UPLOAD_ATTEMPT_METADATA_KEY] !== uploadAttempt) return;
+    if (metadata.generation == null) {
+      log.error('uploadSessionMaterial: could not verify the unregistered object generation');
+      return;
+    }
+    await file.delete({
+      ignoreNotFound: true,
+      preconditionOpts: { ifGenerationMatch: metadata.generation },
+    });
+  } catch (cleanupError) {
+    if (storageErrorHasStatus(cleanupError, 404)) return;
+    log.error('uploadSessionMaterial: failed to remove an unregistered object', cleanupError);
+  }
 }
 
 /**
@@ -219,6 +259,7 @@ async function uploadSessionMaterial({
   // below repeats this check so a session change cannot race the write.
   const sessionSnap = await db.collection(SESSIONS).doc(sessionId).get();
   assertMaterialCreateAllowed({ sessionSnap, sessionId, actor });
+  const normalizedFilename = normalizeFileMaterialFilename(filename, { fallback: 'Untitled file' });
 
   const file = bucket.file(storagePath);
   const [exists] = await file.exists();
@@ -234,7 +275,7 @@ async function uploadSessionMaterial({
     type: 'file',
     url: null,
     storagePath,
-    filename: typeof filename === 'string' && filename.trim() ? filename.trim() : 'Untitled file',
+    filename: normalizedFilename,
     managedStorageObject,
   });
 }
@@ -327,32 +368,26 @@ async function uploadSessionMaterialBytes({
   if (normalizedType.length > 100 || !CONTENT_TYPE_RE.test(normalizedType)) {
     throw new InvalidMaterialUploadError('contentType: must be a valid media type.');
   }
-  const normalizedFilename = typeof filename === 'string' ? filename.trim() : '';
-  if (
-    !normalizedFilename
-    || normalizedFilename.length > MAX_MATERIAL_FILENAME_LENGTH
-    || hasControlCharacter(normalizedFilename)
-  ) {
-    throw new InvalidMaterialUploadError(
-      `filename: must be 1-${MAX_MATERIAL_FILENAME_LENGTH} characters without control characters.`,
-    );
-  }
+  const normalizedFilename = normalizeFileMaterialFilename(filename);
   const buffer = decodeMaterialUpload(data);
 
   const objectId = db.collection(MATERIALS).doc().id;
   const storagePath = `session-materials/${sessionId}/${objectId}`;
+  const uploadAttempt = randomUUID();
   const file = bucket.file(storagePath);
-  await file.save(buffer, {
-    resumable: false,
-    preconditionOpts: { ifGenerationMatch: 0 },
-    metadata: {
-      contentType: normalizedType,
-      cacheControl: PRIVATE_CACHE_CONTROL,
-      metadata: { uploadedBy: actor.uid },
-    },
-  });
-
   try {
+    await file.save(buffer, {
+      resumable: false,
+      preconditionOpts: { ifGenerationMatch: 0 },
+      metadata: {
+        contentType: normalizedType,
+        cacheControl: PRIVATE_CACHE_CONTROL,
+        metadata: {
+          uploadedBy: actor.uid,
+          [UPLOAD_ATTEMPT_METADATA_KEY]: uploadAttempt,
+        },
+      },
+    });
     return await uploadSessionMaterial({
       db,
       bucket,
@@ -364,10 +399,10 @@ async function uploadSessionMaterialBytes({
       managedStorageObject: true,
     });
   } catch (err) {
-    try {
-      await file.delete({ ignoreNotFound: true });
-    } catch (cleanupError) {
-      log.error('uploadSessionMaterial: failed to remove an unregistered object', cleanupError);
+    // A 412 means the fresh-name precondition found an existing object.
+    // That object belongs to another invocation, so never inspect or delete it.
+    if (!storageErrorHasStatus(err, 412)) {
+      await removeOwnedUpload({ file, uploadAttempt, log });
     }
     throw err;
   }
@@ -456,7 +491,9 @@ async function updateSessionMaterial({ db, materialId, patch, actor, now = Date.
       next.url = patch.url;
     }
     if (typeof patch?.filename === 'string') {
-      next.filename = current.type === 'link' ? scrubLinkLabel(patch.filename) : patch.filename.trim() || 'Untitled file';
+      next.filename = current.type === 'link'
+        ? scrubLinkLabel(patch.filename)
+        : normalizeFileMaterialFilename(patch.filename);
     }
     tx.update(materialRef, next);
     return { material: { ...current, ...next } };
