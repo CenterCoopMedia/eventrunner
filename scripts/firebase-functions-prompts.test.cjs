@@ -10,6 +10,7 @@ const {
   promptForFunctionDeletion,
   promptForCleanupPolicyDays,
 } = require('firebase-tools/lib/deploy/functions/prompts.js');
+const { createDeploymentPlan } = require('firebase-tools/lib/deploy/functions/release/planner.js');
 
 const endpoint = {
   id: 'retryingFunction',
@@ -35,4 +36,33 @@ test('the pinned CLI needs force for a new retry policy in non-interactive mode'
 test('the pinned CLI force flag also accepts deletion and one-day artifact retention', async () => {
   assert.equal(await promptForFunctionDeletion([endpoint], { nonInteractive: true, force: true }), true);
   assert.equal(await promptForCleanupPolicyDays({ nonInteractive: true, force: true }, ['us-central1']), 1);
+});
+
+test('a partial first deploy still prompts for an absent retry handler', async () => {
+  const unrelated = {
+    id: 'existingHttpFunction',
+    region: 'us-central1',
+    platform: 'gcfv2',
+    httpsTrigger: {},
+    labels: { 'deployment-tool': 'cli-firebase' },
+    state: 'ACTIVE',
+  };
+  const partial = { endpoints: { 'us-central1': { existingHttpFunction: unrelated } } };
+
+  await assert.rejects(
+    promptForFailurePolicies({ nonInteractive: true }, want, partial),
+    /Pass the --force option to deploy functions with a failure policy/,
+  );
+
+  const plan = createDeploymentPlan({
+    wantBackend: want,
+    haveBackend: partial,
+    codebase: 'default',
+    filters: [{ idChunks: [endpoint.id] }],
+    deleteAll: false,
+  });
+  const changes = Object.values(plan);
+  assert.deepEqual(changes.flatMap((change) => change.endpointsToCreate), [endpoint]);
+  assert.deepEqual(changes.flatMap((change) => change.endpointsToDelete), []);
+  assert.deepEqual(changes.flatMap((change) => change.endpointsToUpdate), []);
 });

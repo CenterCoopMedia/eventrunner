@@ -412,6 +412,108 @@
           can retry failed executions for up to seven days, so they must remain idempotent. Later deployments
           do not use <code>--force</code>, including later runs that mistakenly leave <code>bootstrap: true</code> after Functions
           exist.</p>
+          <p><strong>Recover a partial first Functions deploy.</strong> If the first bootstrap creates some Functions and
+          then fails, a rerun sees the nonempty inventory and correctly omits <code>--force</code>. It can then stop at
+          the retry-policy prompt for retry-enabled handlers that the failed run did not create. Do not add
+          blanket <code>--force</code> to the workflow. Use this bounded recovery:</p>
+          <ol>
+          <li><p>Read the failed run and repair its original API, permission, quota, or provider-configuration
+          failure. Keep the failed run&#39;s reviewed commit, <code>EVENT_FIREBASE_REGION</code>, and GitHub Environment
+          provider settings unchanged through recovery. Use a clean checkout at that exact commit and the
+          same trusted deploy credentials. The targeted command must use the same
+          <code>functions/.env.&lt;GCP_PROJECT_ID&gt;</code> content the failed workflow generated; stop if that input cannot
+          be reproduced exactly.</p></li>
+          <li><p>From that checkout with Node 22 and <code>npm ci</code> complete, read the full inventory. This uses the same
+          authenticated, pinned <code>firebase-tools</code> backend as the workflow and fails if a v1, v2, or Cloud
+          Run region is unreachable:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">set -euo pipefail
+          export EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID&gt;
+          export EVENT_FIREBASE_REGION=&lt;the unchanged region from the failed run&gt;
+          export GCLOUD_PROJECT=&quot;$EVENT_FIREBASE_PROJECT_ID&quot;
+          export FAILED_DEPLOY_SHA=&lt;the failed workflow&#39;s exact commit&gt;
+          test &quot;$(git rev-parse HEAD)&quot; = &quot;$FAILED_DEPLOY_SHA&quot;
+          test -z &quot;$(git status --porcelain)&quot;
+
+          read_functions_inventory() {
+            node - &lt;&lt;&#39;NODE&#39;
+          const { readCompleteInventory } = require(&#39;./scripts/deploy-functions.cjs&#39;);
+          readCompleteInventory(process.env.EVENT_FIREBASE_PROJECT_ID).then((functions) =&gt; {
+            const rows = functions
+              .map(({ id, region, platform }) =&gt; ({ id, region, platform }))
+              .sort((a, b) =&gt; `${a.region}/${a.id}`.localeCompare(`${b.region}/${b.id}`));
+            process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
+          }).catch((error) =&gt; {
+            console.error(error.message);
+            process.exitCode = 1;
+          });
+          NODE
+          }
+
+          inventory_file=&quot;$(mktemp)&quot;
+          read_functions_inventory &gt; &quot;$inventory_file&quot;
+          cat &quot;$inventory_file&quot;
+          </code></pre></li>
+          </ol>
+          <ol start="3">
+          <li><p>At this source commit, the retry-enabled handlers are <code>onUserCreated</code>, <code>onUserDeleted</code>,
+          <code>refreshUserPublicBadges</code>, <code>refreshUserPublicFeatures</code>, <code>syncScheduleShare</code>,
+          <code>syncScheduleShareOnAccountWrite</code>, <code>onTicketWritten</code>, <code>onUserRegistrationPromptCreated</code>,
+          <code>syncSessionMaterialPublic</code>, and <code>onSpeakerWritten</code>. Derive the missing set from the complete
+          inventory. Abort if any name exists in another region; that is a migration, not an absent
+          handler:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">retry_handlers=(
+            onUserCreated onUserDeleted refreshUserPublicBadges refreshUserPublicFeatures
+            syncScheduleShare syncScheduleShareOnAccountWrite onTicketWritten
+            onUserRegistrationPromptCreated syncSessionMaterialPublic onSpeakerWritten
+          )
+          missing=()
+          for handler in &quot;${retry_handlers[@]}&quot;; do
+            if jq -e --arg id &quot;$handler&quot; --arg region &quot;$EVENT_FIREBASE_REGION&quot; \
+              &#39;any(.[]; .id == $id and .region != $region)&#39; &quot;$inventory_file&quot; &gt;/dev/null; then
+              echo &quot;Stop: $handler already exists outside $EVENT_FIREBASE_REGION&quot; &gt;&amp;2
+              exit 1
+            fi
+            if ! jq -e --arg id &quot;$handler&quot; --arg region &quot;$EVENT_FIREBASE_REGION&quot; \
+              &#39;any(.[]; .id == $id and .region == $region)&#39; &quot;$inventory_file&quot; &gt;/dev/null; then
+              missing+=(&quot;$handler&quot;)
+            fi
+          done
+          printf &#39;Verified absent retry handlers: %s\n&#39; &quot;${missing[*]:-(none)}&quot;
+          </code></pre></li>
+          </ol>
+          <ol start="4">
+          <li><p>If <code>missing</code> is empty, do not run a forced command. Otherwise, deploy only those verified-absent
+          names. Do not add any existing handler to this selector and do not replace it with
+          <code>--only functions</code>. With exact absent-name filters, Firebase&#39;s plan contains creates only, so
+          <code>--force</code> cannot approve deletion or unsafe migration of an existing Function:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">selectors=()
+          for handler in &quot;${missing[@]}&quot;; do selectors+=(&quot;functions:$handler&quot;); done
+          only=&quot;$(IFS=,; echo &quot;${selectors[*]}&quot;)&quot;
+          test -n &quot;$only&quot;
+          npx firebase deploy \
+            --only &quot;$only&quot; \
+            --project &quot;$EVENT_FIREBASE_PROJECT_ID&quot; \
+            --non-interactive \
+            --force
+          </code></pre></li>
+          </ol>
+          <ol start="5">
+          <li><p>Read the complete inventory again and require every retry handler above to exist in the held
+          region:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">read_functions_inventory &gt; &quot;$inventory_file&quot;
+          for handler in &quot;${retry_handlers[@]}&quot;; do
+            jq -e --arg id &quot;$handler&quot; --arg region &quot;$EVENT_FIREBASE_REGION&quot; \
+              &#39;any(.[]; .id == $id and .region == $region)&#39; &quot;$inventory_file&quot; &gt;/dev/null || {
+              echo &quot;Stop: $handler is still absent from $EVENT_FIREBASE_REGION&quot; &gt;&amp;2
+              exit 1
+            }
+          done
+          </code></pre>
+          <p>Then rerun the standard <code>bootstrap: true</code> workflow from the same commit and unchanged provider
+          configuration. It now deploys without <code>--force</code>: the retry handlers are no longer new, and the
+          ordinary deletion and migration safeguards remain active. Delete the temporary inventory file
+          when recovery is complete.</p></li>
+          </ol>
           <p><strong>Upgrade order for unpublished counts.</strong> Pause CMS saves, publishes, deletes, and seed jobs during
           the first upgrade. Deploy Firestore rules and all Functions, then wait for the deploy and any older
           in-flight CMS requests to finish. Before deploying the count-reading UI or resuming edits, make an
