@@ -14,6 +14,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
+vi.mock('../lib/announcementsSource.js', () => ({ subscribeAnnouncements: () => () => {} }));
 vi.mock('../lib/contentSource.js', () => ({
   subscribeContentCollection: () => () => {},
   subscribeSpeakersPublic: () => () => {},
