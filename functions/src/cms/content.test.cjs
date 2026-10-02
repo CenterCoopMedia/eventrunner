@@ -646,7 +646,7 @@ test('cmsUpdateContent → 404 when neither draft nor live doc exists', async ()
 
 // --- cmsDeleteContent ---------------------------------------------------------
 
-test('cmsDeleteContent removes live and draft in one batch and logs the action', async () => {
+test('cmsDeleteContent removes live and draft in one transaction and logs the action', async () => {
   const db = makeFakeDb({
     'cmsContent/hero__title': { value: 'live', visible: true, revision: 1 },
     'cmsContent_drafts/hero__title': { value: 'draft', visible: true, status: 'clean', basedOnRevision: 1 },
@@ -660,7 +660,7 @@ test('cmsDeleteContent removes live and draft in one batch and logs the action',
   assert.deepEqual(res.body.deleted, ['cmsContent/hero__title', 'cmsContent_drafts/hero__title']);
   assert.equal(db.read('cmsContent', 'hero__title'), undefined);
   assert.equal(db.read('cmsContent_drafts', 'hero__title'), undefined);
-  assert.equal(db.commitCount, 1);
+  assert.equal(db.commitCount, 0, 'deleteBoth owns one transaction, not a write batch');
   assert.equal(db.ids('admin_logs').length, 1);
 });
 

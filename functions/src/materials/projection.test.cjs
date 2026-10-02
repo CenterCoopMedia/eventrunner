@@ -5,8 +5,25 @@ const assert = require('node:assert/strict');
 
 const {
   createSyncSessionMaterialPublic,
+  cleanupDeletedMaterialFile,
+  createHandleSessionMaterialWritten,
   internals: { projectMaterial },
 } = require('./projection.cjs');
+
+function fakeBucket({ fail = false } = {}) {
+  const deleted = [];
+  return {
+    deleted,
+    file(path) {
+      return {
+        async delete(options) {
+          if (fail) throw new Error('Storage unavailable');
+          deleted.push({ path, options });
+        },
+      };
+    },
+  };
+}
 
 function fakeDb(seed = {}) {
   const docs = new Map(Object.entries(seed));
@@ -121,4 +138,111 @@ test('syncSessionMaterialPublic: an already-absent material with no public row i
   const sync = createSyncSessionMaterialPublic({ db });
   const result = await sync({ materialId: 'ghost' });
   assert.equal(result.action, 'unchanged');
+});
+
+// ------------------------------------------------------- deleted file cleanup
+
+test('cleanupDeletedMaterialFile: removes the valid private object for a deleted file', async () => {
+  const db = fakeDb();
+  const bucket = fakeBucket();
+  const result = await cleanupDeletedMaterialFile({
+    db,
+    bucket,
+    materialId: 'm-file',
+    deletedMaterial: {
+      sessionId: 's1',
+      type: 'file',
+      storagePath: 'session-materials/s1/server-object-id',
+      managedStorageObject: true,
+    },
+  });
+  assert.deepEqual(result, { action: 'deleted', storagePath: 'session-materials/s1/server-object-id' });
+  assert.deepEqual(bucket.deleted, [{
+    path: 'session-materials/s1/server-object-id',
+    options: { ignoreNotFound: true },
+  }]);
+});
+
+test('cleanupDeletedMaterialFile: a stale delete event cannot remove a recreated material file', async () => {
+  const db = fakeDb({
+    'session_materials/m-file': {
+      sessionId: 's1', type: 'file', storagePath: 'session-materials/s1/current-object',
+    },
+  });
+  const bucket = fakeBucket();
+  const result = await cleanupDeletedMaterialFile({
+    db,
+    bucket,
+    materialId: 'm-file',
+    deletedMaterial: {
+      sessionId: 's1', type: 'file', storagePath: 'session-materials/s1/old-object',
+      managedStorageObject: true,
+    },
+  });
+  assert.deepEqual(result, { action: 'unchanged' });
+  assert.deepEqual(bucket.deleted, []);
+});
+
+test('cleanupDeletedMaterialFile: refuses to delete outside the material session path', async () => {
+  const db = fakeDb();
+  const bucket = fakeBucket();
+  const errors = [];
+  const result = await cleanupDeletedMaterialFile({
+    db,
+    bucket,
+    materialId: 'm-file',
+    deletedMaterial: {
+      sessionId: 's1',
+      type: 'file',
+      storagePath: 'branding/logo.svg',
+      managedStorageObject: true,
+    },
+    log: { error: (...args) => errors.push(args) },
+  });
+  assert.deepEqual(result, { action: 'invalid-path' });
+  assert.equal(errors.length, 1);
+  assert.deepEqual(bucket.deleted, []);
+});
+
+test('material written handler: a Storage failure rejects so the event can retry', async () => {
+  const db = fakeDb();
+  const handler = createHandleSessionMaterialWritten({ db, bucket: fakeBucket({ fail: true }) });
+  await assert.rejects(
+    handler({
+      materialId: 'm-file',
+      before: {
+        sessionId: 's1',
+        type: 'file',
+        storagePath: 'session-materials/s1/server-object-id',
+        managedStorageObject: true,
+      },
+    }),
+    /Storage unavailable/,
+  );
+});
+
+test('cleanupDeletedMaterialFile: preserves objects registered by the legacy path', async () => {
+  const db = fakeDb();
+  const bucket = fakeBucket();
+  const result = await cleanupDeletedMaterialFile({
+    db,
+    bucket,
+    materialId: 'm-file',
+    deletedMaterial: {
+      sessionId: 's1',
+      type: 'file',
+      storagePath: 'session-materials/s1/operator-managed.pdf',
+    },
+  });
+  assert.deepEqual(result, { action: 'unchanged' });
+  assert.deepEqual(bucket.deleted, []);
+});
+
+test('syncSessionMaterialPublic is deployed with retries enabled for file cleanup', () => {
+  const { handlers } = require('./projection.cjs');
+  const endpoint = Object.getOwnPropertyDescriptor(
+    handlers.syncSessionMaterialPublic,
+    '__endpoint',
+  )?.value;
+  assert.equal(endpoint.eventTrigger.retry, true);
 });

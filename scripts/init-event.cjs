@@ -335,6 +335,13 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
 
   console.log(`\ninit-event: ${dryRun ? 'DRY RUN — ' : ''}seeding ${tierA.projectId}\n`);
 
+  // Bootstrap the one pending-count document before any CMS seed transition.
+  // On an upgrade this counts existing dirty drafts first; every seed save,
+  // publish, and delete below then changes the count atomically through store.
+  // A dry run remains read-only and leaves a missing document for the deployed
+  // cmsEnsurePendingCounts endpoint to prepare.
+  if (!dryRun) await store.ensurePendingCounts({ db, now });
+
   // On a re-run, only the explicit flags may add to config/bootstrap: the
   // answers file's lists seeded the first run and are not re-applied, so
   // an address an operator removed or demoted on the Access page stays

@@ -1,11 +1,10 @@
-// The unpublished changes seam (issue #196): the live read the admin's
-// pending-changes banner and page share, and nothing else.
+// Full rows for the Unpublished changes page. The shell's banner uses
+// pendingCountsSource and never opens these collection listeners.
 //
 // A saved draft that is not live is a `<collection>_drafts` document with
 // `status == 'dirty'` — the query functions/src/cms/store.cjs listDirty runs,
-// and the set cmsPublish `{ all: true }` publishes. Reading the same
-// predicate here is what keeps the banner, the page, the overview's
-// readiness count and "Publish all" counting one set.
+// and the set cmsPublish `{ all: true }` publishes. The page derives its
+// displayed count from these same rows.
 //
 // The publish runs (publishRunsSource.js) are read beside them on the page
 // only, so they load with it and stay out of the admin entry chunk.

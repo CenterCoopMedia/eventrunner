@@ -14,14 +14,30 @@ const {
   internals,
 } = require('./store.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
+const { PUBLISHABLE_COLLECTIONS } = require('./blockTypes.cjs');
 
 const ACTOR = { uid: 'admin1', email: 'admin@example.org' };
 const NOW = 1_750_000_000_000;
 const now = () => NOW;
 
+function pendingDoc(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    counts: {
+      ...Object.fromEntries(PUBLISHABLE_COLLECTIONS.map((collection) => [collection, 0])),
+      ...overrides,
+    },
+    updatedAt: new Date(0),
+  };
+}
+
 test('chunk size never exceeds 400 writes per batch', () => {
-  assert.equal(internals.DOCS_PER_CHUNK * internals.WRITES_PER_DOC <= internals.MAX_WRITES_PER_BATCH, true);
-  assert.equal(internals.DOCS_PER_CHUNK, 133);
+  assert.equal(
+    internals.DOCS_PER_CHUNK * internals.WRITES_PER_DOC + internals.FIXED_WRITES_PER_CHUNK <=
+      internals.MAX_WRITES_PER_BATCH,
+    true,
+  );
+  assert.equal(internals.DOCS_PER_CHUNK, 132);
 });
 
 test('contentFieldsOf strips every bookkeeping key', () => {
@@ -46,7 +62,7 @@ test('contentFieldsOf strips every bookkeeping key', () => {
 test('writeDraft writes the draft only — the live collection is never touched', async () => {
   const db = makeFakeDb({ 'cmsContent/hero__title': { value: 'live', visible: true, revision: 3 } });
   await writeDraft({ db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'edited' }, actor: ACTOR, now });
-  assert.deepEqual(db.writes.map((w) => w.path), ['cmsContent_drafts/hero__title']);
+  assert.deepEqual(db.writes.map((w) => w.path), ['cmsMeta/pending', 'cmsContent_drafts/hero__title']);
   assert.equal(db.read('cmsContent', 'hero__title').value, 'live');
 });
 
@@ -91,6 +107,26 @@ test('writeDraft preserves an existing draft basedOnRevision and re-dirties a cl
   assert.equal(draft.updatedBy, ACTOR.email);
 });
 
+test('writeDraft increments only absent-or-clean to dirty transitions', async () => {
+  const db = makeFakeDb({ 'cmsMeta/pending': pendingDoc() });
+  await writeDraft({
+    db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'one' }, actor: ACTOR, now,
+  });
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1);
+
+  await writeDraft({
+    db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'two' }, actor: ACTOR, now,
+  });
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1, 'dirty to dirty is not counted twice');
+
+  await publishDocs({ db, collection: 'cmsContent', docIds: ['hero__title'], actor: ACTOR, now });
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 0);
+  await writeDraft({
+    db, collection: 'cmsContent', docId: 'hero__title', fields: { value: 'three' }, actor: ACTOR, now,
+  });
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1, 'clean to dirty increments');
+});
+
 test('writeDraft strips reserved bookkeeping keys from caller fields', async () => {
   const db = makeFakeDb();
   await writeDraft({
@@ -116,7 +152,7 @@ test('writeDraft throws on a non-publishable collection before writing anything'
 
 // --- deleteBoth -------------------------------------------------------------
 
-test('deleteBoth removes live and draft in a single batch', async () => {
+test('deleteBoth removes live and draft in one transaction', async () => {
   const db = makeFakeDb({
     'cmsUpdates/post1': { title: 'x', visible: true, revision: 1 },
     'cmsUpdates_drafts/post1': { title: 'x', visible: true, status: 'clean', basedOnRevision: 1 },
@@ -126,7 +162,7 @@ test('deleteBoth removes live and draft in a single batch', async () => {
   assert.equal(draftPath, 'cmsUpdates_drafts/post1');
   assert.equal(db.read('cmsUpdates', 'post1'), undefined);
   assert.equal(db.read('cmsUpdates_drafts', 'post1'), undefined);
-  assert.equal(db.commitCount, 1);
+  assert.equal(db.commitCount, 0);
 });
 
 test('deleteBoth inside a transaction still removes the pair, or neither', async () => {
@@ -156,6 +192,17 @@ test('deleteBoth inside a transaction still removes the pair, or neither', async
   );
   assert.notEqual(kept.read('cmsSchedule', 's2'), undefined);
   assert.notEqual(kept.read('cmsSchedule_drafts', 's2'), undefined);
+});
+
+test('deleteBoth repairs an undercount before deleting a dirty draft', async () => {
+  const db = makeFakeDb({
+    'cmsMeta/pending': pendingDoc(),
+    'cmsUpdates/post1': { title: 'x', visible: true, revision: 1 },
+    'cmsUpdates_drafts/post1': { title: 'edited', visible: true, status: 'dirty', basedOnRevision: 1 },
+  });
+  await deleteBoth({ db, collection: 'cmsUpdates', docId: 'post1', now });
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsUpdates, 0);
+  assert.equal(db.read('cmsUpdates_drafts', 'post1'), undefined);
 });
 
 // --- unpublishDoc -----------------------------------------------------------
@@ -397,10 +444,10 @@ test('publishDocs: a mid-way batch failure leaves committed chunks recorded, and
   );
 
   // Exactly the first chunk landed, and the row records exactly that.
-  assert.equal(db.ids('cmsSchedule').length, 133);
-  assert.equal(db.ids('cmsVersionHistory').length, 133);
+  assert.equal(db.ids('cmsSchedule').length, 132);
+  assert.equal(db.ids('cmsVersionHistory').length, 132);
   const rowAfterFailure = db.read('cmsPublishQueue', 'q1');
-  assert.equal(rowAfterFailure.progress.cmsSchedule.published.length, 133);
+  assert.equal(rowAfterFailure.progress.cmsSchedule.published.length, 132);
   assert.equal(rowAfterFailure.progress.cmsSchedule.chunksCommitted, 1);
 
   // Re-run with the same queue row: only the remaining doc publishes.
@@ -432,6 +479,34 @@ test('publishDocs queue progress rides IN the chunk batch, never a separate post
   const row = db.read('cmsPublishQueue', 'q1');
   assert.deepEqual(row.progress.cmsSchedule.published, ['s1']);
   assert.equal(row.progress.cmsSchedule.chunksCommitted, 1);
+});
+
+test('publishDocs retries a concurrent pending-count update and decrements once', async () => {
+  const db = makeFakeDb({
+    'cmsMeta/pending': pendingDoc({ cmsContent: 1 }),
+    'cmsContent_drafts/a': { value: 'a1', visible: true, status: 'dirty' },
+  });
+  const getAll = db.getAll.bind(db);
+  let interleaved = false;
+  db.getAll = async (...refs) => {
+    const snapshots = await getAll(...refs);
+    if (!interleaved && refs.length === 1 && refs[0]._col === 'cmsMeta') {
+      interleaved = true;
+      await db.collection('cmsMeta').doc('pending').update({ updatedAt: new Date(NOW - 1) });
+    }
+    return snapshots;
+  };
+
+  const queueRef = db.collection('cmsPublishQueue').doc('q1');
+  const result = await publishDocs({
+    db, collection: 'cmsContent', docIds: ['a', 'missing'], actor: ACTOR, now, queueRef,
+  });
+
+  assert.deepEqual(result.published, ['a']);
+  assert.deepEqual(result.skipped, [{ docId: 'missing', reason: 'no-draft' }]);
+  assert.deepEqual(db.read('cmsPublishQueue', 'q1').progress.cmsContent.skipped, result.skipped);
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 0);
+  assert.equal(db.read('cmsContent_drafts', 'a').status, 'clean');
 });
 
 test('publishDocs: an editor save between the read and the commit is a conflict skip, never a stale publish', async () => {
@@ -467,6 +542,7 @@ test('publishDocs: an editor save between the read and the commit is a conflict 
   const draft = db.read('cmsContent_drafts', 'hero__title');
   assert.equal(draft.value, 'v3');
   assert.equal(draft.status, 'dirty');
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1);
   assert.equal(db.ids('cmsVersionHistory').length, 0);
 });
 
@@ -494,6 +570,7 @@ test('publishDocs conflict on one doc does not fail the chunk: the others still 
   assert.equal(db.read('cmsContent', 'b').value, 'b1');
   assert.equal(db.read('cmsContent', 'a'), undefined);
   assert.equal(db.read('cmsContent_drafts', 'a').status, 'dirty');
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1);
   // The queue row records the conflict so the operator can see it.
   const row = db.read('cmsPublishQueue', 'q1');
   assert.deepEqual(row.progress.cmsContent.published, ['b']);
@@ -509,6 +586,7 @@ test('publishDocs rethrows non-precondition commit failures instead of retrying 
   );
   assert.equal(db.read('cmsContent', 'x'), undefined);
   assert.equal(db.read('cmsContent_drafts', 'x').status, 'dirty');
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1);
 });
 
 // --- writeDraft createOnly (concurrent create race) ---------------------------

@@ -152,7 +152,7 @@ function makeFakeDb(seed = {}) {
   }
 
   function query(col, filters, order, limitN, startAfterValue) {
-    return {
+    const built = {
       // Marks this object as a Query for `tx.get()`, which accepts either a
       // DocumentReference or a Query in the Admin SDK (the ticketing
       // entitlement recomputation reads its ticket set inside the
@@ -203,13 +203,15 @@ function makeFakeDb(seed = {}) {
       count() {
         return {
           _kind: 'aggregate',
+          _query: built,
           async get() {
-            const { size } = await query(col, filters, order, limitN, startAfterValue).get();
+            const { size } = await built.get();
             return { data: () => ({ count: size }) };
           },
         };
       },
     };
+    return built;
   }
 
   const db = {
@@ -263,14 +265,14 @@ function makeFakeDb(seed = {}) {
      * before the conflict check, so a test can interleave a competing
      * write at exactly the moment that matters.
      *
-     * Query reads are NOT tracked (a documented limitation of this fake,
-     * not of Firestore): the modules under test rely on document reads
-     * for conflict detection, and every test that needs interleaving uses
-     * one.
+     * Query and aggregate reads retain the matched ids and update times. A
+     * changed result retries the body, including a document that newly starts
+     * or stops matching. This is the count-bootstrap lock used by issue #287.
      */
     async runTransaction(fn, { maxAttempts = 5 } = {}) {
       for (let attempt = 1; ; attempt += 1) {
         const readVersions = new Map();
+        const queryReads = [];
         const ops = [];
         const trackRead = (col, id) => {
           readVersions.set(`${col}/${id}`, updateTimes.get(`${col}/${id}`));
@@ -278,7 +280,18 @@ function makeFakeDb(seed = {}) {
         };
         const tx = {
           async get(target) {
-            if (target && (target._kind === 'query' || target._kind === 'aggregate')) return target.get();
+            if (target?._kind === 'query' || target?._kind === 'aggregate') {
+              const trackedQuery = target._kind === 'aggregate' ? target._query : target;
+              // Read sequentially so a rejected aggregate cannot leave an
+              // unobserved query promise running after the transaction fails.
+              const answer = await target.get();
+              const matched = target._kind === 'aggregate' ? await trackedQuery.get() : answer;
+              queryReads.push({
+                query: trackedQuery,
+                versions: matched.docs.map((doc) => [`${doc.ref._col}/${doc.id}`, doc.updateTime]),
+              });
+              return answer;
+            }
             return trackRead(target._col, target.id);
           },
           async getAll(...refs) {
@@ -309,6 +322,14 @@ function makeFakeDb(seed = {}) {
         let conflicted = false;
         for (const [key, version] of readVersions) {
           if (updateTimes.get(key) !== version) {
+            conflicted = true;
+            break;
+          }
+        }
+        for (const { query: readQuery, versions } of queryReads) {
+          const current = await readQuery.get();
+          const currentVersions = current.docs.map((doc) => [`${doc.ref._col}/${doc.id}`, doc.updateTime]);
+          if (JSON.stringify(currentVersions) !== JSON.stringify(versions)) {
             conflicted = true;
             break;
           }

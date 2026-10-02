@@ -13,13 +13,12 @@
  * kept in the SAME transaction as the material write — no reconciler,
  * because there is no second document to drift.
  *
- * **Uploads are out of scope here.** `session-materials/{sessionId}/{allPaths}`
- * Storage writes are server-authorized (spec §8.5) and belong to the media
- * library work (issue #24, in flight on a parallel branch). This module
- * only registers metadata for a file whose bytes already exist at a given
- * Storage path (`uploadSessionMaterial`) — it never accepts or moves bytes.
- * A link material (`addSessionMaterialLink`) needs no Storage interaction
- * at all.
+ * `session-materials/{sessionId}/{allPaths}` Storage writes stay closed to
+ * every client (spec §8.5). `uploadSessionMaterialBytes` therefore accepts
+ * the speaker's bounded base64 payload, writes it through the Admin SDK to
+ * a server-derived path, and registers that path through the same
+ * `uploadSessionMaterial` primitive operator tooling already uses. A link
+ * material (`addSessionMaterialLink`) needs no Storage interaction.
  *
  * **Who may write (judgment call — the spec table names the exports but not
  * the write ACL; this mirrors §3.4's `hasAttendeeAccess`-adjacent posture
@@ -47,6 +46,7 @@
 
 const { scrubLinkLabel, isSafeUrl } = require('shared/urlSafety');
 const {
+  MAX_MATERIAL_FILE_BYTES,
   MaterialFileTooLargeError,
   MaterialFileSizeUnavailableError,
   isSessionMaterialStoragePath,
@@ -64,6 +64,19 @@ const {
 const SESSIONS = 'cmsSchedule';
 const MATERIALS = 'session_materials';
 const MATERIALS_PUBLIC = 'session_materials_public';
+
+/** Base64 with optional padding, nothing else. */
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+const CONTENT_TYPE_RE = /^[a-z0-9!#$%&'*+.^_`|~-]+\/[a-z0-9!#$%&'*+.^_`|~-]+$/i;
+const PRIVATE_CACHE_CONTROL = 'private, max-age=0, no-store';
+const MAX_MATERIAL_FILENAME_LENGTH = 240;
+
+function hasControlCharacter(value) {
+  return [...value].some((character) => {
+    const code = character.codePointAt(0);
+    return code <= 31 || code === 127;
+  });
+}
 
 /**
  * Per-session cap on the number of materials (spec: "the per-session cap
@@ -124,6 +137,13 @@ class InvalidStoragePathError extends Error {
   }
 }
 
+class InvalidMaterialUploadError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'InvalidMaterialUploadError';
+  }
+}
+
 /** Thrown when registration names no object in Storage. */
 class MaterialFileNotFoundError extends Error {
   constructor() {
@@ -171,7 +191,8 @@ async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = 
 /**
  * Register metadata for a file material whose bytes already exist at
  * `storagePath` (this function verifies but never writes the Storage
- * object). File material filenames are NOT scrubbed
+ * object). These objects stay operator-managed when the material is
+ * deleted. File material filenames are NOT scrubbed
  * (spec §4.4): a URL-shaped filename like `slides.pdf` is a display label,
  * not a secret, because the bytes are always signed-URL gated.
  *
@@ -180,7 +201,16 @@ async function addSessionMaterialLink({ db, sessionId, url, label, actor, now = 
  *           now?: () => number }} args
  * @returns {Promise<{ id: string, material: object }>}
  */
-async function uploadSessionMaterial({ db, bucket, sessionId, storagePath, filename, actor, now = Date.now }) {
+async function uploadSessionMaterial({
+  db,
+  bucket,
+  sessionId,
+  storagePath,
+  filename,
+  actor,
+  now = Date.now,
+  managedStorageObject = false,
+}) {
   if (!isSessionMaterialStoragePath(storagePath, sessionId)) {
     throw new InvalidStoragePathError(sessionId);
   }
@@ -205,7 +235,142 @@ async function uploadSessionMaterial({ db, bucket, sessionId, storagePath, filen
     url: null,
     storagePath,
     filename: typeof filename === 'string' && filename.trim() ? filename.trim() : 'Untitled file',
+    managedStorageObject,
   });
+}
+
+/** Decode one browser upload without allocating a buffer above the file cap. */
+function decodeMaterialUpload(data) {
+  if (typeof data !== 'string' || data.length === 0 || data.length % 4 !== 0) {
+    throw new InvalidMaterialUploadError('data: must be a base64-encoded string.');
+  }
+  const padding = data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0;
+  const decodedSize = (data.length / 4) * 3 - padding;
+  if (decodedSize > MAX_MATERIAL_FILE_BYTES) throw new MaterialFileTooLargeError(decodedSize);
+  if (!BASE64_RE.test(data)) {
+    throw new InvalidMaterialUploadError('data: must be a base64-encoded string.');
+  }
+  const buffer = Buffer.from(data, 'base64');
+  if (buffer.length === 0) throw new InvalidMaterialUploadError('data: must not be empty.');
+  requireAllowedMaterialFileSize(buffer.length);
+  return buffer;
+}
+
+/**
+ * Select the backwards-compatible registration request or browser byte
+ * upload from one HTTP body. Presence matters here: a caller may send one
+ * variant only, even if the extra field is empty.
+ */
+async function uploadSessionMaterialRequest({ db, bucket, body, actor, now = Date.now, log = console }) {
+  const { sessionId, storagePath, filename, data, contentType } = body || {};
+  if (typeof sessionId !== 'string' || !sessionId) {
+    throw new InvalidMaterialUploadError('sessionId: must be a non-empty string.');
+  }
+  const hasData = Object.prototype.hasOwnProperty.call(body || {}, 'data');
+  const hasStoragePath = Object.prototype.hasOwnProperty.call(body || {}, 'storagePath');
+  if (hasData && hasStoragePath) {
+    throw new InvalidMaterialUploadError('Send data or storagePath, not both.');
+  }
+  if (hasData) {
+    return uploadSessionMaterialBytes({
+      db,
+      bucket,
+      sessionId,
+      data,
+      contentType,
+      filename: typeof filename === 'string' ? filename : '',
+      actor,
+      now,
+      log,
+    });
+  }
+  if (typeof storagePath !== 'string' || !storagePath) {
+    throw new InvalidMaterialUploadError('storagePath: must be a non-empty string.');
+  }
+  return uploadSessionMaterial({
+    db,
+    bucket,
+    sessionId,
+    storagePath,
+    filename: typeof filename === 'string' ? filename : '',
+    actor,
+    now,
+  });
+}
+
+/**
+ * Store browser-supplied bytes at a server-derived path, then register the
+ * material through the existing transactional create path. The stored row
+ * marks the object as server-managed so the projection trigger removes it
+ * when the row is deleted. Registration re-checks session ownership and
+ * the per-session cap. If that check loses a race, the just-written object
+ * is removed before the error is returned.
+ */
+async function uploadSessionMaterialBytes({
+  db,
+  bucket,
+  sessionId,
+  data,
+  contentType,
+  filename,
+  actor,
+  now = Date.now,
+  log = console,
+}) {
+  // Refuse a foreign session before decoding or writing any supplied bytes.
+  const sessionSnap = await db.collection(SESSIONS).doc(sessionId).get();
+  assertMaterialCreateAllowed({ sessionSnap, sessionId, actor });
+
+  const normalizedType = typeof contentType === 'string' && contentType.trim()
+    ? contentType.trim().toLowerCase()
+    : 'application/octet-stream';
+  if (normalizedType.length > 100 || !CONTENT_TYPE_RE.test(normalizedType)) {
+    throw new InvalidMaterialUploadError('contentType: must be a valid media type.');
+  }
+  const normalizedFilename = typeof filename === 'string' ? filename.trim() : '';
+  if (
+    !normalizedFilename
+    || normalizedFilename.length > MAX_MATERIAL_FILENAME_LENGTH
+    || hasControlCharacter(normalizedFilename)
+  ) {
+    throw new InvalidMaterialUploadError(
+      `filename: must be 1-${MAX_MATERIAL_FILENAME_LENGTH} characters without control characters.`,
+    );
+  }
+  const buffer = decodeMaterialUpload(data);
+
+  const objectId = db.collection(MATERIALS).doc().id;
+  const storagePath = `session-materials/${sessionId}/${objectId}`;
+  const file = bucket.file(storagePath);
+  await file.save(buffer, {
+    resumable: false,
+    preconditionOpts: { ifGenerationMatch: 0 },
+    metadata: {
+      contentType: normalizedType,
+      cacheControl: PRIVATE_CACHE_CONTROL,
+      metadata: { uploadedBy: actor.uid },
+    },
+  });
+
+  try {
+    return await uploadSessionMaterial({
+      db,
+      bucket,
+      sessionId,
+      storagePath,
+      filename: normalizedFilename,
+      actor,
+      now,
+      managedStorageObject: true,
+    });
+  } catch (err) {
+    try {
+      await file.delete({ ignoreNotFound: true });
+    } catch (cleanupError) {
+      log.error('uploadSessionMaterial: failed to remove an unregistered object', cleanupError);
+    }
+    throw err;
+  }
 }
 
 function assertMaterialCreateAllowed({ sessionSnap, sessionId, actor }) {
@@ -221,7 +386,17 @@ function assertMaterialCreateAllowed({ sessionSnap, sessionId, actor }) {
   return { sessionData, currentCount };
 }
 
-async function createMaterial({ db, sessionId, actor, now, type, url, storagePath, filename }) {
+async function createMaterial({
+  db,
+  sessionId,
+  actor,
+  now,
+  type,
+  url,
+  storagePath,
+  filename,
+  managedStorageObject = false,
+}) {
   const sessionRef = db.collection(SESSIONS).doc(sessionId);
   const materialRef = db.collection(MATERIALS).doc();
 
@@ -242,6 +417,7 @@ async function createMaterial({ db, sessionId, actor, now, type, url, storagePat
       createdAt: at,
       updatedAt: at,
     };
+    if (managedStorageObject) material.managedStorageObject = true;
     tx.set(materialRef, material);
     tx.update(sessionRef, { materialCount: currentCount + 1 });
     return { id: materialRef.id, material };
@@ -368,6 +544,7 @@ function sendStoreError(res, err, log) {
   if (
     err instanceof InvalidUrlError
     || err instanceof InvalidStoragePathError
+    || err instanceof InvalidMaterialUploadError
     || err instanceof MaterialFileNotFoundError
     || err instanceof MaterialCapExceededError
   ) {
@@ -451,20 +628,11 @@ function buildHandlers() {
       { region },
       withCors(
         withActor(async (req, res, { db, getBucket }, actor) => {
-          const { sessionId, storagePath, filename } = req.body || {};
-          if (typeof sessionId !== 'string' || !sessionId) {
-            return badRequest(res, 'sessionId: must be a non-empty string');
-          }
-          if (typeof storagePath !== 'string' || !storagePath) {
-            return badRequest(res, 'storagePath: must be a non-empty string');
-          }
           try {
-            const result = await uploadSessionMaterial({
+            const result = await uploadSessionMaterialRequest({
               db,
               bucket: getBucket(),
-              sessionId,
-              storagePath,
-              filename: typeof filename === 'string' ? filename : '',
+              body: req.body,
               actor,
             });
             res.status(200).json(result);
@@ -519,6 +687,8 @@ function buildHandlers() {
 module.exports = {
   addSessionMaterialLink,
   uploadSessionMaterial,
+  uploadSessionMaterialBytes,
+  uploadSessionMaterialRequest,
   updateSessionMaterial,
   deleteSessionMaterial,
   deleteMaterialsForSession,
@@ -531,6 +701,7 @@ module.exports = {
     NotAuthorizedError,
     InvalidUrlError,
     InvalidStoragePathError,
+    InvalidMaterialUploadError,
     MaterialFileNotFoundError,
     MaterialFileTooLargeError,
     MaterialFileSizeUnavailableError,
@@ -540,6 +711,8 @@ module.exports = {
     MATERIALS,
     MATERIALS_PUBLIC,
     MAX_MATERIALS_PER_SESSION,
+    MAX_MATERIAL_FILENAME_LENGTH,
+    decodeMaterialUpload,
     sendStoreError,
   },
 };
