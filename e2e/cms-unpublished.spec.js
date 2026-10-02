@@ -68,6 +68,14 @@ test.describe.serial('unpublished changes', () => {
     // it, without downloading those draft rows into the shell.
     await countRef.delete();
     await expect.poll(async () => (await countRef.get()).data()?.counts?.cmsContent).toBe(1);
+    // An older function during rollout can leave a valid overcount. The
+    // authenticated repair rebuilds it without changing any draft.
+    await countRef.update({ 'counts.cmsContent': 8 });
+    await expect(banner(page)).toHaveAttribute('data-pending-total', '8');
+    const repaired = await callFunction('cmsEnsurePendingCounts', { force: true }, await adminIdToken());
+    expect(repaired.status, JSON.stringify(repaired.body)).toBe(200);
+    await expect(banner(page)).toHaveAttribute('data-pending-total', '1');
+    expect((await countRef.get()).data().counts.cmsContent).toBe(1);
     // Above the title band, never under it.
     const bannerBox = await banner(page).boundingBox();
     const bandBox = await page.locator('main header.admin-job-line').boundingBox();
