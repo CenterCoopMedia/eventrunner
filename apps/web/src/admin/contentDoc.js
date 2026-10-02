@@ -7,6 +7,7 @@
 // typed form shape and immediate field feedback. The server repeats the
 // required-field contract at the write boundary.
 import { blockTypeFor } from './blockTypes.js';
+import { hasRichTextContent } from 'shared/richText';
 
 /**
  * Mirrors functions/src/cms/content.cjs's DELETE_FIELD_SENTINEL exactly (a
@@ -163,7 +164,9 @@ export function validateRequiredContent(content) {
   for (const field of valueFieldsOf(content.blockType)) {
     if (!field.required || field.type === 'boolean') continue;
     const raw = content.values?.[field.id];
-    const isEmpty = raw === undefined || raw === null || String(raw).trim() === '';
+    const isEmpty = field.type === 'richtext'
+      ? !hasRichTextContent(raw)
+      : raw === undefined || raw === null || String(raw).trim() === '';
     if (isEmpty) errors.push({ field: field.id, message: `${field.id}: is required.` });
   }
   // The page draws a sponsor package's limit only when it is a whole number

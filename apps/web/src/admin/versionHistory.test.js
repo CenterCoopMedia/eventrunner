@@ -161,6 +161,20 @@ describe('restoreRequestFor', () => {
     });
   });
 
+  it('routes restored rich text through the authoritative content write endpoint', () => {
+    const answer = '<p onclick="bad()"><strong>Earlier answer</strong></p><img src="x">';
+    const request = restoreRequestFor(
+      'cmsContent',
+      'faq_items__earlier',
+      entry({ section: 'faq_items', field: 'earlier', blockType: 'faq_item', question: 'Earlier?', answer }),
+      { id: 'faq_items__earlier', section: 'faq_items', field: 'earlier', blockType: 'faq_item', question: 'Now?', answer: '<p>Now.</p>' },
+    );
+    expect(request.endpoint).toBe('cmsUpdateContent');
+    // The request keeps the historical value intact. cmsUpdateContent owns
+    // the shared sanitizer and cleans the merged record before storage.
+    expect(request.body.fields.answer).toBe(answer);
+  });
+
   it('never clears publish-model bookkeeping', () => {
     const current = { id: 's1', title: 'Now', materialCount: 2 };
     for (const key of storeInternals.RESERVED_FIELDS) current[key] = current[key] ?? 'x';

@@ -1380,6 +1380,19 @@
           <code>getPageSections</code>, <code>getAllowedBlocksForSection</code>, <code>getDefaultBlocks</code>, <code>isSectionReorderable</code>,
           <code>getMaxBlocks</code>, and <code>findFieldLocation</code> keep their signatures and take the pages collection as input
           instead of closing over the constant.</p>
+          <p><strong>Rich text has one stored vocabulary (issue #197).</strong> <code>packages/shared/src/richText.cjs</code> defines the
+          allowed tags, link schemes, and elements whose contents must be dropped. The browser applies that
+          policy when it loads, pastes, exports, and renders rich text. <code>cmsCreateContent</code> and
+          <code>cmsUpdateContent</code> apply the same policy after they merge the stored record and remove deleted
+          fields, then validate and write the result. Version restore uses <code>cmsUpdateContent</code>, so it crosses
+          the same authoritative boundary. This protects old records and partial updates as well as new
+          editor output.</p>
+          <p>The visual editor uses Quill core 2.0.3 and loads only for a registry field whose type is
+          <code>richtext</code>; it does not enter the public bundle or the general content-editor route. The editor
+          registers only the formats in the shared allowlist. It does not import or register image, video, or
+          formula blots. This excludes the video and formula export paths affected by the
+          <a href="https://fluidattacks.com/advisories/diomedes">Diomedes advisory</a>, while the client and server
+          sanitizers remain the security boundary for all stored HTML.</p>
           <p><strong>Generic pages route at their own root-level <code>path</code>, not a <code>/p/:slug</code> prefix (issue #52).</strong> A
           non-system page&#39;s admin-set <code>path</code> (e.g. <code>/scholarships</code>) IS its URL — there is no separate slug
           namespace. <code>apps/web/src/App.jsx</code> mounts every system route (<code>schedule</code>, <code>speakers</code>, <code>sponsors</code>,
