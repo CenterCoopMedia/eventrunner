@@ -125,7 +125,13 @@ async function storeFeedback({ db, id, message, email, category, ipHash, userAge
   const ref = db.collection(FEEDBACK_COLLECTION).doc(id);
   const limitRef = db.collection(RATE_LIMIT_COLLECTION).doc(ipHash);
   return db.runTransaction(async (tx) => {
-    const [snap, limitSnap] = await Promise.all([tx.get(ref), tx.get(limitRef)]);
+    const limitSnap = await tx.get(limitRef);
+    const window = feedbackRateLimitWindow(limitSnap.exists ? limitSnap.data()?.requests : null, nowMs);
+    if (window.limited) return { outcome: 'limited', retryAfterMs: window.retryAfterMs };
+
+    const snap = await tx.get(ref);
+    const at = new Date(nowMs);
+    tx.set(limitRef, { requests: [...window.requests, nowMs], updatedAt: at });
     if (snap.exists) {
       const stored = snap.data() || {};
       if (stored.message !== message
@@ -134,12 +140,6 @@ async function storeFeedback({ db, id, message, email, category, ipHash, userAge
         return { outcome: 'changed' };
       }
     }
-
-    const window = feedbackRateLimitWindow(limitSnap.exists ? limitSnap.data()?.requests : null, nowMs);
-    if (window.limited) return { outcome: 'limited', retryAfterMs: window.retryAfterMs };
-
-    const at = new Date(nowMs);
-    tx.set(limitRef, { requests: [...window.requests, nowMs], updatedAt: at });
     if (snap.exists) return { outcome: 'replayed' };
 
     tx.create(ref, {

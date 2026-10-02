@@ -343,7 +343,7 @@ test('identical retries are rate-limited after five requests without another row
   assert.equal(deliveredOnceKeys.size, 1);
 });
 
-test('a used submissionKey with a changed normalized field returns 409 and writes nothing', async (t) => {
+test('a used submissionKey with a changed normalized field returns 409 and consumes a rate slot', async (t) => {
   const changes = [
     ['message', 'A different message.'],
     ['email', 'other@example.org'],
@@ -371,17 +371,58 @@ test('a used submissionKey with a changed normalized field returns 409 and write
       await handler(fakeReq({ body: original }), first);
       assert.equal(first.statusCode, 201);
       assert.equal(sent.length, 1);
-      const storedAfterFirstAttempt = [...db.store.entries()];
+      const storedAfterFirstAttempt = structuredClone(db.store.get(`feedback/${submissionKey}`));
 
       const conflict = fakeRes();
       await handler(fakeReq({ body: { ...original, [field]: value } }), conflict);
 
       assert.equal(conflict.statusCode, 409);
       assert.equal(conflict.body.error.code, 'conflict');
-      assert.deepEqual([...db.store.entries()], storedAfterFirstAttempt);
+      assert.deepEqual(db.store.get(`feedback/${submissionKey}`), storedAfterFirstAttempt);
+      const [, rateLimit] = [...db.store.entries()].find(([key]) => key.startsWith('feedback_rate_limits/'));
+      assert.equal(rateLimit.requests.length, 2);
       assert.equal(sent.length, 1);
     });
   }
+});
+
+test('conflicting retries are rate-limited on the sixth total request without changing feedback or email', async () => {
+  const db = fakeDb();
+  const sent = [];
+  const handler = createSubmitFeedbackHandler({
+    db,
+    now: () => NOW,
+    sendEmail: async (mail) => { sent.push(mail); return { status: 'sent' }; },
+    getConfig: async () => ({ event: { name: 'Test Summit', sender: {} } }),
+  });
+  const submissionKey = 'bounded-conflict-0123456789';
+  const original = realBody({
+    submissionKey,
+    message: 'The registration link is broken.',
+    email: 'attendee@example.org',
+  });
+
+  const first = fakeRes();
+  await handler(fakeReq({ body: original }), first);
+  assert.equal(first.statusCode, 201);
+  const storedAfterFirstAttempt = structuredClone(db.store.get(`feedback/${submissionKey}`));
+
+  for (let i = 1; i <= internals.RATE_LIMIT_MAX; i += 1) {
+    const conflict = fakeRes();
+    await handler(fakeReq({ body: { ...original, message: `Different message ${i}.` } }), conflict);
+    if (i < internals.RATE_LIMIT_MAX) {
+      assert.equal(conflict.statusCode, 409, `request ${i + 1} should conflict`);
+      assert.equal(conflict.body.error.code, 'conflict');
+    } else {
+      assert.equal(conflict.statusCode, 429, `request ${i + 1} should be rate-limited`);
+      assert.equal(conflict.body.error.code, 'rate-limited');
+    }
+  }
+
+  assert.deepEqual(db.store.get(`feedback/${submissionKey}`), storedAfterFirstAttempt);
+  const [, rateLimit] = [...db.store.entries()].find(([key]) => key.startsWith('feedback_rate_limits/'));
+  assert.equal(rateLimit.requests.length, internals.RATE_LIMIT_MAX);
+  assert.equal(sent.length, 1);
 });
 
 test('a submission with no submissionKey still works (older/non-conforming callers)', async () => {
