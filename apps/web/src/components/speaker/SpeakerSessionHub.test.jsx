@@ -7,6 +7,10 @@ vi.mock('../../contexts/ContentContext.jsx', () => ({
   useContent: () => ({ speakers }),
 }));
 
+vi.mock('./SpeakerSessionMaterials.jsx', () => ({
+  default: ({ sessionId }) => <p>Materials for {sessionId}</p>,
+}));
+
 const { default: SpeakerSessionHub } = await import('./SpeakerSessionHub.jsx');
 
 const EVENT = {
@@ -99,6 +103,7 @@ describe('SpeakerSessionHub', () => {
 
     const details = screen.getByRole('tab', { name: 'Details' });
     const coSpeakers = screen.getByRole('tab', { name: 'Co-speakers' });
+    const materials = screen.getByRole('tab', { name: 'Materials' });
     details.focus();
     fireEvent.keyDown(details, { key: 'ArrowRight' });
     expect(coSpeakers).toHaveFocus();
@@ -111,6 +116,11 @@ describe('SpeakerSessionHub', () => {
     expect(details).toHaveFocus();
     expect(details).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(details, { key: 'End' });
+    expect(materials).toHaveFocus();
+    expect(materials).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Materials for session-one')).toBeInTheDocument();
+
+    fireEvent.keyDown(materials, { key: 'ArrowLeft' });
     expect(coSpeakers).toHaveFocus();
     expect(coSpeakers).toHaveAttribute('aria-selected', 'true');
 

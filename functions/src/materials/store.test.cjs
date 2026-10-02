@@ -6,6 +6,8 @@ const assert = require('node:assert/strict');
 const {
   addSessionMaterialLink,
   uploadSessionMaterial,
+  uploadSessionMaterialBytes,
+  uploadSessionMaterialRequest,
   updateSessionMaterial,
   deleteSessionMaterial,
   deleteMaterialsForSession,
@@ -20,6 +22,7 @@ const {
     MaterialFileSizeUnavailableError,
     MaterialCapExceededError,
     MAX_MATERIALS_PER_SESSION,
+    decodeMaterialUpload,
     sendStoreError,
   },
 } = require('./store.cjs');
@@ -122,6 +125,36 @@ function fakeBucket({ exists = true, size = MAX_MATERIAL_FILE_BYTES } = {}) {
         async getMetadata() {
           state.metadataCalls += 1;
           return [{ size }];
+        },
+      };
+    },
+  };
+}
+
+function fakeWritableBucket() {
+  const state = {
+    paths: [],
+    savedBytes: null,
+    saveOptions: null,
+    deletedPaths: [],
+  };
+  return {
+    state,
+    file(path) {
+      state.paths.push(path);
+      return {
+        async save(bytes, options) {
+          state.savedBytes = bytes;
+          state.saveOptions = options;
+        },
+        async exists() {
+          return [state.savedBytes != null && !state.deletedPaths.includes(path)];
+        },
+        async getMetadata() {
+          return [{ size: state.savedBytes?.length }];
+        },
+        async delete() {
+          state.deletedPaths.push(path);
         },
       };
     },
@@ -363,6 +396,137 @@ test('uploadSessionMaterial: checks session authorization before reading Storage
     NotAuthorizedError,
   );
   assert.equal(bucket.state.fileCalls, 0);
+});
+
+// ------------------------------------------------------- browser byte uploads
+
+test('uploadSessionMaterialBytes: own-session bytes use a fresh server path and register pending', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const bucket = fakeWritableBucket();
+  const { id, material } = await uploadSessionMaterialBytes({
+    db,
+    bucket,
+    sessionId: 's1',
+    data: Buffer.from('synthetic slides').toString('base64'),
+    contentType: 'application/pdf',
+    filename: 'slides.pdf',
+    actor: speaker('spk-1'),
+    now,
+  });
+
+  assert.match(material.storagePath, /^session-materials\/s1\/auto-\d+$/);
+  assert.equal(material.type, 'file');
+  assert.equal(material.reviewStatus, 'pending');
+  assert.equal(material.submittedBySpeakerId, 'spk-1');
+  assert.equal(bucket.state.savedBytes.toString(), 'synthetic slides');
+  assert.deepEqual(bucket.state.saveOptions, {
+    resumable: false,
+    preconditionOpts: { ifGenerationMatch: 0 },
+    metadata: {
+      contentType: 'application/pdf',
+      cacheControl: 'private, max-age=0, no-store',
+      metadata: { uploadedBy: 'speaker-uid' },
+    },
+  });
+  assert.equal(db.docs.get(`session_materials/${id}`).storagePath, material.storagePath);
+  assert.equal(db.docs.get('cmsSchedule/s1').materialCount, 1);
+});
+
+test('uploadSessionMaterialBytes: a foreign speaker is refused before bytes are decoded or Storage is read', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const bucket = fakeWritableBucket();
+  await assert.rejects(
+    uploadSessionMaterialBytes({
+      db,
+      bucket,
+      sessionId: 's1',
+      data: 'not base64',
+      contentType: 'application/pdf',
+      filename: 'slides.pdf',
+      actor: speaker('spk-2'),
+      now,
+    }),
+    NotAuthorizedError,
+  );
+  assert.deepEqual(bucket.state.paths, []);
+});
+
+test('uploadSessionMaterialBytes: a transaction-time authorization loss removes only the new object', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const runTransaction = db.runTransaction;
+  db.runTransaction = (fn) => {
+    db.docs.set('cmsSchedule/s1', { title: 'Fixture session', speakerIds: ['spk-2'] });
+    return runTransaction(fn);
+  };
+  const bucket = fakeWritableBucket();
+  await assert.rejects(
+    uploadSessionMaterialBytes({
+      db,
+      bucket,
+      sessionId: 's1',
+      data: Buffer.from('synthetic slides').toString('base64'),
+      contentType: 'application/pdf',
+      filename: 'slides.pdf',
+      actor: speaker('spk-1'),
+      now,
+    }),
+    NotAuthorizedError,
+  );
+  assert.equal(bucket.state.deletedPaths.length, 1);
+  assert.match(bucket.state.deletedPaths[0], /^session-materials\/s1\/auto-\d+$/);
+  assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false);
+});
+
+test('uploadSessionMaterialRequest: rejects mixed byte and storage-path variants without touching Storage', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const bucket = fakeWritableBucket();
+  await assert.rejects(
+    uploadSessionMaterialRequest({
+      db,
+      bucket,
+      body: {
+        sessionId: 's1',
+        storagePath: '',
+        data: Buffer.from('synthetic slides').toString('base64'),
+        filename: 'slides.pdf',
+      },
+      actor: speaker('spk-1'),
+      now,
+    }),
+    /Send data or storagePath, not both/,
+  );
+  assert.deepEqual(bucket.state.paths, []);
+});
+
+test('decodeMaterialUpload: accepts the exact decoded cap and rejects one byte more', () => {
+  const exact = Buffer.alloc(MAX_MATERIAL_FILE_BYTES).toString('base64');
+  assert.equal(decodeMaterialUpload(exact).length, MAX_MATERIAL_FILE_BYTES);
+  const tooLarge = Buffer.alloc(MAX_MATERIAL_FILE_BYTES + 1).toString('base64');
+  assert.throws(() => decodeMaterialUpload(tooLarge), MaterialFileTooLargeError);
+});
+
+test('uploadSessionMaterialBytes: rejects invalid filenames and media types before writing', async () => {
+  const bodies = [
+    { filename: 'slides\n.pdf', contentType: 'application/pdf' },
+    { filename: 'slides.pdf', contentType: 'not a media type' },
+  ];
+  for (const body of bodies) {
+    const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+    const bucket = fakeWritableBucket();
+    await assert.rejects(
+      uploadSessionMaterialBytes({
+        db,
+        bucket,
+        sessionId: 's1',
+        data: Buffer.from('synthetic slides').toString('base64'),
+        ...body,
+        actor: speaker('spk-1'),
+        now,
+      }),
+      /must be/,
+    );
+    assert.deepEqual(bucket.state.paths, []);
+  }
 });
 
 // ------------------------------------------------------------ updateSessionMaterial

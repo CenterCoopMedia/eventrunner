@@ -10,8 +10,9 @@ import { Tab, TabList, TabPanel, Tabs } from '../forms/Tabs.jsx';
 import { useSessionSpeakerNames } from '../SessionCard.jsx';
 import { formatSessionTimeRange } from '../../lib/eventTime.js';
 import { selectOwnSpeakerSessions } from '../../lib/speakerSessions.js';
+import SpeakerSessionMaterials from './SpeakerSessionMaterials.jsx';
 
-const TAB_IDS = Object.freeze(['details', 'co-speakers']);
+const TAB_IDS = Object.freeze(['details', 'co-speakers', 'materials']);
 
 function Detail({ term, children, className = '' }) {
   return (
@@ -110,12 +111,20 @@ export default function SpeakerSessionHub({ eventConfig, scheduleData, speakerId
               <TabList label={`${selectedSession.title} information`}>
                 <Tab id="details">Details</Tab>
                 <Tab id="co-speakers">Co-speakers</Tab>
+                <Tab id="materials">Materials</Tab>
               </TabList>
               <TabPanel id="details">
                 <SessionDetails eventConfig={eventConfig} session={selectedSession} />
               </TabPanel>
               <TabPanel id="co-speakers">
                 <CoSpeakers session={selectedSession} speakerId={speakerId} />
+              </TabPanel>
+              <TabPanel id="materials">
+                <SpeakerSessionMaterials
+                  key={`${speakerId}:${selectedSession.id}`}
+                  sessionId={selectedSession.id}
+                  speakerId={speakerId}
+                />
               </TabPanel>
             </Tabs>
           </div>
