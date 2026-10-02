@@ -110,7 +110,7 @@ async function removeOwnedUpload({ file, uploadAttempt, log }) {
     }
     await file.delete({
       ignoreNotFound: true,
-      preconditionOpts: { ifGenerationMatch: metadata.generation },
+      ifGenerationMatch: metadata.generation,
     });
   } catch (cleanupError) {
     if (storageErrorHasStatus(cleanupError, 404)) return;
