@@ -32,7 +32,7 @@ function SessionDetails({ eventConfig, session }) {
     <dl className="grid gap-md sm:grid-cols-2">
       <Detail term="Time">
         {day?.label ? <span>{day.label}</span> : null}
-        {day?.label && range ? ' · ' : null}
+        {day?.label ? ' · ' : null}
         {range ? (
           <span className="font-mono">
             <time dateTime={range.startIso}>{range.startLabel}</time>
