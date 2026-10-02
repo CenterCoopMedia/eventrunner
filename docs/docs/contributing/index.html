@@ -230,8 +230,8 @@
           still runs. All tiers remain credential-free.</p>
           <h3 id="local-ci-on-operator-machines">Local CI on operator machines<a class="heading-anchor" href="#local-ci-on-operator-machines" aria-label="Link to this section">#</a></h3>
           <p>Run expensive checks on an operator machine before opening a PR. Use Node 22,
-          Java 21, and Playwright Chromium with its sandbox enabled. Install dependencies
-          with <code>npm run prepare:functions</code> followed by <code>npm ci</code>. The emulator tests bind
+          Java 21, and Playwright Chromium with its sandbox enabled. The runner packs the
+          shared package and installs the locked dependencies before testing. The emulator tests bind
           to localhost and use synthetic data. Run them in an isolated checkout with no
           production credentials. Keep concurrent emulator jobs on separate machines.</p>
           <p>Commit the change and regenerate required output first. With a clean worktree
