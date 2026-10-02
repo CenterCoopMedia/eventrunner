@@ -398,6 +398,20 @@
           <code>content</code> (and, transitively, <code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code>) on this run. A dispatch run always deploys
           functions regardless of <code>bootstrap</code>, because a fresh project has none yet and gating that on a paths
           filter would provision an empty, broken deployment (spec §8.1).</p>
+          <p>The first Functions deploy contains event handlers with retry enabled. Firebase CLI requires an
+          explicit acceptance for a new retry policy, even in non-interactive mode. On a bootstrap run, the
+          workflow reads the complete Functions inventory through the pinned <code>firebase-tools</code> backend used by
+          <code>functions:list</code>. It rejects missing regional availability or any unreachable region. It passes
+          <code>--force</code> only when that read succeeds and reports no Functions. A failed or partial inventory stops
+          the deploy. An inventory with any existing function uses the normal deployment path without
+          <code>--force</code>, so Firebase continues to stop for function deletion, unsafe trigger migration, and other
+          protected changes.</p>
+          <p>For that verified-empty initial deploy, <code>--force</code> also accepts Firebase CLI&#39;s default Artifact
+          Registry cleanup policy: container images older than one day are deleted. This is build-artifact
+          retention only; it does not change deployed Functions or event data. Retry-enabled event handlers
+          can retry failed executions for up to seven days, so they must remain idempotent. Later deployments
+          do not use <code>--force</code>, including later runs that mistakenly leave <code>bootstrap: true</code> after Functions
+          exist.</p>
           <p><strong>Upgrade order for unpublished counts.</strong> Pause CMS saves, publishes, deletes, and seed jobs during
           the first upgrade. Deploy Firestore rules and all Functions, then wait for the deploy and any older
           in-flight CMS requests to finish. Before deploying the count-reading UI or resuming edits, make an
