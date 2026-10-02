@@ -15,10 +15,15 @@ const {
     NotAuthorizedError,
     InvalidUrlError,
     InvalidStoragePathError,
+    MaterialFileNotFoundError,
+    MaterialFileTooLargeError,
+    MaterialFileSizeUnavailableError,
     MaterialCapExceededError,
     MAX_MATERIALS_PER_SESSION,
+    sendStoreError,
   },
 } = require('./store.cjs');
+const { MAX_MATERIAL_FILE_BYTES } = require('./policy.cjs');
 
 /** Minimal in-memory Firestore fake, same shape as bookmarks.test.cjs's. */
 function fakeDb(seed = {}) {
@@ -102,6 +107,41 @@ function seedSession(id, overrides = {}) {
 
 const ADMIN = { uid: 'admin-1', isAdmin: true, speakerId: null };
 const speaker = (speakerId, uid = 'speaker-uid') => ({ uid, isAdmin: false, speakerId });
+
+function fakeBucket({ exists = true, size = MAX_MATERIAL_FILE_BYTES } = {}) {
+  const state = { fileCalls: 0, existsCalls: 0, metadataCalls: 0 };
+  return {
+    state,
+    file() {
+      state.fileCalls += 1;
+      return {
+        async exists() {
+          state.existsCalls += 1;
+          return [exists];
+        },
+        async getMetadata() {
+          state.metadataCalls += 1;
+          return [{ size }];
+        },
+      };
+    },
+  };
+}
+
+function fakeErrorRes() {
+  return {
+    statusCode: null,
+    body: null,
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+}
 
 // --------------------------------------------------------- addSessionMaterialLink
 
@@ -209,8 +249,10 @@ test('pinning: a real label is preserved', async () => {
 
 test('uploadSessionMaterial: file materials are never scrubbed even when URL-shaped', async () => {
   const db = fakeDb(seedSession('s1'));
+  const bucket = fakeBucket();
   const { material } = await uploadSessionMaterial({
     db,
+    bucket,
     sessionId: 's1',
     storagePath: 'session-materials/s1/slides.pdf',
     filename: 'slides.pdf',
@@ -229,14 +271,98 @@ test('uploadSessionMaterial: refuses a path outside the material session before 
     'session-materials/s1/',
   ]) {
     const db = fakeDb(seedSession('s1'));
+    const bucket = fakeBucket();
     await assert.rejects(
-      uploadSessionMaterial({ db, sessionId: 's1', storagePath, filename: 'slides.pdf', actor: ADMIN, now }),
+      uploadSessionMaterial({ db, bucket, sessionId: 's1', storagePath, filename: 'slides.pdf', actor: ADMIN, now }),
       (err) => err instanceof InvalidStoragePathError && err.message.startsWith('storagePath:'),
       storagePath,
     );
     assert.equal(db.docs.get('cmsSchedule/s1').materialCount, undefined, storagePath);
     assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false, storagePath);
+    assert.equal(bucket.state.fileCalls, 0, storagePath);
   }
+});
+
+test('uploadSessionMaterial: accepts the exact file-size cap from Storage', async () => {
+  const db = fakeDb(seedSession('s1'));
+  const bucket = fakeBucket({ size: String(MAX_MATERIAL_FILE_BYTES) });
+  const { material } = await uploadSessionMaterial({
+    db,
+    bucket,
+    sessionId: 's1',
+    storagePath: 'session-materials/s1/slides.pdf',
+    filename: 'slides.pdf',
+    actor: ADMIN,
+    now,
+  });
+  assert.equal(material.storagePath, 'session-materials/s1/slides.pdf');
+  assert.deepEqual(bucket.state, { fileCalls: 1, existsCalls: 1, metadataCalls: 1 });
+});
+
+test('uploadSessionMaterial: refuses a file one byte over the cap with both sizes and no write', async () => {
+  const db = fakeDb(seedSession('s1'));
+  const size = MAX_MATERIAL_FILE_BYTES + 1;
+  const bucket = fakeBucket({ size: String(size) });
+  const error = await uploadSessionMaterial({
+      db,
+      bucket,
+      sessionId: 's1',
+      storagePath: 'session-materials/s1/slides.pdf',
+      filename: 'slides.pdf',
+      actor: ADMIN,
+      now,
+    }).catch((err) => err);
+  assert.ok(error instanceof MaterialFileTooLargeError);
+  assert.match(error.message, new RegExp(`${size}.*${MAX_MATERIAL_FILE_BYTES}`));
+  assert.equal(db.docs.get('cmsSchedule/s1').materialCount, undefined);
+  assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false);
+
+  const res = fakeErrorRes();
+  sendStoreError(res, error, { error() {} });
+  assert.equal(res.statusCode, 413);
+  assert.equal(res.body.error.code, 'too-large');
+  assert.match(res.body.error.message, new RegExp(`^storagePath:.*${size}.*${MAX_MATERIAL_FILE_BYTES}`));
+});
+
+test('uploadSessionMaterial: refuses a missing file or an unreadable size without a write', async () => {
+  for (const [bucket, ErrorType] of [
+    [fakeBucket({ exists: false }), MaterialFileNotFoundError],
+    [fakeBucket({ size: 'unknown' }), MaterialFileSizeUnavailableError],
+  ]) {
+    const db = fakeDb(seedSession('s1'));
+    await assert.rejects(
+      uploadSessionMaterial({
+        db,
+        bucket,
+        sessionId: 's1',
+        storagePath: 'session-materials/s1/slides.pdf',
+        filename: 'slides.pdf',
+        actor: ADMIN,
+        now,
+      }),
+      ErrorType,
+    );
+    assert.equal(db.docs.get('cmsSchedule/s1').materialCount, undefined);
+    assert.equal([...db.docs.keys()].some((key) => key.startsWith('session_materials/')), false);
+  }
+});
+
+test('uploadSessionMaterial: checks session authorization before reading Storage', async () => {
+  const db = fakeDb(seedSession('s1', { speakerIds: ['spk-1'] }));
+  const bucket = fakeBucket();
+  await assert.rejects(
+    uploadSessionMaterial({
+      db,
+      bucket,
+      sessionId: 's1',
+      storagePath: 'session-materials/s1/slides.pdf',
+      filename: 'slides.pdf',
+      actor: speaker('spk-2'),
+      now,
+    }),
+    NotAuthorizedError,
+  );
+  assert.equal(bucket.state.fileCalls, 0);
 });
 
 // ------------------------------------------------------------ updateSessionMaterial
@@ -397,12 +523,14 @@ test('addSessionMaterialLink: the exact cap boundary is still accepted', async (
 
 test('uploadSessionMaterial: the cap applies to file materials too', async () => {
   const db = fakeDb(seedSession('s1', { materialCount: MAX_MATERIALS_PER_SESSION }));
+  const bucket = fakeBucket();
   await assert.rejects(
     uploadSessionMaterial({
-      db, sessionId: 's1', storagePath: 'session-materials/s1/x.pdf', filename: 'x.pdf', actor: ADMIN, now,
+      db, bucket, sessionId: 's1', storagePath: 'session-materials/s1/x.pdf', filename: 'x.pdf', actor: ADMIN, now,
     }),
     MaterialCapExceededError,
   );
+  assert.equal(bucket.state.fileCalls, 0);
 });
 
 // ------------------------------------------------- deleteMaterialsForSession (cascade)

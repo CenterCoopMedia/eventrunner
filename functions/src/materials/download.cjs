@@ -45,9 +45,14 @@
  * via a local object URL.
  */
 
-const { badRequest, notFound, forbidden, methodNotAllowed, internal } =
+const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } =
   require('../core/errors.cjs');
-const { isSessionMaterialStoragePath } = require('./policy.cjs');
+const {
+  MaterialFileTooLargeError,
+  MaterialFileSizeUnavailableError,
+  isSessionMaterialStoragePath,
+  requireAllowedMaterialFileSize,
+} = require('./policy.cjs');
 
 /** Strip characters that would break a Content-Disposition header value
  * (quotes, CR/LF) rather than reject the whole filename — this is a
@@ -62,7 +67,7 @@ function sanitizeForHeader(filename) {
  * Stream one Storage object to an HTTP response.
  *
  * @param {{ file: { exists: () => Promise<[boolean]>,
- *                    getMetadata: () => Promise<[{contentType?: string}]>,
+ *                    getMetadata: () => Promise<[{contentType?: string, size?: string|number}]>,
  *                    createReadStream: () => import('stream').Readable },
  *           res: import('express').Response, filename: string,
  *           log?: { error: Function } }} args
@@ -72,13 +77,15 @@ async function streamMaterialFile({ file, res, filename, log = console }) {
   const [exists] = await file.exists();
   if (!exists) return false;
 
-  const [metadata] = await file.getMetadata().catch(() => [{}]);
+  const [metadata] = await file.getMetadata();
+  const size = requireAllowedMaterialFileSize(metadata?.size);
   const contentType = typeof metadata?.contentType === 'string' && metadata.contentType
     ? metadata.contentType
     : 'application/octet-stream';
 
   res.set('Content-Type', contentType);
   res.set('Content-Disposition', `attachment; filename="${sanitizeForHeader(filename)}"`);
+  res.set('Content-Length', String(size));
   res.set('Cache-Control', 'private, max-age=0, no-store');
 
   await new Promise((resolve, reject) => {
@@ -149,8 +156,19 @@ function createDownloadSessionMaterialHandler({
     let served;
     try {
       served = await streamMaterialFile({ file, res, filename: material.filename, log });
-    } catch {
-      // streamMaterialFile already responded/ended on a stream error.
+    } catch (err) {
+      if (err instanceof MaterialFileTooLargeError) {
+        return sendError(res, 413, 'too-large', err.message);
+      }
+      if (err instanceof MaterialFileSizeUnavailableError) {
+        log.error('downloadSessionMaterial: Storage did not state a valid file size', err);
+        return internal(res, 'The file size could not be checked.');
+      }
+      if (!res.headersSent) {
+        log.error('downloadSessionMaterial: Storage could not be read', err);
+        return internal(res, 'The underlying file could not be read.');
+      }
+      // streamMaterialFile already ended a response whose stream failed.
       return;
     }
     if (!served) return notFound(res, 'The underlying file could not be found.');
