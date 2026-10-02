@@ -89,6 +89,10 @@ async function seedDemo({ db, store, args, now = Date.now }) {
   // This is not a lock across the seed run: the final transaction checks again.
   const speakerPlan = await seedDemoSpeakers({ db, speakers: demo.speakers, dryRun: true, now });
 
+  // Count any existing unpublished demo edits before the seed begins. The
+  // store updates this document with each later draft status transition.
+  if (!dryRun) await store.ensurePendingCounts({ db, now });
+
   // writeConfigDocs answers { results, effective } — the per-doc decisions
   // AND what the project now holds. Destructuring matters: iterating the
   // wrapper object threw "configResults is not iterable" and took the whole

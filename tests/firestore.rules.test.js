@@ -51,6 +51,7 @@ const ADMIN_READABLE = [
   { path: "cmsPages_drafts/pub", tier: "admin" },
   { path: "cmsVersionHistory/v1", tier: "admin" },
   { path: "cmsPublishQueue/q1", tier: "admin" },
+  { path: "cmsMeta/pending", tier: "admin" },
   { path: "admin_logs/l1", tier: "operator" },
   { path: "media_assets/asset-1", tier: "admin" },
   { path: "users/pending-1", tier: "admin" },
@@ -218,6 +219,11 @@ beforeAll(async () => {
     }
     await setDoc(doc(db, "cmsVersionHistory/v1"), { collection: "cmsPages" });
     await setDoc(doc(db, "cmsPublishQueue/q1"), { status: "complete" });
+    await setDoc(doc(db, "cmsMeta/pending"), {
+      schemaVersion: 1,
+      counts: Object.fromEntries(PUBLISHABLE.map((collection) => [collection, 0])),
+      updatedAt: new Date(),
+    });
     await setDoc(doc(db, "admin_logs/l1"), { action: "cmsPublish" });
     await setDoc(doc(db, "media_assets/asset-1"), {
       path: "cms-images/asset-1/hero.png",
@@ -468,6 +474,7 @@ describe("publish bookkeeping collections", () => {
   for (const path of [
     "cmsVersionHistory/v1",
     "cmsPublishQueue/q1",
+    "cmsMeta/pending",
     "admin_logs/l1",
   ]) {
     it(`allows admin read of ${path} but no one else`, async () => {
@@ -480,6 +487,11 @@ describe("publish bookkeeping collections", () => {
       await assertFails(setDoc(doc(admin(), path), { x: 1 }));
     });
   }
+
+  it("does not expose other cmsMeta documents", async () => {
+    await assertFails(getDoc(doc(admin(), "cmsMeta/other")));
+    await assertFails(getDoc(doc(staff(), "cmsMeta/other")));
+  });
 });
 
 // The media library's index (spec §4.1, §8.5). Rows are written only by

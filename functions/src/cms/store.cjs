@@ -12,9 +12,9 @@
  *   - Publish is an atomic per-doc batch: live copy at revision+1, draft
  *     marked clean with basedOnRevision, cmsVersionHistory append — all
  *     three writes commit together or not at all.
- *   - A multi-doc publish chunks at 400 writes per batch (3 writes/doc →
- *     133 docs/chunk) and records each committed chunk on its
- *     cmsPublishQueue row, so a partial publish is resumable and
+ *   - A multi-doc publish chunks below 400 writes per batch (3 writes/doc,
+ *     plus pending-count and queue rows, gives 132 docs/chunk) and records
+ *     each committed chunk on its cmsPublishQueue row, so a partial publish is resumable and
  *     observable rather than silently half-applied.
  *
  * Every function takes an injected db/clock — no firebase-admin import.
@@ -23,10 +23,20 @@
  */
 
 const { draftCollectionFor } = require('./blockTypes.cjs');
+const {
+  countsAfterPublish,
+  ensurePendingCounts,
+  parsePendingCounts,
+  pendingCountsRef,
+  pendingPayload,
+  writePendingDelta,
+} = require('./pendingCounts.cjs');
 
 const MAX_WRITES_PER_BATCH = 400;
 const WRITES_PER_DOC = 3; // live set + draft update + version-history append
-const DOCS_PER_CHUNK = Math.floor(MAX_WRITES_PER_BATCH / WRITES_PER_DOC);
+// The queue progress row and pending-count row may both ride in the batch.
+const FIXED_WRITES_PER_CHUNK = 2;
+const DOCS_PER_CHUNK = Math.floor((MAX_WRITES_PER_BATCH - FIXED_WRITES_PER_CHUNK) / WRITES_PER_DOC);
 
 /**
  * Bookkeeping keys owned by the publish model itself. They are stripped
@@ -119,9 +129,13 @@ function contentFieldsOf(data) {
  */
 async function writeDraft({ db, tx = null, collection, docId, fields, visible, actor, now = Date.now, createOnly = false }) {
   const draftCol = draftCollectionFor(collection);
+  if (!tx) {
+    return db.runTransaction((ownedTx) => writeDraft({
+      db, tx: ownedTx, collection, docId, fields, visible, actor, now, createOnly,
+    }));
+  }
   const ref = db.collection(draftCol).doc(docId);
-  const read = (target) => (tx ? tx.get(target) : target.get());
-  const draftSnap = await read(ref);
+  const draftSnap = await tx.get(ref);
   if (createOnly && draftSnap.exists) {
     throw new Error(`ALREADY_EXISTS: document ${draftCol}/${docId} already exists`);
   }
@@ -133,7 +147,7 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     basedOnRevision = typeof prior.basedOnRevision === 'number' ? prior.basedOnRevision : null;
     priorVisible = prior.visible !== false;
   } else {
-    const liveSnap = await read(db.collection(collection).doc(docId));
+    const liveSnap = await tx.get(db.collection(collection).doc(docId));
     if (liveSnap.exists) {
       const live = liveSnap.data();
       basedOnRevision = typeof live.revision === 'number' ? live.revision : null;
@@ -149,14 +163,10 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     updatedAt: new Date(now()),
     updatedBy: actor.email,
   };
-  if (tx) {
-    if (createOnly) tx.create(ref, payload);
-    else tx.set(ref, payload);
-  } else if (createOnly) {
-    await ref.create(payload);
-  } else {
-    await ref.set(payload);
-  }
+  const wasDirty = draftSnap.exists && draftSnap.data()?.status === 'dirty';
+  await writePendingDelta({ db, tx, collection, delta: wasDirty ? 0 : 1, now });
+  if (createOnly) tx.create(ref, payload);
+  else tx.set(ref, payload);
   return { docPath: `${draftCol}/${docId}`, existed: draftSnap.exists };
 }
 
@@ -176,26 +186,26 @@ function isAlreadyExistsError(err) {
  * (schedule/sessions.cjs checkSessionDeletable): a refusal to strand child
  * sessions has to read the children in the same transaction that removes
  * the parent, or a child created a heartbeat later is orphaned by a check
- * that had already passed. Without `tx` this commits its own batch, which
- * is what every other collection's delete does.
+ * that had already passed. Without `tx` this commits its own transaction.
  *
  * @param {{ db: FirebaseFirestore.Firestore, tx?: FirebaseFirestore.Transaction,
- *           collection: string, docId: string }} args
+ *           collection: string, docId: string, now?: () => number }} args
  * @returns {Promise<{ livePath: string, draftPath: string }>}
  */
-async function deleteBoth({ db, tx = null, collection, docId }) {
+async function deleteBoth({ db, tx = null, collection, docId, now = Date.now }) {
   const draftCol = draftCollectionFor(collection);
+  if (!tx) {
+    return db.runTransaction((ownedTx) => deleteBoth({
+      db, tx: ownedTx, collection, docId, now,
+    }));
+  }
   const liveRef = db.collection(collection).doc(docId);
   const draftRef = db.collection(draftCol).doc(docId);
-  if (tx) {
-    tx.delete(liveRef);
-    tx.delete(draftRef);
-  } else {
-    const batch = db.batch();
-    batch.delete(liveRef);
-    batch.delete(draftRef);
-    await batch.commit();
-  }
+  const draftSnap = await tx.get(draftRef);
+  const wasDirty = draftSnap.exists && draftSnap.data()?.status === 'dirty';
+  await writePendingDelta({ db, tx, collection, delta: wasDirty ? -1 : 0, now });
+  tx.delete(liveRef);
+  tx.delete(draftRef);
   return { livePath: `${collection}/${docId}`, draftPath: `${draftCol}/${docId}` };
 }
 
@@ -301,6 +311,8 @@ function sameUpdateTime(a, b) {
  */
 async function publishDocs({ db, collection, docIds, actor, now = Date.now, queueRef }) {
   const draftCol = draftCollectionFor(collection);
+  await ensurePendingCounts({ db, now });
+  const metaRef = pendingCountsRef(db);
 
   let alreadyPublished = [];
   if (queueRef) {
@@ -325,25 +337,35 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
       const liveRefs = chunkIds.map((id) => db.collection(collection).doc(id));
       const draftSnaps = await db.getAll(...draftRefs);
       const liveSnaps = await db.getAll(...liveRefs);
+      const [metaSnap] = await db.getAll(metaRef);
+      const counts = metaSnap.exists ? parsePendingCounts(metaSnap.data()) : null;
+      if (!counts) {
+        if (attempt >= MAX_CHUNK_ATTEMPTS) throw new Error('Pending counts could not be repaired.');
+        await ensurePendingCounts({ db, now, force: true });
+        continue;
+      }
 
       const batch = db.batch();
       const chunkPublished = [];
+      const attemptSkipped = [];
       const keptIds = [];
+      let dirtyPublished = 0;
       const publishedAt = new Date(now());
       for (let j = 0; j < chunkIds.length; j += 1) {
         const docId = chunkIds[j];
         if (!draftSnaps[j].exists) {
-          skipped.push({ docId, reason: 'no-draft' });
+          attemptSkipped.push({ docId, reason: 'no-draft' });
           continue;
         }
         if (prevTimes.has(docId) && !sameUpdateTime(prevTimes.get(docId), draftSnaps[j].updateTime)) {
           // An editor saved between our earlier read and its failed commit.
           // Leave the newer draft dirty rather than publishing content the
           // editor never saw; the next publish picks it up.
-          skipped.push({ docId, reason: 'conflict' });
+          attemptSkipped.push({ docId, reason: 'conflict' });
           continue;
         }
         const draft = draftSnaps[j].data();
+        if (draft.status === 'dirty') dirtyPublished += 1;
         const live = liveSnaps[j].exists ? liveSnaps[j].data() : null;
         // No live doc means first publish OR a recreation after deleteBoth
         // (whose cmsVersionHistory rows survive as the audit trail). Resume
@@ -391,6 +413,20 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
         chunkPublished.push(docId);
       }
 
+      const nextCounts = countsAfterPublish(counts, collection, dirtyPublished);
+      if (!nextCounts) {
+        if (attempt >= MAX_CHUNK_ATTEMPTS) throw new Error(`Pending count underflow for ${collection}.`);
+        await ensurePendingCounts({ db, now, force: true });
+        continue;
+      }
+      if (dirtyPublished > 0) {
+        batch.update(
+          metaRef,
+          pendingPayload(nextCounts, now),
+          { lastUpdateTime: metaSnap.updateTime },
+        );
+      }
+
       if (queueRef) {
         // Progress rides in the SAME batch as the doc writes: a resume can
         // never see committed docs missing from the row (double-bump) or
@@ -401,7 +437,7 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
             progress: {
               [collection]: {
                 published: [...published, ...chunkPublished],
-                skipped,
+                skipped: [...skipped, ...attemptSkipped],
                 chunksCommitted: chunksCommitted + 1,
               },
             },
@@ -414,6 +450,7 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
       try {
         if (chunkPublished.length > 0 || queueRef) await batch.commit();
         published.push(...chunkPublished);
+        skipped.push(...attemptSkipped);
         chunksCommitted += 1;
         break;
       } catch (err) {
@@ -425,6 +462,9 @@ async function publishDocs({ db, collection, docIds, actor, now = Date.now, queu
         for (let j = 0; j < chunkIds.length; j += 1) {
           if (draftSnaps[j].exists) prevTimes.set(chunkIds[j], draftSnaps[j].updateTime);
         }
+        // The retry drops documents already classified as missing or
+        // conflicted, so retain those verdicts for the final result.
+        skipped.push(...attemptSkipped);
         chunkIds = keptIds;
       }
     }
@@ -469,6 +509,7 @@ module.exports = {
   unpublishDoc,
   listDirty,
   publishDocs,
+  ensurePendingCounts,
   logAdminAction,
   contentFieldsOf,
   isValidDocId,
@@ -476,6 +517,7 @@ module.exports = {
   internals: {
     MAX_WRITES_PER_BATCH,
     WRITES_PER_DOC,
+    FIXED_WRITES_PER_CHUNK,
     DOCS_PER_CHUNK,
     RESERVED_FIELDS,
     MAX_DOC_ID_LENGTH,

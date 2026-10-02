@@ -315,6 +315,15 @@ intent and log clarity, not as a gate. `bootstrap: true` is the actual gate: it 
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).
 
+**Upgrade order for unpublished counts.** Deploy Firestore rules and Functions before the web app
+that reads `cmsMeta/pending`. Do not create that document with zero counts. On an existing site,
+`cmsEnsurePendingCounts` counts all six dirty draft collections in one transaction when the first
+admin opens the upgraded app. A draft save, publish, or delete also prepares a missing or invalid
+document before it changes the count, so this release needs no separate data migration. Run only
+the upgraded `init-event.cjs` or `seed-demo-event.cjs` after this deploy; each script prepares the
+count before its first CMS write and then uses the same atomic save and publish paths. This keeps
+existing unpublished edits counted and leaves a dry run read-only.
+
 **Step 2 — seed content**, from an operator's machine, once the bootstrap dispatch succeeds:
 
 ```sh

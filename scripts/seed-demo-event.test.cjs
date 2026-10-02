@@ -54,6 +54,7 @@ test('every seeded speaker gets a matching slug reservation', async () => {
     assert.equal(db.read('speaker_slugs', slug)?.speakerId, id, `no slug reservation for ${id}`);
   }
   assert.equal(db.ids('speaker_slugs').length, speakerIds.length);
+  assert.deepEqual(Object.values(db.read('cmsMeta', 'pending').counts), [0, 0, 0, 0, 0, 0]);
 });
 
 test('a dry run writes no speakers and no reservations', async () => {
