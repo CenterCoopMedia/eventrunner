@@ -78,14 +78,13 @@ async function streamMaterialFile({ file, res, filename, log = console }) {
   if (!exists) return false;
 
   const [metadata] = await file.getMetadata();
-  const size = requireAllowedMaterialFileSize(metadata?.size);
+  requireAllowedMaterialFileSize(metadata?.size);
   const contentType = typeof metadata?.contentType === 'string' && metadata.contentType
     ? metadata.contentType
     : 'application/octet-stream';
 
   res.set('Content-Type', contentType);
   res.set('Content-Disposition', `attachment; filename="${sanitizeForHeader(filename)}"`);
-  res.set('Content-Length', String(size));
   res.set('Cache-Control', 'private, max-age=0, no-store');
 
   await new Promise((resolve, reject) => {

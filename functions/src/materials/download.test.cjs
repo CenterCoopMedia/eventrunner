@@ -50,11 +50,14 @@ function fakeRes() {
     statusCode: null,
     body: null,
     headersSent: false,
+    ended: false,
     set(name, value) {
       headers[name] = value;
     },
     write() {},
-    end() {},
+    end() {
+      this.ended = true;
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -120,7 +123,7 @@ test('streamMaterialFile: sets Content-Type from Storage metadata and a Content-
   assert.equal(served, true);
   assert.equal(res.headers['Content-Type'], 'application/pdf');
   assert.equal(res.headers['Content-Disposition'], 'attachment; filename="Opening slides.pdf"');
-  assert.equal(res.headers['Content-Length'], String(Buffer.byteLength('fake-bytes')));
+  assert.equal(res.headers['Content-Length'], undefined);
 });
 
 test('streamMaterialFile: falls back to application/octet-stream when metadata has no contentType', async () => {
@@ -154,8 +157,41 @@ test('streamMaterialFile: streams a file at the exact cap', async () => {
     filename: 'largest.pdf',
   });
   assert.equal(served, true);
-  assert.equal(res.headers['Content-Length'], String(MAX_MATERIAL_FILE_BYTES));
+  assert.equal(res.headers['Content-Length'], undefined);
   assert.equal(state.streams, 1);
+});
+
+test('streamMaterialFile: an error before the first byte ends a complete 500 response', async () => {
+  const file = {
+    async exists() {
+      return [true];
+    },
+    async getMetadata() {
+      return [{ contentType: 'application/pdf', size: 10 }];
+    },
+    createReadStream() {
+      const stream = new EventEmitter();
+      stream.pipe = () => {
+        queueMicrotask(() => stream.emit('error', new Error('Storage read failed')));
+      };
+      return stream;
+    },
+  };
+  const res = fakeRes();
+  let logged = 0;
+
+  const served = await streamMaterialFile({
+    file,
+    res,
+    filename: 'slides.pdf',
+    log: { error() { logged += 1; } },
+  });
+
+  assert.equal(served, true);
+  assert.equal(res.statusCode, 500);
+  assert.equal(res.headers['Content-Length'], undefined);
+  assert.equal(res.ended, true);
+  assert.equal(logged, 1);
 });
 
 test('downloadSessionMaterial: refuses a legacy file over the cap before its stream opens', async () => {
