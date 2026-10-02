@@ -3,6 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const { validateHeaderValue } = require('node:http');
+const express = require('express');
 
 const {
   createDownloadSessionMaterialHandler,
@@ -53,7 +55,10 @@ function fakeRes() {
     ended: false,
     set(name, value) {
       headers[name] = value;
+      return this;
     },
+    type: express.response.type,
+    attachment: express.response.attachment,
     write() {},
     end() {
       this.ended = true;
@@ -124,6 +129,17 @@ test('streamMaterialFile: sets Content-Type from Storage metadata and a Content-
   assert.equal(res.headers['Content-Type'], 'application/pdf');
   assert.equal(res.headers['Content-Disposition'], 'attachment; filename="Opening slides.pdf"');
   assert.equal(res.headers['Content-Length'], undefined);
+});
+
+test('streamMaterialFile: emits a valid Unicode download header and preserves the Storage MIME type', async () => {
+  const file = fakeFile({ contentType: 'application/x-eventrunner-fixture' });
+  const res = fakeRes();
+  const served = await streamMaterialFile({ file, res, filename: '資料.pdf' });
+
+  assert.equal(served, true);
+  assert.doesNotThrow(() => validateHeaderValue('Content-Disposition', res.headers['Content-Disposition']));
+  assert.match(res.headers['Content-Disposition'], /filename\*=UTF-8''%E8%B3%87%E6%96%99\.pdf/);
+  assert.equal(res.headers['Content-Type'], 'application/x-eventrunner-fixture');
 });
 
 test('streamMaterialFile: falls back to application/octet-stream when metadata has no contentType', async () => {
@@ -234,13 +250,30 @@ test('downloadSessionMaterial: refuses a legacy file with no valid size before i
   assert.equal(state.streams, 0);
 });
 
-test('sanitizeForHeader: strips quotes and newlines that would break the header value', () => {
+test('sanitizeForHeader: strips quotes and controls that would break the header value', () => {
   assert.equal(sanitizeForHeader('normal.pdf'), 'normal.pdf');
   assert.equal(sanitizeForHeader('evil".pdf\r\nX-Injected: 1'), 'evil.pdfX-Injected: 1');
+  assert.equal(sanitizeForHeader('tab\there\u0000.pdf'), 'tabhere.pdf');
 });
 
 test('sanitizeForHeader: a blank/undefined filename falls back to a safe default', () => {
   assert.equal(sanitizeForHeader(''), 'download');
   assert.equal(sanitizeForHeader('   '), 'download');
   assert.equal(sanitizeForHeader(undefined), 'download');
+});
+
+test('sanitizeForHeader: bounds a legacy name without splitting a surrogate pair', () => {
+  const name = `${'a'.repeat(239)}\u{1F4C4}rest.pdf`;
+  const sanitized = sanitizeForHeader(name);
+  assert.equal(sanitized, 'a'.repeat(239));
+  assert.ok(sanitized.length <= 240);
+});
+
+test('sanitizeForHeader: repairs an unpaired legacy surrogate before Express formats it', () => {
+  const filename = sanitizeForHeader('bad\uD800name.pdf');
+  const res = fakeRes();
+
+  assert.equal(filename, 'bad\uFFFDname.pdf');
+  assert.doesNotThrow(() => res.attachment(filename));
+  assert.doesNotThrow(() => validateHeaderValue('Content-Disposition', res.headers['Content-Disposition']));
 });
