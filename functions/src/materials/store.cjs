@@ -375,6 +375,7 @@ async function uploadSessionMaterialBytes({
   const storagePath = `session-materials/${sessionId}/${objectId}`;
   const uploadAttempt = randomUUID();
   const file = bucket.file(storagePath);
+  let saveCompleted = false;
   try {
     await file.save(buffer, {
       resumable: false,
@@ -388,6 +389,7 @@ async function uploadSessionMaterialBytes({
         },
       },
     });
+    saveCompleted = true;
     return await uploadSessionMaterial({
       db,
       bucket,
@@ -399,11 +401,28 @@ async function uploadSessionMaterialBytes({
       managedStorageObject: true,
     });
   } catch (err) {
-    // A 412 means the fresh-name precondition found an existing object.
-    // That object belongs to another invocation, so never inspect or delete it.
-    if (!storageErrorHasStatus(err, 412)) {
-      await removeOwnedUpload({ file, uploadAttempt, log });
+    // A 412 may be another object's create collision, or this upload's retry
+    // after the first write succeeded and its response was lost. The attempt
+    // marker and generation precondition distinguish those cases safely.
+    let canRemove = true;
+    if (saveCompleted) {
+      // The Firestore transaction can also commit before its response is lost.
+      // Keep the bytes whenever a canonical row exists or cannot be ruled out.
+      try {
+        const registration = await db.collection(MATERIALS)
+          .where('storagePath', '==', storagePath)
+          .limit(1)
+          .get();
+        canRemove = registration.empty;
+      } catch (registrationCheckError) {
+        canRemove = false;
+        log.error(
+          'uploadSessionMaterial: could not verify whether the object was registered',
+          registrationCheckError,
+        );
+      }
     }
+    if (canRemove) await removeOwnedUpload({ file, uploadAttempt, log });
     throw err;
   }
 }
