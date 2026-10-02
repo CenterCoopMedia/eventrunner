@@ -61,6 +61,7 @@ vi.mock('firebase/firestore', () => ({
     return () => {};
   }),
   query: vi.fn((ref) => ref),
+  where: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn((ref) => {
     if (ref?.name === 'admin_logs') {
