@@ -279,9 +279,9 @@ function TourLoadFailed({ onEnd }) {
 const AdminTour = lazy(() => import('./components/AdminTour.jsx').catch(() => ({ default: TourLoadFailed })));
 
 /**
- * The shell. One count of unpublished changes (issue #196) is opened here,
- * once, for the banner above the stone and the Unpublished changes page to
- * read; the shell mounts only inside AdminGate, so a non-admin opens none.
+ * The shell opens one unpublished-count document for the banner. The
+ * Unpublished changes page loads its own rows. The shell mounts only inside
+ * AdminGate, so a non-admin opens neither listener here.
  */
 export default function AdminLayout() {
   return (

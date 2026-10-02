@@ -398,6 +398,14 @@
           <code>content</code> (and, transitively, <code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code>) on this run. A dispatch run always deploys
           functions regardless of <code>bootstrap</code>, because a fresh project has none yet and gating that on a paths
           filter would provision an empty, broken deployment (spec §8.1).</p>
+          <p><strong>Upgrade order for unpublished counts.</strong> Deploy Firestore rules and Functions first. Do not create
+          <code>cmsMeta/pending</code> with zero counts. On an existing site, the authenticated staff endpoint
+          <code>cmsEnsurePendingCounts</code> counts all six dirty draft collections in one transaction. A draft save,
+          publish, or delete also prepares a missing or invalid document before it changes the count, so this
+          release needs no separate data migration. Run only the upgraded <code>init-event.cjs</code> or
+          <code>seed-demo-event.cjs</code> after this deploy; each script prepares the count before its first CMS write
+          and then uses the same atomic save and publish paths. This keeps existing unpublished edits counted
+          and leaves a dry run read-only.</p>
           <p><strong>Step 2 — seed content</strong>, from an operator&#39;s machine, once the bootstrap dispatch succeeds:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">export FIRESTORE_EMULATOR_HOST=  # unset — this targets the real project
           export EVENT_FIREBASE_PROJECT_ID=&lt;GCP_PROJECT_ID&gt;

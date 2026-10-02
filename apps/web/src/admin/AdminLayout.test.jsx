@@ -58,7 +58,7 @@ vi.mock('firebase/firestore', () => ({
 import App from '../App.jsx';
 import { ADMIN_TIERS, DOCKET, TIER_SCOPE, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
 // Mocked for every file in src/test/setup.js; steered here for the banner.
-import { subscribeDirtyDrafts } from './pendingChangesSource.js';
+import { subscribePendingCounts } from './pendingCountsSource.js';
 import { markTourDone, readTourDone } from './tourState.js';
 
 async function renderAdmin(path = '/admin/pages') {
@@ -317,12 +317,8 @@ describe('the admin shell', () => {
   // inside it: the title band pulls itself up by the stone's top padding
   // and would slide over anything placed before it there.
   it('puts the unpublished changes banner first in main, outside the stone', async () => {
-    vi.mocked(subscribeDirtyDrafts).mockImplementation((collection, onNext) => {
-      onNext(
-        collection === 'cmsContent'
-          ? [{ id: 'hero__subtitle', section: 'hero', field: 'subtitle', status: 'dirty', basedOnRevision: 1 }]
-          : [],
-      );
+    vi.mocked(subscribePendingCounts).mockImplementation((_initialize, onNext) => {
+      onNext({ cmsContent: 1, cmsPages: 0, cmsSchedule: 0, cmsOrganizations: 0, cmsUpdates: 0, cmsTimeline: 0 });
       return () => {};
     });
     try {
@@ -337,8 +333,8 @@ describe('the admin shell', () => {
       // The rail carries words only: no count joins the docket link.
       expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveTextContent(/^Unpublished changes$/);
     } finally {
-      vi.mocked(subscribeDirtyDrafts).mockImplementation((_collection, onNext) => {
-        onNext([]);
+      vi.mocked(subscribePendingCounts).mockImplementation((_initialize, onNext) => {
+        onNext({ cmsContent: 0, cmsPages: 0, cmsSchedule: 0, cmsOrganizations: 0, cmsUpdates: 0, cmsTimeline: 0 });
         return () => {};
       });
     }

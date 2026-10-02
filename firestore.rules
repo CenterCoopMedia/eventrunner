@@ -139,6 +139,13 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+    // One server-maintained summary for the admin shell. The Unpublished
+    // changes page still reads draft rows while it is open; every other admin
+    // screen reads this one document instead.
+    match /cmsMeta/{docId} {
+      allow read: if docId == 'pending' && isAdmin();
+      allow write: if false;
+    }
     // admin_logs is the audit trail, and it is the OPERATOR tier's: it
     // records who granted and revoked admin access, alongside every other
     // admin action. That makes it the one client-readable collection the

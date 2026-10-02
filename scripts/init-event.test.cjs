@@ -96,6 +96,14 @@ test('init seeds config, pages, and content, and exits 0 despite unmet readiness
   assert.equal((await db.collection('config').doc('bootstrap').get()).data().adminEmails[0], 'ops@example.org');
   assert.equal((await db.collection('cmsPages').doc('privacy').get()).exists, true);
   assert.equal((await db.collection('cmsContent').doc('hero__title').get()).data().value, 'Test Gathering');
+  assert.deepEqual(db.read('cmsMeta', 'pending').counts, {
+    cmsContent: 0,
+    cmsSchedule: 0,
+    cmsOrganizations: 0,
+    cmsTimeline: 0,
+    cmsUpdates: 0,
+    cmsPages: 0,
+  });
   // Every seeded section's blocks are written, the sponsor strip's lede
   // included — this is the baseline the collision test below is a
   // departure from.
@@ -156,6 +164,20 @@ test('--dry-run seeds no email_templates override either', async () => {
     db, store, bucket: noBucket, args: initArgs({ 'dry-run': true }), tierA: TIER_A, env: ENV, now: () => 0,
   }));
   assert.equal((await db.collection('email_templates').doc('ticket.get_ticket').get()).exists, false);
+  assert.equal(db.read('cmsMeta', 'pending'), undefined);
+});
+
+test('init bootstraps existing dirty drafts and leaves client work counted through seeding', async () => {
+  const db = makeFakeDb({
+    'cmsContent_drafts/hero__title': {
+      value: 'Client title', section: 'hero', field: 'title', status: 'dirty', visible: true,
+    },
+  });
+  await quietly(() =>
+    runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+
+  assert.equal(db.read('cmsContent_drafts', 'hero__title').value, 'Client title');
+  assert.equal(db.read('cmsMeta', 'pending').counts.cmsContent, 1);
 });
 
 test('init prints the manual checklist including the Firebase Auth steps (§5.6)', async () => {

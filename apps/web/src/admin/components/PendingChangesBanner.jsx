@@ -2,10 +2,9 @@
 // and one link on the proof ground, above the stone on every admin screen
 // while something is saved but not live.
 //
-// It reads the shell's one count (PendingChangesContext) and counts nothing
-// of its own, so it cannot disagree with the Unpublished changes page. It
-// reads the dirty drafts, never the publish run rows: a run is progress, not
-// unpublished work.
+// It reads the shell's server-maintained count (PendingChangesContext),
+// never draft rows or publish runs. On the Unpublished changes page it is
+// hidden; that page derives its count from the rows it displays.
 //
 // What it leaves out, on purpose. No live role: the editor that saved
 // already says so once, and a second announcement would repeat it. No
