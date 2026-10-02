@@ -26,7 +26,7 @@ import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
-import AreaMap from '../components/AreaMap.jsx';
+import AreaMap, { openStreetMapCoordinates } from '../components/AreaMap.jsx';
 import SectionBlocks from '../components/blocks/SectionBlocks.jsx';
 import { PullQuoteBudget } from '../components/blocks/pullQuoteBudget.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
@@ -67,6 +67,7 @@ const SECTION_INDEX_MIN_BLOCKS = 8;
 // text does not, or a screen reader hears "3 of 12 items match" rebuilt on
 // every letter typed.
 const STATUS_SETTLE_MS = 300;
+const AREA_MAP_SECTION_ID = 'travel_local';
 
 /**
  * A section that stands in for the page's own title rather than presenting
@@ -110,7 +111,7 @@ function isTitleRepeatingSection(section, page) {
 function filterSections(sections, query) {
   const trimmed = query.trim().toLowerCase();
   return sections
-    .map(({ section, blocks, map }) => ({
+    .map(({ section, blocks, map, areaMap }) => ({
       section,
       blocks: blocks.filter((block) =>
         blockMatchesQuery(block, query, { sectionLabel: section.label }),
@@ -121,8 +122,12 @@ function filterSections(sections, query) {
       // and an empty query keeps it, which is what makes this the identity
       // map for a page whose only content is the map.
       map: map && (!trimmed || section.label.toLowerCase().includes(trimmed)) ? map : null,
+      areaMap:
+        areaMap && (!trimmed || section.label.toLowerCase().includes(trimmed))
+          ? areaMap
+          : null,
     }))
-    .filter(({ blocks, map }) => blocks.length > 0 || map);
+    .filter(({ blocks, map, areaMap }) => blocks.length > 0 || map || areaMap);
 }
 
 export default function ContentPage() {
@@ -200,6 +205,10 @@ export default function ContentPage() {
   // notice and a malformed doc simply shows the page.
   const showLegalNotice =
     LEGAL_PAGE_IDS.includes(page.id) && eventConfig?.legal?.reviewRequired === true;
+  const areaMap = page.id === VENUE_MAP_PAGE_ID
+    && openStreetMapCoordinates(eventConfig?.venue?.mapUrl)
+    ? eventConfig.venue.mapUrl
+    : null;
 
   // A PAGE POSITIONS THE MAP BY ASKING FOR IT. Stating a section with this
   // id is what puts the map at that point in the page — the seeded travel
@@ -210,12 +219,15 @@ export default function ContentPage() {
       section,
       blocks: getSectionBlocks(section.id),
       map: section.id === VENUE_MAP_SECTION_ID ? map : null,
+      areaMap: section.id === AREA_MAP_SECTION_ID ? areaMap : null,
     }))
     // A section with nothing in it renders nothing, and a map is something.
     // A map section carries no blocks, so this is the one place that decides
     // it counts as populated — which is also what carries it into the
     // long-page gate and the section index below.
-    .filter(({ blocks, map: sectionMap }) => blocks.length > 0 || sectionMap);
+    .filter(({ blocks, map: sectionMap, areaMap: sectionAreaMap }) =>
+      blocks.length > 0 || sectionMap || sectionAreaMap,
+    );
 
   // AND A PAGE THAT NEVER ASKED STILL GETS IT, at the end. A deployment
   // seeded before that section existed has a travel page without it, and
@@ -268,7 +280,8 @@ export default function ContentPage() {
   // the total never admitted to having.
   const countItems = (sections) =>
     sections.reduce(
-      (sum, { blocks, map: sectionMap }) => sum + blocks.length + (sectionMap ? 1 : 0),
+      (sum, { blocks, map: sectionMap, areaMap: sectionAreaMap }) =>
+        sum + blocks.length + (sectionMap ? 1 : 0) + (sectionAreaMap ? 1 : 0),
       0,
     );
   const totalItems = countItems(baseSections);
@@ -373,7 +386,7 @@ export default function ContentPage() {
         />
       ) : (
         <>
-          {filteredSections.map(({ section, blocks, map: sectionMap }, index) => (
+          {filteredSections.map(({ section, blocks, map: sectionMap, areaMap: sectionAreaMap }, index) => (
             <section
               key={section.id}
               aria-labelledby={`section-${section.id}`}
@@ -413,7 +426,7 @@ export default function ContentPage() {
                 <LongReadOpening active={isLongRead && section.id === baseSections[0]?.section.id}>
                   <SectionBlocks blocks={blocks} />
                 </LongReadOpening>
-                {page.id === 'travel' && section.id === 'travel_local' ? <AreaMap url={eventConfig.venue?.mapUrl} /> : null}
+                {sectionAreaMap ? <AreaMap url={sectionAreaMap} /> : null}
                 <VenueMap
                   map={sectionMap}
                   image={venueMapImage}
