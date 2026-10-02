@@ -431,7 +431,7 @@ export function DestructiveConfirm({
         <button
           type="button"
           className={dangerButtonClass}
-          disabled={busy}
+          disabled={busy || disabled}
           onClick={() => onConfirm()}
         >
           {busy ? (busyLabel ?? confirmLabel) : confirmLabel}
