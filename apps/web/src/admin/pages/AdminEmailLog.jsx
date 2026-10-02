@@ -602,7 +602,7 @@ export default function AdminEmailLog() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Email log"
-        description="Every message this site sent, newest first. Sign-in codes and speaker invitations never store their body."
+        description="Every message this site sent, newest first. Messages stay in this log for 90 days after the site sends them. Automatic maintenance then removes them. Sign-in codes and speaker invitations never store their body."
         actions={
           <button
             type="button"

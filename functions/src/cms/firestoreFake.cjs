@@ -7,7 +7,7 @@
  * not execute it directly.
  *
  * Supports exactly what the cms modules use — doc get/set/update/delete,
- * create (fails ALREADY_EXISTS like the Admin SDK), `==` queries with
+ * create (fails ALREADY_EXISTS like the Admin SDK), `==` and `<` queries with
  * orderBy/limit/startAfter, `count()` aggregates on a query or a whole
  * collection (admin/eventStats.cjs), getAll, batches with per-update
  * { lastUpdateTime } preconditions (snapshots expose a monotonically
@@ -159,8 +159,8 @@ function makeFakeDb(seed = {}) {
       // transaction that writes the account).
       _kind: 'query',
       where(field, op, value) {
-        if (op !== '==') throw new Error(`fake supports only '==', got ${op}`);
-        return query(col, [...filters, { field, value }], order, limitN, startAfterValue);
+        if (op !== '==' && op !== '<') throw new Error(`fake supports only '==' and '<', got ${op}`);
+        return query(col, [...filters, { field, op, value }], order, limitN, startAfterValue);
       },
       orderBy(field, direction = 'asc') {
         return query(col, filters, { field, direction }, limitN, startAfterValue);
@@ -174,7 +174,11 @@ function makeFakeDb(seed = {}) {
       async get() {
         let rows = [...colMap(col).entries()]
           .map(([id, data]) => ({ id, data }))
-          .filter(({ data }) => filters.every((f) => readPath(data, f.field) === f.value));
+          .filter(({ data }) => filters.every((f) => {
+            const actual = readPath(data, f.field);
+            if (f.op === '<') return orderValue(actual) < orderValue(f.value);
+            return actual === f.value;
+          }));
         if (order) {
           const dir = order.direction === 'desc' ? -1 : 1;
           rows.sort((a, b) => {

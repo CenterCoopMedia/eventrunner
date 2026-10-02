@@ -271,6 +271,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
+  function deletes older `sent_emails` rows in bounded batches, and the Email log and onboarding
+  guide state the period before an operator or client relies on the log (#268).
 - The speaker and session editors now return to their own list after a delete or **Cancel**, and
   a new speaker opens its own editor. They went to the admin index, which is now the Overview,
   because a relative link from an editor resolved against the admin layout, not the list.

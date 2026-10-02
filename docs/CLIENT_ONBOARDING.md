@@ -144,6 +144,10 @@ Don't skip this step because "the emails are going out fine in testing" — quar
 inconsistent across mail filters and shows up as an intermittent, hard-to-reproduce client
 complaint weeks into the event, not a clean failure during setup.
 
+Tell the client that the admin Email log keeps each sent-message row for 90 days. A row includes
+the recipient address and may include the subject and rendered body. Automatic maintenance removes
+the row after 90 days. Sign-in codes and speaker invitations do not store their subject or body.
+
 ### 5. Ticketing (capability-gated)
 
 Complete the step for the provider this client selected. The checklist supports Eventbrite,

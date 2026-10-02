@@ -26,11 +26,12 @@
  *      the execution was accepted by the Cloud Run API and the container
  *      never got far enough to claim the row.
  *
- * The sweep only ever moves a row from a non-terminal state to `failed`.
- * It never deletes, never re-invokes, and never touches a row that already
- * reached a terminal state, so running it twice on the same row is a
- * no-op — which matters, because it runs on a schedule alongside whatever
- * the operator is doing by hand.
+ * The publish sweep only ever moves a row from a non-terminal state to
+ * `failed`. It never deletes, never re-invokes, and never touches a row that
+ * already reached a terminal state. The same scheduled function also
+ * removes sent-email audit rows after their documented retention period.
+ * Both sweeps are idempotent, which matters because they run alongside
+ * whatever the operator is doing by hand.
  */
 
 /**
@@ -45,8 +46,14 @@
  */
 const STRANDED_AFTER_MS = 90 * 60 * 1000;
 
+/** Sent-email audit rows carry addresses and sometimes rendered bodies. */
+const SENT_EMAIL_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
 /** Batch bound per query, matching cleanupExpiredAuthChallenges. */
 const SWEEP_LIMIT = 250;
+
+/** Keep one invocation bounded; the next scheduled run continues a backlog. */
+const MAX_SWEEP_BATCHES = 40;
 
 /** @param {*} value @returns {number|null} epoch ms, or null */
 function toMillis(value) {
@@ -199,6 +206,50 @@ async function sweepStrandedPublishRows({
 }
 
 /**
+ * Delete sent-email audit rows whose `sentAt` is older than 90 days.
+ *
+ * The strict `<` boundary keeps a row for its full retention period. A
+ * missing `sentAt` is not guessed at and therefore does not match the query.
+ * The loop drains normal traffic promptly, while `maxBatches` caps one
+ * scheduled invocation so an old deployment cannot turn a backlog into an
+ * unbounded function run.
+ *
+ * @param {{
+ *   db: object,
+ *   now?: () => number,
+ *   retentionMs?: number,
+ *   batchLimit?: number,
+ *   maxBatches?: number,
+ * }} deps
+ * @returns {Promise<{ deleted: number }>}
+ */
+async function sweepExpiredSentEmails({
+  db,
+  now = Date.now,
+  retentionMs = SENT_EMAIL_RETENTION_MS,
+  batchLimit = SWEEP_LIMIT,
+  maxBatches = MAX_SWEEP_BATCHES,
+}) {
+  const cutoff = new Date(now() - retentionMs);
+  const query = db.collection('sent_emails').where('sentAt', '<', cutoff).limit(batchLimit);
+  let deleted = 0;
+
+  for (let i = 0; i < maxBatches; i += 1) {
+    const snapshot = await query.get();
+    if (snapshot.empty) break;
+
+    const batch = db.batch();
+    for (const doc of snapshot.docs) batch.delete(doc.ref);
+    await batch.commit();
+    deleted += snapshot.docs.length;
+
+    if (snapshot.docs.length < batchLimit) break;
+  }
+
+  return { deleted };
+}
+
+/**
  * Deployable exports (spec §1.3). Follows cleanupExpiredAuthChallenges's
  * conventions (auth/otp.cjs): onSchedule, region from EVENT_FIREBASE_REGION,
  * and every dependency required inside the callback so deploy analysis
@@ -241,7 +292,10 @@ function buildHandlers() {
             db, provider: getEmailProvider({ env: process.env }), getConfig,
           }).send(message),
         });
-        await sweepStrandedPublishRows({ db, notifyOperator: notifier.notify });
+        await Promise.all([
+          sweepStrandedPublishRows({ db, notifyOperator: notifier.notify }),
+          sweepExpiredSentEmails({ db }),
+        ]);
       },
     ),
   };
@@ -249,8 +303,17 @@ function buildHandlers() {
 
 module.exports = {
   sweepStrandedPublishRows,
+  sweepExpiredSentEmails,
   get handlers() {
     return buildHandlers();
   },
-  internals: { strandedParts, strandedPatch, toMillis, STRANDED_AFTER_MS, SWEEP_LIMIT },
+  internals: {
+    strandedParts,
+    strandedPatch,
+    toMillis,
+    STRANDED_AFTER_MS,
+    SENT_EMAIL_RETENTION_MS,
+    SWEEP_LIMIT,
+    MAX_SWEEP_BATCHES,
+  },
 };

@@ -128,6 +128,7 @@ describe('AdminEmailLog', () => {
     await renderPage();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Email log' })).toBeInTheDocument();
+    expect(screen.getByText(/Messages stay in this log for 90 days/)).toBeInTheDocument();
     expect(listCalls()).toEqual([{ limit: 25 }]);
 
     const region = screen.getByRole('region', { name: 'Sent messages' });
