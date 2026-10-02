@@ -315,6 +315,22 @@ intent and log clarity, not as a gate. `bootstrap: true` is the actual gate: it 
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).
 
+The first Functions deploy contains event handlers with retry enabled. Firebase CLI requires an
+explicit acceptance for a new retry policy, even in non-interactive mode. On a bootstrap run, the
+workflow reads the complete Functions inventory through the pinned `firebase-tools` backend used by
+`functions:list`. It rejects missing regional availability or any unreachable region. It passes
+`--force` only when that read succeeds and reports no Functions. A failed or partial inventory stops
+the deploy. An inventory with any existing function uses the normal deployment path without
+`--force`, so Firebase continues to stop for function deletion, unsafe trigger migration, and other
+protected changes.
+
+For that verified-empty initial deploy, `--force` also accepts Firebase CLI's default Artifact
+Registry cleanup policy: container images older than one day are deleted. This is build-artifact
+retention only; it does not change deployed Functions or event data. Retry-enabled event handlers
+can retry failed executions for up to seven days, so they must remain idempotent. Later deployments
+do not use `--force`, including later runs that mistakenly leave `bootstrap: true` after Functions
+exist.
+
 **Upgrade order for unpublished counts.** Pause CMS saves, publishes, deletes, and seed jobs during
 the first upgrade. Deploy Firestore rules and all Functions, then wait for the deploy and any older
 in-flight CMS requests to finish. Before deploying the count-reading UI or resuming edits, make an
