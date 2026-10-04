@@ -3,7 +3,7 @@
 // The session list comes from the public schedule projection and is joined to
 // the account only by its canonical speaker id. Co-speakers resolve through
 // speakers_public, never through another speaker's canonical profile.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import SectionHead from '../editorial/SectionHead.jsx';
 import { SelectField } from '../forms/publicForm.jsx';
 import { Tab, TabList, TabPanel, Tabs } from '../forms/Tabs.jsx';
@@ -78,14 +78,18 @@ function CoSpeakers({ session, speakerId }) {
   );
 }
 
-export default function SpeakerSessionHub({ eventConfig, scheduleData, speakerId }) {
+export default function SpeakerSessionHub({
+  eventConfig, scheduleData, speakerId, requestedSessionId, requestedTab, navigationKey, onMaterialsChanged,
+}) {
   const sessions = useMemo(
     () => selectOwnSpeakerSessions(scheduleData, speakerId, eventConfig),
     [eventConfig, scheduleData, speakerId],
   );
   const [selectedId, setSelectedId] = useState(() => sessions[0]?.id ?? '');
   const [activeTab, setActiveTab] = useState('details');
+  const openedFromLink = useRef(false);
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;
+  const requestedTargetId = sessions.find((session) => session.id === requestedSessionId)?.id ?? null;
 
   // A live schedule can remove the selected row or the signed-in account can
   // change. Move the control to the first row from the new canonical list;
@@ -94,6 +98,18 @@ export default function SpeakerSessionHub({ eventConfig, scheduleData, speakerId
     const nextId = selectedSession?.id ?? '';
     if (selectedId !== nextId) setSelectedId(nextId);
   }, [selectedId, selectedSession]);
+
+  useEffect(() => {
+    if (requestedTab === 'materials' && requestedTargetId) {
+      openedFromLink.current = true;
+      setSelectedId(requestedTargetId);
+      setActiveTab('materials');
+    } else if (openedFromLink.current) {
+      openedFromLink.current = false;
+      setSelectedId('');
+      setActiveTab('details');
+    }
+  }, [navigationKey, requestedTargetId, requestedTab]);
 
   return (
     <section aria-labelledby="speaker-sessions-heading" className="mt-xl">
@@ -124,6 +140,7 @@ export default function SpeakerSessionHub({ eventConfig, scheduleData, speakerId
                   key={`${speakerId}:${selectedSession.id}`}
                   sessionId={selectedSession.id}
                   speakerId={speakerId}
+                  onMaterialsChanged={onMaterialsChanged}
                 />
               </TabPanel>
             </Tabs>
