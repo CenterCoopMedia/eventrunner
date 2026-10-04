@@ -7,7 +7,7 @@
 // sent to the attendee dashboard; a failed request stays visible and retryable
 // because a network error is not evidence that the account is not a speaker.
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -17,6 +17,7 @@ import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import SpeakerSessionHub from '../components/speaker/SpeakerSessionHub.jsx';
+import SpeakerActionItems from '../components/speaker/SpeakerActionItems.jsx';
 import SpeakerResourceCard from '../components/speaker/SpeakerResourceCard.jsx';
 import SpeakerStatusHeader from '../components/speaker/SpeakerStatusHeader.jsx';
 import { secondaryActionClass } from '../components/controlClasses.js';
@@ -38,25 +39,29 @@ const statusCardClass =
   'rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt p-md';
 
 export default function SpeakerDashboard() {
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { eventConfig, features } = useEventConfig();
   const { scheduleData } = useContent();
   const { profile, status: accountStatus } = useProfile();
   const speakerId = profile?.speakerId ?? null;
-  const [load, setLoad] = useState({ status: 'idle', speaker: null, error: null });
+  const scope = JSON.stringify([user?.uid ?? '', speakerId ?? '']);
+  const [load, setLoad] = useState({ scope: '', status: 'idle', speaker: null, error: null });
   const [attempt, setAttempt] = useState(0);
+  const [materialsRevision, setMaterialsRevision] = useState(0);
 
   useEffect(() => {
     if (!user || accountStatus !== 'ready' || !speakerId) return undefined;
     let current = true;
-    setLoad({ status: 'loading', speaker: null, error: null });
+    setLoad({ scope, status: 'loading', speaker: null, error: null });
     getOwnSpeakerProfile({ user, speakerId }).then(
       (speaker) => {
-        if (current) setLoad({ status: 'ready', speaker, error: null });
+        if (current) setLoad({ scope, status: 'ready', speaker, error: null });
       },
       (error) => {
         if (current) {
           setLoad({
+            scope,
             status: 'error',
             speaker: null,
             error: error?.message || 'Your speaker dashboard could not be loaded.',
@@ -67,7 +72,7 @@ export default function SpeakerDashboard() {
     return () => {
       current = false;
     };
-  }, [user, accountStatus, speakerId, attempt]);
+  }, [user, accountStatus, speakerId, scope, attempt]);
 
   if (authLoading || (user && accountStatus === 'pending-account')) {
     return (
@@ -95,7 +100,7 @@ export default function SpeakerDashboard() {
   }
   if (accountStatus === 'ready' && !speakerId) return <Navigate to="/dashboard" replace />;
 
-  if (load.status === 'error') {
+  if (load.scope === scope && load.status === 'error') {
     return (
       <EmptyState
         title="Your speaker dashboard could not be loaded"
@@ -109,7 +114,7 @@ export default function SpeakerDashboard() {
     );
   }
 
-  if (load.status !== 'ready') {
+  if (load.scope !== scope || load.status !== 'ready') {
     return (
       <div className="mt-lg">
         <LoadingState label="Loading your speaker dashboard…" />
@@ -119,6 +124,7 @@ export default function SpeakerDashboard() {
 
   if (!isSpeakerDashboardEligible(load.speaker)) return <Navigate to="/dashboard" replace />;
   const status = SPEAKER_STATUS[load.speaker.status];
+  const searchParams = new URLSearchParams(location.search);
 
   const name = [load.speaker.firstName, load.speaker.lastName]
     .filter((part) => typeof part === 'string' && part.trim())
@@ -139,10 +145,22 @@ export default function SpeakerDashboard() {
         speakerId={speakerId}
       />
 
+      <SpeakerActionItems
+        speaker={load.speaker}
+        scheduleData={scheduleData}
+        eventConfig={eventConfig}
+        user={user}
+        refreshKey={materialsRevision}
+      />
+
       <SpeakerSessionHub
         eventConfig={eventConfig}
         scheduleData={scheduleData}
         speakerId={speakerId}
+        requestedSessionId={searchParams.get('session')}
+        requestedTab={searchParams.get('tab')}
+        navigationKey={location.key}
+        onMaterialsChanged={() => setMaterialsRevision((value) => value + 1)}
       />
 
       <SpeakerResourceCard />

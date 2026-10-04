@@ -126,7 +126,7 @@ function MaterialRow({ material, speakerId, user, onSaved }) {
   );
 }
 
-export default function SpeakerSessionMaterials({ sessionId, speakerId }) {
+export default function SpeakerSessionMaterials({ sessionId, speakerId, onMaterialsChanged }) {
   const { user } = useAuth();
   const requestIdRef = useRef(0);
   const fileInputRef = useRef(null);
@@ -180,6 +180,7 @@ export default function SpeakerSessionMaterials({ sessionId, speakerId }) {
 
   function refresh(message = '', expectedScope = scopeKey) {
     if (scopeKeyRef.current !== expectedScope) return;
+    onMaterialsChanged?.();
     setNotice(message);
     setAttempt((value) => value + 1);
   }

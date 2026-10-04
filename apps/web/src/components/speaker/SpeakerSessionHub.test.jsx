@@ -156,4 +156,35 @@ describe('SpeakerSessionHub', () => {
     expect(screen.queryByRole('combobox', { name: 'Session' })).toBeNull();
     expect(screen.queryByRole('tab')).toBeNull();
   });
+
+  it('opens a linked session materials tab without reopening it after a schedule update', () => {
+    const props = {
+      eventConfig: EVENT,
+      scheduleData: SESSIONS,
+      speakerId: 'speaker-own',
+      requestedSessionId: 'session-two',
+      requestedTab: 'materials',
+      navigationKey: 'first-navigation',
+    };
+    const { rerender } = render(<SpeakerSessionHub {...props} />);
+
+    expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('session-two');
+    expect(screen.getByRole('tab', { name: 'Materials' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Materials for session-two')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    rerender(<SpeakerSessionHub {...props} scheduleData={[...SESSIONS]} />);
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+
+    rerender(<SpeakerSessionHub {...props} navigationKey="second-navigation" />);
+    expect(screen.getByRole('tab', { name: 'Materials' })).toHaveAttribute('aria-selected', 'true');
+
+    rerender(<SpeakerSessionHub {...props} requestedSessionId={null} requestedTab={null} navigationKey="back" />);
+    expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('session-one');
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+
+    rerender(<SpeakerSessionHub {...props} navigationKey="forward" />);
+    expect(screen.getByRole('combobox', { name: 'Session' })).toHaveValue('session-two');
+    expect(screen.getByRole('tab', { name: 'Materials' })).toHaveAttribute('aria-selected', 'true');
+  });
 });

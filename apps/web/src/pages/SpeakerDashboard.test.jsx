@@ -184,6 +184,45 @@ describe('the speaker dashboard shell', () => {
     expect(await screen.findByRole('heading', { name: 'Speaker dashboard' })).toBeInTheDocument();
   });
 
+  it('does not show the previous speaker while a changed account loads', async () => {
+    let resolveOld;
+    const oldRead = new Promise((resolve) => { resolveOld = resolve; });
+    getOwnSpeakerProfileMock.mockReturnValueOnce(oldRead).mockResolvedValueOnce({
+      ...SPEAKER, speakerId: 'sam-own', firstName: 'Sam', lastName: 'Rivers',
+    });
+    const view = renderPage();
+
+    authValue = { user: { uid: 'u2', getIdToken: async () => 'new-token' }, loading: false };
+    profileValue = { profile: { speakerId: 'sam-own' }, status: 'ready' };
+    view.rerender(<PageFixture />);
+
+    expect(screen.getByRole('status', { name: 'Loading your speaker dashboard…' })).toBeInTheDocument();
+    expect(await screen.findByText(/Welcome back, Sam Rivers/)).toBeInTheDocument();
+    resolveOld(SPEAKER);
+    await waitFor(() => expect(screen.queryByText(/Welcome back, Rae Okonkwo/)).toBeNull());
+  });
+
+  it('keeps account scope distinct when ids contain colons', async () => {
+    authValue = { user: { uid: 'a:b', getIdToken: async () => 'old-token' }, loading: false };
+    profileValue = { profile: { speakerId: 'c' }, status: 'ready' };
+    let resolveNew;
+    const newRead = new Promise((resolve) => { resolveNew = resolve; });
+    getOwnSpeakerProfileMock.mockReset()
+      .mockResolvedValueOnce({ ...SPEAKER, speakerId: 'c' })
+      .mockReturnValueOnce(newRead);
+    const view = renderPage();
+    expect(await screen.findByText(/Welcome back, Rae Okonkwo/)).toBeInTheDocument();
+
+    authValue = { user: { uid: 'a', getIdToken: async () => 'new-token' }, loading: false };
+    profileValue = { profile: { speakerId: 'b:c' }, status: 'ready' };
+    view.rerender(<PageFixture />);
+
+    expect(screen.getByRole('status', { name: 'Loading your speaker dashboard…' })).toBeInTheDocument();
+    expect(screen.queryByText(/Welcome back, Rae Okonkwo/)).toBeNull();
+    resolveNew({ ...SPEAKER, speakerId: 'b:c', firstName: 'Sam', lastName: 'Rivers' });
+    expect(await screen.findByText(/Welcome back, Sam Rivers/)).toBeInTheDocument();
+  });
+
   it('leaves the updates area out when the event disables it', async () => {
     configValue = { eventConfig: {}, features: { liveUpdates: false } };
     renderPage();

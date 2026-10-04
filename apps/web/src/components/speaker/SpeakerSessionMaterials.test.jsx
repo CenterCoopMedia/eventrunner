@@ -65,7 +65,8 @@ describe('SpeakerSessionMaterials', () => {
   });
 
   it('adds a link and uploads a synthetic file to the selected own session', async () => {
-    render(<SpeakerSessionMaterials sessionId="session-one" speakerId="speaker-one" />);
+    const onMaterialsChanged = vi.fn();
+    render(<SpeakerSessionMaterials sessionId="session-one" speakerId="speaker-one" onMaterialsChanged={onMaterialsChanged} />);
     await screen.findByText(/No materials have been sent/i);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Link URL' }), {
@@ -92,11 +93,13 @@ describe('SpeakerSessionMaterials', () => {
       file,
     }));
     expect(await screen.findByText('File sent for organizer review.')).toBeInTheDocument();
+    expect(onMaterialsChanged).toHaveBeenCalledTimes(2);
   });
 
   it('shows a server refusal for a foreign session', async () => {
     addLink.mockRejectedValueOnce(new Error('You do not have permission to change this material.'));
-    render(<SpeakerSessionMaterials sessionId="foreign-session" speakerId="speaker-one" />);
+    const onMaterialsChanged = vi.fn();
+    render(<SpeakerSessionMaterials sessionId="foreign-session" speakerId="speaker-one" onMaterialsChanged={onMaterialsChanged} />);
     await screen.findByText(/No materials have been sent/i);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Link URL' }), {
@@ -105,6 +108,7 @@ describe('SpeakerSessionMaterials', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send link' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/do not have permission/i);
+    expect(onMaterialsChanged).not.toHaveBeenCalled();
   });
 
   it('edits an own pending item and surfaces a reviewed-item race from the server', async () => {
