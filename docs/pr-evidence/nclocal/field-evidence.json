@@ -1,0 +1,361 @@
+{
+  "sourceHead": "f250b58d2b249dc30334c5ec609226252f10ed5f",
+  "surface": "Existing demo Specimen book public fields",
+  "typedValues": [
+    "NC Local demo reader",
+    "Historical summit session notes for this demo."
+  ],
+  "autofillProbe": "A temporary local form clones the actual public TextField classes into an email control with autocomplete=email. Chromium Autofill.trigger fills the reserved example address. Native :autofill is observed; no data is submitted or saved.",
+  "modes": {
+    "light": {
+      "fields": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "NC Local demo reader",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(9, 58, 70)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "NC Local demo reader",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(170, 32, 44)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": true,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "NC Local demo reader",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "room-3",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(9, 58, 70)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "room-3",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(170, 32, 44)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "room-3",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": true,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "room-3",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(9, 58, 70)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "Historical summit session notes for this demo.",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(9, 58, 70)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "Historical summit session notes for this demo.",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(170, 32, 44)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "",
+          "contrast": 18.88
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "border": "rgb(131, 131, 131)",
+          "color": "rgb(17, 17, 17)",
+          "disabled": true,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(17, 17, 17)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(17, 17, 17)",
+          "value": "Historical summit session notes for this demo.",
+          "contrast": 18.88
+        }
+      ],
+      "autofill": {
+        "status": "triggered",
+        "value": "demo@example.test",
+        "autofilled": true,
+        "color": "rgb(0, 0, 0)",
+        "background": "rgb(232, 240, 254)",
+        "textFill": "rgb(0, 0, 0)",
+        "font": "Cabin, Arial, sans-serif",
+        "compositedBackground": [
+          232,
+          240,
+          254
+        ],
+        "contrast": 18.33
+      }
+    },
+    "dark": {
+      "fields": [
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "NC Local demo reader",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(193, 196, 220)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "NC Local demo reader",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(242, 136, 142)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": true,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "INPUT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "NC Local demo reader",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "room-3",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(193, 196, 220)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "room-3",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(242, 136, 142)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "room-3",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": true,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "SELECT",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "room-3",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(193, 196, 220)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "Historical summit session notes for this demo.",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(193, 196, 220)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "Historical summit session notes for this demo.",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(242, 136, 142)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": false,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "",
+          "contrast": 16.42
+        },
+        {
+          "background": "rgb(0, 28, 40)",
+          "border": "rgb(129, 142, 147)",
+          "color": "rgb(249, 247, 245)",
+          "disabled": true,
+          "font": "Cabin, Arial, sans-serif",
+          "outline": "rgb(249, 247, 245)",
+          "outlineWidth": "3px",
+          "tag": "TEXTAREA",
+          "textFill": "rgb(249, 247, 245)",
+          "value": "Historical summit session notes for this demo.",
+          "contrast": 16.42
+        }
+      ],
+      "autofill": {
+        "status": "triggered",
+        "value": "demo@example.test",
+        "autofilled": true,
+        "color": "rgb(255, 255, 255)",
+        "background": "rgba(70, 90, 126, 0.4)",
+        "textFill": "rgb(255, 255, 255)",
+        "font": "Cabin, Arial, sans-serif",
+        "compositedBackground": [
+          28,
+          52.8,
+          74.4
+        ],
+        "contrast": 12.69
+      }
+    }
+  }
+}
