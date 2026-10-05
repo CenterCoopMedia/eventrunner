@@ -59,6 +59,7 @@
 // namespace. Whatever is in `logos` is carried through every save verbatim.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  THEME_HEADERS,
   getPreset,
   findThemeContrastFailures,
   resolveFontRoles,
@@ -214,6 +215,10 @@ function toForm(theme) {
     texture: pick(theme?.texture, TEXTURE_IDS),
     radius: pick(theme?.radius, RADIUS_IDS),
     density: pick(theme?.density, DENSITY_IDS),
+    // Header style has no field in this editor, but config/theme is replaced
+    // whole on publish. Carry the stored value so an unrelated phone-layout
+    // change cannot reset the public header or make the draft preview lie.
+    header: pick(theme?.header, THEME_HEADERS),
     // A stored document that predates the mode policy has no `mode`, and
     // light is what it renders, so light is what the form starts on.
     mode: MODE_POLICY_IDS.includes(theme?.mode) ? theme.mode : DEFAULT_MODE_POLICY,
@@ -263,7 +268,7 @@ export function toThemeDoc(form) {
     if (Object.keys(overrides).length > 0) tokens[mode] = overrides;
   }
   if (Object.keys(tokens).length > 0) doc.tokens = tokens;
-  for (const field of ['texture', 'radius', 'density', 'motifSet']) {
+  for (const field of ['texture', 'radius', 'density', 'motifSet', 'header']) {
     if (form[field]) doc[field] = form[field];
   }
   if (form.brandColor.trim()) doc.brandColor = form.brandColor.trim();

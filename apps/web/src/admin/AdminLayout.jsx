@@ -345,7 +345,7 @@ function AdminDesk() {
       <a href="#admin-content" className="skip-link skip-link--admin">
         Skip to main content
       </a>
-      <div className="admin-rail relative flex h-14 shrink-0 flex-row items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:flex-col lg:overflow-y-auto">
+      <div className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto">
         <div className="flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline px-sm lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
           {markSrc && !markFailed ? (
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-admin-small bg-admin-ground-raised p-3xs lg:h-9 lg:w-9">
@@ -426,7 +426,10 @@ function AdminDesk() {
                 <button
                   type="button"
                   ref={takeTourRef}
-                  onClick={() => setTour((run) => (run ?? 0) + 1)}
+                  onClick={() => {
+                    setMobileDocketOpen(false);
+                    setTour((run) => (run ?? 0) + 1);
+                  }}
                   className={railButtonClass}
                 >
                   Take the tour
@@ -443,7 +446,7 @@ function AdminDesk() {
         </details>
 
         {adminTier === 'unknown' ? (
-          <div className="fixed inset-x-0 top-14 z-30 flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-b-admin-hairline bg-admin-rail-ground px-md py-xs lg:static lg:order-last lg:border-b-0 lg:border-t-admin-hairline lg:py-sm">
+          <div className="order-last flex w-full flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-b-admin-hairline bg-admin-rail-ground px-md py-xs lg:border-b-0 lg:border-t-admin-hairline lg:py-sm">
             <p className="text-admin-xs text-admin-rail-ink-muted" role="status">
               Your access tier could not be checked.
             </p>
@@ -454,7 +457,11 @@ function AdminDesk() {
         ) : null}
       </div>
 
-      <main id="admin-content" className="min-w-0 flex-1">
+      <main
+        id="admin-content"
+        className="min-w-0 flex-1"
+        {...(!wide && mobileDocketOpen ? { inert: '' } : null)}
+      >
         {/* Above the stone, never inside it: the title band pulls itself
             up by the stone's top padding and would slide over it. */}
         <PendingChangesBanner />

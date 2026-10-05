@@ -112,6 +112,7 @@ const LEGACY_THEME = {
 /** A deployment on the preset pipeline — what PR2-A ships. */
 const PRESET_THEME = {
   preset: 'broadsheet',
+  header: 'masthead',
   optionPicks: { headingFace: 'libre-baskerville', nameplate: 'full-measure' },
   tokens: { light: { surface: hex('f7f4ee') } },
   motifSet: 'none',
@@ -315,6 +316,7 @@ describe('the proof', () => {
       ).toBeInTheDocument(),
     );
     expect(screen.getAllByText(/Session · light · 1440px/).length).toBeGreaterThan(0);
+    expect(frame().querySelector('.site-masthead')).not.toBeNull();
   });
 
   it('names a colour it cannot read and says what is showing instead', async () => {
@@ -547,6 +549,7 @@ describe('publishing the theme', () => {
     expect(theme.motifSet).toBe('none');
     expect(theme.brandColor).toBe(hex('1a3a6e'));
     expect(theme.mode).toBe('light');
+    expect(theme.header).toBe('masthead');
     expect(theme.texture).toBe('flat');
     expect(theme.radius).toBe('sharp');
     expect(theme.logos).toEqual({ primary: 'branding/new.svg' });

@@ -279,6 +279,7 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   await expect(links).toHaveCount(25);
   await expect(docket.getByText(ADMIN_EMAIL)).toBeVisible();
   await expect(docket.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await expect(page.locator('#admin-content')).toHaveAttribute('inert', '');
 
   const drawerEvidence = await page.evaluate(() => {
     const sheetElement = document.querySelector('.admin-mobile-docket__content');
@@ -316,6 +317,14 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
     label: link.textContent.trim(),
     href: link.getAttribute('href'),
   })));
+  await docket.getByRole('button', { name: 'Take the tour' }).click();
+  await expect(docket).not.toHaveAttribute('open', '');
+  await expect(page.locator('#admin-content')).not.toHaveAttribute('inert', '');
+  const tour = page.getByRole('complementary', { name: 'Admin tour' });
+  await expect(tour).toBeVisible();
+  await expect(tour.getByRole('heading', { name: 'Welcome to the admin panel' })).toBeFocused();
+  await tour.getByRole('button', { name: 'End tour' }).click();
+
   const pageEvidence = [];
   for (const destination of destinations) {
     await page.goto(destination.href);

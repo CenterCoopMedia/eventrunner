@@ -133,7 +133,8 @@ describe('the admin shell', () => {
       const sheet = docket.querySelector('.admin-mobile-docket__content');
       const nav = within(docket).getByRole('navigation', { name: 'Admin sections' });
 
-      expect(rail.className).toContain('h-14');
+      expect(rail.className).toContain('min-h-14');
+      expect(rail.className).toContain('flex-wrap');
       expect(within(rail).getByText('Harborlight')).toBeInTheDocument();
       expect(within(summary).getByText('Pages')).toBeInTheDocument();
       expect(within(summary).getByText('Menu')).toBeInTheDocument();
@@ -155,6 +156,12 @@ describe('the admin shell', () => {
       }
       expect(docket).toContainElement(screen.getByText('admin@example.org'));
       expect(docket).toContainElement(screen.getByRole('button', { name: 'Sign out' }));
+
+      fireEvent.click(summary);
+      expect(docket).toHaveAttribute('open');
+      await waitFor(() =>
+        expect(container.querySelector('#admin-content')).toHaveAttribute('inert'),
+      );
     } finally {
       if (original) window.matchMedia = original;
       else delete window.matchMedia;
@@ -483,19 +490,29 @@ describe('the editor tour in the shell', () => {
     }
   });
 
-  it('opens again at step 1 from Take the tour, with the focus on its heading, and Escape ends it', async () => {
+  it('closes the phone menu before opening the tour, then returns focus to Menu', async () => {
     markTourDone('admin-1');
     await renderAdmin('/admin/pages');
+    const menu = screen.getByText('Menu').closest('summary');
+    const docket = menu.closest('details');
+    docket.open = true;
+    fireEvent(docket, new Event('toggle'));
+    await waitFor(() => expect(docket).toHaveAttribute('open'));
+    await waitFor(() =>
+      expect(document.querySelector('#admin-content')).toHaveAttribute('inert'),
+    );
     const takeTour = screen.getByRole('button', { name: 'Take the tour' });
     // First in the rail foot's button row, and a rail control like its neighbours.
     expect(takeTour.parentElement.firstElementChild).toBe(takeTour);
     expect(takeTour.className).toContain('min-h-admin-control');
     fireEvent.click(takeTour);
+    expect(docket).not.toHaveAttribute('open');
+    expect(document.querySelector('#admin-content')).not.toHaveAttribute('inert');
     const heading = await screen.findByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
     await waitFor(() => expect(heading).toHaveFocus());
     fireEvent.keyDown(heading, { key: 'Escape' });
     expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
-    expect(takeTour).toHaveFocus();
+    expect(menu).toHaveFocus();
   });
 
   it('stays on screen, at its step, while the reader opens the section it names', async () => {
