@@ -5,7 +5,8 @@ let organizationsData;
 let enabled = true;
 let scheduleEnabled;
 let scheduleData;
-vi.mock('../contexts/ContentContext.jsx', () => ({ useContent: () => ({ organizationsData, scheduleData }) }));
+let pageDoc;
+vi.mock('../contexts/ContentContext.jsx', () => ({ useContent: () => ({ organizationsData, scheduleData, getPage: () => pageDoc }) }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ features: { sponsors: enabled, schedule: scheduleEnabled } }) }));
 vi.mock('../components/media/AssetImage.jsx', () => ({ default: () => null }));
 import SponsorDetail from './SponsorDetail.jsx';
@@ -13,12 +14,28 @@ function show(search = '') {
   return render(<MemoryRouter initialEntries={['/sponsors/demo-beacon' + search]}><Routes><Route path="/sponsors/:slug" element={<SponsorDetail />} /></Routes></MemoryRouter>);
 }
 beforeEach(() => {
+  pageDoc = null;
   enabled = true;
   scheduleEnabled = true;
   scheduleData = [{ id: 'session-closing', visible: true }];
   organizationsData = [{ id: 'demo-beacon', name: 'Beacon', tier: 'presenting', visible: true, description: 'Travel support.', bio: 'First paragraph.\n\nSecond paragraph.', supportDescription: 'Covers the peer clinic.', readMorePath: '/schedule/session-closing', url: 'https://example.org' }];
 });
 describe('Sponsor detail', () => {
+  it.each([
+    ['a legacy title', { systemPage: true, label: 'Partners', title: 'Old partner title' }, 'partners'],
+    ['a blank label', { systemPage: true, label: '  ', title: 'Old partner title' }, 'sponsors'],
+    ['a malformed label', { systemPage: true, label: {}, title: 'Old partner title' }, 'sponsors'],
+  ])('uses the shared return-label contract with %s', (_, page, label) => {
+    pageDoc = page;
+    show();
+    expect(screen.getByRole('link', { name: `← Back to ${label}` })).toHaveAttribute('href', '/sponsors');
+  });
+  it.each(['  ', {}])('uses the return-label fallback for an unavailable organization with %j', (label) => {
+    pageDoc = { systemPage: true, label };
+    organizationsData = [];
+    show();
+    expect(screen.getByRole('link', { name: 'Back to sponsors' })).toHaveAttribute('href', '/sponsors');
+  });
   it('renders the full biography and supported session', () => {
     show();
     expect(screen.getByRole('heading', { name: 'Beacon', level: 1 })).toBeInTheDocument();

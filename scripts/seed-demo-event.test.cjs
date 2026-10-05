@@ -5,6 +5,16 @@ const assert = require('node:assert/strict');
 
 const { isDemoProject, seedDemo } = require('./seed-demo-event.cjs');
 const { makeFakeDb } = require('../functions/src/cms/firestoreFake.cjs');
+const { demoEvent } = require('./lib/demo-event.cjs');
+
+test('the enabled historical updates retain their visible navigation page and rendered source block', () => {
+  const demo = demoEvent();
+  assert.equal(demo.config.features.updates, true);
+  assert.ok(demo.pages.some((page) => page.id === 'updates' && page.visible !== false));
+  const source = demo.updates[0].content.find((block) => block.type === 'button');
+  assert.equal(source.href, 'https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119');
+  assert.equal(demo.updates[0].links, undefined);
+});
 
 /** Run seedDemo with its progress output swallowed. */
 async function runSeed(db, args = {}, now = () => Date.parse('2026-01-01T00:00:00Z')) {

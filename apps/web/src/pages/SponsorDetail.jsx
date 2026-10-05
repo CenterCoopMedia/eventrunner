@@ -20,6 +20,7 @@ import { isSafeHref } from '../lib/sanitizeHtml.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 import { IS_DEMO } from '../lib/demoMode.js';
+import { pageHeading } from 'shared/page';
 
 function paragraphs(value) {
   return typeof value === 'string' ? value.split(/\n\s*\n/).filter(Boolean) : [];
@@ -30,7 +31,7 @@ export default function SponsorDetail() {
   const { search } = useLocation();
   const { features } = useEventConfig();
   const { organizationsData, scheduleData = [], getPage } = useContent();
-  const directoryLabel = getPage?.('sponsors')?.label ?? 'Sponsors';
+  const directoryLabel = pageHeading(getPage?.('sponsors')) || 'Sponsors';
   const backLabel = `Back to ${directoryLabel.toLowerCase()}`;
   const roleLabel = IS_DEMO && directoryLabel === 'Partners' ? 'Historical role' : 'Tier';
   const org = features.sponsors && visibleOrganizations(organizationsData).find((item) => item.id === slug);

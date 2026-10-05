@@ -659,6 +659,17 @@ export const pagesData = [
     seeded: true,
   },
   {
+    id: 'updates',
+    label: 'Updates',
+    path: '/updates',
+    icon: null,
+    order: 11,
+    visible: true,
+    systemPage: true,
+    sections: [],
+    seeded: true,
+  },
+  {
     id: 'recap',
     label: 'Recap',
     path: '/recap',

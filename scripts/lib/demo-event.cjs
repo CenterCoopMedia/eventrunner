@@ -143,7 +143,7 @@ function demoEvent() {
   Object.assign(config.event, { announcedAt: '2026-01-01T12:00:00', archivedAt: '2026-03-28T00:00:00' });
   config.event.seo.defaultOgImagePath = 'branding/nclocal-og.png';
   config.event.seo.organizerUrl = 'https://nclocal.org/';
-  const visiblePages = new Set(['home', 'schedule', 'speakers', 'sponsors', 'travel', 'recap', 'faq', 'privacy', 'terms', 'contact', 'city_guide', 'conduct', 'guidelines']);
+  const visiblePages = new Set(['home', 'schedule', 'speakers', 'sponsors', 'updates', 'travel', 'recap', 'faq', 'privacy', 'terms', 'contact', 'city_guide', 'conduct', 'guidelines']);
   const labels = { schedule: 'Program', sponsors: 'Partners', travel: 'Locations', city_guide: 'Raleigh', recap: 'Recap' };
   const pages = defaultPages().filter((page) => visiblePages.has(page.id)).map((page) => ({
     ...page, label: labels[page.id] ?? page.label, seeded: true,

@@ -11,12 +11,11 @@
       {
         "type": "richtext",
         "value": "<p>NC Local and NC Open Government Coalition co-produced the summit. WUNC participated in the Due South lunch broadcast. The Assembly sponsored the afterparty.</p>"
-      }
-    ],
-    "links": [
+      },
       {
+        "type": "button",
         "label": "Original 2026 program (ended listing)",
-        "url": "https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119"
+        "href": "https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119"
       }
     ]
   }
