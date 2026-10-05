@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Validated config writers — the ONLY writer of `config/*` (spec §1.3,
+ * Validated writers for `config/{event,features,theme,badges}` (spec §1.3,
  * issue #14). Four handlers: updateEventConfig, updateFeatures,
  * updateTheme, updateBadges. Every write:
  *
@@ -19,7 +19,9 @@
  *      comparison happens inside the write transaction against the stored
  *      values, so a staff save that carries the sender unchanged (the
  *      form sends the whole editable slice) goes through.
- *   2. Targets only {event, features, theme, badges}. `config/bootstrap`
+ *   2. Targets only {event, features, theme, badges}. Other domain modules
+ *      own their named config documents, including `config/pitch_call`.
+ *      `config/bootstrap`
  *      (the admin-list seed) and `config/providers` (a read-only mirror of
  *      Tier A deploy env) are NEVER writable from the panel, and the
  *      refusal names the doc.

@@ -2,6 +2,8 @@
 
 How to run a client's site from the admin panel, in the order the work happens. For the narrative "why does this work this way" version, hand a new staff member [`docs/handbook/for-event-staff.md`](handbook/for-event-staff.md) first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see [`design-reference.md`](design-reference.md). You do not need it to run a site.
 
+Session pitch intake currently uses server endpoints and has no admin screen. See [Operate session pitch intake](operator/session-pitches.md) for the call controls, request fields, review concurrency, and private data boundaries.
+
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
 **The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.

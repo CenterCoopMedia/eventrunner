@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Private session pitch APIs for verified accounts, without a ticket requirement. Operators open
+  or close intake through `config/pitch_call`; staff review proposals with status and revision
+  checks. Account-scoped retry keys and atomic rate limits prevent duplicate or excessive writes.
+  Firestore rules keep pitches and notes private, and rate-limit records are server-only. Reviews
+  are audited but do not publish sessions, grant roles or send mail. Pitches retain the captured
+  uid and email after account deletion; deployments must define retention before opening intake
+  (#322).
 - Site-wide announcements for staff and operators. Each record has plain-text content, a notice or
   urgent level, a required start and end time, and an optional safe web link. Saving is live at
   once. The public shell shows every active announcement on every route, rechecks the window while

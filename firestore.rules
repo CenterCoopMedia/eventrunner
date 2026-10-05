@@ -468,6 +468,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Session pitches contain submitter identity, proposal text, review
+    // status, and private staff notes. Either admin tier may review them.
+    // Visitors cannot read even their own pitch, and every write goes
+    // through functions/src/sessions/pitches.cjs.
+    match /session_pitches/{pitchId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // media_assets: the index of uploaded Storage objects behind the media
     // library (spec §4.1, §8.5). Admin-readable so the library can list and
     // search without a callable per keystroke; never client-written — every
@@ -517,6 +526,7 @@ service cloud.firestore {
     match /email_templates/{docId} { allow read, write: if false; }
     match /feedback_rate_limits/{docId} { allow read, write: if false; }
     match /change_request_rate_limits/{docId} { allow read, write: if false; }
+    match /session_pitch_rate_limits/{docId} { allow read, write: if false; }
     // Per-section transaction locks serialize content creates so maxBlocks
     // cannot be exceeded by two requests that arrive together.
     match /cmsContentSectionLocks/{lockId} { allow read, write: if false; }
