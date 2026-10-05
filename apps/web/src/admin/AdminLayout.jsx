@@ -165,6 +165,25 @@ export function tierReaches(held, required = 'operator') {
   return held === 'staff' && required === 'staff';
 }
 
+// Share route normalization between the section label and its access check.
+function adminSection(pathname) {
+  const segments = [];
+  for (const raw of String(pathname ?? '').split('/').slice(1)) {
+    let segment;
+    try {
+      segment = decodeURIComponent(raw).toLowerCase();
+    } catch {
+      return null;
+    }
+    if (segment.includes('/')) return null;
+    segments.push(segment);
+  }
+  // A trailing slash is not a section.
+  if (segments.length > 1 && segments[segments.length - 1] === '') segments.pop();
+  if (segments[0] !== 'admin') return null;
+  return segments[1];
+}
+
 /**
  * The tier the section at `pathname` asks for, from its docket entry. A
  * section owns every path under it, so /admin/pages/new is Pages. The
@@ -182,21 +201,7 @@ export function tierReaches(held, required = 'operator') {
  * @returns {'operator'|'staff'|null}
  */
 export function sectionTier(pathname) {
-  const segments = [];
-  for (const raw of String(pathname ?? '').split('/').slice(1)) {
-    let segment;
-    try {
-      segment = decodeURIComponent(raw).toLowerCase();
-    } catch {
-      return 'operator';
-    }
-    if (segment.includes('/')) return 'operator';
-    segments.push(segment);
-  }
-  // A trailing slash is not a section.
-  if (segments.length > 1 && segments[segments.length - 1] === '') segments.pop();
-  if (segments[0] !== 'admin') return 'operator';
-  const section = segments[1];
+  const section = adminSection(pathname);
   if (section === undefined) return null;
   for (const group of DOCKET) {
     const item = group.items.find((entry) => entry.to === section);
@@ -320,9 +325,10 @@ function AdminDesk() {
   const docket = docketForTier(tierKnown ? adminTier : 'staff');
   const required = sectionTier(pathname);
   const refused = tierKnown && required !== null && !tierReaches(adminTier, required);
+  const section = adminSection(pathname);
   const activeSection = docket
     .flatMap((group) => group.items)
-    .find((item) => pathname === `${ROOT}/${item.to}` || pathname.startsWith(`${ROOT}/${item.to}/`));
+    .find((item) => item.to === section);
   // The editor tour (issue #198): null while closed, else the run number.
   // Run 0 is the first visit and takes no focus; each "Take the tour" is a
   // new run, so it starts again at step 1 with the focus on its heading.

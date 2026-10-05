@@ -118,6 +118,15 @@ describe('the admin shell', () => {
     expect(ADMIN_DESKTOP_VIEWPORT).toBe('(min-width: 1024px)');
   });
 
+  it('names the current section for case-insensitive and encoded admin routes', async () => {
+    for (const path of ['/admin/Pages', '/admin/%50ages', '/Admin/pages', '/%41dmin/pages']) {
+      const { container, unmount } = await renderAdmin(path);
+      const summary = container.querySelector('details.admin-mobile-docket > summary');
+      expect(within(summary).getByText('Pages')).toHaveAttribute('title', 'Pages');
+      unmount();
+    }
+  });
+
   it('uses one compact phone bar and a full-width grouped menu sheet', async () => {
     const original = window.matchMedia;
     const originalBodyOverflow = document.body.style.overflow;
