@@ -286,6 +286,11 @@ describe('the proof', () => {
     expect(compared.dataset.theme).toBe(frame().dataset.theme);
     expect(previewCss(PREVIEW_COMPARE_SCOPE_ID)).toContain(`#${PREVIEW_COMPARE_SCOPE_ID}`);
     expect(screen.getAllByText(/Home · dark · 1440px/).length).toBeGreaterThan(0);
+
+    const comparedDocument = compared.ownerDocument;
+    fireEvent.click(screen.getByRole('button', { name: 'Light' }));
+    expect(previewIframe(PREVIEW_COMPARE_SCOPE_ID)).toBeNull();
+    expect(comparedDocument.getElementById(PREVIEW_STYLE_ID)).toBeNull();
   });
 
   it('swaps in a long title and a dense day on request, and says it is doing it', async () => {

@@ -51,6 +51,12 @@ let savedMotifSet = null;
 const previewDocuments = new Set();
 const previewTargets = new Set();
 
+function clearPreviewAttributes(element) {
+  for (const attribute of ['texture', 'density', 'theme', 'motifSet', 'mode']) {
+    delete element.dataset[attribute];
+  }
+}
+
 function previewStyle(doc) {
   let styleEl = doc.getElementById(PREVIEW_STYLE_ID);
   if (!styleEl) {
@@ -158,15 +164,27 @@ export function applyThemePreview(themeDoc, { scope = null, mode = null, scopes 
   }
 }
 
+/** Release one framed preview without disturbing any frames that remain mounted. */
+export function releaseThemePreviewTarget(element) {
+  if (!element) return;
+  previewTargets.delete(element);
+  clearPreviewAttributes(element);
+
+  const doc = element.ownerDocument;
+  const documentStillInUse = [...previewTargets].some(
+    (target) => target.ownerDocument === doc,
+  );
+  if (!documentStillInUse) {
+    doc.getElementById(PREVIEW_STYLE_ID)?.remove();
+    previewDocuments.delete(doc);
+  }
+}
+
 /** Remove the preview overlay, restoring the saved theme's rendering. */
 export function clearThemePreview() {
   for (const doc of previewDocuments) doc.getElementById(PREVIEW_STYLE_ID)?.remove();
   previewDocuments.clear();
-  for (const element of previewTargets) {
-    for (const attribute of ['texture', 'density', 'theme', 'motifSet', 'mode']) {
-      delete element.dataset[attribute];
-    }
-  }
+  for (const element of previewTargets) clearPreviewAttributes(element);
   previewTargets.clear();
   if (savedTexture !== null) {
     if (savedTexture) document.documentElement.dataset.texture = savedTexture;

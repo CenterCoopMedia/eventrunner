@@ -66,6 +66,7 @@ import {
   PREVIEW_STYLE_ID,
   applyThemePreview,
   clearThemePreview,
+  releaseThemePreviewTarget,
 } from '../themePreview.js';
 import {
   Notice,
@@ -234,6 +235,7 @@ function copyPreviewStyles(targetDocument) {
 /** One rendered frame, at one width, in one mode. */
 function PreviewFrame({ path, scopeId, onReady, width, height, scale, identification, title }) {
   const iframeRef = useRef(null);
+  const previewRootRef = useRef(null);
   const [host, setHost] = useState(null);
 
   const prepare = useCallback(() => {
@@ -247,13 +249,21 @@ function PreviewFrame({ path, scopeId, onReady, width, height, scale, identifica
       body: targetDocument.body,
       view: iframe.contentWindow,
     };
+    if (previewRootRef.current !== next.root) {
+      releaseThemePreviewTarget(previewRootRef.current);
+      previewRootRef.current = next.root;
+    }
     setHost(next);
     onReady(next.root);
   }, [onReady]);
 
   useLayoutEffect(() => {
     prepare();
-    return () => onReady(null);
+    return () => {
+      releaseThemePreviewTarget(previewRootRef.current);
+      previewRootRef.current = null;
+      onReady(null);
+    };
   }, [onReady, prepare]);
 
   const page = host
