@@ -2549,7 +2549,6 @@
     .event-hero--compact .event-hero__tagline { display: none; }
     .event-hero--compact .event-hero__media { block-size: 7rem; }
     .schedule-page-header { margin-block-start: var(--space-lg); }
-    .schedule-controls { display: block; }
     .schedule-optional-controls { margin-block-start: var(--space-md); }
     .schedule-optional-controls > summary {
       display: flex;

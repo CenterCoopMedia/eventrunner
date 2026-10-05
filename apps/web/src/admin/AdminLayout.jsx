@@ -361,6 +361,17 @@ function AdminDesk() {
           </p>
         </div>
 
+        {adminTier === 'unknown' ? (
+          <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-b-admin-hairline px-md py-xs lg:order-last lg:border-b-0 lg:border-t-admin-hairline lg:py-sm">
+            <p className="text-admin-xs text-admin-rail-ink-muted" role="status">
+              Your access tier could not be checked.
+            </p>
+            <button type="button" onClick={refreshAdminStatus} className={railButtonClass}>
+              Check again
+            </button>
+          </div>
+        ) : null}
+
         <details
           className="admin-mobile-docket flex min-h-0 flex-1 flex-col"
           open={wide || mobileDocketOpen}
@@ -419,16 +430,6 @@ function AdminDesk() {
               <p className="text-admin-xs font-semibold text-admin-rail-ink" data-admin-tier={adminTier}>
                 {adminTier === 'operator' ? 'Operator' : 'Staff'}
               </p>
-            ) : null}
-            {adminTier === 'unknown' ? (
-              <div className="mt-2xs flex flex-col items-start gap-2xs">
-                <p className="text-admin-xs text-admin-rail-ink-muted" role="status">
-                  Your access tier could not be checked.
-                </p>
-                <button type="button" onClick={refreshAdminStatus} className={railButtonClass}>
-                  Check again
-                </button>
-              </div>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-xs">

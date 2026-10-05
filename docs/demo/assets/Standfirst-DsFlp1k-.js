@@ -1,0 +1,1 @@
+import{j as o}from"./index-DB66MigX.js";function a({children:t,className:s=""}){return t==null||t===""?null:o.jsx("p",{className:["standfirst max-w-prose",s].filter(Boolean).join(" "),children:t})}export{a as S};

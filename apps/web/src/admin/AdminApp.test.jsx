@@ -437,8 +437,9 @@ describe('admin route gating', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
     expect(screen.queryByText('Staff')).toBeNull();
     expect(screen.queryByText('Operator')).toBeNull();
-    const rail = screen.getByRole('navigation', { name: 'Admin sections' }).parentElement;
+    const rail = screen.getByRole('navigation', { name: 'Admin sections' }).closest('.admin-rail');
     expect(rail.textContent).toContain('Your access tier could not be checked.');
+    expect(screen.getByRole('status').closest('details')).toBeNull();
 
     operatorProbeError = null;
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));

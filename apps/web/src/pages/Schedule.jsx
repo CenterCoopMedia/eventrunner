@@ -427,7 +427,7 @@ export default function Schedule() {
           {/* The controls that narrow and order what the day shows. Controls
               do not print: a button on paper is a lie (index.css, the print
               block), and so is a search box. */}
-          <div className="schedule-controls no-print mt-md flex flex-wrap items-start gap-lg">
+          <div className="schedule-controls no-print mt-md block items-start gap-lg sm:flex sm:flex-wrap">
             <div className="w-full max-w-prose lg:w-auto lg:flex-1">
               <SearchField
                 label="Search this day"
