@@ -34,6 +34,7 @@ import SectionHead from './editorial/SectionHead.jsx';
 import AssetImage from './media/AssetImage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 import ExternalLink from './ExternalLink.jsx';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 /**
  * The mark size for a tier group, by its rank in the operator's ordering.
@@ -189,11 +190,13 @@ export default function SponsorWall({
                 act on it and was never asked to think about the file. The
                 mark box keeps its size either way, so a missing logo is an
                 empty frame in the wall rather than a hole in it. */}
-            <div className="logo-wall__mark">
-              {org.logoPath ? (
-                <AssetImage path={org.logoPath} alt="" className="" decorative />
-              ) : null}
-            </div>
+            {org.logoPath || !IS_DEMO ? (
+              <div className="logo-wall__mark">
+                {org.logoPath ? (
+                  <AssetImage path={org.logoPath} alt="" className="" decorative />
+                ) : null}
+              </div>
+            ) : null}
             {/* The name is a caption under the mark, not a headline over a
                 card: the wall's own weighting is what says how much of a
                 supporter this is, so the name does not have to shout it a
