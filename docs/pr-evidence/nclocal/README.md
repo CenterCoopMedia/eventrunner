@@ -8,9 +8,11 @@ Before: Base `dec343bf65a22c9a376b3f5b459f91da6b43f724`, with the same
 approved historical content supplied through `GENERATED_DIR`. Its theme CSS,
 theme config and neutral branding stay at the base revision. This fixture
 overlay makes the visual comparison use the same sessions, people and prose.
+A private Vite alias supplies the same historical update JSON to the unchanged
+base update renderer. This supplies fixture data without changing base code.
 The source diff records the replacement of the previous fictional content.
 
-After: Source `7c4906c455dce9f052f9c8ec00184db8864f0b79`, with the committed
+After: Source `6658c0b7d0a35d31de299943f9e053ee2f46e6ed`, with the committed
 historical content and NC Local theme. The after images use the fresh Node 22
 lockfile build from Legion, served by a loopback-only local preview. The before
 uses the isolated base development server. Both use `VITE_DEMO_MODE=1`.
@@ -19,11 +21,12 @@ semantic locators; screenshots did not supply click coordinates.
 
 This refresh uses the official Google Fonts Cabin normal Latin 400–700 slice:
 28,320 bytes, below the project's existing 60 KB font limit. Its asset source
-and digest are recorded in `field-evidence.json`. The prior full CI at `c873c639`, based on `4ae4a1aa`, passed all ten tiers,
-including 3,032 web tests, 2,787 node tests, 352 rules tests and 62 browser
-cases. This refresh integrates current main at `dec343bf`, including its
-session pitch workspace. The derived white wordmark remains limited to
-screen media and has a CSS regression test.
+and digest are recorded in `field-evidence.json`. The prior full CI at `02335394`, based on `dec343bf`, passed all ten tiers,
+including 3,036 web tests, 2,796 node tests, 354 rules tests and 66 browser
+cases. This refresh restores Updates navigation and the rendered historical
+agenda source link, and uses the shared page-heading contract for partner
+detail return links. The derived white wordmark remains limited to screen
+media and has a CSS regression test.
 Final exact-head CI and independent review receipts are recorded separately in
 the PR.
 
@@ -43,6 +46,10 @@ definitions are byte-for-byte equal to the base revision.
 | Speakers phone | [Before](before-speakers-phone-light.png) | [After](after-speakers-phone-light.png) |
 | Partners desktop | [Before](before-partners-desktop-light.png) | [After](after-partners-desktop-light.png) |
 | Partners phone | [Before](before-partners-phone-light.png) | [After](after-partners-phone-light.png) |
+| Updates desktop | [Before](before-updates-desktop-light.png) | [After](after-updates-desktop-light.png) |
+| Updates phone | [Before](before-updates-phone-light.png) | [After](after-updates-phone-light.png) |
+| Historical update desktop | [Before](before-update-detail-desktop-light.png) | [After](after-update-detail-desktop-light.png) |
+| Historical update phone | [Before](before-update-detail-phone-light.png) | [After](after-update-detail-phone-light.png) |
 
 No after view exceeded its viewport width. The historical roster is a text
 directory; absent portraits and partner logos do not reserve empty frames.
@@ -88,7 +95,7 @@ the larger consumer. These images were opened and inspected.
 
 The Program and Partners print pairs use the same historical fixture and
 1280 × 800 viewport. The before source is base `dec343bf`; after is source
-`7c4906c4`. Chromium emulates print media while the root remains in dark mode.
+`6658c0b7`. Chromium emulates print media while the root remains in dark mode.
 The original teal wordmark is retained on the light print surface. The derived
 white wordmark is applied only on screen. `after-print-evidence.json` records
 the actual image source, computed content and background; Program switches to
@@ -98,3 +105,10 @@ its dedicated print layout. The captures were opened and inspected.
 | --- | --- | --- |
 | Program printed from dark mode | [Before](before-program-desktop-dark-print.png) | [After](after-program-desktop-dark-print.png) |
 | Partners printed from dark mode | [Before](before-partners-desktop-dark-print.png) | [After](after-partners-desktop-dark-print.png) |
+
+## Historical update navigation
+
+The Updates directory and historical-note detail have matched before/after
+fixtures and desktop/phone captures. `after-updates-evidence.json` records the
+visible navigation links and the actual ended Eventbrite agenda anchor. The
+note identifies itself as demo-authored; it is not an official NC Local post.

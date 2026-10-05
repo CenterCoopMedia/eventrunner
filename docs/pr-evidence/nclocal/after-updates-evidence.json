@@ -1,0 +1,238 @@
+{
+  "sourceHead": "6658c0b7d0a35d31de299943f9e053ee2f46e6ed",
+  "historicalUpdateFixture": "/tmp/nclocal-before-demo-updates.json",
+  "rows": [
+    {
+      "phase": "after",
+      "view": "updates",
+      "size": "desktop",
+      "mode": "light",
+      "filename": "after-updates-desktop-light.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "demoAuthored": true,
+      "heading": "Updates",
+      "scrollWidth": 1265,
+      "sourceLink": [],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "phase": "after",
+      "view": "updates",
+      "size": "desktop",
+      "mode": "dark",
+      "filename": "after-updates-desktop-dark.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "demoAuthored": true,
+      "heading": "Updates",
+      "scrollWidth": 1265,
+      "sourceLink": [],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "phase": "after",
+      "view": "update-detail",
+      "size": "desktop",
+      "mode": "light",
+      "filename": "after-update-detail-desktop-light.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "demoAuthored": true,
+      "heading": "Explore the historical 2026 program",
+      "scrollWidth": 1265,
+      "sourceLink": [
+        {
+          "href": "https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119",
+          "rel": "noopener noreferrer",
+          "text": "Original 2026 program (ended listing)"
+        }
+      ],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "phase": "after",
+      "view": "update-detail",
+      "size": "desktop",
+      "mode": "dark",
+      "filename": "after-update-detail-desktop-dark.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "demoAuthored": true,
+      "heading": "Explore the historical 2026 program",
+      "scrollWidth": 1265,
+      "sourceLink": [
+        {
+          "href": "https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119",
+          "rel": "noopener noreferrer",
+          "text": "Original 2026 program (ended listing)"
+        }
+      ],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 1280
+    },
+    {
+      "phase": "after",
+      "view": "updates",
+      "size": "phone",
+      "mode": "light",
+      "filename": "after-updates-phone-light.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "demoAuthored": true,
+      "heading": "Updates",
+      "scrollWidth": 375,
+      "sourceLink": [],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "phase": "after",
+      "view": "updates",
+      "size": "phone",
+      "mode": "dark",
+      "filename": "after-updates-phone-dark.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "demoAuthored": true,
+      "heading": "Updates",
+      "scrollWidth": 375,
+      "sourceLink": [],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "phase": "after",
+      "view": "update-detail",
+      "size": "phone",
+      "mode": "light",
+      "filename": "after-update-detail-phone-light.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "demoAuthored": true,
+      "heading": "Explore the historical 2026 program",
+      "scrollWidth": 375,
+      "sourceLink": [
+        {
+          "href": "https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119",
+          "rel": "noopener noreferrer",
+          "text": "Original 2026 program (ended listing)"
+        }
+      ],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 390
+    },
+    {
+      "phase": "after",
+      "view": "update-detail",
+      "size": "phone",
+      "mode": "dark",
+      "filename": "after-update-detail-phone-dark.png",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "demoAuthored": true,
+      "heading": "Explore the historical 2026 program",
+      "scrollWidth": 375,
+      "sourceLink": [
+        {
+          "href": "https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119",
+          "rel": "noopener noreferrer",
+          "text": "Original 2026 program (ended listing)"
+        }
+      ],
+      "updatesNavigation": [
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        },
+        {
+          "href": "#/updates",
+          "text": "Updates"
+        }
+      ],
+      "width": 390
+    }
+  ]
+}
