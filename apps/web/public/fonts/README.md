@@ -41,7 +41,7 @@ declares.
 | `archivo-condensed-latin.woff2` | Archivo (width 75) | 400–700 var | `archivo-condensed` | 33 KB | SIL OFL 1.1 |
 | `merriweather-400-latin.woff2`, `merriweather-700-latin.woff2` | Merriweather | 400, 700 | `merriweather` | 47 KB + 46 KB | SIL OFL 1.1 |
 | `public-sans-latin.woff2` | Public Sans | 400–700 var | `public-sans` | 24 KB | SIL OFL 1.1 |
-| `cabin-latin.woff2` | Cabin | 400–700 var | `cabin` | 73 KB | SIL OFL 1.1; `OFL-cabin.txt` |
+| `cabin-latin.woff2` | Cabin | 400–700 var | `cabin` | 28 KB | SIL OFL 1.1; `OFL-cabin.txt` |
 | `karrik-latin.woff2` | Karrik | 400 | `karrik` | 16 KB | SIL OFL 1.1 |
 | `bagnard-latin.woff2` | Bagnard | 400 | `bagnard` | 7 KB | SIL OFL 1.1 |
 | `avara-latin.woff2` | Avara | 700 | `avara` | 6 KB | SIL OFL 1.1 |
@@ -71,6 +71,7 @@ OFL 1.1 text in their upstream Google Fonts repository.
 | Archivo | Omnibus-Type | Google Fonts |
 | Merriweather | Sorkin Type / Eben Sorkin | Google Fonts |
 | Public Sans | USWDS, after Libre Franklin | Google Fonts |
+| Cabin | The Cabin Project Authors | Google Fonts; `OFL-cabin.txt` |
 | Besley | Indestructible Type / Owen Earl | Google Fonts |
 | Vollkorn | Friedrich Althausen | Google Fonts |
 | Overpass, Overpass Mono | Delve Withrington, Dave Bailey, Thomas Jockin (Red Hat) | Google Fonts |
@@ -85,6 +86,10 @@ OFL 1.1 text in their upstream Google Fonts repository.
   fetched from the `fonts.googleapis.com/css2` stylesheet with a modern
   browser user agent, and taken from the block whose `unicode-range` is the
   Latin one. No re-subsetting was needed.
+- **Cabin.** The NC Local addition uses Google Fonts v35's normal Latin
+  slice for weights 400–700, with width fixed at 100%. Source:
+  <https://fonts.gstatic.com/s/cabin/v35/u-4i0qWljRw-PfU81xCKCpdpbgZJl6Xvqdns.woff2>.
+  It is 28,320 bytes, below the existing 60 KB limit.
 - **Weight range.** A variable face has its `wght` axis clipped to 400–700 with
   `fonttools varLib.instancer`, so the emitted `font-weight: 400 700` is the
   truth and the file carries no weights the system can reach. Any second axis

@@ -191,7 +191,7 @@ test('getEventStats returns the counts for the seeded demo event', async () => {
   await addDocs(db, 'tickets', 'refunded', 6, { status: 'refunded' });
   await addDocs(db, 'tickets', 'cancelled', 7, { status: 'cancelled' });
   await addDocs(db, 'tickets', 'pending-info', 8, { status: 'pending_info' });
-  // Speakers beyond the seed's approved twelve.
+  // Speakers beyond the historical fixture's 25 public speakers.
   await addDocs(db, 'speakers', 'draft', 1, { status: 'draft' });
   await addDocs(db, 'speakers', 'invited', 2, { status: 'invited' });
   await addDocs(db, 'speakers', 'accepted', 3, { status: 'accepted' });
@@ -214,16 +214,15 @@ test('getEventStats returns the counts for the seeded demo event', async () => {
       profileComplete: 6,
     },
     tickets: { total: 26, byStatus: { valid: 5, refunded: 6, cancelled: 7, pending_info: 8 } },
-    speakers: { total: 22, byStatus: { draft: 1, invited: 2, accepted: 3, approved: 12, removed: 4 } },
+    speakers: { total: 35, byStatus: { draft: 1, invited: 2, accepted: 3, approved: 25, removed: 4 } },
     content: {
-      // 101 before the demo's three sponsor packages (issue 193).
-      cmsContent: { published: 104, drafts: 0 },
-      cmsSchedule: { published: 31, drafts: 1 },
-      cmsOrganizations: { published: 6, drafts: 0 },
-      // The demo's two past editions (issue 194).
-      cmsTimeline: { published: 2, drafts: 0 },
-      cmsUpdates: { published: 6, drafts: 0 },
-      cmsPages: { published: 15, drafts: 0 },
+      cmsContent: { published: 46, drafts: 0 },
+      cmsSchedule: { published: 11, drafts: 1 },
+      cmsOrganizations: { published: 4, drafts: 0 },
+      // No invented past editions or sponsor offers in this historical demo.
+      cmsTimeline: { published: 0, drafts: 0 },
+      cmsUpdates: { published: 1, drafts: 0 },
+      cmsPages: { published: 13, drafts: 0 },
     },
     errors: { unresolved: 2 },
     funnel: [

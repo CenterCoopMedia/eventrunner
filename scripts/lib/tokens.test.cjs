@@ -367,7 +367,7 @@ test('every option a preset offers remaps a token the contracts already declare'
   }
 });
 
-test('the bundled library is 23 families, every one of them recorded', () => {
+test('the bundled library retains 23 families and adds the requested Cabin family', () => {
   // Owner calibration, 2026-08-27: "Keep the full 23-family font library
   // (licensing/loading/fallback/performance verified)". The library is the
   // repo's, not the reader's — a deployed site loads two to four families —
@@ -376,7 +376,8 @@ test('the bundled library is 23 families, every one of them recorded', () => {
     path.join(__dirname, '..', '..', 'apps', 'web', 'public', 'fonts', 'README.md'),
     'utf8',
   );
-  assert.equal(THEME_FONT_SET_IDS.length, 23, 'the library is 23 set ids');
+  assert.equal(THEME_FONT_SET_IDS.length, 24, 'the original 23 set ids plus Cabin');
+  assert.ok(THEME_FONT_SET_IDS.includes('cabin'), 'NC Local controls use the requested Cabin family');
 
   // LICENSING. Every set has a row in the README table, and every row states
   // a licence. Four faces are not on Google Fonts and carry their licence
