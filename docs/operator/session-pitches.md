@@ -77,7 +77,7 @@ Deleting an attendee account does not delete its submitted pitches. A pitch rema
 
 ## Visitor form and review queue
 
-Before deploying this version, check existing CMS pages at `/pitch` and below it. Content generation and the site artifact build block deployment if any such page exists, including a hidden page. Rename and publish those pages through the CMS first. This check does not move or delete content.
+Before deploying this version, check existing CMS pages and page drafts at `/pitch` and below it. Content generation and the site artifact build block deployment if any such page exists, including a hidden page or an unpublished draft. Rename and publish those pages through the CMS first. This check does not move or delete content.
 
 The public `/pitch` route uses the event branding and theme. Visitors can write before signing in. Google or an emailed code verifies their email without a ticket. The form retains entries and the retry key in browser tab storage through sign-in, reloads, and request failures. It clears the stored draft after a confirmed submission. Browser storage failure leaves entries available while the page stays open.
 
@@ -104,7 +104,7 @@ Each file contains 1–50 proposals and is smaller than 512 KB. Keep original ex
 
 Save an **Accepted** decision first. Expand **Create session and speaker drafts**. Confirm the proposed speaker's first and last names, configured event day, and start/end time. Verify consent and identity, then check the review acknowledgement and choose **Create reviewed drafts**. This is separate from acceptance. The server checks the accepted decision and review revision in a transaction.
 
-`convertSessionPitch` accepts `{ id, expectedRevision, firstName, lastName, dayId, startTime, endTime }`. It atomically creates one hidden `cmsSchedule_drafts` row, one canonical `speakers` row with `status: draft`, the speaker slug reservation, and a conversion/audit record. The proposed format becomes the session draft’s `type`, which the session editor, cards, and format filters use. No invite, account role, live session, or public speaker projection is created. Retry returns the existing conversion and cannot overwrite or duplicate drafts.
+`convertSessionPitch` accepts `{ id, expectedRevision, firstName, lastName, dayId, startTime, endTime }`. It atomically creates one hidden `cmsSchedule_drafts` row, one canonical `speakers` row with `status: draft`, the speaker slug reservation, and a conversion/audit record. The proposed format becomes the session draft’s `type`, which session cards and format filters use. The session editor keeps it on save. No invite, account role, live session, or public speaker projection is created. Retry returns the existing conversion and cannot overwrite or duplicate drafts.
 
 Use **Review session draft** and **Review speaker draft** to complete the ordinary editors. Session visibility and speaker approval remain explicit actions in those editors. Private notes and reviewer identities never enter either draft.
 

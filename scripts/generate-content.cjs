@@ -128,7 +128,8 @@ async function readDeployment({ db }) {
     readVisibleCollection('cmsTimeline'),
     readCollection('speakers_public'),
   ]);
-  assertNoPitchPageCollisions(allPages);
+  const draftPaths = await db.collection('cmsPages_drafts').select('path').get();
+  assertNoPitchPageCollisions([...allPages, ...draftPaths.docs.map((doc) => doc.data())]);
   // Hidden page bodies are inspected for collisions, never emitted.
   const pages = allPages.filter((page) => page.visible === true);
   // `speakerId` on the projection is the document id under another name;

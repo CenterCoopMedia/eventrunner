@@ -34,6 +34,11 @@ function readFake({ config = {}, collections = {}, failing = [] } = {}) {
           const docs = list(name);
           return { docs, size: docs.length, empty: docs.length === 0 };
         },
+        select(...fields) {
+          return { async get() {
+            return { docs: list(name).map((doc) => ({ data: () => Object.fromEntries(fields.filter((field) => Object.hasOwn(doc.data(), field)).map((field) => [field, doc.data()[field]])) })) };
+          } };
+        },
         // readVisibleCollection queries `visible == true` server-side
         // (spec §8.4 point 4) — filtered in-memory here, '==' only, which
         // is all generate-content.cjs issues.
@@ -237,4 +242,14 @@ test('deployment generation refuses visible and hidden legacy pitch pages withou
       await assert.rejects(readDeployment({ db }), /Session pitch route collision: Rename the CMS page paths/);
     }
   }
+});
+
+
+test('deployment checks legacy page draft paths without including draft bodies', async () => {
+  for (const path of ['/pitch', '/pitch/guidelines']) {
+    const db = readFake({ config: CONFIG, collections: { cmsPages_drafts: [{ __id: 'legacy-draft', path, title: 'PRIVATE-DRAFT' }] } });
+    await assert.rejects(readDeployment({ db }), /Session pitch route collision/);
+  }
+  const db = readFake({ config: CONFIG, collections: { cmsPages_drafts: [{ __id: 'private-draft', path: '/other', title: 'PRIVATE-DRAFT' }] } });
+  assert.doesNotMatch(JSON.stringify(await readDeployment({ db })), /PRIVATE-DRAFT|private-draft/);
 });
