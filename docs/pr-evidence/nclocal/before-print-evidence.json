@@ -1,0 +1,34 @@
+{
+  "sourceHead": "4ae4a1aaae0a5eb8ed0b724a72119b5332d6c93a",
+  "mechanism": "Chromium CDP print-media emulation, with structured page navigation and no print submission.",
+  "rows": [
+    {
+      "view": "program",
+      "filename": "before-program-desktop-dark-print.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "ground": "rgb(246, 247, 249)",
+      "logos": [],
+      "mode": "dark",
+      "print": true,
+      "schedulePrint": "block",
+      "scheduleScreen": "none"
+    },
+    {
+      "view": "partners",
+      "filename": "before-partners-desktop-dark-print.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "ground": "rgb(246, 247, 249)",
+      "logos": [],
+      "mode": "dark",
+      "print": true,
+      "schedulePrint": null,
+      "scheduleScreen": null
+    }
+  ]
+}

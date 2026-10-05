@@ -10,7 +10,7 @@ theme config and neutral branding stay at the base revision. This fixture
 overlay makes the visual comparison use the same sessions, people and prose.
 The source diff records the replacement of the previous fictional content.
 
-After: Source `7b4a09b2eac2712bc6516df780e509e5b8dd0ab2`, with the committed
+After: Source `aee62acce9486137727c6170e0f47acbde1d1ac4`, with the committed
 historical content and NC Local theme. The after images use the fresh Node 22
 lockfile build from Legion, served by a loopback-only local preview. The before
 uses the isolated base development server. Both use `VITE_DEMO_MODE=1`.
@@ -19,11 +19,11 @@ semantic locators; screenshots did not supply click coordinates.
 
 This refresh uses the official Google Fonts Cabin normal Latin 400–700 slice:
 28,320 bytes, below the project's existing 60 KB font limit. Its asset source
-and digest are recorded in `field-evidence.json`. The prior full CI at `77931662` passed nine tiers, including 3,025 web tests,
-2,787 node tests and 352 rules tests. It stopped during E2E collection before
-browser cases ran. This source fixes that loader failure and adds six page-heading
-regression tests; all 62 E2E cases load. Final exact-head CI and independent
-review receipts are recorded separately in the PR.
+and digest are recorded in `field-evidence.json`. The prior full CI at `4b668285` passed all ten tiers, including 3,031 web
+tests, 2,787 node tests, 352 rules tests and 62 browser cases. This source limits
+the derived white wordmark to screen media and adds one CSS regression test.
+Final exact-head CI and independent review receipts are recorded separately in
+the PR.
 
 `render-evidence.json` records headings, fonts, viewport widths, transaction
 link checks and checks of the other five style selectors. Their source preset
@@ -81,3 +81,18 @@ Home partner wall, Partners wall and partner-detail view. The canvas comparison
 at 1200 × 260 found zero alpha or globe pixel mismatches; all nontransparent
 wordmark pixels are white. The additional partner-detail dark capture records
 the larger consumer. These images were opened and inspected.
+
+## Printed views
+
+The Program and Partners print pairs use the same historical fixture and
+1280 × 800 viewport. The before source is base `4ae4a1aa`; after is source
+`aee62acc`. Chromium emulates print media while the root remains in dark mode.
+The original teal wordmark is retained on the light print surface. The derived
+white wordmark is applied only on screen. `after-print-evidence.json` records
+the actual image source, computed content and background; Program switches to
+its dedicated print layout. The captures were opened and inspected.
+
+| View | Before | After |
+| --- | --- | --- |
+| Program printed from dark mode | [Before](before-program-desktop-dark-print.png) | [After](after-program-desktop-dark-print.png) |
+| Partners printed from dark mode | [Before](before-partners-desktop-dark-print.png) | [After](after-partners-desktop-dark-print.png) |
