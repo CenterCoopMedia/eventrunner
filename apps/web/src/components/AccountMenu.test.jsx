@@ -99,6 +99,46 @@ describe('view selection', () => {
 });
 
 describe('phone account sheet', () => {
+  it('keeps role links and Close usable without native dialog methods', () => {
+    const original = window.matchMedia;
+    window.matchMedia = () => ({matches:true,addEventListener:()=>{},removeEventListener:()=>{}});
+    const showModal = HTMLDialogElement.prototype.showModal;
+    const close = HTMLDialogElement.prototype.close;
+    HTMLDialogElement.prototype.showModal = undefined;
+    HTMLDialogElement.prototype.close = undefined;
+    try {
+      renderAccount({admin:true});
+      const trigger = screen.getByRole('button',{name:'Account',exact:true});
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      fireEvent.click(trigger);
+      const sheet = screen.getByRole('dialog',{name:'Account'});
+      expect(sheet).toHaveAttribute('open');
+      expect(within(sheet).getByRole('link',{name:'Admin',exact:true})).toBeVisible();
+      expect(document.documentElement.style.overflow).toBe('hidden');
+      const closeControl = within(sheet).getByRole('button',{name:'Close',exact:true});
+      const lastRole = within(sheet).getByRole('link',{name:'Admin',exact:true});
+      fireEvent.keyDown(closeControl,{key:'Tab',shiftKey:true});
+      expect(lastRole).toHaveFocus();
+      fireEvent.keyDown(lastRole,{key:'Tab'});
+      expect(closeControl).toHaveFocus();
+      screen.getByRole('link',{name:'Schedule'}).focus();
+      expect(closeControl).toHaveFocus();
+      fireEvent.click(within(sheet).getByRole('button',{name:'Close',exact:true}));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      fireEvent.click(trigger);
+      fireEvent.keyDown(screen.getByRole('dialog'),{key:'Escape'});
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(document.documentElement.style.overflow).toBe('');
+      expect(trigger).toHaveFocus();
+    } finally {
+      HTMLDialogElement.prototype.showModal = showModal;
+      HTMLDialogElement.prototype.close = close;
+      if(original) window.matchMedia=original;
+      else delete window.matchMedia;
+    }
+  });
+
   it('opens a modal sheet, locks scrolling, and restores focus on Close', async () => {
     const original = window.matchMedia;
     window.matchMedia = () => ({matches:true,addEventListener:()=>{},removeEventListener:()=>{}});

@@ -1,1 +1,0 @@
-import{j as n,L as t,a0 as m}from"./index-9B1gKRlj.js";function a({account:s}){const i=(s==null?void 0:s.views)??[];return i.length<2||!i.some(e=>e.id==="admin")?null:n.jsx(t,{to:"/admin",className:`${m} mt-sm`,children:"Manage event"})}export{a as A};

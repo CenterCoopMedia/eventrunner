@@ -4,6 +4,11 @@ import { quietActionClass } from './controlClasses.js';
 
 const PHONE_VIEWPORT = '(max-width: 767px)';
 
+function closeSheet(sheet) {
+  if (typeof sheet?.close === 'function') sheet.close();
+  else sheet?.removeAttribute('open');
+}
+
 export default function AccountMenu({ account }) {
   const menu = useRef(null);
   const trigger = useRef(null);
@@ -22,7 +27,7 @@ export default function AccountMenu({ account }) {
   const close = () => {
     setOpen(false);
     if (menu.current) menu.current.open = false;
-    if (dialog.current?.open) dialog.current.close();
+    closeSheet(dialog.current);
     trigger.current?.focus();
   };
 
@@ -30,11 +35,35 @@ export default function AccountMenu({ account }) {
     if (!phone || !open) return undefined;
     const sheet = dialog.current;
     const previousOverflow = document.documentElement.style.overflow;
-    sheet.showModal();
+    // Older WebViews need the focus behavior that showModal normally supplies.
+    const containFocus = (event) => {
+      if (!sheet.contains(event.target)) sheet.querySelector('button')?.focus();
+    };
+    const wrapFocus = (event) => {
+      if (event.key !== 'Tab') return;
+      const controls = sheet.querySelectorAll('button, a[href]');
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    if (typeof sheet.showModal === 'function') sheet.showModal();
+    else {
+      sheet.setAttribute('open', '');
+      document.addEventListener('focusin', containFocus);
+      sheet.addEventListener('keydown', wrapFocus);
+      sheet.querySelector('button')?.focus();
+    }
     document.documentElement.style.overflow = 'hidden';
     return () => {
-      if (sheet.open) sheet.close();
+      document.removeEventListener('focusin', containFocus);
+      sheet.removeEventListener('keydown', wrapFocus);
+      closeSheet(sheet);
       document.documentElement.style.overflow = previousOverflow;
+      trigger.current?.focus();
     };
   }, [phone, open]);
 
@@ -42,13 +71,15 @@ export default function AccountMenu({ account }) {
     return (
       <>
         <button ref={trigger} type="button" className={quietActionClass} onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>Account</button>
-        <dialog ref={dialog} aria-label="Account" className="public-dialog site-account-sheet" onCancel={(event) => { event.preventDefault(); close(); }}>
+        {open && <dialog ref={dialog} aria-label="Account" aria-modal="true" className="public-dialog site-account-sheet" onCancel={(event) => { event.preventDefault(); close(); }} onKeyDown={(event) => {
+          if (event.key === 'Escape') { event.preventDefault(); close(); }
+        }}>
           <div className="sticky top-0 flex items-center justify-between gap-sm bg-surface pb-sm">
             <h2 className="font-heading text-h3">Your account</h2>
             <button type="button" className={quietActionClass} onClick={close}>Close</button>
           </div>
           <RoleSwitcher account={account} onNavigate={close} />
-        </dialog>
+        </dialog>}
       </>
     );
   }
