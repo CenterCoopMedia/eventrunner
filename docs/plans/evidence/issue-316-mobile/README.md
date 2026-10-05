@@ -1,8 +1,13 @@
 # Issue 316 mobile layout evidence
 
-This evidence covers the Issue 316 rendering changes at source commit
-`8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2`. The evidence files are the only
-changes after that source commit.
+This evidence covers the Issue 316 rendering changes through source commit
+`7905c10372c59f6ab779049a7072a1d13cd19288`. The normal 480-cell public matrix
+was captured at `8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2`. The later source delta changes
+only the shared admin shell, its scoped CSS, tests, documentation and generated
+demo. The public stress, illustrated, reduced-motion and all CMS preview cells
+were rerun at `7905c103`. The full admin matrix and every admin destination were
+also run at `7905c103`. The evidence files are the only changes after that
+source commit.
 
 The run used the project's Chromium Playwright project and synthetic Firebase
 emulators. It did not read or write a live event. The matrix uses real browser
@@ -19,6 +24,8 @@ a 640 CSS px viewport at 200% zoom.
 | Illustrated hero | 6 themes x 2 modes at 390px = 12 cells | Pass |
 | Reduced motion | 6 themes x 2 modes at 390px = 12 cells | Pass |
 | Populated admin Branding form | 2 modes x 16 widths = 32 cells | Pass |
+| Shared admin shell | 25 destinations x 2 modes at 412px = 50 cells | Pass |
+| Open admin drawer | 2 modes at 412px = 2 cells | Pass |
 | CMS phone preview | 6 themes x 2 modes at a real 390px iframe viewport = 12 cells | Pass |
 
 Widths were 320, 375, 390, 400, 430, 639, 640, 767, 768, 1023, 1024,
@@ -55,8 +62,16 @@ The machine-readable results are in [summary.json](summary.json),
 - Reduced-motion contexts reported the reduced preference and passed the same
   phone geometry checks in all 12 theme/mode pairs.
 - Populated color, logo and icon controls, expanded advanced settings and
-  action rows stayed inside every admin viewport. The phone rail was at most
-  100.5px high. The title band scrolled below 640px and remained sticky above.
+  action rows stayed inside every admin viewport. The closed phone rail was
+  56px high from 320 through 1023px. The title band scrolled below 640px and
+  remained sticky above.
+- At 412 x 844 in both modes, all 25 admin destinations opened below the same
+  56px top bar with no horizontal overflow. The bar showed the event, current
+  section and Menu on one row.
+- In both modes, Menu opened a fixed sheet from y=56 through the viewport
+  bottom. It retained four separate group labels and 25 full-width rows. Every
+  row rendered at least 44px high. The account address and Sign out stayed
+  inside the sheet.
 - Every CMS phone preview had a 390px browsing context, no overflow, correct
   theme/mode attributes and public text inheritance. The committed browser
   regression also verifies exact public/preview title geometry, type and color,
@@ -70,7 +85,11 @@ The machine-readable results are in [summary.json](summary.json),
 
 ### Open
 
-- Joe's visual review of the captures is open. Merge and deployment remain
+- Joe's visual acceptance of the one-row top bar remains open. Automated
+  geometry passed on every admin destination in light and dark modes.
+- Joe's visual acceptance of the grouped full-width drawer rows remains open.
+  Automated geometry, grouping, target size and account placement passed.
+- Independent review verification is open. Merge and deployment remain
   separate approval steps.
 
 ## Captures
@@ -96,5 +115,7 @@ The two reported public views are
 fixture is [Newsroom Home with an illustrated hero](newsroom-light-390-home-illustrated.png).
 
 CMS preview captures include all six themes in both modes. Admin shell captures
-are [light](admin-light-400x844.png) and [dark](admin-dark-400x844.png) at
-400 x 844px.
+show the [light closed bar](admin-light-412x844-closed.png),
+[light drawer](admin-light-412x844-drawer.png),
+[dark closed bar](admin-dark-412x844-closed.png) and
+[dark drawer](admin-dark-412x844-drawer.png) at 412 x 844px.

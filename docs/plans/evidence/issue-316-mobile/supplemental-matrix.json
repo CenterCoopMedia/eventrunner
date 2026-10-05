@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-05T02:06:42.708Z",
-  "testedCommit": "8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2",
+  "generatedAt": "2026-10-05T02:36:57.907Z",
+  "testedCommit": "7905c10372c59f6ab779049a7072a1d13cd19288",
   "public": [],
   "routes": [],
   "stress": [
@@ -1216,7 +1216,7 @@
       "clientWidth": 320,
       "scrollWidth": 320,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1229,7 +1229,7 @@
       "clientWidth": 375,
       "scrollWidth": 375,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1242,7 +1242,7 @@
       "clientWidth": 390,
       "scrollWidth": 390,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1255,7 +1255,7 @@
       "clientWidth": 400,
       "scrollWidth": 400,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1268,7 +1268,7 @@
       "clientWidth": 430,
       "scrollWidth": 430,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1281,7 +1281,7 @@
       "clientWidth": 575,
       "scrollWidth": 575,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1294,7 +1294,7 @@
       "clientWidth": 576,
       "scrollWidth": 576,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1307,7 +1307,7 @@
       "clientWidth": 639,
       "scrollWidth": 639,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1320,7 +1320,7 @@
       "clientWidth": 640,
       "scrollWidth": 640,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1333,7 +1333,7 @@
       "clientWidth": 767,
       "scrollWidth": 767,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1346,7 +1346,7 @@
       "clientWidth": 768,
       "scrollWidth": 768,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1359,7 +1359,7 @@
       "clientWidth": 1023,
       "scrollWidth": 1023,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1424,7 +1424,7 @@
       "clientWidth": 320,
       "scrollWidth": 320,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1437,7 +1437,7 @@
       "clientWidth": 375,
       "scrollWidth": 375,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1450,7 +1450,7 @@
       "clientWidth": 390,
       "scrollWidth": 390,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1463,7 +1463,7 @@
       "clientWidth": 400,
       "scrollWidth": 400,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1476,7 +1476,7 @@
       "clientWidth": 430,
       "scrollWidth": 430,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1489,7 +1489,7 @@
       "clientWidth": 575,
       "scrollWidth": 575,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1502,7 +1502,7 @@
       "clientWidth": 576,
       "scrollWidth": 576,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1515,7 +1515,7 @@
       "clientWidth": 639,
       "scrollWidth": 639,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "static",
       "actionPadding": 8,
       "controlsInside": true,
@@ -1528,7 +1528,7 @@
       "clientWidth": 640,
       "scrollWidth": 640,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1541,7 +1541,7 @@
       "clientWidth": 767,
       "scrollWidth": 767,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1554,7 +1554,7 @@
       "clientWidth": 768,
       "scrollWidth": 768,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1567,7 +1567,7 @@
       "clientWidth": 1023,
       "scrollWidth": 1023,
       "menuOpen": false,
-      "railHeight": 100.5,
+      "railHeight": 56,
       "titlePosition": "sticky",
       "actionPadding": 16,
       "controlsInside": true,
@@ -1625,6 +1625,892 @@
       "controlsInside": true,
       "controlsColumns": "382px",
       "splitColumns": "416px 728px"
+    }
+  ],
+  "adminPages": [
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Overview",
+      "route": "/admin/overview",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Pages",
+      "route": "/admin/pages",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Sessions",
+      "route": "/admin/sessions",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Organizations",
+      "route": "/admin/organizations",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Content",
+      "route": "/admin/content",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Updates",
+      "route": "/admin/updates",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Timeline",
+      "route": "/admin/timeline",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Media",
+      "route": "/admin/media",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Materials",
+      "route": "/admin/materials",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Version history",
+      "route": "/admin/versions",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Unpublished changes",
+      "route": "/admin/unpublished",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Speakers",
+      "route": "/admin/speakers",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Attendees",
+      "route": "/admin/attendees",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Badges",
+      "route": "/admin/badges",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Announcements",
+      "route": "/admin/announcements",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Live updates",
+      "route": "/admin/live-updates",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Ticketing",
+      "route": "/admin/ticketing",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Feedback",
+      "route": "/admin/feedback",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Email log",
+      "route": "/admin/email-log",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Change requests",
+      "route": "/admin/change-requests",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Event",
+      "route": "/admin/settings",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Features",
+      "route": "/admin/features",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Branding",
+      "route": "/admin/branding",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "Access",
+      "route": "/admin/access",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "light",
+      "width": 412,
+      "label": "System errors",
+      "route": "/admin/system-errors",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Overview",
+      "route": "/admin/overview",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Pages",
+      "route": "/admin/pages",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Sessions",
+      "route": "/admin/sessions",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Organizations",
+      "route": "/admin/organizations",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Content",
+      "route": "/admin/content",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Updates",
+      "route": "/admin/updates",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Timeline",
+      "route": "/admin/timeline",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Media",
+      "route": "/admin/media",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Materials",
+      "route": "/admin/materials",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Version history",
+      "route": "/admin/versions",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Unpublished changes",
+      "route": "/admin/unpublished",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Speakers",
+      "route": "/admin/speakers",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Attendees",
+      "route": "/admin/attendees",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Badges",
+      "route": "/admin/badges",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Announcements",
+      "route": "/admin/announcements",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Live updates",
+      "route": "/admin/live-updates",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Ticketing",
+      "route": "/admin/ticketing",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Feedback",
+      "route": "/admin/feedback",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Email log",
+      "route": "/admin/email-log",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Change requests",
+      "route": "/admin/change-requests",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Event",
+      "route": "/admin/settings",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Features",
+      "route": "/admin/features",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Branding",
+      "route": "/admin/branding",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "Access",
+      "route": "/admin/access",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "label": "System errors",
+      "route": "/admin/system-errors",
+      "clientWidth": 412,
+      "scrollWidth": 412,
+      "railHeight": 56,
+      "mainTop": 56
+    }
+  ],
+  "adminDrawer": [
+    {
+      "mode": "light",
+      "width": 412,
+      "position": "fixed",
+      "top": 56,
+      "bottom": 844,
+      "viewportHeight": 844,
+      "groupLabels": [
+        "Content",
+        "People",
+        "Operations",
+        "System"
+      ],
+      "rows": [
+        {
+          "label": "Overview",
+          "href": "/admin/overview",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Pages",
+          "href": "/admin/pages",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Sessions",
+          "href": "/admin/sessions",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Organizations",
+          "href": "/admin/organizations",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Content",
+          "href": "/admin/content",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Updates",
+          "href": "/admin/updates",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Timeline",
+          "href": "/admin/timeline",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Media",
+          "href": "/admin/media",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Materials",
+          "href": "/admin/materials",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Version history",
+          "href": "/admin/versions",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Unpublished changes",
+          "href": "/admin/unpublished",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Speakers",
+          "href": "/admin/speakers",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Attendees",
+          "href": "/admin/attendees",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Badges",
+          "href": "/admin/badges",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Announcements",
+          "href": "/admin/announcements",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Live updates",
+          "href": "/admin/live-updates",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Ticketing",
+          "href": "/admin/ticketing",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Feedback",
+          "href": "/admin/feedback",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Email log",
+          "href": "/admin/email-log",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Change requests",
+          "href": "/admin/change-requests",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Event",
+          "href": "/admin/settings",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Features",
+          "href": "/admin/features",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Branding",
+          "href": "/admin/branding",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Access",
+          "href": "/admin/access",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "System errors",
+          "href": "/admin/system-errors",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        }
+      ]
+    },
+    {
+      "mode": "dark",
+      "width": 412,
+      "position": "fixed",
+      "top": 56,
+      "bottom": 844,
+      "viewportHeight": 844,
+      "groupLabels": [
+        "Content",
+        "People",
+        "Operations",
+        "System"
+      ],
+      "rows": [
+        {
+          "label": "Overview",
+          "href": "/admin/overview",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Pages",
+          "href": "/admin/pages",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Sessions",
+          "href": "/admin/sessions",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Organizations",
+          "href": "/admin/organizations",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Content",
+          "href": "/admin/content",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Updates",
+          "href": "/admin/updates",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Timeline",
+          "href": "/admin/timeline",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Media",
+          "href": "/admin/media",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Materials",
+          "href": "/admin/materials",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Version history",
+          "href": "/admin/versions",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Unpublished changes",
+          "href": "/admin/unpublished",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Speakers",
+          "href": "/admin/speakers",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Attendees",
+          "href": "/admin/attendees",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Badges",
+          "href": "/admin/badges",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Announcements",
+          "href": "/admin/announcements",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Live updates",
+          "href": "/admin/live-updates",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Ticketing",
+          "href": "/admin/ticketing",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Feedback",
+          "href": "/admin/feedback",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Email log",
+          "href": "/admin/email-log",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Change requests",
+          "href": "/admin/change-requests",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Event",
+          "href": "/admin/settings",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Features",
+          "href": "/admin/features",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Branding",
+          "href": "/admin/branding",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "Access",
+          "href": "/admin/access",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        },
+        {
+          "label": "System errors",
+          "href": "/admin/system-errors",
+          "height": 44,
+          "width": 380,
+          "parentWidth": 380
+        }
+      ]
     }
   ],
   "preview": [
