@@ -1437,7 +1437,11 @@ past-event mock-up in the existing primary `newsroom` style. The exception is
 limited to the public March 27, 2026 summit material documented in
 [NC Local historical demo](../nclocal-demo.md): Eight selected sessions, 25 public
 speaker names and affiliations, four organizations with their documented roles,
-the official NC Local logo and a credited documentary photograph. The fixture,
+the official NC Local logo and a credited documentary photograph. Joe also
+authorized a derived dark-mode logo treatment: A white wordmark with the
+original colored globe and interior arcs preserved. This treatment must retain
+the official artwork's exact geometry, transparency and aspect ratio, identify
+itself as derived, and leave the light-mode artwork unchanged. The fixture,
 generated snapshot, tests and reviewable demo build can include this material.
 `scripts/seed-demo-event.cjs` uses that curated fixture; normal client
 initialization still uses synthetic placeholders.

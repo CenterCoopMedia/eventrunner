@@ -23,8 +23,11 @@ an existing stored palette can use the existing `None` selection. The other five
 preset definitions are unchanged.
 
 The approved historical-data exception in ADR 0001 §5.4 covers the public names,
-affiliations, session details, documented partner roles, official logo and credited
-documentary photo listed below. It supplies no private attendee or contact data
+affiliations, session details, documented partner roles, official logo, the later
+authorized derived dark-mode wordmark treatment and credited documentary photo
+listed below. The derived treatment preserves the colored globe, interior arcs,
+geometry, transparency and aspect ratio; the light-mode artwork is unchanged.
+It supplies no private attendee or contact data
 and claims no consent, endorsement or official NC Local ownership of this demo.
 
 The fixture in `scripts/lib/demo-event.cjs` owns the event, pages, content,
