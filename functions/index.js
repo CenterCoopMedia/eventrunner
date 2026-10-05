@@ -30,6 +30,7 @@ const schedulePdf = require('./src/schedule/pdf.cjs');
 const scheduleShare = require('./src/schedule/share.cjs');
 const publicOg = require('./src/public/og.cjs');
 const scheduleReactions = require('./src/schedule/reactions.cjs');
+const sessionPitches = require('./src/sessions/pitches.cjs');
 const usersLifecycle = require('./src/users/lifecycle.cjs');
 const usersProjection = require('./src/users/projection.cjs');
 const usersApproval = require('./src/users/approval.cjs');
@@ -84,6 +85,7 @@ module.exports = {
   ...scheduleShare.handlers,
   ...publicOg.handlers,
   ...scheduleReactions.handlers,
+  ...sessionPitches.handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...usersApproval.handlers,

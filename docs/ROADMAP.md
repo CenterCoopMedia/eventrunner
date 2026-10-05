@@ -2,6 +2,8 @@
 
 v1 is five phases. The architecture spec and triage record are the contract. Issues in this repo are the queue.
 
+First-customer readiness work is tracked in [epic #337](https://github.com/CenterCoopMedia/eventrunner/issues/337) and the [Run of Show v1 project](https://github.com/orgs/CenterCoopMedia/projects/2). The epic links each product issue and its acceptance criteria.
+
 ## M1: Prerequisites and repo bootstrap — effectively complete
 
 Legal and operator setup that gated the public repo. Two residual operator tasks are closing today.
