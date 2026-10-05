@@ -2,7 +2,8 @@ import { parseCsv } from '../lib/csv.js';
 
 export const PITCH_COLUMNS = ['externalId', 'email', 'title', 'description', 'organization', 'format', 'consent'];
 export function readPitchCsv(text) {
-  const [headers, ...table] = parseCsv(text);
+  const [rawHeaders, ...table] = parseCsv(text);
+  const headers = rawHeaders?.map((header) => header.trim());
   if (!headers || headers.length !== PITCH_COLUMNS.length || !PITCH_COLUMNS.every((name) => headers.includes(name))) throw new Error(`Use these exact headers: ${PITCH_COLUMNS.join(', ')}.`);
   const rows = table.filter((cells) => cells.some((cell) => cell.trim()));
   if (!rows.length || rows.length > 50) throw new Error('Import 1-50 proposals at a time.');

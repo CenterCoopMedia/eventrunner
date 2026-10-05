@@ -289,6 +289,36 @@ describe('pitch submission', () => {
     expect((await db.collection('session_pitch_rate_limits').doc(RATE_LIMIT_ID).get()).data().requests).toEqual([T0]);
   });
 
+  it('accepts maximum-length Unicode and escaped fields within the bounded payload', async () => {
+    for (const [index, text] of ['界', '\u0000'].entries()) {
+      const fill = (max) => 'x' + text.repeat(max - 2) + 'x';
+      const body = pitch({ title: fill(160), description: fill(5000), organization: fill(200), format: fill(120), submissionKey: `unicode-pitch-${index}` });
+      expect((await submit(body)).statusCode).toBe(201);
+    }
+    expect((await db.collection('session_pitches').get()).size).toBe(2);
+    expect((await submit(pitch({ padding: 'x'.repeat(40 * 1024) }))).statusCode).toBe(413);
+  });
+
+  it('records newly supplied consent on a legacy replay without changing review or rate-limit state', async () => {
+    const { submissionKey: _key, consent: _consent, ...content } = pitch();
+    await db.collection('session_pitches').doc(PITCH_ID).set({ ...content, uid: 'submitter-1', email: SUBMITTER_EMAIL, status: 'accepted', reviewRevision: 3, createdAt: new Date(T0), privateNotes: 'Keep the review.' });
+    expect((await submit(pitch({ consent: false }))).statusCode).toBe(400);
+    expect((await submit(pitch({ title: 'Different' }))).statusCode).toBe(409);
+    expect((await db.collection('session_pitches').doc(PITCH_ID).get()).data().consent).toBeUndefined();
+    await db.collection('config').doc('pitch_call').set({ enabled: false, closesAt: CLOSES_AT });
+    expect((await submit(pitch(), 'submitter', () => T0 + 1000)).statusCode).toBe(201);
+    const saved = (await db.collection('session_pitches').doc(PITCH_ID).get()).data();
+    expect(saved.consent.version).toBe('session-pitch-review-v1');
+    expect(saved.consent.at.toMillis()).toBe(T0 + 1000);
+    expect(saved.createdAt.toMillis()).toBe(T0);
+    expect(saved.status).toBe('accepted');
+    expect(saved.reviewRevision).toBe(3);
+    expect(saved.privateNotes).toBe('Keep the review.');
+    expect((await db.collection('session_pitch_rate_limits').get()).empty).toBe(true);
+    expect((await submit(pitch(), 'submitter', () => T0 + 2000)).statusCode).toBe(201);
+    expect((await db.collection('session_pitches').doc(PITCH_ID).get()).data().consent.at.toMillis()).toBe(T0 + 1000);
+  });
+
   it('concurrent retries create one pitch and spend one rate-limit slot', async () => {
     const responses = await Promise.all([submit(), submit()]);
     expect(responses.map((response) => response.statusCode)).toEqual([201, 201]);

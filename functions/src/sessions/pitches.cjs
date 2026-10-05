@@ -37,6 +37,9 @@ const MAX_ORGANIZATION_LENGTH = 200;
 const MAX_FORMAT_LENGTH = 120;
 const MAX_PRIVATE_NOTES_LENGTH = 5000;
 const MAX_BODY_BYTES = 16 * 1024;
+// JSON can escape one UTF-16 code unit as six bytes. Cover every valid
+// field at its character limit, plus the key and object framing.
+const MAX_SUBMISSION_BODY_BYTES = 40 * 1024;
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const CLOSED_MESSAGE = 'Session pitch submissions are closed.';
@@ -45,7 +48,7 @@ function bodyBytes(body) {
   try {
     return Buffer.byteLength(JSON.stringify(body ?? {}), 'utf8');
   } catch {
-    return MAX_BODY_BYTES + 1;
+    return Number.POSITIVE_INFINITY;
   }
 }
 
@@ -174,9 +177,14 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
     ]);
 
     if (pitchSnap.exists) {
-      return samePitch(pitchSnap.data() || {}, actor, pitch)
-        ? { outcome: 'replayed' }
-        : { outcome: 'changed' };
+      const stored = pitchSnap.data() || {};
+      if (!samePitch(stored, actor, pitch)) return { outcome: 'changed' };
+      // A pre-consent submission may replay only after this caller agrees.
+      // Preserve the proposal, review revision, and original submission time.
+      if (!stored.consent && pitch.consent === true) {
+        tx.update(pitchRef, { consent: { version: 'session-pitch-review-v1', at: new Date(now()) } });
+      }
+      return { outcome: 'replayed' };
     }
 
     const nowMs = now();
@@ -220,7 +228,7 @@ function createSubmitSessionPitchHandler({ db, auth, now = Date.now, log = conso
     if (!email || decoded.email_verified !== true) {
       return sendError(res, 403, 'forbidden', 'Use a verified email address to submit a session pitch.');
     }
-    if (bodyBytes(req.body) > MAX_BODY_BYTES) {
+    if (bodyBytes(req.body) > MAX_SUBMISSION_BODY_BYTES) {
       return sendError(res, 413, 'payload-too-large', 'The session pitch is too large.');
     }
 
@@ -414,6 +422,7 @@ module.exports = {
     MAX_FORMAT_LENGTH,
     MAX_PRIVATE_NOTES_LENGTH,
     MAX_BODY_BYTES,
+    MAX_SUBMISSION_BODY_BYTES,
     RATE_LIMIT_MAX,
     RATE_LIMIT_WINDOW_MS,
     CLOSED_MESSAGE,

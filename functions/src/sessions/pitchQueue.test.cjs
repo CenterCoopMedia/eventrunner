@@ -64,7 +64,7 @@ test('both private queue actions admit staff and operators and refuse other iden
 });
 
 test('conversion checks the accepted revision and replays its frozen result without new writes', async () => {
-  const db = queueDb();
+  const db = queueDb({ ...row, format: 'Workshop', status: 'accepted', reviewRevision: 1 });
   assert.equal((await invoke(db, 'convert', 'staff', { ...conversion, id: 'missing' })).statusCode, 404);
   assert.equal((await invoke(db, 'convert', 'staff', { ...conversion, expectedRevision: 0 })).statusCode, 409);
   await db.collection('session_pitches').doc('proposal').update({ status: 'new' });
@@ -73,6 +73,9 @@ test('conversion checks the accepted revision and replays its frozen result with
   const result = await invoke(db, 'convert', 'staff', conversion);
   assert.equal(result.statusCode, 200);
   assert.equal(result.body.revision, 2);
+  const draft = db.read('cmsSchedule_drafts', 'pitch-proposal');
+  assert.equal(draft.type, 'Workshop');
+  assert.equal(Object.hasOwn(draft, 'format'), false);
   await db.collection('session_pitches').doc('proposal').update({ reviewRevision: 3 });
   const writes = db.writes.length;
   assert.deepEqual((await invoke(db, 'convert', 'staff', conversion)).body, { ...result.body, replayed: true });

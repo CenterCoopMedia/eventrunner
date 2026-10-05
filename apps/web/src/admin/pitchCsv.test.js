@@ -8,6 +8,9 @@ describe('reviewed pitch CSV contract', () => {
       { externalId: 'external-17', email: 'one@example.test', title: 'Local, together', description: 'First line\nSecond line', organization: 'Example', format: 'Panel', consent: true },
     ]);
   });
+  it('accepts a UTF-8 BOM and surrounding header whitespace', () => {
+    expect(readPitchCsv('\uFEFF externalId , email , title , description , organization , format , consent \n' + 'id,one@example.test,Title,Description,,Panel,true')[0].externalId).toBe('id');
+  });
   it('rejects missing consent, duplicate IDs, and ambiguous headers before import', () => {
     expect(() => readPitchCsv(headers + 'id,one@example.test,Title,Description,,,false')).toThrow(/Consent/);
     expect(() => readPitchCsv(headers + 'id,one@example.test,Title,Description,,,true\nid,two@example.test,Other,Description,,,true')).toThrow(/unique source ID/);

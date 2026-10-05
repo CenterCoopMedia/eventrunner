@@ -41,9 +41,9 @@ The server stores the closing time as a canonical UTC RFC3339 value. It writes t
 }
 ```
 
-`consent: true` records agreement to organizer storage, review, and contact. The stored consent includes its version and submission time. `title` and `description` are required, with limits of 160 and 5,000 characters. `organization` and `format` are optional, with limits of 200 and 120 characters. `submissionKey` must contain 8 to 128 letters, numbers, underscores, or hyphens. The server stores the uid and normalized email from the verified token. It checks token revocation, so a disabled or deleted Firebase account cannot submit with an unexpired token. It ignores identity and review fields in the request body.
+`consent: true` records agreement to organizer storage, review, and contact. The stored consent includes its version and submission time. `title` and `description` are required, with limits of 160 and 5,000 characters. `organization` and `format` are optional, with limits of 200 and 120 characters. `submissionKey` must contain 8 to 128 letters, numbers, underscores, or hyphens. The submission payload limit is 40 KB, which covers all valid fields at their character limits, including Unicode and JSON escapes. The server stores the uid and normalized email from the verified token. It checks token revocation, so a disabled or deleted Firebase account cannot submit with an unexpired token. It ignores identity and review fields in the request body.
 
-Keep the same `submissionKey` while retrying one unchanged form. The server derives the stored record id from the verified uid and the key. An unchanged retry returns the original id and does not spend another rate-limit slot. Changed content with the same account and key returns `409 conflict`. A different account has its own key namespace.
+Keep the same `submissionKey` while retrying one unchanged form. The server derives the stored record id from the verified uid and the key. An unchanged retry returns the original id and does not spend another rate-limit slot. A retry of a legacy proposal without consent stores the newly supplied consent and its time before returning success; it keeps the original proposal time and review revision. Changed content with the same account and key returns `409 conflict`. A different account has its own key namespace.
 
 The limit is five new pitches per account in 15 minutes. The pitch and its rate-limit slot commit in one transaction. A completed retry is still acknowledged after the call closes. A new pitch is refused.
 
@@ -77,6 +77,8 @@ Deleting an attendee account does not delete its submitted pitches. A pitch rema
 
 ## Visitor form and review queue
 
+Before deploying this version, check existing CMS pages at `/pitch` and below it. Content generation and the site artifact build block deployment if any such page exists, including a hidden page. Rename and publish those pages through the CMS first. This check does not move or delete content.
+
 The public `/pitch` route uses the event branding and theme. Visitors can write before signing in. Google or an emailed code verifies their email without a ticket. The form retains entries and the retry key in browser tab storage through sign-in, reloads, and request failures. It clears the stored draft after a confirmed submission. Browser storage failure leaves entries available while the page stays open.
 
 The form requires a title, description, and organizer-review consent. Organization and format are optional. It displays the deadline in the visitor's timezone. A missing, malformed, expired, or unreadable call keeps submission unavailable. Configure the deployment's consent and retention policy before opening intake; this acknowledgement does not grant permission to publish a proposal.
@@ -102,7 +104,7 @@ Each file contains 1–50 proposals and is smaller than 512 KB. Keep original ex
 
 Save an **Accepted** decision first. Expand **Create session and speaker drafts**. Confirm the proposed speaker's first and last names, configured event day, and start/end time. Verify consent and identity, then check the review acknowledgement and choose **Create reviewed drafts**. This is separate from acceptance. The server checks the accepted decision and review revision in a transaction.
 
-`convertSessionPitch` accepts `{ id, expectedRevision, firstName, lastName, dayId, startTime, endTime }`. It atomically creates one hidden `cmsSchedule_drafts` row, one canonical `speakers` row with `status: draft`, the speaker slug reservation, and a conversion/audit record. No invite, account role, live session, or public speaker projection is created. Retry returns the existing conversion and cannot overwrite or duplicate drafts.
+`convertSessionPitch` accepts `{ id, expectedRevision, firstName, lastName, dayId, startTime, endTime }`. It atomically creates one hidden `cmsSchedule_drafts` row, one canonical `speakers` row with `status: draft`, the speaker slug reservation, and a conversion/audit record. The proposed format becomes the session draft’s `type`, which the session editor, cards, and format filters use. No invite, account role, live session, or public speaker projection is created. Retry returns the existing conversion and cannot overwrite or duplicate drafts.
 
 Use **Review session draft** and **Review speaker draft** to complete the ordinary editors. Session visibility and speaker approval remain explicit actions in those editors. Private notes and reviewer identities never enter either draft.
 

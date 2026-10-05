@@ -228,3 +228,13 @@ test('--demo --check flags an unexpected extra file, not just content difference
   assert.match(output, /unexpected file/);
   assert.match(output, /leaked-client-data\.js/);
 });
+
+
+test('deployment generation refuses visible and hidden legacy pitch pages without emitting content', async () => {
+  for (const path of ['/pitch', '/pitch/guidelines']) {
+    for (const visible of [true, false]) {
+      const db = readFake({ config: CONFIG, collections: { cmsPages: [{ __id: 'legacy', path, visible }] } });
+      await assert.rejects(readDeployment({ db }), /Session pitch route collision: Rename the CMS page paths/);
+    }
+  }
+});

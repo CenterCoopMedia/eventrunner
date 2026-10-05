@@ -259,7 +259,13 @@ async function main(argv, { importModule = importGenerated, log = console, fetch
     return 3;
   }
 
-  const artifacts = buildSiteArtifacts({ ...snapshot, publicUrl: parsed['public-url'] });
+  let artifacts;
+  try {
+    artifacts = buildSiteArtifacts({ ...snapshot, publicUrl: parsed['public-url'] });
+  } catch (err) {
+    log.error(`write-site-files: ${err.message}`);
+    return 4;
+  }
 
   const listed = excludedRoutesFound(artifacts.sitemapXml);
   if (listed.length > 0) {

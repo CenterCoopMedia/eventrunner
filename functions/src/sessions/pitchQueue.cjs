@@ -75,7 +75,7 @@ async function convertPitch({ db, actor, body, now, at }) {
     const event = await tx.get(db.collection('config').doc('event'));
     if (!(event.data()?.days || []).some((day) => day.id === dayId)) fail(400, 'bad-request', 'dayId: Choose a configured event day.');
     const fields = { title: pitch.title, description: `<p>${escapeHtml(pitch.description).replace(/\n/g, '<br>')}</p>`,
-      dayId, startTime, endTime, speakerIds: [speakerId], format: pitch.format || '' };
+      dayId, startTime, endTime, speakerIds: [speakerId], type: pitch.format || '' };
     const shape = validateSessionShape(fields, sessionId);
     if (!shape.ok) fail(400, 'bad-request', shape.errors.join('; '));
     const structure = await validateSessionStructure({ db, tx, docId: sessionId, fields });

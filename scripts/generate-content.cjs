@@ -38,6 +38,7 @@ const path = require('node:path');
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { emitAll } = require('./lib/emit.cjs');
 const { demoSnapshot } = require('./lib/demo-event.cjs');
+const { assertNoPitchPageCollisions } = require('./lib/pitch-route-check.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const COMMITTED_DIR = path.join(ROOT, 'apps', 'web', 'src', 'generated');
@@ -119,14 +120,17 @@ async function readDeployment({ db }) {
   // returns an empty snapshot, so the only thing a catch here could
   // swallow is a transient read failure — which would silently ship a
   // build with no speakers rather than failing the generation.
-  const [pages, content, sessions, organizations, timeline, speakerProjections] = await Promise.all([
-    readVisibleCollection('cmsPages'),
+  const [allPages, content, sessions, organizations, timeline, speakerProjections] = await Promise.all([
+    readCollection('cmsPages'),
     readVisibleCollection('cmsContent'),
     readVisibleCollection('cmsSchedule'),
     readVisibleCollection('cmsOrganizations'),
     readVisibleCollection('cmsTimeline'),
     readCollection('speakers_public'),
   ]);
+  assertNoPitchPageCollisions(allPages);
+  // Hidden page bodies are inspected for collisions, never emitted.
+  const pages = allPages.filter((page) => page.visible === true);
   // `speakerId` on the projection is the document id under another name;
   // the emitted snapshot addresses speakers by `id` like every other
   // collection, so carrying both would be two spellings of one value.
