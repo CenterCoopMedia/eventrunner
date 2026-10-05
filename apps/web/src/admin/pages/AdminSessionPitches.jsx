@@ -6,6 +6,7 @@ import { subscribePitchCall } from '../../lib/pitchSource.js';
 import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { saveTextFile } from '../downloadFile.js';
+import { toMillis } from '../versionHistory.js';
 import { PITCH_COLUMNS, readPitchCsv, pitchQueueCsv } from '../pitchCsv.js';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { Panel, Notice, SaveStatus, TextField, TextAreaField, SelectField, CheckboxField,
@@ -181,7 +182,7 @@ export default function AdminSessionPitches() {
   const detailRef = useRef(null);
   useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs); setListError(null); }, setListError), []);
   useEffect(() => subscribePitchCall((value) => { setSettings(value); setConfigError(false); }, () => setConfigError(true)), []);
-  const shown = (rows || []).filter((row) => (filter === 'all' || row.status === filter) && `${row.title} ${row.email} ${row.organization || ''}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => a.id.localeCompare(b.id));
+  const shown = (rows || []).filter((row) => (filter === 'all' || row.status === filter) && `${row.title} ${row.email} ${row.organization || ''}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => (toMillis(b.createdAt) ?? -Infinity) - (toMillis(a.createdAt) ?? -Infinity) || a.id.localeCompare(b.id));
   const current = rows?.find((row) => row.id === selected?.id);
   useEffect(() => { if (selected) detailRef.current?.focus(); }, [selected]);
   return <div className="flex flex-col gap-md [overflow-wrap:anywhere]">

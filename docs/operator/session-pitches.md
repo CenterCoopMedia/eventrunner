@@ -107,3 +107,5 @@ Save an **Accepted** decision first. Expand **Create session and speaker drafts*
 Use **Review session draft** and **Review speaker draft** to complete the ordinary editors. Session visibility and speaker approval remain explicit actions in those editors. Private notes and reviewer identities never enter either draft.
 
 The conversion response includes its committed review revision. A retry returns the same conversion revision even if a later reviewer changed the pitch; the queue still shows a conflict for that later change.
+
+The review queue lists newest proposals first. Records without a creation time follow dated proposals. Equal creation times use the proposal ID as a stable tie-breaker; the CSV export keeps the displayed order.
