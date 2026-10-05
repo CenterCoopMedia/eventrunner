@@ -7,8 +7,9 @@
 // those paths and values into the words the page shows. Every value is
 // text: nothing here builds markup, and a stored URL stays a string.
 //
-// It is imported by the two lazy version pages only, so none of it rides in
-// the admin entry chunk (scripts/ci/bundle-budget.json).
+// The lazy version pages use this module; the pitch queue shares its
+// timestamp reader. It stays out of the admin entry chunk
+// (scripts/ci/bundle-budget.json).
 import { zoneLabel } from '../lib/eventTime.js';
 import { DELETE_FIELD_SENTINEL } from './contentDoc.js';
 import { COLLECTION_CHOICES } from './collectionWords.js';

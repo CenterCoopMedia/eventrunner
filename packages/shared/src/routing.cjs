@@ -65,7 +65,7 @@
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
   'schedule', 'speakers', 'speaker', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
-  'ticket', 'specimen', 'dashboard',
+  'ticket', 'specimen', 'dashboard', 'pitch',
 ]);
 
 /**

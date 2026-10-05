@@ -52,6 +52,7 @@ function lazyPage(importer) {
 const Login = lazyPage(() => import('./pages/Login.jsx'));
 const Schedule = lazyPage(() => import('./pages/Schedule.jsx'));
 const SessionDetail = lazyPage(() => import('./pages/SessionDetail.jsx'));
+const SessionPitch = lazyPage(() => import('./pages/SessionPitch.jsx'));
 const MySchedule = lazyPage(() => import('./pages/MySchedule.jsx'));
 const SharedSchedule = lazyPage(() => import('./pages/SharedSchedule.jsx'));
 const Speakers = lazyPage(() => import('./pages/Speakers.jsx'));
@@ -115,6 +116,7 @@ export function AppRoutes() {
         <Route path="sponsors/:slug" element={<DeferredPage component={SponsorDetail} label="sponsor" />} />
         <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
         <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
+        <Route path="pitch" element={<DeferredPage component={SessionPitch} label="session pitch" />} />
         <Route path="signin" element={<DeferredPage component={Login} label="sign in" />} />
         {/* Speaker invite acceptance (issue #21). Singular `speaker`, and
             reserved in shared/routing alongside the plural directory route:

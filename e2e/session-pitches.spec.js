@@ -48,6 +48,7 @@ test('a signed-in account submits a private pitch and staff reviews it without a
       organization: 'Example newsroom',
       format: 'Panel',
       submissionKey,
+      consent: true,
       uid: 'forged-uid',
       email: 'forged@example.test',
     };

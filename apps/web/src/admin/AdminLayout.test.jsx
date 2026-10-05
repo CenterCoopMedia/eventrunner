@@ -238,7 +238,7 @@ describe('the admin shell', () => {
     // issue #195, Unpublished changes, issue #196, and Announcements,
     // issue #199), every one a word. No
     // icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(25);
+    expect(nav.querySelectorAll('a')).toHaveLength(26);
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
       'href',
@@ -307,7 +307,7 @@ describe('the admin shell', () => {
     expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
       'overview',
-      'pages', 'sessions', 'organizations', 'content', 'updates', 'timeline', 'media', 'materials',
+      'pages', 'sessions', 'pitches', 'organizations', 'content', 'updates', 'timeline', 'media', 'materials',
       'versions', 'unpublished',
       'speakers', 'attendees', 'badges',
       'announcements', 'live-updates', 'ticketing', 'feedback', 'email-log', 'change-requests',
