@@ -10,12 +10,17 @@ theme config and neutral branding stay at the base revision. This fixture
 overlay makes the visual comparison use the same sessions, people and prose.
 The source diff records the replacement of the previous fictional content.
 
-After: Source `4b73e3dd60d7b7336f30cf9a38f05141b7382709`, with the committed
+After: Source `cb576832868e6f2e0fd1b467e6f51bbc744c6c50`, with the committed
 historical content and NC Local theme. The after images use the fresh Node 22
 lockfile build from Legion, served by a loopback-only local preview. The before
 uses the isolated base development server. Both use `VITE_DEMO_MODE=1`.
 The browser retained Chromium's sandbox. Navigation used route URLs and
 semantic locators; screenshots did not supply click coordinates.
+
+This refresh uses the official Google Fonts Cabin normal Latin 400–700 slice:
+28,320 bytes, below the project's existing 60 KB font limit. Its asset source
+and digest are recorded in `field-evidence.json`. The full web suite at this
+source passed 3,025 tests across 260 files; this is separate from full CI.
 
 `render-evidence.json` records headings, fonts, viewport widths, transaction
 link checks and checks of the other five style selectors. Their source preset
@@ -42,6 +47,9 @@ the supplied historical values.
 ## Field states
 
 Program captures with `-filled` show actual typed `AI` search text in each mode.
+The `-placeholder` Program captures show the empty search control and its
+actual `Title, room, speaker…` placeholder. Its paired contrast is 5.66:1
+in light mode and 10.90:1 in dark mode, recorded from the rendered colors.
 The existing demo Specimen book supplies text input, select and textarea
 examples at rest, focused, in error and disabled. The `after-fields-*-filled-visible`
 captures contain the typed name and notes recorded in `field-evidence.json`.
@@ -55,6 +63,10 @@ earlier element crops were blank, were invalidated and removed, and do not count
 as visual evidence. The replacements were opened and inspected. This local probe does
 not submit or save data and does not add a form to the mock-up. Alpha backgrounds
 are composited over the recorded field surface for the contrast calculation.
+Disabled controls retain their opacity in the readback; their raw color ratio
+is not a claim about the composited disabled presentation. The focused Specimen
+variants illustrate focus styling; the typed Program search and active textarea
+also record native focus.
 These are NC Local demo checks; they do not close #316 acceptance.
 
 ## Derived dark logo
