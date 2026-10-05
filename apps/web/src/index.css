@@ -14,10 +14,12 @@
   padding: 4px;
 }
 
-:root[data-mode='dark'] .demo-brand-artwork,
-:root[data-mode='dark'] .historical-demo-logo {
-  background: transparent;
-  content: url('/branding/nclocal-logo-dark.svg');
+@media screen {
+  :root[data-mode='dark'] .demo-brand-artwork,
+  :root[data-mode='dark'] .historical-demo-logo {
+    background: transparent;
+    content: url('/branding/nclocal-logo-dark.svg');
+  }
 }
 
 /* NC Local uses its data face for field values as well as their labels. */
