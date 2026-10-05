@@ -1,10 +1,10 @@
 /*
- * GENERATED FILE — committed synthetic demo copy (spec §2.4, §7.2, §8.6).
+ * GENERATED FILE — committed public demo copy (spec §2.4, §7.2, §8.6).
  *
  * Regenerate with:  node scripts/generate-content.cjs --demo
  *
  * At deploy time the same script reads config/theme and writes out-of-tree
- * (GENERATED_DIR); this committed copy is the synthetic demo event that keeps
+ * (GENERATED_DIR); this committed copy is the approved public demo fixture that keeps
  * CI builds credential-free. It is the ONLY file in apps/web allowed to carry
  * raw color values (spec §7.6 allowlist), and values are space-separated RGB
  * triples so Tailwind rgb(var(--…-rgb) / <alpha-value>) utilities keep opacity
@@ -122,9 +122,9 @@
   --focus-ring-offset: var(--er-width-focus-offset);
 
   /* Tier 2 — font roles (brief §3.2). The active preset's type map, then its picked heading-face option, then any role config/theme.fonts names outright — all resolved to a bundled set id (spec §7.4). Preset: newsroom. */
-  --font-heading: 'Fraunces', 'Source Serif 4', Georgia, serif;
-  --font-body: 'Newsreader', 'Source Serif 4', Georgia, serif;
-  --font-data: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Merriweather', Georgia, 'Times New Roman', serif;
+  --font-body: 'Merriweather', Georgia, 'Times New Roman', serif;
+  --font-data: 'Cabin', Arial, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Tier 2 — radius scale: 'small'. ('sharp' → 0 / 2px, 'small' → 2px / 4px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
@@ -426,12 +426,13 @@
   --notice-bar-urgent-rule-width: var(--rule-nameplate-width);
   --table-head-transform: uppercase;
   --table-head-tracking: 0.04em;
-  --hero-art-width: 56%;
-  --hero-copy-pad-inline-start: var(--space-md);
-  --hero-copy-border-inline-start: .35rem solid rgb(var(--color-accent-rgb));
+  --hero-art-width: 50%;
+  --hero-copy-pad-inline-start: 0;
+  --hero-copy-border-inline-start: 0;
   --hero-veil-background: linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%);
   --standfirst-font: var(--font-heading);
   --standfirst-weight: var(--weight-regular);
+  --radius-base: 4px;
   --nameplate-align: start;
   --nameplate-rule-width: var(--rule-strong-width);
   --nameplate-meta-placement: inline;
@@ -474,19 +475,19 @@
 
 /* Light palette, attribute-free baseline — what first paint renders before the runtime writes data-mode. */
 :root {
-  --brand-primary-rgb: 178 30 50;
-  --brand-primary-dark-rgb: 140 20 38;
-  --brand-primary-light-rgb: 224 148 158;
-  --brand-accent-rgb: 46 84 126;
-  --brand-surface-rgb: 246 247 249;
-  --brand-surface-alt-rgb: 236 238 242;
-  --brand-ink-rgb: 22 24 29;
-  --brand-ink-muted-rgb: 88 95 108;
+  --brand-primary-rgb: 9 58 70;
+  --brand-primary-dark-rgb: 0 28 40;
+  --brand-primary-light-rgb: 193 196 220;
+  --brand-accent-rgb: 9 58 70;
+  --brand-surface-rgb: 255 255 255;
+  --brand-surface-alt-rgb: 244 240 235;
+  --brand-ink-rgb: 17 17 17;
+  --brand-ink-muted-rgb: 103 103 103;
   --semantic-success-rgb: 22 96 62;
   --semantic-warning-rgb: 134 82 10;
   --semantic-danger-rgb: 170 32 44;
   --semantic-highlight-rgb: 124 90 14;
-  --semantic-keynote-rgb: 82 54 140;
+  --semantic-keynote-rgb: 9 58 70;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -496,10 +497,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 215 216 218;
-  --rule-strong-rgb: 123 124 128;
-  --rule-nameplate-rgb: 22 24 29;
-  --color-border-control-rgb: 130 131 135;
+  --rule-hairline-rgb: 222 222 222;
+  --rule-strong-rgb: 124 124 124;
+  --rule-nameplate-rgb: 17 17 17;
+  --color-border-control-rgb: 131 131 131;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -539,19 +540,19 @@
 /* Light palette (brief §3.3). Every color token is defined in both mode blocks. */
 :root[data-mode='light'],
 [data-mode='light'] {
-  --brand-primary-rgb: 178 30 50;
-  --brand-primary-dark-rgb: 140 20 38;
-  --brand-primary-light-rgb: 224 148 158;
-  --brand-accent-rgb: 46 84 126;
-  --brand-surface-rgb: 246 247 249;
-  --brand-surface-alt-rgb: 236 238 242;
-  --brand-ink-rgb: 22 24 29;
-  --brand-ink-muted-rgb: 88 95 108;
+  --brand-primary-rgb: 9 58 70;
+  --brand-primary-dark-rgb: 0 28 40;
+  --brand-primary-light-rgb: 193 196 220;
+  --brand-accent-rgb: 9 58 70;
+  --brand-surface-rgb: 255 255 255;
+  --brand-surface-alt-rgb: 244 240 235;
+  --brand-ink-rgb: 17 17 17;
+  --brand-ink-muted-rgb: 103 103 103;
   --semantic-success-rgb: 22 96 62;
   --semantic-warning-rgb: 134 82 10;
   --semantic-danger-rgb: 170 32 44;
   --semantic-highlight-rgb: 124 90 14;
-  --semantic-keynote-rgb: 82 54 140;
+  --semantic-keynote-rgb: 9 58 70;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -561,10 +562,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 215 216 218;
-  --rule-strong-rgb: 123 124 128;
-  --rule-nameplate-rgb: 22 24 29;
-  --color-border-control-rgb: 130 131 135;
+  --rule-hairline-rgb: 222 222 222;
+  --rule-strong-rgb: 124 124 124;
+  --rule-nameplate-rgb: 17 17 17;
+  --color-border-control-rgb: 131 131 131;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -604,19 +605,19 @@
 /* Dark palette (brief §3.3). Its own palette, never light mode reversed. */
 :root[data-mode='dark'],
 [data-mode='dark'] {
-  --brand-primary-rgb: 240 122 134;
-  --brand-primary-dark-rgb: 248 168 176;
-  --brand-primary-light-rgb: 118 56 66;
-  --brand-accent-rgb: 130 172 216;
-  --brand-surface-rgb: 23 25 30;
-  --brand-surface-alt-rgb: 34 37 44;
-  --brand-ink-rgb: 232 235 240;
-  --brand-ink-muted-rgb: 160 168 180;
+  --brand-primary-rgb: 193 196 220;
+  --brand-primary-dark-rgb: 224 225 237;
+  --brand-primary-light-rgb: 9 58 70;
+  --brand-accent-rgb: 194 206 209;
+  --brand-surface-rgb: 0 28 40;
+  --brand-surface-alt-rgb: 9 42 54;
+  --brand-ink-rgb: 249 247 245;
+  --brand-ink-muted-rgb: 194 206 209;
   --semantic-success-rgb: 116 200 150;
   --semantic-warning-rgb: 228 174 88;
   --semantic-danger-rgb: 242 136 142;
   --semantic-highlight-rgb: 222 190 108;
-  --semantic-keynote-rgb: 186 164 240;
+  --semantic-keynote-rgb: 193 196 220;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -626,10 +627,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 52 54 59;
-  --rule-strong-rgb: 138 141 146;
-  --rule-nameplate-rgb: 232 235 240;
-  --color-border-control-rgb: 132 134 139;
+  --rule-hairline-rgb: 35 59 69;
+  --rule-strong-rgb: 137 148 153;
+  --rule-nameplate-rgb: 249 247 245;
+  --color-border-control-rgb: 129 142 147;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -803,19 +804,19 @@
 /* newsroom — light, the active preset, with this deployment's overrides. */
 :root[data-theme='newsroom'][data-mode='light'],
 [data-theme='newsroom'][data-mode='light'] {
-  --brand-primary-rgb: 178 30 50;
-  --brand-primary-dark-rgb: 140 20 38;
-  --brand-primary-light-rgb: 224 148 158;
-  --brand-accent-rgb: 46 84 126;
-  --brand-surface-rgb: 246 247 249;
-  --brand-surface-alt-rgb: 236 238 242;
-  --brand-ink-rgb: 22 24 29;
-  --brand-ink-muted-rgb: 88 95 108;
+  --brand-primary-rgb: 9 58 70;
+  --brand-primary-dark-rgb: 0 28 40;
+  --brand-primary-light-rgb: 193 196 220;
+  --brand-accent-rgb: 9 58 70;
+  --brand-surface-rgb: 255 255 255;
+  --brand-surface-alt-rgb: 244 240 235;
+  --brand-ink-rgb: 17 17 17;
+  --brand-ink-muted-rgb: 103 103 103;
   --semantic-success-rgb: 22 96 62;
   --semantic-warning-rgb: 134 82 10;
   --semantic-danger-rgb: 170 32 44;
   --semantic-highlight-rgb: 124 90 14;
-  --semantic-keynote-rgb: 82 54 140;
+  --semantic-keynote-rgb: 9 58 70;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -825,10 +826,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 215 216 218;
-  --rule-strong-rgb: 123 124 128;
-  --rule-nameplate-rgb: 22 24 29;
-  --color-border-control-rgb: 130 131 135;
+  --rule-hairline-rgb: 222 222 222;
+  --rule-strong-rgb: 124 124 124;
+  --rule-nameplate-rgb: 17 17 17;
+  --color-border-control-rgb: 131 131 131;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -868,19 +869,19 @@
 /* newsroom — dark, the active preset, with this deployment's overrides. */
 :root[data-theme='newsroom'][data-mode='dark'],
 [data-theme='newsroom'][data-mode='dark'] {
-  --brand-primary-rgb: 240 122 134;
-  --brand-primary-dark-rgb: 248 168 176;
-  --brand-primary-light-rgb: 118 56 66;
-  --brand-accent-rgb: 130 172 216;
-  --brand-surface-rgb: 23 25 30;
-  --brand-surface-alt-rgb: 34 37 44;
-  --brand-ink-rgb: 232 235 240;
-  --brand-ink-muted-rgb: 160 168 180;
+  --brand-primary-rgb: 193 196 220;
+  --brand-primary-dark-rgb: 224 225 237;
+  --brand-primary-light-rgb: 9 58 70;
+  --brand-accent-rgb: 194 206 209;
+  --brand-surface-rgb: 0 28 40;
+  --brand-surface-alt-rgb: 9 42 54;
+  --brand-ink-rgb: 249 247 245;
+  --brand-ink-muted-rgb: 194 206 209;
   --semantic-success-rgb: 116 200 150;
   --semantic-warning-rgb: 228 174 88;
   --semantic-danger-rgb: 242 136 142;
   --semantic-highlight-rgb: 222 190 108;
-  --semantic-keynote-rgb: 186 164 240;
+  --semantic-keynote-rgb: 193 196 220;
   --color-surface-rgb: var(--brand-surface-rgb);
   --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
   --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -890,10 +891,10 @@
   --color-accent-soft-rgb: var(--brand-primary-light-rgb);
   --color-accent-secondary-rgb: var(--brand-accent-rgb);
   --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-  --rule-hairline-rgb: 52 54 59;
-  --rule-strong-rgb: 138 141 146;
-  --rule-nameplate-rgb: 232 235 240;
-  --color-border-control-rgb: 132 134 139;
+  --rule-hairline-rgb: 35 59 69;
+  --rule-strong-rgb: 137 148 153;
+  --rule-nameplate-rgb: 249 247 245;
+  --color-border-control-rgb: 129 142 147;
   --session-card-rule-rgb: var(--rule-hairline-rgb);
   --session-card-surface-rgb: var(--color-surface-rgb);
   --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -1458,19 +1459,19 @@
   html:root,
   html:root[data-mode='dark'],
   html:root[data-theme][data-mode='dark'] {
-    --brand-primary-rgb: 178 30 50;
-    --brand-primary-dark-rgb: 140 20 38;
-    --brand-primary-light-rgb: 224 148 158;
-    --brand-accent-rgb: 46 84 126;
-    --brand-surface-rgb: 246 247 249;
-    --brand-surface-alt-rgb: 236 238 242;
-    --brand-ink-rgb: 22 24 29;
-    --brand-ink-muted-rgb: 88 95 108;
+    --brand-primary-rgb: 9 58 70;
+    --brand-primary-dark-rgb: 0 28 40;
+    --brand-primary-light-rgb: 193 196 220;
+    --brand-accent-rgb: 9 58 70;
+    --brand-surface-rgb: 255 255 255;
+    --brand-surface-alt-rgb: 244 240 235;
+    --brand-ink-rgb: 17 17 17;
+    --brand-ink-muted-rgb: 103 103 103;
     --semantic-success-rgb: 22 96 62;
     --semantic-warning-rgb: 134 82 10;
     --semantic-danger-rgb: 170 32 44;
     --semantic-highlight-rgb: 124 90 14;
-    --semantic-keynote-rgb: 82 54 140;
+    --semantic-keynote-rgb: 9 58 70;
     --color-surface-rgb: var(--brand-surface-rgb);
     --color-surface-alt-rgb: var(--brand-surface-alt-rgb);
     --color-text-primary-rgb: var(--brand-ink-rgb);
@@ -1480,10 +1481,10 @@
     --color-accent-soft-rgb: var(--brand-primary-light-rgb);
     --color-accent-secondary-rgb: var(--brand-accent-rgb);
     --color-ink-motif-rgb: var(--color-text-secondary-rgb);
-    --rule-hairline-rgb: 215 216 218;
-    --rule-strong-rgb: 123 124 128;
-    --rule-nameplate-rgb: 22 24 29;
-    --color-border-control-rgb: 130 131 135;
+    --rule-hairline-rgb: 222 222 222;
+    --rule-strong-rgb: 124 124 124;
+    --rule-nameplate-rgb: 17 17 17;
+    --color-border-control-rgb: 131 131 131;
     --session-card-rule-rgb: var(--rule-hairline-rgb);
     --session-card-surface-rgb: var(--color-surface-rgb);
     --session-card-stamp-rgb: var(--color-accent-rgb);
@@ -1560,7 +1561,7 @@
   --admin-ink-data-rgb: 82 101 129;
   --admin-ink-inverse-rgb: 255 255 255;
   --admin-ink-disabled-rgb: 90 104 125;
-  --admin-ink-link-rgb: 178 30 50;
+  --admin-ink-link-rgb: 9 58 70;
   --admin-rule-hairline-rgb: 220 228 239;
   --admin-rule-strong-rgb: 122 139 164;
   --admin-rule-control-rgb: 124 141 166;
@@ -1572,22 +1573,22 @@
   --admin-state-caution-rgb: 128 83 11;
   --admin-state-ok-rgb: 8 100 65;
   --admin-state-info-rgb: 36 82 142;
-  --admin-action-rgb: 178 30 50;
-  --admin-action-hover-rgb: 153 26 43;
-  --admin-action-pressed-rgb: 128 22 36;
-  --admin-action-soft-rgb: 247 233 235;
-  --admin-action-soft-hover-rgb: 243 219 222;
-  --admin-focus-ring-rgb: 178 30 50;
+  --admin-action-rgb: 9 58 70;
+  --admin-action-hover-rgb: 8 50 60;
+  --admin-action-pressed-rgb: 6 42 50;
+  --admin-action-soft-rgb: 230 235 237;
+  --admin-action-soft-hover-rgb: 216 223 225;
+  --admin-focus-ring-rgb: 9 58 70;
   --admin-focus-ring-rail-rgb: 183 206 255;
-  --admin-rail-ground-rgb: 39 7 11;
-  --admin-rail-ground-raised-rgb: 56 27 31;
-  --admin-rail-ground-hover-rgb: 65 37 40;
-  --admin-rail-current-rgb: 178 30 50;
+  --admin-rail-ground-rgb: 2 13 15;
+  --admin-rail-ground-raised-rgb: 22 32 34;
+  --admin-rail-ground-hover-rgb: 32 42 44;
+  --admin-rail-current-rgb: 9 58 70;
   --admin-rail-ink-rgb: 244 247 252;
   --admin-rail-ink-muted-rgb: 180 194 216;
-  --admin-rail-rule-rgb: 87 62 65;
+  --admin-rail-rule-rgb: 58 66 68;
   --admin-client-accent-ink-rgb: 255 255 255;
-  --admin-client-accent-rgb: 178 30 50;
+  --admin-client-accent-rgb: 9 58 70;
   --admin-nav-active-marker-rgb: var(--admin-rail-ink-rgb);
   --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
 }
@@ -1607,7 +1608,7 @@
   --admin-ink-data-rgb: 200 208 220;
   --admin-ink-inverse-rgb: 17 21 28;
   --admin-ink-disabled-rgb: 150 160 176;
-  --admin-ink-link-rgb: 243 146 156;
+  --admin-ink-link-rgb: 193 196 220;
   --admin-rule-hairline-rgb: 52 58 70;
   --admin-rule-strong-rgb: 128 142 164;
   --admin-rule-control-rgb: 134 148 170;
@@ -1619,22 +1620,22 @@
   --admin-state-caution-rgb: 232 182 96;
   --admin-state-ok-rgb: 122 198 148;
   --admin-state-info-rgb: 142 182 234;
-  --admin-action-rgb: 240 122 134;
-  --admin-action-hover-rgb: 242 138 149;
-  --admin-action-pressed-rgb: 211 107 118;
-  --admin-action-soft-rgb: 69 51 60;
-  --admin-action-soft-hover-rgb: 86 58 67;
-  --admin-focus-ring-rgb: 240 122 134;
+  --admin-action-rgb: 193 196 220;
+  --admin-action-hover-rgb: 200 203 224;
+  --admin-action-pressed-rgb: 170 172 194;
+  --admin-action-soft-rgb: 61 65 76;
+  --admin-action-soft-hover-rgb: 74 78 90;
+  --admin-focus-ring-rgb: 193 196 220;
   --admin-focus-ring-rail-rgb: 196 214 255;
-  --admin-rail-ground-rgb: 20 12 13;
-  --admin-rail-ground-raised-rgb: 44 36 37;
-  --admin-rail-ground-hover-rgb: 53 46 47;
-  --admin-rail-current-rgb: 168 85 94;
+  --admin-rail-ground-rgb: 19 20 22;
+  --admin-rail-ground-raised-rgb: 43 44 45;
+  --admin-rail-ground-hover-rgb: 52 53 55;
+  --admin-rail-current-rgb: 109 111 125;
   --admin-rail-ink-rgb: 240 244 250;
   --admin-rail-ink-muted-rgb: 170 184 206;
-  --admin-rail-rule-rgb: 72 65 66;
+  --admin-rail-rule-rgb: 71 72 73;
   --admin-client-accent-ink-rgb: 17 21 28;
-  --admin-client-accent-rgb: 240 122 134;
+  --admin-client-accent-rgb: 193 196 220;
   --admin-nav-active-marker-rgb: var(--admin-rail-ink-rgb);
   --admin-page-header-mark-rgb: var(--admin-client-accent-rgb);
 }
@@ -1788,6 +1789,13 @@
   font-weight: 400 700;
   font-display: swap;
   src: url('/fonts/archivo-condensed-latin.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cabin';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/cabin-latin.woff2') format('woff2');
 }
 @font-face {
   font-family: 'Merriweather';

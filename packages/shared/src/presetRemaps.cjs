@@ -328,15 +328,21 @@ const PRESET_REMAPS = Object.freeze({
         '--notice-bar-urgent-rule-width': 'var(--rule-nameplate-width)',
         '--table-head-transform': 'uppercase',
         '--table-head-tracking': '0.04em',
-        '--hero-art-width': '56%',
-        '--hero-copy-pad-inline-start': 'var(--space-md)',
-        '--hero-copy-border-inline-start': '.35rem solid rgb(var(--color-accent-rgb))',
+        '--hero-art-width': '50%',
+        '--hero-copy-pad-inline-start': '0',
+        '--hero-copy-border-inline-start': '0',
         '--hero-veil-background': 'linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)',
         '--standfirst-font': 'var(--font-heading)',
         '--standfirst-weight': 'var(--weight-regular)',
+        '--radius-base': '4px',
       },
       options: {
         headingFace: {
+          merriweather: {
+            fonts: {
+              heading: 'merriweather',
+            },
+          },
           fraunces: {
             fonts: {
               heading: 'fraunces',

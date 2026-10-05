@@ -116,8 +116,10 @@ conflict (§2.2). An answers file that sets one gets a warning.
 
 ### `seed-demo-event.cjs`
 
-Seeds the public demo instance (§5.4, milestone issue #35): a fictional three-day event with
-placeholder speakers, sponsors, and sessions. Refuses a project id that is not a demo project —
+Seeds the public demo instance (§5.4, milestone issue #35): an explicitly approved historical
+NC Local mock-up with eight selected sessions, public speaker affiliations and exact historical
+partner roles. It includes no private contacts or attendee data. Registration and email actions
+are disabled in the static demo. Refuses a project id that is not a demo project —
 either an exact `DEMO_PROJECT_ID` or a delimited `demo` component (`demo-run-of-show`, not
 `democratic-media-prod`) — unless `--i-know-this-is-not-a-demo-project` is passed — the one thing this script must never do is
 publish placeholder speakers on a client's live site. Idempotent on the same terms as init.

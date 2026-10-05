@@ -18,7 +18,8 @@ import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Sponsors() {
   const { features } = useEventConfig();
-  const { organizationsData } = useContent();
+  const { organizationsData, getPage } = useContent();
+  const pageTitle = getPage?.('sponsors')?.title ?? getPage?.('sponsors')?.label ?? 'Sponsors';
   const visible = visibleOrganizations(organizationsData);
 
   if (!features.sponsors) {
@@ -39,7 +40,7 @@ export default function Sponsors() {
     <SystemPage pageId="sponsors">
       {({ arrangement }) => (
         <>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">Sponsors</h1>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">{pageTitle}</h1>
           {visible.length === 0 ? (
             <div className="mt-lg">
               <EmptyState

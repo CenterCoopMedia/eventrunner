@@ -119,6 +119,7 @@ const FONT_SETS = {
   'plex-mono': "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
   'archivo-condensed': "'Archivo Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif",
   merriweather: "'Merriweather', Georgia, 'Times New Roman', serif",
+  cabin: "'Cabin', Arial, sans-serif",
   'public-sans':
     "'Public Sans', 'Helvetica Neue', Helvetica, Arial, ui-sans-serif, system-ui, sans-serif",
   karrik: "'Karrik', 'Arial Black', Impact, sans-serif",

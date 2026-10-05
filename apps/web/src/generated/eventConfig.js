@@ -1,150 +1,86 @@
-// GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).
+// GENERATED FILE — committed public demo copy (spec §2.4, §5.4, §8.6).
 //
 // Regenerate with:  node scripts/generate-content.cjs --demo
 // At deploy time the same script reads config/event + config/features from
 // the project and writes out-of-tree (--out / GENERATED_DIR), so this
-// committed copy — a fictional demo event, never a real organization name,
-// city, or dates — is what CI builds from. config/bootstrap is never
+// committed copy uses the explicitly approved public historical demo
+// fixture. No private deployment export is committed. config/bootstrap is never
 // emitted here (§2.4).
 
 export const eventConfig = {
-  name: 'Harborlight Media Summit',
-  shortName: 'Harborlight',
-  tagline: 'Stronger local news. Further together.',
+  name: 'NC News & Information Summit',
+  shortName: 'NC Local',
+  tagline: 'Historical 2026 program · EventRunner demo',
   timezone: 'America/New_York',
   days: [
     {
       id: 'day-1',
-      label: 'Day one',
-      date: '2026-10-14',
-      startTime: '09:00',
-      endTime: '17:00',
-    },
-    {
-      id: 'day-2',
-      label: 'Day two',
-      date: '2026-10-15',
-      startTime: '09:00',
-      endTime: '17:00',
-    },
-    {
-      id: 'day-3',
-      label: 'Day three',
-      date: '2026-10-16',
-      startTime: '09:00',
-      endTime: '16:00',
+      label: 'Friday',
+      date: '2026-03-27',
+      startTime: '08:00',
+      endTime: '16:30',
     },
   ],
   tracks: [
     {
       letter: 'A',
-      name: 'Practice',
+      name: 'Reporting & public information',
     },
     {
       letter: 'B',
-      name: 'Sustainability',
+      name: 'Community & collaboration',
     },
   ],
   registration: {
-    opensAt: '2026-06-01T09:00:00',
-    closesAt: '2026-10-09T23:59:00',
+    opensAt: null,
+    closesAt: null,
     externalUrl: null,
     actionLabel: null,
   },
   venue: {
-    name: 'The Newark Museum of Art',
-    addressLine1: '49 Washington Street',
+    name: 'McKimmon Center',
+    addressLine1: '1101 Gorman Street',
     addressLine2: null,
-    city: 'Newark',
-    region: 'NJ',
-    postalCode: '07102',
+    city: 'Raleigh',
+    region: 'NC',
+    postalCode: '27606',
     country: 'US',
-    mapUrl: 'https://www.openstreetmap.org/?mlat=40.7426&mlon=-74.1712#map=17/40.7426/-74.1712',
+    mapUrl: 'https://www.openstreetmap.org/search?query=1101%20Gorman%20Street%20Raleigh%20NC%2027606',
     places: [
       {
-        id: 'main-hall',
-        name: 'Main hall',
-        floor: 'Ground floor',
+        id: 'room-3',
+        name: 'Room 3',
+        floor: null,
       },
       {
-        id: 'room-a',
-        name: 'Room A',
-        floor: 'First floor',
+        id: 'room-4',
+        name: 'Room 4',
+        floor: null,
       },
       {
-        id: 'room-b',
-        name: 'Room B',
-        floor: 'First floor',
+        id: 'room-6',
+        name: 'Room 6',
+        floor: null,
+      },
+      {
+        id: 'room-9',
+        name: 'Room 9',
+        floor: null,
       },
     ],
-    movements: [
-      {
-        from: 'main-hall',
-        to: 'room-a',
-        walkingMinutes: 4,
-        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
-      },
-      {
-        from: 'room-a',
-        to: 'main-hall',
-        walkingMinutes: 3,
-        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
-      },
-      {
-        from: 'main-hall',
-        to: 'room-b',
-        walkingMinutes: 5,
-        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
-      },
-      {
-        from: 'room-b',
-        to: 'main-hall',
-        walkingMinutes: 4,
-      },
-      {
-        from: 'room-a',
-        to: 'room-b',
-        walkingMinutes: 1,
-        accessibleRoute: 'Illustrative route only. Follow the marked gallery and lift on the demo plan. This is not a surveyed museum route.',
-      },
-      {
-        from: 'room-b',
-        to: 'room-a',
-        walkingMinutes: 1,
-      },
-    ],
-    map: {
-      image: 'branding/demo-venue-plan.svg',
-      alt: 'Illustrative summit floor plan with the main hall, rooms A and B, registration, and a quiet room. This is not the museum floor plan.',
-      markers: [
-        {
-          placeId: 'main-hall',
-          x: 52,
-          y: 27,
-        },
-        {
-          placeId: 'room-a',
-          x: 20,
-          y: 79,
-        },
-        {
-          placeId: 'room-b',
-          x: 65,
-          y: 79,
-        },
-      ],
-    },
+    movements: [],
+    map: null,
   },
   sender: {
     email: 'summit@example.org',
-    name: 'Harborlight Media Summit',
+    name: 'NC Local historical demo',
     replyTo: null,
     domainVerified: false,
     domainVerifiedAt: null,
   },
   legal: {
-    operatorName: 'Harborlight Cooperative',
-    postalAddressHtml: '<p>Harborlight Cooperative<br>Fictional demo organization<br>Contact: support@example.org</p>',
+    operatorName: 'EventRunner historical demo',
+    postalAddressHtml: '<p>Historical NC Local summit mock-up. No registration, email delivery or staffed event service.</p>',
     supportEmail: 'support@example.org',
     conductEmail: 'conduct@example.org',
     reviewRequired: true,
@@ -153,13 +89,13 @@ export const eventConfig = {
     hashtag: null,
     handles: [],
   },
-  announcedAt: '2026-05-01T12:00:00',
-  archivedAt: null,
+  announcedAt: '2026-01-01T12:00:00',
+  archivedAt: '2026-03-28T00:00:00',
   seo: {
-    description: 'Schedule, speaker, workshop, and travel information for the fictional Harborlight Media Summit.',
-    defaultOgImagePath: 'branding/og-default.svg',
-    organizerName: 'Harborlight Cooperative',
-    organizerUrl: 'https://example.org',
+    description: 'Past-event demo of the 2026 NC News & Information Summit in Raleigh: Selected historical sessions, speakers and documented partners.',
+    defaultOgImagePath: 'branding/nclocal-og.svg',
+    organizerName: 'NC Local and NC Open Government Coalition',
+    organizerUrl: 'https://nclocal.org/',
   },
   auth: {
     googleProviderEnabled: false,
@@ -173,7 +109,7 @@ export const features = {
   schedule: true,
   speakers: true,
   sponsors: true,
-  attendeeDirectory: true,
+  attendeeDirectory: false,
   sessionBookmarks: false,
   sessionReactions: false,
   sessionMaterials: false,
@@ -182,7 +118,7 @@ export const features = {
   liveUpdates: false,
   feedbackInbox: false,
   schedulePdf: false,
-  icsExport: true,
+  icsExport: false,
   calendarSync: false,
   updates: true,
   autoApproveTicketHolders: false,
@@ -199,11 +135,11 @@ export const theme = {
   mode: 'light',
   header: 'masthead',
   logos: {
-    primary: 'branding/logo.svg',
-    mark: null,
-    footer: 'branding/mark.svg',
-    ogDefault: 'branding/og-default.svg',
-    favicon: 'branding/favicon.svg',
+    primary: 'branding/nclocal-logo.png',
+    mark: 'branding/nclocal-logo.png',
+    footer: 'branding/nclocal-logo.png',
+    ogDefault: 'branding/nclocal-og.svg',
+    favicon: 'branding/nclocal-favicon.svg',
   },
 };
 

@@ -86,7 +86,8 @@ export function sortSessions(sessions) {
 
 export default function Schedule() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { scheduleData, speakers, loading, getSectionBlocks } = useContent();
+  const { scheduleData, speakers, loading, getSectionBlocks, getPage } = useContent();
+  const page = getPage?.('schedule');
   const { user } = useAuth();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
@@ -322,7 +323,7 @@ export default function Schedule() {
       />
       <header className="schedule-page-header">
         <div>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">Schedule</h1>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">{page?.title ?? page?.label ?? 'Schedule'}</h1>
           {eventZoneLabel ? (
             <p className="mt-2xs font-data text-caption text-text-secondary">
               All times are shown in {eventZoneLabel}.

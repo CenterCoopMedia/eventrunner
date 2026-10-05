@@ -41,6 +41,7 @@ declares.
 | `archivo-condensed-latin.woff2` | Archivo (width 75) | 400–700 var | `archivo-condensed` | 33 KB | SIL OFL 1.1 |
 | `merriweather-400-latin.woff2`, `merriweather-700-latin.woff2` | Merriweather | 400, 700 | `merriweather` | 47 KB + 46 KB | SIL OFL 1.1 |
 | `public-sans-latin.woff2` | Public Sans | 400–700 var | `public-sans` | 24 KB | SIL OFL 1.1 |
+| `cabin-latin.woff2` | Cabin | 400–700 var | `cabin` | 73 KB | SIL OFL 1.1; `OFL-cabin.txt` |
 | `karrik-latin.woff2` | Karrik | 400 | `karrik` | 16 KB | SIL OFL 1.1 |
 | `bagnard-latin.woff2` | Bagnard | 400 | `bagnard` | 7 KB | SIL OFL 1.1 |
 | `avara-latin.woff2` | Avara | 700 | `avara` | 6 KB | SIL OFL 1.1 |

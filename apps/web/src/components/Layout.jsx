@@ -357,6 +357,7 @@ export default function Layout() {
   // Only the event bar prefers the short name.
   const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
   const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
+  const historicalDemo = IS_DEMO && eventConfig.shortName === 'NC Local';
 
   // The navigation IS the page list (lib/siteNavigation.js). Every visible
   // page document becomes a link, in its own `order`, with system pages
@@ -448,7 +449,7 @@ export default function Layout() {
             </details>
           </li>
         ) : null}
-        <li>
+        <li hidden={IS_DEMO}>
           <NavLink to={account.to} end={account.end} className={accountClass}>
             {account.label}
           </NavLink>
@@ -501,7 +502,7 @@ export default function Layout() {
         <div className="stage">
           <Header
             variant={headerVariant}
-            name={plate.name}
+            name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}
             place={plate.edition}
             mark={
@@ -511,10 +512,10 @@ export default function Layout() {
                 // wrong pair moves the header on first paint.
                 <img
                   src={markSrc}
-                  alt=""
-                  className={markSize.className}
-                  width={markSize.px}
-                  height={markSize.px}
+                  alt={historicalDemo ? 'NC Local' : ''}
+                  className={historicalDemo ? 'historical-demo-logo' : markSize.className}
+                  width={historicalDemo ? 220 : markSize.px}
+                  height={historicalDemo ? 48 : markSize.px}
                   onError={() => setMarkFailed(true)}
                 />
               ) : null
@@ -577,8 +578,8 @@ export default function Layout() {
             {operatorName || supportEmail ? (
               <p className="mt-md">
                 {operatorName ? `Operated by ${operatorName}` : null}
-                {operatorName && supportEmail ? ' · ' : null}
-                {supportEmail ? (
+                {operatorName && supportEmail && !IS_DEMO ? ' · ' : null}
+                {supportEmail && !IS_DEMO ? (
                   <a href={`mailto:${supportEmail}`} className={FOOTER_LINK_CLASS}>
                     Contact support
                   </a>

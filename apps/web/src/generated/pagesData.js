@@ -1,4 +1,4 @@
-// GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.2–5.4, §8.6).
+// GENERATED FILE — committed public demo copy (spec §2.4, §5.2–5.4, §8.6).
 //
 // Regenerate with:  node scripts/generate-content.cjs --demo
 //
@@ -121,42 +121,8 @@ export const pagesData = [
         ],
       },
       {
-        id: 'stats',
-        label: 'By the numbers',
-        description: 'Headline figures with captions.',
-        allowedBlocks: [
-          'stat',
-        ],
-        maxBlocks: 6,
-        reorderable: true,
-        defaultBlocks: [
-          {
-            field: 'attendees',
-            blockType: 'stat',
-            description: 'Expected attendance.',
-          },
-          {
-            field: 'sessions',
-            blockType: 'stat',
-            description: 'Sessions planned.',
-          },
-        ],
-      },
-      {
-        id: 'history',
-        label: 'History',
-        description: 'Background on previous editions of the event. The editions themselves come from the Timeline list, not from here.',
-        allowedBlocks: [
-          'richtext',
-          'image',
-        ],
-        maxBlocks: 6,
-        reorderable: true,
-        defaultBlocks: [],
-      },
-      {
         id: 'sponsors',
-        label: 'Sponsors',
+        label: 'Historical partners',
         description: 'One line above the logo wall. The organizations come from the Organizations list, not from here.',
         allowedBlocks: [
           'text',
@@ -189,17 +155,19 @@ export const pagesData = [
         ],
       },
     ],
+    navHidden: false,
     seeded: true,
   },
   {
     id: 'schedule',
-    label: 'Schedule',
+    label: 'Program',
     path: '/schedule',
     icon: null,
     order: 1,
     visible: true,
     systemPage: true,
     sections: [],
+    navHidden: false,
     seeded: true,
   },
   {
@@ -214,35 +182,24 @@ export const pagesData = [
       arrangement: 'grid',
     },
     sections: [],
+    navHidden: false,
     seeded: true,
   },
   {
     id: 'sponsors',
-    label: 'Sponsors',
+    label: 'Partners',
     path: '/sponsors',
     icon: null,
     order: 3,
     visible: true,
     systemPage: true,
-    sections: [
-      {
-        id: 'sponsor_packages',
-        label: 'Sponsorship packages',
-        description: 'What a sponsor can support, one package per block. The section is not shown until it holds a package.',
-        allowedBlocks: [
-          'sponsor_package',
-          'richtext',
-        ],
-        maxBlocks: 6,
-        reorderable: true,
-        defaultBlocks: [],
-      },
-    ],
+    sections: [],
+    navHidden: false,
     seeded: true,
   },
   {
     id: 'travel',
-    label: 'Travel',
+    label: 'Locations',
     path: '/travel',
     icon: null,
     order: 4,
@@ -384,6 +341,7 @@ export const pagesData = [
         ],
       },
     ],
+    navHidden: false,
     seeded: true,
   },
   {
@@ -432,6 +390,7 @@ export const pagesData = [
         ],
       },
     ],
+    navHidden: true,
     seeded: true,
   },
   {
@@ -498,6 +457,7 @@ export const pagesData = [
         ],
       },
     ],
+    navHidden: true,
     seeded: true,
   },
   {
@@ -545,6 +505,7 @@ export const pagesData = [
         ],
       },
     ],
+    navHidden: true,
     seeded: true,
   },
   {
@@ -624,6 +585,7 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
+    navHidden: true,
     seeded: true,
   },
   {
@@ -703,28 +665,7 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
-    seeded: true,
-  },
-  {
-    id: 'attendees',
-    label: 'Attendees',
-    path: '/attendees',
-    icon: null,
-    order: 10,
-    visible: true,
-    systemPage: true,
-    sections: [],
-    seeded: true,
-  },
-  {
-    id: 'updates',
-    label: 'Updates',
-    path: '/updates',
-    icon: null,
-    order: 11,
-    visible: true,
-    systemPage: true,
-    sections: [],
+    navHidden: true,
     seeded: true,
   },
   {
@@ -807,6 +748,7 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
+    navHidden: false,
     seeded: true,
   },
   {
@@ -889,11 +831,12 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
+    navHidden: true,
     seeded: true,
   },
   {
     id: 'city_guide',
-    label: 'City guide',
+    label: 'Raleigh',
     path: '/city-guide',
     icon: null,
     order: 14,
@@ -948,6 +891,7 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
+    navHidden: true,
     seeded: true,
   },
 ];

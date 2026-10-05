@@ -2347,6 +2347,14 @@
    backlight, and a handout is read across a room. */
 /* Event heroes: shared content and controls, authored preset compositions. */
 @layer components {
+  .historical-demo-logo {
+    inline-size: 13.75rem;
+    max-inline-size: 65vw;
+    block-size: auto;
+    background: white;
+    padding: .25rem;
+    border-radius: 4px;
+  }
   .site-masthead__bar {
     display: flex;
     align-items: center;

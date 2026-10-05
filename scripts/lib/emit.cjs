@@ -139,13 +139,13 @@ function emitEventConfig({ event, features, theme }) {
   };
   return [
     header([
-      'GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).',
+      'GENERATED FILE — committed public demo copy (spec §2.4, §5.4, §8.6).',
       '',
       'Regenerate with:  node scripts/generate-content.cjs --demo',
       'At deploy time the same script reads config/event + config/features from',
       'the project and writes out-of-tree (--out / GENERATED_DIR), so this',
-      'committed copy — a fictional demo event, never a real organization name,',
-      'city, or dates — is what CI builds from. config/bootstrap is never',
+      'committed copy uses the explicitly approved public historical demo',
+      'fixture. No private deployment export is committed. config/bootstrap is never',
       'emitted here (§2.4).',
     ]),
     '',
@@ -175,7 +175,7 @@ function emitSiteContent(contentDocs) {
   }
   return [
     header([
-      'GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).',
+      'GENERATED FILE — committed public demo copy (spec §2.4, §5.4, §8.6).',
       '',
       'Regenerate with:  node scripts/generate-content.cjs --demo',
       '',
@@ -185,8 +185,8 @@ function emitSiteContent(contentDocs) {
       '(functions/src/cms/blockTypes.cjs): text, richtext, image, cta, stat,',
       'list_item, faq_item, link_group.',
       '',
-      'Copy strategy (spec §5.4): realistic-shaped synthetic text, `[Replace]`',
-      'prefixes on anything an operator must rewrite, never a real org copy.',
+      'Client seeds use neutral `[Replace]` instructions. The demo fixture',
+      'uses explicitly approved public historical content with demo labels.',
     ]),
     '',
     `export const siteContent = ${jsValue(map)};`,
@@ -206,7 +206,7 @@ function emitPagesData(pages) {
   const sorted = [...pages].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id.localeCompare(b.id));
   return [
     header([
-      'GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.2–5.4, §8.6).',
+      'GENERATED FILE — committed public demo copy (spec §2.4, §5.2–5.4, §8.6).',
       '',
       'Regenerate with:  node scripts/generate-content.cjs --demo',
       '',
@@ -243,13 +243,13 @@ function emitScheduleData({ sessions, speakers }) {
   const sortedSpeakers = [...speakers].sort((a, b) => a.id.localeCompare(b.id));
   return [
     header([
-      'GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).',
+      'GENERATED FILE — committed public demo copy (spec §2.4, §5.4, §8.6).',
       '',
       'Regenerate with:  node scripts/generate-content.cjs --demo',
       '',
       'Shape mirrors published cmsSchedule docs. dayId values are stable keys',
-      'from config/event.days (eventConfig.js). All names are fictional; no real',
-      'speakers, ever (spec §5.4).',
+      'from config/event.days (eventConfig.js). The historical demo uses only',
+      'approved public speaker names and affiliations; no private contacts.',
     ]),
     '',
     `export const scheduleData = ${jsValue(sortedSessions.map(stripBookkeeping))};`,
@@ -273,13 +273,13 @@ function emitOrganizationsData(organizations) {
   );
   return [
     header([
-      'GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).',
+      'GENERATED FILE — committed public demo copy (spec §2.4, §5.4, §8.6).',
       '',
       'Regenerate with:  node scripts/generate-content.cjs --demo',
       '',
-      'Shape mirrors published cmsOrganizations docs. All organizations are',
-      'fictional; logos point at the neutral branding placeholders — no real',
-      'sponsor logos in seeds, fixtures, tests, or the demo instance (spec §5.4).',
+      'Shape mirrors published cmsOrganizations docs. Historical roles are',
+      'explicitly labeled and do not imply endorsement of EventRunner.',
+      'The NC Local artwork comes from its official public logo source.',
     ]),
     '',
     `export const organizationsData = ${jsValue(sorted.map(stripBookkeeping))};`,
@@ -301,7 +301,7 @@ function emitTimelineData(timeline = []) {
   );
   return [
     header([
-      'GENERATED FILE — committed synthetic demo copy (spec §2.4, §5.4, §8.6).',
+      'GENERATED FILE — committed public demo copy (spec §2.4, §5.4, §8.6).',
       '',
       'Regenerate with:  node scripts/generate-content.cjs --demo',
       '',
@@ -334,12 +334,12 @@ function emitTimelineData(timeline = []) {
 function emitThemeCss(theme) {
   const lines = [];
   lines.push('/*');
-  lines.push(' * GENERATED FILE — committed synthetic demo copy (spec §2.4, §7.2, §8.6).');
+  lines.push(' * GENERATED FILE — committed public demo copy (spec §2.4, §7.2, §8.6).');
   lines.push(' *');
   lines.push(' * Regenerate with:  node scripts/generate-content.cjs --demo');
   lines.push(' *');
   lines.push(' * At deploy time the same script reads config/theme and writes out-of-tree');
-  lines.push(' * (GENERATED_DIR); this committed copy is the synthetic demo event that keeps');
+  lines.push(' * (GENERATED_DIR); this committed copy is the approved public demo fixture that keeps');
   lines.push(' * CI builds credential-free. It is the ONLY file in apps/web allowed to carry');
   lines.push(' * raw color values (spec §7.6 allowlist), and values are space-separated RGB');
   lines.push(' * triples so Tailwind rgb(var(--…-rgb) / <alpha-value>) utilities keep opacity');

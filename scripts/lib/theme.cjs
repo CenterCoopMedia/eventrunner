@@ -138,6 +138,11 @@ const FONT_SETS = Object.freeze({
     faces: Object.freeze([{ file: 'archivo-condensed-latin', weight: '400 700' }]),
     stack: "'Archivo Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif",
   }),
+  cabin: Object.freeze({
+    family: 'Cabin',
+    faces: Object.freeze([{ file: 'cabin-latin', weight: '400 700' }]),
+    stack: "'Cabin', Arial, sans-serif",
+  }),
   merriweather: Object.freeze({
     family: 'Merriweather',
     faces: Object.freeze([

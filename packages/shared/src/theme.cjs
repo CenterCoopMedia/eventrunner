@@ -60,7 +60,7 @@ const THEME_FONT_SET_IDS = Object.freeze([
   'serif-editorial', 'sans-humanist', 'script-casual',
   'caslon-display', 'caslon-text', 'baskerville', 'spectral',
   'fraunces', 'newsreader', 'plex-sans', 'plex-mono', 'archivo-condensed',
-  'merriweather', 'public-sans',
+  'merriweather', 'public-sans', 'cabin',
   'karrik', 'bagnard', 'avara', 'fragment-mono',
   'besley', 'vollkorn', 'overpass', 'overpass-mono', 'libre-franklin',
 ]);

@@ -42,13 +42,13 @@ The catalog is one flat, ordered list: Six styles, every one of them finished wo
 - **Why it is the default**: It is the plainest of the six, it targets the highest accessibility bar, and it is the look a client is least likely to have to undo. A fresh deployment starts here.
 - **Deeper controls**: The heading face can move to Source Serif 4 (warmer) or to Public Sans bold (drops the serif entirely, for an event that is not a document). The header can become a two-part lockup, for an event run by two organizations, or a compact standing head. The schedule can number its agenda items, which a formal proceeding often wants. A long read opens plain; a quote is a ruled minute or plain rules; the directory is ruled entries or portrait plates; a table takes the full grid; a section boundary keeps its folio, drops it, or moves it to the margin.
 
-### Newsroom
+### NC Local (Newsroom slot)
 
-*A well-made news site on a good day.* Named sections, one strong rule each, numbers that never borrow the headline face.
+NC Local’s historical demo uses broad editorial headlines, thin section rules and a white canvas with warm section surfaces. The observed organization palette provides deep teal controls and lavender soft accents. This is an approved mock-up direction, not a published brand manual.
 
 - **Suits**: A conference with a programme worth reading, a summit, a festival — anything with editorial ambition and a lot of sessions.
-- **Type**: Fraunces over Newsreader, with IBM Plex Sans carrying data and IBM Plex Mono carrying values. Four roles, four jobs.
-- **Shape**: The small radius, flat surfaces, comfortable spacing.
+- **Type**: Merriweather and Georgia for headings and prose; Cabin for controls, navigation and metadata; IBM Plex Mono for figures.
+- **Shape**: 4px corners, flat surfaces, comfortable spacing.
 - **Devices**: The rule-bounded bar header; the hairline row for a session.
 - **Illustrations**: None.
 - **Deeper controls**: The heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves. A long read opens on a standfirst; a quote is ruled with an opening mark, a side rule, or the mark alone; the directory is a portrait shelf or tall portraits; a table closes its head with a strong rule; a section boundary keeps its folio, drops it, or moves it to the margin.

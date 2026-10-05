@@ -1,11 +1,12 @@
 # Theme hero artwork
 
-These illustrations belong to the fictional Harborlight demo. They do not document a real event or venue. Client builds use their own CMS hero image and its alt text, crop, and caption.
+The NC Local primary demo uses a documentary photograph from the historical 2026 summit. The other five styles retain their illustrative artwork. Client builds use their own CMS hero image and its alt text, crop, and caption.
 
 Art direction follows the approved September 11, 2026 transit mockups: a quiet copy area at left, a strong visual subject at right, and no baked-in interface text. The artwork uses the existing style palettes. Titles, dates, routes, and controls remain live HTML or SVG.
 
 | File | Art brief |
 | --- | --- |
+| nclocal-summit.jpg | Opening panel of the 2026 NC News & Information Summit. Source: Elon University’s April 1 recap; visible credit accompanies the image. See `docs/nclocal-demo.md` for the source URL. |
 | newsroom.webp | Editorial collage of local journalists working around a table beside a harbor window; cool paper, charcoal, slate, and restrained red. |
 | atlas.webp | Daytime waterfront transit platform, open sky at left, navy sign and structure at right. |
 | atlas-night.webp | Matching platform composition at night, warm canopy lights and reflections. |

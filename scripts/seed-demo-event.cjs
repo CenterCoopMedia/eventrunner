@@ -4,12 +4,10 @@
 /**
  * Seed the public demo instance (spec §1.5, §5.4; milestone issue #35).
  *
- * The demo is a fictional three-day event: made-up organizer, made-up
- * venue, placeholder speakers and sponsors, sessions across all three days.
- * It exists so someone can look at a working deployment without a client's
- * data being the thing they are looking at — which is also why nothing here
- * is real (§5.4: no real names, cities, logos, or copy, in seeds, fixtures,
- * tests, or the demo instance).
+ * The demo is an explicitly approved public historical NC Local mock-up.
+ * It uses selected published sessions and affiliations, no attendee data,
+ * no private contacts and no live registration or email actions. It does
+ * not import a client deployment or imply organizational endorsement.
  *
  * The fixture lives in `scripts/lib/demo-event.cjs` and is shared with
  * `generate-content.cjs --demo`, so the demo instance and the committed
