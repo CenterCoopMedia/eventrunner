@@ -118,6 +118,49 @@ describe('the admin shell', () => {
     expect(ADMIN_DESKTOP_VIEWPORT).toBe('(min-width: 1024px)');
   });
 
+  it('uses one compact phone bar and a full-width grouped menu sheet', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    try {
+      const { container } = await renderAdmin('/admin/pages');
+      const rail = container.querySelector('.admin-rail');
+      const docket = rail.querySelector('details.admin-mobile-docket');
+      const summary = docket.querySelector('summary');
+      const sheet = docket.querySelector('.admin-mobile-docket__content');
+      const nav = within(docket).getByRole('navigation', { name: 'Admin sections' });
+
+      expect(rail.className).toContain('h-14');
+      expect(within(rail).getByText('Harborlight')).toBeInTheDocument();
+      expect(within(summary).getByText('Pages')).toBeInTheDocument();
+      expect(within(summary).getByText('Menu')).toBeInTheDocument();
+      expect(docket).not.toHaveAttribute('open');
+      expect(sheet.className).toMatch(/\bfixed\b/);
+      expect(sheet.className).toContain('top-14');
+      expect(sheet.className).toContain('bottom-0');
+
+      for (const group of nav.children) {
+        expect(group.className).not.toContain('flex-wrap');
+      }
+      for (const list of nav.querySelectorAll('ul')) {
+        expect(list.className).toContain('flex-col');
+      }
+      for (const link of nav.querySelectorAll('a')) {
+        expect(link.parentElement.className).toContain('w-full');
+        expect(link.className).toContain('w-full');
+        expect(link.className).toContain('min-h-admin-control');
+      }
+      expect(docket).toContainElement(screen.getByText('admin@example.org'));
+      expect(docket).toContainElement(screen.getByRole('button', { name: 'Sign out' }));
+    } finally {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    }
+  });
+
   it('reads the admin tokens only — no client brand utility reaches the room', async () => {
     const { container } = await renderAdmin();
     const html = shellChrome(container).innerHTML;

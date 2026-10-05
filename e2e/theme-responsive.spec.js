@@ -259,16 +259,92 @@ test('a light proof keeps public inheritance inside a dark admin', async ({ page
   }
 });
 
-test('phone admin opens on the work and keeps populated controls inside the viewport', async ({ page }) => {
-  test.setTimeout(90_000);
-  await page.setViewportSize({ width: 400, height: 606 });
+test('phone admin uses a compact bar and full-width sheet on every page', async ({ page }, testInfo) => {
+  test.setTimeout(240_000);
+  await page.setViewportSize({ width: 412, height: 844 });
   await signIn(page, ADMIN_EMAIL);
   await page.goto('/admin/branding');
   await expect(page.getByRole('heading', { level: 1, name: 'Branding' })).toBeVisible();
 
   const docket = page.locator('details.admin-mobile-docket');
   await expect(docket).not.toHaveAttribute('open', '');
-  await expect(docket.locator('summary')).toContainText('Branding');
+  const summary = docket.locator('summary');
+  await expect(page.locator('.admin-rail')).toContainText('E2E Summit');
+  await expect(summary).toContainText('Branding');
+  await expect(summary).toContainText('Menu');
+
+  await summary.click();
+  await expect(docket).toHaveAttribute('open', '');
+  const links = docket.getByRole('navigation', { name: 'Admin sections' }).getByRole('link');
+  await expect(links).toHaveCount(25);
+  await expect(docket.getByText(ADMIN_EMAIL)).toBeVisible();
+  await expect(docket.getByRole('button', { name: 'Sign out' })).toBeVisible();
+
+  const drawerEvidence = await page.evaluate(() => {
+    const sheetElement = document.querySelector('.admin-mobile-docket__content');
+    const navLinks = [...sheetElement.querySelectorAll('nav a')];
+    const box = sheetElement.getBoundingClientRect();
+    return {
+      position: getComputedStyle(sheetElement).position,
+      top: box.top,
+      bottom: box.bottom,
+      viewportHeight: document.defaultView.innerHeight,
+      groupLabels: [...sheetElement.querySelectorAll('.admin-folio')].map((label) => label.textContent),
+      rows: navLinks.map((link) => ({
+        label: link.textContent.trim(),
+        href: link.getAttribute('href'),
+        height: link.getBoundingClientRect().height,
+        width: link.getBoundingClientRect().width,
+        parentWidth: link.parentElement.getBoundingClientRect().width,
+      })),
+    };
+  });
+  expect(drawerEvidence.position).toBe('fixed');
+  expect(drawerEvidence.top).toBe(56);
+  expect(drawerEvidence.bottom).toBe(drawerEvidence.viewportHeight);
+  expect(drawerEvidence.groupLabels).toEqual(['Content', 'People', 'Operations', 'System']);
+  for (const row of drawerEvidence.rows) {
+    expect(row.height, row.label).toBeGreaterThanOrEqual(44);
+    expect(row.width, row.label).toBe(row.parentWidth);
+  }
+  await testInfo.attach('phone-admin-drawer.json', {
+    body: Buffer.from(`${JSON.stringify(drawerEvidence, null, 2)}\n`),
+    contentType: 'application/json',
+  });
+
+  const destinations = await links.evaluateAll((elements) => elements.map((link) => ({
+    label: link.textContent.trim(),
+    href: link.getAttribute('href'),
+  })));
+  const pageEvidence = [];
+  for (const destination of destinations) {
+    await page.goto(destination.href);
+    await expect(page.locator('.admin-room')).toBeVisible();
+    const routeDocket = page.locator('details.admin-mobile-docket');
+    await expect(routeDocket).not.toHaveAttribute('open', '');
+    await expect(routeDocket.locator('summary [title]')).toHaveAttribute('title', destination.label);
+    const metrics = await page.evaluate(() => {
+      const railBox = document.querySelector('.admin-rail').getBoundingClientRect();
+      const mainBox = document.querySelector('#admin-content').getBoundingClientRect();
+      return {
+        railHeight: railBox.height,
+        mainTop: mainBox.top,
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+    expect(metrics.railHeight, destination.label).toBe(56);
+    expect(metrics.mainTop, destination.label).toBe(56);
+    expect(metrics.scrollWidth, destination.label).toBe(metrics.clientWidth);
+    pageEvidence.push({ ...destination, ...metrics });
+  }
+  await testInfo.attach('phone-admin-pages.json', {
+    body: Buffer.from(`${JSON.stringify(pageEvidence, null, 2)}\n`),
+    contentType: 'application/json',
+  });
+
+  await page.goto('/admin/branding');
+  await expect(page.getByRole('heading', { level: 1, name: 'Branding' })).toBeVisible();
   const populatedBrandColor = `#${[18, 52, 86]
     .map((channel) => channel.toString(16).padStart(2, '0'))
     .join('')}`;
@@ -301,7 +377,7 @@ test('phone admin opens on the work and keeps populated controls inside the view
   });
 
   expect(measurements.scrollWidth).toBe(measurements.clientWidth);
-  expect(measurements.railHeight).toBeLessThan(180);
+  expect(measurements.railHeight).toBe(56);
   expect(measurements.jobPosition).toBe('static');
   expect(measurements.actionPadding).toBe(8);
   expect(measurements.controlsInside).toBe(true);

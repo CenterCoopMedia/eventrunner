@@ -22,10 +22,11 @@
 // four signals, never colour alone: the marker at its leading edge, the bold
 // weight, the ground shift, and `aria-current="page"`.
 //
-// On a narrow screen the rail becomes the head of the page. Its brand and a
-// native Menu disclosure stay visible; opening it shows the same grouped
-// words and account controls. This keeps the work surface in the first
-// screen without replacing destinations with unlabeled icons.
+// On a narrow screen the rail becomes one compact head of the page: job,
+// current section and a native Menu disclosure. Opening it shows the same
+// groups as full-width control rows in a viewport sheet, with the account
+// controls at its foot. This keeps the work surface in the first screen
+// without replacing destinations with unlabeled icons.
 //
 // THE JOB MARK. The client logo sits at the top of the rail on a small paper
 // tile, beside the event's short name. A tile, because a client's mark is
@@ -240,7 +241,7 @@ export function docketForTier(held) {
  */
 function docketItemClass({ isActive }) {
   return [
-    'admin-target flex items-center rounded-admin border-s-admin-marker py-2xs ps-sm pe-sm text-admin-sm',
+    'flex min-h-admin-control w-full items-center rounded-admin border-s-admin-marker py-2xs ps-sm pe-sm text-admin-sm',
     'lg:py-xs lg:text-admin-base',
     isActive
       ? 'border-admin-nav-active-marker bg-admin-rail-current font-bold text-admin-rail-ink'
@@ -344,14 +345,14 @@ function AdminDesk() {
       <a href="#admin-content" className="skip-link skip-link--admin">
         Skip to main content
       </a>
-      <div className="admin-rail flex shrink-0 flex-col bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:overflow-y-auto">
-        <div className="flex items-center gap-sm border-admin-rail-rule border-b-admin-hairline px-md py-sm">
+      <div className="admin-rail relative flex h-14 shrink-0 flex-row items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:flex-col lg:overflow-y-auto">
+        <div className="flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline px-sm lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
           {markSrc && !markFailed ? (
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-admin-small bg-admin-ground-raised p-3xs">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-admin-small bg-admin-ground-raised p-3xs lg:h-9 lg:w-9">
               <img
                 src={markSrc}
                 alt=""
-                className="h-7 w-7 object-contain"
+                className="h-6 w-6 object-contain lg:h-7 lg:w-7"
                 onError={() => setMarkFailed(true)}
               />
             </span>
@@ -361,8 +362,88 @@ function AdminDesk() {
           </p>
         </div>
 
+        <details
+          className="admin-mobile-docket shrink-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+          open={wide || mobileDocketOpen}
+          onToggle={(event) => {
+            if (!wide) setMobileDocketOpen(event.currentTarget.open);
+          }}
+        >
+          <summary
+            ref={mobileMenuRef}
+            className="admin-target flex h-14 cursor-pointer items-center gap-xs px-sm font-semibold text-admin-rail-ink lg:hidden"
+          >
+            <span
+              className="max-w-28 truncate font-admin-data text-admin-xs text-admin-rail-ink-muted"
+              title={activeSection?.label ?? 'Admin sections'}
+            >
+              {activeSection?.label ?? 'Admin sections'}
+            </span>
+            <span className="shrink-0">Menu</span>
+          </summary>
+          <div className="admin-mobile-docket__content fixed inset-x-0 bottom-0 top-14 z-40 min-h-0 overflow-y-auto overscroll-contain bg-admin-rail-ground lg:static lg:z-auto lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-visible">
+            <nav aria-label="Admin sections" className="flex-1 px-md py-sm lg:px-xs">
+              {docket.map((group) => (
+                <div key={group.id} className="py-xs first:pt-0 lg:mt-sm lg:py-0 lg:first:mt-0">
+                  {group.label ? (
+                    <p className="admin-folio px-sm pb-3xs pt-2xs">
+                      {group.label}
+                    </p>
+                  ) : null}
+                  <ul className="flex flex-col gap-3xs">
+                    {group.items.map((item) => (
+                      <li key={item.to} className="w-full">
+                        <NavLink
+                          to={`${ROOT}/${item.to}`}
+                          className={docketItemClass}
+                          onClick={() => setMobileDocketOpen(false)}
+                        >
+                          {item.label}
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </nav>
+
+            <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline px-md py-sm lg:flex-col lg:items-stretch">
+              {/* An operator has to be able to tell which account the server
+                  will see, so the address is set in the data face: it is an
+                  identifier, and identifiers are the machine's. The tier word
+                  beside it says what that account may do here. */}
+              <div className="min-w-0">
+                <p className="break-all font-admin-data text-admin-xs text-admin-rail-ink-muted">
+                  {user?.email}
+                </p>
+                {tierKnown ? (
+                  <p className="text-admin-xs font-semibold text-admin-rail-ink" data-admin-tier={adminTier}>
+                    {adminTier === 'operator' ? 'Operator' : 'Staff'}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-xs">
+                <button
+                  type="button"
+                  ref={takeTourRef}
+                  onClick={() => setTour((run) => (run ?? 0) + 1)}
+                  className={railButtonClass}
+                >
+                  Take the tour
+                </button>
+                <NavLink to="/" className={railButtonClass}>
+                  View site
+                </NavLink>
+                <button type="button" onClick={signOut} className={railButtonClass}>
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </div>
+        </details>
+
         {adminTier === 'unknown' ? (
-          <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-b-admin-hairline px-md py-xs lg:order-last lg:border-b-0 lg:border-t-admin-hairline lg:py-sm">
+          <div className="fixed inset-x-0 top-14 z-30 flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-b-admin-hairline bg-admin-rail-ground px-md py-xs lg:static lg:order-last lg:border-b-0 lg:border-t-admin-hairline lg:py-sm">
             <p className="text-admin-xs text-admin-rail-ink-muted" role="status">
               Your access tier could not be checked.
             </p>
@@ -371,86 +452,6 @@ function AdminDesk() {
             </button>
           </div>
         ) : null}
-
-        <details
-          className="admin-mobile-docket flex min-h-0 flex-1 flex-col"
-          open={wide || mobileDocketOpen}
-          onToggle={(event) => {
-            if (!wide) setMobileDocketOpen(event.currentTarget.open);
-          }}
-        >
-          <summary
-            ref={mobileMenuRef}
-            className="admin-target flex cursor-pointer items-center justify-between border-admin-rail-rule border-b-admin-hairline px-md py-xs font-semibold text-admin-rail-ink lg:hidden"
-          >
-            <span>Menu</span>
-            <span className="font-admin-data text-admin-xs text-admin-rail-ink-muted">
-              {activeSection?.label ?? 'Admin sections'}
-            </span>
-          </summary>
-          <div className="admin-mobile-docket__content min-h-0 flex-1 lg:flex lg:flex-col">
-        <nav aria-label="Admin sections" className="px-md py-xs lg:flex-1 lg:px-xs lg:py-sm">
-          {docket.map((group) => (
-            <div
-              key={group.id}
-              className="flex flex-wrap items-center gap-x-xs gap-y-3xs py-3xs lg:mt-sm lg:block lg:py-0 lg:first:mt-0"
-            >
-              {group.label ? (
-                <p className="admin-folio me-2xs lg:me-0 lg:px-sm lg:pb-3xs lg:pt-2xs">
-                  {group.label}
-                </p>
-              ) : null}
-              <ul className="flex flex-wrap gap-2xs lg:flex-col lg:gap-3xs">
-                {group.items.map((item) => (
-                  <li key={item.to}>
-                    <NavLink
-                      to={`${ROOT}/${item.to}`}
-                      className={docketItemClass}
-                      onClick={() => setMobileDocketOpen(false)}
-                    >
-                      {item.label}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
-
-        <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline px-md py-sm lg:flex-col lg:items-stretch">
-          {/* An operator has to be able to tell which account the server
-              will see, so the address is set in the data face: it is an
-              identifier, and identifiers are the machine's. The tier word
-              beside it says what that account may do here. */}
-          <div className="min-w-0">
-            <p className="break-all font-admin-data text-admin-xs text-admin-rail-ink-muted">
-              {user?.email}
-            </p>
-            {tierKnown ? (
-              <p className="text-admin-xs font-semibold text-admin-rail-ink" data-admin-tier={adminTier}>
-                {adminTier === 'operator' ? 'Operator' : 'Staff'}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-xs">
-            <button
-              type="button"
-              ref={takeTourRef}
-              onClick={() => setTour((run) => (run ?? 0) + 1)}
-              className={railButtonClass}
-            >
-              Take the tour
-            </button>
-            <NavLink to="/" className={railButtonClass}>
-              View site
-            </NavLink>
-            <button type="button" onClick={signOut} className={railButtonClass}>
-              Sign out
-            </button>
-          </div>
-        </div>
-          </div>
-        </details>
       </div>
 
       <main id="admin-content" className="min-w-0 flex-1">

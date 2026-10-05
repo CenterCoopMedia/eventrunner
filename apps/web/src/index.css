@@ -2036,6 +2036,12 @@
   .admin-rail .admin-folio {
     @apply text-admin-rail-ink;
   }
+  .admin-mobile-docket > summary {
+    list-style: none;
+  }
+  .admin-mobile-docket > summary::-webkit-details-marker {
+    display: none;
+  }
 
   /* Part f: ONE ring on the light surfaces — the action blue, 3px, offset so
      it never collides with a rule — clearing the canvas, the panel and the

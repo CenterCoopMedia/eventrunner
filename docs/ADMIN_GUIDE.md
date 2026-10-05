@@ -6,7 +6,7 @@ How to run a client's site from the admin panel, in the order the work happens. 
 
 **The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.
 
-**On a phone, open Menu to reach the admin sections and account controls.** The band names the section you are in. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
+**On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
 
 ## Find your way: The tour
 
