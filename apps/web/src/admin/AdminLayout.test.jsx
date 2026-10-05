@@ -172,6 +172,14 @@ describe('the admin shell', () => {
       fireEvent.click(summary);
       await waitFor(() => expect(document.documentElement.style.overflow).toBe(''));
       expect(document.body.style.overflow).toBe('');
+
+      fireEvent.click(summary);
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe('hidden'));
+      const pagesLink = within(nav).getByRole('link', { name: 'Pages' });
+      pagesLink.focus();
+      fireEvent.click(pagesLink);
+      await waitFor(() => expect(docket).not.toHaveAttribute('open'));
+      expect(summary).toHaveFocus();
     } finally {
       document.body.style.overflow = originalBodyOverflow;
       if (original) window.matchMedia = original;

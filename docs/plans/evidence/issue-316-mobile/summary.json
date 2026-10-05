@@ -1,7 +1,7 @@
 {
-  "testedCommit": "f45eed4c19a06529bbb15c2f83a399d2034d8dc6",
-  "normalPublicMatrixTestedCommit": "8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2",
-  "supplementalAndAdminTestedCommit": "f45eed4c19a06529bbb15c2f83a399d2034d8dc6",
+  "testedCommit": "b08919fa0c4c36857a5c1313b44a335c035721a8",
+  "normalPublicMatrixTestedCommit": "4cd934e352103b2653979a674f38e78d081ccb50",
+  "supplementalAndAdminTestedCommit": "b08919fa0c4c36857a5c1313b44a335c035721a8",
   "status": "pass",
   "failures": 0,
   "publicHomeScheduleCells": 336,
@@ -78,5 +78,6 @@
     "/travel",
     "/sponsors",
     "/attendees"
-  ]
+  ],
+  "scope": "Historical source-tree evidence. Later detached-preview cleanup and compact Schedule changes require separate final-head verification."
 }

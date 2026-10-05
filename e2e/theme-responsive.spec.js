@@ -339,6 +339,14 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   await expect(tour.getByRole('heading', { name: 'Welcome to the admin panel' })).toBeFocused();
   await tour.getByRole('button', { name: 'End tour' }).click();
 
+  await summary.click();
+  const overviewLink = docket.getByRole('link', { name: 'Overview', exact: true });
+  await overviewLink.focus();
+  await overviewLink.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(docket).not.toHaveAttribute('open', '');
+  await expect(summary).toBeFocused();
+
   const pageEvidence = [];
   for (const destination of destinations) {
     await page.goto(destination.href);

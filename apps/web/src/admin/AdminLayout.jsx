@@ -410,7 +410,10 @@ function AdminDesk() {
                         <NavLink
                           to={`${ROOT}/${item.to}`}
                           className={docketItemClass}
-                          onClick={() => setMobileDocketOpen(false)}
+                          onClick={() => {
+                            if (!wide) mobileMenuRef.current?.focus();
+                            setMobileDocketOpen(false);
+                          }}
                         >
                           {item.label}
                         </NavLink>

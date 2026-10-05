@@ -1,13 +1,15 @@
 # Issue 316 mobile layout evidence
 
-This evidence covers the Issue 316 rendering changes through source commit
-`f45eed4c19a06529bbb15c2f83a399d2034d8dc6`. The normal 480-cell public matrix
-was captured at `8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2`. The later source delta changes
-the shared admin shell, Branding preview and whole-document serialization,
-tests, documentation and generated demo. The public stress, illustrated,
-reduced-motion and all CMS preview cells were rerun at `f45eed4c`. The full
-admin matrix and every admin destination were also run at `f45eed4c`. The
-evidence files are the only changes after that source commit.
+This is historical evidence through the source tree at
+`b08919fa0c4c36857a5c1313b44a335c035721a8`. The normal public matrix
+was captured from the source tree at
+`4cd934e352103b2653979a674f38e78d081ccb50`. These hashes identify the same
+source trees after the branch's DCO metadata repair.
+
+Later changes release detached preview documents and add the compact Schedule
+hero and grouped phone controls. The matrix and screenshots below do not
+verify those later changes. Their pass results apply only to the recorded
+source trees. Current shipping checks must verify the final PR head separately.
 
 The run used the project's Chromium Playwright project and synthetic Firebase
 emulators. It did not read or write a live event. The matrix uses real browser
@@ -125,3 +127,25 @@ show the [light closed bar](admin-light-412x844-closed.png),
 [light drawer](admin-light-412x844-drawer.png),
 [dark closed bar](admin-dark-412x844-closed.png) and
 [dark drawer](admin-dark-412x844-drawer.png) at 412 x 844px.
+
+
+## October 5 shipping verification
+
+The [shipping phone matrix](ship-phone-matrix.json) passes all 402 layout cells:
+25 admin destinations in both modes at 320, 390 and 412px (150 cells), and seven
+public routes in all six themes and both modes at those widths (252 cells).
+Every cell has zero horizontal document overflow. It uses synthetic E2E Test
+Summit content, real browser viewport widths and sandboxed Chromium.
+
+This matrix checks the final phone geometry, including the compact Schedule
+hero and grouped controls. It began at source tree `0575b679d841e7edec9bb1f8c93bb52193ae36d0`.
+The later menu focus repair changes interaction only; its separate keyboard
+regression checks destination activation, disclosure closure and Menu focus.
+The four preview/admin browser regressions also pass, including all six phone
+preview themes in both modes, hostile copy, public parity and detached frames.
+
+The before/after Overview captures use the same synthetic content and light
+mode at 390 x 844px and 1280 x 900px. Figures finish loading before capture.
+The main baseline has no phone disclosure: Its navigation remains expanded
+in both phone comparison rows. The after view has a closed compact bar and
+an open scrollable menu sheet.
