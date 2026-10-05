@@ -336,18 +336,16 @@ function AdminDesk() {
   }, [uid]);
   useEffect(() => {
     if (wide || !mobileDocketOpen) return undefined;
-    // The sheet owns the phone viewport while it is open. Lock both scroll
-    // roots so PageDown and touch scrolling cannot move the top bar, which
-    // carries the sheet's only dismiss control, out of view.
+    // The sheet owns the phone viewport while it is open. Lock the document
+    // scroll root so PageDown and touch scrolling cannot move the top bar,
+    // which carries the sheet's only dismiss control, out of view. Media
+    // dialogs own body overflow separately; leaving it alone prevents the two
+    // independent overlays from restoring a stale lock over each other.
     const root = document.documentElement;
-    const body = document.body;
     const rootOverflow = root.style.overflow;
-    const bodyOverflow = body.style.overflow;
     root.style.overflow = 'hidden';
-    body.style.overflow = 'hidden';
     return () => {
       root.style.overflow = rootOverflow;
-      body.style.overflow = bodyOverflow;
     };
   }, [wide, mobileDocketOpen]);
   const endTour = () => {

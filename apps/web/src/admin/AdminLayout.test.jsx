@@ -120,6 +120,7 @@ describe('the admin shell', () => {
 
   it('uses one compact phone bar and a full-width grouped menu sheet', async () => {
     const original = window.matchMedia;
+    const originalBodyOverflow = document.body.style.overflow;
     window.matchMedia = vi.fn(() => ({
       matches: false,
       addEventListener: vi.fn(),
@@ -157,14 +158,22 @@ describe('the admin shell', () => {
       expect(docket).toContainElement(screen.getByText('admin@example.org'));
       expect(docket).toContainElement(screen.getByRole('button', { name: 'Sign out' }));
 
+      // Stand in for an already-open media dialog, which owns body overflow.
+      document.body.style.overflow = 'hidden';
       fireEvent.click(summary);
       expect(docket).toHaveAttribute('open');
       await waitFor(() =>
         expect(container.querySelector('#admin-content')).toHaveAttribute('inert'),
       );
       expect(document.documentElement.style.overflow).toBe('hidden');
-      expect(document.body.style.overflow).toBe('hidden');
+      // A media dialog owns body overflow. If it closes while this sheet is
+      // open, closing the sheet must not restore the dialog's stale lock.
+      document.body.style.overflow = '';
+      fireEvent.click(summary);
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe(''));
+      expect(document.body.style.overflow).toBe('');
     } finally {
+      document.body.style.overflow = originalBodyOverflow;
       if (original) window.matchMedia = original;
       else delete window.matchMedia;
     }
