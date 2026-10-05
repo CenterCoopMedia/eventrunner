@@ -1,1 +1,0 @@
-import{c as u,r as e}from"./index-dZY1P0zV.js";import{s as c}from"./bookmarksSource-D1CiR-9y.js";function m(){const{user:s}=u(),[t,a]=e.useState(new Set),[r,o]=e.useState(!!s);return e.useEffect(()=>(o(!!s),c(s==null?void 0:s.uid,n=>{a(n),o(!1)},()=>o(!1))),[s==null?void 0:s.uid]),{bookmarkedIds:t,loading:r}}export{m as u};

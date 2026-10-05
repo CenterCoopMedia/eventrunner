@@ -320,7 +320,7 @@ export default function Schedule() {
         tagline={eventConfig.tagline}
         image={demoHero(theme) ?? getSectionBlocks?.('hero')?.find((block) => block.blockType === 'image')}
       />
-      <header className="schedule-page-header flex flex-wrap items-baseline justify-between gap-md">
+      <header className="schedule-page-header">
         <div>
           <h1 className="font-heading text-h1 font-semibold text-text-primary">Schedule</h1>
           {eventZoneLabel ? (
@@ -336,50 +336,6 @@ export default function Schedule() {
               className="mt-2xs"
               items={[{ term: 'Saved', meaning: 'how many attendees bookmarked a session' }]}
             />
-          ) : null}
-        </div>
-        {/* Controls do not print: a button on paper is a lie (index.css,
-            the print block). */}
-        <div className="no-print flex flex-wrap items-center gap-xs">
-          {features.sessionBookmarks && user && attendeeAccess ? (
-            <Link to="/schedule/mine" className={quietActionClass}>
-              My schedule
-            </Link>
-          ) : null}
-          {features.icsExport && !archived && visibleSessions.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => {
-                downloadIcs(icsFileName(eventConfig.shortName || eventConfig.name), buildIcsCalendar(eventConfig, visibleSessions));
-              }}
-              className={quietActionClass}
-            >
-              Download schedule (.ics)
-            </button>
-          ) : null}
-          {/* The take-it-with-you controls (issue #166). Print uses the
-              existing handout: the screen view hides and the print view
-              shows, which the stylesheet already owns. The PDF asks the
-              server for the same programme behind its feature flag. */}
-          {visibleSessions.length > 0 ? (
-            <button type="button" onClick={() => window.print()} className={quietActionClass}>
-              Print the schedule
-            </button>
-          ) : null}
-          {features.schedulePdf && visibleSessions.length > 0 ? (
-            <button
-              type="button"
-              onClick={onDownloadPdf}
-              disabled={pdfState.status === 'loading'}
-              className={quietActionClass}
-            >
-              Download schedule (PDF)
-            </button>
-          ) : null}
-          {pdfState.status === 'error' ? (
-            <p role="status" className="basis-full font-data text-caption text-text-secondary">
-              {pdfState.message}
-            </p>
           ) : null}
         </div>
       </header>
@@ -424,80 +380,119 @@ export default function Schedule() {
               </div>
             ) : null}
 
-          {/* The controls that narrow and order what the day shows. Controls
-              do not print: a button on paper is a lie (index.css, the print
-              block), and so is a search box. */}
-          <div className="schedule-controls no-print mt-md block items-start gap-lg sm:flex sm:flex-wrap">
-            <div className="w-full max-w-prose lg:w-auto lg:flex-1">
-              <SearchField
-                label="Search this day"
-                value={query}
-                onChange={(next) => updateView({ q: next }, { replace: true })}
-                status={
-                  query.trim() ? `${matchedCount} sessions match “${query.trim()}”` : undefined
-                }
-                placeholder="Title, room, speaker…"
-              />
-            </div>
-            {/* Optional controls stay one disclosure on a phone so the first
-                session follows the search promptly. The same details is
-                forced open above phone width; there is only one control tree
-                in the document, so labels and form state remain unique. */}
-            {formatOptions.length > 0 || trackOptions.length > 0 || sortOptions.length > 1 ? (
-              <details
-                className="schedule-optional-controls min-w-0 flex-1"
-                open={!compactFilters || filtersExpanded}
-                onToggle={(event) => {
-                  if (compactFilters) setFiltersExpanded(event.currentTarget.open);
-                }}
-              >
-                <summary className="touch-target cursor-pointer border-t-hairline border-rule-hairline font-data text-body font-semibold text-text-primary">
-                  Filter and sort sessions
-                  {formats.length + tracks.length > 0 ? (
-                    <span className="font-normal text-text-secondary">
-                      {' '}— {formats.length + tracks.length} selected
-                    </span>
-                  ) : null}
-                </summary>
-                <div className="schedule-optional-controls__body flex flex-wrap items-start gap-lg">
-                  {/* A group renders only when its facet has something to offer:
-                      a filter over nothing is a dead control. */}
-                  {formatOptions.length > 0 ? (
-                    <div className="flex-1">
-                      <FilterGroup
-                        legend="Format"
-                        options={formatOptions}
-                        selected={formats}
-                        onChange={(next) => updateView({ formats: next })}
-                        clearLabel="Clear format filter"
-                      />
-                    </div>
-                  ) : null}
-                  {trackOptions.length > 0 ? (
-                    <div className="flex-1">
-                      <FilterGroup
-                        legend="Track"
-                        options={trackOptions}
-                        selected={tracks}
-                        onChange={(next) => updateView({ tracks: next })}
-                        clearLabel="Clear track filter"
-                      />
-                    </div>
-                  ) : null}
-                  {sortOptions.length > 1 ? (
-                    <div className="flex-1">
-                      <SortControl
-                        label="Sort sessions"
-                        options={sortOptions}
-                        value={sort}
-                        onChange={(next) => updateView({ sort: next })}
-                      />
-                    </div>
-                  ) : null}
+          {/* Search, filtering and exports are one tool group. The native
+              disclosure keeps the first programme row in a short phone
+              viewport; from 640px upward it stays open and its summary is
+              hidden. Every control remains in one tree and stays reachable. */}
+          <details
+            className="schedule-controls schedule-optional-controls no-print mt-md"
+            open={!compactFilters || filtersExpanded}
+            onToggle={(event) => {
+              if (compactFilters) setFiltersExpanded(event.currentTarget.open);
+            }}
+          >
+            <summary className="touch-target cursor-pointer border-t-hairline border-rule-hairline font-data text-body font-semibold text-text-primary">
+              Search, filter, and export
+              {query.trim() || formats.length + tracks.length > 0 ? (
+                <span className="font-normal text-text-secondary">
+                  {' '}— {[query.trim() ? 'search active' : null,
+                    formats.length + tracks.length > 0
+                      ? `${formats.length + tracks.length} selected`
+                      : null]
+                    .filter(Boolean)
+                    .join(', ')}
+                </span>
+              ) : null}
+            </summary>
+            <div className="schedule-optional-controls__body flex flex-wrap items-start gap-lg">
+              <div className="w-full max-w-prose lg:w-auto lg:flex-1">
+                <SearchField
+                  label="Search this day"
+                  value={query}
+                  onChange={(next) => updateView({ q: next }, { replace: true })}
+                  status={
+                    query.trim() ? `${matchedCount} sessions match “${query.trim()}”` : undefined
+                  }
+                  placeholder="Title, room, speaker…"
+                />
+              </div>
+              {/* A group renders only when its facet has something to offer:
+                  a filter over nothing is a dead control. */}
+              {formatOptions.length > 0 ? (
+                <div className="flex-1">
+                  <FilterGroup
+                    legend="Format"
+                    options={formatOptions}
+                    selected={formats}
+                    onChange={(next) => updateView({ formats: next })}
+                    clearLabel="Clear format filter"
+                  />
                 </div>
-              </details>
-            ) : null}
-          </div>
+              ) : null}
+              {trackOptions.length > 0 ? (
+                <div className="flex-1">
+                  <FilterGroup
+                    legend="Track"
+                    options={trackOptions}
+                    selected={tracks}
+                    onChange={(next) => updateView({ tracks: next })}
+                    clearLabel="Clear track filter"
+                  />
+                </div>
+              ) : null}
+              {sortOptions.length > 1 ? (
+                <div className="flex-1">
+                  <SortControl
+                    label="Sort sessions"
+                    options={sortOptions}
+                    value={sort}
+                    onChange={(next) => updateView({ sort: next })}
+                  />
+                </div>
+              ) : null}
+              {/* Controls do not print: a button on paper is a lie. Print
+                  uses the handout below; PDF asks the server for the same
+                  programme behind its feature flag. */}
+              <div className="flex basis-full flex-wrap items-center gap-xs">
+                {features.sessionBookmarks && user && attendeeAccess ? (
+                  <Link to="/schedule/mine" className={quietActionClass}>
+                    My schedule
+                  </Link>
+                ) : null}
+                {features.icsExport && !archived && visibleSessions.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadIcs(icsFileName(eventConfig.shortName || eventConfig.name), buildIcsCalendar(eventConfig, visibleSessions));
+                    }}
+                    className={quietActionClass}
+                  >
+                    Download schedule (.ics)
+                  </button>
+                ) : null}
+                {visibleSessions.length > 0 ? (
+                  <button type="button" onClick={() => window.print()} className={quietActionClass}>
+                    Print the schedule
+                  </button>
+                ) : null}
+                {features.schedulePdf && visibleSessions.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={onDownloadPdf}
+                    disabled={pdfState.status === 'loading'}
+                    className={quietActionClass}
+                  >
+                    Download schedule (PDF)
+                  </button>
+                ) : null}
+                {pdfState.status === 'error' ? (
+                  <p role="status" className="basis-full font-data text-caption text-text-secondary">
+                    {pdfState.message}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </details>
 
           {/* The sheet the programme is drawn on (brief §4.6): a faint
               coordinate grid, below hairline contrast and inert to the

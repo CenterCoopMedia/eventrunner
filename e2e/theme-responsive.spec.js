@@ -165,7 +165,7 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
     };
   });
 
-  const publicContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const publicContext = await browser.newContext({ viewport: { width: 390, height: 606 } });
   try {
     const publicPage = await publicContext.newPage();
     await publicPage.goto('/');
@@ -184,6 +184,17 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
       };
     });
     expect(previewMetrics).toEqual(publicMetrics);
+
+    await publicPage.goto('/schedule');
+    await expect(publicPage.locator('.session-block').first()).toBeVisible();
+    const firstPublicSession = await publicPage.locator('.session-block').first().evaluate(
+      (element) => ({
+        top: element.getBoundingClientRect().top,
+        viewportHeight: element.ownerDocument.defaultView.innerHeight,
+      }),
+    );
+    expect(firstPublicSession.viewportHeight).toBe(606);
+    expect(firstPublicSession.top).toBeLessThan(firstPublicSession.viewportHeight);
   } finally {
     await publicContext.close();
   }

@@ -176,6 +176,29 @@ describe('SchedulePage', () => {
     expect(container.querySelector('.event-hero')).toHaveClass('event-hero--compact');
   });
 
+  it('keeps every phone schedule tool in one collapsed disclosure', () => {
+    const original = window.matchMedia;
+    window.matchMedia = (query) => ({
+      matches: query === '(max-width: 639px)',
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+    try {
+      renderSchedule();
+      const summary = screen.getByText('Search, filter, and export');
+      const tools = summary.closest('details');
+
+      expect(tools).not.toHaveAttribute('open');
+      expect(within(tools).getByLabelText('Search this day')).toBeInTheDocument();
+      expect(within(tools).getByRole('button', { name: 'Print the schedule' }))
+        .toBeInTheDocument();
+      expect(within(tools).getByText('Format')).toBeInTheDocument();
+    } finally {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    }
+  });
+
   it('groups sessions by day and sorts the active day by start time', () => {
     renderSchedule();
 

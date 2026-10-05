@@ -2549,13 +2549,15 @@
     }
     .event-hero__route { z-index: 1; }
     .event-hero__sign { display: none; }
-    .event-hero.event-hero--compact .event-hero__copy { padding-block: var(--space-md); }
-    .event-hero--compact .event-hero__title { font-size: clamp(1.9rem, 7.5vw, 2.6rem); }
-    .event-hero--compact .event-hero__dateline { margin-block-start: var(--space-sm); }
+    .event-hero.event-hero--compact .event-hero__copy { padding-block: var(--space-sm); }
+    .event-hero--compact .event-hero__title { font-size: clamp(1.55rem, 6vw, 2rem); }
+    .event-hero--compact .event-hero__dateline { margin-block-start: var(--space-xs); }
     .event-hero--compact .event-hero__tagline { display: none; }
     .event-hero--compact .event-hero__media { block-size: 7rem; }
-    .schedule-page-header { margin-block-start: var(--space-lg); }
-    .schedule-optional-controls { margin-block-start: var(--space-md); }
+    .schedule-page-header { margin-block-start: var(--space-md); }
+    .schedule-screen > .schedule-days { margin-block-start: var(--space-md); }
+    .schedule-optional-controls { margin-block-start: var(--space-sm); }
+    .schedule-screen > .map-grid { margin-block-start: var(--space-md); }
     .schedule-optional-controls > summary {
       display: flex;
       align-items: center;
