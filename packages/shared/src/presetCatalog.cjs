@@ -218,7 +218,7 @@ const PRESETS = Object.freeze({
       mono: 'plex-mono',
     },
     shape: {
-      radius: 'small',
+      radius: 'editorial',
       texture: 'flat',
       density: 'comfortable',
     },

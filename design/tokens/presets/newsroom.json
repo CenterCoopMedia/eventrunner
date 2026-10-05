@@ -153,7 +153,7 @@
     "mono": "plex-mono"
   },
   "shape": {
-    "radius": "small",
+    "radius": "editorial",
     "texture": "flat",
     "density": "comfortable"
   },
@@ -174,8 +174,7 @@
     "--hero-copy-border-inline-start": "0",
     "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)",
     "--standfirst-font": "var(--font-heading)",
-    "--standfirst-weight": "var(--weight-regular)",
-    "--radius-base": "4px"
+    "--standfirst-weight": "var(--weight-regular)"
   },
   "options": {
     "headingFace": {

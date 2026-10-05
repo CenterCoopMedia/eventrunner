@@ -334,7 +334,6 @@ const PRESET_REMAPS = Object.freeze({
         '--hero-veil-background': 'linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)',
         '--standfirst-font': 'var(--font-heading)',
         '--standfirst-weight': 'var(--weight-regular)',
-        '--radius-base': '4px',
       },
       options: {
         headingFace: {

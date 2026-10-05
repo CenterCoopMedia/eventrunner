@@ -51,7 +51,7 @@ NC Local’s historical demo uses broad editorial headlines, thin section rules 
 - **Shape**: 4px corners, flat surfaces, comfortable spacing.
 - **Devices**: The rule-bounded bar header; the hairline row for a session.
 - **Illustrations**: None.
-- **Deeper controls**: The heading face can move to Newsreader at display weights (one family throughout, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves. A long read opens on a standfirst; a quote is ruled with an opening mark, a side rule, or the mark alone; the directory is a portrait shelf or tall portraits; a table closes its head with a strong rule; a section boundary keeps its folio, drops it, or moves it to the margin.
+- **Deeper controls**: The heading face can move to Newsreader at display weights (a second serif family, quieter) or to Archivo bold condensed (more sessions per screen in a headline). The header can stack with a deck, which suits an event whose name needs a sentence after it, or become section-aware so the running header names where the reader is. Sessions can run as "lead and rest", which gives the first session of a day the room a keynote deserves. A long read opens on a standfirst; a quote is ruled with an opening mark, a side rule, or the mark alone; the directory is a portrait shelf or tall portraits; a table closes its head with a strong rule; a section boundary keeps its folio, drops it, or moves it to the margin.
 
 ### Zine
 
@@ -137,7 +137,7 @@ There is no fifth role. Zine's handwritten callout runs on a component token, wh
 
 **The scale is fluid and has eight steps** — nameplate, h1, h2, h3, lead, body, caption, folio — and each step carries its own size, line height, and tracking together. Never pick a size without its leading.
 
-**The bundled sets** are the only faces a site can use, and they are self-hosted. No page on a client site asks an external font service for anything, ever: Source Serif 4, Source Sans 3, Caveat, Libre Caslon Display, Libre Caslon Text, Libre Baskerville, Spectral, Fraunces, Newsreader, IBM Plex Sans, IBM Plex Mono, Archivo Condensed, Merriweather, Public Sans, Karrik, Bagnard, Avara, Fragment Mono, Besley, Vollkorn, Overpass, Overpass Mono, Libre Franklin.
+**The bundled sets** are the only faces a site can use, and they are self-hosted. No page on a client site asks an external font service for anything, ever: Source Serif 4, Source Sans 3, Caveat, Libre Caslon Display, Libre Caslon Text, Libre Baskerville, Spectral, Fraunces, Newsreader, IBM Plex Sans, IBM Plex Mono, Archivo Condensed, Merriweather, Public Sans, Karrik, Bagnard, Avara, Fragment Mono, Besley, Vollkorn, Overpass, Overpass Mono, Libre Franklin, Cabin.
 
 **Heading-face options** are the sanctioned way to change type: Each style offers three, and they are chosen to still work with that style's body face. Naming a role outright is the override path, and it is where a pairing can go wrong.
 

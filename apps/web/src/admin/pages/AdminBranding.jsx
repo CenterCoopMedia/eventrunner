@@ -308,7 +308,7 @@ const FONT_SET_LABELS = {
   'script-casual': 'Script casual',
 };
 
-const RADIUS_LABELS = { sharp: 'Sharp', small: 'Small', soft: 'Soft', round: 'Round' };
+const RADIUS_LABELS = { sharp: 'Sharp', small: 'Small', editorial: 'Editorial (4px)', soft: 'Soft', round: 'Round' };
 const TEXTURE_LABELS = { paper: 'Paper grain', flat: 'Flat' };
 const DENSITY_LABELS = { tight: 'Tight', comfortable: 'Comfortable', loose: 'Loose' };
 

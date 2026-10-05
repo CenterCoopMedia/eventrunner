@@ -27,6 +27,8 @@ afterparty at Trophy Brewing’s The Bend Bar, 853 W Morgan St, Raleigh.
 
 The hero headline is an adaptation for the demo. Speaker text records only the
 published session and affiliation; it does not invent biographies or portraits.
+The topical track names and session format chips are demo presentation groupings,
+not a claim about the organizer's published track system.
 
 ## Source and asset provenance
 
@@ -34,6 +36,7 @@ published session and affiliation; it does not invent biographies or portraits.
 - Program: [Published 2026 agenda](https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119). Exact eight-session details were supplied from this agenda in the approved task brief; automated access to the ended listing was unavailable during implementation.
 - Corroboration: [Elon University recap](https://www.elon.edu/u/news/2026/04/01/nc-news-information-summit-draws-record-attendance-spotlights-ais-impact-on-local-news/), [Catherine Komp post](https://www.linkedin.com/posts/catherinekomp_we-are-less-than-a-week-away-from-the-2026-activity-7440777551871926272-a_42) and [ProJourn listing](https://projourn.org/event/north-carolina-news-information-summit).
 - Logo: [Official NC Local horizontal artwork](https://nclocal.org/wp-content/uploads/2025/06/cropped-NCLocal_Logo_Horizontal_Dark_1200px.png), 1200×260, preserved unchanged in `apps/web/public/branding/nclocal-logo.png`. The header preserves its aspect ratio and uses a white backing in dark mode.
+- App icons: The same horizontal artwork sits unchanged on a warm square canvas. The demo manifest uses `purpose: any`; it does not claim maskable support. The SVG source and 192px/512px raster exports are in `apps/web/public/branding/`.
 - Documentary photo: [Elon University’s opening-panel photograph](https://eloncdn.blob.core.windows.net/eu3/sites/74/2026/04/Summit-Panel-950x535.jpg), shown with visible source credit. This is historical reference imagery for the mock-up; no new photo or endorsement is claimed.
 - Cabin: [Google Fonts upstream](https://github.com/google/fonts/tree/main/ofl/cabin), self-hosted Latin variable WOFF2, weights 400–700. SIL Open Font License 1.1 accompanies it as `OFL-cabin.txt`.
 

@@ -19,8 +19,8 @@
  * `npm run build -w apps/web` WITHOUT these switches, so every demo branch
  * compiles away to dead code there and their output is unchanged.
  *
- * The content is the committed synthetic snapshot in apps/web/src/generated
- * (a fictional event, spec §2.4/§5.4). GENERATED_DIR is deliberately NOT
+ * The content is the approved public historical fixture in apps/web/src/generated.
+ * GENERATED_DIR is deliberately NOT
  * honored: pointing this at a real client's Firestore export would publish
  * that client's content into a public repository, which §8.6 exists to
  * prevent. It is cleared for the child process even if the caller set it.
@@ -96,6 +96,18 @@ async function writeDemoSiteFiles({ base }) {
     process.exit(1);
   }
   const snapshot = demoSnapshot();
+  // The historical demo bundles its official artwork. Client icon generation
+  // still uses the uploaded square mark and its existing fallback policy.
+  for (const size of [192, 512]) {
+    fs.copyFileSync(
+      path.join(WEB_DIR, 'public', 'branding', `nclocal-icon-${size}.png`),
+      path.join(DIST_DIR, 'branding', `app-icon-${size}.png`),
+    );
+  }
+  const manifestPath = path.join(DIST_DIR, 'manifest.webmanifest');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.icons = manifest.icons.map((icon) => ({ ...icon, purpose: 'any' }));
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const indexPath = path.join(DIST_DIR, 'index.html');
   fs.writeFileSync(indexPath, demoHeadMetadata(fs.readFileSync(indexPath, 'utf8'), snapshot, publicUrl));
 }

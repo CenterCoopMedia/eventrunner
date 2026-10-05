@@ -139,6 +139,7 @@ const FONT_SETS = {
 const RADIUS_SCALES = {
   sharp: ['0px', '2px'],
   small: ['2px', '4px'],
+  editorial: ['4px', '4px'],
   soft: ['8px', '16px'],
   round: ['16px', '28px'],
 };

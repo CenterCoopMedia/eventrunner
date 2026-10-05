@@ -130,7 +130,7 @@ Use this style for publications, media conferences, and newsroom events.
 | Body | `merriweather` |
 | Data | `cabin` |
 | Figures and code | `plex-mono` |
-| Corners | small |
+| Corners | editorial |
 | Surface | flat |
 | Density | comfortable |
 | Illustrations | none |

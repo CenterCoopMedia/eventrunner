@@ -15,4 +15,4 @@ Art direction follows the approved September 11, 2026 transit mockups: a quiet c
 | civic.webp | Sunlit civic architecture and a waterfront plaza, open sky at left. |
 | zine.webp | Riso print collage with a microphone, hands, paper, toner, and hot magenta. |
 
-Source artwork is 1536 × 1024. WebP copies strip metadata and use quality 83. The Atlas day and night pair preserves the same composition. Decorative transit marks use the shared code icon set. Full source receipts are kept in the session task record.
+The illustrative source artwork is 1536 × 1024. Its WebP copies strip metadata and use quality 83. The documentary JPEG is 950 × 535. The Atlas day and night pair preserves the same composition. Decorative transit marks use the shared code icon set. Source provenance is in `docs/nclocal-demo.md`.

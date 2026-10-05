@@ -127,8 +127,8 @@
   --font-data: 'Cabin', Arial, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Tier 2 — radius scale: 'small'. ('sharp' → 0 / 2px, 'small' → 2px / 4px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
-  --radius-base: 2px;
+  /* Tier 2 — radius scale: 'editorial'. ('sharp' → 0 / 2px, 'small' → 2px / 4px, 'soft' → 8px / 16px, 'round' → 16px / 28px.) */
+  --radius-base: 4px;
   --radius-large: 4px;
 
   /* Tier 2 — texture treatment: config/theme.texture = 'flat' | 'paper'. Flat is the base; a texture is a theme opt-in, painted by the .page-surface layer in index.css. */
@@ -432,7 +432,6 @@
   --hero-veil-background: linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%);
   --standfirst-font: var(--font-heading);
   --standfirst-weight: var(--weight-regular);
-  --radius-base: 4px;
   --nameplate-align: start;
   --nameplate-rule-width: var(--rule-strong-width);
   --nameplate-meta-placement: inline;
