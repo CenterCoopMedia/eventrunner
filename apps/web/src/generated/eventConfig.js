@@ -93,7 +93,7 @@ export const eventConfig = {
   archivedAt: '2026-03-28T00:00:00',
   seo: {
     description: 'Past-event demo of the 2026 NC News & Information Summit in Raleigh: Selected historical sessions, speakers and documented partners.',
-    defaultOgImagePath: 'branding/nclocal-og.svg',
+    defaultOgImagePath: 'branding/nclocal-og.png',
     organizerName: 'NC Local and NC Open Government Coalition',
     organizerUrl: 'https://nclocal.org/',
   },
@@ -138,7 +138,7 @@ export const theme = {
     primary: 'branding/nclocal-logo.png',
     mark: 'branding/nclocal-logo.png',
     footer: 'branding/nclocal-logo.png',
-    ogDefault: 'branding/nclocal-og.svg',
+    ogDefault: 'branding/nclocal-og.png',
     favicon: 'branding/nclocal-favicon.svg',
   },
 };

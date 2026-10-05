@@ -64,6 +64,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const { main: writeSiteFiles } = require('./write-site-files.cjs');
+const { demoSnapshot } = require('./lib/demo-event.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
@@ -94,6 +95,27 @@ async function writeDemoSiteFiles({ base }) {
     console.error(`write-site-files failed while building the demo (exit ${code}).`);
     process.exit(1);
   }
+  const snapshot = demoSnapshot();
+  const indexPath = path.join(DIST_DIR, 'index.html');
+  fs.writeFileSync(indexPath, demoHeadMetadata(fs.readFileSync(indexPath, 'utf8'), snapshot, publicUrl));
+}
+
+function demoHeadMetadata(html, { event, theme }, publicUrl) {
+  const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]
+  ));
+  const title = `${event.name} · Past-event demo`;
+  const image = new URL(event.seo.defaultOgImagePath, `${publicUrl}/`).href;
+  const icon = new URL(theme.logos.favicon, `${publicUrl}/`).href;
+  const tags = [
+    ['name', 'description', event.seo.description],
+    ['property', 'og:title', title], ['property', 'og:description', event.seo.description],
+    ['property', 'og:type', 'website'], ['property', 'og:url', publicUrl], ['property', 'og:image', image],
+    ['name', 'twitter:card', 'summary_large_image'], ['name', 'twitter:title', title], ['name', 'twitter:image', image],
+  ].map(([attribute, key, value]) => `    <meta ${attribute}="${key}" content="${escape(value)}" />`).join('\n');
+  return html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escape(title)}</title>`)
+    .replace(/<link rel="icon"[^>]*>/, `<link rel="icon" type="image/svg+xml" href="${escape(icon)}" />`)
+    .replace('</head>', `${tags}\n  </head>`);
 }
 
 /**
@@ -453,4 +475,5 @@ module.exports = {
   main,
   runCheck,
   writeDemoSiteFiles,
+  demoHeadMetadata,
 };

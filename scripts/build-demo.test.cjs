@@ -28,9 +28,20 @@ const {
   DEMO_FIREBASE_ENV,
   UsageError,
   main,
+  demoHeadMetadata,
 } = require('./build-demo.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
+
+test('static demo metadata identifies the historical fixture and escapes source text', () => {
+  const html = '<head><title>Event site</title><link rel="icon" href="/branding/favicon.svg" /></head>';
+  const snapshot = { event: { name: 'NC News & Information Summit', seo: { description: 'Historical "2026" program', defaultOgImagePath: 'branding/nclocal-og.png' } }, theme: { logos: { favicon: 'branding/nclocal-favicon.svg' } } };
+  const result = demoHeadMetadata(html, snapshot, 'https://example.org/demo');
+  assert.match(result, /NC News &amp; Information Summit · Past-event demo/);
+  assert.match(result, /Historical &quot;2026&quot; program/);
+  assert.match(result, /content="https:\/\/example.org\/demo\/branding\/nclocal-og.png"/);
+  assert.match(result, /href="https:\/\/example.org\/demo\/branding\/nclocal-favicon.svg"/);
+});
 
 test('defaults target the Pages subpath and docs/demo', () => {
   const options = parseArgs([]);

@@ -139,9 +139,9 @@ function demoEvent() {
   if (!built.ok) throw new Error(`demo fixture no longer validates: ${built.errors.join('; ')}`);
   const config = built.docs;
   Object.assign(config.features, { updates: true, attendeeDirectory: false, icsExport: false });
-  Object.assign(config.theme.logos, { primary: 'branding/nclocal-logo.png', mark: 'branding/nclocal-logo.png', footer: 'branding/nclocal-logo.png', ogDefault: 'branding/nclocal-og.svg', favicon: 'branding/nclocal-favicon.svg' });
+  Object.assign(config.theme.logos, { primary: 'branding/nclocal-logo.png', mark: 'branding/nclocal-logo.png', footer: 'branding/nclocal-logo.png', ogDefault: 'branding/nclocal-og.png', favicon: 'branding/nclocal-favicon.svg' });
   Object.assign(config.event, { announcedAt: '2026-01-01T12:00:00', archivedAt: '2026-03-28T00:00:00' });
-  config.event.seo.defaultOgImagePath = 'branding/nclocal-og.svg';
+  config.event.seo.defaultOgImagePath = 'branding/nclocal-og.png';
   config.event.seo.organizerUrl = 'https://nclocal.org/';
   const visiblePages = new Set(['home', 'schedule', 'speakers', 'sponsors', 'travel', 'recap', 'faq', 'privacy', 'terms', 'contact', 'city_guide', 'conduct', 'guidelines']);
   const labels = { schedule: 'Program', sponsors: 'Partners', travel: 'Locations', city_guide: 'Raleigh', recap: 'Recap' };
