@@ -59,6 +59,7 @@ const ADMIN_READABLE = [
   { path: "speakers/spk-tier", tier: "admin" },
   { path: "feedback/f-tier", tier: "admin" },
   { path: "change_requests/cr-tier", tier: "admin" },
+  { path: "session_pitches/pitch-tier", tier: "admin" },
 ];
 
 /**
@@ -192,6 +193,20 @@ beforeAll(async () => {
       createdAt: new Date(),
       updatedAt: null,
       updatedBy: null,
+    });
+    await setDoc(doc(db, "session_pitches/pitch-tier"), {
+      title: "Tier fixture",
+      description: "A private pitch used to verify admin read access.",
+      organization: null,
+      format: null,
+      status: "new",
+      reviewRevision: 0,
+      uid: "attendee-1",
+      email: "attendee@example.com",
+      privateNotes: null,
+      createdAt: new Date(),
+      reviewedAt: null,
+      reviewedBy: null,
     });
     // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
     // profile visibility on it, and setPublicProfilesFeature() flips it.
@@ -538,6 +553,7 @@ describe("server-only collections stay deny-all", () => {
     "email_templates",
     // The change request rate limit (issue #188), one document per account.
     "change_request_rate_limits",
+    "session_pitch_rate_limits",
     "cmsContentSectionLocks",
     "speaker_slugs",
     "speaker_invites",

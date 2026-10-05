@@ -116,6 +116,13 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Private session pitch APIs for verified accounts, without a ticket requirement. Operators open
+          or close intake through <code>config/pitch_call</code>; staff review proposals with status and revision
+          checks. Account-scoped retry keys and atomic rate limits prevent duplicate or excessive writes.
+          Firestore rules keep pitches and notes private, and rate-limit records are server-only. Reviews
+          are audited but do not publish sessions, grant roles or send mail. Pitches retain the captured
+          uid and email after account deletion; deployments must define retention before opening intake
+          (#322).</li>
           <li>Site-wide announcements for staff and operators. Each record has plain-text content, a notice or
           urgent level, a required start and end time, and an optional safe web link. Saving is live at
           once. The public shell shows every active announcement on every route, rechecks the window while
