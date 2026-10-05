@@ -248,7 +248,7 @@ describe('the proof', () => {
     expect(screen.getByText('Schedule · light · 1440px · published theme')).toBeInTheDocument();
     // And the FRAME really moved. `initialEntries` is read once, so the
     // router has to remount or the line and the picture disagree.
-    expect(await within(frame()).findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
+    expect(await within(frame()).findByRole('heading', { name: 'Program' })).toBeInTheDocument();
   });
 
   it('switches light and dark instantly, as two proofs of one forme', async () => {
