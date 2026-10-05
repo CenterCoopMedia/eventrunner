@@ -37,9 +37,9 @@ You are still in the room where the paper gets made, and the room has been fitte
 - **The title band** — the page header. The page's name at title size on the white ground, a
   small mark in the client's colour beside it, the record's state badge and identifiers beside or
   under the name, and the page's own actions at the trailing end. The band runs to the edges of
-  the work surface and holds the top of the viewport while the page scrolls, so the name and the
-  save actions are always in reach. The page's description is a paragraph under the band, not
-  inside it.
+  the work surface. From 640px upward it holds the top of the viewport while the page scrolls, so
+  the name and save actions stay in reach. On a phone it scrolls with the work, so wrapped actions
+  do not cover the form. The page's description is a paragraph under the band, not inside it.
 - **The panel** — a white surface on the canvas inside a hairline rule with the panel radius. A
   panel's heading is bold at the large step with its description under it in the secondary ink.
   Elevation is the step from the canvas to the paper; no shadow ships.

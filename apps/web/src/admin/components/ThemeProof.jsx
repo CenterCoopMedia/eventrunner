@@ -432,16 +432,35 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
     }),
     [realConfig, stressDay],
   );
-  const stressContent = useMemo(
-    () => ({
+  const stressContent = useMemo(() => {
+    const realHeroTitle = realContent.getBlock?.('hero', 'title');
+    const stressHeroTitle = {
+      ...realHeroTitle,
+      id: realHeroTitle?.id ?? 'hero__title',
+      section: 'hero',
+      field: 'title',
+      blockType: 'text',
+      visible: true,
+      value: STRESS_EVENT_NAME,
+    };
+    return {
       ...realContent,
       scheduleData: denseSchedule(
         realContent.scheduleData ?? [],
         realConfig.eventConfig?.days?.[0]?.id ?? STRESS_DAY.id,
       ),
-    }),
-    [realContent, realConfig],
-  );
+      getBlock: (section, field) =>
+        section === 'hero' && field === 'title'
+          ? stressHeroTitle
+          : realContent.getBlock?.(section, field),
+      getSectionBlocks: (section) => {
+        const blocks = realContent.getSectionBlocks?.(section) ?? [];
+        if (section !== 'hero') return blocks;
+        const withoutTitle = blocks.filter((block) => block?.field !== 'title');
+        return [stressHeroTitle, ...withoutTitle];
+      },
+    };
+  }, [realContent, realConfig]);
   const previewConfig = useMemo(
     () => ({ ...(stress ? stressConfig : realConfig), theme: themeDoc }),
     [realConfig, stress, stressConfig, themeDoc],

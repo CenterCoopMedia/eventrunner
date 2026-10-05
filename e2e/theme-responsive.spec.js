@@ -105,7 +105,9 @@ test('phone proof uses its own viewport and public inheritance for every theme a
       const stressedHome = page.frameLocator(
         `iframe[title="Home preview, ${mode} mode, 390px wide"]`,
       );
-      await expect(stressedHome.locator('.event-hero__title')).toBeVisible();
+      await expect(stressedHome.locator('.event-hero__title')).toContainText(
+        'The Fifteenth Annual Regional Convening',
+      );
       expect(await iframe.evaluate((element) => ({
         clientWidth: element.contentDocument.documentElement.clientWidth,
         scrollWidth: element.contentDocument.documentElement.scrollWidth,
@@ -119,6 +121,13 @@ test('phone proof uses its own viewport and public inheritance for every theme a
         'The Fifteenth Annual Regional Convening',
       );
       await expect(stressedSchedule.locator('.session-block')).toHaveCount(28);
+      const optionalControls = stressedSchedule.locator('.schedule-optional-controls');
+      await expect(optionalControls).not.toHaveAttribute('open', '');
+      const filtersSummary = optionalControls.locator('summary');
+      await expect(filtersSummary).toBeVisible();
+      expect((await filtersSummary.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      await filtersSummary.press('Enter');
+      await expect(stressedSchedule.getByText('Format', { exact: true })).toBeVisible();
       const stressedScheduleFrame = page.locator(
         `iframe[title="Schedule preview, ${mode} mode, 390px wide"]`,
       );
@@ -193,6 +202,7 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
   }
   await page.getByRole('button', { name: 'Light', exact: true }).click();
 
+  await page.getByLabel('Site style').selectOption('newsroom');
   await page.getByRole('button', { name: 'Schedule' }).click();
   const scheduleFrame = page.frameLocator(
     'iframe[title="Schedule preview, light mode, 390px wide"]',
@@ -200,6 +210,14 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
   await expect(scheduleFrame.locator('.schedule-screen')).toBeVisible();
   await expect(scheduleFrame.locator('.schedule-grid')).toHaveCount(0);
   await expect(scheduleFrame.locator('.event-hero')).toHaveClass(/event-hero--compact/);
+  await expect(scheduleFrame.locator('.schedule-optional-controls')).not.toHaveAttribute('open', '');
+  const firstSession = await scheduleFrame.locator('.session-block').first().evaluate(
+    (element) => ({
+      top: element.getBoundingClientRect().top,
+      viewportHeight: element.ownerDocument.defaultView.innerHeight,
+    }),
+  );
+  expect(firstSession.top).toBeLessThan(firstSession.viewportHeight);
 });
 
 test('a light proof keeps public inheritance inside a dark admin', async ({ page }) => {

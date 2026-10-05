@@ -2150,8 +2150,8 @@
   }
 
   /* The title band: the page's name on the raised ground, running to the
-     stone's edges and holding the top of the viewport while the page
-     scrolls, so the name and the page's own actions are always in reach. */
+     stone's edges. It scrolls with the work on a phone, where wrapped actions
+     would otherwise cover the form, and holds the viewport from 640px up. */
   .admin-job-line {
     position: static;
     z-index: 8;
@@ -2493,6 +2493,8 @@
     background: var(--schedule-day-active-background);
     border-color: var(--schedule-day-active-border-color);
   }
+  .schedule-optional-controls > summary { display: none; }
+  .schedule-optional-controls__body { padding-block-start: 0; }
   .schedule-route { padding-inline-start: var(--schedule-route-pad-inline-start); }
   .schedule-page-header { margin-block-start: var(--space-xl); }
   .schedule-route > .session-block::after {
@@ -2547,6 +2549,14 @@
     .event-hero--compact .event-hero__tagline { display: none; }
     .event-hero--compact .event-hero__media { block-size: 7rem; }
     .schedule-page-header { margin-block-start: var(--space-lg); }
+    .schedule-controls { display: block; }
+    .schedule-optional-controls { margin-block-start: var(--space-md); }
+    .schedule-optional-controls > summary {
+      display: flex;
+      align-items: center;
+      padding-block: var(--space-xs);
+    }
+    .schedule-optional-controls__body { padding-block-start: var(--space-sm); }
   }
 }
 

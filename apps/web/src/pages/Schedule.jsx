@@ -102,6 +102,8 @@ export default function Schedule() {
   // browser that cannot be asked gets the accessible baseline rather than a
   // grid it has no room for.
   const wide = useMediaQuery(WIDE_VIEWPORT);
+  const compactFilters = useMediaQuery('(max-width: 639px)');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // The whole view lives in the URL (issue #164): the search, the facet
   // filters, the day, and the sort all round trip through query parameters,
@@ -425,7 +427,7 @@ export default function Schedule() {
           {/* The controls that narrow and order what the day shows. Controls
               do not print: a button on paper is a lie (index.css, the print
               block), and so is a search box. */}
-          <div className="no-print mt-md flex flex-wrap items-start gap-lg">
+          <div className="schedule-controls no-print mt-md flex flex-wrap items-start gap-lg">
             <div className="w-full max-w-prose lg:w-auto lg:flex-1">
               <SearchField
                 label="Search this day"
@@ -437,39 +439,63 @@ export default function Schedule() {
                 placeholder="Title, room, speaker…"
               />
             </div>
-            {/* A group renders only when its facet has something to offer:
-                a filter over nothing is a dead control. */}
-            {formatOptions.length > 0 ? (
-              <div className="flex-1">
-                <FilterGroup
-                  legend="Format"
-                  options={formatOptions}
-                  selected={formats}
-                  onChange={(next) => updateView({ formats: next })}
-                  clearLabel="Clear format filter"
-                />
-              </div>
-            ) : null}
-            {trackOptions.length > 0 ? (
-              <div className="flex-1">
-                <FilterGroup
-                  legend="Track"
-                  options={trackOptions}
-                  selected={tracks}
-                  onChange={(next) => updateView({ tracks: next })}
-                  clearLabel="Clear track filter"
-                />
-              </div>
-            ) : null}
-            {sortOptions.length > 1 ? (
-              <div className="flex-1">
-                <SortControl
-                  label="Sort sessions"
-                  options={sortOptions}
-                  value={sort}
-                  onChange={(next) => updateView({ sort: next })}
-                />
-              </div>
+            {/* Optional controls stay one disclosure on a phone so the first
+                session follows the search promptly. The same details is
+                forced open above phone width; there is only one control tree
+                in the document, so labels and form state remain unique. */}
+            {formatOptions.length > 0 || trackOptions.length > 0 || sortOptions.length > 1 ? (
+              <details
+                className="schedule-optional-controls min-w-0 flex-1"
+                open={!compactFilters || filtersExpanded}
+                onToggle={(event) => {
+                  if (compactFilters) setFiltersExpanded(event.currentTarget.open);
+                }}
+              >
+                <summary className="touch-target cursor-pointer border-t-hairline border-rule-hairline font-data text-body font-semibold text-text-primary">
+                  Filter and sort sessions
+                  {formats.length + tracks.length > 0 ? (
+                    <span className="font-normal text-text-secondary">
+                      {' '}— {formats.length + tracks.length} selected
+                    </span>
+                  ) : null}
+                </summary>
+                <div className="schedule-optional-controls__body flex flex-wrap items-start gap-lg">
+                  {/* A group renders only when its facet has something to offer:
+                      a filter over nothing is a dead control. */}
+                  {formatOptions.length > 0 ? (
+                    <div className="flex-1">
+                      <FilterGroup
+                        legend="Format"
+                        options={formatOptions}
+                        selected={formats}
+                        onChange={(next) => updateView({ formats: next })}
+                        clearLabel="Clear format filter"
+                      />
+                    </div>
+                  ) : null}
+                  {trackOptions.length > 0 ? (
+                    <div className="flex-1">
+                      <FilterGroup
+                        legend="Track"
+                        options={trackOptions}
+                        selected={tracks}
+                        onChange={(next) => updateView({ tracks: next })}
+                        clearLabel="Clear track filter"
+                      />
+                    </div>
+                  ) : null}
+                  {sortOptions.length > 1 ? (
+                    <div className="flex-1">
+                      <SortControl
+                        label="Sort sessions"
+                        options={sortOptions}
+                        value={sort}
+                        onChange={(next) => updateView({ sort: next })}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              </details>
             ) : null}
           </div>
 
