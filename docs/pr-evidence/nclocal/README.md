@@ -4,13 +4,13 @@ Desktop: 1280 × 800. Phone: 390 × 844. Images capture the full document at
 these viewport sizes. The light images form the paired before/after set.
 Dark after images record the second supported mode.
 
-Before: Base `4ae4a1aaae0a5eb8ed0b724a72119b5332d6c93a`, with the same
+Before: Base `dec343bf65a22c9a376b3f5b459f91da6b43f724`, with the same
 approved historical content supplied through `GENERATED_DIR`. Its theme CSS,
 theme config and neutral branding stay at the base revision. This fixture
 overlay makes the visual comparison use the same sessions, people and prose.
 The source diff records the replacement of the previous fictional content.
 
-After: Source `aee62acce9486137727c6170e0f47acbde1d1ac4`, with the committed
+After: Source `7c4906c455dce9f052f9c8ec00184db8864f0b79`, with the committed
 historical content and NC Local theme. The after images use the fresh Node 22
 lockfile build from Legion, served by a loopback-only local preview. The before
 uses the isolated base development server. Both use `VITE_DEMO_MODE=1`.
@@ -19,9 +19,11 @@ semantic locators; screenshots did not supply click coordinates.
 
 This refresh uses the official Google Fonts Cabin normal Latin 400–700 slice:
 28,320 bytes, below the project's existing 60 KB font limit. Its asset source
-and digest are recorded in `field-evidence.json`. The prior full CI at `4b668285` passed all ten tiers, including 3,031 web
-tests, 2,787 node tests, 352 rules tests and 62 browser cases. This source limits
-the derived white wordmark to screen media and adds one CSS regression test.
+and digest are recorded in `field-evidence.json`. The prior full CI at `c873c639`, based on `4ae4a1aa`, passed all ten tiers,
+including 3,032 web tests, 2,787 node tests, 352 rules tests and 62 browser
+cases. This refresh integrates current main at `dec343bf`, including its
+session pitch workspace. The derived white wordmark remains limited to
+screen media and has a CSS regression test.
 Final exact-head CI and independent review receipts are recorded separately in
 the PR.
 
@@ -85,8 +87,8 @@ the larger consumer. These images were opened and inspected.
 ## Printed views
 
 The Program and Partners print pairs use the same historical fixture and
-1280 × 800 viewport. The before source is base `4ae4a1aa`; after is source
-`aee62acc`. Chromium emulates print media while the root remains in dark mode.
+1280 × 800 viewport. The before source is base `dec343bf`; after is source
+`7c4906c4`. Chromium emulates print media while the root remains in dark mode.
 The original teal wordmark is retained on the light print surface. The derived
 white wordmark is applied only on screen. `after-print-evidence.json` records
 the actual image source, computed content and background; Program switches to
