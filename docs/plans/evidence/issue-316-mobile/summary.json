@@ -1,7 +1,7 @@
 {
-  "testedCommit": "7905c10372c59f6ab779049a7072a1d13cd19288",
+  "testedCommit": "ecdfa10feec0c695cfb60820262c1d7b784e41ae",
   "normalPublicMatrixTestedCommit": "8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2",
-  "supplementalAndAdminTestedCommit": "7905c10372c59f6ab779049a7072a1d13cd19288",
+  "supplementalAndAdminTestedCommit": "ecdfa10feec0c695cfb60820262c1d7b784e41ae",
   "status": "pass",
   "failures": 0,
   "publicHomeScheduleCells": 336,
