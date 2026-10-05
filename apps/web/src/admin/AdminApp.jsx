@@ -39,6 +39,7 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // The overview is the page the admin opens on (issue #179). Lazy like the
 // sessions list, so its figures and panels stay out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
+const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
 const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
@@ -146,6 +147,7 @@ export default function AdminApp() {
             path="overview"
             element={<DeferredAdminPage label="overview"><AdminOverview /></DeferredAdminPage>}
           />
+          <Route path="pitches" element={<DeferredAdminPage label="session pitches"><AdminSessionPitches /></DeferredAdminPage>} />
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />

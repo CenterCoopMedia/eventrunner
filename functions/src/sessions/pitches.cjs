@@ -29,7 +29,7 @@ const PITCH_CALL_PATH = 'config/pitch_call';
 
 const STATUSES = Object.freeze(['new', 'in_review', 'accepted', 'rejected']);
 const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
-const RFC3339_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|([+-])(\d{2}):(\d{2}))$/;
+const { readClosesAt } = require('shared/pitch');
 
 const MAX_TITLE_LENGTH = 160;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -82,6 +82,7 @@ function readSubmission(body) {
   if (!organization.ok) return organization;
   const format = readOptionalText(source, 'format', MAX_FORMAT_LENGTH);
   if (!format.ok) return format;
+  if (source.consent !== true) return { ok: false, message: 'consent: Agree to organizer review before submitting.' };
   const submissionKey = source.submissionKey;
   if (typeof submissionKey !== 'string' || !SUBMISSION_KEY_RE.test(submissionKey)) {
     return { ok: false, message: 'submissionKey: must be 8-128 characters of [A-Za-z0-9_-].' };
@@ -93,30 +94,10 @@ function readSubmission(body) {
     organization: organization.value,
     format: format.value,
     submissionKey,
+    consent: source.consent === true,
   };
 }
 
-function isValidCalendarDate(year, month, day) {
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year
-    && date.getUTCMonth() === month - 1
-    && date.getUTCDate() === day;
-}
-
-/** Return a canonical RFC3339 instant, or null. */
-function readClosesAt(value) {
-  if (typeof value !== 'string') return null;
-  const match = value.match(RFC3339_RE);
-  if (!match) return null;
-  const [, y, mo, d, h, mi, s, , oh, om] = match;
-  const parts = [y, mo, d, h, mi, s, oh ?? '0', om ?? '0'].map(Number);
-  const [year, month, day, hour, minute, second, offsetHour, offsetMinute] = parts;
-  if (!isValidCalendarDate(year, month, day)
-      || hour > 23 || minute > 59 || second > 59
-      || offsetHour > 23 || offsetMinute > 59) return null;
-  const millis = Date.parse(value);
-  return Number.isFinite(millis) ? new Date(millis).toISOString() : null;
-}
 
 function rateLimitWindow(stored, nowMs) {
   const requests = (Array.isArray(stored) ? stored : [])
@@ -214,6 +195,7 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
       description: pitch.description,
       organization: pitch.organization,
       format: pitch.format,
+      ...(pitch.consent ? { consent: { version: 'session-pitch-review-v1', at } } : {}),
       uid: actor.uid,
       email: actor.email,
       status: 'new',
