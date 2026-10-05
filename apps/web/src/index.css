@@ -9,8 +9,13 @@
 
 /* Official horizontal artwork retains its white ground in either mode. */
 .demo-brand-artwork {
-  background: #fff;
+  background: white;
   padding: 4px;
+}
+
+/* NC Local uses its data face for field values as well as their labels. */
+:root[data-theme='newsroom'] .public-field {
+  font-family: var(--font-data);
 }
 
 @layer base {

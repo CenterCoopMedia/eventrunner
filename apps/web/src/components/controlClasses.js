@@ -84,7 +84,7 @@ export const textControlStateClass =
 // (design brief §8.1 polish, WCAG 1.4.11): a rule is tuned for low-contrast
 // section dividers, and a control's boundary needs 3:1 against its ground.
 export const inputClass =
-  'touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
+  'public-field touch-target w-full rounded-brand border-hairline border-control bg-surface px-sm py-xs ' +
   'font-body text-body text-text-primary placeholder:text-text-secondary ' +
   'aria-[invalid=true]:border-danger';
 
