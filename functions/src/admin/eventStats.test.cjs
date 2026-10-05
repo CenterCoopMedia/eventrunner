@@ -222,7 +222,7 @@ test('getEventStats returns the counts for the seeded demo event', async () => {
       // No invented past editions or sponsor offers in this historical demo.
       cmsTimeline: { published: 0, drafts: 0 },
       cmsUpdates: { published: 1, drafts: 0 },
-      cmsPages: { published: 13, drafts: 0 },
+      cmsPages: { published: 14, drafts: 0 },
     },
     errors: { unresolved: 2 },
     funnel: [
