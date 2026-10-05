@@ -31,15 +31,17 @@ You are still in the room where the paper gets made, and the room has been fitte
   and the event's own colour worked dark where a deployment follows it (below). The event's
   short name and the job mark sit at its head; the docket's four groups stand below them, group
   heads as small uppercase folios; the signed-in address and the two ways out sit at its foot. On a
-  wide screen the rail holds the viewport and scrolls on its own; on a narrow one it stacks above
-  the work.
+  wide screen the rail holds the viewport and scrolls on its own. On a narrow screen one compact
+  top bar names the event and current section beside Menu. Menu opens the same groups as full-width
+  44px rows in a viewport sheet, with the signed-in account and actions at its foot. The closed bar
+  keeps the work at the top of the first screen.
 - **The canvas** — the base ground behind everything: a calm cool grey, never white.
 - **The title band** — the page header. The page's name at title size on the white ground, a
   small mark in the client's colour beside it, the record's state badge and identifiers beside or
   under the name, and the page's own actions at the trailing end. The band runs to the edges of
-  the work surface and holds the top of the viewport while the page scrolls, so the name and the
-  save actions are always in reach. The page's description is a paragraph under the band, not
-  inside it.
+  the work surface. From 640px upward it holds the top of the viewport while the page scrolls, so
+  the name and save actions stay in reach. On a phone it scrolls with the work, so wrapped actions
+  do not cover the form. The page's description is a paragraph under the band, not inside it.
 - **The panel** — a white surface on the canvas inside a hairline rule with the panel radius. A
   panel's heading is bold at the large step with its description under it in the secondary ink.
   Elevation is the step from the canvas to the paper; no shadow ships.

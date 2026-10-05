@@ -59,6 +59,7 @@
 // namespace. Whatever is in `logos` is carried through every save verbatim.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  THEME_HEADERS,
   getPreset,
   findThemeContrastFailures,
   resolveFontRoles,
@@ -214,6 +215,10 @@ function toForm(theme) {
     texture: pick(theme?.texture, TEXTURE_IDS),
     radius: pick(theme?.radius, RADIUS_IDS),
     density: pick(theme?.density, DENSITY_IDS),
+    // Header style has no field in this editor, but config/theme is replaced
+    // whole on publish. Carry the stored value so an unrelated phone-layout
+    // change cannot reset the public header or make the draft preview lie.
+    header: pick(theme?.header, THEME_HEADERS),
     // A stored document that predates the mode policy has no `mode`, and
     // light is what it renders, so light is what the form starts on.
     mode: MODE_POLICY_IDS.includes(theme?.mode) ? theme.mode : DEFAULT_MODE_POLICY,
@@ -263,7 +268,7 @@ export function toThemeDoc(form) {
     if (Object.keys(overrides).length > 0) tokens[mode] = overrides;
   }
   if (Object.keys(tokens).length > 0) doc.tokens = tokens;
-  for (const field of ['texture', 'radius', 'density', 'motifSet']) {
+  for (const field of ['texture', 'radius', 'density', 'motifSet', 'header']) {
     if (form[field]) doc[field] = form[field];
   }
   if (form.brandColor.trim()) doc.brandColor = form.brandColor.trim();
@@ -488,7 +493,7 @@ export default function AdminBranding() {
 
       <div className="grid gap-md xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         {/* ------------------------------------------- the staff decisions */}
-        <div className="flex min-w-0 flex-col gap-md">
+        <div className="admin-branding-controls flex min-w-0 flex-col gap-md">
           {/* 1 ------------------------------------------------ site style */}
           <Panel
             title="Site style"
@@ -529,7 +534,7 @@ export default function AdminBranding() {
             title="Logo and icon"
             description="Each slot points at a file in the media library. Choose an existing file or upload a new one."
           >
-            <div className="grid gap-md sm:grid-cols-2">
+            <div className="admin-branding-grid grid gap-md">
               {WORKFLOW_LOGO_SLOTS.map((slot) => (
                 <ImagePicker
                   key={slot}
@@ -557,7 +562,7 @@ export default function AdminBranding() {
               <div
                 id="admin-theme-more-logos"
                 hidden={!moreLogosOpen}
-                className="mt-sm grid gap-md sm:grid-cols-2"
+                className="admin-branding-grid mt-sm grid gap-md"
               >
                 {EXTRA_LOGO_SLOTS.map((slot) => (
                   <ImagePicker
@@ -582,7 +587,7 @@ export default function AdminBranding() {
             description="One colour. The darker and lighter shades that go with it are worked out for light mode and dark mode, and they are always readable on the page they land on."
           >
             <div className="flex flex-col gap-sm">
-              <div className="flex items-end gap-sm">
+              <div className="admin-branding-color-row flex flex-wrap items-end gap-sm">
                 {toPickerHex(form.brandColor) ? (
                   <input
                     type="color"
@@ -594,7 +599,7 @@ export default function AdminBranding() {
                     className="admin-target h-9 w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
                   />
                 ) : null}
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <TextField
                     label="Main brand colour"
                     value={form.brandColor}
@@ -751,7 +756,7 @@ export default function AdminBranding() {
                     </div>
                   ))}
                 </dl>
-                <div className="grid gap-sm sm:grid-cols-2">
+                <div className="admin-branding-grid grid gap-sm">
                   {preset?.options?.headingFace
                     ? optionField('headingFace', preset.options.headingFace)
                     : null}
@@ -815,7 +820,7 @@ export default function AdminBranding() {
                 >
                   Surface and shape
                 </h3>
-                <div className="mt-sm grid gap-sm sm:grid-cols-2">
+                <div className="admin-branding-grid mt-sm grid gap-sm">
                   <SelectField
                     label="Surface"
                     value={form.texture}
@@ -885,7 +890,7 @@ export default function AdminBranding() {
                   ))}
                 </div>
 
-                <div className="mt-sm grid gap-sm sm:grid-cols-2">
+                <div className="admin-branding-grid mt-sm grid gap-sm">
                   {THEME_COLOR_KEYS.map((key) => {
                     const failure = failureFor(overrideMode, key);
                     const derived = form.brandColor.trim() && DERIVED_COLOR_KEYS.includes(key);
@@ -940,9 +945,9 @@ export default function AdminBranding() {
                 {form.preset ? null : (
                   // A deployment made before presets existed keeps its stored
                   // palette, and this is the control that edits it.
-                  <div className="mt-md grid gap-sm sm:grid-cols-2">
+                  <div className="admin-branding-grid mt-md grid gap-sm">
                     {THEME_COLOR_KEYS.map((key) => (
-                      <div key={key} className="flex items-end gap-sm">
+                      <div key={key} className="admin-branding-color-row flex flex-wrap items-end gap-sm">
                         {toPickerHex(form.colors[key]) ? (
                           <input
                             type="color"
@@ -957,7 +962,7 @@ export default function AdminBranding() {
                             className="admin-target h-9 w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
                           />
                         ) : null}
-                        <div className="flex-1">
+                        <div className="min-w-0 flex-1">
                           <TextField
                             label={COLOR_LABELS[key] ?? key}
                             value={form.colors[key]}

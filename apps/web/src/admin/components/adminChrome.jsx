@@ -162,7 +162,11 @@ export default function AdminPageHeader({
             </Heading>
             {state}
           </div>
-          {actions ? <div className="flex flex-wrap items-center gap-xs">{actions}</div> : null}
+          {actions ? (
+            <div className="admin-job-line__actions flex flex-wrap items-center gap-xs">
+              {actions}
+            </div>
+          ) : null}
         </div>
         {identifiers ? (
           <p className="font-admin-data text-admin-xs text-admin-ink-data">{identifiers}</p>

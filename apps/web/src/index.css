@@ -2036,6 +2036,12 @@
   .admin-rail .admin-folio {
     @apply text-admin-rail-ink;
   }
+  .admin-mobile-docket > summary {
+    list-style: none;
+  }
+  .admin-mobile-docket > summary::-webkit-details-marker {
+    display: none;
+  }
 
   /* Part f: ONE ring on the light surfaces — the action blue, 3px, offset so
      it never collides with a rule — clearing the canvas, the panel and the
@@ -2136,6 +2142,12 @@
     --admin-stone-pad-block: var(--space-md);
     padding: var(--admin-stone-pad-block) var(--admin-stone-pad-inline) var(--space-xl);
   }
+  .admin-branding-controls { container-type: inline-size; }
+  .admin-branding-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-branding-color-row > :last-child { flex-basis: 14rem; }
+  @container (min-width: 36rem) {
+    .admin-branding-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
   @media (min-width: 1024px) {
     .admin-stone {
       --admin-stone-pad-inline: var(--space-lg);
@@ -2144,14 +2156,22 @@
   }
 
   /* The title band: the page's name on the raised ground, running to the
-     stone's edges and holding the top of the viewport while the page
-     scrolls, so the name and the page's own actions are always in reach. */
+     stone's edges. It scrolls with the work on a phone, where wrapped actions
+     would otherwise cover the form, and holds the viewport from 640px up. */
   .admin-job-line {
-    position: sticky;
-    top: 0;
+    position: static;
     z-index: 8;
     margin: calc(-1 * var(--admin-stone-pad-block)) calc(-1 * var(--admin-stone-pad-inline)) 0;
     padding: var(--space-sm) var(--admin-stone-pad-inline);
+  }
+  @media (min-width: 640px) {
+    .admin-job-line {
+      position: sticky;
+      top: 0;
+    }
+  }
+  @media (max-width: 639px) {
+    .admin-job-line .admin-job-line__actions > * { padding-inline: var(--space-xs); }
   }
   /* The editor tour (issue #198) is the one panel the shell sets inside the
      stone above a page: the desk's panel ground and rule, named once here
@@ -2479,7 +2499,10 @@
     background: var(--schedule-day-active-background);
     border-color: var(--schedule-day-active-border-color);
   }
+  .schedule-optional-controls > summary { display: none; }
+  .schedule-optional-controls__body { padding-block-start: 0; }
   .schedule-route { padding-inline-start: var(--schedule-route-pad-inline-start); }
+  .schedule-page-header { margin-block-start: var(--space-xl); }
   .schedule-route > .session-block::after {
     content: '';
     position: absolute;
@@ -2500,10 +2523,17 @@
   @media (max-width: 639px) {
     .site-masthead__bar { align-items: flex-start; flex-direction: column; gap: var(--space-sm); }
     .site-masthead__bar nav ul { justify-content: flex-start; }
+    .site-header-nav a,
+    .site-header-nav summary { font-size: var(--text-body); }
     .site-masthead__identity { max-inline-size: 18rem; }
     .event-hero { min-block-size: 0; display: flex; flex-direction: column; }
-    .event-hero__copy { inline-size: 100%; padding: var(--space-lg) 0; order: 0; }
-    .event-hero__title { font-size: clamp(2.6rem, 10vw, 3.7rem); }
+    .event-hero__copy {
+      inline-size: 100%;
+      padding: var(--space-lg) 0;
+      padding-inline-start: var(--space-sm);
+      order: 0;
+    }
+    .event-hero__title { font-size: clamp(2.35rem, 9vw, 3.35rem); }
     .event-hero__figure { display: block; position: relative; order: 1; inline-size: 100%; }
     .event-hero__media { position: relative; block-size: 14rem; }
     .event-hero__art { inline-size: 100%; block-size: 100%; z-index: 0; }
@@ -2519,6 +2549,21 @@
     }
     .event-hero__route { z-index: 1; }
     .event-hero__sign { display: none; }
+    .event-hero.event-hero--compact .event-hero__copy { padding-block: var(--space-sm); }
+    .event-hero--compact .event-hero__title { font-size: clamp(1.55rem, 6vw, 2rem); }
+    .event-hero--compact .event-hero__dateline { margin-block-start: var(--space-xs); }
+    .event-hero--compact .event-hero__tagline { display: none; }
+    .event-hero--compact .event-hero__media { block-size: 7rem; }
+    .schedule-page-header { margin-block-start: var(--space-md); }
+    .schedule-screen > .schedule-days { margin-block-start: var(--space-md); }
+    .schedule-optional-controls { margin-block-start: var(--space-sm); }
+    .schedule-screen > .map-grid { margin-block-start: var(--space-md); }
+    .schedule-optional-controls > summary {
+      display: flex;
+      align-items: center;
+      padding-block: var(--space-xs);
+    }
+    .schedule-optional-controls__body { padding-block-start: var(--space-sm); }
   }
 }
 

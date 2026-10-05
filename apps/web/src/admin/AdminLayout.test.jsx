@@ -56,7 +56,15 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../App.jsx';
-import { ADMIN_TIERS, DOCKET, TIER_SCOPE, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
+import {
+  ADMIN_DESKTOP_VIEWPORT,
+  ADMIN_TIERS,
+  DOCKET,
+  TIER_SCOPE,
+  docketForTier,
+  sectionTier,
+  tierReaches,
+} from './AdminLayout.jsx';
 // Mocked for every file in src/test/setup.js; steered here for the banner.
 import { subscribePendingCounts } from './pendingCountsSource.js';
 import { markTourDone, readTourDone } from './tourState.js';
@@ -106,6 +114,79 @@ beforeEach(() => {
 });
 
 describe('the admin shell', () => {
+  it('opens the docket at the same pixel breakpoint that hides Menu', () => {
+    expect(ADMIN_DESKTOP_VIEWPORT).toBe('(min-width: 1024px)');
+  });
+
+  it('uses one compact phone bar and a full-width grouped menu sheet', async () => {
+    const original = window.matchMedia;
+    const originalBodyOverflow = document.body.style.overflow;
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    try {
+      const { container } = await renderAdmin('/admin/pages');
+      const rail = container.querySelector('.admin-rail');
+      const docket = rail.querySelector('details.admin-mobile-docket');
+      const summary = docket.querySelector('summary');
+      const sheet = docket.querySelector('.admin-mobile-docket__content');
+      const nav = within(docket).getByRole('navigation', { name: 'Admin sections' });
+
+      expect(rail.className).toContain('min-h-14');
+      expect(rail.className).toContain('flex-wrap');
+      expect(within(rail).getByText('Harborlight')).toBeInTheDocument();
+      expect(within(summary).getByText('Pages')).toBeInTheDocument();
+      expect(within(summary).getByText('Menu')).toBeInTheDocument();
+      expect(docket).not.toHaveAttribute('open');
+      expect(sheet.className).toMatch(/\bfixed\b/);
+      expect(sheet.className).toContain('top-14');
+      expect(sheet.className).toContain('bottom-0');
+
+      for (const group of nav.children) {
+        expect(group.className).not.toContain('flex-wrap');
+      }
+      for (const list of nav.querySelectorAll('ul')) {
+        expect(list.className).toContain('flex-col');
+      }
+      for (const link of nav.querySelectorAll('a')) {
+        expect(link.parentElement.className).toContain('w-full');
+        expect(link.className).toContain('w-full');
+        expect(link.className).toContain('min-h-admin-control');
+      }
+      expect(docket).toContainElement(screen.getByText('admin@example.org'));
+      expect(docket).toContainElement(screen.getByRole('button', { name: 'Sign out' }));
+
+      // Stand in for an already-open media dialog, which owns body overflow.
+      document.body.style.overflow = 'hidden';
+      fireEvent.click(summary);
+      expect(docket).toHaveAttribute('open');
+      await waitFor(() =>
+        expect(container.querySelector('#admin-content')).toHaveAttribute('inert'),
+      );
+      expect(document.documentElement.style.overflow).toBe('hidden');
+      // A media dialog owns body overflow. If it closes while this sheet is
+      // open, closing the sheet must not restore the dialog's stale lock.
+      document.body.style.overflow = '';
+      fireEvent.click(summary);
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe(''));
+      expect(document.body.style.overflow).toBe('');
+
+      fireEvent.click(summary);
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe('hidden'));
+      const pagesLink = within(nav).getByRole('link', { name: 'Pages' });
+      pagesLink.focus();
+      fireEvent.click(pagesLink);
+      await waitFor(() => expect(docket).not.toHaveAttribute('open'));
+      expect(summary).toHaveFocus();
+    } finally {
+      document.body.style.overflow = originalBodyOverflow;
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    }
+  });
+
   it('reads the admin tokens only — no client brand utility reaches the room', async () => {
     const { container } = await renderAdmin();
     const html = shellChrome(container).innerHTML;
@@ -404,19 +485,53 @@ describe('the editor tour in the shell', () => {
     expect(readTourDone('admin-1')).toBe(true);
   });
 
-  it('opens again at step 1 from Take the tour, with the focus on its heading, and Escape ends it', async () => {
+  it('returns focus to the visible Menu when a first phone tour ends with the docket closed', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    try {
+      await renderAdmin('/admin/pages');
+      const tour = await tourPanel();
+      const menu = screen.getByText('Menu').closest('summary');
+      expect(menu.closest('details')).not.toHaveAttribute('open');
+
+      fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
+
+      expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+      expect(menu).toHaveFocus();
+      expect(readTourDone('admin-1')).toBe(true);
+    } finally {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    }
+  });
+
+  it('closes the phone menu before opening the tour, then returns focus to Menu', async () => {
     markTourDone('admin-1');
     await renderAdmin('/admin/pages');
+    const menu = screen.getByText('Menu').closest('summary');
+    const docket = menu.closest('details');
+    docket.open = true;
+    fireEvent(docket, new Event('toggle'));
+    await waitFor(() => expect(docket).toHaveAttribute('open'));
+    await waitFor(() =>
+      expect(document.querySelector('#admin-content')).toHaveAttribute('inert'),
+    );
     const takeTour = screen.getByRole('button', { name: 'Take the tour' });
     // First in the rail foot's button row, and a rail control like its neighbours.
     expect(takeTour.parentElement.firstElementChild).toBe(takeTour);
     expect(takeTour.className).toContain('min-h-admin-control');
     fireEvent.click(takeTour);
+    expect(docket).not.toHaveAttribute('open');
+    expect(document.querySelector('#admin-content')).not.toHaveAttribute('inert');
     const heading = await screen.findByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
     await waitFor(() => expect(heading).toHaveFocus());
     fireEvent.keyDown(heading, { key: 'Escape' });
     expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
-    expect(takeTour).toHaveFocus();
+    expect(menu).toHaveFocus();
   });
 
   it('stays on screen, at its step, while the reader opens the section it names', async () => {

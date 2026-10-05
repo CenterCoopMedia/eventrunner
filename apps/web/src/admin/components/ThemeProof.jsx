@@ -48,7 +48,8 @@
 // The identification line sits BELOW each frame, on a hairline, in the data
 // face — never above it, where it would stack over the page's own nameplate
 // and become an eyebrow (brief §2.4).
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   MemoryRouter,
   UNSAFE_LocationContext,
@@ -58,11 +59,14 @@ import { AppRoutes } from '../../App.jsx';
 import EventConfigContext, { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import ContentContext, { useContent } from '../../contexts/ContentContext.jsx';
 import { themeFallbackWarnings } from '../../lib/themeRuntime.js';
+import { ViewportProvider } from '../../lib/viewport.js';
 import {
   PREVIEW_COMPARE_SCOPE_ID,
   PREVIEW_SCOPE_ID,
+  PREVIEW_STYLE_ID,
   applyThemePreview,
   clearThemePreview,
+  releaseThemePreviewTarget,
 } from '../themePreview.js';
 import {
   Notice,
@@ -215,8 +219,75 @@ export function denseSchedule(sessions, dayId) {
   return packed;
 }
 
+const PREVIEW_DOCUMENT = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>';
+
+/** Copy the app's built or development styles into one isolated proof document. */
+function copyPreviewStyles(targetDocument) {
+  targetDocument.head.querySelectorAll('[data-theme-proof-base]').forEach((node) => node.remove());
+  for (const source of document.head.querySelectorAll('link[rel="stylesheet"], style')) {
+    if (source.id === PREVIEW_STYLE_ID) continue;
+    const clone = source.cloneNode(true);
+    clone.dataset.themeProofBase = '';
+    targetDocument.head.appendChild(clone);
+  }
+}
+
 /** One rendered frame, at one width, in one mode. */
-function PreviewFrame({ path, scopeRef, width, height, scale, identification }) {
+function PreviewFrame({ path, scopeId, onReady, width, height, scale, identification, title }) {
+  const iframeRef = useRef(null);
+  const previewRootRef = useRef(null);
+  const [host, setHost] = useState(null);
+
+  const prepare = useCallback(() => {
+    const iframe = iframeRef.current;
+    const targetDocument = iframe?.contentDocument;
+    if (!targetDocument?.head || !targetDocument.body || !iframe.contentWindow) return;
+    copyPreviewStyles(targetDocument);
+    targetDocument.body.className = 'theme-preview-document';
+    const next = {
+      root: targetDocument.documentElement,
+      body: targetDocument.body,
+      view: iframe.contentWindow,
+    };
+    if (previewRootRef.current !== next.root) {
+      releaseThemePreviewTarget(previewRootRef.current);
+      previewRootRef.current = next.root;
+    }
+    setHost(next);
+    onReady(next.root);
+  }, [onReady]);
+
+  useLayoutEffect(() => {
+    prepare();
+    return () => {
+      releaseThemePreviewTarget(previewRootRef.current);
+      previewRootRef.current = null;
+      onReady(null);
+    };
+  }, [onReady, prepare]);
+
+  const page = host
+    ? createPortal(
+        <ViewportProvider view={host.view}>
+          {/* React Router refuses a Router inside a Router, and rightly: two
+              histories fighting over one URL is a bug everywhere else. Here
+              the preview owns a separate history and cannot move the admin. */}
+          <UNSAFE_RouteContext.Provider value={{ outlet: null, matches: [], isDataRoute: false }}>
+            <UNSAFE_LocationContext.Provider value={null}>
+              <MemoryRouter
+                key={path}
+                initialEntries={[path]}
+                future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+              >
+                <AppRoutes />
+              </MemoryRouter>
+            </UNSAFE_LocationContext.Provider>
+          </UNSAFE_RouteContext.Provider>
+        </ViewportProvider>,
+        host.body,
+      )
+    : null;
+
   return (
     <div className="flex min-w-0 flex-col">
       {/* What the frame is, for a reader who cannot see it. The frame itself
@@ -238,39 +309,36 @@ function PreviewFrame({ path, scopeRef, width, height, scale, identification }) 
         style={{ height: `${Math.round(height * scale)}px` }}
       >
         <div
-          ref={scopeRef}
-          inert=""
+          aria-hidden="true"
           style={{
-            width: `${width}px`,
-            height: `${height}px`,
-            transform: scale === 1 ? undefined : `scale(${scale})`,
-            transformOrigin: 'top left',
+            position: 'relative',
+            width: `${Math.round(width * scale)}px`,
+            height: `${Math.round(height * scale)}px`,
           }}
-          className="overflow-auto"
         >
-          {/* React Router refuses a Router inside a Router, and rightly: two
-              histories fighting over one URL is a bug everywhere else. Here
-              it is the point — the preview has its OWN history, so nothing
-              it renders can move the admin's location. Clearing the two
-              contexts is what lets the frame start a router of its own;
-              nothing outside this element sees it. */}
-          <UNSAFE_RouteContext.Provider value={{ outlet: null, matches: [], isDataRoute: false }}>
-            <UNSAFE_LocationContext.Provider value={null}>
-              {/* `key={path}` is load-bearing. `initialEntries` is read once,
-                  when the router mounts, so without the key the identification
-                  line would say Schedule while the frame kept rendering Home.
-                  The key remounts the router — and only the router, so the
-                  frame element and the id the scoped CSS is written against
-                  both survive the switch. */}
-              <MemoryRouter
-                key={path}
-                initialEntries={[path]}
-                future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-              >
-                <AppRoutes />
-              </MemoryRouter>
-            </UNSAFE_LocationContext.Provider>
-          </UNSAFE_RouteContext.Provider>
+          <iframe
+            ref={iframeRef}
+            srcDoc={PREVIEW_DOCUMENT}
+            title={title}
+            width={width}
+            height={height}
+            tabIndex={-1}
+            inert=""
+            sandbox="allow-same-origin"
+            onLoad={prepare}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'block',
+              width: `${width}px`,
+              height: `${height}px`,
+              border: 0,
+              transform: scale === 1 ? undefined : `scale(${scale})`,
+              transformOrigin: 'top left',
+            }}
+            data-theme-proof={scopeId}
+          />
+          {page}
         </div>
       </div>
       <p
@@ -302,8 +370,8 @@ function ControlGroup({ label, options, value, onChange }) {
 }
 
 export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
-  const frameRef = useRef(null);
-  const compareRef = useRef(null);
+  const [frameRoot, setFrameRoot] = useState(null);
+  const [compareRoot, setCompareRoot] = useState(null);
   const columnRef = useRef(null);
   const [pageId, setPageId] = useState(PROOF_PAGES[0].id);
   const [viewportId, setViewportId] = useState(PREVIEW_VIEWPORTS[0].id);
@@ -340,18 +408,18 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   // behind and the saved theme renders again.
   useEffect(() => {
     const scopes = [];
-    if (frameRef.current) {
+    if (frameRoot) {
       scopes.push({
-        element: frameRef.current,
+        element: frameRoot,
         id: PREVIEW_SCOPE_ID,
         mode: compare ? 'light' : mode,
       });
     }
-    if (compare && compareRef.current) {
-      scopes.push({ element: compareRef.current, id: PREVIEW_COMPARE_SCOPE_ID, mode: 'dark' });
+    if (compare && compareRoot) {
+      scopes.push({ element: compareRoot, id: PREVIEW_COMPARE_SCOPE_ID, mode: 'dark' });
     }
     if (scopes.length > 0) applyThemePreview(themeDoc, { scopes });
-  }, [themeDoc, mode, compare, stress]);
+  }, [themeDoc, mode, compare, stress, frameRoot, compareRoot]);
   useEffect(() => () => clearThemePreview(), []);
 
   // The stress fixtures. Both contexts are overridden by VALUE only — the
@@ -374,15 +442,38 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
     }),
     [realConfig, stressDay],
   );
-  const stressContent = useMemo(
-    () => ({
+  const stressContent = useMemo(() => {
+    const realHeroTitle = realContent.getBlock?.('hero', 'title');
+    const stressHeroTitle = {
+      ...realHeroTitle,
+      id: realHeroTitle?.id ?? 'hero__title',
+      section: 'hero',
+      field: 'title',
+      blockType: 'text',
+      visible: true,
+      value: STRESS_EVENT_NAME,
+    };
+    return {
       ...realContent,
       scheduleData: denseSchedule(
         realContent.scheduleData ?? [],
         realConfig.eventConfig?.days?.[0]?.id ?? STRESS_DAY.id,
       ),
-    }),
-    [realContent, realConfig],
+      getBlock: (section, field) =>
+        section === 'hero' && field === 'title'
+          ? stressHeroTitle
+          : realContent.getBlock?.(section, field),
+      getSectionBlocks: (section) => {
+        const blocks = realContent.getSectionBlocks?.(section) ?? [];
+        if (section !== 'hero') return blocks;
+        const withoutTitle = blocks.filter((block) => block?.field !== 'title');
+        return [stressHeroTitle, ...withoutTitle];
+      },
+    };
+  }, [realContent, realConfig]);
+  const previewConfig = useMemo(
+    () => ({ ...(stress ? stressConfig : realConfig), theme: themeDoc }),
+    [realConfig, stress, stressConfig, themeDoc],
   );
 
   const warnings = useMemo(() => themeFallbackWarnings(themeDoc), [themeDoc]);
@@ -405,20 +496,24 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
     <div className={compare ? 'grid grid-cols-2 gap-xs' : ''}>
       <PreviewFrame
         path={path}
-        scopeRef={frameRef}
+        scopeId={PREVIEW_SCOPE_ID}
+        onReady={setFrameRoot}
         width={viewport.width}
         height={height}
         scale={scale}
         identification={identification(compare ? 'light' : mode)}
+        title={`${page.label} preview, ${compare ? 'light' : mode} mode, ${viewport.width}px wide`}
       />
       {compare ? (
         <PreviewFrame
           path={path}
-          scopeRef={compareRef}
+          scopeId={PREVIEW_COMPARE_SCOPE_ID}
+          onReady={setCompareRoot}
           width={viewport.width}
           height={height}
           scale={scale}
           identification={identification('dark')}
+          title={`${page.label} preview, dark mode, ${viewport.width}px wide`}
         />
       ) : null}
     </div>
@@ -507,7 +602,7 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
           frames, which would throw away the ids the scoped preview CSS is
           written against — the page would render unstyled for a beat and
           then not at all. */}
-      <EventConfigContext.Provider value={stress ? stressConfig : realConfig}>
+      <EventConfigContext.Provider value={previewConfig}>
         <ContentContext.Provider value={stress ? stressContent : realContent}>
           {frames}
         </ContentContext.Provider>

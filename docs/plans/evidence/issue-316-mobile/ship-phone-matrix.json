@@ -1,0 +1,3218 @@
+[
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Overview",
+    "href": "/admin/overview",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Pages",
+    "href": "/admin/pages",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Sessions",
+    "href": "/admin/sessions",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Organizations",
+    "href": "/admin/organizations",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Content",
+    "href": "/admin/content",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Updates",
+    "href": "/admin/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Timeline",
+    "href": "/admin/timeline",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Media",
+    "href": "/admin/media",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Materials",
+    "href": "/admin/materials",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Version history",
+    "href": "/admin/versions",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Unpublished changes",
+    "href": "/admin/unpublished",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Speakers",
+    "href": "/admin/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Attendees",
+    "href": "/admin/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Badges",
+    "href": "/admin/badges",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Announcements",
+    "href": "/admin/announcements",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Live updates",
+    "href": "/admin/live-updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Ticketing",
+    "href": "/admin/ticketing",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Feedback",
+    "href": "/admin/feedback",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Email log",
+    "href": "/admin/email-log",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Change requests",
+    "href": "/admin/change-requests",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Event",
+    "href": "/admin/settings",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Features",
+    "href": "/admin/features",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Branding",
+    "href": "/admin/branding",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "Access",
+    "href": "/admin/access",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 320,
+    "label": "System errors",
+    "href": "/admin/system-errors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Overview",
+    "href": "/admin/overview",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Pages",
+    "href": "/admin/pages",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Sessions",
+    "href": "/admin/sessions",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Organizations",
+    "href": "/admin/organizations",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Content",
+    "href": "/admin/content",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Updates",
+    "href": "/admin/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Timeline",
+    "href": "/admin/timeline",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Media",
+    "href": "/admin/media",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Materials",
+    "href": "/admin/materials",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Version history",
+    "href": "/admin/versions",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Unpublished changes",
+    "href": "/admin/unpublished",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Speakers",
+    "href": "/admin/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Attendees",
+    "href": "/admin/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Badges",
+    "href": "/admin/badges",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Announcements",
+    "href": "/admin/announcements",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Live updates",
+    "href": "/admin/live-updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Ticketing",
+    "href": "/admin/ticketing",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Feedback",
+    "href": "/admin/feedback",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Email log",
+    "href": "/admin/email-log",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Change requests",
+    "href": "/admin/change-requests",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Event",
+    "href": "/admin/settings",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Features",
+    "href": "/admin/features",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Branding",
+    "href": "/admin/branding",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "Access",
+    "href": "/admin/access",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 390,
+    "label": "System errors",
+    "href": "/admin/system-errors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Overview",
+    "href": "/admin/overview",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Pages",
+    "href": "/admin/pages",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Sessions",
+    "href": "/admin/sessions",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Organizations",
+    "href": "/admin/organizations",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Content",
+    "href": "/admin/content",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Updates",
+    "href": "/admin/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Timeline",
+    "href": "/admin/timeline",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Media",
+    "href": "/admin/media",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Materials",
+    "href": "/admin/materials",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Version history",
+    "href": "/admin/versions",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Unpublished changes",
+    "href": "/admin/unpublished",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Speakers",
+    "href": "/admin/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Attendees",
+    "href": "/admin/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Badges",
+    "href": "/admin/badges",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Announcements",
+    "href": "/admin/announcements",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Live updates",
+    "href": "/admin/live-updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Ticketing",
+    "href": "/admin/ticketing",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Feedback",
+    "href": "/admin/feedback",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Email log",
+    "href": "/admin/email-log",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Change requests",
+    "href": "/admin/change-requests",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Event",
+    "href": "/admin/settings",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Features",
+    "href": "/admin/features",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Branding",
+    "href": "/admin/branding",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "Access",
+    "href": "/admin/access",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "light",
+    "width": 412,
+    "label": "System errors",
+    "href": "/admin/system-errors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Overview",
+    "href": "/admin/overview",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Pages",
+    "href": "/admin/pages",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Sessions",
+    "href": "/admin/sessions",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Organizations",
+    "href": "/admin/organizations",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Content",
+    "href": "/admin/content",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Updates",
+    "href": "/admin/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Timeline",
+    "href": "/admin/timeline",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Media",
+    "href": "/admin/media",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Materials",
+    "href": "/admin/materials",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Version history",
+    "href": "/admin/versions",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Unpublished changes",
+    "href": "/admin/unpublished",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Speakers",
+    "href": "/admin/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Attendees",
+    "href": "/admin/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Badges",
+    "href": "/admin/badges",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Announcements",
+    "href": "/admin/announcements",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Live updates",
+    "href": "/admin/live-updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Ticketing",
+    "href": "/admin/ticketing",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Feedback",
+    "href": "/admin/feedback",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Email log",
+    "href": "/admin/email-log",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Change requests",
+    "href": "/admin/change-requests",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Event",
+    "href": "/admin/settings",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Features",
+    "href": "/admin/features",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Branding",
+    "href": "/admin/branding",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "Access",
+    "href": "/admin/access",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 320,
+    "label": "System errors",
+    "href": "/admin/system-errors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Overview",
+    "href": "/admin/overview",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Pages",
+    "href": "/admin/pages",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Sessions",
+    "href": "/admin/sessions",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Organizations",
+    "href": "/admin/organizations",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Content",
+    "href": "/admin/content",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Updates",
+    "href": "/admin/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Timeline",
+    "href": "/admin/timeline",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Media",
+    "href": "/admin/media",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Materials",
+    "href": "/admin/materials",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Version history",
+    "href": "/admin/versions",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Unpublished changes",
+    "href": "/admin/unpublished",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Speakers",
+    "href": "/admin/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Attendees",
+    "href": "/admin/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Badges",
+    "href": "/admin/badges",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Announcements",
+    "href": "/admin/announcements",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Live updates",
+    "href": "/admin/live-updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Ticketing",
+    "href": "/admin/ticketing",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Feedback",
+    "href": "/admin/feedback",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Email log",
+    "href": "/admin/email-log",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Change requests",
+    "href": "/admin/change-requests",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Event",
+    "href": "/admin/settings",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Features",
+    "href": "/admin/features",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Branding",
+    "href": "/admin/branding",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "Access",
+    "href": "/admin/access",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 390,
+    "label": "System errors",
+    "href": "/admin/system-errors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Overview",
+    "href": "/admin/overview",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Pages",
+    "href": "/admin/pages",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Sessions",
+    "href": "/admin/sessions",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Organizations",
+    "href": "/admin/organizations",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Content",
+    "href": "/admin/content",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Updates",
+    "href": "/admin/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Timeline",
+    "href": "/admin/timeline",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Media",
+    "href": "/admin/media",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Materials",
+    "href": "/admin/materials",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Version history",
+    "href": "/admin/versions",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Unpublished changes",
+    "href": "/admin/unpublished",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Speakers",
+    "href": "/admin/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Attendees",
+    "href": "/admin/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Badges",
+    "href": "/admin/badges",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Announcements",
+    "href": "/admin/announcements",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Live updates",
+    "href": "/admin/live-updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Ticketing",
+    "href": "/admin/ticketing",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Feedback",
+    "href": "/admin/feedback",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Email log",
+    "href": "/admin/email-log",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Change requests",
+    "href": "/admin/change-requests",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Event",
+    "href": "/admin/settings",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Features",
+    "href": "/admin/features",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Branding",
+    "href": "/admin/branding",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "Access",
+    "href": "/admin/access",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "admin",
+    "mode": "dark",
+    "width": 412,
+    "label": "System errors",
+    "href": "/admin/system-errors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "light",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "civic",
+    "mode": "dark",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "light",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "newsroom",
+    "mode": "dark",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "light",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "broadsheet",
+    "mode": "dark",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "light",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "atlas",
+    "mode": "dark",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "light",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "field-guide",
+    "mode": "dark",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "light",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 320,
+    "route": "/",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 320,
+    "route": "/schedule",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 320,
+    "route": "/speakers",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 320,
+    "route": "/sponsors",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 320,
+    "route": "/attendees",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 320,
+    "route": "/updates",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 320,
+    "route": "/travel",
+    "scrollWidth": 320
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 390,
+    "route": "/",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 390,
+    "route": "/schedule",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 390,
+    "route": "/speakers",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 390,
+    "route": "/sponsors",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 390,
+    "route": "/attendees",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 390,
+    "route": "/updates",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 390,
+    "route": "/travel",
+    "scrollWidth": 390
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 412,
+    "route": "/",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 412,
+    "route": "/schedule",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 412,
+    "route": "/speakers",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 412,
+    "route": "/sponsors",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 412,
+    "route": "/attendees",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 412,
+    "route": "/updates",
+    "scrollWidth": 412
+  },
+  {
+    "surface": "public",
+    "theme": "zine",
+    "mode": "dark",
+    "width": 412,
+    "route": "/travel",
+    "scrollWidth": 412
+  }
+]

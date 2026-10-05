@@ -12,10 +12,25 @@
 // wherever `matchMedia` is missing, so a viewport that cannot be measured
 // gets the list. That is the same "no preference is the safe answer" rule
 // `prefersDark` follows in lib/modeRuntime.js.
-import { useEffect, useState } from 'react';
+import { createContext, createElement, useContext, useEffect, useState } from 'react';
 
 /** Tailwind's `lg` breakpoint, which is where the grid has room to be one. */
 export const WIDE_VIEWPORT = '(min-width: 64rem)';
+
+// A page normally reads the browser window. The Branding proof renders the
+// same page into an iframe, so it supplies that iframe's window here. This
+// keeps React-owned responsive choices on the same viewport as CSS media
+// queries instead of leaving the schedule on the admin window's answer.
+const ViewportContext = createContext(null);
+
+export function ViewportProvider({ view, children }) {
+  return createElement(ViewportContext.Provider, { value: view }, children);
+}
+
+export function useViewport() {
+  const provided = useContext(ViewportContext);
+  return provided ?? (typeof window === 'undefined' ? undefined : window);
+}
 
 /**
  * Whether a media query matches, kept in step with the browser.
@@ -24,24 +39,26 @@ export const WIDE_VIEWPORT = '(min-width: 64rem)';
  * @param {{ matchMedia?: Function }} [view] injectable for tests
  * @returns {boolean}
  */
-export function useMediaQuery(query, view = typeof window === 'undefined' ? undefined : window) {
+export function useMediaQuery(query, view) {
+  const activeView = useViewport();
+  const resolvedView = view ?? activeView;
   // Read once before the first paint, so a wide viewport draws the grid
   // rather than drawing the list and swapping it a frame later. The answer
   // is still `false` wherever the question cannot be asked.
   const [matches, setMatches] = useState(() => {
-    if (!view || typeof view.matchMedia !== 'function') return false;
+    if (!resolvedView || typeof resolvedView.matchMedia !== 'function') return false;
     try {
-      return view.matchMedia(query).matches === true;
+      return resolvedView.matchMedia(query).matches === true;
     } catch {
       return false;
     }
   });
 
   useEffect(() => {
-    if (!view || typeof view.matchMedia !== 'function') return undefined;
+    if (!resolvedView || typeof resolvedView.matchMedia !== 'function') return undefined;
     let media;
     try {
-      media = view.matchMedia(query);
+      media = resolvedView.matchMedia(query);
     } catch {
       // An unsupported query string throws in some engines. Answer no.
       return undefined;
@@ -55,7 +72,7 @@ export function useMediaQuery(query, view = typeof window === 'undefined' ? unde
     // Safari before 14 carries only the deprecated pair.
     media.addListener?.(onChange);
     return () => media.removeListener?.(onChange);
-  }, [query, view]);
+  }, [query, resolvedView]);
 
   return matches;
 }
