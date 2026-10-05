@@ -56,7 +56,15 @@ vi.mock('firebase/firestore', () => ({
 }));
 
 import App from '../App.jsx';
-import { ADMIN_TIERS, DOCKET, TIER_SCOPE, docketForTier, sectionTier, tierReaches } from './AdminLayout.jsx';
+import {
+  ADMIN_DESKTOP_VIEWPORT,
+  ADMIN_TIERS,
+  DOCKET,
+  TIER_SCOPE,
+  docketForTier,
+  sectionTier,
+  tierReaches,
+} from './AdminLayout.jsx';
 // Mocked for every file in src/test/setup.js; steered here for the banner.
 import { subscribePendingCounts } from './pendingCountsSource.js';
 import { markTourDone, readTourDone } from './tourState.js';
@@ -106,6 +114,10 @@ beforeEach(() => {
 });
 
 describe('the admin shell', () => {
+  it('opens the docket at the same pixel breakpoint that hides Menu', () => {
+    expect(ADMIN_DESKTOP_VIEWPORT).toBe('(min-width: 1024px)');
+  });
+
   it('reads the admin tokens only — no client brand utility reaches the room', async () => {
     const { container } = await renderAdmin();
     const html = shellChrome(container).innerHTML;

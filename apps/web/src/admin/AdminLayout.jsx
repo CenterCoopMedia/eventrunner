@@ -50,7 +50,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
-import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
+import { useMediaQuery } from '../lib/viewport.js';
 import { AdminEmptyState } from './components/adminChrome.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
 import { linkButtonClass } from './components/formControls.jsx';
@@ -69,6 +69,12 @@ const ROOT = '/admin';
  * both tiers, 'operator' admits operators only.
  */
 export const ADMIN_TIERS = Object.freeze(['operator', 'staff']);
+
+// This must stay identical to Tailwind's `lg` screen. The summary is hidden
+// at that pixel breakpoint, so the disclosure must be forced open there too.
+// A rem query would move when a reader changes the browser's default font
+// size and could leave both a closed docket and a hidden Menu control.
+export const ADMIN_DESKTOP_VIEWPORT = '(min-width: 1024px)';
 
 /**
  * The docket. A lead group with no label holds the Overview, the page the
@@ -300,7 +306,7 @@ function AdminDesk() {
   // the bucket, so the job mark degrades to the event's short name rather
   // than to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
-  const wide = useMediaQuery(WIDE_VIEWPORT);
+  const wide = useMediaQuery(ADMIN_DESKTOP_VIEWPORT);
   const [mobileDocketOpen, setMobileDocketOpen] = useState(
     () => typeof window === 'undefined' || typeof window.matchMedia !== 'function',
   );
