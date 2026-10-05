@@ -1468,10 +1468,22 @@
           chip on any block still flagged, and the admin dashboard shows a count of remaining seeded blocks.
           Editing a block clears the flag. This is what makes &quot;is this site ready to launch&quot; answerable.</li>
           </ul>
-          <p>No CJS copy, no real speaker names, no real attendee data, no real sponsor logos — in seeds, in
-          fixtures, in tests, or in the demo instance. The demo instance is seeded by
-          <code>scripts/seed-demo-event.cjs</code> with a fictional event, fictional speakers, and generated placeholder
-          headshots.</p>
+          <p>Client initialization seeds use synthetic placeholders: No copied CJS content,
+          real speaker names, real attendee data or real sponsor logos.</p>
+          <p><strong>Approved historical demo exception, October 5, 2026:</strong> Joe requested an NC Local
+          past-event mock-up in the existing primary <code>newsroom</code> style. The exception is
+          limited to the public March 27, 2026 summit material documented in
+          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/nclocal-demo.md">NC Local historical demo</a>: Eight selected sessions, 25 public
+          speaker names and affiliations, four organizations with their documented roles,
+          the official NC Local logo and a credited documentary photograph. The fixture,
+          generated snapshot, tests and reviewable demo build can include this material.
+          <code>scripts/seed-demo-event.cjs</code> uses that curated fixture; normal client
+          initialization still uses synthetic placeholders.</p>
+          <p>The demo must identify the event as historical, state that it is an EventRunner
+          demo, disable registration and email actions, and show no private contacts,
+          attendee records, invitation tokens, invented biographies or invented portraits.
+          The exception does not claim consent or endorsement from the named people or
+          organizations and does not authorize a merge, deployment or public release.</p>
           <h3 id="55-legal-page-templates">5.5 Legal page templates<a class="heading-anchor" href="#55-legal-page-templates" aria-label="Link to this section">#</a></h3>
           <p><code>src/pages/PrivacyPolicy.jsx</code> and <code>src/pages/TermsOfService.jsx</code> today are React components with
           hardcoded prose naming Montclair State University as operator (three occurrences across the two
