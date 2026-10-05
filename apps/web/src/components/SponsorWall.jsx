@@ -193,7 +193,7 @@ export default function SponsorWall({
             {org.logoPath || !IS_DEMO ? (
               <div className="logo-wall__mark">
                 {org.logoPath ? (
-                  <AssetImage path={org.logoPath} alt="" className="" decorative />
+                  <AssetImage path={org.logoPath} alt="" className={IS_DEMO && org.logoPath === 'branding/nclocal-logo.png' ? 'demo-brand-artwork' : ''} decorative />
                 ) : null}
               </div>
             ) : null}

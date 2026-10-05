@@ -51,7 +51,7 @@ export default function SponsorDetail() {
     <article>
       <Link to={{ pathname: "/sponsors", search }} className="font-data text-caption text-text-secondary hover:underline">← {backLabel}</Link>
       <header className="mt-lg">
-        {org.logoPath ? <div className="mb-lg max-w-sm"><AssetImage path={org.logoPath} alt="" decorative className="sponsor-logo max-h-40 w-auto object-contain" /></div> : null}
+        {org.logoPath ? <div className="mb-lg max-w-sm"><AssetImage path={org.logoPath} alt="" decorative className={`sponsor-logo max-h-40 w-auto object-contain${IS_DEMO && org.logoPath === 'branding/nclocal-logo.png' ? ' demo-brand-artwork' : ''}`} /></div> : null}
         <h1 className="font-heading text-h1 font-semibold text-text-primary">{org.name}</h1>
         {org.description ? <Standfirst className="mt-md">{org.description}</Standfirst> : null}
         {tier ? <dl className="definition-list mt-md max-w-prose"><DefinitionPair term={roleLabel}>{tier}</DefinitionPair></dl> : null}

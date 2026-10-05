@@ -7,6 +7,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Official horizontal artwork retains its white ground in either mode. */
+.demo-brand-artwork {
+  background: #fff;
+  padding: 4px;
+}
+
 @layer base {
   :root {
     -webkit-font-smoothing: antialiased;
