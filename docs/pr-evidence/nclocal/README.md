@@ -10,7 +10,7 @@ theme config and neutral branding stay at the base revision. This fixture
 overlay makes the visual comparison use the same sessions, people and prose.
 The source diff records the replacement of the previous fictional content.
 
-After: Source `47b64fab90e95d2b0c06e04d8172759409095aa9`, with the committed
+After: Source `7b4a09b2eac2712bc6516df780e509e5b8dd0ab2`, with the committed
 historical content and NC Local theme. The after images use the fresh Node 22
 lockfile build from Legion, served by a loopback-only local preview. The before
 uses the isolated base development server. Both use `VITE_DEMO_MODE=1`.
@@ -19,10 +19,11 @@ semantic locators; screenshots did not supply click coordinates.
 
 This refresh uses the official Google Fonts Cabin normal Latin 400–700 slice:
 28,320 bytes, below the project's existing 60 KB font limit. Its asset source
-and digest are recorded in `field-evidence.json`. The earlier full web suite at
-`cb576832` passed 3,025 tests across 260 files. Current main was then integrated;
-its changes do not alter the public application source. Final exact-head CI and
-independent review receipts are recorded separately in the PR.
+and digest are recorded in `field-evidence.json`. The prior full CI at `77931662` passed nine tiers, including 3,025 web tests,
+2,787 node tests and 352 rules tests. It stopped during E2E collection before
+browser cases ran. This source fixes that loader failure and adds six page-heading
+regression tests; all 62 E2E cases load. Final exact-head CI and independent
+review receipts are recorded separately in the PR.
 
 `render-evidence.json` records headings, fonts, viewport widths, transaction
 link checks and checks of the other five style selectors. Their source preset

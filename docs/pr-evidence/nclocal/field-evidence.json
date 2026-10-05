@@ -1,5 +1,5 @@
 {
-  "sourceHead": "47b64fab90e95d2b0c06e04d8172759409095aa9",
+  "sourceHead": "7b4a09b2eac2712bc6516df780e509e5b8dd0ab2",
   "surface": "Existing demo Specimen book public fields",
   "typedValues": [
     "NC Local demo reader",
@@ -242,7 +242,7 @@
         "background": "rgb(255, 255, 255)",
         "color": "rgb(17, 17, 17)",
         "font": "Cabin, Arial, sans-serif",
-        "placeholder": "Title, room, speaker\u2026",
+        "placeholder": "Title, room, speaker…",
         "placeholderColor": "rgb(103, 103, 103)",
         "placeholderOpacity": "1",
         "surface": "rgb(255, 255, 255)",
@@ -491,7 +491,7 @@
         "background": "rgb(0, 28, 40)",
         "color": "rgb(249, 247, 245)",
         "font": "Cabin, Arial, sans-serif",
-        "placeholder": "Title, room, speaker\u2026",
+        "placeholder": "Title, room, speaker…",
         "placeholderColor": "rgb(194, 206, 209)",
         "placeholderOpacity": "1",
         "surface": "rgb(0, 28, 40)",
