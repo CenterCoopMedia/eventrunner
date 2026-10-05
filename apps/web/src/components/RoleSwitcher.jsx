@@ -11,8 +11,8 @@ export default function RoleSwitcher({ account, linkClass = quietActionClass, la
           <li key={view.id}>
             <Link
               to={view.to}
-              aria-current={view.id === account.current?.id ? 'page' : undefined}
-              className={`${linkClass} w-full min-h-11 aria-[current=page]:font-bold aria-[current=page]:underline underline-offset-4`}
+              aria-current={view.id === account.current?.id ? 'true' : undefined}
+              className={`${linkClass} w-full min-h-11 aria-[current=true]:font-bold aria-[current=true]:underline underline-offset-4`}
               onClick={() => { account.select(view.id); onNavigate?.(); }}
             >{view.label}</Link>
           </li>

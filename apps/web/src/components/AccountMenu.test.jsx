@@ -44,7 +44,7 @@ describe('account visibility rules (issue 340)', () => {
     fireEvent.click(screen.getByText('Account',{exact:true}));
     const nav = screen.getByRole('navigation',{name:'Account views'});
     expect(within(nav).getAllByRole('link').map(link=>link.textContent)).toEqual(['Attendee','Speaker','Admin']);
-    expect(within(nav).getByRole('link',{name:'Attendee'})).toHaveAttribute('aria-current','page');
+    expect(within(nav).getByRole('link',{name:'Attendee'})).toHaveAttribute('aria-current','true');
     expect(screen.getByRole('link',{name:'Manage event'})).toHaveAttribute('href','/admin');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -73,6 +73,9 @@ describe('view selection', () => {
     fireEvent.click(screen.getByRole('link',{name:'Schedule'}));
     expect(screen.getByText('View as: Speaker')).toBeInTheDocument();
     expect(screen.getByRole('link',{name:'Dashboard'})).toHaveAttribute('href','/speaker/dashboard');
+    fireEvent.click(screen.getByText('Account',{exact:true}));
+    expect(screen.getByRole('link',{name:'Speaker',exact:true})).toHaveAttribute('aria-current','true');
+    expect(screen.getByRole('link',{name:'Attendee',exact:true})).not.toHaveAttribute('aria-current');
   });
   it('restores a session selection and lets role deep links win', () => {
     saveSessionView(user.uid,'admin');
