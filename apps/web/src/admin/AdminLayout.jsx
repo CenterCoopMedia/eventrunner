@@ -22,10 +22,10 @@
 // four signals, never colour alone: the marker at its leading edge, the bold
 // weight, the ground shift, and `aria-current="page"`.
 //
-// On a narrow screen the rail becomes the head of the page: the same groups,
-// each set as one wrapping row of words with its folio at the start, so the
-// work surface begins inside the first screen rather than under a list that
-// fills it. Nothing collapses into a menu and every item stays a word.
+// On a narrow screen the rail becomes the head of the page. Its brand and a
+// native Menu disclosure stay visible; opening it shows the same grouped
+// words and account controls. This keeps the work surface in the first
+// screen without replacing destinations with unlabeled icons.
 //
 // THE JOB MARK. The client logo sits at the top of the rail on a small paper
 // tile, beside the event's short name. A tile, because a client's mark is
@@ -50,6 +50,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
+import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
 import { AdminEmptyState } from './components/adminChrome.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
 import { linkButtonClass } from './components/formControls.jsx';
@@ -299,6 +300,10 @@ function AdminDesk() {
   // the bucket, so the job mark degrades to the event's short name rather
   // than to a broken image.
   const [markFailed, setMarkFailed] = useState(false);
+  const wide = useMediaQuery(WIDE_VIEWPORT);
+  const [mobileDocketOpen, setMobileDocketOpen] = useState(
+    () => typeof window === 'undefined' || typeof window.matchMedia !== 'function',
+  );
   const markSrc = brandingSrc(theme?.logos?.mark ?? theme?.logos?.primary);
   // An unknown tier (the probe failed for a reason other than
   // permission-denied) draws the sections every admin holds and refuses
@@ -308,6 +313,9 @@ function AdminDesk() {
   const docket = docketForTier(tierKnown ? adminTier : 'staff');
   const required = sectionTier(pathname);
   const refused = tierKnown && required !== null && !tierReaches(adminTier, required);
+  const activeSection = docket
+    .flatMap((group) => group.items)
+    .find((item) => pathname === `${ROOT}/${item.to}` || pathname.startsWith(`${ROOT}/${item.to}/`));
   // The editor tour (issue #198): null while closed, else the run number.
   // Run 0 is the first visit and takes no focus; each "Take the tour" is a
   // new run, so it starts again at step 1 with the focus on its heading.
@@ -315,13 +323,14 @@ function AdminDesk() {
   const uid = user?.uid;
   const [tour, setTour] = useState(null);
   const takeTourRef = useRef(null);
+  const mobileMenuRef = useRef(null);
   useEffect(() => {
     setTour(readTourDone(uid) ? null : 0);
   }, [uid]);
   const endTour = () => {
     markTourDone(uid);
     setTour(null);
-    takeTourRef.current?.focus();
+    (wide || mobileDocketOpen ? takeTourRef : mobileMenuRef).current?.focus();
   };
 
   return (
@@ -346,7 +355,24 @@ function AdminDesk() {
           </p>
         </div>
 
-        <nav aria-label="Admin sections" className="flex-1 px-md py-xs lg:px-xs lg:py-sm">
+        <details
+          className="admin-mobile-docket flex min-h-0 flex-1 flex-col"
+          open={wide || mobileDocketOpen}
+          onToggle={(event) => {
+            if (!wide) setMobileDocketOpen(event.currentTarget.open);
+          }}
+        >
+          <summary
+            ref={mobileMenuRef}
+            className="admin-target flex cursor-pointer items-center justify-between border-admin-rail-rule border-b-admin-hairline px-md py-xs font-semibold text-admin-rail-ink lg:hidden"
+          >
+            <span>Menu</span>
+            <span className="font-admin-data text-admin-xs text-admin-rail-ink-muted">
+              {activeSection?.label ?? 'Admin sections'}
+            </span>
+          </summary>
+          <div className="admin-mobile-docket__content min-h-0 flex-1 lg:flex lg:flex-col">
+        <nav aria-label="Admin sections" className="px-md py-xs lg:flex-1 lg:px-xs lg:py-sm">
           {docket.map((group) => (
             <div
               key={group.id}
@@ -360,7 +386,11 @@ function AdminDesk() {
               <ul className="flex flex-wrap gap-2xs lg:flex-col lg:gap-3xs">
                 {group.items.map((item) => (
                   <li key={item.to}>
-                    <NavLink to={`${ROOT}/${item.to}`} className={docketItemClass}>
+                    <NavLink
+                      to={`${ROOT}/${item.to}`}
+                      className={docketItemClass}
+                      onClick={() => setMobileDocketOpen(false)}
+                    >
                       {item.label}
                     </NavLink>
                   </li>
@@ -412,6 +442,8 @@ function AdminDesk() {
             </button>
           </div>
         </div>
+          </div>
+        </details>
       </div>
 
       <main id="admin-content" className="min-w-0 flex-1">

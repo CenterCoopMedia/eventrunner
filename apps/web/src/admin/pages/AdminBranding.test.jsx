@@ -130,8 +130,12 @@ function okResponse(body = {}) {
 function errorResponse(status, code, message) {
   return { ok: false, status, json: async () => ({ error: { code, message } }) };
 }
-const previewCss = () => document.getElementById(PREVIEW_STYLE_ID)?.textContent ?? '';
-const frame = () => document.getElementById(PREVIEW_SCOPE_ID);
+const previewIframe = (scopeId = PREVIEW_SCOPE_ID) =>
+  document.querySelector(`iframe[data-theme-proof="${scopeId}"]`);
+const previewDocument = (scopeId = PREVIEW_SCOPE_ID) => previewIframe(scopeId)?.contentDocument;
+const previewCss = (scopeId = PREVIEW_SCOPE_ID) =>
+  previewDocument(scopeId)?.getElementById(PREVIEW_STYLE_ID)?.textContent ?? '';
+const frame = (scopeId = PREVIEW_SCOPE_ID) => previewDocument(scopeId)?.documentElement;
 
 async function renderBranding(themeDoc = LEGACY_THEME) {
   const result = render(
@@ -162,6 +166,10 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   );
   await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
   act(() => configSubscriptions.get('theme')(themeDoc));
+  await waitFor(() => {
+    expect(frame()).not.toBeNull();
+    expect(previewCss()).not.toBe('');
+  });
   if (typeof themeDoc.brandColor === 'string') {
     await waitFor(() =>
       expect(screen.getByLabelText('Main brand colour')).toHaveValue(themeDoc.brandColor),
@@ -256,7 +264,9 @@ describe('the proof', () => {
   it('renders a phone at a phone’s real width, so its own breakpoints fire', async () => {
     await renderBranding();
     fireEvent.click(screen.getByRole('button', { name: 'Phone (390px)' }));
-    expect(frame().style.width).toBe('390px');
+    const preview = screen.getByTitle('Home preview, light mode, 390px wide');
+    expect(preview).toHaveAttribute('width', '390');
+    expect(frame().ownerDocument).toBe(preview.contentDocument);
     // Twice on purpose: the visible identification line and the screen-reader
     // description of the frame carry the same facts.
     expect(screen.getAllByText(/Home · light · 390px/).length).toBeGreaterThan(0);
@@ -268,12 +278,12 @@ describe('the proof', () => {
     await renderBranding(PRESET_THEME);
     fireEvent.click(screen.getByRole('button', { name: 'Compare light and dark' }));
 
-    const compared = document.getElementById(PREVIEW_COMPARE_SCOPE_ID);
+    const compared = frame(PREVIEW_COMPARE_SCOPE_ID);
     expect(frame().dataset.mode).toBe('light');
     expect(compared.dataset.mode).toBe('dark');
     // One candidate, two frames: both carry the same style.
     expect(compared.dataset.theme).toBe(frame().dataset.theme);
-    expect(previewCss()).toContain(`#${PREVIEW_COMPARE_SCOPE_ID}`);
+    expect(previewCss(PREVIEW_COMPARE_SCOPE_ID)).toContain(`#${PREVIEW_COMPARE_SCOPE_ID}`);
     expect(screen.getAllByText(/Home · dark · 1440px/).length).toBeGreaterThan(0);
   });
 
@@ -316,9 +326,10 @@ describe('the proof', () => {
 
   it('discards the preview when the tab is left', async () => {
     const { unmount } = await renderBranding();
-    expect(document.getElementById(PREVIEW_STYLE_ID)).not.toBeNull();
+    const proofDocument = previewDocument();
+    expect(proofDocument.getElementById(PREVIEW_STYLE_ID)).not.toBeNull();
     unmount();
-    expect(document.getElementById(PREVIEW_STYLE_ID)).toBeNull();
+    expect(proofDocument.getElementById(PREVIEW_STYLE_ID)).toBeNull();
   });
 });
 

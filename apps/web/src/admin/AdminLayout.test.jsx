@@ -404,6 +404,30 @@ describe('the editor tour in the shell', () => {
     expect(readTourDone('admin-1')).toBe(true);
   });
 
+  it('returns focus to the visible Menu when a first phone tour ends with the docket closed', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    try {
+      await renderAdmin('/admin/pages');
+      const tour = await tourPanel();
+      const menu = screen.getByText('Menu').closest('summary');
+      expect(menu.closest('details')).not.toHaveAttribute('open');
+
+      fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
+
+      expect(screen.queryByRole('complementary', { name: 'Admin tour' })).toBeNull();
+      expect(menu).toHaveFocus();
+      expect(readTourDone('admin-1')).toBe(true);
+    } finally {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    }
+  });
+
   it('opens again at step 1 from Take the tour, with the focus on its heading, and Escape ends it', async () => {
     markTourDone('admin-1');
     await renderAdmin('/admin/pages');

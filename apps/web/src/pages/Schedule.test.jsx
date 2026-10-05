@@ -171,6 +171,11 @@ function onScreen() {
 }
 
 describe('SchedulePage', () => {
+  it('marks the repeated event identity as the compact interior-page hero', () => {
+    const { container } = renderSchedule();
+    expect(container.querySelector('.event-hero')).toHaveClass('event-hero--compact');
+  });
+
   it('groups sessions by day and sorts the active day by start time', () => {
     renderSchedule();
 

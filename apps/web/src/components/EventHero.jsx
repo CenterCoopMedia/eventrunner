@@ -4,12 +4,31 @@ import { isSafeHref } from '../lib/sanitizeHtml.js';
 
 // One live content contract; each preset composes its own artwork and marks.
 // Home owns the h1; the schedule uses a paragraph before its own heading.
-export default function EventHero({ name, dates, place, tagline, image, nameAs: Name = 'p', nameId, children }) {
+// `compact` is the Schedule-only interior-page treatment: on a phone it
+// keeps the event name and dateline, drops the repeated tagline, and uses a
+// shorter art crop while preserving meaningful alt text and captions.
+export default function EventHero({
+  name,
+  dates,
+  place,
+  tagline,
+  image,
+  compact = false,
+  nameAs: Name = 'p',
+  nameId,
+  children,
+}) {
   const alt = typeof image?.alt === 'string' ? image.alt.trim() : '';
   const src = image?.url && isSafeHref(image.url) && alt ? image.url : null;
   const caption = typeof image?.caption === 'string' ? image.caption.trim() : '';
   return (
-    <div className={`event-hero${src ? ' event-hero--illustrated' : ''}`}>
+    <div
+      className={[
+        'event-hero',
+        src ? 'event-hero--illustrated' : '',
+        compact ? 'event-hero--compact' : '',
+      ].filter(Boolean).join(' ')}
+    >
       {src ? <div className="event-hero__veil" aria-hidden="true" /> : null}
       <div className="event-hero__copy">
         {name ? <Name id={nameId} className="event-hero__title font-heading">{name}</Name> : null}

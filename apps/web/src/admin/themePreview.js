@@ -44,9 +44,23 @@ export const PREVIEW_SCOPE_ID = 'admin-theme-proof';
 export const PREVIEW_COMPARE_SCOPE_ID = 'admin-theme-proof-compare';
 
 let savedTexture = null;
+let savedDensity = null;
 let savedMode = null;
 let savedPresetTheme = null;
 let savedMotifSet = null;
+const previewDocuments = new Set();
+const previewTargets = new Set();
+
+function previewStyle(doc) {
+  let styleEl = doc.getElementById(PREVIEW_STYLE_ID);
+  if (!styleEl) {
+    styleEl = doc.createElement('style');
+    styleEl.id = PREVIEW_STYLE_ID;
+    doc.head.appendChild(styleEl);
+  }
+  previewDocuments.add(doc);
+  return styleEl;
+}
 
 /**
  * Rewrite the runtime CSS to land on one element instead of the document.
@@ -80,16 +94,6 @@ export function scopeThemeCss(css, scopeId) {
  *   side. One style element carries a block per frame.
  */
 export function applyThemePreview(themeDoc, { scope = null, mode = null, scopes = null } = {}) {
-  let styleEl = document.getElementById(PREVIEW_STYLE_ID);
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = PREVIEW_STYLE_ID;
-    document.head.appendChild(styleEl);
-    savedTexture = document.documentElement.dataset.texture ?? null;
-    savedMode = document.documentElement.dataset.mode ?? null;
-    savedPresetTheme = document.documentElement.dataset.theme ?? null;
-    savedMotifSet = document.documentElement.dataset.motifSet ?? null;
-  }
   const css = buildRuntimeThemeCss(themeDoc);
   const shape = resolveShape(themeDoc);
   const { theme, motifSet } = resolveRootAttributes(themeDoc);
@@ -97,27 +101,53 @@ export function applyThemePreview(themeDoc, { scope = null, mode = null, scopes 
   const targets =
     scopes ?? (scope ? [{ element: scope, id: PREVIEW_SCOPE_ID, mode }] : null);
   if (targets) {
-    styleEl.textContent = targets
-      .map((target) => scopeThemeCss(css, target.id))
-      .join('\n');
+    // A proof frame owns its own document. Group the targets by that
+    // document so the candidate stylesheet lands beside the public CSS it
+    // overrides instead of staying in the admin document where it cannot
+    // cross the iframe boundary.
+    const byDocument = new Map();
+    for (const target of targets) {
+      const doc = target.element.ownerDocument;
+      if (!byDocument.has(doc)) byDocument.set(doc, []);
+      byDocument.get(doc).push(target);
+    }
+    for (const [doc, documentTargets] of byDocument) {
+      previewStyle(doc).textContent = documentTargets
+        .map((target) => scopeThemeCss(css, target.id))
+        .join('\n');
+    }
     for (const target of targets) {
       const { element } = target;
+      previewTargets.add(element);
       element.id = target.id;
       if (shape.texture) element.dataset.texture = shape.texture;
       else delete element.dataset.texture;
+      if (shape.density) element.dataset.density = shape.density;
+      else delete element.dataset.density;
       if (theme) element.dataset.theme = theme;
       else delete element.dataset.theme;
       element.dataset.motifSet = motifSet;
       // Each frame states its own mode. Nothing is written to the document,
       // so the room around them keeps the mode the operator is working in.
       element.dataset.mode =
-        target.mode ?? resolveMode(themeDoc?.mode, prefersDark());
+        target.mode ?? resolveMode(themeDoc?.mode, prefersDark(element.ownerDocument.defaultView));
     }
     return;
   }
 
+  const styleEl = previewStyle(document);
+  if (savedTexture === null) {
+    savedTexture = document.documentElement.dataset.texture ?? '';
+    savedDensity = document.documentElement.dataset.density ?? '';
+    savedMode = document.documentElement.dataset.mode ?? '';
+    savedPresetTheme = document.documentElement.dataset.theme ?? '';
+    savedMotifSet = document.documentElement.dataset.motifSet ?? '';
+  }
   styleEl.textContent = css;
   if (shape.texture) document.documentElement.dataset.texture = shape.texture;
+  else delete document.documentElement.dataset.texture;
+  if (shape.density) document.documentElement.dataset.density = shape.density;
+  else delete document.documentElement.dataset.density;
   if (theme) document.documentElement.dataset.theme = theme;
   else delete document.documentElement.dataset.theme;
   document.documentElement.dataset.motifSet = motifSet;
@@ -130,23 +160,37 @@ export function applyThemePreview(themeDoc, { scope = null, mode = null, scopes 
 
 /** Remove the preview overlay, restoring the saved theme's rendering. */
 export function clearThemePreview() {
-  document.getElementById(PREVIEW_STYLE_ID)?.remove();
+  for (const doc of previewDocuments) doc.getElementById(PREVIEW_STYLE_ID)?.remove();
+  previewDocuments.clear();
+  for (const element of previewTargets) {
+    for (const attribute of ['texture', 'density', 'theme', 'motifSet', 'mode']) {
+      delete element.dataset[attribute];
+    }
+  }
+  previewTargets.clear();
   if (savedTexture !== null) {
-    document.documentElement.dataset.texture = savedTexture;
+    if (savedTexture) document.documentElement.dataset.texture = savedTexture;
+    else delete document.documentElement.dataset.texture;
     savedTexture = null;
   }
+  if (savedDensity !== null) {
+    if (savedDensity) document.documentElement.dataset.density = savedDensity;
+    else delete document.documentElement.dataset.density;
+    savedDensity = null;
+  }
   if (savedMode !== null) {
-    applyMode(savedMode);
+    if (savedMode) applyMode(savedMode);
+    else delete document.documentElement.dataset.mode;
     savedMode = null;
   }
   if (savedPresetTheme !== null) {
-    document.documentElement.dataset.theme = savedPresetTheme;
+    if (savedPresetTheme) document.documentElement.dataset.theme = savedPresetTheme;
+    else delete document.documentElement.dataset.theme;
     savedPresetTheme = null;
-  } else {
-    delete document.documentElement.dataset.theme;
   }
   if (savedMotifSet !== null) {
-    document.documentElement.dataset.motifSet = savedMotifSet;
+    if (savedMotifSet) document.documentElement.dataset.motifSet = savedMotifSet;
+    else delete document.documentElement.dataset.motifSet;
     savedMotifSet = null;
   }
 }

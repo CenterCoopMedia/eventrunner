@@ -63,7 +63,7 @@ import { primaryActionClass, quietActionClass } from '../components/controlClass
 // than a shortened move (expansion record §2.2).
 function dayClass(isActive) {
   return [
-    'touch-target inline-flex items-center border-b-strong px-2xs py-xs font-data text-caption '
+    'touch-target inline-flex items-center border-b-strong px-2xs py-xs font-data text-body '
     + 'active:scale-[0.98] motion-safe:transition-transform motion-safe:duration-slow '
     + 'motion-safe:ease-motion',
     isActive
@@ -311,13 +311,14 @@ export default function Schedule() {
   return (
     <SystemPage pageId="schedule">
       <EventHero
+        compact
         name={eventConfig.name}
         dates={buildNameplate(eventConfig).dates}
         place={buildNameplate(eventConfig).edition}
         tagline={eventConfig.tagline}
         image={demoHero(theme) ?? getSectionBlocks?.('hero')?.find((block) => block.blockType === 'image')}
       />
-      <header className="mt-xl flex flex-wrap items-baseline justify-between gap-md">
+      <header className="schedule-page-header flex flex-wrap items-baseline justify-between gap-md">
         <div>
           <h1 className="font-heading text-h1 font-semibold text-text-primary">Schedule</h1>
           {eventZoneLabel ? (

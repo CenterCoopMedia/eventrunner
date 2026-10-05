@@ -54,6 +54,7 @@
 // for why :focus-visible and bare :focus are both wrong here.
 import { useEffect, useState } from 'react';
 import { focusAsDestination, scrollToTop } from '../lib/scrollToTop.js';
+import { useViewport } from '../lib/viewport.js';
 import { quietActionClass } from './controlClasses.js';
 
 /**
@@ -72,8 +73,8 @@ const FOCUSABLE =
  * from the viewport rather than fixed in pixels, because "one screen" is
  * 600px on a phone and 1200px on a desktop.
  */
-function threshold() {
-  return typeof window === 'undefined' ? Infinity : window.innerHeight || 0;
+function threshold(view) {
+  return view?.innerHeight || 0;
 }
 
 /**
@@ -87,12 +88,12 @@ function threshold() {
  * @param {string} targetId
  * @returns {HTMLElement|null}
  */
-function topFocusTarget(targetId) {
-  if (typeof document === 'undefined') return null;
+function topFocusTarget(targetId, doc) {
+  if (!doc) return null;
   return (
-    document.getElementById(targetId) ||
-    document.querySelector('main') ||
-    document.querySelector(FOCUSABLE)
+    doc.getElementById(targetId) ||
+    doc.querySelector('main') ||
+    doc.querySelector(FOCUSABLE)
   );
 }
 
@@ -118,28 +119,30 @@ const WITHDRAWN_CLASS =
  *   element focus lands on, and of the region the control withdraws for
  */
 export default function BackToTop({ targetId, footerId }) {
+  const view = useViewport();
+  const doc = view?.document;
   const [past, setPast] = useState(false);
   const [footerInView, setFooterInView] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const read = () => setPast((window.scrollY || 0) > threshold());
+    if (!view) return undefined;
+    const read = () => setPast((view.scrollY || 0) > threshold(view));
     // A reader can arrive already scrolled: a reload, or a back button that
     // restored the position. Read once before waiting for a scroll event.
     read();
-    window.addEventListener('scroll', read, { passive: true });
-    window.addEventListener('resize', read);
+    view.addEventListener('scroll', read, { passive: true });
+    view.addEventListener('resize', read);
     return () => {
-      window.removeEventListener('scroll', read);
-      window.removeEventListener('resize', read);
+      view.removeEventListener('scroll', read);
+      view.removeEventListener('resize', read);
     };
-  }, []);
+  }, [view]);
 
   useEffect(() => {
-    const ObserverType = globalThis.IntersectionObserver;
+    const ObserverType = view?.IntersectionObserver ?? globalThis.IntersectionObserver;
     // No observer, no refinement — the control stays as it is (see above).
     if (typeof ObserverType !== 'function') return undefined;
-    const target = typeof document === 'undefined' ? null : document.getElementById(footerId);
+    const target = doc?.getElementById(footerId);
     if (!target) return undefined;
     const observer = new ObserverType((entries) => {
       // One target, so the last entry is the current answer for it.
@@ -148,7 +151,7 @@ export default function BackToTop({ targetId, footerId }) {
     });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [footerId]);
+  }, [doc, footerId, view]);
 
   if (!past) return null;
 
@@ -159,8 +162,8 @@ export default function BackToTop({ targetId, footerId }) {
         // On its own ground, so the text under it never shows through.
         className={`${quietActionClass} bg-surface`}
         onClick={() => {
-          scrollToTop();
-          focusAsDestination(topFocusTarget(targetId));
+          scrollToTop(view);
+          focusAsDestination(topFocusTarget(targetId, doc));
         }}
       >
         Back to top

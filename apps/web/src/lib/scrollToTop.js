@@ -18,12 +18,12 @@
 //     no scroller at all has nothing to move.
 
 /** Scroll the window to the top. Safe to call on a host with no scroller. */
-export function scrollToTop() {
-  if (typeof window === 'undefined' || typeof window.scrollTo !== 'function') return;
+export function scrollToTop(view = typeof window === 'undefined' ? undefined : window) {
+  if (!view || typeof view.scrollTo !== 'function') return;
   try {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    view.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   } catch {
-    window.scrollTo(0, 0);
+    view.scrollTo(0, 0);
   }
 }
 

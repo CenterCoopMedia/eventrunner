@@ -36,7 +36,7 @@ export const fieldHintClass = 'text-admin-sm text-admin-ink-secondary';
 // generated utilities, so on the same element it would beat the control
 // height at equal specificity and the control would fall to its padding.
 export const inputClass =
-  'min-h-admin-control w-full rounded-admin border-admin-hairline border-admin-rule-control ' +
+  'min-h-admin-control min-w-0 w-full rounded-admin border-admin-hairline border-admin-rule-control ' +
   'bg-admin-ground-input px-sm py-xs font-admin-ui text-admin-base text-admin-ink ' +
   'placeholder:text-admin-ink-data hover:border-admin-action ' +
   'aria-[invalid=true]:border-admin-rule-alarm';
@@ -126,7 +126,7 @@ export function TextField({
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex flex-col gap-3xs">
+    <div className="flex min-w-0 flex-col gap-3xs">
       <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
@@ -168,7 +168,7 @@ export function TextAreaField({
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex flex-col gap-3xs">
+    <div className="flex min-w-0 flex-col gap-3xs">
       <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
@@ -210,7 +210,7 @@ export function SelectField({
     .filter(Boolean)
     .join(' ');
   return (
-    <div className="flex flex-col gap-3xs">
+    <div className="flex min-w-0 flex-col gap-3xs">
       <label htmlFor={id} className={fieldLabelClass}>
         {label}
       </label>
