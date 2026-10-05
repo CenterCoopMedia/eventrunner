@@ -55,12 +55,12 @@ function useSpeakerDashboardEligibility({
   return result.identity === identity && result.eligible;
 }
 
-export default function useAccountViews() {
+export default function useAccountViews({ refreshOnNavigation = true } = {}) {
   const { user, loading: authLoading, adminStatus } = useAuth();
   const { profile, status: accountStatus } = useProfile();
   const { pathname, key: navigationKey } = useLocation();
   const speakerDashboardEligible = useSpeakerDashboardEligibility({
-    authLoading, user, accountStatus, speakerId: profile?.speakerId, navigationKey,
+    authLoading, user, accountStatus, speakerId: profile?.speakerId, navigationKey: refreshOnNavigation ? navigationKey : null,
   });
   const views = accountViews({
     signedIn: Boolean(user) && !authLoading,

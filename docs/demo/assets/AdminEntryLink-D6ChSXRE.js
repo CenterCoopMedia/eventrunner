@@ -1,1 +1,0 @@
-import{c as e,j as t,e as a,L as u,a0 as r}from"./index--wAo6LUd.js";function o(){const{views:n}=a();return n.length<2||!n.some(s=>s.id==="admin")?null:t.jsx(u,{to:"/admin",className:`${r} mt-sm`,children:"Manage event"})}function l(){const{user:n,loading:s,adminStatus:i}=e();return!n||s||i!=="admin"?null:t.jsx(o,{})}export{l as A};

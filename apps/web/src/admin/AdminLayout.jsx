@@ -310,7 +310,7 @@ function AdminDesk() {
   const { eventConfig, theme } = useEventConfig();
   const { user, adminTier, refreshAdminStatus, signOut } = useAuth();
   const { pathname } = useLocation();
-  const accountViews = useAccountViews();
+  const accountViews = useAccountViews({ refreshOnNavigation: false });
   // A branding slot can point at an object that has since been deleted from
   // the bucket, so the job mark degrades to the event's short name rather
   // than to a broken image.

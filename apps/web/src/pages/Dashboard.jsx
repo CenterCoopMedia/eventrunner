@@ -15,7 +15,7 @@
 // feed is empty or the flag is off, so an event that says nothing live
 // shows no dead frame. Beneath them: the personal schedule card and the
 // event's own resource cards (issue #169).
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import AdminEntryLink from '../components/AdminEntryLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -29,6 +29,7 @@ import ResourceCards from '../components/dashboard/ResourceCards.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Dashboard() {
+  const accountViews = useOutletContext();
   const { user, loading: authLoading } = useAuth();
   const { features } = useEventConfig();
   const { profile, status } = useProfile();
@@ -67,7 +68,7 @@ export default function Dashboard() {
           Welcome back{profile?.displayName ? `, ${profile.displayName}` : ''}. This is your
           place at the event.
         </p>
-        <AdminEntryLink />
+        <AdminEntryLink account={accountViews} />
       </header>
 
       {/* The status card and the live feed side by side where there is

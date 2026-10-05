@@ -103,7 +103,7 @@ export function optionalOnDemand(importer, label) {
   );
 }
 // Only multi-role accounts need this menu; keep it out of public first paint.
-const AccountMenu = onDemand(() => import('./AccountMenu.jsx'));
+const AccountMenu = optionalOnDemand(() => import('./AccountMenu.jsx'), 'account menu');
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 // The public model tools are optional and render no interface. Keep their
@@ -418,7 +418,7 @@ export default function Layout() {
           : 'stage flex-1 pb-2xl pt-md'
       }
     >
-      <Outlet />
+      <Outlet context={accountViews} />
     </main>
   );
 

@@ -13,7 +13,7 @@ function Account() {
   const account = useAccountViews();
   const {pathname} = useLocation();
   return <><p>{pathname}</p><Link to={account.current?.to ?? '/signin'}>Dashboard</Link>
-    {account.views.length > 1 ? <AccountMenu account={account}/> : null}<AdminEntryLink/><Link to="/schedule">Schedule</Link></>;
+    {account.views.length > 1 ? <AccountMenu account={account}/> : null}<AdminEntryLink account={account}/><Link to="/schedule">Schedule</Link></>;
 }
 function renderAccount({registered=true, speaker=false, admin=false, path='/dashboard', uid=user.uid} = {}) {
   return render(<MemoryRouter initialEntries={[path]} future={{v7_startTransition:true, v7_relativeSplatPath:true}}>
@@ -46,6 +46,7 @@ describe('account visibility rules (issue 340)', () => {
     expect(within(nav).getAllByRole('link').map(link=>link.textContent)).toEqual(['Attendee','Speaker','Admin']);
     expect(within(nav).getByRole('link',{name:'Attendee'})).toHaveAttribute('aria-current','page');
     expect(screen.getByRole('link',{name:'Manage event'})).toHaveAttribute('href','/admin');
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
   it('offers two views without an admin link to an attendee and speaker', async () => {
     renderAccount({speaker:true});
