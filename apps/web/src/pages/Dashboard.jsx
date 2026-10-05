@@ -16,6 +16,7 @@
 // shows no dead frame. Beneath them: the personal schedule card and the
 // event's own resource cards (issue #169).
 import { Link } from 'react-router-dom';
+import AdminEntryLink from '../components/AdminEntryLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
@@ -66,6 +67,7 @@ export default function Dashboard() {
           Welcome back{profile?.displayName ? `, ${profile.displayName}` : ''}. This is your
           place at the event.
         </p>
+        <AdminEntryLink />
       </header>
 
       {/* The status card and the live feed side by side where there is

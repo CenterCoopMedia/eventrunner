@@ -48,6 +48,8 @@
 // chunk (components/AdminTour.jsx), and its steps are this docket.
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import useAccountViews from '../hooks/useAccountViews.js';
+import RoleSwitcher from '../components/RoleSwitcher.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { brandingSrc } from '../lib/mediaSource.js';
@@ -308,6 +310,7 @@ function AdminDesk() {
   const { eventConfig, theme } = useEventConfig();
   const { user, adminTier, refreshAdminStatus, signOut } = useAuth();
   const { pathname } = useLocation();
+  const accountViews = useAccountViews();
   // A branding slot can point at an object that has since been deleted from
   // the bucket, so the job mark degrades to the event's short name rather
   // than to a broken image.
@@ -431,6 +434,10 @@ function AdminDesk() {
             </nav>
 
             <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline px-md py-sm lg:flex-col lg:items-stretch">
+              <RoleSwitcher account={accountViews} linkClass={railButtonClass} labelClass="text-admin-xs" onNavigate={() => {
+                if (!wide) mobileMenuRef.current?.focus();
+                setMobileDocketOpen(false);
+              }} />
               {/* An operator has to be able to tell which account the server
                   will see, so the address is set in the data face: it is an
                   identifier, and identifiers are the machine's. The tier word
