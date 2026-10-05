@@ -4,13 +4,13 @@ Desktop: 1280 × 800. Phone: 390 × 844. Images capture the full document at
 these viewport sizes. The light images form the paired before/after set.
 Dark after images record the second supported mode.
 
-Before: Base `eaf4e2b5857fe0b1349db1e2f6763d8da51bc86d`, with the same
+Before: Base `4ae4a1aaae0a5eb8ed0b724a72119b5332d6c93a`, with the same
 approved historical content supplied through `GENERATED_DIR`. Its theme CSS,
 theme config and neutral branding stay at the base revision. This fixture
 overlay makes the visual comparison use the same sessions, people and prose.
 The source diff records the replacement of the previous fictional content.
 
-After: Source `cb576832868e6f2e0fd1b467e6f51bbc744c6c50`, with the committed
+After: Source `47b64fab90e95d2b0c06e04d8172759409095aa9`, with the committed
 historical content and NC Local theme. The after images use the fresh Node 22
 lockfile build from Legion, served by a loopback-only local preview. The before
 uses the isolated base development server. Both use `VITE_DEMO_MODE=1`.
@@ -19,8 +19,10 @@ semantic locators; screenshots did not supply click coordinates.
 
 This refresh uses the official Google Fonts Cabin normal Latin 400–700 slice:
 28,320 bytes, below the project's existing 60 KB font limit. Its asset source
-and digest are recorded in `field-evidence.json`. The full web suite at this
-source passed 3,025 tests across 260 files; this is separate from full CI.
+and digest are recorded in `field-evidence.json`. The earlier full web suite at
+`cb576832` passed 3,025 tests across 260 files. Current main was then integrated;
+its changes do not alter the public application source. Final exact-head CI and
+independent review receipts are recorded separately in the PR.
 
 `render-evidence.json` records headings, fonts, viewport widths, transaction
 link checks and checks of the other five style selectors. Their source preset
