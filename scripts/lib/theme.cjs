@@ -212,6 +212,7 @@ const FONT_SETS = Object.freeze({
 const RADIUS_SCALES = Object.freeze({
   sharp: Object.freeze({ base: '0', large: '2px' }),
   small: Object.freeze({ base: '2px', large: '4px' }),
+  editorial: Object.freeze({ base: '4px', large: '4px' }),
   soft: Object.freeze({ base: '8px', large: '16px' }),
   round: Object.freeze({ base: '16px', large: '28px' }),
 });
