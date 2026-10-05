@@ -1,7 +1,7 @@
 # Issue 316 mobile layout evidence
 
 This evidence covers the Issue 316 rendering changes at source commit
-`fea64f9d9678298c5e2719e05ca367af0c148c33`. The evidence files are the only
+`8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2`. The evidence files are the only
 changes after that source commit.
 
 The run used the project's Chromium Playwright project and synthetic Firebase
@@ -44,7 +44,7 @@ The machine-readable results are in [summary.json](summary.json),
   footer passed in every theme and mode at phone and desktop widths.
 - The public and CMS phone titles used the full responsive layout. The maximum
   measured phone title sizes were 38.7px public and 37.6px in CMS preview.
-- The Newsroom light Schedule placed its first session at y=762.53px in the
+- The Newsroom light Schedule placed its first session at y=738.53px in the
   400 x 844 viewport. Optional filters stayed reachable in one 44px disclosure.
 - No matrix cell had horizontal document overflow. Navigation and footer
   targets had a minimum rendered height of 44px.

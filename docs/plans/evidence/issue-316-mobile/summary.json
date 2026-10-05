@@ -1,5 +1,5 @@
 {
-  "testedCommit": "fea64f9d9678298c5e2719e05ca367af0c148c33",
+  "testedCommit": "8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2",
   "status": "pass",
   "failures": 0,
   "publicHomeScheduleCells": 336,
@@ -15,7 +15,7 @@
   "minimumIllustratedCaptionContrast": 14.06,
   "minimumNavigationTargetHeight": 44,
   "minimumFooterTargetHeight": 44,
-  "newsroomLightScheduleFirstSessionTopAt400": 762.53125,
+  "newsroomLightScheduleFirstSessionTopAt400": 738.53125,
   "maximumPhoneAdminRailHeight": 100.5,
   "maximumPhonePublicTitleFontSize": 38.7,
   "maximumCmsPhoneTitleFontSize": 37.6,
