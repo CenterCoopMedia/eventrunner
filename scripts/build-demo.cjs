@@ -123,7 +123,9 @@ function demoHeadMetadata(html, { event, theme }, publicUrl) {
     ['name', 'description', event.seo.description],
     ['property', 'og:title', title], ['property', 'og:description', event.seo.description],
     ['property', 'og:type', 'website'], ['property', 'og:url', publicUrl], ['property', 'og:image', image],
-    ['name', 'twitter:card', 'summary_large_image'], ['name', 'twitter:title', title], ['name', 'twitter:image', image],
+    ['property', 'og:image:width', '1200'], ['property', 'og:image:height', '630'],
+    ['name', 'twitter:card', 'summary_large_image'], ['name', 'twitter:title', title],
+    ['name', 'twitter:description', event.seo.description], ['name', 'twitter:image', image],
   ].map(([attribute, key, value]) => `    <meta ${attribute}="${key}" content="${escape(value)}" />`).join('\n');
   return html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escape(title)}</title>`)
     .replace(/<link rel="icon"[^>]*>/, `<link rel="icon" type="image/svg+xml" href="${escape(icon)}" />`)

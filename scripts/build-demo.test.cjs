@@ -41,6 +41,9 @@ test('static demo metadata identifies the historical fixture and escapes source 
   assert.match(result, /Historical &quot;2026&quot; program/);
   assert.match(result, /content="https:\/\/example.org\/demo\/branding\/nclocal-og.png"/);
   assert.match(result, /href="https:\/\/example.org\/demo\/branding\/nclocal-favicon.svg"/);
+  assert.match(result, /property="og:image:width" content="1200"/);
+  assert.match(result, /property="og:image:height" content="630"/);
+  assert.match(result, /name="twitter:description" content="Historical &quot;2026&quot; program"/);
 });
 
 test('defaults target the Pages subpath and docs/demo', () => {
