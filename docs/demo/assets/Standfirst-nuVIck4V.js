@@ -1,0 +1,1 @@
+import{j as o}from"./index-Ca_a-a6Q.js";function a({children:t,className:s=""}){return t==null||t===""?null:o.jsx("p",{className:["standfirst max-w-prose",s].filter(Boolean).join(" "),children:t})}export{a as S};

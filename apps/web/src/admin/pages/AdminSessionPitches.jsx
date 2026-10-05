@@ -125,7 +125,9 @@ function PitchReview({ initial, current, call }) {
     setBusy(true); setError(null); setResult('');
     try {
       const response = await call('convertSessionPitch', { id: baseline.id, expectedRevision: revision(baseline), firstName, lastName, dayId, startTime, endTime });
-      setConversion(response); setResult('Private drafts created. Review both editors before publication.');
+      setConversion(response);
+      setBaseline((previous) => ({ ...previous, conversion: response, reviewRevision: response.revision }));
+      setResult('Private drafts created. Review both editors before publication.');
     } catch (err) { setError(err); }
     finally { setBusy(false); }
   }

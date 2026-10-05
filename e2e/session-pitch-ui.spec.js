@@ -145,6 +145,14 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     expect((await db.collection('cmsSchedule_drafts').doc(converted.sessionId).get()).data()).toMatchObject({ visible: false, status: 'dirty', speakerIds: [converted.speakerId] });
     expect((await db.collection('speakers').doc(converted.speakerId).get()).data()).toMatchObject({ status: 'draft', uid: null, inviteToken: null });
     expect((await db.collection('speakers_public').doc(converted.speakerId).get()).exists).toBe(false);
+    await expect(page.getByRole('button', { name: 'Save review decision' })).toBeEnabled();
+    await page.getByLabel('Private review notes').fill('Post-conversion review');
+    await page.getByRole('button', { name: 'Save review decision' }).click();
+    await expect(page.getByText('Review saved. No notification was sent.')).toBeVisible();
+    expect((await ref.get()).data()).toMatchObject({ privateNotes: 'Post-conversion review', reviewRevision: 4 });
+    await ref.update({ reviewRevision: 5, privateNotes: 'Another reviewer after conversion' });
+    await expect(page.getByText(/This pitch changed. Your unsaved notes/)).toBeVisible();
+    await expect(page.getByLabel('Private review notes')).toHaveValue('Post-conversion review');
     const token = await adminIdToken();
     const retry = await callFunction('convertSessionPitch', { id, expectedRevision: 2, firstName: 'Example', lastName: 'Presenter', dayId, startTime: '10:00', endTime: '11:00' }, token);
     expect(retry).toMatchObject({ status: 200, body: { ...converted, replayed: true } });

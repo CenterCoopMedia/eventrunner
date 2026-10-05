@@ -105,3 +105,5 @@ Save an **Accepted** decision first. Expand **Create session and speaker drafts*
 `convertSessionPitch` accepts `{ id, expectedRevision, firstName, lastName, dayId, startTime, endTime }`. It atomically creates one hidden `cmsSchedule_drafts` row, one canonical `speakers` row with `status: draft`, the speaker slug reservation, and a conversion/audit record. No invite, account role, live session, or public speaker projection is created. Retry returns the existing conversion and cannot overwrite or duplicate drafts.
 
 Use **Review session draft** and **Review speaker draft** to complete the ordinary editors. Session visibility and speaker approval remain explicit actions in those editors. Private notes and reviewer identities never enter either draft.
+
+The conversion response includes its committed review revision. A retry returns the same conversion revision even if a later reviewer changed the pitch; the queue still shows a conflict for that later change.

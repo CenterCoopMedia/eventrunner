@@ -86,6 +86,7 @@ function pitch(overrides = {}) {
     organization: 'Example newsroom',
     format: 'Panel',
     submissionKey: KEY,
+    consent: true,
     ...overrides,
   };
 }
@@ -223,6 +224,9 @@ describe('pitch submission', () => {
       pitch({ organization: { name: 'Example' } }),
       pitch({ format: ['Panel'] }),
       pitch({ submissionKey: 'short' }),
+      pitch({ consent: undefined }),
+      pitch({ consent: false }),
+      pitch({ consent: 'true' }),
     ]) {
       expect((await submit(body)).statusCode).toBe(400);
     }
@@ -256,6 +260,7 @@ describe('pitch submission', () => {
       privateNotes: null,
       reviewedAt: null,
       reviewedBy: null,
+      consent: { version: 'session-pitch-review-v1' },
     });
     expect((await db.collection('session_pitch_rate_limits').doc(RATE_LIMIT_ID).get()).data().requests).toEqual([T0]);
 

@@ -94,7 +94,7 @@ async function convertPitch({ db, actor, body, now, at }) {
     tx.create(speakerRef, { firstName: firstName.trim(), lastName: lastName.trim(), slug: speakerId,
       email: pitch.email, organization: pitch.organization || '', bio: '', jobTitle: '', socialHandles: {}, headshotPath: null,
       status: 'draft', uid: null, inviteToken: null, approvedAt: null, createdAt: at, updatedAt: at, updatedBy: actor.email });
-    const conversion = { sessionId, speakerId };
+    const conversion = { sessionId, speakerId, revision: expectedRevision + 1 };
     tx.update(ref, { conversion, convertedAt: at, convertedBy: actor.email, reviewRevision: expectedRevision + 1 });
     tx.set(db.collection('admin_logs').doc(), { action: 'convertSessionPitch', docPath: `session_pitches/${id}`, uid: actor.uid, email: actor.email, at, details: conversion });
     return conversion;
