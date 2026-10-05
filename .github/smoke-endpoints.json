@@ -71,6 +71,8 @@
     "submitSessionPitch",
     "updatePitchCall",
     "reviewSessionPitch",
+    "importSessionPitches",
+    "convertSessionPitch",
     "submitChangeRequest",
     "updateChangeRequestStatus",
     "deleteChangeRequest",

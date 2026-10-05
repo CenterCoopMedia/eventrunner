@@ -7,6 +7,7 @@
   "exports": {
     ".": { "require": "./src/index.cjs", "import": "./src/index.mjs" },
     "./config": { "require": "./src/config/index.cjs", "import": "./src/config/index.mjs" },
+    "./pitch": { "require": "./src/pitch.cjs", "import": "./src/pitch.mjs" },
     "./time": { "require": "./src/time.cjs", "import": "./src/time.mjs" },
     "./registration": { "require": "./src/registration.cjs", "import": "./src/registration.mjs" },
     "./badges": { "require": "./src/badges.cjs", "import": "./src/badges.mjs" },

@@ -136,6 +136,7 @@ export function routeTitlePartFor({ pathname, pages, features }) {
   // event name alone: "Home" names the document for an editor, not the
   // site for a reader.
   if (path === '/') return null;
+  if (path === '/pitch') return 'Pitch a session';
 
   const systemId = systemPageIdForPath(path);
   if (systemId) {

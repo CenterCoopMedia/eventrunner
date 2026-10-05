@@ -368,3 +368,19 @@ test('the demo snapshot writes a sitemap that does not list the specimen book', 
   const sitemap = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8');
   assert.equal(sitemap.includes('/specimen'), false);
 });
+
+
+test('snapshot pitch route collisions stop the build before writing site files', async (t) => {
+  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pitch-collision-'));
+  t.after(() => fs.rmSync(distDir, { recursive: true, force: true }));
+  for (const path of ['/pitch', '/pitch/guidelines']) {
+    const modules = { ...MODULES, 'pagesData.js': { pagesData: [{ id: 'legacy', path, visible: true }] } };
+    const errors = [];
+    const code = await main(['--dist', distDir, '--public-url', 'https://example.org'], {
+      importModule: fakeImporter(modules), log: { log() {}, error: (message) => errors.push(message) },
+    });
+    assert.equal(code, 4);
+    assert.ok(errors.some((message) => message.includes(path) && message.includes('Rename')));
+    assert.deepEqual(fs.readdirSync(distDir), []);
+  }
+});
