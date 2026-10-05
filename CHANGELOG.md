@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Account view switching for users with multiple attendee, speaker or admin roles. The selected
+  view stays in the browser session, and multi-role admins can open Manage event from their
+  attendee or speaker dashboard. Phone controls support browsers without native dialogs (#340).
 - Private session pitch APIs for verified accounts, without a ticket requirement. Operators open
   or close intake through `config/pitch_call`; staff review proposals with status and revision
   checks. Account-scoped retry keys and atomic rate limits prevent duplicate or excessive writes.
