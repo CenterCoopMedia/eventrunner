@@ -162,6 +162,8 @@ describe('the admin shell', () => {
       await waitFor(() =>
         expect(container.querySelector('#admin-content')).toHaveAttribute('inert'),
       );
+      expect(document.documentElement.style.overflow).toBe('hidden');
+      expect(document.body.style.overflow).toBe('hidden');
     } finally {
       if (original) window.matchMedia = original;
       else delete window.matchMedia;

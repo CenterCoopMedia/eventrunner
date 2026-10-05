@@ -334,6 +334,22 @@ function AdminDesk() {
   useEffect(() => {
     setTour(readTourDone(uid) ? null : 0);
   }, [uid]);
+  useEffect(() => {
+    if (wide || !mobileDocketOpen) return undefined;
+    // The sheet owns the phone viewport while it is open. Lock both scroll
+    // roots so PageDown and touch scrolling cannot move the top bar, which
+    // carries the sheet's only dismiss control, out of view.
+    const root = document.documentElement;
+    const body = document.body;
+    const rootOverflow = root.style.overflow;
+    const bodyOverflow = body.style.overflow;
+    root.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    return () => {
+      root.style.overflow = rootOverflow;
+      body.style.overflow = bodyOverflow;
+    };
+  }, [wide, mobileDocketOpen]);
   const endTour = () => {
     markTourDone(uid);
     setTour(null);

@@ -280,6 +280,9 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   await expect(docket.getByText(ADMIN_EMAIL)).toBeVisible();
   await expect(docket.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await expect(page.locator('#admin-content')).toHaveAttribute('inert', '');
+  const pageScroll = await page.evaluate(() => document.defaultView.scrollY);
+  await summary.press('PageDown');
+  await expect.poll(() => page.evaluate(() => document.defaultView.scrollY)).toBe(pageScroll);
 
   const drawerEvidence = await page.evaluate(() => {
     const sheetElement = document.querySelector('.admin-mobile-docket__content');
