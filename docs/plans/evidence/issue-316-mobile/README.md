@@ -1,12 +1,12 @@
 # Issue 316 mobile layout evidence
 
 This evidence covers the Issue 316 rendering changes through source commit
-`ecdfa10feec0c695cfb60820262c1d7b784e41ae`. The normal 480-cell public matrix
+`cb85ce7a74e5c88b5df2f5dabe215f924eba1f7d`. The normal 480-cell public matrix
 was captured at `8ee16eec6784cc1f951eeffa7a3f7fa795a15fa2`. The later source delta changes
 the shared admin shell, Branding preview and whole-document serialization,
 tests, documentation and generated demo. The public stress, illustrated,
-reduced-motion and all CMS preview cells were rerun at `ecdfa10f`. The full
-admin matrix and every admin destination were also run at `ecdfa10f`. The
+reduced-motion and all CMS preview cells were rerun at `cb85ce7a`. The full
+admin matrix and every admin destination were also run at `cb85ce7a`. The
 evidence files are the only changes after that source commit.
 
 The run used the project's Chromium Playwright project and synthetic Firebase
@@ -72,7 +72,8 @@ The machine-readable results are in [summary.json](summary.json),
   bottom. It retained four separate group labels and 25 full-width rows. Every
   row rendered at least 44px high. The account address and Sign out stayed
   inside the sheet.
-- The open phone sheet made the covered work surface inert. Starting the admin
+- The open phone sheet made the covered work surface inert and locked outer
+  scrolling, so the Menu dismiss control stayed reachable. Starting the admin
   tour closed the sheet before moving focus into the tour.
 - Every CMS phone preview had a 390px browsing context, no overflow, correct
   theme/mode attributes and public text inheritance. The committed browser
