@@ -1,0 +1,93 @@
+{
+  "sourceHead": "4b73e3dd60d7b7336f30cf9a38f05141b7382709",
+  "officialSource": "https://nclocal.org/wp-content/uploads/2025/06/cropped-NCLocal_Logo_Horizontal_Dark_1200px.png",
+  "officialAssetSha256": "867308cd11cb50c6c783d1b8a655eefaa2c9b7aae773761792251d13b2ca3674",
+  "derivedAsset": "apps/web/public/branding/nclocal-logo-dark.svg",
+  "treatment": "Derived white wordmark; unchanged original colored globe and interior arcs. Not an official white variant.",
+  "geometry": {
+    "alphaMismatches": 0,
+    "derivedSize": [
+      1200,
+      260
+    ],
+    "globeMismatches": 0,
+    "originalSize": [
+      1200,
+      260
+    ],
+    "wordmarkNonwhite": 0
+  },
+  "renderedConsumers": [
+    {
+      "view": "home",
+      "consumers": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "derivedContent": "url(\"http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo-dark.svg\")",
+          "ground": "rgb(0, 28, 40)",
+          "height": 53.921875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 220,
+          "whiteWordmarkContrast": 17.55
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "derivedContent": "url(\"http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo-dark.svg\")",
+          "ground": "rgb(0, 28, 40)",
+          "height": 54.796875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 224,
+          "whiteWordmarkContrast": 17.55
+        }
+      ]
+    },
+    {
+      "view": "partners",
+      "consumers": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "derivedContent": "url(\"http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo-dark.svg\")",
+          "ground": "rgb(0, 28, 40)",
+          "height": 53.921875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 220,
+          "whiteWordmarkContrast": 17.55
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "derivedContent": "url(\"http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo-dark.svg\")",
+          "ground": "rgb(0, 28, 40)",
+          "height": 54.796875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 224,
+          "whiteWordmarkContrast": 17.55
+        }
+      ]
+    },
+    {
+      "view": "partner-detail",
+      "consumers": [
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "derivedContent": "url(\"http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo-dark.svg\")",
+          "ground": "rgb(0, 28, 40)",
+          "height": 53.921875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 220,
+          "whiteWordmarkContrast": 17.55
+        },
+        {
+          "background": "rgba(0, 0, 0, 0)",
+          "derivedContent": "url(\"http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo-dark.svg\")",
+          "ground": "rgb(0, 28, 40)",
+          "height": 89.453125,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 383.9375,
+          "whiteWordmarkContrast": 17.55
+        }
+      ]
+    }
+  ],
+  "visuallyInspected": true,
+  "contrastScope": "White wordmark versus the recorded dark surface. Original globe detail is visually inspected and pixel-compared; no new official brand or logo contrast standard is claimed."
+}

@@ -6,8 +6,8 @@
 //      from e2e/fixtures/answers.json, admin e2e-admin@example.test
 //      (spec §5.1). This is also where sessionBookmarks and
 //      autoApproveTicketHolders get turned on for the ticket-claim journey.
-//   2. seed-demo-event.cjs — layers the synthetic demo fixture on top
-//      (§5.4): sessions, speakers, sponsors, past editions. It never
+//   2. seed-demo-event.cjs — layers the approved historical demo fixture on top
+//      (§5.4): selected public sessions, speakers and partner roles. It never
 //      touches config/event once init has already created it (idempotency
 //      rule, scripts/lib/idempotency.cjs) — only cmsPages/cmsContent (still
 //      `seeded: true`, so refreshed with the demo's overlay copy) and the
