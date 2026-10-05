@@ -15,10 +15,10 @@
 // the page loads records that commit, so nothing that arrives later, a
 // listener result or a chunk, can satisfy the check.
 import { test, expect } from '@playwright/test';
-import { createRequire } from 'node:module';
+import seed from '../scripts/lib/seed.cjs';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
 
-const { defaultPages } = createRequire(import.meta.url)('../scripts/lib/seed.cjs');
+const { defaultPages } = seed;
 
 /**
  * Runs in the page before its scripts. Records the History titles and the

@@ -21,9 +21,8 @@ const TIER_A = { publicUrl: 'https://example.org', ticketingProvider: 'none', em
 
 /**
  * The demo fixture's identity phrases — event, venue, city,
- * operator, sponsors, and speakers — derived from `demo-event.cjs` rather
- * than copied by hand, so a renamed fixture entity updates this list on
- * its own instead of silently going unchecked. Match complete institution
+ * operator, sponsors, and speakers — come from `demo-event.cjs`. The
+ * named organizational context is protected explicitly too. Match complete institution
  * names: a neutral instruction mentioning "information" must not be
  * mistaken for the named NC News & Information Summit.
  */
@@ -33,6 +32,7 @@ function demoFixtureProperNouns() {
     DEMO_ANSWERS.event.venue.name,
     DEMO_ANSWERS.event.venue.city,
     DEMO_ANSWERS.event.legal.operatorName,
+    'Catherine Komp',
     ...DEMO_ORGANIZATIONS.map((org) => org.name),
     ...DEMO_SPEAKERS.flatMap((speaker) => [speaker.firstName, speaker.lastName, speaker.organization]),
   ];

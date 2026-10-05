@@ -121,6 +121,7 @@ function renderSchedule({
   scheduleData = fixtureSessions,
   speakers: speakerRows = [],
   loading = false,
+  pageDoc = null,
   auth = { user: null, isAdmin: false, loading: false },
   profile = { attendeeAccess: false },
 } = {}) {
@@ -143,7 +144,7 @@ function renderSchedule({
                   getBlock: () => null,
                   // The page shell reads the page document for its layout and
                   // its slot sections (components/SystemPage.jsx).
-                  getPage: () => null,
+                  getPage: () => pageDoc,
                   getSectionBlocks: () => [],
                 }}
               >
@@ -171,6 +172,15 @@ function onScreen() {
 }
 
 describe('SchedulePage', () => {
+  it.each([
+    ['a legacy title', { systemPage: true, label: 'Program', title: 'Old program title' }, 'Program'],
+    ['an empty title', { systemPage: true, label: 'Program', title: '' }, 'Program'],
+    ['a blank label', { systemPage: true, label: '  ', title: 'Old program title' }, 'Schedule'],
+  ])('uses the shared system-page heading contract with %s', (_, pageDoc, expected) => {
+    renderSchedule({ pageDoc });
+    expect(screen.getByRole('heading', { level: 1, name: expected })).toBeInTheDocument();
+  });
+
   it('marks the repeated event identity as the compact interior-page hero', () => {
     const { container } = renderSchedule();
     expect(container.querySelector('.event-hero')).toHaveClass('event-hero--compact');

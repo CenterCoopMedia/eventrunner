@@ -23,12 +23,17 @@ an existing stored palette can use the existing `None` selection. The other five
 preset definitions are unchanged.
 
 The approved historical-data exception in ADR 0001 §5.4 covers the public names,
-affiliations, session details, documented partner roles, official logo, the later
+affiliations, session details, documented partner roles, Catherine Komp's public
+ecosystem engagement and annual-summit role, official logo, the later
 authorized derived dark-mode wordmark treatment and credited documentary photo
 listed below. The derived treatment preserves the colored globe, interior arcs,
 geometry, transparency and aspect ratio; the light-mode artwork is unchanged.
 It supplies no private attendee or contact data
 and claims no consent, endorsement or official NC Local ownership of this demo.
+
+Joe's supplied organizational brief and the official NC Local team/Hub sources
+provide the Catherine Komp context. This is organizational context; she is not
+listed among the 25 speakers in the selected historical sessions.
 
 The fixture in `scripts/lib/demo-event.cjs` owns the event, pages, content,
 program, speaker affiliations and partner roles. Regenerate the first paint

@@ -14,12 +14,12 @@
 // history page, in a signed-in browser, reads the publish back as a
 // version with its time, its account, and the one field it changed.
 import { test, expect } from '@playwright/test';
-import { createRequire } from 'node:module';
+import seed from '../scripts/lib/seed.cjs';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
 import { RETRY_DELAY_MS } from '../apps/web/src/lib/retrySubscription.js';
 
 const CONTENT_TIMEOUT_MS = RETRY_DELAY_MS + 15_000;
-const { defaultPages } = createRequire(import.meta.url)('../scripts/lib/seed.cjs');
+const { defaultPages } = seed;
 
 test.describe.serial('CMS edit -> publish -> public visibility', () => {
   let newSubtitle;

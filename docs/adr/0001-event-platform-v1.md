@@ -1434,9 +1434,13 @@ real speaker names, real attendee data or real sponsor logos.
 
 **Approved historical demo exception, October 5, 2026:** Joe requested an NC Local
 past-event mock-up in the existing primary `newsroom` style. The exception is
-limited to the public March 27, 2026 summit material documented in
+limited to the public organizational context and March 27, 2026 summit material in
 [NC Local historical demo](../nclocal-demo.md): Eight selected sessions, 25 public
 speaker names and affiliations, four organizations with their documented roles,
+and public organizational context about Catherine Komp's ecosystem engagement
+and annual-summit role supplied in Joe's brief and linked NC Local sources.
+This context does not list her as one of the selected program speakers. The
+exception also covers
 the official NC Local logo and a credited documentary photograph. Joe also
 authorized a derived dark-mode logo treatment: A white wordmark with the
 original colored globe and interior arcs preserved. This treatment must retain
