@@ -5,9 +5,9 @@
  * Post-deploy smoke test (spec §8.1 `smoke` job, issue #19).
  *
  * OPTIONS-preflights every function name in `.github/smoke-endpoints.json`
- * against the deployment's Cloud Functions domain (every onRequest handler
- * answers OPTIONS with 204 regardless of origin — functions/src/core/http.cjs)
- * and GETs the deployed site's public URL. Fails loudly (no
+ * against the deployment's Cloud Functions domain. Browser handlers answer
+ * OPTIONS with 204; POST-only webhooks reject it with 405. Also GETs the
+ * deployed site's public URL. Fails loudly (no
  * `continue-on-error` anywhere per spec §8.1) so a bad deploy is caught
  * before an operator finds out from a client.
  *
@@ -26,6 +26,10 @@ const { buildSmokeUrls } = require('./lib/deploy-matrix.cjs');
 const FLAGS = ['region', 'project-id', 'public-url', 'endpoints-file', 'help'];
 const ROOT = path.resolve(__dirname, '..');
 
+// These method guards return 405 before authentication or writes:
+// functions/src/email/send.cjs and functions/src/ticketing/webhook.cjs.
+const POST_ONLY_WEBHOOKS = new Set(['emailDeliveryWebhook', 'ticketingWebhook']);
+
 function usage() {
   return [
     'Usage: node scripts/smoke-test.cjs --region <region> --project-id <id>',
@@ -35,15 +39,15 @@ function usage() {
 
 /**
  * @param {string} url
- * @param {{ method?: string }} [opts]
+ * @param {{ method?: string, expectedStatus?: number }} [opts]
  * @returns {Promise<{ url: string, ok: boolean, status: number|null, error: string|null }>}
  */
-async function probe(url, { method = 'GET' } = {}) {
+async function probe(url, { method = 'GET', expectedStatus } = {}) {
   try {
     const res = await fetch(url, { method, redirect: 'manual' });
-    // OPTIONS preflights answer 204; a plain GET of the hosted site is a
-    // healthy 2xx or an edge redirect (3xx) — never a 4xx/5xx.
-    const ok = res.status < 400;
+    // Only known POST-only webhooks have an expected 405 on OPTIONS.
+    // Other probes retain their existing 2xx/3xx success behavior.
+    const ok = res.status < 400 || res.status === expectedStatus;
     return { url, ok, status: res.status, error: null };
   } catch (err) {
     return { url, ok: false, status: null, error: err.message };
@@ -83,14 +87,18 @@ async function main(argv) {
 
   const checks = [
     { url: args['public-url'], method: 'GET' },
-    ...functionUrls.map((url) => ({ url, method: 'OPTIONS' })),
+    ...functionUrls.map((url, index) => ({
+      url,
+      method: 'OPTIONS',
+      expectedStatus: POST_ONLY_WEBHOOKS.has(endpoints[index]) ? 405 : undefined,
+    })),
   ];
 
   const results = [];
   for (const check of checks) {
     // Sequential and small: this is a handful of HTTP calls right after a
     // deploy, not a load test.
-    results.push(await probe(check.url, { method: check.method }));
+    results.push(await probe(check.url, check));
   }
 
   const failed = results.filter((r) => !r.ok);
