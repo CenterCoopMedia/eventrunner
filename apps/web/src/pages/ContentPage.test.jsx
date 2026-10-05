@@ -62,6 +62,17 @@ import organizationsData from '@generated/organizationsData.js';
 import { VENUE_MAP_SECTION_ID } from 'shared/venue';
 import { pageHeading } from 'shared/page';
 
+// Map features use isolated client data: the historical demo does not
+// supply an invented floor plan or surveyed room positions.
+const CLIENT_VENUE = {
+  ...eventConfig.venue,
+  mapUrl: 'https://www.openstreetmap.org/?mlat=35.781&mlon=-78.679#map=17/35.781/-78.679',
+  map: { image: 'branding/test-venue-plan.svg', alt: 'Synthetic client floor plan for tests.', markers: [] },
+};
+function publishClientVenue() {
+  act(() => configSubscriptions.get('event')({ ...eventConfig, venue: CLIENT_VENUE }));
+}
+
 function renderAt(path) {
   return render(
     <MemoryRouter
@@ -103,21 +114,18 @@ describe('Home', () => {
     expect(screen.getByText(siteContent.info__where.value)).toBeInTheDocument();
     // The sponsor strip (M7 issue 10) draws the demo's own published
     // organizations on the home page, in the section's own place: it comes
-    // after the History section, which is where the seed puts it.
+    // after the Details section, which is where the historical fixture puts it.
     expect(screen.getByText(siteContent.sponsors__lede.value)).toBeInTheDocument();
-    // Fictional sponsors open their internal profile.
-    expect(screen.getByText(organizationsData[0].name)).toBeInTheDocument();
+    // Historical partners open their internal profile.
     expect(screen.getByRole('link', { name: organizationsData[0].name })).toHaveAttribute('href', `/sponsors/${organizationsData[0].id}`);
     const sectionOrder = home.sections
       .filter((s) => screen.queryByRole('heading', { name: s.label }))
       .map((s) => s.id);
-    expect(sectionOrder.indexOf('sponsors')).toBeGreaterThan(sectionOrder.indexOf('stats'));
-    const statsSection = home.sections.find((s) => s.id === 'stats');
-    expect(
-      screen.getByRole('heading', { name: statsSection.label }),
-    ).toBeInTheDocument();
-    // Stat blocks render value + label.
-    expect(screen.getByText(siteContent.stats__attendees.label)).toBeInTheDocument();
+    expect(sectionOrder.indexOf('details')).toBeGreaterThanOrEqual(0);
+    expect(sectionOrder.indexOf('sponsors')).toBeGreaterThan(sectionOrder.indexOf('details'));
+    // This historical demo supplies neither invented attendance totals nor
+    // past-edition history. Normal client block coverage uses isolated fixtures.
+    expect(home.sections.some((section) => ['stats', 'history'].includes(section.id))).toBe(false);
     // Footer link group renders as a descriptive link.
     expect(
       screen.getByRole('link', { name: siteContent.footer__contact_link.label }),
@@ -213,13 +221,14 @@ describe('ContentPage (catch-all route)', () => {
     // with no blocks in it at all — and a reader who cannot see the picture
     // still gets every room name as text.
     renderAt('/travel');
+    publishClientVenue();
     const travel = pagesData.find((p) => p.id === 'travel');
     const mapSection = travel.sections.find((s) => s.id === 'travel_map');
     expect(mapSection.defaultBlocks).toHaveLength(0);
     expect(
       await screen.findByRole('heading', { name: mapSection.label }),
     ).toBeInTheDocument();
-    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    expect(screen.getByAltText(CLIENT_VENUE.map.alt)).toBeInTheDocument();
     for (const place of eventConfig.venue.places) {
       expect(screen.getByText(place.name)).toBeInTheDocument();
     }
@@ -232,6 +241,7 @@ describe('ContentPage (catch-all route)', () => {
     // filled in a form that does nothing and no way to find out why. The
     // section POSITIONS the map; it is not what makes the map exist.
     renderAt('/travel');
+    publishClientVenue();
     await screen.findByRole('heading', { name: 'Venue map' });
     const travel = pagesData.find((p) => p.id === 'travel');
     act(() => {
@@ -242,7 +252,7 @@ describe('ContentPage (catch-all route)', () => {
     });
     const headings = screen.getAllByRole('heading', { level: 2 });
     expect(headings.at(-1)).toHaveTextContent('Venue map');
-    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    expect(screen.getByAltText(CLIENT_VENUE.map.alt)).toBeInTheDocument();
     expect(screen.getByText(eventConfig.venue.places[0].name)).toBeInTheDocument();
   });
 
@@ -255,7 +265,7 @@ describe('ContentPage (catch-all route)', () => {
       subscriptions.get('cmsContent')(blocksWithoutLocalLinks);
       configSubscriptions.get('event')({
         ...eventConfig,
-        venue: { ...eventConfig.venue, map: null },
+        venue: { ...CLIENT_VENUE, map: null },
       });
     });
 
@@ -308,7 +318,7 @@ describe('ContentPage (catch-all route)', () => {
     // import rather than on a render: the default one-second window is a
     // measure of how busy the machine is, not of whether the route resolved.
     expect(
-      await screen.findByRole('heading', { name: 'Schedule' }, { timeout: 5000 }),
+      await screen.findByRole('heading', { name: 'Program' }, { timeout: 5000 }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Page not found' })).not.toBeInTheDocument();
   });
@@ -720,6 +730,7 @@ describe('ContentPage — search and section index on long pages', () => {
   // with an index that will not name the one thing on it.
   it('counts a map-only section as populated, for the gate and for the index', async () => {
     renderAt('/map-gate');
+    publishClientVenue();
     await screen.findByRole('heading', { name: 'Page not found' });
     pushPage({
       id: 'map-gate',
@@ -748,7 +759,7 @@ describe('ContentPage — search and section index on long pages', () => {
       await screen.findByRole('heading', { level: 1, name: 'Map gate fixture' }),
     ).toBeInTheDocument();
     // The map itself rendered, with no block of its own to render.
-    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    expect(screen.getByAltText(CLIENT_VENUE.map.alt)).toBeInTheDocument();
     // The gate opened: without the map section this page has two populated
     // sections and two blocks, which crosses neither size rule.
     expect(screen.getByRole('searchbox', { name: 'Filter by keyword' })).toBeInTheDocument();
@@ -761,6 +772,7 @@ describe('ContentPage — search and section index on long pages', () => {
 
   it('counts the retained map as a result so the status does not deny what is on screen', async () => {
     renderAt('/map-status');
+    publishClientVenue();
     await screen.findByRole('heading', { name: 'Page not found' });
     pushPage({
       id: 'map-status',
@@ -795,7 +807,7 @@ describe('ContentPage — search and section index on long pages', () => {
       act(() => {
         vi.advanceTimersByTime(300);
       });
-      expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+      expect(screen.getByAltText(CLIENT_VENUE.map.alt)).toBeInTheDocument();
       expect(status).toHaveTextContent('1 of 3 items match');
 
       // A query nothing answers still says so, map and all.
@@ -811,6 +823,7 @@ describe('ContentPage — search and section index on long pages', () => {
 
   it('shows no empty state on a page whose only content is the map', async () => {
     renderAt('/map-only');
+    publishClientVenue();
     await screen.findByRole('heading', { name: 'Page not found' });
     pushPage({
       id: 'map-only',
@@ -827,7 +840,7 @@ describe('ContentPage — search and section index on long pages', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Map only fixture' }),
     ).toBeInTheDocument();
-    expect(screen.getByAltText(eventConfig.venue.map.alt)).toBeInTheDocument();
+    expect(screen.getByAltText(CLIENT_VENUE.map.alt)).toBeInTheDocument();
     // Neither empty state: there IS something here, and no filter ran.
     expect(screen.queryByText('Nothing here yet')).not.toBeInTheDocument();
     expect(screen.queryByText('Nothing matches that filter')).not.toBeInTheDocument();
@@ -927,9 +940,14 @@ describe('ContentPage — search and section index on long pages', () => {
     // The regression this whole rule exists to fix: the old positional rule
     // hid whichever section rendered first, so a demo with no
     // city_guide_intro content hid "Places to eat" — real content — right
-    // along with it. The demo overlay now seeds city_guide_intro (see
-    // demo-event.cjs), so this exercises the fixed shape end to end.
+    // along with it. Supply synthetic client recommendations so this
+    // feature remains covered without inventing historical NC Local advice.
     renderAt('/city-guide');
+    pushContent([
+      ...Object.entries(siteContent).map(([id, block]) => ({ id, ...block })),
+      textBlock('city_guide_eat', 'test_cafe', 'Synthetic client cafe recommendation.'),
+      textBlock('city_guide_see', 'test_sight', 'Synthetic client sightseeing recommendation.'),
+    ]);
     const cityGuidePage = pagesData.find((p) => p.id === 'city_guide');
     const introSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_intro');
     const eatSection = cityGuidePage.sections.find((s) => s.id === 'city_guide_eat');
@@ -1188,7 +1206,7 @@ describe('ContentPage section edit links', () => {
   it('draws no link for a section the filter leaves out', async () => {
     renderFaqAs({ adminStatus: 'admin' });
     const filter = await screen.findByRole('searchbox', { name: 'Filter by keyword' });
-    fireEvent.change(filter, { target: { value: 'dietary' } });
+    fireEvent.change(filter, { target: { value: 'registration' } });
     expect(screen.queryByRole('heading', { name: intro.label })).toBeNull();
     expect(screen.queryByRole('link', { name: `Edit section: ${intro.label}` })).toBeNull();
     expect(screen.getByRole('link', { name: `Edit section: ${items.label}` })).toBeInTheDocument();

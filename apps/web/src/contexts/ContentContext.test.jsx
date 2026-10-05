@@ -480,12 +480,10 @@ describe('ContentProvider', () => {
       );
     const entry = (id, year, title, extra = {}) => ({ id, year, title, description: null, visible: true, ...extra });
 
-    it('serves the committed snapshot, oldest first, before the listener reports', () => {
+    it('serves the historical demo’s empty snapshot before the listener reports', () => {
       renderTimeline();
-      expect(snapshotTimelineData.length).toBeGreaterThanOrEqual(2);
-      expect(screen.getByTestId('timeline-ids')).toHaveTextContent(
-        [...snapshotTimelineData].sort((a, b) => a.year - b.year).map((doc) => doc.id).join('|'),
-      );
+      expect(snapshotTimelineData).toEqual([]);
+      expect(screen.getByTestId('timeline-ids')).toHaveTextContent(/^empty$/);
       expect(screen.getByTestId('timeline-source')).toHaveTextContent('snapshot');
       expect(subscriptions.get('cmsTimeline').readSource).toBe('published');
     });

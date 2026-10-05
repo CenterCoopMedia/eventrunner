@@ -1,4 +1,4 @@
-// Smoke test: the app shell renders end to end from the committed synthetic
+// Smoke test: the app shell renders end to end from the committed historical
 // snapshot — providers nest, routes resolve, and the snapshot content
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -135,12 +135,12 @@ describe('app shell', () => {
     // Load the lazy module before measuring the rendered route.
     await import('./pages/Schedule.jsx');
     renderAt('/schedule');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Schedule' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Program' })).toBeInTheDocument();
     // The page carries two views of the day — the screen one and the
     // printed programme, which lists every day and prints only on paper.
     // This asserts the one a reader is looking at (Schedule.test.jsx).
     const onScreen = within(document.querySelector('.schedule-screen'));
-    expect(onScreen.getByText('Welcome and orientation')).toBeInTheDocument();
+    expect(onScreen.getByText('Keynote: NC’s AI Crossroads: Innovation, Investigation & the Public Interest.')).toBeInTheDocument();
   });
 
   it('renders a designed empty state on unknown routes', async () => {
@@ -167,12 +167,12 @@ describe('app shell', () => {
 
   it('gates the /sponsors route behind config/features.sponsors, not just the nav link', async () => {
     renderAt('/sponsors');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Sponsors' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Partners' })).toBeInTheDocument();
 
     act(() => {
       configSubscriptions.get('features')({ sponsors: false });
     });
-    expect(screen.queryByRole('heading', { level: 1, name: 'Sponsors' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Partners' })).toBeNull();
     expect(
       screen.getByRole('heading', { name: 'This event doesn’t have public sponsors' }),
     ).toBeInTheDocument();
@@ -180,8 +180,19 @@ describe('app shell', () => {
 
   it('gates the /attendees route and its nav link behind config/features.attendeeDirectory', async () => {
     renderAt('/attendees');
-    // The snapshot enables the directory; signed out with no public profiles,
-    // the page asks for sign-in rather than rendering an empty directory.
+    // The historical demo disables attendance. Enable a normal client
+    // directory with an isolated live page/config before checking both gates.
+    expect(await screen.findByRole('heading', {
+      name: 'This event doesn’t have an attendee directory',
+    })).toBeInTheDocument();
+    expect(screen.queryAllByRole('link', { name: 'Attendees' })).toHaveLength(0);
+    act(() => {
+      contentSubscriptions.get('cmsPages').onNext([
+        { id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true, sections: [] },
+        { id: 'attendees', label: 'Attendees', path: '/attendees', order: 1, visible: true, systemPage: true, sections: [] },
+      ]);
+      configSubscriptions.get('features')({ attendeeDirectory: true });
+    });
     expect(
       await screen.findByRole('heading', { name: 'Sign in to see who’s attending' }),
     ).toBeInTheDocument();
