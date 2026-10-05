@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Account view switching for users with multiple attendee, speaker or admin roles. The selected
   view stays in the browser session, and multi-role admins can open Manage event from their
   attendee or speaker dashboard. Phone controls support browsers without native dialogs (#340).
+- A branded `/pitch` form with live deadline, verified sign-in, review consent, preserved entries,
+  and safe retries. The private staff queue supports notes, decisions, review conflicts,
+  reviewed external-form CSV import and filtered export without private notes. A separate
+  confirmed action converts accepted proposals into hidden session drafts and unapproved
+  speakers, once only. Decisions and conversion send no notifications (#323).
+
 - Private session pitch APIs for verified accounts, without a ticket requirement. Operators open
   or close intake through `config/pitch_call`; staff review proposals with status and revision
   checks. Account-scoped retry keys and atomic rate limits prevent duplicate or excessive writes.
@@ -310,6 +316,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section the client has already written. Both are reported by init as kept.
 
 ### Changed
+
+- **Breaking:** `submitSessionPitch` now requires `consent: true`. Callers must record agreement
+  to organizer review before submitting; requests without it return 400. Stored proposals
+  record the consent version and time (#323).
 
 - The admin loads the Branding page and the block editor when someone opens them, not with the
   rest of the admin. Together with the tiers work, the wave 2 block forms had pushed the admin

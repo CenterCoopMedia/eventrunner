@@ -5,13 +5,12 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { isSpeakerDashboardEligible } from '../lib/speakerDashboardEligibility.js';
 import { accountViews, viewForPath, readSessionView, saveSessionView } from '../lib/accountViews.js';
 
-function useSpeakerDashboardEligibility({
-  authLoading,
-  user,
-  accountStatus,
-  speakerId,
-  navigationKey,
-}) {
+export default function useAccountViews({ refreshOnNavigation = true } = {}) {
+  const { user, loading: authLoading, adminStatus } = useAuth();
+  const { profile, status: accountStatus } = useProfile();
+  const { pathname, key } = useLocation();
+  const speakerId = profile?.speakerId;
+  const navigationKey = refreshOnNavigation ? key : null;
   const identity = !authLoading && user && accountStatus === 'ready' && speakerId
     ? JSON.stringify([user.uid, speakerId])
     : null;
@@ -52,16 +51,7 @@ function useSpeakerDashboardEligibility({
     };
   }, [identity, navigationKey, speakerId, user]);
 
-  return result.identity === identity && result.eligible;
-}
-
-export default function useAccountViews({ refreshOnNavigation = true } = {}) {
-  const { user, loading: authLoading, adminStatus } = useAuth();
-  const { profile, status: accountStatus } = useProfile();
-  const { pathname, key: navigationKey } = useLocation();
-  const speakerDashboardEligible = useSpeakerDashboardEligibility({
-    authLoading, user, accountStatus, speakerId: profile?.speakerId, navigationKey: refreshOnNavigation ? navigationKey : null,
-  });
+  const speakerDashboardEligible = result.identity === identity && result.eligible;
   const views = accountViews({
     signedIn: Boolean(user) && !authLoading,
     profile,

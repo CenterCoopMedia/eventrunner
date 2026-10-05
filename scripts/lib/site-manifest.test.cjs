@@ -628,3 +628,14 @@ test('sponsor profile routes require a visible record and a public parent', () =
   assert.ok(collectPublicRoutes({ pages: [page], features: { sponsors: true }, organizations }).some((route) => route.path === '/sponsors/beacon'));
   assert.equal(collectPublicRoutes({ pages: [page], features: { sponsors: false }, organizations }).length, 0);
 });
+
+
+test('site artifacts refuse legacy pitch page collisions before deployment', () => {
+  for (const path of ['/pitch', '/pitch/guidelines']) {
+    for (const visible of [true, false]) {
+      const pages = [...PAGES, page({ id: 'legacy-pitch', path, visible })];
+      assert.throws(() => buildSiteArtifacts({ publicUrl: PUBLIC_URL, pages, features: FEATURES }), /Session pitch route collision: Rename the CMS page paths/);
+    }
+  }
+  assert.doesNotThrow(() => buildSiteArtifacts({ publicUrl: PUBLIC_URL, pages: [...PAGES, page({ path: '/pitching' })], features: FEATURES }));
+});

@@ -6,6 +6,7 @@ You edit the site. You do not deploy it. CCM (or another operator) handles Fireb
 
 - Pages (about, travel, conduct, and anything else seeded for the event)
 - Schedule, sessions, and bookmarks settings
+- Session pitches: Private review, CSV import and export, and accepted proposal drafts
 - Speakers: invite, accept, profile, approval
 - Attendees and the public directory
 - Sponsors and organizations
@@ -19,6 +20,14 @@ Legal pages ship as templates. They stay flagged until your counsel signs off. D
 ## Publish
 
 Draft and live are separate. Publishing copies the draft to what attendees see. It is not a code deploy. If a change is not on the public site, check that you published, not only saved.
+
+## Session pitches
+
+Share `/pitch` for proposals. The form requires a verified email, title, description, and review consent. Open **Session pitches** to search and filter the private queue. Save a review decision and private notes explicitly. A conflict keeps your notes visible; copy them before loading the current review. Decisions do not send notifications.
+
+Import outside proposals only after reviewing the CSV preview and verifying the source form's consent. Export downloads the filtered queue with contact details and excludes private notes. Keep the file private.
+
+An accepted proposal can create private session and speaker drafts through a separate confirmed action. Review the names, consent, event day, and times first. Complete the session and speaker editors before publication. See [Operate session pitch intake](../operator/session-pitches.md) for the full workflow. Operators control intake and its deadline.
 
 ## Speakers
 

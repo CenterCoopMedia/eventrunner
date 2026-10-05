@@ -86,6 +86,7 @@ module.exports = {
   ...publicOg.handlers,
   ...scheduleReactions.handlers,
   ...sessionPitches.handlers,
+  ...require('./src/sessions/pitchQueue.cjs').handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...usersApproval.handlers,

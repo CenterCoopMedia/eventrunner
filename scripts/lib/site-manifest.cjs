@@ -24,6 +24,7 @@
  */
 
 const { configuredThemeColor } = require('./shared-theme.cjs');
+const { assertNoPitchPageCollisions } = require('./pitch-route-check.cjs');
 const { SYSTEM_PAGE_ROUTES } = require('shared/routing');
 const { isPublicPage, pageFeatureGate } = require('shared/page');
 const { APP_ICON_SIZES, appIconPath } = require('./app-icons.cjs');
@@ -394,6 +395,7 @@ function escapeXml(value) {
 function buildSitemapXml({
   publicUrl, pages, features, sessions = [], speakers = [], organizations = [], updates = [],
 }) {
+  assertNoPitchPageCollisions(pages);
   const base = normalizedBaseUrl(publicUrl);
   const publicRoutes = collectPublicRoutes({
     pages, features, sessions, speakers, organizations, updates,

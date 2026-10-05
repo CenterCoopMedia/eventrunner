@@ -26,6 +26,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'shared/time',
+      'shared/pitch',
       'shared/registration',
       'shared/announcement',
       'shared/richText',
