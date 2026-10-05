@@ -155,7 +155,6 @@ export const pagesData = [
         ],
       },
     ],
-    navHidden: false,
     seeded: true,
   },
   {
@@ -167,7 +166,6 @@ export const pagesData = [
     visible: true,
     systemPage: true,
     sections: [],
-    navHidden: false,
     seeded: true,
   },
   {
@@ -182,7 +180,6 @@ export const pagesData = [
       arrangement: 'grid',
     },
     sections: [],
-    navHidden: false,
     seeded: true,
   },
   {
@@ -194,7 +191,6 @@ export const pagesData = [
     visible: true,
     systemPage: true,
     sections: [],
-    navHidden: false,
     seeded: true,
   },
   {
@@ -341,7 +337,6 @@ export const pagesData = [
         ],
       },
     ],
-    navHidden: false,
     seeded: true,
   },
   {
@@ -390,7 +385,6 @@ export const pagesData = [
         ],
       },
     ],
-    navHidden: true,
     seeded: true,
   },
   {
@@ -457,7 +451,6 @@ export const pagesData = [
         ],
       },
     ],
-    navHidden: true,
     seeded: true,
   },
   {
@@ -505,7 +498,6 @@ export const pagesData = [
         ],
       },
     ],
-    navHidden: true,
     seeded: true,
   },
   {
@@ -585,7 +577,6 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
-    navHidden: true,
     seeded: true,
   },
   {
@@ -665,7 +656,6 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
-    navHidden: true,
     seeded: true,
   },
   {
@@ -748,7 +738,6 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
-    navHidden: false,
     seeded: true,
   },
   {
@@ -831,7 +820,6 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
-    navHidden: true,
     seeded: true,
   },
   {
@@ -891,7 +879,6 @@ export const pagesData = [
         defaultBlocks: [],
       },
     ],
-    navHidden: true,
     seeded: true,
   },
 ];

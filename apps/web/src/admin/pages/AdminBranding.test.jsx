@@ -369,7 +369,7 @@ describe('the staff workflow', () => {
     expect(offered).toEqual([
       'None — this deployment’s stored palette',
       'Institutional',
-      'Newsroom',
+      'NC Local',
       'Broadsheet',
       'Atlas',
       'Field Guide',

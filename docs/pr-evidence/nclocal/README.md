@@ -43,14 +43,16 @@ the supplied historical values.
 
 Program captures with `-filled` show actual typed `AI` search text in each mode.
 The existing demo Specimen book supplies text input, select and textarea
-examples at rest, focused, in error and disabled. The `after-fields-*-filled`
+examples at rest, focused, in error and disabled. The `after-fields-*-filled-visible`
 captures contain the typed name and notes recorded in `field-evidence.json`.
 The same readback records foreground, background, border, focus and font values.
 
 Native autofill is checked through a temporary local form that copies the real
 public field classes and uses `autocomplete=email`. Chromium's Autofill domain
 fills the reserved `demo@example.test` value, and the probe verifies `:autofill`.
-The `after-fields-*-autofill` captures record that state. This local probe does
+The `after-fields-*-autofill-visible` viewport captures record that state. The
+earlier element crops were blank, were invalidated and removed, and do not count
+as visual evidence. The replacements were opened and inspected. This local probe does
 not submit or save data and does not add a form to the mock-up. Alpha backgrounds
 are composited over the recorded field surface for the contrast calculation.
 These are NC Local demo checks; they do not close #316 acceptance.

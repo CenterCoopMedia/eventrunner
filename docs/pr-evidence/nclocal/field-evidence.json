@@ -20,7 +20,8 @@
           "tag": "INPUT",
           "textFill": "rgb(17, 17, 17)",
           "value": "NC Local demo reader",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         },
         {
           "background": "rgb(255, 255, 255)",
@@ -33,7 +34,8 @@
           "tag": "INPUT",
           "textFill": "rgb(17, 17, 17)",
           "value": "NC Local demo reader",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         },
         {
           "background": "rgb(255, 255, 255)",
@@ -46,7 +48,8 @@
           "tag": "INPUT",
           "textFill": "rgb(17, 17, 17)",
           "value": "",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         },
         {
           "background": "rgb(255, 255, 255)",
@@ -59,7 +62,8 @@
           "tag": "INPUT",
           "textFill": "rgb(17, 17, 17)",
           "value": "NC Local demo reader",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         },
         {
           "background": "rgb(255, 255, 255)",
@@ -124,7 +128,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(17, 17, 17)",
           "value": "Historical summit session notes for this demo.",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         },
         {
           "background": "rgb(255, 255, 255)",
@@ -137,7 +142,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(17, 17, 17)",
           "value": "Historical summit session notes for this demo.",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         },
         {
           "background": "rgb(255, 255, 255)",
@@ -150,7 +156,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(17, 17, 17)",
           "value": "",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         },
         {
           "background": "rgb(255, 255, 255)",
@@ -163,7 +170,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(17, 17, 17)",
           "value": "Historical summit session notes for this demo.",
-          "contrast": 18.88
+          "contrast": 18.88,
+          "placeholder": ""
         }
       ],
       "autofill": {
@@ -195,7 +203,8 @@
           "tag": "INPUT",
           "textFill": "rgb(249, 247, 245)",
           "value": "NC Local demo reader",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         },
         {
           "background": "rgb(0, 28, 40)",
@@ -208,7 +217,8 @@
           "tag": "INPUT",
           "textFill": "rgb(249, 247, 245)",
           "value": "NC Local demo reader",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         },
         {
           "background": "rgb(0, 28, 40)",
@@ -221,7 +231,8 @@
           "tag": "INPUT",
           "textFill": "rgb(249, 247, 245)",
           "value": "",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         },
         {
           "background": "rgb(0, 28, 40)",
@@ -234,7 +245,8 @@
           "tag": "INPUT",
           "textFill": "rgb(249, 247, 245)",
           "value": "NC Local demo reader",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         },
         {
           "background": "rgb(0, 28, 40)",
@@ -299,7 +311,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(249, 247, 245)",
           "value": "Historical summit session notes for this demo.",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         },
         {
           "background": "rgb(0, 28, 40)",
@@ -312,7 +325,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(249, 247, 245)",
           "value": "Historical summit session notes for this demo.",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         },
         {
           "background": "rgb(0, 28, 40)",
@@ -325,7 +339,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(249, 247, 245)",
           "value": "",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         },
         {
           "background": "rgb(0, 28, 40)",
@@ -338,7 +353,8 @@
           "tag": "TEXTAREA",
           "textFill": "rgb(249, 247, 245)",
           "value": "Historical summit session notes for this demo.",
-          "contrast": 16.42
+          "contrast": 16.42,
+          "placeholder": ""
         }
       ],
       "autofill": {
@@ -357,5 +373,34 @@
         "contrast": 12.69
       }
     }
-  }
+  },
+  "captures": {
+    "light": {
+      "filled": "after-fields-light-filled-visible.png",
+      "autofill": "after-fields-light-autofill-visible.png",
+      "viewportFilled": {
+        "width": 1280,
+        "height": 1600
+      },
+      "viewportAutofill": {
+        "width": 1280,
+        "height": 800
+      },
+      "visuallyInspected": true
+    },
+    "dark": {
+      "filled": "after-fields-dark-filled-visible.png",
+      "autofill": "after-fields-dark-autofill-visible.png",
+      "viewportFilled": {
+        "width": 1280,
+        "height": 1600
+      },
+      "viewportAutofill": {
+        "width": 1280,
+        "height": 800
+      },
+      "visuallyInspected": true
+    }
+  },
+  "invalidatedCaptures": "The earlier after-fields-*-filled.png and after-fields-*-autofill.png were blank element crops, were removed, and do not support a visual pass. The replacement viewport captures above were inspected."
 }

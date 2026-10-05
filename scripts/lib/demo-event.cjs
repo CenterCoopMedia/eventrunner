@@ -147,7 +147,6 @@ function demoEvent() {
   const labels = { schedule: 'Program', sponsors: 'Partners', travel: 'Locations', city_guide: 'Raleigh', recap: 'Recap' };
   const pages = defaultPages().filter((page) => visiblePages.has(page.id)).map((page) => ({
     ...page, label: labels[page.id] ?? page.label, seeded: true,
-    navHidden: !['home', 'schedule', 'speakers', 'sponsors', 'travel', 'recap'].includes(page.id),
     sections: page.sections.filter((section) => !['stats', 'history', 'sponsor_packages'].includes(section.id)).map((section) => {
       if (section.id === 'sponsors') return { ...section, label: 'Historical partners' };
       if (section.id === 'recap_media') return { ...section, allowedBlocks: [...section.allowedBlocks, 'image'] };
