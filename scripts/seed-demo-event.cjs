@@ -73,7 +73,7 @@ function usage() {
     'Usage: node scripts/seed-demo-event.cjs [--dry-run] [--force]',
     '',
     '  --dry-run   report every write without performing it',
-    '  --force     refresh config documents that already exist',
+    '  --force     refresh existing config and retire superseded demo seeds',
     '  --i-know-this-is-not-a-demo-project',
     '              allow a project id that does not contain "demo"',
   ].join('\n');
@@ -93,16 +93,6 @@ async function seedDemo({ db, store, args, now = Date.now }) {
   // Count any existing unpublished demo edits before the seed begins. The
   // store updates this document with each later draft status transition.
   if (!dryRun) await store.ensurePendingCounts({ db, now });
-
-  // Retire the old fixture before publishing the replacement. CMS ownership
-  // checks cover both revisions; speaker checks also protect accounts and slugs.
-  for (const [collection, docIds] of Object.entries(SUPERSEDED_DEMO_IDS)) {
-    const result = collection === 'speakers'
-      ? await removeObsoleteDemoSpeakers({ db, docIds, dryRun })
-      : await removeObsoleteSeeds({ db, store, collection, docIds, dryRun });
-    console.log(`  ${collection.padEnd(17)} ${result.removed.length} ${dryRun ? 'planned removals' : 'removed'}, ${result.kept.length} protected`);
-    for (const item of result.kept) console.log(`    kept ${item.id}: ${item.reason}`);
-  }
 
   // writeConfigDocs answers { results, effective } — the per-doc decisions
   // AND what the project now holds. Destructuring matters: iterating the
@@ -140,6 +130,23 @@ async function seedDemo({ db, store, args, now = Date.now }) {
     `  speakers          ${speakerWrites} ${dryRun ? 'planned' : 'written'}, ` +
     `${speakerResult.skipped.length} left alone`,
   );
+
+  // Retire only after the replacement config, CMS and speakers succeeded.
+  // A plain rerun preserves old config, so retirement requires --force.
+  if (force || dryRun) {
+    if (dryRun && !force) console.log('  Retirement preview: records --force would retire.');
+    let plannedSessionRemovals = [];
+    for (const [collection, docIds] of Object.entries(SUPERSEDED_DEMO_IDS)) {
+      const result = collection === 'speakers'
+        ? await removeObsoleteDemoSpeakers({ db, docIds, dryRun, plannedSessionRemovals })
+        : await removeObsoleteSeeds({ db, store, collection, docIds, dryRun });
+      if (dryRun && collection === 'cmsSchedule') plannedSessionRemovals = result.removed;
+      console.log(`  ${collection.padEnd(17)} ${result.removed.length} ${dryRun ? 'planned removals' : 'removed'}, ${result.kept.length} protected`);
+      for (const item of result.kept) console.log(`    kept ${item.id}: ${item.reason}`);
+    }
+  } else {
+    console.log('  Superseded record retirement skipped (re-run with --force).');
+  }
 
   console.log(
     '\nseed-demo-event: done. Regenerate the committed snapshot with:\n' +

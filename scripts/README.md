@@ -132,7 +132,11 @@ Existing demo projects require `--force` to refresh configuration, including
 `config/event.historicalDemo`, which disables account and support email actions
 in normal Hosting builds. Preview with `--dry-run --force`. The migration removes
 only superseded Harborlight IDs that remain seed-owned, checking both CMS
-revisions and speaker account, edit, invitation and slug protections.
+revisions and speaker account, edit, invitation and slug protections. Retirement
+requires `--force` and starts only after the replacement config, CMS collections
+and speakers are written successfully. A plain run reports that retirement was
+skipped; `--dry-run` previews what `--force` would retire. Speakers referenced by
+remaining live or draft sessions are also protected.
 
 ### `generate-content.cjs`
 

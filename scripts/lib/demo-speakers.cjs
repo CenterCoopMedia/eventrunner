@@ -92,11 +92,25 @@ async function seedDemoSpeakers({ db, speakers, dryRun = false, now = Date.now }
   });
 }
 
-/** Remove only superseded, untouched approved seeds and their owned locks. */
-async function removeObsoleteDemoSpeakers({ db, docIds, dryRun = false }) {
+/**
+ * Remove only superseded, untouched approved seeds and their owned locks.
+ * Dry-run can exclude sessions whose two revisions are planned for retirement.
+ */
+async function removeObsoleteDemoSpeakers({ db, docIds, dryRun = false, plannedSessionRemovals = [] }) {
   return db.runTransaction(async (tx) => {
     const result = { removed: [], kept: [] };
     const planned = [];
+    const retiringSessions = new Set(dryRun ? plannedSessionRemovals : []);
+    const references = new Map();
+    for (const collection of ['cmsSchedule', 'cmsSchedule_drafts']) {
+      const sessions = await tx.get(db.collection(collection));
+      for (const session of sessions.docs) {
+        if (retiringSessions.has(session.id)) continue;
+        const speakerIds = session.data().speakerIds;
+        if (!Array.isArray(speakerIds)) continue;
+        for (const id of speakerIds) references.set(id, `${collection}/${session.id}`);
+      }
+    }
     for (const id of docIds) {
       const ref = db.collection('speakers').doc(id);
       const snapshot = await tx.get(ref);
@@ -105,6 +119,10 @@ async function removeObsoleteDemoSpeakers({ db, docIds, dryRun = false }) {
       if (!canRefreshSpeaker(stored, { status: 'approved' }) ||
           typeof stored.slug !== 'string' || !DOC_ID_RE.test(stored.slug)) {
         result.kept.push({ id, reason: 'edited or protected speaker' });
+        continue;
+      }
+      if (references.has(id)) {
+        result.kept.push({ id, reason: `referenced by remaining session ${references.get(id)}` });
         continue;
       }
       const slugRef = db.collection('speaker_slugs').doc(stored.slug);

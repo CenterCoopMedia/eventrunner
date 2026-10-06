@@ -39,6 +39,7 @@ const configSubscriptions = new Map();
 vi.mock('../../lib/configSource.js', () => ({
   subscribeConfigDoc: (docId, onNext) => {
     configSubscriptions.set(docId, onNext);
+    if (docId === 'event') onNext({ historicalDemo: false });
     return () => configSubscriptions.delete(docId);
   },
 }));
@@ -166,7 +167,8 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
     { timeout: 20_000 },
   );
   await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
-  act(() => configSubscriptions.get('theme')(themeDoc));
+  // These client palettes have no NC Local deployment token overrides.
+  act(() => configSubscriptions.get('theme')({ tokens: {}, ...themeDoc }));
   await waitFor(() => {
     expect(frame()).not.toBeNull();
     expect(previewCss()).not.toBe('');
@@ -369,7 +371,7 @@ describe('the staff workflow', () => {
     expect(offered).toEqual([
       'None — this deployment’s stored palette',
       'Institutional',
-      'NC Local',
+      'Newsroom',
       'Broadsheet',
       'Atlas',
       'Field Guide',

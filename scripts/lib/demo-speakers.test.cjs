@@ -245,3 +245,54 @@ test('obsolete speaker cleanup rechecks concurrent edits before deleting', async
   assert.deepEqual((await remove(db)).removed, []);
   assert.equal(db.read('speakers', 'demo-one').uid, 'linked-account');
 });
+
+
+test('obsolete speaker cleanup protects references in either remaining schedule revision', async (t) => {
+  for (const collection of ['cmsSchedule', 'cmsSchedule_drafts']) {
+    await t.test(collection, async () => {
+      const db = strictTransactions(makeFakeDb({
+        'speakers/demo-one': stored(),
+        'speaker_slugs/demo-one': { speakerId: 'demo-one' },
+        [`${collection}/kept-session`]: { seeded: false, speakerIds: ['demo-one'] },
+      }));
+      for (const dryRun of [true, false]) {
+        assert.deepEqual(await remove(db, { dryRun }), {
+          removed: [], kept: [{ id: 'demo-one', reason: `referenced by remaining session ${collection}/kept-session` }],
+        });
+        assert.deepEqual(db.read('speakers', 'demo-one'), stored());
+        assert.deepEqual(db.read('speaker_slugs', 'demo-one'), { speakerId: 'demo-one' });
+        assert.deepEqual(db.writes, []);
+      }
+    });
+  }
+});
+
+test('only a dry run can disregard sessions whose two revisions are planned for removal', async () => {
+  const db = strictTransactions(makeFakeDb({
+    'speakers/demo-one': stored(),
+    'cmsSchedule/old-session': { speakerIds: ['demo-one'] },
+    'cmsSchedule_drafts/old-session': { speakerIds: ['demo-one'] },
+  }));
+  const options = { plannedSessionRemovals: ['old-session'] };
+  assert.deepEqual(await remove(db, { ...options, dryRun: true }), { removed: ['demo-one'], kept: [] });
+  assert.deepEqual(db.writes, []);
+  assert.deepEqual((await remove(db, options)).removed, []);
+  assert.deepEqual(db.read('speakers', 'demo-one'), stored());
+});
+
+test('obsolete speaker cleanup retries and protects a concurrently added session reference', async (t) => {
+  for (const collection of ['cmsSchedule', 'cmsSchedule_drafts']) {
+    await t.test(collection, async () => {
+      const db = strictTransactions(makeFakeDb({
+        'speakers/demo-one': stored(),
+        'speaker_slugs/demo-one': { speakerId: 'demo-one' },
+      }));
+      db.beforeCommit = () => db.collection(collection).doc('new-session').set({ speakerIds: ['demo-one'] });
+      assert.deepEqual(await remove(db), {
+        removed: [], kept: [{ id: 'demo-one', reason: `referenced by remaining session ${collection}/new-session` }],
+      });
+      assert.deepEqual(db.read('speakers', 'demo-one'), stored());
+      assert.deepEqual(db.read('speaker_slugs', 'demo-one'), { speakerId: 'demo-one' });
+    });
+  }
+});

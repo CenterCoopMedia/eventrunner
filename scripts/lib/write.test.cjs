@@ -692,3 +692,32 @@ test('a withheld replacement protects only the predecessors the site actually ho
   assert.ok(upgrade.withheld.some((w) => w.id === 'info__where'));
   assert.deepEqual(upgrade.protected, ['info__where_venue']);
 });
+
+
+test('obsolete CMS cleanup rechecks concurrent live and draft edits in the delete transaction', async (t) => {
+  for (const collection of ['cmsContent', 'cmsContent_drafts']) {
+    await t.test(collection, async () => {
+      const db = makeFakeDb();
+      await seedCollection({
+        db, store, collection: 'cmsContent', docs: [{ id: 'hero__register_cta', ...legacyCta() }], now,
+      });
+      const patch = { label: 'Keep the operator edit', updatedBy: ADMIN.email };
+      db.beforeCommit = () => db.collection(collection).doc('hero__register_cta').update(patch);
+      const before = db.writes.length;
+      const pending = db.read('cmsMeta', 'pending');
+      const result = await removeObsoleteSeeds({
+        db, store, collection: 'cmsContent', docIds: OBSOLETE_CONTENT_IDS,
+      });
+      assert.deepEqual(result, {
+        removed: [],
+        kept: [{ id: 'hero__register_cta', reason: collection === 'cmsContent'
+          ? 'client-edited' : 'unpublished editor draft' }],
+      });
+      assert.equal(db.read(collection, 'hero__register_cta').label, patch.label);
+      assert.ok(db.read('cmsContent', 'hero__register_cta'));
+      assert.ok(db.read('cmsContent_drafts', 'hero__register_cta'));
+      assert.deepEqual(db.read('cmsMeta', 'pending'), pending);
+      assert.deepEqual(db.writes.slice(before), [{ type: 'update', path: `${collection}/hero__register_cta` }]);
+    });
+  }
+});

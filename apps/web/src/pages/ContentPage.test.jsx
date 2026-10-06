@@ -117,7 +117,7 @@ describe('Home', () => {
     // after the Details section, which is where the historical fixture puts it.
     expect(screen.getByText(siteContent.sponsors__lede.value)).toBeInTheDocument();
     // Historical partners open their internal profile.
-    expect(screen.getByRole('link', { name: organizationsData[0].name })).toHaveAttribute('href', `/sponsors/${organizationsData[0].id}`);
+    expect(within(screen.getByRole('main')).getByRole('link', { name: organizationsData[0].name })).toHaveAttribute('href', `/sponsors/${organizationsData[0].id}`);
     const sectionOrder = home.sections
       .filter((s) => screen.queryByRole('heading', { name: s.label }))
       .map((s) => s.id);
