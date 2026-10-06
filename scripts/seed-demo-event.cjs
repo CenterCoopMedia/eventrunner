@@ -38,8 +38,11 @@
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { demoEvent } = require('./lib/demo-event.cjs');
-const { writeConfigDocs, seedCollection } = require('./lib/write.cjs');
-const { seedDemoSpeakers } = require('./lib/demo-speakers.cjs');
+const { writeConfigDocs, seedCollection, removeObsoleteSeeds } = require('./lib/write.cjs');
+const { seedDemoSpeakers, removeObsoleteDemoSpeakers } = require('./lib/demo-speakers.cjs');
+// IDs emitted by the superseded Harborlight fixture on base-main. This
+// explicit migration never sweeps operator-created or unrelated seed IDs.
+const SUPERSEDED_DEMO_IDS = require('./lib/superseded-demo-ids.json');
 
 const FLAGS = ['dry-run', 'force', 'i-know-this-is-not-a-demo-project', 'help'];
 
@@ -90,6 +93,16 @@ async function seedDemo({ db, store, args, now = Date.now }) {
   // Count any existing unpublished demo edits before the seed begins. The
   // store updates this document with each later draft status transition.
   if (!dryRun) await store.ensurePendingCounts({ db, now });
+
+  // Retire the old fixture before publishing the replacement. CMS ownership
+  // checks cover both revisions; speaker checks also protect accounts and slugs.
+  for (const [collection, docIds] of Object.entries(SUPERSEDED_DEMO_IDS)) {
+    const result = collection === 'speakers'
+      ? await removeObsoleteDemoSpeakers({ db, docIds, dryRun })
+      : await removeObsoleteSeeds({ db, store, collection, docIds, dryRun });
+    console.log(`  ${collection.padEnd(17)} ${result.removed.length} ${dryRun ? 'planned removals' : 'removed'}, ${result.kept.length} protected`);
+    for (const item of result.kept) console.log(`    kept ${item.id}: ${item.reason}`);
+  }
 
   // writeConfigDocs answers { results, effective } — the per-doc decisions
   // AND what the project now holds. Destructuring matters: iterating the

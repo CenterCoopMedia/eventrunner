@@ -92,4 +92,40 @@ async function seedDemoSpeakers({ db, speakers, dryRun = false, now = Date.now }
   });
 }
 
-module.exports = { seedDemoSpeakers, canRefreshSpeaker };
+/** Remove only superseded, untouched approved seeds and their owned locks. */
+async function removeObsoleteDemoSpeakers({ db, docIds, dryRun = false }) {
+  return db.runTransaction(async (tx) => {
+    const result = { removed: [], kept: [] };
+    const planned = [];
+    for (const id of docIds) {
+      const ref = db.collection('speakers').doc(id);
+      const snapshot = await tx.get(ref);
+      if (!snapshot.exists) continue;
+      const stored = snapshot.data();
+      if (!canRefreshSpeaker(stored, { status: 'approved' }) ||
+          typeof stored.slug !== 'string' || !DOC_ID_RE.test(stored.slug)) {
+        result.kept.push({ id, reason: 'edited or protected speaker' });
+        continue;
+      }
+      const slugRef = db.collection('speaker_slugs').doc(stored.slug);
+      const reservation = await tx.get(slugRef);
+      const owners = await tx.get(db.collection('speakers').where('slug', '==', stored.slug).limit(2));
+      if ((reservation.exists && reservation.data()?.speakerId !== id) ||
+          owners.docs.some((owner) => owner.id !== id)) {
+        result.kept.push({ id, reason: 'conflicting slug ownership' });
+        continue;
+      }
+      planned.push({ ref, slugRef, reserved: reservation.exists });
+      result.removed.push(id);
+    }
+    if (!dryRun) {
+      for (const item of planned) {
+        tx.delete(item.ref);
+        if (item.reserved) tx.delete(item.slugRef);
+      }
+    }
+    return result;
+  });
+}
+
+module.exports = { seedDemoSpeakers, canRefreshSpeaker, removeObsoleteDemoSpeakers };

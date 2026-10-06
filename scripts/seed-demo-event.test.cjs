@@ -192,3 +192,65 @@ test('a demo dry run writes no past editions', async () => {
   assert.deepEqual(db.ids('cmsTimeline'), []);
   assert.deepEqual(db.ids('cmsTimeline_drafts'), []);
 });
+
+test('the Harborlight migration removes every superseded seed in both CMS revisions', async () => {
+  const obsolete = require('./lib/superseded-demo-ids.json');
+  const initial = {};
+  for (const [collection, ids] of Object.entries(obsolete)) {
+    for (const id of ids) {
+      initial[`${collection}/${id}`] = collection === 'speakers'
+        ? { seeded: true, status: 'approved', slug: id }
+        : { seeded: true };
+      if (collection === 'speakers') initial[`speaker_slugs/${id}`] = { speakerId: id };
+      else initial[`${collection}_drafts/${id}`] = { seeded: true, status: 'clean' };
+    }
+  }
+  initial['cmsSchedule/operator-session'] = { seeded: true };
+  const db = makeFakeDb(initial);
+  await runSeed(db);
+  for (const [collection, ids] of Object.entries(obsolete)) {
+    for (const id of ids) {
+      assert.equal(db.read(collection, id), undefined, `${collection}/${id}`);
+      assert.equal(db.read(collection === 'speakers' ? 'speaker_slugs' : `${collection}_drafts`, id), undefined);
+    }
+  }
+  assert.deepEqual(db.read('cmsSchedule', 'operator-session'), { seeded: true });
+  await runSeed(db); // A second migration is harmless.
+});
+
+test('the migration preserves edited live docs and unpublished edits even with --force', async () => {
+  const initial = {
+    'cmsSchedule/session-welcome': { seeded: false, title: 'Operator welcome' },
+    'cmsOrganizations/org-placeholder-1': { seeded: true, updatedBy: 'operator@example.test' },
+    'cmsUpdates/demo-program-ready': { seeded: true },
+    'cmsUpdates_drafts/demo-program-ready': { seeded: true, updatedBy: 'operator@example.test', status: 'dirty' },
+    'cmsTimeline_drafts/demo-edition-2024': { seeded: false, status: 'dirty' },
+  };
+  const db = makeFakeDb(initial);
+  await runSeed(db, { force: true });
+  for (const [path, value] of Object.entries(initial)) {
+    const [collection, id] = path.split('/');
+    assert.deepEqual(db.read(collection, id), value, path);
+  }
+});
+
+test('dry-run migration reports removals and protections without writing', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-welcome': { seeded: true },
+    'cmsSchedule/session-opening': { seeded: false },
+    'speakers/speaker-placeholder-1': { seeded: true, status: 'approved', slug: 'old-speaker' },
+    'speaker_slugs/old-speaker': { speakerId: 'speaker-placeholder-1' },
+  });
+  const output = [];
+  const log = console.log;
+  console.log = (line) => output.push(line);
+  try {
+    await seedDemo({ db, store: require('../functions/src/cms/store.cjs'), args: { 'dry-run': true } });
+  } finally {
+    console.log = log;
+  }
+  assert.deepEqual(db.writes, []);
+  assert.ok(output.some((line) => /cmsSchedule\s+1 planned removals, 1 protected/.test(line)));
+  assert.ok(output.some((line) => /speakers\s+1 planned removals, 0 protected/.test(line)));
+  assert.ok(output.some((line) => line.includes('kept session-opening: client-edited')));
+});
