@@ -4,20 +4,30 @@ Desktop: 1280 × 800. Phone: 390 × 844. Images capture the full document at
 these viewport sizes. The light images form the paired before/after set.
 Dark after images record the second supported mode.
 
-Before: Base `dec343bf65a22c9a376b3f5b459f91da6b43f724`, with the same
-approved historical content supplied through `GENERATED_DIR`. Its theme CSS,
-theme config and neutral branding stay at the base revision. This fixture
-overlay makes the visual comparison use the same sessions, people and prose.
-A private Vite alias supplies the same historical update JSON to the unchanged
-base update renderer. This supplies fixture data without changing base code.
-The source diff records the replacement of the previous fictional content.
+Paired light captures (the Paired views table and the Sign-in row) were
+retaken on 2026-10-06 on legion2025:
 
-After: Source `6658c0b7d0a35d31de299943f9e053ee2f46e6ed`, with the committed
-historical content and NC Local theme. The after images use the fresh Node 22
-lockfile build from Legion, served by a loopback-only local preview. The before
-uses the isolated base development server. Both use `VITE_DEMO_MODE=1`.
-The browser retained Chromium's sandbox. Navigation used route URLs and
-semantic locators; screenshots did not supply click coordinates.
+- Before: the committed static demo build in `docs/demo` at `origin/main`
+  `7144ec395897141da92b00d1fe49f95e0617e9cd` (the Harborlight fixture in the
+  reusable Newsroom style).
+- After: the committed static demo build in `docs/demo` at PR source
+  `9be267830705710c177e21531543574533b4e284`. CI's demo build hygiene job
+  checks that this build matches its source.
+- Both were served by a loopback-only static server. One Playwright Chromium
+  (141.0.7390.37) ran as an unprivileged user with the sandbox on. Navigation
+  used route URLs and role locators only. `capture-evidence.json` records the
+  heading, fonts, theme attribute, page width and sign-in controls of each
+  capture.
+- The Newsroom preset files (`design/tokens/presets/newsroom.json`, its README
+  entry, `presetCatalog.cjs`, `presetRemaps.cjs`, `presetCopy.js`) are
+  byte-identical between the two revisions. The NC Local look comes from the
+  demo deployment theme in `scripts/lib/nclocal-theme.json`.
+
+The before content therefore differs from the after content: main still ships
+the fictional Harborlight event. The dark, print, field, placeholder and
+autofill captures and their JSON readbacks below were not retaken. They come
+from source `6658c0b7d0a35d31de299943f9e053ee2f46e6ed`, before the review
+fixes that moved NC Local styling out of the shared preset.
 
 This refresh uses the official Google Fonts Cabin normal Latin 400–700 slice:
 28,320 bytes, below the project's existing 60 KB font limit. Its asset source
@@ -50,6 +60,8 @@ definitions are byte-for-byte equal to the base revision.
 | Updates phone | [Before](before-updates-phone-light.png) | [After](after-updates-phone-light.png) |
 | Historical update desktop | [Before](before-update-detail-desktop-light.png) | [After](after-update-detail-desktop-light.png) |
 | Historical update phone | [Before](before-update-detail-phone-light.png) | [After](after-update-detail-phone-light.png) |
+| Sign-in desktop | [Before](before-signin-desktop-light.png) | [After](after-signin-desktop-light.png) |
+| Sign-in phone | [Before](before-signin-phone-light.png) | [After](after-signin-phone-light.png) |
 
 No after view exceeded its viewport width. The historical roster is a text
 directory; absent portraits and partner logos do not reserve empty frames.
