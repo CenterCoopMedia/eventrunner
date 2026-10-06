@@ -34,6 +34,13 @@
   --hero-copy-border-inline-start: 0;
 }
 
+/* Keep the NC Local hero copy in the text column beside the photograph. */
+@media screen and (min-width: 640px) {
+  [data-historical-demo='nclocal'] .event-hero--illustrated .event-hero__copy {
+    inline-size: calc(100% - var(--hero-art-width));
+  }
+}
+
 @layer base {
   :root {
     -webkit-font-smoothing: antialiased;
