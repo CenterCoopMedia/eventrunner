@@ -269,6 +269,9 @@ function validateEventConfig(event) {
   if (event.tagline != null && typeof event.tagline !== 'string') {
     errors.push('tagline: must be a string or absent');
   }
+  if (event.historicalDemo !== undefined && typeof event.historicalDemo !== 'boolean') {
+    errors.push('historicalDemo: must be a boolean or absent');
+  }
 
   if (!Array.isArray(event.days)) {
     errors.push('days: must be an array');

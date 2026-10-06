@@ -76,6 +76,7 @@ import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import AnnouncementBanners from './AnnouncementBanners.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
+import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 
 // The feedback dialog and the change request dialog (issue #188) each sit
 // behind a flag that is off by default and open only on a press, so they
@@ -357,7 +358,8 @@ export default function Layout() {
   // Only the event bar prefers the short name.
   const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
   const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
-  const historicalDemo = IS_DEMO && eventConfig.shortName === 'NC Local';
+  const readOnlyDemo = isReadOnlyDemo(eventConfig);
+  const historicalDemo = readOnlyDemo && eventConfig.shortName === 'NC Local';
 
   // The navigation IS the page list (lib/siteNavigation.js). Every visible
   // page document becomes a link, in its own `order`, with system pages
@@ -449,7 +451,7 @@ export default function Layout() {
             </details>
           </li>
         ) : null}
-        <li hidden={IS_DEMO}>
+        <li hidden={readOnlyDemo}>
           <NavLink to={account.to} end={account.end} className={accountClass}>
             {account.label}
           </NavLink>
@@ -578,8 +580,8 @@ export default function Layout() {
             {operatorName || supportEmail ? (
               <p className="mt-md">
                 {operatorName ? `Operated by ${operatorName}` : null}
-                {operatorName && supportEmail && !IS_DEMO ? ' · ' : null}
-                {supportEmail && !IS_DEMO ? (
+                {operatorName && supportEmail && !readOnlyDemo ? ' · ' : null}
+                {supportEmail && !readOnlyDemo ? (
                   <a href={`mailto:${supportEmail}`} className={FOOTER_LINK_CLASS}>
                     Contact support
                   </a>

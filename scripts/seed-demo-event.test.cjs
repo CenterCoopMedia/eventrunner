@@ -278,3 +278,11 @@ test('NC Local uses deployment overrides while the reusable Newsroom identity st
   });
   assert.equal(resolveShape(theme).radius, 'editorial');
 });
+
+test('the deployed demo receives its historical account gate through writeConfigDocs', async () => {
+  const db = makeFakeDb();
+  await runSeed(db);
+  assert.equal(db.read('config', 'event').historicalDemo, true);
+  const { validateEventConfig } = require('shared/config');
+  assert.equal(validateEventConfig(db.read('config', 'event')).ok, true);
+});

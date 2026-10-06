@@ -996,3 +996,14 @@ test('validateFeatures: changeRequests is a known boolean flag', () => {
   assert.equal(bad.ok, false);
   assert.ok(bad.errors.some((e) => e.includes('features.changeRequests: must be a boolean')));
 });
+
+test('historicalDemo is an optional boolean in deployed event configuration', () => {
+  for (const historicalDemo of [true, false, undefined]) {
+    assert.equal(validateEventConfig({ ...VALID_EVENT, historicalDemo }).ok, true);
+  }
+  for (const historicalDemo of ['true', 1, null, {}]) {
+    const verdict = validateEventConfig({ ...VALID_EVENT, historicalDemo });
+    assert.equal(verdict.ok, false);
+    assert.ok(verdict.errors.includes('historicalDemo: must be a boolean or absent'));
+  }
+});

@@ -111,7 +111,11 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
       // that includes a nested object (e.g. `logos: {...}`) is expected to
       // include it in full, since this merge does not descend into it.
       eventConfig: overlay.event
-        ? { ...snapshotEventConfig, ...overlay.event }
+        ? {
+            ...snapshotEventConfig, ...overlay.event,
+            // An older client config must not inherit the demo's account gate.
+            historicalDemo: overlay.event.historicalDemo === true,
+          }
         : snapshotEventConfig,
       // config/features is the one doc where an omitted key is not "keep the
       // snapshot value" — the backend contract is that an omitted flag means

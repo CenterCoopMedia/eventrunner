@@ -103,6 +103,7 @@ export const eventConfig = {
     attestedAt: null,
     attestedBy: null,
   },
+  historicalDemo: true,
 };
 
 export const features = {

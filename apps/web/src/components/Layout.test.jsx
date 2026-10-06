@@ -1302,3 +1302,22 @@ describe('the footer change request control', () => {
     expect(feedback.compareDocumentPosition(request) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('deployed historical demo shell', () => {
+  it('hides account and support actions in a normal build', () => {
+    renderShell({}, {
+      event: { ...FIXTURE_EVENT, historicalDemo: true, legal: { operatorName: 'Historical demo', supportEmail: 'support@example.test' } },
+    });
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Contact support' })).not.toBeInTheDocument();
+    expect(screen.getByText('Operated by Historical demo')).toBeInTheDocument();
+  });
+
+  it('keeps ordinary client account and support actions available', () => {
+    renderShell({}, {
+      event: { ...FIXTURE_EVENT, legal: { supportEmail: 'support@example.test' } },
+    });
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', 'mailto:support@example.test');
+  });
+});

@@ -22,6 +22,15 @@ Existing client deployments selecting `newsroom` retain Newsroom's palette,
 typography, shape and catalog label. All six preset definitions retain their
 own identities.
 
+The seeded `config/event` carries `historicalDemo: true`. Normal Hosting builds
+read this flag at runtime to hide account and support email links and show the
+disabled sign-in notice at `/signin` and in the shared sign-in panel. Static
+demo builds also keep their build-time gate. Existing demo projects need
+`node scripts/seed-demo-event.cjs --force` to refresh configuration; run
+`--dry-run --force` first to review protected records and planned removals.
+The project guard still applies, and `--force` preserves edited CMS records,
+protected speakers and real bootstrap access.
+
 The approved historical-data exception in ADR 0001 §5.4 covers the public names,
 affiliations, session details, documented partner roles, Catherine Komp's public
 ecosystem engagement and annual-summit role, official logo, the later
