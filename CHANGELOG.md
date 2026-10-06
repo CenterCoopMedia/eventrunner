@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Account view switching for users with multiple attendee, speaker or admin roles. The selected
+  view stays in the browser session, and multi-role admins can open Manage event from their
+  attendee or speaker dashboard. Phone controls support browsers without native dialogs (#340).
 - A branded `/pitch` form with live deadline, verified sign-in, review consent, preserved entries,
   and safe retries. The private staff queue supports notes, decisions, review conflicts,
   reviewed external-form CSV import and filtered export without private notes. A separate

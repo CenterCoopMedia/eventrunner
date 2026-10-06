@@ -7,7 +7,8 @@
 // sent to the attendee dashboard; a failed request stays visible and retryable
 // because a network error is not evidence that the account is not a speaker.
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation, useOutletContext } from 'react-router-dom';
+import AdminEntryLink from '../components/AdminEntryLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -39,6 +40,7 @@ const statusCardClass =
   'rounded-brand-lg border-hairline border-rule-hairline bg-surface-alt p-md';
 
 export default function SpeakerDashboard() {
+  const accountViews = useOutletContext();
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { eventConfig, features } = useEventConfig();
@@ -137,6 +139,7 @@ export default function SpeakerDashboard() {
         <p className="mt-xs max-w-prose text-body text-text-secondary">
           Welcome back{name ? `, ${name}` : ''}. This is your place at the event.
         </p>
+        <AdminEntryLink account={accountViews} />
       </header>
 
       <SpeakerStatusHeader
