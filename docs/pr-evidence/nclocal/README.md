@@ -8,10 +8,10 @@ Paired light captures (the Paired views table and the Sign-in row) were
 retaken on 2026-10-06 on legion2025:
 
 - Before: the committed static demo build in `docs/demo` at `origin/main`
-  `7144ec395897141da92b00d1fe49f95e0617e9cd` (the Harborlight fixture in the
+  `9e96bb153acc02f953450c5f05e8076733b24af9` (the Harborlight fixture in the
   reusable Newsroom style).
 - After: the committed static demo build in `docs/demo` at PR source
-  `9be267830705710c177e21531543574533b4e284`. CI's demo build hygiene job
+  `64d7298e1d8713f38aeab26194356a421ba0d67c` (merge of main after #341). CI's demo build hygiene job
   checks that this build matches its source.
 - Both were served by a loopback-only static server. One Playwright Chromium
   (141.0.7390.37) ran as an unprivileged user with the sandbox on. Navigation
