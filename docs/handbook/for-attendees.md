@@ -4,7 +4,11 @@ You registered for an event. This page is what the site is supposed to let you d
 
 ## Sign in
 
-The last item in the site navigation is your account control. It reads **Sign in** until you are signed in, and **Your profile** after that. It is in the same place on every page, in the top row or in the side rail, whichever the site uses.
+The last item in the site navigation is your account control. It reads **Sign in** until you are signed in, and **Dashboard** after that. It is in the same place on every page, in the top row or in the side rail, whichever the site uses.
+
+If you are also a speaker or an admin, open **Account** and select **Attendee**, **Speaker**, or **Admin**. The menu shows your current view. Your choice stays in this tab for the session. A direct link to a dashboard or profile still opens that view. Single-role accounts have no role switcher.
+
+Admins with another role also see **Manage event** on their attendee and speaker dashboards. On a phone, account choices use full-width rows. In the admin workspace, open **Menu** to find them.
 
 You can sign in with Google or with a 6-digit code we email you. University and nonprofit inboxes often quarantine the code. Check junk, and wait a minute before requesting another.
 

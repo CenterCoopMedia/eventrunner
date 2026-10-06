@@ -60,12 +60,11 @@ import { listSocialAccounts } from 'shared/config';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
-import { useProfile } from '../contexts/ProfileContext.jsx';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { statedPageLayout } from '../lib/pageLayout.js';
 import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc } from '../lib/mediaSource.js';
-import { isSpeakerDashboardEligible } from '../lib/speakerDashboardEligibility.js';
+import useAccountViews from '../hooks/useAccountViews.js';
 import BackToTop from './BackToTop.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
@@ -104,6 +103,8 @@ export function optionalOnDemand(importer, label) {
       }),
   );
 }
+// Only multi-role accounts need this menu; keep it out of public first paint.
+const AccountMenu = optionalOnDemand(() => import('./AccountMenu.jsx'), 'account menu');
 const FeedbackModal = onDemand(() => import('./FeedbackModal.jsx'));
 const ChangeRequestModal = onDemand(() => import('./ChangeRequestModal.jsx'));
 // The public model tools are optional and render no interface. Keep their
@@ -153,8 +154,9 @@ function navClass({ isActive }) {
 //
 // A reader who is not signed in is offered the sign-in page. A signed-in
 // attendee gets the attendee dashboard, while a linked speaker gets the
-// speaker dashboard (issue #210). There is still one control: signing out
-// lives on the sign-in page itself, where the account it ends is named.
+// speaker dashboard (issue #210). Multi-role accounts can change that
+// destination in the adjacent Account menu. Signing out lives on the
+// sign-in page itself, where the account it ends is named.
 //
 // It is the LAST ITEM OF THE NAV, not a separate control beside it, so it
 // inherits everything the nav already settled: one landmark, one keyboard
@@ -191,7 +193,6 @@ const ACCOUNT_SIGNED_OUT = Object.freeze({ to: '/signin', label: 'Sign in', end:
 // was not: the day the dashboard grows children, an end match would quietly
 // stop marking the control while the reader is inside the section it names.
 const ACCOUNT_SIGNED_IN = Object.freeze({ to: '/dashboard', label: 'Dashboard', end: false });
-const ACCOUNT_SPEAKER = Object.freeze({ to: '/speaker/dashboard', label: 'Dashboard', end: false });
 
 /**
  * Tailwind's font-weight utilities by name. Deliberately a closed list and
@@ -232,56 +233,6 @@ function accountClass({ isActive }) {
     : quietActionClass;
 }
 
-function useSpeakerDashboardEligibility({
-  authLoading,
-  user,
-  accountStatus,
-  speakerId,
-  navigationKey,
-}) {
-  const identity = !authLoading && user && accountStatus === 'ready' && speakerId
-    ? `${user.uid}:${speakerId}`
-    : null;
-  const [result, setResult] = useState({ identity: null, eligible: false });
-
-  useEffect(() => {
-    let current = true;
-    const storeResult = (eligible) => {
-      setResult((previous) => (
-        previous.identity === identity && previous.eligible === eligible
-          ? previous
-          : { identity, eligible }
-      ));
-    };
-    if (!identity) {
-      storeResult(false);
-      return () => {
-        current = false;
-      };
-    }
-
-    // speakerProfileApi carries the authenticated endpoint client and media
-    // helpers. Load it only for a linked account so the public shell's first
-    // bundle does not pay for a speaker-only read.
-    import('../lib/speakerProfileApi.js')
-      .then(({ getOwnSpeakerProfile }) => getOwnSpeakerProfile({ user, speakerId }))
-      .then(
-        (speaker) => {
-          if (current) storeResult(isSpeakerDashboardEligible(speaker));
-        },
-        () => {
-          if (current) storeResult(false);
-        },
-      );
-
-    return () => {
-      current = false;
-    };
-  }, [identity, navigationKey, speakerId, user]);
-
-  return result.identity === identity && result.eligible;
-}
-
 // The banner at the top of the shell, named so the back-to-top control can
 // move focus to it (M7 issue 6). Landing there puts the keyboard at the top
 // of the page, with the identity and the whole navigation still ahead of it
@@ -308,16 +259,8 @@ export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage } = useContent();
   const { user, loading: authLoading } = useAuth();
-  const { profile, status: accountStatus } = useProfile();
-  const { pathname, key: navigationKey } = useLocation();
-  const speakerId = profile?.speakerId ?? null;
-  const speakerDashboardEligible = useSpeakerDashboardEligibility({
-    authLoading,
-    user,
-    accountStatus,
-    speakerId,
-    navigationKey,
-  });
+  const { pathname } = useLocation();
+  const accountViews = useAccountViews();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
   // bundle) or an uploaded asset (`branding/{assetId}/{name}`, which exists
@@ -384,16 +327,8 @@ export default function Layout() {
   // tells two accounts on one service apart.
   const socialLinks = useMemo(() => listSocialAccounts(eventConfig?.social), [eventConfig?.social]);
 
-  // One control, routed from the owner-checked canonical speaker record. A
-  // linked draft or removed record stays on the attendee dashboard; the
-  // server-owned speakerId identifies the record but does not establish
-  // dashboard eligibility.
-  // An unfinished auth handshake and an account still being seeded retain
-  // the existing signed-out and attendee answers (see ACCOUNT_SIGNED_OUT).
   const account = !authLoading && user
-    ? speakerDashboardEligible
-      ? ACCOUNT_SPEAKER
-      : ACCOUNT_SIGNED_IN
+    ? { ...ACCOUNT_SIGNED_IN, to: accountViews.current?.to ?? '/dashboard' }
     : ACCOUNT_SIGNED_OUT;
 
   // One nav, placed two ways. The list, its labels, its landmark, and its
@@ -409,6 +344,7 @@ export default function Layout() {
   const nav = (
     <nav
       aria-label="Main"
+      data-placement={navPlacement}
       className={
         navPlacement === 'side'
           ? 'site-header-nav relative border-b-hairline border-b-rule-hairline lg:w-48 lg:shrink-0 lg:self-stretch lg:border-b-0 lg:border-e-hairline lg:border-e-rule-hairline lg:pe-md lg:pt-xl'
@@ -451,6 +387,9 @@ export default function Layout() {
             </details>
           </li>
         ) : null}
+        {!readOnlyDemo && accountViews.views.length > 1 ? (
+          <li><Suspense fallback={null}><AccountMenu account={accountViews} /></Suspense></li>
+        ) : null}
         <li hidden={readOnlyDemo}>
           <NavLink to={account.to} end={account.end} className={accountClass}>
             {account.label}
@@ -482,7 +421,7 @@ export default function Layout() {
           : 'stage flex-1 pb-2xl pt-md'
       }
     >
-      <Outlet />
+      <Outlet context={accountViews} />
     </main>
   );
 

@@ -1304,6 +1304,24 @@ describe('the footer change request control', () => {
 });
 
 describe('deployed historical demo shell', () => {
+  it.each([true, false])('gates the multi-role Account menu when historicalDemo is %s', async (historicalDemo) => {
+    const { container } = renderShell({}, {
+      event: { ...FIXTURE_EVENT, historicalDemo },
+      user: { uid: 'multi-role-demo' },
+      profile: { registrationStatus: 'approved', speakerId: 'rae-okonkwo' },
+    });
+    await waitFor(() => expect(container.querySelector('nav[aria-label="Main"] > ul > li:last-child > a'))
+      .toHaveAttribute('href', '/speaker/dashboard'));
+    if (historicalDemo) {
+      expect(screen.queryByText('Account', { exact: true })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: 'Account views', hidden: true })).not.toBeInTheDocument();
+    } else {
+      expect(await screen.findByText('Account', { exact: true })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
+    }
+  });
+
   it('hides account and support actions in a normal build', () => {
     renderShell({}, {
       event: { ...FIXTURE_EVENT, historicalDemo: true, legal: { operatorName: 'Historical demo', supportEmail: 'support@example.test' } },
