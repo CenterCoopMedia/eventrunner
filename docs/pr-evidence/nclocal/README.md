@@ -23,6 +23,16 @@ retaken on 2026-10-06 on legion2025:
   byte-identical between the two revisions. The NC Local look comes from the
   demo deployment theme in `scripts/lib/nclocal-theme.json`.
 
+Hero overlap check: `hero-overlap.json` measures every text line in the
+hero copy against the hero photograph on Home and Program at 16 widths from
+390 to 1440 px. At 640 px and wider, the NC Local demo keeps the copy in the
+column beside the photograph (`[data-historical-demo='nclocal']` rule in
+`apps/web/src/index.css`), so no text line overlaps it and no word breaks
+across lines. After the fix, only `after-home-desktop-light.png` changed and
+was retaken at `37539b7d`. Main's reusable Newsroom hero still places some
+copy over the faded left edge of its photograph at 640 px and wider; see the
+`before` rows in the same file.
+
 The before content therefore differs from the after content: main still ships
 the fictional Harborlight event. The dark, print, field, placeholder and
 autofill captures and their JSON readbacks below were not retaken. They come

@@ -1,0 +1,1151 @@
+[
+  {
+    "side": "before",
+    "width": 390,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 342,
+    "artLeft": 24,
+    "artTop": 711,
+    "artWidth": 342,
+    "artVisible": true,
+    "copyRight": 366,
+    "maxTextRight": 360,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 390,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 342,
+    "artLeft": 24,
+    "artTop": 530,
+    "artWidth": 342,
+    "artVisible": true,
+    "copyRight": 366,
+    "maxTextRight": 348,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 480,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 432,
+    "artLeft": 24,
+    "artTop": 705,
+    "artWidth": 432,
+    "artVisible": true,
+    "copyRight": 456,
+    "maxTextRight": 424,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 480,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 432,
+    "artLeft": 24,
+    "artTop": 516,
+    "artWidth": 432,
+    "artVisible": true,
+    "copyRight": 456,
+    "maxTextRight": 401,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 600,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 552,
+    "artLeft": 24,
+    "artTop": 728,
+    "artWidth": 552,
+    "artVisible": true,
+    "copyRight": 576,
+    "maxTextRight": 433,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 600,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 552,
+    "artLeft": 24,
+    "artTop": 521,
+    "artWidth": 552,
+    "artVisible": true,
+    "copyRight": 576,
+    "maxTextRight": 438,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 639,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 591,
+    "artLeft": 24,
+    "artTop": 633,
+    "artWidth": 591,
+    "artVisible": true,
+    "copyRight": 615,
+    "maxTextRight": 603,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 639,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 591,
+    "artLeft": 24,
+    "artTop": 452,
+    "artWidth": 591,
+    "artVisible": true,
+    "copyRight": 615,
+    "maxTextRight": 438,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 640,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 592,
+    "artLeft": 284,
+    "artTop": 370,
+    "artWidth": 332,
+    "artVisible": true,
+    "copyRight": 409,
+    "maxTextRight": 373,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 49,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Newark, NJ",
+        "overlapPx": 23,
+        "element": ""
+      },
+      {
+        "text": "Stronger local news. Further together.",
+        "overlapPx": 59,
+        "element": "event-hero__tagline font-body"
+      },
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 89,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 640,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 592,
+    "artLeft": 284,
+    "artTop": 370,
+    "artWidth": 332,
+    "artVisible": true,
+    "copyRight": 409,
+    "maxTextRight": 343,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 49,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Newark, NJ",
+        "overlapPx": 23,
+        "element": ""
+      },
+      {
+        "text": "Stronger local news. Further together.",
+        "overlapPx": 59,
+        "element": "event-hero__tagline font-body"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 700,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 652,
+    "artLeft": 311,
+    "artTop": 318,
+    "artWidth": 365,
+    "artVisible": true,
+    "copyRight": 448,
+    "maxTextRight": 413,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 23,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Stronger local news. Further together.",
+        "overlapPx": 32,
+        "element": "event-hero__tagline font-body"
+      },
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 102,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 700,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 652,
+    "artLeft": 311,
+    "artTop": 318,
+    "artWidth": 365,
+    "artVisible": true,
+    "copyRight": 448,
+    "maxTextRight": 343,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 23,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Stronger local news. Further together.",
+        "overlapPx": 32,
+        "element": "event-hero__tagline font-body"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 768,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 720,
+    "artLeft": 341,
+    "artTop": 319,
+    "artWidth": 403,
+    "artVisible": true,
+    "copyRight": 492,
+    "maxTextRight": 446,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 4,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Stronger local news. Further together.",
+        "overlapPx": 12,
+        "element": "event-hero__tagline font-body"
+      },
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 105,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 768,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 720,
+    "artLeft": 341,
+    "artTop": 319,
+    "artWidth": 403,
+    "artVisible": true,
+    "copyRight": 492,
+    "maxTextRight": 353,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 4,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Stronger local news. Further together.",
+        "overlapPx": 12,
+        "element": "event-hero__tagline font-body"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 820,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 772,
+    "artLeft": 364,
+    "artTop": 319,
+    "artWidth": 432,
+    "artVisible": true,
+    "copyRight": 526,
+    "maxTextRight": 446,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 2,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 82,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 820,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 772,
+    "artLeft": 364,
+    "artTop": 319,
+    "artWidth": 432,
+    "artVisible": true,
+    "copyRight": 526,
+    "maxTextRight": 365,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 2,
+        "element": "event-hero__title font-heading"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 900,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 852,
+    "artLeft": 399,
+    "artTop": 277,
+    "artWidth": 477,
+    "artVisible": true,
+    "copyRight": 578,
+    "maxTextRight": 446,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 47,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 900,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 852,
+    "artLeft": 399,
+    "artTop": 277,
+    "artWidth": 477,
+    "artVisible": true,
+    "copyRight": 578,
+    "maxTextRight": 395,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 1000,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 952,
+    "artLeft": 443,
+    "artTop": 279,
+    "artWidth": 533,
+    "artVisible": true,
+    "copyRight": 643,
+    "maxTextRight": 449,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 6,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1000,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 952,
+    "artLeft": 443,
+    "artTop": 279,
+    "artWidth": 533,
+    "artVisible": true,
+    "copyRight": 643,
+    "maxTextRight": 434,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 1024,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 976,
+    "artLeft": 453,
+    "artTop": 279,
+    "artWidth": 547,
+    "artVisible": true,
+    "copyRight": 658,
+    "maxTextRight": 625,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 172,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1024,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 976,
+    "artLeft": 453,
+    "artTop": 279,
+    "artWidth": 547,
+    "artVisible": true,
+    "copyRight": 658,
+    "maxTextRight": 443,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 1100,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1052,
+    "artLeft": 487,
+    "artTop": 280,
+    "artWidth": 589,
+    "artVisible": true,
+    "copyRight": 708,
+    "maxTextRight": 629,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 142,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1100,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1052,
+    "artLeft": 487,
+    "artTop": 280,
+    "artWidth": 589,
+    "artVisible": true,
+    "copyRight": 708,
+    "maxTextRight": 473,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 1180,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 523,
+    "artTop": 281,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 757,
+    "maxTextRight": 639,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 116,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1180,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 523,
+    "artTop": 281,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 757,
+    "maxTextRight": 513,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "before",
+    "width": 1280,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 573,
+    "artTop": 283,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 807,
+    "maxTextRight": 692,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 33,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 119,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1280,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 573,
+    "artTop": 283,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 807,
+    "maxTextRight": 606,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 33,
+        "element": "event-hero__title font-heading"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1366,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 616,
+    "artTop": 284,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 850,
+    "maxTextRight": 743,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 65,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 127,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1366,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 616,
+    "artTop": 284,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 850,
+    "maxTextRight": 681,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 65,
+        "element": "event-hero__title font-heading"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1440,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 653,
+    "artTop": 285,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 887,
+    "maxTextRight": 789,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 93,
+        "element": "event-hero__title font-heading"
+      },
+      {
+        "text": "Sessions and workshops for people who operate loca",
+        "overlapPx": 136,
+        "element": "mt-sm max-w-prose text-body text-text-se"
+      }
+    ]
+  },
+  {
+    "side": "before",
+    "width": 1440,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 653,
+    "artTop": 285,
+    "artWidth": 623,
+    "artVisible": true,
+    "copyRight": 887,
+    "maxTextRight": 746,
+    "veil": "linear-gradient(90deg, rgb(246, 247, 249) 38%, rgba(246, 247, 249, 0.95) 45%, rgba(246, 247, 249, 0) 67%)",
+    "hits": [
+      {
+        "text": "Harborlight Media Summit",
+        "overlapPx": 93,
+        "element": "event-hero__title font-heading"
+      }
+    ]
+  },
+  {
+    "side": "after",
+    "width": 390,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 342,
+    "artLeft": 24,
+    "artTop": 986,
+    "artWidth": 342,
+    "artVisible": true,
+    "copyRight": 366,
+    "maxTextRight": 346,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 390,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 342,
+    "artLeft": 24,
+    "artTop": 590,
+    "artWidth": 342,
+    "artVisible": true,
+    "copyRight": 366,
+    "maxTextRight": 276,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 480,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 432,
+    "artLeft": 24,
+    "artTop": 923,
+    "artWidth": 432,
+    "artVisible": true,
+    "copyRight": 456,
+    "maxTextRight": 452,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 480,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 432,
+    "artLeft": 24,
+    "artTop": 600,
+    "artWidth": 432,
+    "artVisible": true,
+    "copyRight": 456,
+    "maxTextRight": 311,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 600,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 552,
+    "artLeft": 24,
+    "artTop": 885,
+    "artWidth": 552,
+    "artVisible": true,
+    "copyRight": 576,
+    "maxTextRight": 558,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 600,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 552,
+    "artLeft": 24,
+    "artTop": 532,
+    "artWidth": 552,
+    "artVisible": true,
+    "copyRight": 576,
+    "maxTextRight": 508,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 639,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 591,
+    "artLeft": 24,
+    "artTop": 886,
+    "artWidth": 591,
+    "artVisible": true,
+    "copyRight": 615,
+    "maxTextRight": 586,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 639,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 591,
+    "artLeft": 24,
+    "artTop": 533,
+    "artWidth": 591,
+    "artVisible": true,
+    "copyRight": 615,
+    "maxTextRight": 508,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 640,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 592,
+    "artLeft": 320,
+    "artTop": 415,
+    "artWidth": 296,
+    "artVisible": true,
+    "copyRight": 320,
+    "maxTextRight": 288,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 640,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 592,
+    "artLeft": 320,
+    "artTop": 415,
+    "artWidth": 296,
+    "artVisible": true,
+    "copyRight": 320,
+    "maxTextRight": 264,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 700,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 652,
+    "artLeft": 350,
+    "artTop": 318,
+    "artWidth": 326,
+    "artVisible": true,
+    "copyRight": 350,
+    "maxTextRight": 311,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 700,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 652,
+    "artLeft": 350,
+    "artTop": 318,
+    "artWidth": 326,
+    "artVisible": true,
+    "copyRight": 350,
+    "maxTextRight": 264,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 768,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 720,
+    "artLeft": 384,
+    "artTop": 288,
+    "artWidth": 360,
+    "artVisible": true,
+    "copyRight": 384,
+    "maxTextRight": 350,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 768,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 720,
+    "artLeft": 384,
+    "artTop": 288,
+    "artWidth": 360,
+    "artVisible": true,
+    "copyRight": 384,
+    "maxTextRight": 274,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 820,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 772,
+    "artLeft": 410,
+    "artTop": 288,
+    "artWidth": 386,
+    "artVisible": true,
+    "copyRight": 410,
+    "maxTextRight": 382,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 820,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 772,
+    "artLeft": 410,
+    "artTop": 288,
+    "artWidth": 386,
+    "artVisible": true,
+    "copyRight": 410,
+    "maxTextRight": 288,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 900,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 852,
+    "artLeft": 450,
+    "artTop": 289,
+    "artWidth": 426,
+    "artVisible": true,
+    "copyRight": 450,
+    "maxTextRight": 409,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 900,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 852,
+    "artLeft": 450,
+    "artTop": 289,
+    "artWidth": 426,
+    "artVisible": true,
+    "copyRight": 450,
+    "maxTextRight": 314,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1000,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 952,
+    "artLeft": 500,
+    "artTop": 290,
+    "artWidth": 476,
+    "artVisible": true,
+    "copyRight": 500,
+    "maxTextRight": 465,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1000,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 952,
+    "artLeft": 500,
+    "artTop": 290,
+    "artWidth": 476,
+    "artVisible": true,
+    "copyRight": 500,
+    "maxTextRight": 347,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1024,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 976,
+    "artLeft": 512,
+    "artTop": 290,
+    "artWidth": 488,
+    "artVisible": true,
+    "copyRight": 512,
+    "maxTextRight": 487,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1024,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 976,
+    "artLeft": 512,
+    "artTop": 290,
+    "artWidth": 488,
+    "artVisible": true,
+    "copyRight": 512,
+    "maxTextRight": 355,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1100,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1052,
+    "artLeft": 550,
+    "artTop": 290,
+    "artWidth": 526,
+    "artVisible": true,
+    "copyRight": 550,
+    "maxTextRight": 491,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1100,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1052,
+    "artLeft": 550,
+    "artTop": 290,
+    "artWidth": 526,
+    "artVisible": true,
+    "copyRight": 550,
+    "maxTextRight": 381,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1180,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 590,
+    "artTop": 291,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 590,
+    "maxTextRight": 557,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1180,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 590,
+    "artTop": 291,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 590,
+    "maxTextRight": 415,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1280,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 640,
+    "artTop": 292,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 640,
+    "maxTextRight": 607,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1280,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 640,
+    "artTop": 292,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 640,
+    "maxTextRight": 498,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1366,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 683,
+    "artTop": 292,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 683,
+    "maxTextRight": 650,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1366,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 683,
+    "artTop": 292,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 683,
+    "maxTextRight": 570,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1440,
+    "page": "home",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 720,
+    "artTop": 293,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 720,
+    "maxTextRight": 687,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  },
+  {
+    "side": "after",
+    "width": 1440,
+    "page": "program",
+    "splitWords": [],
+    "heroWidth": 1112,
+    "artLeft": 720,
+    "artTop": 293,
+    "artWidth": 556,
+    "artVisible": true,
+    "copyRight": 720,
+    "maxTextRight": 631,
+    "veil": "linear-gradient(90deg, rgb(255, 255, 255) 38%, rgba(255, 255, 255, 0.95) 45%, rgba(255, 255, 255, 0) 67%)",
+    "hits": []
+  }
+]
