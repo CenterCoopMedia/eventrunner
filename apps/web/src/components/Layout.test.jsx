@@ -1313,6 +1313,11 @@ describe('deployed historical demo shell', () => {
     await waitFor(() => expect(container.querySelector('nav[aria-label="Main"] > ul > li:last-child > a'))
       .toHaveAttribute('href', '/speaker/dashboard'));
     if (historicalDemo) {
+      // The menu is a lazy chunk. Load it first so a missing gate would
+      // render the menu before these negative checks run.
+      await act(async () => {
+        await import('./AccountMenu.jsx');
+      });
       expect(screen.queryByText('Account', { exact: true })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: 'Account views', hidden: true })).not.toBeInTheDocument();
