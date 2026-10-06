@@ -485,7 +485,7 @@ export default function Layout() {
   );
 
   return (
-    <div className="page-surface flex min-h-screen flex-col">
+    <div className="page-surface flex min-h-screen flex-col" data-historical-demo={historicalDemo && theme?.preset === 'newsroom' ? 'nclocal' : undefined}>
       {IS_DEMO || features.webmcpPublic === true ? (
         <Suspense fallback={null}>
           <PublicWebMcpRegistration />

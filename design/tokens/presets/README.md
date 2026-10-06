@@ -116,21 +116,21 @@ Choose how a table is ruled.
 - **Ruled head**: Closes the head with a strong rule and rules the rows at the hairline, with no column rules.
 - **Full grid** *(default)*: Rules the rows and the columns at the hairline, with the head closed at the width the style sets.
 
-## NC Local
+## Newsroom
 
 `data-theme="newsroom"`
 
-NC Local editorial style: Teal, lavender, warm surfaces and broad serif headlines.
+A modern editorial layout with strong section rules, compact data, and restrained color.
 
 Use this style for publications, media conferences, and newsroom events.
 
 | | |
 |---|---|
-| Headings | `merriweather` |
-| Body | `merriweather` |
-| Data | `cabin` |
+| Headings | `fraunces` |
+| Body | `newsreader` |
+| Data | `plex-sans` |
 | Figures and code | `plex-mono` |
-| Corners | editorial |
+| Corners | small |
 | Surface | flat |
 | Density | comfortable |
 | Illustrations | none |
@@ -143,11 +143,11 @@ Use this style for publications, media conferences, and newsroom events.
 
 **first-class-note.** All six styles are complete and supported. Each has one default configuration.
 
-**palette-words-light.** NC Local teal, dark teal, lavender chips, pale teal, warm editorial white and black prose
+**palette-words-light.** cool newsprint white, desk black, one saturated editorial accent, muted data slate, hairline silver, section-rule graphite, caption grey, archive fog
 
-**palette-words-dark.** NC Local dark teal, warm white, pale teal metadata and lavender accents
+**palette-words-dark.** charcoal desk, screen-lit soft white, night-retuned editorial accent, dimmed data slate, graphite rule, ash grey, low-lamp caption grey, archive slate
 
-**font-note.** Uses Merriweather/Georgia headings and prose, Cabin controls and metadata, and Plex Mono figures.
+**font-note.** Uses Fraunces for headings, Newsreader for body text, Plex Sans for labels and data, and Plex Mono for figures and identifiers.
 
 **tokens-note.** Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading. The definition list keeps the data face for its terms in a wide column. The pull quote sits between strong rules with a large opening mark. An urgent notice takes the nameplate rule, and table heads are set in small capitals over a strong rule. The standfirst is set in the heading typeface at regular weight.
 
@@ -155,9 +155,8 @@ Use this style for publications, media conferences, and newsroom events.
 
 Choose the headline typeface.
 
-- **Merriweather** *(default)*: Uses NC Local’s observed serif heading style.
-- **Fraunces**: Uses soft serif headlines with Merriweather body text and Cabin controls.
-- **Newsreader at display weights**: Uses Newsreader headlines with Merriweather prose and Cabin controls.
+- **Fraunces** *(default)*: Uses a distinctive soft-serif heading face. It separates headlines from Newsreader body text and Plex data text.
+- **Newsreader at display weights**: Uses Newsreader for both headings and body text. This creates a quieter and more traditional publication style.
 - **Archivo bold condensed**: Uses condensed sans-serif headlines. It fits longer titles in less vertical space and increases visual contrast.
 
 ### Header style: `nameplate`

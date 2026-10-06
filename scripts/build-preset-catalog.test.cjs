@@ -158,14 +158,12 @@ test('every preset states the whole contract the brief §4 requires', () => {
         `${id} ${role}: the dark value is authored, never the light one reused`,
       );
     }
-    // NC Local's approved editorial canvas is white. The other five
-    // identities retain their tonal grounds. No role uses pure black.
+    // Grounds are tonal: no ground is pure white and no ground is pure
+    // black, and the darkest ink is never pure black.
     for (const mode of ['light', 'dark']) {
       for (const role of ['surface', 'surfaceAlt', 'ink', 'inkMuted']) {
         const value = preset.palette[mode][role];
-        if (id !== 'newsroom' || mode !== 'light' || role !== 'surface') {
-          assert.notDeepEqual(value, [255, 255, 255], `${id} ${mode} ${role} is not pure white`);
-        }
+        assert.notDeepEqual(value, [255, 255, 255], `${id} ${mode} ${role} is not pure white`);
         assert.notDeepEqual(value, [0, 0, 0], `${id} ${mode} ${role} is not pure black`);
       }
     }

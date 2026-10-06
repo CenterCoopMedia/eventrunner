@@ -14,6 +14,7 @@ import {
   EventConfigProvider,
   useEventConfig,
 } from './EventConfigContext.jsx';
+import { resolveFontRoles, resolveThemePalettes } from 'shared/theme';
 
 function DemoThemeProbe() {
   const { setDemoTheme, source, theme } = useEventConfig();
@@ -21,6 +22,8 @@ function DemoThemeProbe() {
     <>
       <span data-testid="theme-preset">{theme.preset}</span>
       <span data-testid="theme-mode">{theme.mode}</span>
+      <span data-testid="theme-body">{resolveFontRoles(theme).body}</span>
+      <span data-testid="theme-surface">{resolveThemePalettes(theme).light.surface.join(' ')}</span>
       <span data-testid="config-source">{source}</span>
       <button
         type="button"
@@ -36,6 +39,9 @@ function DemoThemeProbe() {
       </button>
       <button type="button" onClick={() => setDemoTheme(null)}>
         Clear demo theme
+      </button>
+      <button type="button" onClick={() => setDemoTheme({ preset: 'newsroom', mode: 'dark' })}>
+        Restore NC Local
       </button>
     </>
   );
@@ -56,6 +62,17 @@ beforeEach(() => {
 });
 
 describe('EventConfigProvider demo theme override', () => {
+  it('removes NC Local overrides for other demo styles and restores them on return', () => {
+    render(<EventConfigProvider demoMode><DemoThemeProbe /></EventConfigProvider>);
+    expect(screen.getByTestId('theme-body')).toHaveTextContent('merriweather');
+    expect(screen.getByTestId('theme-surface')).toHaveTextContent('255 255 255');
+    fireEvent.click(screen.getByRole('button', { name: 'Set demo theme' }));
+    expect(screen.getByTestId('theme-body')).toHaveTextContent('vollkorn');
+    expect(screen.getByTestId('theme-surface')).not.toHaveTextContent('255 255 255');
+    fireEvent.click(screen.getByRole('button', { name: 'Restore NC Local' }));
+    expect(screen.getByTestId('theme-body')).toHaveTextContent('merriweather');
+    expect(screen.getByTestId('theme-surface')).toHaveTextContent('255 255 255');
+  });
   it('uses the normal resolver and stays separate from live configuration', () => {
     render(
       <EventConfigProvider demoMode>

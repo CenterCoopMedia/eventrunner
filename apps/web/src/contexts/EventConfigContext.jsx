@@ -84,7 +84,16 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   const effectiveDemoTheme = useMemo(
     () =>
       demoMode && demoTheme
-        ? { ...snapshotTheme, ...demoTheme }
+        ? {
+            ...snapshotTheme,
+            // NC Local's deployment overrides belong only to its demo style.
+            // Comparing another preset must resolve that preset's own identity.
+            ...(demoTheme.preset === snapshotTheme.preset ? {} : {
+              fonts: {}, tokens: {}, radius: undefined,
+              texture: undefined, density: undefined,
+            }),
+            ...demoTheme,
+          }
         : null,
     [demoMode, demoTheme],
   );

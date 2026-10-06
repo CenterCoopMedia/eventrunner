@@ -1,0 +1,46 @@
+{
+  "preset": "newsroom",
+  "fonts": {
+    "heading": "merriweather",
+    "body": "merriweather",
+    "data": "cabin",
+    "mono": "plex-mono"
+  },
+  "radius": "editorial",
+  "texture": "flat",
+  "density": "comfortable",
+  "tokens": {
+    "light": {
+      "surface": "#ffffff",
+      "surfaceAlt": "#f4f0eb",
+      "ink": "#111111",
+      "inkMuted": "#676767",
+      "primary": "#093a46",
+      "primaryDark": "#001c28",
+      "primaryLight": "#c1c4dc",
+      "accent": "#093a46",
+      "success": "#16603e",
+      "warning": "#86520a",
+      "danger": "#aa202c",
+      "highlight": "#7c5a0e",
+      "keynote": "#093a46"
+    },
+    "dark": {
+      "surface": "#001c28",
+      "surfaceAlt": "#092a36",
+      "ink": "#f9f7f5",
+      "inkMuted": "#c2ced1",
+      "primary": "#c1c4dc",
+      "primaryDark": "#e0e1ed",
+      "primaryLight": "#093a46",
+      "accent": "#c2ced1",
+      "success": "#74c896",
+      "warning": "#e4ae58",
+      "danger": "#f2888e",
+      "highlight": "#debe6c",
+      "keynote": "#c1c4dc"
+    }
+  },
+  "mode": "light",
+  "header": "masthead"
+}

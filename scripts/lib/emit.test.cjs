@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { emitAll, emitScheduleData, internals } = require('./emit.cjs');
+const { emitAll, emitScheduleData, emitEventConfig, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { organizationSlugError, validateOrganizationFields } = require('../../functions/src/cms/organizations.cjs');
@@ -308,4 +308,15 @@ test('the furnished demo schedule keeps its count and references consistent', ()
     assert.ok(demo.sessions.some((session) => session.speakerIds.includes(speaker.id)), speaker.id);
   }
   assert.equal(demo.config.event.venue.map, null, 'no inferred historical floor plan');
+});
+
+test('the theme snapshot preserves deployment palette and density overrides for runtime resolution', () => {
+  const { demoSnapshot } = require('./demo-event.cjs');
+  const snapshot = demoSnapshot();
+  const js = emitEventConfig(snapshot);
+  const vm = require('node:vm');
+  const context = {};
+  vm.runInNewContext(js.replace(/export const /g, 'var ').replace(/export default eventConfig;/, ''), context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.theme.tokens)), snapshot.theme.tokens);
+  assert.equal(context.theme.density, 'comfortable');
 });

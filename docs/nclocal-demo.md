@@ -14,13 +14,13 @@ requested replacement of the fictional Harborlight/Example City demo, retention
 of the other five theme identities and the draft/publish behavior, and an isolated
 review-ready PR. This task does not authorize a merge, deployment or public release.
 
-The primary preset definition is intentionally shared. Existing deployments that
-select `newsroom` receive the NC Local palette, typography, 4px corners and style
-label on their next publish. This is a visual compatibility change to that slot,
-not a demo-only token override. Their own content, logo slots and transaction
-controls still come from their own configuration. Operators who need to retain
-an existing stored palette can use the existing `None` selection. The other five
-preset definitions are unchanged.
+The reusable Newsroom preset remains unchanged. The demo carries its NC Local
+palette in `config/theme.tokens`, typography in `fonts`, and 4px corners in
+`radius`, with explicit texture and density overrides. Demo presentation rules
+scope the hero composition and field typography to this historical fixture.
+Existing client deployments selecting `newsroom` retain Newsroom's palette,
+typography, shape and catalog label. All six preset definitions retain their
+own identities.
 
 The approved historical-data exception in ADR 0001 §5.4 covers the public names,
 affiliations, session details, documented partner roles, Catherine Komp's public

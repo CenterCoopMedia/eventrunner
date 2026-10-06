@@ -23,8 +23,15 @@
 }
 
 /* NC Local uses its data face for field values as well as their labels. */
-:root[data-theme='newsroom'] .public-field {
+[data-historical-demo='nclocal'] .public-field {
   font-family: var(--font-data);
+}
+
+/* Historical demo composition; reusable Newsroom keeps its editorial rule. */
+[data-historical-demo='nclocal'] {
+  --hero-art-width: 50%;
+  --hero-copy-pad-inline-start: 0;
+  --hero-copy-border-inline-start: 0;
 }
 
 @layer base {

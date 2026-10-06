@@ -152,25 +152,21 @@ export const PRESET_COPY = Object.freeze({
     },
   },
   newsroom: {
-    label: 'NC Local',
-    summary: 'NC Local editorial style: Teal, lavender, warm surfaces and broad serif headlines.',
+    label: 'Newsroom',
+    summary: 'A modern editorial layout with strong section rules, compact data, and restrained color.',
     bestFor: 'Use this style for publications, media conferences, and newsroom events.',
     options: {
       headingFace: {
         label: 'Heading face',
         prompt: 'Choose the headline typeface.',
         choices: {
-          merriweather: {
-            label: 'Merriweather',
-            why: 'Uses NC Local’s observed serif heading style.',
-          },
           fraunces: {
             label: 'Fraunces',
-            why: 'Uses soft serif headlines with Merriweather body text and Cabin controls.',
+            why: 'Uses a distinctive soft-serif heading face. It separates headlines from Newsreader body text and Plex data text.',
           },
           'newsreader-display': {
             label: 'Newsreader at display weights',
-            why: 'Uses Newsreader headlines with Merriweather prose and Cabin controls.',
+            why: 'Uses Newsreader for both headings and body text. This creates a quieter and more traditional publication style.',
           },
           'archivo-condensed': {
             label: 'Archivo bold condensed',

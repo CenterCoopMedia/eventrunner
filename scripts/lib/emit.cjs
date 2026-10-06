@@ -106,8 +106,8 @@ function header(lines) {
 }
 
 /**
- * eventConfig.js — `config/event`, `config/features`, and the non-color
- * part of `config/theme` (colors go to theme.css as RGB triples).
+ * eventConfig.js — `config/event`, `config/features`, and public theme
+ * settings. Resolved colors go to theme.css; runtime keeps override inputs.
  *
  * @param {{ event: object, features: object, theme: object }} config
  * @returns {string}
@@ -121,15 +121,17 @@ function emitEventConfig({ event, features, theme }) {
     preset: theme.preset,
     optionPicks: theme.optionPicks,
     fonts: theme.fonts,
+    // Runtime demo style comparisons must retain deployment overrides too.
+    tokens: theme.tokens,
     texture: theme.texture,
     radius: theme.radius,
+    density: theme.density,
     // The mode policy (design brief §3.3). EventConfigProvider reads it to
     // write data-mode on <html>; a document from before the field existed
     // has no `mode` and the runtime defaults it to light.
     mode: theme.mode,
     // The motif set (design brief §3.8), written to data-motif-set on
-    // <html>. Colors stay out of this projection — they go to theme.css as
-    // RGB triples — but the motif set is an attribute, not a color.
+    // <html>. The motif set is an attribute, not a color.
     motifSet: theme.motifSet,
     // The header the theme names for its public pages (design brief §2.1).
     // A document from before the field existed has none, and the shell
@@ -137,6 +139,10 @@ function emitEventConfig({ event, features, theme }) {
     header: theme.header,
     logos: theme.logos,
   };
+  // Keep configured overrides available to runtime resolution without raw
+  // hex literals in generated source (the same rule as handwritten JS).
+  const themeLiteral = jsValue(themeProjection)
+    .replace(/'#([0-9a-fA-F]{3,8})'/g, "'#' + '$1'");
   return [
     header([
       'GENERATED FILE — committed public demo copy (spec §2.4, §5.4, §8.6).',
@@ -153,7 +159,7 @@ function emitEventConfig({ event, features, theme }) {
     '',
     `export const features = ${jsValue(features)};`,
     '',
-    `export const theme = ${jsValue(themeProjection)};`,
+    `export const theme = ${themeLiteral};`,
     '',
     'export default eventConfig;',
     '',

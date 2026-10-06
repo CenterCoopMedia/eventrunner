@@ -254,3 +254,27 @@ test('dry-run migration reports removals and protections without writing', async
   assert.ok(output.some((line) => /speakers\s+1 planned removals, 0 protected/.test(line)));
   assert.ok(output.some((line) => line.includes('kept session-opening: client-edited')));
 });
+
+test('NC Local uses deployment overrides while the reusable Newsroom identity stays intact', () => {
+  const { getPreset, resolveThemePalettes, resolveFontRoles, resolveShape } = require('shared/theme');
+  const { validateTheme } = require('shared/config');
+  const preset = getPreset('newsroom');
+  assert.equal(require('../design/tokens/presets/newsroom.json').label, 'Newsroom');
+  assert.deepEqual(preset.palette.light.primary, [178, 30, 50]);
+  assert.deepEqual(preset.palette.dark.surface, [23, 25, 30]);
+  assert.deepEqual(resolveFontRoles({ preset: 'newsroom' }), {
+    heading: 'fraunces', body: 'newsreader', data: 'plex-sans', mono: 'plex-mono',
+  });
+  assert.equal(resolveShape({ preset: 'newsroom' }).radius, 'small');
+  const { theme } = demoEvent().config;
+  assert.equal(validateTheme(theme).ok, true);
+  const palettes = resolveThemePalettes(theme);
+  assert.deepEqual(palettes.light.primary, [9, 58, 70]);
+  assert.deepEqual(palettes.light.surface, [255, 255, 255]);
+  assert.deepEqual(palettes.dark.surface, [0, 28, 40]);
+  assert.deepEqual(palettes.dark.primary, [193, 196, 220]);
+  assert.deepEqual(resolveFontRoles(theme), {
+    heading: 'merriweather', body: 'merriweather', data: 'cabin', mono: 'plex-mono',
+  });
+  assert.equal(resolveShape(theme).radius, 'editorial');
+});

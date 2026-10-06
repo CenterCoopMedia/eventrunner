@@ -11,6 +11,8 @@ const DEMO_SEEDED_AT = '2026-01-01T00:00:00.000Z';
 const PROGRAM_SOURCE = 'https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119';
 const RECAP_SOURCE = 'https://www.elon.edu/u/news/2026/04/01/nc-news-information-summit-draws-record-attendance-spotlights-ais-impact-on-local-news/';
 const DEMO_TIER_A = Object.freeze({ slug: 'demo-event', projectId: 'demo-run-of-show', region: 'us-central1', publicUrl: 'https://example.org', storageBucket: null, allowedOrigins: [], emailProvider: 'console', ticketingProvider: 'none', ticketingEventId: null, operatorNotifier: 'none' });
+// Deployment overrides preserve the reusable Newsroom preset.
+const DEMO_THEME = require('./nclocal-theme.json');
 const DEMO_ANSWERS = Object.freeze({
   adminEmails: ['demo-admin@example.org', 'demo-operator@example.org'],
   event: {
@@ -27,7 +29,7 @@ const DEMO_ANSWERS = Object.freeze({
     legal: { operatorName: 'EventRunner historical demo', postalAddressHtml: '<p>Historical NC Local summit mock-up. No registration, email delivery or staffed event service.</p>', supportEmail: 'support@example.org', conductEmail: 'conduct@example.org' },
     seo: { description: 'Past-event demo of the 2026 NC News & Information Summit in Raleigh: Selected historical sessions, speakers and documented partners.', organizerName: 'NC Local and NC Open Government Coalition', organizerUrl: 'https://nclocal.org/' },
   },
-  theme: { preset: 'newsroom', colors: resolveLegacyColors({ preset: 'newsroom' }), mode: 'light', header: 'masthead' },
+  theme: { ...DEMO_THEME, colors: resolveLegacyColors(DEMO_THEME) },
 });
 
 // Titles, rooms, times and affiliations come from the supplied published

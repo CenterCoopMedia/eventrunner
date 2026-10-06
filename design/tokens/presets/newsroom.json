@@ -4,160 +4,56 @@
   "$palette-note": "Color channels use [r, g, b] numbers. The generator writes RGB triples. The dark palette is authored separately.",
   "$first-class-note": "All six styles are complete and supported. Each has one default configuration.",
   "id": "newsroom",
-  "label": "NC Local",
-  "summary": "NC Local editorial style: Teal, lavender, warm surfaces and broad serif headlines.",
+  "label": "Newsroom",
+  "summary": "A modern editorial layout with strong section rules, compact data, and restrained color.",
   "bestFor": "Use this style for publications, media conferences, and newsroom events.",
-  "$palette-words-light": "NC Local teal, dark teal, lavender chips, pale teal, warm editorial white and black prose",
-  "$palette-words-dark": "NC Local dark teal, warm white, pale teal metadata and lavender accents",
+
+  "$palette-words-light": "cool newsprint white, desk black, one saturated editorial accent, muted data slate, hairline silver, section-rule graphite, caption grey, archive fog",
+  "$palette-words-dark": "charcoal desk, screen-lit soft white, night-retuned editorial accent, dimmed data slate, graphite rule, ash grey, low-lamp caption grey, archive slate",
   "palette": {
     "light": {
-      "surface": [
-        255,
-        255,
-        255
-      ],
-      "surfaceAlt": [
-        244,
-        240,
-        235
-      ],
-      "ink": [
-        17,
-        17,
-        17
-      ],
-      "inkMuted": [
-        103,
-        103,
-        103
-      ],
-      "primary": [
-        9,
-        58,
-        70
-      ],
-      "primaryDark": [
-        0,
-        28,
-        40
-      ],
-      "primaryLight": [
-        193,
-        196,
-        220
-      ],
-      "accent": [
-        9,
-        58,
-        70
-      ],
-      "success": [
-        22,
-        96,
-        62
-      ],
-      "warning": [
-        134,
-        82,
-        10
-      ],
-      "danger": [
-        170,
-        32,
-        44
-      ],
-      "highlight": [
-        124,
-        90,
-        14
-      ],
-      "keynote": [
-        9,
-        58,
-        70
-      ]
+      "surface": [246, 247, 249],
+      "surfaceAlt": [236, 238, 242],
+      "ink": [22, 24, 29],
+      "inkMuted": [88, 95, 108],
+      "primary": [178, 30, 50],
+      "primaryDark": [140, 20, 38],
+      "primaryLight": [224, 148, 158],
+      "accent": [46, 84, 126],
+      "success": [22, 96, 62],
+      "warning": [134, 82, 10],
+      "danger": [170, 32, 44],
+      "highlight": [124, 90, 14],
+      "keynote": [82, 54, 140]
     },
     "dark": {
-      "surface": [
-        0,
-        28,
-        40
-      ],
-      "surfaceAlt": [
-        9,
-        42,
-        54
-      ],
-      "ink": [
-        249,
-        247,
-        245
-      ],
-      "inkMuted": [
-        194,
-        206,
-        209
-      ],
-      "primary": [
-        193,
-        196,
-        220
-      ],
-      "primaryDark": [
-        224,
-        225,
-        237
-      ],
-      "primaryLight": [
-        9,
-        58,
-        70
-      ],
-      "accent": [
-        194,
-        206,
-        209
-      ],
-      "success": [
-        116,
-        200,
-        150
-      ],
-      "warning": [
-        228,
-        174,
-        88
-      ],
-      "danger": [
-        242,
-        136,
-        142
-      ],
-      "highlight": [
-        222,
-        190,
-        108
-      ],
-      "keynote": [
-        193,
-        196,
-        220
-      ]
+      "surface": [23, 25, 30],
+      "surfaceAlt": [34, 37, 44],
+      "ink": [232, 235, 240],
+      "inkMuted": [160, 168, 180],
+      "primary": [240, 122, 134],
+      "primaryDark": [248, 168, 176],
+      "primaryLight": [118, 56, 66],
+      "accent": [130, 172, 216],
+      "success": [116, 200, 150],
+      "warning": [228, 174, 88],
+      "danger": [242, 136, 142],
+      "highlight": [222, 190, 108],
+      "keynote": [186, 164, 240]
     }
   },
-  "$font-note": "Uses Merriweather/Georgia headings and prose, Cabin controls and metadata, and Plex Mono figures.",
+
+  "$font-note": "Uses Fraunces for headings, Newsreader for body text, Plex Sans for labels and data, and Plex Mono for figures and identifiers.",
   "fonts": {
-    "heading": "merriweather",
-    "body": "merriweather",
-    "data": "cabin",
+    "heading": "fraunces",
+    "body": "newsreader",
+    "data": "plex-sans",
     "mono": "plex-mono"
   },
-  "shape": {
-    "radius": "editorial",
-    "texture": "flat",
-    "density": "comfortable"
-  },
+
+  "shape": { "radius": "small", "texture": "flat", "density": "comfortable" },
   "motifSet": "none",
+
   "$tokens-note": "Remaps existing tier 2 and tier 3 tokens. The style uses the data font for folio text and a strong rule below each section heading. The definition list keeps the data face for its terms in a wide column. The pull quote sits between strong rules with a large opening mark. An urgent notice takes the nameplate rule, and table heads are set in small capitals over a strong rule. The standfirst is set in the heading typeface at regular weight.",
   "tokens": {
     "--folio-font": "var(--font-data)",
@@ -169,50 +65,37 @@
     "--notice-bar-urgent-rule-width": "var(--rule-nameplate-width)",
     "--table-head-transform": "uppercase",
     "--table-head-tracking": "0.04em",
-    "--hero-art-width": "50%",
-    "--hero-copy-pad-inline-start": "0",
-    "--hero-copy-border-inline-start": "0",
+    "--hero-art-width": "56%",
+    "--hero-copy-pad-inline-start": "var(--space-md)",
+    "--hero-copy-border-inline-start": ".35rem solid rgb(var(--color-accent-rgb))",
     "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)",
     "--standfirst-font": "var(--font-heading)",
     "--standfirst-weight": "var(--weight-regular)"
   },
+
   "options": {
     "headingFace": {
       "label": "Heading face",
       "prompt": "Choose the headline typeface.",
-      "default": "merriweather",
+      "default": "fraunces",
       "choices": [
-        {
-          "id": "merriweather",
-          "label": "Merriweather",
-          "why": "Uses NC Local’s observed serif heading style.",
-          "fonts": {
-            "heading": "merriweather"
-          }
-        },
         {
           "id": "fraunces",
           "label": "Fraunces",
-          "why": "Uses soft serif headlines with Merriweather body text and Cabin controls.",
-          "fonts": {
-            "heading": "fraunces"
-          }
+          "why": "Uses a distinctive soft-serif heading face. It separates headlines from Newsreader body text and Plex data text.",
+          "fonts": { "heading": "fraunces" }
         },
         {
           "id": "newsreader-display",
           "label": "Newsreader at display weights",
-          "why": "Uses Newsreader headlines with Merriweather prose and Cabin controls.",
-          "fonts": {
-            "heading": "newsreader"
-          }
+          "why": "Uses Newsreader for both headings and body text. This creates a quieter and more traditional publication style.",
+          "fonts": { "heading": "newsreader" }
         },
         {
           "id": "archivo-condensed",
           "label": "Archivo bold condensed",
           "why": "Uses condensed sans-serif headlines. It fits longer titles in less vertical space and increases visual contrast.",
-          "fonts": {
-            "heading": "archivo-condensed"
-          }
+          "fonts": { "heading": "archivo-condensed" }
         }
       ]
     },
