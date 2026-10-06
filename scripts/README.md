@@ -116,8 +116,10 @@ conflict (§2.2). An answers file that sets one gets a warning.
 
 ### `seed-demo-event.cjs`
 
-Seeds the public demo instance (§5.4, milestone issue #35): a fictional three-day event with
-placeholder speakers, sponsors, and sessions. Refuses a project id that is not a demo project —
+Seeds the public demo instance (§5.4, milestone issue #35): an explicitly approved historical
+NC Local mock-up with eight selected sessions, public speaker affiliations and exact historical
+partner roles. It includes no private contacts or attendee data. Registration and email actions
+are disabled in static and seeded historical demos. Refuses a project id that is not a demo project —
 either an exact `DEMO_PROJECT_ID` or a delimited `demo` component (`demo-run-of-show`, not
 `democratic-media-prod`) — unless `--i-know-this-is-not-a-demo-project` is passed — the one thing this script must never do is
 publish placeholder speakers on a client's live site. Idempotent on the same terms as init.
@@ -125,6 +127,16 @@ publish placeholder speakers on a client's live site. Idempotent on the same ter
 ```sh
 node scripts/seed-demo-event.cjs [--dry-run] [--force]
 ```
+
+Existing demo projects require `--force` to refresh configuration, including
+`config/event.historicalDemo`, which disables account and support email actions
+in normal Hosting builds. Preview with `--dry-run --force`. The migration removes
+only superseded Harborlight IDs that remain seed-owned, checking both CMS
+revisions and speaker account, edit, invitation and slug protections. Retirement
+requires `--force` and starts only after the replacement config, CMS collections
+and speakers are written successfully. A plain run reports that retirement was
+skipped; `--dry-run` previews what `--force` would retire. Speakers referenced by
+remaining live or draft sessions are also protected.
 
 ### `generate-content.cjs`
 

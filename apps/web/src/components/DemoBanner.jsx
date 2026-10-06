@@ -278,7 +278,7 @@ export function DemoBannerContent({
 
         <p className="max-w-prose text-caption text-text-secondary">
           <strong className="text-text-primary">Demo site.</strong>{' '}
-          This event is fictional and read-only. Account features are off.
+          Past-event demo · Historical 2026 program. Registration and email actions are off.
         </p>
       </div>
     </section>

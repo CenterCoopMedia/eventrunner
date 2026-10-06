@@ -31,7 +31,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
-import { IS_DEMO } from '../lib/demoMode.js';
+import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import {
   inputClass,
   primaryButtonClass,
@@ -416,8 +417,7 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
 }
 
 /**
- * The demo build's stand-in for the whole sign-in panel: there is no Firebase
- * project behind the static site, so both paths would fail at the network.
+ * The read-only demo's stand-in for the whole sign-in panel.
  * Saying so plainly beats a form that cannot work — and it keeps every
  * existing "Sign in" link in the app (SessionCard, Attendees, MySchedule,
  * Profile, the admin gate) landing somewhere honest, without touching any of
@@ -430,7 +430,7 @@ function DemoSignInNotice() {
         Sign-in is disabled in this demo
       </p>
       <p className="text-text-secondary text-pretty">
-        This is a read-only tour of a fictional event. Accounts, bookmarks,
+        This is a read-only event tour. Accounts, bookmarks,
         the attendee directory, and the admin CMS all work on a real
         deployment — ask us for a walkthrough.
       </p>
@@ -445,5 +445,6 @@ export default function SignInPanel(props) {
   // A plain branch rather than an early return inside SignInForm: the form
   // is a hooks-heavy component and rules-of-hooks forbids returning before
   // them. In a normal client build IS_DEMO is a compile-time `false`.
-  return IS_DEMO ? <DemoSignInNotice /> : <SignInForm {...props} />;
+  const { eventConfig } = useEventConfig();
+  return isReadOnlyDemo(eventConfig) ? <DemoSignInNotice /> : <SignInForm {...props} />;
 }

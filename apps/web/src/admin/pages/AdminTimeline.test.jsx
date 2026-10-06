@@ -243,21 +243,23 @@ describe('the timeline list', () => {
     const warning = (_content, element) =>
       element?.tagName === 'P'
       && element.textContent === 'The home page has no section with the id history, so published entries do not appear on the site. Add one to the home page under Pages.';
-    // The snapshot's home page has the section.
-    expect(screen.queryByText(warning)).toBeNull();
+    // The historical snapshot has no invented past-edition history.
+    const notice = screen.getByText(warning);
+    const id = within(notice).getByText('history', { selector: 'code' });
+    expect(id).toHaveClass('font-admin-data');
 
     const home = snapshotPages.find((page) => page.id === 'home');
     act(() => {
       contentSubscriptions.get('cmsPages')(
         snapshotPages.map((page) => (page.id === 'home'
-          ? { ...home, sections: home.sections.filter((section) => section.id !== 'history') }
+          ? { ...home, sections: [...home.sections, { id: 'history', label: 'History' }] }
           : page)),
       );
     });
-    const notice = screen.getByText(warning);
-    // The id is a value the operator types, so it is set in the data face.
-    const id = within(notice).getByText('history', { selector: 'code' });
-    expect(id).toHaveClass('font-admin-data');
+    expect(screen.queryByText(warning)).toBeNull();
+
+    act(() => contentSubscriptions.get('cmsPages')(snapshotPages));
+    expect(screen.getByText(warning)).toBeInTheDocument();
   });
 });
 

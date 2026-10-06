@@ -388,6 +388,13 @@ describe('admin Sessions workspace', () => {
     async function openSessions(features = { sessionBookmarks: true }) {
       await renderAt('/admin/sessions');
       await screen.findByRole('heading', { name: 'Sessions' });
+      // These synthetic sessions span two client days. The historical
+      // NC Local demo has one Friday, so configure this test's own days.
+      await waitFor(() => expect(configSubscriptions.has('event')).toBe(true));
+      act(() => configSubscriptions.get('event')({ days: [
+        { id: 'day-1', label: 'Day one', date: '2026-03-27', startTime: '08:00', endTime: '16:30' },
+        { id: 'day-2', label: 'Day two', date: '2026-03-28', startTime: '08:00', endTime: '16:30' },
+      ] }));
       if (features) {
         await waitFor(() => expect(configSubscriptions.has('features')).toBe(true));
         act(() => configSubscriptions.get('features')(features));

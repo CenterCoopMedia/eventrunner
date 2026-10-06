@@ -39,6 +39,7 @@ const configSubscriptions = new Map();
 vi.mock('../../lib/configSource.js', () => ({
   subscribeConfigDoc: (docId, onNext) => {
     configSubscriptions.set(docId, onNext);
+    if (docId === 'event') onNext({ historicalDemo: false });
     return () => configSubscriptions.delete(docId);
   },
 }));
@@ -166,7 +167,8 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
     { timeout: 20_000 },
   );
   await waitFor(() => expect(configSubscriptions.has('theme')).toBe(true));
-  act(() => configSubscriptions.get('theme')(themeDoc));
+  // These client palettes have no NC Local deployment token overrides.
+  act(() => configSubscriptions.get('theme')({ tokens: {}, ...themeDoc }));
   await waitFor(() => {
     expect(frame()).not.toBeNull();
     expect(previewCss()).not.toBe('');
@@ -248,7 +250,7 @@ describe('the proof', () => {
     expect(screen.getByText('Schedule · light · 1440px · published theme')).toBeInTheDocument();
     // And the FRAME really moved. `initialEntries` is read once, so the
     // router has to remount or the line and the picture disagree.
-    expect(await within(frame()).findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
+    expect(await within(frame()).findByRole('heading', { name: 'Program' })).toBeInTheDocument();
   });
 
   it('switches light and dark instantly, as two proofs of one forme', async () => {

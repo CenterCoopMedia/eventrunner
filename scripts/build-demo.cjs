@@ -19,8 +19,8 @@
  * `npm run build -w apps/web` WITHOUT these switches, so every demo branch
  * compiles away to dead code there and their output is unchanged.
  *
- * The content is the committed synthetic snapshot in apps/web/src/generated
- * (a fictional event, spec §2.4/§5.4). GENERATED_DIR is deliberately NOT
+ * The content is the approved public historical fixture in apps/web/src/generated.
+ * GENERATED_DIR is deliberately NOT
  * honored: pointing this at a real client's Firestore export would publish
  * that client's content into a public repository, which §8.6 exists to
  * prevent. It is cleared for the child process even if the caller set it.
@@ -64,6 +64,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const { main: writeSiteFiles } = require('./write-site-files.cjs');
+const { demoSnapshot } = require('./lib/demo-event.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
@@ -94,6 +95,41 @@ async function writeDemoSiteFiles({ base }) {
     console.error(`write-site-files failed while building the demo (exit ${code}).`);
     process.exit(1);
   }
+  const snapshot = demoSnapshot();
+  // The historical demo bundles its official artwork. Client icon generation
+  // still uses the uploaded square mark and its existing fallback policy.
+  for (const size of [192, 512]) {
+    fs.copyFileSync(
+      path.join(WEB_DIR, 'public', 'branding', `nclocal-icon-${size}.png`),
+      path.join(DIST_DIR, 'branding', `app-icon-${size}.png`),
+    );
+  }
+  const manifestPath = path.join(DIST_DIR, 'manifest.webmanifest');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.icons = manifest.icons.map((icon) => ({ ...icon, purpose: 'any' }));
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  const indexPath = path.join(DIST_DIR, 'index.html');
+  fs.writeFileSync(indexPath, demoHeadMetadata(fs.readFileSync(indexPath, 'utf8'), snapshot, publicUrl));
+}
+
+function demoHeadMetadata(html, { event, theme }, publicUrl) {
+  const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]
+  ));
+  const title = `${event.name} · Past-event demo`;
+  const image = new URL(event.seo.defaultOgImagePath, `${publicUrl}/`).href;
+  const icon = new URL(theme.logos.favicon, `${publicUrl}/`).href;
+  const tags = [
+    ['name', 'description', event.seo.description],
+    ['property', 'og:title', title], ['property', 'og:description', event.seo.description],
+    ['property', 'og:type', 'website'], ['property', 'og:url', publicUrl], ['property', 'og:image', image],
+    ['property', 'og:image:width', '1200'], ['property', 'og:image:height', '630'],
+    ['name', 'twitter:card', 'summary_large_image'], ['name', 'twitter:title', title],
+    ['name', 'twitter:description', event.seo.description], ['name', 'twitter:image', image],
+  ].map(([attribute, key, value]) => `    <meta ${attribute}="${key}" content="${escape(value)}" />`).join('\n');
+  return html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escape(title)}</title>`)
+    .replace(/<link rel="icon"[^>]*>/, `<link rel="icon" type="image/svg+xml" href="${escape(icon)}" />`)
+    .replace('</head>', `${tags}\n  </head>`);
 }
 
 /**
@@ -453,4 +489,5 @@ module.exports = {
   main,
   runCheck,
   writeDemoSiteFiles,
+  demoHeadMetadata,
 };

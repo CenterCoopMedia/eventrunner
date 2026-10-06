@@ -2,7 +2,7 @@
 // organizationsData's raw `url` field straight into an href, so a
 // javascript: URL in a sponsor record would execute on click. It must go
 // through the same isSafeHref allowlist the block renderers use.
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -37,6 +37,21 @@ function renderSponsors() {
 }
 
 describe('Sponsors', () => {
+  describe('system-page heading', () => {
+    afterEach(() => { pageDoc = null; });
+
+    it.each([
+      ['a legacy title', { systemPage: true, label: 'Partners', title: 'Old partner title' }, 'Partners'],
+      ['an empty title', { systemPage: true, label: 'Partners', title: '' }, 'Partners'],
+      ['a blank label', { systemPage: true, label: '  ', title: 'Old partner title' }, 'Sponsors'],
+    ])('uses the shared contract with %s', (_, page, expected) => {
+      organizationsData = [];
+      pageDoc = page;
+      renderSponsors();
+      expect(screen.getByRole('heading', { level: 1, name: expected })).toBeInTheDocument();
+    });
+  });
+
   it('renders no link for a sponsor with an unsafe (javascript:) url, but still shows its name', () => {
     organizationsData = [
       {

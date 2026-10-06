@@ -1,10 +1,11 @@
 // The home page's History section on the real surface (issue #194): the
-// shipped Home inside the real ContentProvider, fed the committed generated
-// snapshot, with only the Firestore listener seam (lib/contentSource.js)
-// replaced so a test can report a published set the way the listener does.
+// shipped Home inside the real ContentProvider, fed an isolated client
+// snapshot with a History section. The historical NC Local demo deliberately
+// has no invented past editions; this fixture preserves the client feature
+// coverage independently of that demo's editorial content.
 //
 // "the snapshot still renders on first paint": the first render, before any
-// effect runs and before any listener reports, already lists the committed
+// effect runs and before any listener reports, already lists the test
 // snapshot's editions. "an entry published from the admin appears on the
 // page without a rebuild": a listener result adds it to the mounted page,
 // with no remount.
@@ -27,6 +28,34 @@ let eventConfig;
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig, theme: undefined, features: {} }),
 }));
+
+vi.mock('@generated/pagesData.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  const pagesData = actual.default.map((page) => page.id === 'home'
+    ? { ...page, sections: [...page.sections, {
+      id: 'history', label: 'History', allowedBlocks: ['richtext'],
+      maxBlocks: 4, reorderable: true, defaultBlocks: [],
+    }] }
+    : page);
+  return { ...actual, pagesData, default: pagesData };
+});
+vi.mock('@generated/siteContent.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  const siteContent = { ...actual.default, history__story: {
+    section: 'history', field: 'story', blockType: 'richtext',
+    value: '<p>A synthetic client story about its previous editions.</p>',
+    order: 0, visible: true, seeded: true,
+  } };
+  return { ...actual, siteContent, default: siteContent };
+});
+vi.mock('@generated/timelineData.js', () => {
+  // Unsorted input also verifies the provider's first-paint ordering.
+  const timelineData = [
+    { id: 'edition-2024', year: 2024, title: 'Second test edition', description: null, visible: true },
+    { id: 'edition-2021', year: 2021, title: 'First test edition', description: null, visible: true },
+  ];
+  return { timelineData, default: timelineData };
+});
 
 import Home from './Home.jsx';
 import { ContentProvider } from '../contexts/ContentContext.jsx';

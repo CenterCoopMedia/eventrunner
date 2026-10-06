@@ -16,28 +16,22 @@ describe('static demo community data', () => {
     const next = vi.fn();
     const unsubscribe = subscribeContentCollection('cmsUpdates', 'published', next);
     const updates = next.mock.calls[0][0];
-    expect(updates).toHaveLength(6);
+    expect(updates).toHaveLength(1);
     for (const update of updates) {
       expect(update.visible).toBe(true);
-      expect(update.publishAt).toMatch(/^2026-09-/);
+      expect(update.publishAt).toBe('2026-04-01T12:00:00.000Z');
+      expect(update.body).toContain('Demo-authored historical note');
     }
     expect(collection).not.toHaveBeenCalled();
     expect(onSnapshot).not.toHaveBeenCalled();
     unsubscribe();
   });
 
-  it('returns fictional directory rows and details without public profile reads', async () => {
+  it('returns no historical attendee directory or profile reads', async () => {
     const next = vi.fn();
     const unsubscribe = subscribeDirectory({ includeAttendeesOnly: false }, next);
     const profiles = next.mock.calls[0][0];
-    expect(profiles.length).toBeGreaterThanOrEqual(3);
-    for (const profile of profiles) {
-      expect(profile.profileVisibility).toBe('public');
-      expect(profile.id).toMatch(/^demo-attendee-/);
-      expect(profile).not.toHaveProperty('email');
-      expect(profile).not.toHaveProperty('uid');
-      expect(await fetchPublicProfile(profile.id)).toEqual(profile);
-    }
+    expect(profiles).toEqual([]);
     expect(await fetchPublicProfile('not-a-demo-profile')).toBeNull();
     expect(doc).not.toHaveBeenCalled();
     expect(getDoc).not.toHaveBeenCalled();

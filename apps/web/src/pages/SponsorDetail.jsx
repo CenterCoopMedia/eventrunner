@@ -19,6 +19,8 @@ import { DefinitionPair } from '../components/editorial/DefinitionList.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { primaryActionClass } from '../components/controlClasses.js';
+import { IS_DEMO } from '../lib/demoMode.js';
+import { pageHeading } from 'shared/page';
 
 function paragraphs(value) {
   return typeof value === 'string' ? value.split(/\n\s*\n/).filter(Boolean) : [];
@@ -28,12 +30,15 @@ export default function SponsorDetail() {
   const { slug } = useParams();
   const { search } = useLocation();
   const { features } = useEventConfig();
-  const { organizationsData, scheduleData = [] } = useContent();
+  const { organizationsData, scheduleData = [], getPage } = useContent();
+  const directoryLabel = pageHeading(getPage?.('sponsors')) || 'Sponsors';
+  const backLabel = `Back to ${directoryLabel.toLowerCase()}`;
+  const roleLabel = IS_DEMO && directoryLabel === 'Partners' ? 'Historical role' : 'Tier';
   const org = features.sponsors && visibleOrganizations(organizationsData).find((item) => item.id === slug);
   useDocumentTitle(org?.name);
   if (!org) return (
     <EmptyState title="This sponsor is not available" description="It may not be published yet, or the link may be out of date."
-      action={<Link to={{ pathname: "/sponsors", search }} className={primaryActionClass}>Back to sponsors</Link>} />
+      action={<Link to={{ pathname: "/sponsors", search }} className={primaryActionClass}>{backLabel}</Link>} />
   );
   const bio = paragraphs(org.bio);
   const tier = typeof org.tier === 'string' && org.tier.trim() ? org.tier.trim() : null;
@@ -45,12 +50,12 @@ export default function SponsorDetail() {
     ? requestedSessionPath : null;
   return (
     <article>
-      <Link to={{ pathname: "/sponsors", search }} className="font-data text-caption text-text-secondary hover:underline">← Back to sponsors</Link>
+      <Link to={{ pathname: "/sponsors", search }} className="font-data text-caption text-text-secondary hover:underline">← {backLabel}</Link>
       <header className="mt-lg">
-        {org.logoPath ? <div className="mb-lg max-w-sm"><AssetImage path={org.logoPath} alt="" decorative className="sponsor-logo max-h-40 w-auto object-contain" /></div> : null}
+        {org.logoPath ? <div className="mb-lg max-w-sm"><AssetImage path={org.logoPath} alt="" decorative className={`sponsor-logo max-h-40 w-auto object-contain${IS_DEMO && org.logoPath === 'branding/nclocal-logo.png' ? ' demo-brand-artwork' : ''}`} /></div> : null}
         <h1 className="font-heading text-h1 font-semibold text-text-primary">{org.name}</h1>
         {org.description ? <Standfirst className="mt-md">{org.description}</Standfirst> : null}
-        {tier ? <dl className="definition-list mt-md max-w-prose"><DefinitionPair term="Tier">{tier}</DefinitionPair></dl> : null}
+        {tier ? <dl className="definition-list mt-md max-w-prose"><DefinitionPair term={roleLabel}>{tier}</DefinitionPair></dl> : null}
       </header>
       {bio.length > 0 ? <section className="mt-xl max-w-prose" aria-labelledby="sponsor-about">
         <h2 id="sponsor-about" className="font-heading text-h2 font-semibold">About {org.name}</h2>

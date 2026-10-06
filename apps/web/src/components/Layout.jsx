@@ -75,6 +75,7 @@ import { clearReloadFlag } from '../lib/chunkReload.js';
 import DemoBanner from './DemoBanner.jsx';
 import AnnouncementBanners from './AnnouncementBanners.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
+import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 
 // The feedback dialog and the change request dialog (issue #188) each sit
 // behind a flag that is off by default and open only on a press, so they
@@ -300,6 +301,8 @@ export default function Layout() {
   // Only the event bar prefers the short name.
   const plate = buildNameplate(eventConfig, { compact: headerVariant === 'compact' });
   const markSize = headerVariant === 'masthead' ? MARK_SIZE.masthead : MARK_SIZE.running;
+  const readOnlyDemo = isReadOnlyDemo(eventConfig);
+  const historicalDemo = readOnlyDemo && eventConfig.shortName === 'NC Local';
 
   // The navigation IS the page list (lib/siteNavigation.js). Every visible
   // page document becomes a link, in its own `order`, with system pages
@@ -384,10 +387,10 @@ export default function Layout() {
             </details>
           </li>
         ) : null}
-        {accountViews.views.length > 1 ? (
+        {!readOnlyDemo && accountViews.views.length > 1 ? (
           <li><Suspense fallback={null}><AccountMenu account={accountViews} /></Suspense></li>
         ) : null}
-        <li>
+        <li hidden={readOnlyDemo}>
           <NavLink to={account.to} end={account.end} className={accountClass}>
             {account.label}
           </NavLink>
@@ -423,7 +426,7 @@ export default function Layout() {
   );
 
   return (
-    <div className="page-surface flex min-h-screen flex-col">
+    <div className="page-surface flex min-h-screen flex-col" data-historical-demo={historicalDemo && theme?.preset === 'newsroom' ? 'nclocal' : undefined}>
       {IS_DEMO || features.webmcpPublic === true ? (
         <Suspense fallback={null}>
           <PublicWebMcpRegistration />
@@ -440,7 +443,7 @@ export default function Layout() {
         <div className="stage">
           <Header
             variant={headerVariant}
-            name={plate.name}
+            name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}
             place={plate.edition}
             mark={
@@ -450,10 +453,10 @@ export default function Layout() {
                 // wrong pair moves the header on first paint.
                 <img
                   src={markSrc}
-                  alt=""
-                  className={markSize.className}
-                  width={markSize.px}
-                  height={markSize.px}
+                  alt={historicalDemo ? 'NC Local' : ''}
+                  className={historicalDemo ? 'historical-demo-logo' : markSize.className}
+                  width={historicalDemo ? 220 : markSize.px}
+                  height={historicalDemo ? 48 : markSize.px}
                   onError={() => setMarkFailed(true)}
                 />
               ) : null
@@ -516,8 +519,8 @@ export default function Layout() {
             {operatorName || supportEmail ? (
               <p className="mt-md">
                 {operatorName ? `Operated by ${operatorName}` : null}
-                {operatorName && supportEmail ? ' · ' : null}
-                {supportEmail ? (
+                {operatorName && supportEmail && !readOnlyDemo ? ' · ' : null}
+                {supportEmail && !readOnlyDemo ? (
                   <a href={`mailto:${supportEmail}`} className={FOOTER_LINK_CLASS}>
                     Contact support
                   </a>

@@ -13,7 +13,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-vi.mock('../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
+// Invite acceptance exercises an ordinary client, with account actions enabled.
+vi.mock('../lib/configSource.js', () => ({
+  subscribeConfigDoc: (docId, onNext) => {
+    if (docId === 'event') onNext({ historicalDemo: false });
+    return () => {};
+  },
+}));
 vi.mock('../lib/announcementsSource.js', () => ({ subscribeAnnouncements: () => () => {} }));
 vi.mock('../lib/contentSource.js', () => ({
   subscribeContentCollection: () => () => {},

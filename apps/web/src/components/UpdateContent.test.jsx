@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import UpdateContent, { UpdateImage } from './UpdateContent.jsx';
+import { demoUpdates } from '../lib/demoCommunity.js';
 
 const poll = { type: 'practicePoll', question: 'Choose a workshop', options: ['Reporting', 'Revenue'] };
 describe('UpdateContent', () => {
+  it('renders the historical demo agenda source as a real external link', () => {
+    render(<UpdateContent content={demoUpdates[0].content} />);
+    expect(screen.getByRole('link', { name: 'Original 2026 program (ended listing)' })).toHaveAttribute(
+      'href', 'https://www.eventbrite.com/e/2026-nc-news-information-summit-tickets-1676080575119',
+    );
+  });
   it('renders safe media, columns and an internal action', () => {
     render(<MemoryRouter><UpdateImage image={{ url: 'demo/summit-gathering.webp', alt: 'Summit scene' }} /><UpdateContent content={[
       { type: 'columns', columns: [{ heading: 'Before', body: '<p>Pack notes</p>' }, { heading: 'After', body: '<p>Share notes</p>' }] },

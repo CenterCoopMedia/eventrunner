@@ -16,7 +16,7 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
   const email = `ticket-e2e-${stamp}@example.test`;
   const orderId = `E2E-ORDER-${stamp}`;
   const externalId = `e2e-ticket-${stamp}`;
-  const sessionId = 'session-welcome';
+  const sessionId = 'session-keynote';
 
   test.beforeAll(async () => {
     await adminDb().collection('tickets').doc(externalId).set({
@@ -112,6 +112,6 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     // It shows up under "my schedule" too — the other surface that reads
     // the same bookmark.
     await page.goto('/schedule/mine');
-    await expect(page.getByText(/welcome and orientation/i)).toBeVisible();
+    await expect(page.getByText(/NC’s AI Crossroads/)).toBeVisible();
   });
 });

@@ -1429,10 +1429,32 @@ Seeded blocks carry realistic-shaped synthetic copy, never another organization'
   chip on any block still flagged, and the admin dashboard shows a count of remaining seeded blocks.
   Editing a block clears the flag. This is what makes "is this site ready to launch" answerable.
 
-No CJS copy, no real speaker names, no real attendee data, no real sponsor logos — in seeds, in
-fixtures, in tests, or in the demo instance. The demo instance is seeded by
-`scripts/seed-demo-event.cjs` with a fictional event, fictional speakers, and generated placeholder
-headshots.
+Client initialization seeds use synthetic placeholders: No copied CJS content,
+real speaker names, real attendee data or real sponsor logos.
+
+**Approved historical demo exception, October 5, 2026:** Joe requested an NC Local
+past-event mock-up in the existing primary `newsroom` style. The exception is
+limited to the public organizational context and March 27, 2026 summit material in
+[NC Local historical demo](../nclocal-demo.md): Eight selected sessions, 25 public
+speaker names and affiliations, four organizations with their documented roles,
+and public organizational context about Catherine Komp's ecosystem engagement
+and annual-summit role supplied in Joe's brief and linked NC Local sources.
+This context does not list her as one of the selected program speakers. The
+exception also covers
+the official NC Local logo and a credited documentary photograph. Joe also
+authorized a derived dark-mode logo treatment: A white wordmark with the
+original colored globe and interior arcs preserved. This treatment must retain
+the official artwork's exact geometry, transparency and aspect ratio, identify
+itself as derived, and leave the light-mode artwork unchanged. The fixture,
+generated snapshot, tests and reviewable demo build can include this material.
+`scripts/seed-demo-event.cjs` uses that curated fixture; normal client
+initialization still uses synthetic placeholders.
+
+The demo must identify the event as historical, state that it is an EventRunner
+demo, disable registration and email actions, and show no private contacts,
+attendee records, invitation tokens, invented biographies or invented portraits.
+The exception does not claim consent or endorsement from the named people or
+organizations and does not authorize a merge, deployment or public release.
 
 ### 5.5 Legal page templates
 

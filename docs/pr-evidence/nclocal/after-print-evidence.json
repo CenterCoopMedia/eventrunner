@@ -1,0 +1,57 @@
+{
+  "sourceHead": "6658c0b7d0a35d31de299943f9e053ee2f46e6ed",
+  "mechanism": "Chromium CDP print-media emulation, with structured page navigation and no print submission.",
+  "rows": [
+    {
+      "view": "program",
+      "filename": "after-program-desktop-dark-print.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "ground": "rgb(255, 255, 255)",
+      "logos": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "content": "normal",
+          "height": 53.921875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 220
+        }
+      ],
+      "mode": "dark",
+      "print": true,
+      "schedulePrint": "block",
+      "scheduleScreen": "none"
+    },
+    {
+      "view": "partners",
+      "filename": "after-partners-desktop-dark-print.png",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "ground": "rgb(255, 255, 255)",
+      "logos": [
+        {
+          "background": "rgb(255, 255, 255)",
+          "content": "normal",
+          "height": 53.921875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 220
+        },
+        {
+          "background": "rgb(255, 255, 255)",
+          "content": "normal",
+          "height": 54.796875,
+          "source": "http://127.0.0.1:5276/eventrunner/demo/branding/nclocal-logo.png",
+          "width": 224
+        }
+      ],
+      "mode": "dark",
+      "print": true,
+      "schedulePrint": null,
+      "scheduleScreen": null
+    }
+  ]
+}

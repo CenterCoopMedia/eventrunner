@@ -2,8 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /admin$
 Disallow: /admin/*
-Disallow: /attendees$
-Disallow: /attendees/*
 Disallow: /dashboard$
 Disallow: /profile$
 Disallow: /schedule/mine$

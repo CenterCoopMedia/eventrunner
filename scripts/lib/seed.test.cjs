@@ -20,23 +20,11 @@ const {
 const TIER_A = { publicUrl: 'https://example.org', ticketingProvider: 'none', emailProvider: 'console' };
 
 /**
- * Generic institutional words that show up inside the demo fixture's own
- * invented names (an event called a "Summit", a sponsor with "Media" in
- * its name, a venue that is a "Hall") but are ordinary English words the
- * real, event-neutral seed is free to use on its own — `recap_media`'s
- * "other event media" is exactly that. Excluding them keeps the derived
- * list below to the fixture's actual invented names, not their generic
- * descriptor words.
- */
-const GENERIC_INSTITUTIONAL_WORDS = new Set([
-  'demo', 'hall', 'media', 'the', 'common', 'block', 'reporting',
-]);
-
-/**
- * The demo fixture's own invented proper nouns — event, venue, city,
- * operator, sponsors, and speakers — derived from `demo-event.cjs` rather
- * than copied by hand, so a renamed fixture entity updates this list on
- * its own instead of silently going unchecked.
+ * The demo fixture's identity phrases — event, venue, city,
+ * operator, sponsors, and speakers — come from `demo-event.cjs`. The
+ * named organizational context is protected explicitly too. Match complete institution
+ * names: a neutral instruction mentioning "information" must not be
+ * mistaken for the named NC News & Information Summit.
  */
 function demoFixtureProperNouns() {
   const phrases = [
@@ -44,19 +32,13 @@ function demoFixtureProperNouns() {
     DEMO_ANSWERS.event.venue.name,
     DEMO_ANSWERS.event.venue.city,
     DEMO_ANSWERS.event.legal.operatorName,
+    'Catherine Komp',
     ...DEMO_ORGANIZATIONS.map((org) => org.name),
     ...DEMO_SPEAKERS.flatMap((speaker) => [speaker.firstName, speaker.lastName, speaker.organization]),
   ];
-  const words = new Set();
-  for (const phrase of phrases) {
-    for (const word of String(phrase).replace(/\[Demo\]/gi, '').split(/[^A-Za-z]+/)) {
-      if (word.length < 3) continue;
-      const lower = word.toLowerCase();
-      if (GENERIC_INSTITUTIONAL_WORDS.has(lower)) continue;
-      words.add(lower);
-    }
-  }
-  return [...words];
+  return [...new Set(phrases
+    .map((phrase) => String(phrase).replace(/\[Demo\]/gi, '').trim().toLowerCase())
+    .filter((phrase) => phrase.length >= 3))];
 }
 
 function isNonEmptyDescription(value) {
@@ -382,7 +364,7 @@ test('no content doc is seeded for the city guide page', () => {
 test('no demo fixture copy leaks into the shared seed', () => {
   // The shared seed (defaultPages() and what buildSeedContent() renders
   // from it) ships to every real deployment, so none of it may carry the
-  // demo fixture's own invented event, venue, city, operator, sponsor, or
+  // demo fixture's event, venue, city, operator, sponsor, or
   // speaker names — the same way it may never carry a real one. This is
   // checked against the derived list (demoFixtureProperNouns above), not a
   // hand-typed one, so a renamed or added fixture entity is covered
@@ -391,7 +373,8 @@ test('no demo fixture copy leaks into the shared seed', () => {
   const content = buildSeedContent({ pages: defaultPages(), docs, tierA: TIER_A });
   const haystack = `${JSON.stringify(defaultPages())} ${JSON.stringify(content)}`.toLowerCase();
   for (const word of demoFixtureProperNouns()) {
-    const re = new RegExp(`\\b${word}\\b`);
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`\\b${escaped}\\b`);
     assert.equal(re.test(haystack), false, `the shared seed mentions the demo fixture's "${word}"`);
   }
 });

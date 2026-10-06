@@ -138,6 +138,11 @@ const FONT_SETS = Object.freeze({
     faces: Object.freeze([{ file: 'archivo-condensed-latin', weight: '400 700' }]),
     stack: "'Archivo Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif",
   }),
+  cabin: Object.freeze({
+    family: 'Cabin',
+    faces: Object.freeze([{ file: 'cabin-latin', weight: '400 700' }]),
+    stack: "'Cabin', Arial, sans-serif",
+  }),
   merriweather: Object.freeze({
     family: 'Merriweather',
     faces: Object.freeze([
@@ -207,6 +212,7 @@ const FONT_SETS = Object.freeze({
 const RADIUS_SCALES = Object.freeze({
   sharp: Object.freeze({ base: '0', large: '2px' }),
   small: Object.freeze({ base: '2px', large: '4px' }),
+  editorial: Object.freeze({ base: '4px', large: '4px' }),
   soft: Object.freeze({ base: '8px', large: '16px' }),
   round: Object.freeze({ base: '16px', large: '28px' }),
 });

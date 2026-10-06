@@ -144,7 +144,7 @@ test.describe.serial('bulk material download and coverage', () => {
       createdAt: new Date(), updatedAt: new Date(),
     });
     const base = { dayId: 'day-3', startTime: '15:00', endTime: '15:30', visible: false, description: '', location: '' };
-    await db.collection('cmsSchedule').doc(covered.id).set({ ...base, title: covered.title, speakerIds: ['speaker-lucia-bennett'] });
+    await db.collection('cmsSchedule').doc(covered.id).set({ ...base, title: covered.title, speakerIds: ['speaker-alex-mahadevan'] });
     await db.collection('cmsSchedule').doc(uncovered.id).set({ ...base, title: uncovered.title, speakerIds: [speaker.id] });
 
     // The bytes go to Storage and the records through the real endpoints,

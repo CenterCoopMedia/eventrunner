@@ -138,14 +138,14 @@ stays credential-free (spec §8.1) — see the root `README`/CI workflow.
 
 ## Where `src/generated/` comes from
 
-The files in `src/generated/` are a **committed synthetic snapshot** — a
-fictional demo event (`demo-run-of-show`) — checked in so the app builds
+The files in `src/generated/` are a **committed public demo snapshot** — an
+explicitly approved historical NC Local mock-up (`demo-run-of-show`) — checked in so the app builds
 and renders with zero external calls. At deploy time,
 `scripts/generate-content.cjs` (functions-side, spec §8.6) regenerates the
 same file shapes from the real client's Firestore data into `GENERATED_DIR`;
 Vite reads from there instead when that env var is set. Never hand-edit the
-committed snapshot to match a specific event — it must stay event-neutral
-so a fresh clone (and CI) never leaks a real client's identity.
+committed snapshot from a client deployment. The public historical demo is
+curated in `scripts/lib/demo-event.cjs`; no private client data belongs here.
 
 ## Demo mode (`VITE_DEMO_MODE=1`)
 

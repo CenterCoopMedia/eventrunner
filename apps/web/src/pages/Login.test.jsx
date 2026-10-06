@@ -9,6 +9,15 @@ import App from '../App.jsx';
 import { functionsOrigin } from '../contexts/AuthContext.jsx';
 import { appCheckHeaders } from '../firebase.js';
 
+// Exercise the existing OTP suite as an ordinary deployed client. The
+// committed snapshot is now explicitly a read-only historical fixture.
+vi.mock('../lib/configSource.js', () => ({
+  subscribeConfigDoc: (docId, onNext) => {
+    if (docId === 'event') onNext({ historicalDemo: false });
+    return () => {};
+  },
+}));
+
 function jsonResponse(status, body) {
   return {
     ok: status >= 200 && status < 300,

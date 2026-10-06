@@ -9,18 +9,16 @@
 // entry with no reload: the runtime cmsTimeline listener delivers it.
 //
 // "the snapshot still renders on first paint": with every Firestore listen
-// channel held open and unanswered, the first DOM commit that holds the home
-// page already holds the History list, with the demo's editions from the
-// committed timelineData.js, on the build-time snapshot
+// channel held open and unanswered, the first DOM commit shows the historical
+// demo snapshot with no invented prior editions, on the build-time snapshot
 // (`data-content-source="snapshot"`). A mutation observer installed before
 // the page loads records that commit, so nothing that arrives later, a
 // listener result or a chunk, can satisfy the check.
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, adminIdToken, callFunction, signIn } from './helpers.mjs';
+import seed from '../scripts/lib/seed.cjs';
+import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
 
-// The demo fixture's past editions (scripts/lib/demo-event.cjs DEMO_TIMELINE),
-// oldest first, which is what the committed snapshot and the seed both hold.
-const DEMO_TITLES = ['The first meeting', 'Two workshop tracks'];
+const { defaultPages } = seed;
 
 /**
  * Runs in the page before its scripts. Records the History titles and the
@@ -50,14 +48,26 @@ function historyTitles(page) {
 test.describe.serial('timeline: admin editor -> publish -> the home page History section', () => {
   const title = `E2E edition ${Date.now()}`;
   let entryId = null;
+  let originalHome;
 
-  test.afterAll(async () => {
-    if (!entryId) return;
-    const idToken = await adminIdToken();
-    await callFunction('cmsDeleteContent', { collection: 'cmsTimeline', docId: entryId }, idToken);
+  test.beforeAll(async () => {
+    // Enable the normal client History section only in this emulator test.
+    // The historical demo deliberately has no invented edition timeline.
+    const home = adminDb().doc('cmsPages/home');
+    originalHome = (await home.get()).data();
+    const history = defaultPages().find((page) => page.id === 'home').sections.find((section) => section.id === 'history');
+    await home.set({ ...originalHome, sections: [...originalHome.sections, history] });
   });
 
-  test('the first render of the home page lists the snapshot editions while every listener is held (issue 194)', async ({ page }) => {
+  test.afterAll(async () => {
+    if (entryId) {
+      const idToken = await adminIdToken();
+      await callFunction('cmsDeleteContent', { collection: 'cmsTimeline', docId: entryId }, idToken);
+    }
+    if (originalHome) await adminDb().doc('cmsPages/home').set(originalHome);
+  });
+
+  test('the first render holds the historical snapshot without invented editions while listeners are held (issue 194)', async ({ page }) => {
     // Hold every Firestore listen channel: no request is answered, so no
     // runtime result can arrive and the page can only be drawing the
     // committed snapshot.
@@ -72,15 +82,15 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
       await expect.poll(() => page.evaluate(() => globalThis.__firstHomeCommit ?? null)).not.toBeNull();
       expect(await page.evaluate(() => globalThis.__firstHomeCommit)).toEqual({
         source: 'snapshot',
-        titles: DEMO_TITLES,
+        titles: [],
       });
       await expect(page.locator('article[data-content-source="snapshot"]')).toBeVisible();
-      await expect(historyTitles(page)).toHaveText(DEMO_TITLES);
+      await expect(page.getByRole('region', { name: 'History', exact: true })).toHaveCount(0);
       // The listeners did ask, and nothing answered: the page is still on the
       // snapshot after the listen channel opened.
       await expect.poll(() => held).toBeGreaterThan(0);
       await expect(page.locator('article[data-content-source="snapshot"]')).toBeVisible();
-      await expect(historyTitles(page)).toHaveText(DEMO_TITLES);
+      await expect(page.getByRole('region', { name: 'History', exact: true })).toHaveCount(0);
     } finally {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     }
@@ -92,7 +102,7 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
       const home = await visitor.newPage();
       await home.goto('/');
       await expect(home.locator('article[data-content-source="live"]')).toBeVisible();
-      await expect(historyTitles(home)).toHaveText(DEMO_TITLES);
+      await expect(home.getByRole('region', { name: 'History', exact: true })).toHaveCount(0);
 
       // The operator adds the entry and saves a draft.
       await signIn(page, ADMIN_EMAIL);
@@ -105,11 +115,10 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
       entryId = new URL(page.url()).pathname.split('/').at(-1);
       await expect(page.locator('header [data-record-state]')).toHaveText('Draft');
 
-      // A draft is not on the site: a fresh load, live again, lists the
-      // demo editions only.
+      // A draft is not on the site: a fresh load still has no editions.
       await home.reload();
       await expect(home.locator('article[data-content-source="live"]')).toBeVisible();
-      await expect(historyTitles(home)).toHaveText(DEMO_TITLES);
+      await expect(home.getByRole('region', { name: 'History', exact: true })).toHaveCount(0);
 
       // Published from the editor.
       await page.getByRole('button', { name: 'Save and publish' }).click();
@@ -118,7 +127,7 @@ test.describe.serial('timeline: admin editor -> publish -> the home page History
 
       // The open page picks it up with no reload: 2023 is the oldest, so it
       // leads the list. The list draws no counter.
-      await expect(historyTitles(home)).toHaveText([title, ...DEMO_TITLES]);
+      await expect(historyTitles(home)).toHaveText([title]);
       const list = home.getByRole('region', { name: 'History', exact: true }).locator('ol');
       await expect(list).toHaveCSS('list-style-type', 'none');
       await expect(list.locator('li').first().locator('time')).toHaveAttribute('datetime', '2023');

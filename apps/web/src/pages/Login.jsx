@@ -16,11 +16,23 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import { primaryButtonClass, secondaryButtonClass } from '../components/controlClasses.js';
-import { IS_DEMO } from '../lib/demoMode.js';
+import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 
 export default function Login() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const { eventConfig } = useEventConfig();
+  const readOnlyDemo = isReadOnlyDemo(eventConfig);
+
+  if (readOnlyDemo) {
+    return (
+      <article className="mx-auto max-w-md">
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in</h1>
+        <div className="mt-lg"><SignInPanel /></div>
+      </article>
+    );
+  }
 
   if (loading) {
     return (
@@ -52,15 +64,10 @@ export default function Login() {
   return (
     <article className="mx-auto max-w-md">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in</h1>
-      {/* The demo build has no Firebase project, so SignInPanel renders a
-          "disabled in this demo" notice instead of the form — promising a
-          Google button and an emailed code above it would contradict it. */}
-      {IS_DEMO ? null : (
-        <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
-          Use your Google account, or get a one-time code by email. No password
-          needed.
-        </p>
-      )}
+      <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
+        Use your Google account, or get a one-time code by email. No password
+        needed.
+      </p>
 
       <div className="mt-lg">
         <SignInPanel onSignedIn={() => navigate('/', { replace: true })} />

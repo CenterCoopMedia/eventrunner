@@ -145,7 +145,7 @@ describe('the admin shell', () => {
 
       expect(rail.className).toContain('min-h-14');
       expect(rail.className).toContain('flex-wrap');
-      expect(within(rail).getByText('Harborlight')).toBeInTheDocument();
+      expect(within(rail).getByText('NC Local')).toBeInTheDocument();
       expect(within(summary).getByText('Pages')).toBeInTheDocument();
       expect(within(summary).getByText('Menu')).toBeInTheDocument();
       expect(docket).not.toHaveAttribute('open');

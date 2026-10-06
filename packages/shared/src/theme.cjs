@@ -60,7 +60,7 @@ const THEME_FONT_SET_IDS = Object.freeze([
   'serif-editorial', 'sans-humanist', 'script-casual',
   'caslon-display', 'caslon-text', 'baskerville', 'spectral',
   'fraunces', 'newsreader', 'plex-sans', 'plex-mono', 'archivo-condensed',
-  'merriweather', 'public-sans',
+  'merriweather', 'public-sans', 'cabin',
   'karrik', 'bagnard', 'avara', 'fragment-mono',
   'besley', 'vollkorn', 'overpass', 'overpass-mono', 'libre-franklin',
 ]);
@@ -103,7 +103,7 @@ function resolveHeader(themeHeader, pageHeader) {
  * What `config/theme.radius` may say (spec §7.2). `small` is the 2px-to-4px
  * step Newsroom modern and Civic ask for (brief §4.2, §4.4).
  */
-const THEME_RADIUS_IDS = Object.freeze(['sharp', 'small', 'soft', 'round']);
+const THEME_RADIUS_IDS = Object.freeze(['sharp', 'small', 'editorial', 'soft', 'round']);
 
 /** What a preset's `shape.density` may say (brief §4, §6.1). */
 const THEME_DENSITIES = Object.freeze(['tight', 'comfortable', 'loose']);

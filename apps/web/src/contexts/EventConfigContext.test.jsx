@@ -40,6 +40,7 @@ function Probe() {
     <>
       <span data-testid="name">{eventConfig.name}</span>
       <span data-testid="source">{source}</span>
+      <span data-testid="historical-demo">{String(eventConfig.historicalDemo === true)}</span>
       <span data-testid="schedule-feature">{String(features.schedule)}</span>
     </>
   );
@@ -55,6 +56,14 @@ beforeEach(() => {
 });
 
 describe('EventConfigProvider', () => {
+  it('reads the deployed historical flag and clears snapshot gating for an older client config', () => {
+    render(<EventConfigProvider><Probe /></EventConfigProvider>);
+    expect(screen.getByTestId('historical-demo')).toHaveTextContent('true');
+    act(() => subscriptions.get('event')({ name: 'Historical fixture', historicalDemo: true }));
+    expect(screen.getByTestId('historical-demo')).toHaveTextContent('true');
+    act(() => subscriptions.get('event')({ name: 'Ordinary client' }));
+    expect(screen.getByTestId('historical-demo')).toHaveTextContent('false');
+  });
   it('serves the snapshot first and subscribes to the four config docs', () => {
     render(
       <EventConfigProvider>

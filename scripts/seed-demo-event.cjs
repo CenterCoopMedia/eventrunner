@@ -4,12 +4,10 @@
 /**
  * Seed the public demo instance (spec §1.5, §5.4; milestone issue #35).
  *
- * The demo is a fictional three-day event: made-up organizer, made-up
- * venue, placeholder speakers and sponsors, sessions across all three days.
- * It exists so someone can look at a working deployment without a client's
- * data being the thing they are looking at — which is also why nothing here
- * is real (§5.4: no real names, cities, logos, or copy, in seeds, fixtures,
- * tests, or the demo instance).
+ * The demo is an explicitly approved public historical NC Local mock-up.
+ * It uses selected published sessions and affiliations, no attendee data,
+ * no private contacts and no live registration or email actions. It does
+ * not import a client deployment or imply organizational endorsement.
  *
  * The fixture lives in `scripts/lib/demo-event.cjs` and is shared with
  * `generate-content.cjs --demo`, so the demo instance and the committed
@@ -40,8 +38,11 @@
 
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { demoEvent } = require('./lib/demo-event.cjs');
-const { writeConfigDocs, seedCollection } = require('./lib/write.cjs');
-const { seedDemoSpeakers } = require('./lib/demo-speakers.cjs');
+const { writeConfigDocs, seedCollection, removeObsoleteSeeds } = require('./lib/write.cjs');
+const { seedDemoSpeakers, removeObsoleteDemoSpeakers } = require('./lib/demo-speakers.cjs');
+// IDs emitted by the superseded Harborlight fixture on base-main. This
+// explicit migration never sweeps operator-created or unrelated seed IDs.
+const SUPERSEDED_DEMO_IDS = require('./lib/superseded-demo-ids.json');
 
 const FLAGS = ['dry-run', 'force', 'i-know-this-is-not-a-demo-project', 'help'];
 
@@ -72,7 +73,7 @@ function usage() {
     'Usage: node scripts/seed-demo-event.cjs [--dry-run] [--force]',
     '',
     '  --dry-run   report every write without performing it',
-    '  --force     refresh config documents that already exist',
+    '  --force     refresh existing config and retire superseded demo seeds',
     '  --i-know-this-is-not-a-demo-project',
     '              allow a project id that does not contain "demo"',
   ].join('\n');
@@ -129,6 +130,23 @@ async function seedDemo({ db, store, args, now = Date.now }) {
     `  speakers          ${speakerWrites} ${dryRun ? 'planned' : 'written'}, ` +
     `${speakerResult.skipped.length} left alone`,
   );
+
+  // Retire only after the replacement config, CMS and speakers succeeded.
+  // A plain rerun preserves old config, so retirement requires --force.
+  if (force || dryRun) {
+    if (dryRun && !force) console.log('  Retirement preview: records --force would retire.');
+    let plannedSessionRemovals = [];
+    for (const [collection, docIds] of Object.entries(SUPERSEDED_DEMO_IDS)) {
+      const result = collection === 'speakers'
+        ? await removeObsoleteDemoSpeakers({ db, docIds, dryRun, plannedSessionRemovals })
+        : await removeObsoleteSeeds({ db, store, collection, docIds, dryRun });
+      if (dryRun && collection === 'cmsSchedule') plannedSessionRemovals = result.removed;
+      console.log(`  ${collection.padEnd(17)} ${result.removed.length} ${dryRun ? 'planned removals' : 'removed'}, ${result.kept.length} protected`);
+      for (const item of result.kept) console.log(`    kept ${item.id}: ${item.reason}`);
+    }
+  } else {
+    console.log('  Superseded record retirement skipped (re-run with --force).');
+  }
 
   console.log(
     '\nseed-demo-event: done. Regenerate the committed snapshot with:\n' +

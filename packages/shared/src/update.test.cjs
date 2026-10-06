@@ -36,13 +36,15 @@ test('a category is one short line: 1 to 24 characters once trimmed, with no con
     assert.equal(validUpdateCategory(value), false, JSON.stringify(value));
   }
 });
-test('the demo posts carry valid categories, and exactly one is featured and it is not pinned', () => {
+test('the historical demo note carries a valid category and makes no featured or pinned claim', () => {
   const categorised = updates.filter((update) => update.category !== undefined);
   assert.ok(categorised.length >= 1);
   for (const update of categorised) assert.equal(validUpdateCategory(update.category), true, update.id);
   const featured = updates.filter((update) => update.featured === true);
-  assert.equal(featured.length, 1);
-  assert.equal(featured[0].pinned, false);
+  assert.equal(featured.length, 0);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].pinned, false);
+  assert.match(updates[0].body, /Demo-authored historical note/);
   for (const update of updates) {
     if ('featured' in update) assert.equal(typeof update.featured, 'boolean', update.id);
   }

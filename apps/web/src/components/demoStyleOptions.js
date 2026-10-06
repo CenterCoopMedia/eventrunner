@@ -7,9 +7,9 @@ const STYLE_COPY = Object.freeze({
       'Formal layout with clear hierarchy, restrained decoration, and Public Sans body text.',
   }),
   newsroom: Object.freeze({
-    label: 'Newsroom',
+    label: 'NC Local',
     summary:
-      'Modern editorial layout with strong section rules, compact data, and restrained color.',
+      'NC Local editorial style: Teal, lavender, warm surfaces and broad serif headlines.',
   }),
   broadsheet: Object.freeze({
     label: 'Broadsheet',

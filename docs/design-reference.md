@@ -137,7 +137,7 @@ There is no fifth role. Zine's handwritten callout runs on a component token, wh
 
 **The scale is fluid and has eight steps** — nameplate, h1, h2, h3, lead, body, caption, folio — and each step carries its own size, line height, and tracking together. Never pick a size without its leading.
 
-**The bundled sets** are the only faces a site can use, and they are self-hosted. No page on a client site asks an external font service for anything, ever: Source Serif 4, Source Sans 3, Caveat, Libre Caslon Display, Libre Caslon Text, Libre Baskerville, Spectral, Fraunces, Newsreader, IBM Plex Sans, IBM Plex Mono, Archivo Condensed, Merriweather, Public Sans, Karrik, Bagnard, Avara, Fragment Mono, Besley, Vollkorn, Overpass, Overpass Mono, Libre Franklin.
+**The bundled sets** are the only faces a site can use, and they are self-hosted. No page on a client site asks an external font service for anything, ever: Source Serif 4, Source Sans 3, Caveat, Libre Caslon Display, Libre Caslon Text, Libre Baskerville, Spectral, Fraunces, Newsreader, IBM Plex Sans, IBM Plex Mono, Archivo Condensed, Merriweather, Public Sans, Karrik, Bagnard, Avara, Fragment Mono, Besley, Vollkorn, Overpass, Overpass Mono, Libre Franklin, Cabin.
 
 **Heading-face options** are the sanctioned way to change type: Each style offers three, and they are chosen to still work with that style's body face. Naming a role outright is the override path, and it is where a pairing can go wrong.
 

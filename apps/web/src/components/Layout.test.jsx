@@ -1302,3 +1302,45 @@ describe('the footer change request control', () => {
     expect(feedback.compareDocumentPosition(request) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('deployed historical demo shell', () => {
+  it.each([true, false])('gates the multi-role Account menu when historicalDemo is %s', async (historicalDemo) => {
+    const { container } = renderShell({}, {
+      event: { ...FIXTURE_EVENT, historicalDemo },
+      user: { uid: 'multi-role-demo' },
+      profile: { registrationStatus: 'approved', speakerId: 'rae-okonkwo' },
+    });
+    await waitFor(() => expect(container.querySelector('nav[aria-label="Main"] > ul > li:last-child > a'))
+      .toHaveAttribute('href', '/speaker/dashboard'));
+    if (historicalDemo) {
+      // The menu is a lazy chunk. Load it first so a missing gate would
+      // render the menu before these negative checks run.
+      await act(async () => {
+        await import('./AccountMenu.jsx');
+      });
+      expect(screen.queryByText('Account', { exact: true })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: 'Account views', hidden: true })).not.toBeInTheDocument();
+    } else {
+      expect(await screen.findByText('Account', { exact: true })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
+    }
+  });
+
+  it('hides account and support actions in a normal build', () => {
+    renderShell({}, {
+      event: { ...FIXTURE_EVENT, historicalDemo: true, legal: { operatorName: 'Historical demo', supportEmail: 'support@example.test' } },
+    });
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Contact support' })).not.toBeInTheDocument();
+    expect(screen.getByText('Operated by Historical demo')).toBeInTheDocument();
+  });
+
+  it('keeps ordinary client account and support actions available', () => {
+    renderShell({}, {
+      event: { ...FIXTURE_EVENT, legal: { supportEmail: 'support@example.test' } },
+    });
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', 'mailto:support@example.test');
+  });
+});

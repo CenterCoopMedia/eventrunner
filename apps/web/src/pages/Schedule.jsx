@@ -10,6 +10,7 @@
 // link (/schedule/:sessionId, SessionDetail.jsx).
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { pageHeading } from 'shared/page';
 import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -22,6 +23,7 @@ import LoadingState from '../components/LoadingState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import EventHero from '../components/EventHero.jsx';
 import { demoHero } from '../lib/demoHero.js';
+import { IS_DEMO } from '../lib/demoMode.js';
 import { buildNameplate } from '../components/editorial/Nameplate.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
@@ -86,7 +88,8 @@ export function sortSessions(sessions) {
 
 export default function Schedule() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { scheduleData, speakers, loading, getSectionBlocks } = useContent();
+  const { scheduleData, speakers, loading, getSectionBlocks, getPage } = useContent();
+  const page = getPage?.('schedule');
   const { user } = useAuth();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
@@ -322,7 +325,12 @@ export default function Schedule() {
       />
       <header className="schedule-page-header">
         <div>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">Schedule</h1>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">{pageHeading(page) || 'Schedule'}</h1>
+          {IS_DEMO ? (
+            <p className="mt-2xs max-w-prose text-body text-text-secondary">
+              Selected historical program. Tracks and format chips are demo groupings.
+            </p>
+          ) : null}
           {eventZoneLabel ? (
             <p className="mt-2xs font-data text-caption text-text-secondary">
               All times are shown in {eventZoneLabel}.

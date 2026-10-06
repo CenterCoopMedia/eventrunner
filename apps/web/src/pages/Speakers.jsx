@@ -18,6 +18,7 @@ import SystemPage from '../components/SystemPage.jsx';
 import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
+import { IS_DEMO } from '../lib/demoMode.js';
 
 export default function Speakers() {
   const { features } = useEventConfig();
@@ -105,11 +106,11 @@ export default function Speakers() {
                     {/* The portrait is decorative here: the name is right
                         under it and links to the same place, so alt text
                         would be the name said twice to a screen reader. */}
-                    <div className="portrait-shelf__frame">
+                    {speaker.headshotPath || !IS_DEMO ? <div className="portrait-shelf__frame">
                       {speaker.headshotPath ? (
                         <AssetImage path={speaker.headshotPath} alt="" className="" />
                       ) : null}
-                    </div>
+                    </div> : null}
                     <div className={arrangement === 'grid' ? 'mt-xs' : 'mt-xs sm:mt-0'}>
                       <h2 className="font-heading text-h3 font-semibold text-text-primary">
                         <Link to={href} className="hover:underline">

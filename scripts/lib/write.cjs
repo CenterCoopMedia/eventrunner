@@ -183,23 +183,23 @@ async function removeObsoleteSeeds({ db, store, collection, docIds, dryRun = fal
   const kept = [];
   const draftCollection = draftCollectionFor(collection);
   for (const id of docIds) {
-    const [snap, draftSnap] = await Promise.all([
-      db.collection(collection).doc(id).get(),
-      db.collection(draftCollection).doc(id).get(),
-    ]);
-    const existing = snap.exists ? snap.data() : null;
-    const draft = draftSnap.exists ? draftSnap.data() : null;
-    // Neither revision exists: a site that never had it, which is every
-    // site initialized after the block was dropped. Nothing to report.
-    if (existing == null && draft == null) continue;
-    const decision = decideSeedWrite(existing, { draft });
-    if (decision.action === 'skip') {
-      kept.push({ id, reason: decision.reason });
-      continue;
-    }
-    removed.push(id);
-    if (dryRun) continue;
-    await store.deleteBoth({ db, collection, docId: id });
+    // Ownership reads and both deletes share a transaction, so an operator
+    // edit makes Firestore retry the decision before anything is removed.
+    const result = await db.runTransaction(async (tx) => {
+      const [snap, draftSnap] = await tx.getAll(
+        db.collection(collection).doc(id),
+        db.collection(draftCollection).doc(id),
+      );
+      const existing = snap.exists ? snap.data() : null;
+      const draft = draftSnap.exists ? draftSnap.data() : null;
+      if (existing == null && draft == null) return null;
+      const decision = decideSeedWrite(existing, { draft });
+      if (decision.action === 'skip') return { reason: decision.reason };
+      if (!dryRun) await store.deleteBoth({ db, tx, collection, docId: id });
+      return { removed: true };
+    });
+    if (result?.removed) removed.push(id);
+    else if (result) kept.push({ id, reason: result.reason });
   }
   return { removed, kept };
 }

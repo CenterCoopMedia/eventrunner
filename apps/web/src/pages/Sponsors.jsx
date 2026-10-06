@@ -9,6 +9,7 @@
 // mark size are all documented there. This page is now what it always was
 // around it: the route, the feature gate, the heading, and the empty state.
 import { Link } from 'react-router-dom';
+import { pageHeading } from 'shared/page';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -18,7 +19,8 @@ import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Sponsors() {
   const { features } = useEventConfig();
-  const { organizationsData } = useContent();
+  const { organizationsData, getPage } = useContent();
+  const pageTitle = pageHeading(getPage?.('sponsors')) || 'Sponsors';
   const visible = visibleOrganizations(organizationsData);
 
   if (!features.sponsors) {
@@ -39,7 +41,7 @@ export default function Sponsors() {
     <SystemPage pageId="sponsors">
       {({ arrangement }) => (
         <>
-          <h1 className="font-heading text-h1 font-semibold text-text-primary">Sponsors</h1>
+          <h1 className="font-heading text-h1 font-semibold text-text-primary">{pageTitle}</h1>
           {visible.length === 0 ? (
             <div className="mt-lg">
               <EmptyState

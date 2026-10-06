@@ -60,6 +60,13 @@ test('findFindings reports blocked phrases in string literals', () => {
   );
 });
 
+test('the exact approved historical title is preserved only in its source fixture', () => {
+  const source = "const title = 'When Journalism Becomes Transformative, Not Transactional.';";
+  assert.deepEqual(findFindings(source, 'scripts/lib/demo-event.cjs'), []);
+  assert.equal(findFindings(source, 'apps/web/src/example.js').length, 1);
+  assert.equal(findFindings("const title = 'A transformative event.';", 'scripts/lib/demo-event.cjs').length, 1);
+});
+
 test('operational unlock instructions are allowed while promotion remains blocked', () => {
   const source = [
     "const action = 'Unlock the account.';",

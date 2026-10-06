@@ -14,10 +14,12 @@
 // history page, in a signed-in browser, reads the publish back as a
 // version with its time, its account, and the one field it changed.
 import { test, expect } from '@playwright/test';
+import seed from '../scripts/lib/seed.cjs';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
 import { RETRY_DELAY_MS } from '../apps/web/src/lib/retrySubscription.js';
 
 const CONTENT_TIMEOUT_MS = RETRY_DELAY_MS + 15_000;
+const { defaultPages } = seed;
 
 test.describe.serial('CMS edit -> publish -> public visibility', () => {
   let newSubtitle;
@@ -350,10 +352,25 @@ test.describe.serial('organizations: admin editor -> publish -> sponsor pages', 
     expect((await draftRef.get()).data()).toEqual(before);
   });
 
-  test('the sponsors page shows the demo sponsorship packages (issue 193)', async ({ page }) => {
-    await page.goto('/sponsors');
-    const packages = page.getByRole('region', { name: 'Sponsorship packages', exact: true });
-    await expect(packages.getByRole('heading', { level: 3 })).toHaveText(['Presenting', 'Supporting', 'Partner']);
+  test('the normal client sponsors page can show synthetic test packages (issue 193)', async ({ page }) => {
+    const db = adminDb();
+    const pageRef = db.doc('cmsPages/sponsors');
+    const originalPage = (await pageRef.get()).data();
+    const section = defaultPages().find((entry) => entry.id === 'sponsors').sections.find((entry) => entry.id === 'sponsor_packages');
+    const names = ['Presenting', 'Supporting', 'Partner'];
+    const refs = names.map((_, index) => db.doc(`cmsContent/sponsor_packages__e2e-${index}`));
+    try {
+      await pageRef.set({ ...originalPage, sections: [...originalPage.sections, section] });
+      for (const [index, ref] of refs.entries()) {
+        await ref.set({ section: 'sponsor_packages', field: `e2e-${index}`, blockType: 'sponsor_package', name: names[index], price: 'Test only', benefits: '<p>Synthetic emulator package.</p>', visible: true, order: index });
+      }
+      await page.goto('/sponsors');
+      const packages = page.getByRole('region', { name: 'Sponsorship packages', exact: true });
+      await expect(packages.getByRole('heading', { level: 3 })).toHaveText(names);
+    } finally {
+      await Promise.all(refs.map((ref) => ref.delete()));
+      await pageRef.set(originalPage);
+    }
   });
 });
 

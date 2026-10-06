@@ -6,7 +6,14 @@ import ProfileContext from '../contexts/ProfileContext.jsx';
 import useAccountViews from '../hooks/useAccountViews.js';
 import AccountMenu from './AccountMenu.jsx';
 import AdminEntryLink from './AdminEntryLink.jsx';
+import RoleSwitcher from './RoleSwitcher.jsx';
 import { saveSessionView } from '../lib/accountViews.js';
+
+const demo = vi.hoisted(() => ({ static: false, event: {} }));
+vi.mock('../lib/demoMode.js', () => ({ get IS_DEMO() { return demo.static; } }));
+vi.mock('../contexts/EventConfigContext.jsx', () => ({
+  useEventConfig: () => ({ eventConfig: demo.event }),
+}));
 
 const user = {uid:'fixture-340', getIdToken: async () => 'fixture-token'};
 function Account() {
@@ -25,8 +32,32 @@ function renderAccount({registered=true, speaker=false, admin=false, path='/dash
   </MemoryRouter>);
 }
 beforeEach(() => {
+  demo.static = false;
+  demo.event = {};
   sessionStorage.clear();
   vi.stubGlobal('fetch', vi.fn(async () => ({ok:true, json:async () => ({speaker:{status:'approved'}})})));
+});
+
+describe('read-only demo account entry points', () => {
+  it.each(['static', 'historical'])('hides role links and admin entry for a %s demo', (mode) => {
+    demo.static = mode === 'static';
+    demo.event = { historicalDemo: mode === 'historical' };
+    const account = {
+      views: [
+        { id: 'attendee', label: 'Attendee', to: '/dashboard' },
+        { id: 'admin', label: 'Admin', to: '/admin' },
+      ],
+      current: { id: 'attendee', label: 'Attendee' },
+      select: vi.fn(),
+    };
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <RoleSwitcher account={account} />
+      <AdminEntryLink account={account} />
+    </MemoryRouter>);
+    expect(screen.queryByRole('navigation', { name: 'Account views' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Manage event' })).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('link', { hidden: true })).toHaveLength(0);
+  });
 });
 
 describe('account visibility rules (issue 340)', () => {

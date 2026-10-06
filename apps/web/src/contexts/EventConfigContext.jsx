@@ -84,7 +84,16 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
   const effectiveDemoTheme = useMemo(
     () =>
       demoMode && demoTheme
-        ? { ...snapshotTheme, ...demoTheme }
+        ? {
+            ...snapshotTheme,
+            // NC Local's deployment overrides belong only to its demo style.
+            // Comparing another preset must resolve that preset's own identity.
+            ...(demoTheme.preset === snapshotTheme.preset ? {} : {
+              fonts: {}, tokens: {}, radius: undefined,
+              texture: undefined, density: undefined,
+            }),
+            ...demoTheme,
+          }
         : null,
     [demoMode, demoTheme],
   );
@@ -102,7 +111,11 @@ export function EventConfigProvider({ children, demoMode = IS_DEMO }) {
       // that includes a nested object (e.g. `logos: {...}`) is expected to
       // include it in full, since this merge does not descend into it.
       eventConfig: overlay.event
-        ? { ...snapshotEventConfig, ...overlay.event }
+        ? {
+            ...snapshotEventConfig, ...overlay.event,
+            // An older client config must not inherit the demo's account gate.
+            historicalDemo: overlay.event.historicalDemo === true,
+          }
         : snapshotEventConfig,
       // config/features is the one doc where an omitted key is not "keep the
       // snapshot value" — the backend contract is that an omitted flag means

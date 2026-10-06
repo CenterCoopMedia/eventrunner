@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
+import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { quietActionClass } from './controlClasses.js';
 
 export default function RoleSwitcher({ account, linkClass = quietActionClass, labelClass = 'text-caption', onNavigate }) {
-  if (account.views.length < 2) return null;
+  const { eventConfig } = useEventConfig();
+  if (isReadOnlyDemo(eventConfig) || account.views.length < 2) return null;
   return (
     <nav aria-label="Account views" className="w-full">
       <p className={`mb-2xs ${labelClass}`}>View as: {account.current?.label}</p>

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { emitAll, emitScheduleData, internals } = require('./emit.cjs');
+const { emitAll, emitScheduleData, emitEventConfig, internals } = require('./emit.cjs');
 const { demoSnapshot, demoEvent } = require('./demo-event.cjs');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { organizationSlugError, validateOrganizationFields } = require('../../functions/src/cms/organizations.cjs');
@@ -126,18 +126,19 @@ test('theme.css carries the palette as RGB triples, and the fonts it names ship 
   }
 });
 
-test('the demo fixture is a three-day event with content on every day', () => {
+test('the historical demo is one Friday with eight selected sessions and 25 speakers', () => {
   const demo = demoEvent();
-  assert.equal(demo.config.event.days.length, 3);
+  assert.deepEqual(demo.config.event.days, [{ id: 'day-1', label: 'Friday', date: '2026-03-27', startTime: '08:00', endTime: '16:30' }]);
   const dayIds = new Set(demo.sessions.map((s) => s.dayId));
   for (const day of demo.config.event.days) {
     assert.ok(dayIds.has(day.id), `no demo session on ${day.id}`);
   }
-  assert.ok(demo.speakers.length >= 3);
-  assert.ok(demo.organizations.length >= 3);
+  assert.equal(demo.sessions.filter((session) => session.type !== 'break').length, 8);
+  assert.equal(demo.speakers.length, 25);
+  assert.equal(demo.organizations.length, 4);
 });
 
-test('every demo page is a valid page doc, and the demo names stay fictional', () => {
+test('every demo page is valid and historical public names match the approved selection', () => {
   const demo = demoEvent();
   for (const page of demo.pages) {
     const { seeded, ...contract } = page;
@@ -152,27 +153,21 @@ test('every demo page is a valid page doc, and the demo names stay fictional', (
     demo.config.event.legal.operatorName,
   ];
   assert.deepEqual(names, [
-    'Marisol Reyes',
-    'Devon Achebe',
-    'Priya Natarajan',
-    'Lucia Bennett',
-    'Omar Farouk',
-    'June Park',
-    'Elena Santos',
-    'Theo Brooks',
-    'Amara Okafor',
-    'Samir Das',
-    'Nora Chen',
-    'Mateo Rivera',
-    'Beacon Community Fund',
-    'Lighthouse Press Trust',
-    'Tidewater Media Collective',
-    'Openfield Tools',
-    'Civic Thread Studio',
-    'Common Ground Coffee',
-    'Harborlight Media Summit',
-    'Harborlight Cooperative',
+    'Alex Mahadevan', 'Lisa Sorg', 'Dr. Siobahn Day Grady', 'Ricky Leung',
+    'Brooks Fuller', 'Tyler Daye', 'Kyle Ingram', 'Olivia McCall',
+    'Korie Dean', 'Rachel Keith', 'Corinne Saunders', 'Beth Soja',
+    'Ely Portillo', 'Patricia Ortiz', 'Alvaro Gurdián', 'Brandon Kingdollar', 'Christina Piaia',
+    'Antionette Kerr', 'Derwin Montgomery', 'Aminah Ghaffar-Fulp',
+    'Iain Christie', 'Alicia Bell', 'Chris Rudisill', 'Audrey Nielsen', 'Diara J. Townes',
+    'NC Local', 'NC Open Government Coalition', 'WUNC', 'The Assembly',
+    'NC News & Information Summit', 'EventRunner historical demo',
   ]);
+  assert.equal(demo.config.features.attendeeDirectory, false);
+  assert.equal(demo.config.event.registration.externalUrl, null);
+  for (const speaker of demo.speakers) {
+    assert.equal(speaker.email, null);
+    assert.equal(speaker.headshotPath, null);
+  }
 });
 
 test('every demo organization passes the field checks an admin save applies (issue 192)', () => {
@@ -189,18 +184,18 @@ test('every demo organization passes the field checks an admin save applies (iss
   }
 });
 
-test('every demo timeline entry passes the field checks an admin save applies (issue 194)', () => {
-  // Seeded, never saved through the editor, so nothing else would notice a
-  // fixture edition the timeline seam would refuse.
-  const { timeline } = demoEvent();
-  assert.ok(timeline.length >= 2);
+test('the historical demo invents no chronology and synthetic timeline records still validate (issue 194)', () => {
+  assert.deepEqual(demoEvent().timeline, []);
+  const timeline = [
+    { id: 'test-first', year: 2024, title: 'First synthetic edition', description: 'Test fixture only.', visible: true },
+    { id: 'test-second', year: 2025, title: 'Second synthetic edition', description: null, visible: true },
+  ];
   for (const entry of timeline) {
     const { id, visible, ...fields } = entry;
     assert.equal(visible, true, `${id} is shown`);
     const verdict = validateTimelineFields(fields, fields);
     assert.equal(verdict.ok, true, `${id}: ${JSON.stringify(verdict.errors)}`);
     assert.deepEqual(verdict.fields, fields, `${id} is stored exactly as the seam would store it`);
-    assert.match(entry.description, /This edition is fictional\.$/);
   }
 });
 
@@ -220,23 +215,20 @@ test('the timeline snapshot lists the published entries oldest first, without bo
   assert.match(timelineData, /export default timelineData;/);
 });
 
-test('the demo sponsors page draws three packages, one per demo tier (issue 193)', () => {
+test('the historical partners page preserves roles without offering sponsorship packages (issue 193)', () => {
   const demo = demoEvent();
   const sponsors = demo.pages.find((page) => page.id === 'sponsors');
   const { seeded, ...contract } = sponsors;
   assert.equal(seeded, true);
   assert.equal(validatePageDoc(contract).ok, true);
   const packages = demo.content.filter((doc) => doc.section === 'sponsor_packages');
-  assert.deepEqual(packages.map((doc) => doc.name), ['Presenting', 'Supporting', 'Partner']);
-  const tiers = new Set(demo.organizations.map((organization) => organization.tier.toLowerCase()));
-  for (const doc of packages) {
-    assert.equal(doc.blockType, 'sponsor_package');
-    assert.ok(tiers.has(doc.name.toLowerCase()), `${doc.name} is a demo tier`);
-    assert.match(doc.benefits, /illustrative/);
-    assert.match(doc.benefits, /Nothing here is on offer/);
-    const copy = `${doc.name} ${doc.price} ${doc.benefits.replace(/<[^>]*>/g, '')}`;
-    assert.ok(copy.length < 200, `${doc.id} keeps its copy under 200 characters (${copy.length})`);
-  }
+  assert.deepEqual(packages, []);
+  assert.equal(sponsors.label, 'Partners');
+  assert.equal(sponsors.sections.some((section) => section.id === 'sponsor_packages'), false);
+  assert.deepEqual(demo.organizations.map(({ name, tier }) => [name, tier]), [
+    ['NC Local', 'Co-producers'], ['NC Open Government Coalition', 'Co-producers'],
+    ['WUNC', 'Lunch broadcast participant'], ['The Assembly', 'Afterparty sponsor'],
+  ]);
 });
 
 test('demo speakers are canonical documents, and the bundle ships only their projection', () => {
@@ -296,7 +288,8 @@ test('the furnished demo schedule keeps its count and references consistent', ()
   const speakers = new Set(demo.speakers.map((speaker) => speaker.id));
   const places = new Set(demo.config.event.venue.places.map((place) => place.id));
   const count = demo.sessions.filter((session) => session.type !== 'break' && !session.parentId).length;
-  assert.equal(Number(demo.content.find((doc) => doc.id === 'stats__sessions').value), count);
+  assert.equal(count, 8);
+  assert.equal(demo.content.some((doc) => doc.section === 'stats'), false, 'no unsupported historical statistics');
   for (const session of demo.sessions) {
     const day = demo.config.event.days.find((entry) => entry.id === session.dayId);
     assert.ok(day, session.id);
@@ -314,5 +307,16 @@ test('the furnished demo schedule keeps its count and references consistent', ()
   for (const speaker of demo.speakers) {
     assert.ok(demo.sessions.some((session) => session.speakerIds.includes(speaker.id)), speaker.id);
   }
-  assert.match(demo.config.event.venue.map.alt, /not the museum floor plan/);
+  assert.equal(demo.config.event.venue.map, null, 'no inferred historical floor plan');
+});
+
+test('the theme snapshot preserves deployment palette and density overrides for runtime resolution', () => {
+  const { demoSnapshot } = require('./demo-event.cjs');
+  const snapshot = demoSnapshot();
+  const js = emitEventConfig(snapshot);
+  const vm = require('node:vm');
+  const context = {};
+  vm.runInNewContext(js.replace(/export const /g, 'var ').replace(/export default eventConfig;/, ''), context);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.theme.tokens)), snapshot.theme.tokens);
+  assert.equal(context.theme.density, 'comfortable');
 });

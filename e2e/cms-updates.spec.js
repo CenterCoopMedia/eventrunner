@@ -21,7 +21,7 @@ import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './help
 
 // A post the demo seed publishes (scripts/lib/demo-updates.json). Waiting
 // for it proves the public page's live listener has reported.
-const SEEDED_TITLE = 'The three-day program is ready';
+const SEEDED_TITLE = 'Explore the historical 2026 program';
 // Twenty-four characters, the most a category takes (shared/update).
 const CATEGORY = 'Travel and arrival notes';
 
