@@ -346,7 +346,7 @@ export default function Schedule() {
         dates={buildNameplate(eventConfig).dates}
         place={buildNameplate(eventConfig).edition}
         tagline={eventConfig.tagline}
-        image={demoHero(theme) ?? getSectionBlocks?.('hero')?.find((block) => block.blockType === 'image')}
+        image={demoHero(theme, { compact: true }) ?? getSectionBlocks?.('hero')?.find((block) => block.blockType === 'image')}
       />
       <header className="schedule-page-header">
         <div>
