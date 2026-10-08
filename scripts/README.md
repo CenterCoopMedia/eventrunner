@@ -246,7 +246,7 @@ existing "only when configured" behavior doing the right thing with what this pa
 Builds the public click-through demo and syncs it into `docs/demo/`, which GitHub Pages serves at
 `https://centercoopmedia.github.io/eventrunner/demo/`. The one script here that touches no
 Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base /eventrunner/demo/`, run
-against the committed synthetic snapshot, followed by `write-site-files.cjs` writing a real
+against the committed historical demo snapshot, followed by `write-site-files.cjs` writing a real
 sitemap.xml/robots.txt/manifest into the same output (public URL: GitHub Pages' own origin plus
 `--base`) — so the published demo carries real ones, not only the neutral fallback Vite copies from
 `apps/web/public/manifest.webmanifest`.

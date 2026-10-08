@@ -164,6 +164,46 @@ test('the landing page links into the documentation site', () => {
   );
 });
 
+// ----------------------------------------------------------- demo entry points
+
+test('demo entry points distinguish the historical preview and hosted admin/client demo', () => {
+  const entries = [
+    ['landing', fs.readFileSync(path.join(ROOT, 'docs/index.html'), 'utf8')],
+    ['README', fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8')],
+    ['FAQ', fs.readFileSync(path.join(ROOT, 'docs/handbook/faq.md'), 'utf8')],
+    ['generated overview', site.files.get('overview/index.html')],
+    ['generated FAQ', site.files.get('handbook/faq/index.html')],
+  ];
+  for (const [name, content] of entries) {
+    const text = textOf(content).replace(/\s+/g, ' ');
+    assert.match(text, /NC Local/, `${name}: identify the historical preview`);
+    assert.match(text, /selected historical program/i, `${name}: do not promise the full agenda`);
+    assert.match(text, /eight named sessions/i, `${name}: identify the program selection`);
+    assert.match(text, /25 public speakers/i, `${name}: identify the historical speaker scope`);
+    assert.match(text, /has no admin panel/i, `${name}: the static preview has no admin access`);
+    assert.match(text, /static visitor preview/i, `${name}: label the static experience`);
+    assert.match(text, /hosted admin\/client demo/i, `${name}: label the separate hosted experience`);
+    assert.match(text, /admin (?:screens |access )?require(?:s)? an authorized account/i, `${name}: explain admin access`);
+    assert.match(text, /(?:sign-in|registration).*disabled/i, `${name}: explain disabled interactions`);
+    assert.match(content, /https:\/\/eventrunner-demo\.web\.app\//, `${name}: link the hosted origin`);
+    assert.match(content, /https:\/\/eventrunner-demo\.web\.app\/admin/, `${name}: link the hosted admin route`);
+    assert.doesNotMatch(text, /Open a fictional event site|All data is synthetic|Not up yet|pending the operator.s deploy/i,
+      `${name}: obsolete demo guidance`);
+  }
+});
+
+test('landing and README link to the same canonical static preview and specimen', () => {
+  const origin = 'https://centercoopmedia.github.io/eventrunner/';
+  const landing = fs.readFileSync(path.join(ROOT, 'docs/index.html'), 'utf8');
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+  const landingLinks = [...landing.matchAll(/href="([^"]+)"/g)].map((match) => new URL(match[1], origin).href);
+  const readmeLinks = [...readme.matchAll(/\]\((https:\/\/[^)]+)\)/g)].map((match) => match[1]);
+  for (const href of [`${origin}demo/`, `${origin}demo/#/specimen`, 'https://eventrunner-demo.web.app/', 'https://eventrunner-demo.web.app/admin']) {
+    assert.ok(landingLinks.includes(href), `landing is missing ${href}`);
+    assert.ok(readmeLinks.includes(href), `README is missing ${href}`);
+  }
+});
+
 // -------------------------------------------------------------- page shell
 
 test('every page carries the required metadata', () => {
