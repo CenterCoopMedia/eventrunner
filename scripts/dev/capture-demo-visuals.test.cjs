@@ -169,6 +169,19 @@ test('interaction captures require the requested disclosure or genuine no-result
   assert.equal(validateCapture({ ...shot, state: 'default' }, noResults).length, 1);
 });
 
+test('after-preview evidence requires a separate in-flow exit row before the masthead', async () => {
+  const { validateCapture } = await load();
+  const shot = { source: 'after', width: 485, height: 900, preset: 'newsroom', mode: 'light', presentation: 'preview', route: 'program' };
+  const metrics = { viewport: { width: 485, height: 900 }, theme: 'newsroom', mode: 'light', presentation: 'preview', nativeFullscreen: false, firstSession: { y: 710 }, previewControls: { bottom: 61 }, masthead: { y: 61 }, exitPreviewPosition: 'static' };
+  assert.deepEqual(validateCapture(shot, metrics), []);
+  assert.equal(validateCapture(shot, { ...metrics, previewControls: null }).length, 1);
+  assert.equal(validateCapture(shot, { ...metrics, exitPreviewPosition: 'fixed' }).length, 1);
+  assert.equal(validateCapture(shot, { ...metrics, previewControls: { bottom: 80 } }).length, 1);
+  // A baseline may show the old overlap honestly; only the proposed build
+  // must meet the new layout contract.
+  assert.deepEqual(validateCapture({ ...shot, source: 'before' }, { ...metrics, previewControls: null, exitPreviewPosition: 'fixed' }), []);
+});
+
 test('CI captures after emulator journeys, uploads only public evidence for seven days, and preserves the sandbox', () => {
   const root = path.resolve(__dirname, '../..');
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');

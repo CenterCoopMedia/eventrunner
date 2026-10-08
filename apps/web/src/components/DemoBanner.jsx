@@ -60,8 +60,6 @@ const selectClass =
   'px-sm font-data text-caption text-text-primary';
 
 const bandActionClass = `${quietActionClass} justify-center`;
-const exitPreviewClass =
-  `${quietActionClass} no-print fixed bottom-md start-md z-40 bg-surface`;
 
 function attemptFullscreenCall(target, method) {
   if (typeof method !== 'function') return null;
@@ -176,14 +174,16 @@ export function DemoBannerContent({
 
   if (previewing) {
     return (
-      <button
-        ref={exitButtonRef}
-        type="button"
-        className={exitPreviewClass}
-        onClick={exitPreview}
+      <section
+        aria-label="Preview controls"
+        className="no-print border-b-hairline border-b-rule-hairline bg-surface text-text-primary"
       >
-        Exit preview
-      </button>
+        <div className="stage py-xs">
+          <button ref={exitButtonRef} type="button" className={quietActionClass} onClick={exitPreview}>
+            Exit preview
+          </button>
+        </div>
+      </section>
     );
   }
 

@@ -168,9 +168,13 @@ describe('DemoBannerContent', () => {
     expect(screen.queryByRole('note', { name: 'Demo controls' })).toBeNull();
     const exitButton = screen.getByRole('button', { name: 'Exit preview' });
     expect(exitButton).toHaveFocus();
-    expect(exitButton.className).toContain('fixed');
-    expect(exitButton.className).toContain('bottom-md');
-    expect(exitButton.className).toContain('start-md');
+    const previewControls = screen.getByRole('region', { name: 'Preview controls' });
+    expect(previewControls).toContainElement(exitButton);
+    expect(previewControls).toHaveClass('no-print');
+    expect(exitButton).toHaveClass('touch-target');
+    for (const element of [exitButton, exitButton.parentElement, previewControls]) {
+      expect(element.className).not.toMatch(/\b(fixed|absolute|sticky|bottom-md|start-md)\b/);
+    }
 
     pageDocument.fullscreenElement = null;
     act(() => pageDocument.dispatchEvent(new Event('fullscreenchange')));

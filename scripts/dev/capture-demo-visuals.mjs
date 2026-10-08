@@ -246,6 +246,7 @@ async function measurePage(page) {
     }));
     const firstSession = box(doc.querySelector('.session-block, .schedule-grid__entry'));
     const settings = [...doc.querySelectorAll('button')].find((button) => button.textContent.trim() === 'Demo settings');
+    const exit = [...doc.querySelectorAll('button')].find((button) => button.textContent.trim() === 'Exit preview');
     return {
       viewport, theme: doc.documentElement.dataset.theme, mode: doc.documentElement.dataset.mode,
       presentation: [...doc.querySelectorAll('button')].some((button) => button.textContent.trim() === 'Exit preview') ? 'preview' : 'ordinary',
@@ -262,6 +263,9 @@ async function measurePage(page) {
           : doc.querySelector('.schedule-screen') ? 'empty' : null,
       firstSessionInViewport: firstSession ? firstSession.y < viewport.height && firstSession.bottom > 0 : null,
       hero: box(doc.querySelector('.event-hero')),
+      previewControls: box(doc.querySelector('[aria-label="Preview controls"]')),
+      exitPreviewPosition: exit ? globalThis.getComputedStyle(exit).position : null,
+      masthead: box(doc.querySelector('.site-masthead__bar')),
       menu: box(doc.querySelector('.site-header-menu')),
       search: box(doc.querySelector('input[type="search"]')),
       searchValue: doc.querySelector('input[type="search"]')?.value || '',
@@ -284,6 +288,11 @@ export function validateCapture(shot, metrics) {
   if (metrics.theme !== shot.preset || metrics.mode !== shot.mode) errors.push('rendered preset or mode differs from requested display');
   if (metrics.presentation !== shot.presentation) errors.push('rendered preview state differs from requested state');
   if (metrics.nativeFullscreen) errors.push('native fullscreen changed the controlled capture');
+  if (shot.source === 'after' && shot.presentation === 'preview'
+    && (!metrics.previewControls || !metrics.masthead || metrics.exitPreviewPosition !== 'static'
+      || metrics.previewControls.bottom > metrics.masthead.y + 0.5)) {
+    errors.push('preview exit controls overlap the event content instead of occupying their own row');
+  }
   if (shot.route === 'program' && shot.state !== 'no-results' && !metrics.firstSession) errors.push('Program has no first session');
   const disclosure = { 'menu-open': 'menu', 'demo-settings-open': 'demoSettings', 'filters-open': 'filters' }[shot.state];
   if (disclosure && metrics.disclosures?.[disclosure] !== 'true') errors.push('requested disclosure is not expanded');
@@ -354,8 +363,17 @@ async function captureSource(browser, snapshot, out, manifest, saveManifest) {
             }
             await settlePage(page, shot);
             record.metrics = await measurePage(page);
-            record.errors = validateCapture(shot, record.metrics);
+            record.errors = validateCapture({ ...shot, source: snapshot.label }, record.metrics);
             await page.screenshot({ path: path.join(out, record.file), fullPage: false, animations: 'disabled' });
+            if (shot.presentation === 'preview') {
+              await page.keyboard.press('Escape');
+              await page.getByRole('button', { name: 'Preview full screen', exact: true }).waitFor();
+              await page.waitForFunction(() => globalThis.document.activeElement?.textContent.trim() === 'Preview full screen');
+              await page.getByRole('button', { name: 'Preview full screen', exact: true }).click();
+              await page.getByRole('button', { name: 'Exit preview', exact: true }).click();
+              await page.waitForFunction(() => globalThis.document.activeElement?.textContent.trim() === 'Preview full screen');
+              record.previewExitChecks = ['Escape', 'repeat entry', 'exit button', 'focus restoration'];
+            }
             record.captured = true;
           } catch (error) {
             record.errors = [...(record.errors || []), error.message];
