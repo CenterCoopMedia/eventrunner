@@ -96,6 +96,13 @@ export function captureUrl(origin, shot) {
   return `${origin}${BASE_PATH}?style=${shot.preset}&mode=${shot.mode}#/${shot.route === 'program' ? 'schedule' : ''}`;
 }
 
+/** A same-URL goto may be a same-document navigation. Discard the previous
+ * React tree first so independently named states never inherit disclosures. */
+export async function navigateOrdinaryCapture(page, origin, shot) {
+  await page.goto('about:blank');
+  await page.goto(captureUrl(origin, shot), { waitUntil: 'load' });
+}
+
 /** ls-tree is parsed before serving; symlinks and non-blob entries are refused. */
 export function parseTreeEntries(output) {
   const entries = new Map();
@@ -280,6 +287,9 @@ export function validateCapture(shot, metrics) {
   if (shot.route === 'program' && shot.state !== 'no-results' && !metrics.firstSession) errors.push('Program has no first session');
   const disclosure = { 'menu-open': 'menu', 'demo-settings-open': 'demoSettings', 'filters-open': 'filters' }[shot.state];
   if (disclosure && metrics.disclosures?.[disclosure] !== 'true') errors.push('requested disclosure is not expanded');
+  if (Object.entries(metrics.disclosures || {}).some(([name, state]) => name !== disclosure && state === 'true')) {
+    errors.push('an unrelated disclosure carried into this capture');
+  }
   if (shot.state === 'no-results' && (!metrics.noResults || metrics.searchValue !== NO_RESULTS_QUERY || metrics.firstSession)) {
     errors.push('requested no-results search state was not reached');
   }
@@ -333,7 +343,7 @@ async function captureSource(browser, snapshot, out, manifest, saveManifest) {
             if (shot.presentation === 'ordinary') {
               requests = { blocked: new Set(), aliases: new Set(), failed: new Set() };
               pageErrors = [];
-              await page.goto(captureUrl(server.origin, shot), { waitUntil: 'load' });
+              await navigateOrdinaryCapture(page, server.origin, shot);
               if (shot.state !== 'default') {
                 await settlePage(page, { ...shot, state: 'default' });
                 await applyCaptureState(page, shot);

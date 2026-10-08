@@ -65,6 +65,19 @@ test('CLI requires a full base SHA for PRs and makes manual after-only plans exp
   assert.throws(() => parseArgs(['--host', 'example.org'], {}), /Unknown option/);
 });
 
+test('ordinary captures discard the previous document even for identical hash URLs', async () => {
+  const { navigateOrdinaryCapture } = await load();
+  const calls = [];
+  const page = { goto: async (...args) => calls.push(args) };
+  const shot = { preset: 'newsroom', mode: 'light', route: 'program' };
+  await navigateOrdinaryCapture(page, local, shot);
+  await navigateOrdinaryCapture(page, local, shot);
+  assert.deepEqual(calls, [
+    ['about:blank'], [`${local}/eventrunner/demo/?style=newsroom&mode=light#/schedule`, { waitUntil: 'load' }],
+    ['about:blank'], [`${local}/eventrunner/demo/?style=newsroom&mode=light#/schedule`, { waitUntil: 'load' }],
+  ]);
+});
+
 test('network decisions allow only read-only local files or same-snapshot canonical assets', async () => {
   const { requestDecision } = await load();
   assert.deepEqual(requestDecision(`${local}/eventrunner/demo/?style=zine`, local), { kind: 'local', name: 'index.html' });
@@ -144,6 +157,12 @@ test('interaction captures require the requested disclosure or genuine no-result
     assert.deepEqual(validateCapture({ ...shot, state }, { ...metrics, disclosures: { [disclosure]: 'true' } }), []);
   }
   const noResults = { ...metrics, firstSession: null, noResults: true, searchValue: NO_RESULTS_QUERY };
+  assert.equal(validateCapture({ ...shot, state: 'filters-open' }, {
+    ...metrics, disclosures: { menu: 'true', demoSettings: 'false', filters: 'true' },
+  }).length, 1);
+  assert.equal(validateCapture({ ...shot, state: 'default' }, {
+    ...metrics, disclosures: { menu: 'true' },
+  }).length, 1);
   assert.deepEqual(validateCapture({ ...shot, state: 'no-results' }, noResults), []);
   assert.equal(validateCapture({ ...shot, state: 'no-results' }, { ...noResults, noResults: false }).length, 1);
   assert.equal(validateCapture({ ...shot, state: 'no-results' }, { ...noResults, firstSession: { y: 400 } }).length, 1);
