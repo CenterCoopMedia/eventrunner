@@ -8,7 +8,7 @@
 // sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { pageHeading } from 'shared/page';
 import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
@@ -110,12 +110,26 @@ export default function Schedule() {
   const filtersId = useId();
   const filtersRef = useRef(null);
   const filtersToggleRef = useRef(null);
-  useEffect(() => {
-    // A desktop checkbox must not disappear while it still owns focus.
-    if (compactFilters && filtersRef.current?.contains(filtersRef.current.ownerDocument.activeElement)) {
+  const searchRef = useRef(null);
+  const [settledCompactFilters, setSettledCompactFilters] = useState(compactFilters);
+  useLayoutEffect(() => {
+    if (compactFilters === settledCompactFilters) return;
+    // Keep the outgoing controls present for this layout pass. Otherwise
+    // the browser can blur a hidden facet or an unmounted toggle before
+    // an effect gets to inspect activeElement. Settle the new layout only
+    // after preserving focus, before the browser paints either transition.
+    const panel = filtersRef.current;
+    const toggle = filtersToggleRef.current;
+    if (compactFilters && panel?.contains(panel.ownerDocument.activeElement)) {
       setFiltersExpanded(true);
+    } else if (!compactFilters && toggle === toggle?.ownerDocument.activeElement) {
+      const target = panel?.querySelector('input[type="checkbox"]:checked:not(:disabled)')
+        ?? panel?.querySelector('input[type="checkbox"]:not(:disabled)')
+        ?? searchRef.current?.querySelector('input[type="search"]');
+      target?.focus();
     }
-  }, [compactFilters]);
+    setSettledCompactFilters(compactFilters);
+  }, [compactFilters, settledCompactFilters]);
 
   // The whole view lives in the URL (issue #164): the search, the facet
   // filters, the day, and the sort all round trip through query parameters,
@@ -404,7 +418,7 @@ export default function Schedule() {
               controls retains its URL-backed selections while hidden. */}
           <div className="schedule-controls no-print mt-sm">
             <div className="schedule-toolbar">
-              <div className="schedule-search">
+              <div ref={searchRef} className="schedule-search">
                 <SearchField
                   label="Search this day"
                   value={query}
@@ -428,7 +442,7 @@ export default function Schedule() {
                     onChange={(next) => updateView({ sort: next })}
                   />
                 ) : null}
-                {compactFilters && hasFilters ? (
+                {(compactFilters || settledCompactFilters) && hasFilters ? (
                   <button
                     type="button"
                     ref={filtersToggleRef}
@@ -505,7 +519,7 @@ export default function Schedule() {
                   setFiltersExpanded(false);
                 }}
                 className="schedule-facets"
-                hidden={compactFilters && !filtersExpanded}
+                hidden={compactFilters && settledCompactFilters && !filtersExpanded}
               >
                 {/* A group renders only when its facet has something to offer. */}
                 {formatOptions.length > 0 ? (

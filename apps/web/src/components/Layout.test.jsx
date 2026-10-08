@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Suspense } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 
@@ -1347,11 +1347,13 @@ describe('deployed historical demo shell', () => {
 
 
 describe('Layout mobile navigation', () => {
+  afterEach(() => vi.unstubAllGlobals());
   it('keeps the menu button hidden above the mobile breakpoint despite action display utilities', () => {
     expect(indexCss).toMatch(/\.site-header-treatment \.site-header-menu\s*\{\s*display: none;/);
-    expect(indexCss).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.site-header-treatment \.site-header-menu\s*\{\s*display: inline-flex;/);
+    expect(indexCss).toMatch(/@media screen\s*\{\s*\.site-header-treatment \.site-header-menu\[data-mobile-visible="true"\]\s*\{\s*display: inline-flex;/);
   });
   it('uses one navigation landmark with a labeled disclosure, repeatable close, and Escape focus restoration', () => {
+    vi.stubGlobal('matchMedia', (query) => ({ matches: query === '(max-width: 639px)', addEventListener() {}, removeEventListener() {} }));
     renderShell({});
     const menu = screen.getByRole('button', { name: 'Menu' });
     const nav = screen.getByRole('navigation', { name: 'Main' });
@@ -1397,5 +1399,62 @@ describe('nested mobile navigation disclosures', () => {
     fireEvent.keyDown(more, { key: 'Escape' });
     expect(menu).toHaveAttribute('aria-expanded', 'false');
     expect(menu).toHaveFocus();
+  });
+});
+
+
+describe('mobile Menu focus across breakpoints', () => {
+  function viewport(initialWidth) {
+    let width = initialWidth;
+    const listeners = new Set();
+    vi.stubGlobal('matchMedia', (query) => ({
+      get matches() { return query === '(max-width: 639px)' && width <= 639; },
+      addEventListener: (_, listener) => listeners.add(listener),
+      removeEventListener: (_, listener) => listeners.delete(listener),
+    }));
+    return (nextWidth) => act(() => {
+      width = nextWidth;
+      listeners.forEach((listener) => listener({ matches: width <= 639 }));
+    });
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('hands focused Menu to the current desktop link before hiding the button', () => {
+    const resize = viewport(639);
+    renderShell({}, { path: '/schedule' });
+    const menu = screen.getByRole('button', { name: 'Menu' });
+    menu.focus();
+    const setAttribute = Element.prototype.setAttribute;
+    const hideSpy = vi.spyOn(Element.prototype, 'setAttribute').mockImplementation(function (name, value) {
+      setAttribute.call(this, name, value);
+      if (this === menu && name === 'data-mobile-visible' && value === 'false' && document.activeElement === menu) menu.blur();
+    });
+    resize(640);
+    hideSpy.mockRestore();
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(within(nav).getByRole('link', { name: 'Schedule' })).toHaveFocus();
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(menu).toHaveAttribute('data-mobile-visible', 'false');
+  });
+
+  it('uses the closed More summary when the current page is in that disclosure', () => {
+    const resize = viewport(485);
+    renderShell({}, { path: '/contact', pageDocs: [...FIXTURE_PAGES,
+      { id: 'about', label: 'About', path: '/about', order: 6, visible: true },
+      { id: 'contact', label: 'Contact', path: '/contact', order: 7, visible: true },
+    ] });
+    screen.getByRole('button', { name: 'Menu' }).focus();
+    resize(1165);
+    expect(within(screen.getByRole('navigation', { name: 'Main' })).getByText('More')).toHaveFocus();
+  });
+
+  it('does not steal focus from another control when the viewport expands', () => {
+    const resize = viewport(485);
+    renderShell({});
+    screen.getByRole('button', { name: 'Menu' }).focus();
+    const skip = screen.getByRole('link', { name: 'Skip to main content' });
+    skip.focus();
+    resize(1165);
+    expect(skip).toHaveFocus();
   });
 });

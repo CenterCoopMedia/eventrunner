@@ -53,7 +53,7 @@
 // So: what the page states, then what the site states, then the default.
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
-import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config';
@@ -266,10 +266,25 @@ export default function Layout() {
   const navId = useId();
   const navRef = useRef(null);
   const compactHeader = useMediaQuery('(max-width: 639px)');
-  useEffect(() => {
-    const activeElement = menuButtonRef.current?.ownerDocument.activeElement;
-    if (compactHeader && navRef.current?.contains(activeElement)) menuButtonRef.current?.focus();
+  const [settledCompactHeader, setSettledCompactHeader] = useState(compactHeader);
+  useLayoutEffect(() => {
+    const menu = menuButtonRef.current;
+    const doc = menu?.ownerDocument;
+    const activeElement = doc?.activeElement;
+    if (compactHeader && navRef.current?.contains(activeElement)) {
+      menu?.focus();
+    } else if (!compactHeader && activeElement === menu) {
+      // Both controls remain visible for this layout pass. Move focus
+      // before the next render hides Menu; More uses its visible summary.
+      const candidates = [...(navRef.current?.querySelectorAll('a[href], summary, button:not([disabled])') ?? [])]
+        .filter((element) => !element.closest('[hidden]'));
+      const current = candidates.find((element) => element.getAttribute('aria-current') === 'page')
+        ?? candidates[0];
+      const disclosure = current?.closest('details:not([open])');
+      (disclosure?.querySelector('summary') ?? current ?? doc?.getElementById('main-content'))?.focus();
+    }
     setMenuOpen(false);
+    setSettledCompactHeader(compactHeader);
   }, [locationKey, compactHeader]);
   const closeMenuOnEscape = (event) => {
     if (event.key !== 'Escape' || !menuOpen) return;
@@ -364,6 +379,7 @@ export default function Layout() {
       id={navId}
       ref={navRef}
       data-mobile-open={menuOpen}
+      data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
       onKeyDown={closeMenuOnEscape}
       onClick={(event) => {
         if (!event.target.closest('a') || !menuOpen) return;
@@ -475,6 +491,7 @@ export default function Layout() {
                 type="button"
                 className={`site-header-menu no-print ${quietActionClass}`}
                 aria-expanded={menuOpen}
+                data-mobile-visible={compactHeader || settledCompactHeader}
                 aria-controls={navId}
                 onClick={() => setMenuOpen((open) => !open)}
                 onKeyDown={closeMenuOnEscape}

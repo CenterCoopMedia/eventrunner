@@ -664,6 +664,66 @@ describe('compact program controls', () => {
     expect(workshop).toBeVisible();
   });
 
+  it.each([false, true])('moves focus from Filters to a visible selected facet when widening (expanded: %s)', (expanded) => {
+    const resize = viewport(639);
+    renderSchedule({ initialEntries: ['/schedule?format=workshop'], historyControls: true });
+    const toggle = screen.getByRole('button', { name: 'Filters 1 active' });
+    if (expanded) fireEvent.click(toggle);
+    toggle.focus();
+    resize(640);
+
+    expect(toggle).not.toBeInTheDocument();
+    const workshop = screen.getByRole('checkbox', { name: 'workshop (1)' });
+    expect(workshop).toBeVisible();
+    expect(workshop).toHaveFocus();
+    expect(workshop).toBeChecked();
+    expect(screen.getByLabelText('Current URL')).toHaveTextContent('/schedule?format=workshop');
+    resize(639);
+    expect(workshop).toBeVisible();
+    expect(workshop).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Filters 1 active' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('moves focus to the first facet when widening without an active filter', () => {
+    const resize = viewport(485);
+    renderSchedule();
+    screen.getByRole('button', { name: 'Filters' }).focus();
+    resize(1165);
+    expect(screen.getAllByRole('checkbox')[0]).toHaveFocus();
+  });
+
+  it('does not move focus away from search when widening', () => {
+    const resize = viewport(485);
+    renderSchedule();
+    const search = screen.getByRole('searchbox', { name: 'Search this day' });
+    search.focus();
+    resize(1165);
+    expect(search).toHaveFocus();
+  });
+
+  it('does not transiently hide a focused desktop facet while narrowing', () => {
+    const resize = viewport(640);
+    renderSchedule();
+    const workshop = screen.getByRole('checkbox', { name: 'workshop (1)' });
+    const panel = workshop.closest('.schedule-facets');
+    const setAttribute = panel.setAttribute.bind(panel);
+    // jsdom retains focus in hidden elements. Model the browser's blur at
+    // the DOM mutation itself, before an effect can inspect activeElement.
+    const hide = vi.spyOn(panel, 'setAttribute').mockImplementation((name, value) => {
+      if (name === 'hidden' && panel.contains(document.activeElement)) document.activeElement.blur();
+      return setAttribute(name, value);
+    });
+    try {
+      workshop.focus();
+      resize(639);
+      expect(hide.mock.calls.some(([name]) => name === 'hidden')).toBe(false);
+      expect(workshop).toHaveFocus();
+      expect(workshop).toBeVisible();
+    } finally {
+      hide.mockRestore();
+    }
+  });
+
   it('keeps a focused facet visible across the breakpoint and returns focus on Escape', () => {
     const resize = viewport(1165);
     renderSchedule();

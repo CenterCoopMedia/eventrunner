@@ -2561,6 +2561,14 @@
     z-index: 1;
   }
   .site-header-treatment .site-header-menu { display: none; }
+  @media screen {
+    .site-header-treatment .site-header-menu[data-mobile-visible="true"] {
+      display: inline-flex;
+      margin-inline-start: auto;
+      flex-shrink: 0;
+    }
+  }
+  .site-header-nav[data-mobile-hidden="true"] { display: none; }
   .disclosure-chevron { flex: none; }
   [aria-expanded="true"] > .disclosure-chevron { transform: rotate(180deg); }
   @media (prefers-reduced-motion: no-preference) {
@@ -2576,9 +2584,7 @@
       gap: var(--space-xs);
       padding-block: var(--space-xs);
     }
-    .site-header-treatment .site-header-menu { display: inline-flex; margin-inline-start: auto; flex-shrink: 0; }
     .site-header-nav { inline-size: 100%; flex-basis: 100%; }
-    .site-header-nav[data-mobile-open="false"] { display: none; }
     .site-header-nav > ul { gap: 0 var(--space-sm); padding-block: var(--space-xs); }
     .site-header-treatment .site-header-identity,
     .site-header-treatment .site-masthead__identity,

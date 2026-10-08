@@ -354,6 +354,10 @@ jobs:
     # live project, so this runs the same on a fork PR as every other job.
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Public demo screenshots compare immutable docs/demo blobs at
+          # the PR base with the actual checked-out (normally merge) HEAD.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -399,6 +403,7 @@ jobs:
           sudo install -o root -g root -m 4755 "$helper" "$CHROME_DEVEL_SANDBOX"
           test -u "$CHROME_DEVEL_SANDBOX"
       - name: Run e2e tests
+        id: e2e_journeys
         # Invoke the script directly rather than through `npm run test:e2e`
         # (which is just this same script — see package.json) so local and
         # CI share exactly one invocation path, with nothing to drift: the
@@ -407,6 +412,22 @@ jobs:
         # it before Playwright starts. Reimplementing the emulators:exec
         # call here instead would silently drop that tee.
         run: bash scripts/dev/run-e2e.sh
+      - name: Capture public demo visual evidence
+        id: demo_visuals
+        if: ${{ !cancelled() && steps.e2e_journeys.outcome != 'skipped' }}
+        timeout-minutes: 15
+        env:
+          DEMO_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEMO_VISUAL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/dev/capture-demo-visuals.mjs --out test-results/demo-visual-evidence
+      - name: Upload public demo visual evidence
+        if: ${{ always() && steps.demo_visuals.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-demo-visual-evidence
+          path: test-results/demo-visual-evidence/
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
