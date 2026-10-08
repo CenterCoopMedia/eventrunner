@@ -8,7 +8,7 @@
 // sessionBookmarks) and ICS/calendar-link export (features.icsExport) are
 // wired through SessionCard, which also carries the per-session detail
 // link (/schedule/:sessionId, SessionDetail.jsx).
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { pageHeading } from 'shared/page';
 import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
@@ -107,6 +107,15 @@ export default function Schedule() {
   const wide = useMediaQuery(WIDE_VIEWPORT);
   const compactFilters = useMediaQuery('(max-width: 639px)');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const filtersId = useId();
+  const filtersRef = useRef(null);
+  const filtersToggleRef = useRef(null);
+  useEffect(() => {
+    // A desktop checkbox must not disappear while it still owns focus.
+    if (compactFilters && filtersRef.current?.contains(filtersRef.current.ownerDocument.activeElement)) {
+      setFiltersExpanded(true);
+    }
+  }, [compactFilters]);
 
   // The whole view lives in the URL (issue #164): the search, the facet
   // filters, the day, and the sort all round trip through query parameters,
@@ -242,6 +251,8 @@ export default function Schedule() {
   const query = view.q;
   const formats = view.formats;
   const tracks = view.tracks;
+  const activeFilterCount = formats.length + tracks.length;
+  const hasFilters = formatOptions.length > 0 || trackOptions.length > 0;
   // The URL's day, or the first configured day. An id the event no longer
   // carries already fell back at read time.
   const activeDayId = view.day ?? days[0]?.id ?? null;
@@ -369,7 +380,7 @@ export default function Schedule() {
               <div
                 role="group"
                 aria-label="Event days"
-                className="schedule-days mt-lg flex flex-wrap"
+                className="schedule-days mt-sm flex flex-wrap"
               >
                 {days.map((day) => {
                   const isActive = day.id === activeDayId;
@@ -388,80 +399,63 @@ export default function Schedule() {
               </div>
             ) : null}
 
-          {/* Search, filtering and exports are one tool group. The native
-              disclosure keeps the first programme row in a short phone
-              viewport; from 640px upward it stays open and its summary is
-              hidden. Every control remains in one tree and stays reachable. */}
-          <details
-            className="schedule-controls schedule-optional-controls no-print mt-md"
-            open={!compactFilters || filtersExpanded}
-            onToggle={(event) => {
-              if (compactFilters) setFiltersExpanded(event.currentTarget.open);
-            }}
-          >
-            <summary className="touch-target cursor-pointer border-t-hairline border-rule-hairline font-data text-body font-semibold text-text-primary">
-              Search, filter, and export
-              {query.trim() || formats.length + tracks.length > 0 ? (
-                <span className="font-normal text-text-secondary">
-                  {' '}— {[query.trim() ? 'search active' : null,
-                    formats.length + tracks.length > 0
-                      ? `${formats.length + tracks.length} selected`
-                      : null]
-                    .filter(Boolean)
-                    .join(', ')}
-                </span>
-              ) : null}
-            </summary>
-            <div className="schedule-optional-controls__body flex flex-wrap items-start gap-lg">
-              <div className="w-full max-w-prose lg:w-auto lg:flex-1">
+          {/* Search and the take-it-with-you tools stay visible at every
+              width. Only the facets collapse on phones; the one set of
+              controls retains its URL-backed selections while hidden. */}
+          <div className="schedule-controls no-print mt-sm">
+            <div className="schedule-toolbar">
+              <div className="schedule-search">
                 <SearchField
                   label="Search this day"
                   value={query}
                   onChange={(next) => updateView({ q: next }, { replace: true })}
                   status={
-                    query.trim() ? `${matchedCount} sessions match “${query.trim()}”` : undefined
+                    query.trim()
+                      ? `${matchedCount} sessions match “${query.trim()}”`
+                      : activeFilterCount > 0
+                        ? `${matchedCount} sessions match the selected filters`
+                        : undefined
                   }
                   placeholder="Title, room, speaker…"
                 />
               </div>
-              {/* A group renders only when its facet has something to offer:
-                  a filter over nothing is a dead control. */}
-              {formatOptions.length > 0 ? (
-                <div className="flex-1">
-                  <FilterGroup
-                    legend="Format"
-                    options={formatOptions}
-                    selected={formats}
-                    onChange={(next) => updateView({ formats: next })}
-                    clearLabel="Clear format filter"
-                  />
-                </div>
-              ) : null}
-              {trackOptions.length > 0 ? (
-                <div className="flex-1">
-                  <FilterGroup
-                    legend="Track"
-                    options={trackOptions}
-                    selected={tracks}
-                    onChange={(next) => updateView({ tracks: next })}
-                    clearLabel="Clear track filter"
-                  />
-                </div>
-              ) : null}
-              {sortOptions.length > 1 ? (
-                <div className="flex-1">
+              <div className="schedule-toolbar__actions">
+                {sortOptions.length > 1 ? (
                   <SortControl
                     label="Sort sessions"
                     options={sortOptions}
                     value={sort}
                     onChange={(next) => updateView({ sort: next })}
                   />
-                </div>
-              ) : null}
+                ) : null}
+                {compactFilters && hasFilters ? (
+                  <button
+                    type="button"
+                    ref={filtersToggleRef}
+                    className={`${quietActionClass} schedule-filters-toggle`}
+                    aria-expanded={filtersExpanded}
+                    aria-controls={filtersId}
+                    onClick={() => setFiltersExpanded((expanded) => !expanded)}
+                  >
+                    Filters
+                    {activeFilterCount > 0 ? (
+                      <span className="font-normal">{activeFilterCount} active</span>
+                    ) : null}
+                    <svg
+                      className="schedule-filters-toggle__chevron"
+                      aria-hidden="true"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    >
+                      <path d="m4 6 4 4 4-4" />
+                    </svg>
+                  </button>
+                ) : null}
               {/* Controls do not print: a button on paper is a lie. Print
                   uses the handout below; PDF asks the server for the same
                   programme behind its feature flag. */}
-              <div className="flex basis-full flex-wrap items-center gap-xs">
                 {features.sessionBookmarks && user && attendeeAccess ? (
                   <Link to="/schedule/mine" className={quietActionClass}>
                     My schedule
@@ -500,7 +494,45 @@ export default function Schedule() {
                 ) : null}
               </div>
             </div>
-          </details>
+            {hasFilters ? (
+              <div
+                id={filtersId}
+                ref={filtersRef}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Escape' || !compactFilters || !filtersExpanded) return;
+                  event.stopPropagation();
+                  filtersToggleRef.current?.focus();
+                  setFiltersExpanded(false);
+                }}
+                className="schedule-facets"
+                hidden={compactFilters && !filtersExpanded}
+              >
+                {/* A group renders only when its facet has something to offer. */}
+                {formatOptions.length > 0 ? (
+                  <div className="schedule-facet">
+                    <FilterGroup
+                      legend="Format"
+                      options={formatOptions}
+                      selected={formats}
+                      onChange={(next) => updateView({ formats: next })}
+                      clearLabel="Clear format filter"
+                    />
+                  </div>
+                ) : null}
+                {trackOptions.length > 0 ? (
+                  <div className="schedule-facet">
+                    <FilterGroup
+                      legend="Track"
+                      options={trackOptions}
+                      selected={tracks}
+                      onChange={(next) => updateView({ tracks: next })}
+                      clearLabel="Clear track filter"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
 
           {/* The sheet the programme is drawn on (brief §4.6): a faint
               coordinate grid, below hairline contrast and inert to the
@@ -512,7 +544,7 @@ export default function Schedule() {
             <section
               key={activeDay.id}
               aria-labelledby={`day-${activeDay.id}`}
-              className={backIssue ? 'back-issue map-grid mt-xl' : 'map-grid mt-xl'}
+              className={backIssue ? 'back-issue map-grid mt-md' : 'map-grid mt-md'}
               {...(backIssue ? { 'data-back-issue': 'true' } : null)}
             >
               {/* The day head is a folio on a rule (brief §2.1): the standing

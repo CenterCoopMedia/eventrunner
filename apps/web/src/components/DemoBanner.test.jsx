@@ -13,6 +13,7 @@ function renderControls({
   search = '',
   theme = { preset: 'newsroom', mode: 'light' },
   pageDocument = document,
+  settingsOpen = true,
 } = {}) {
   const setDemoTheme = vi.fn();
   const location = {
@@ -35,6 +36,7 @@ function renderControls({
     </EventConfigContext.Provider>,
   );
 
+  if (settingsOpen) fireEvent.click(screen.getByRole('button', { name: 'Demo settings' }));
   return { history, location, setDemoTheme, view };
 }
 
@@ -63,6 +65,23 @@ describe('demo display query', () => {
 });
 
 describe('DemoBannerContent', () => {
+  it('starts compact, keeps the notice and preview visible, and restores settings focus on Escape', () => {
+    renderControls({ settingsOpen: false });
+    const toggle = screen.getByRole('button', { name: 'Demo settings' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('combobox', { name: 'Site style' })).toBeNull();
+    expect(screen.getByText(/Read-only/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Preview full screen' })).toBeVisible();
+    for (let i = 0; i < 2; i += 1) {
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const style = screen.getByRole('combobox', { name: 'Site style' });
+      style.focus();
+      fireEvent.keyDown(style, { key: 'Escape' });
+      expect(toggle).toHaveFocus();
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
   it('shows every style and applies the URL selection', async () => {
     const { history, setDemoTheme } = renderControls({
       search: '?style=atlas&mode=dark&ref=proposal',

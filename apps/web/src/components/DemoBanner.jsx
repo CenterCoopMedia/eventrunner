@@ -4,24 +4,14 @@
 // and exposes no style controls. The demo uses EventConfigProvider's existing
 // theme path. It does not write Firestore or create a second resolver.
 //
-// The band is the showcase's own device, and it is built from the same
-// vocabulary as the site under it: the STAGE it shares with the header, the
-// page and the footer, the alternate ground, a hairline, the heading face
-// for the style's name, the body face for the line that describes it, and
-// five controls in one row at the shared control height. No pill, no
-// shadow, no gradient, and nothing that can push the page sideways at
-// 390px.
-//
-// The band held its own `max-w-5xl` and `px-md` after the stage landed, so
-// at 1440px its content box ran 224 to 1216 against the header's 164 to
-// 1276: 60px inside the frame at each end. A band that does not line up
-// with the page under it is the one thing a demo band must not be.
+// A short read-only notice and preview action remain visible. The style
+// controls are an optional disclosure on the shared stage, so readers can
+// reach the event content without first scrolling through a control panel.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { recommendedConfiguration } from '../lib/themeRuntime.js';
 import { loadPresetRemaps } from '../lib/presetRemaps.js';
-import Rule from './editorial/Rule.jsx';
 import { quietActionClass } from './controlClasses.js';
 import {
   DEMO_STYLE_OPTIONS,
@@ -95,6 +85,9 @@ export function DemoBannerContent({
   const [mode, setMode] = useState(initialDisplay.mode);
   const [previewing, setPreviewing] = useState(false);
   const selectId = useId();
+  const settingsId = useId();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsButtonRef = useRef(null);
   const previewButtonRef = useRef(null);
   const exitButtonRef = useRef(null);
   const restoreFocusRef = useRef(false);
@@ -198,23 +191,47 @@ export function DemoBannerContent({
     <section
       role="note"
       aria-label="Demo controls"
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || !settingsOpen) return;
+        event.stopPropagation();
+        setSettingsOpen(false);
+        settingsButtonRef.current?.focus();
+      }}
       className="no-print border-b-hairline border-b-rule-hairline bg-surface-alt text-text-primary"
     >
-      <div className="stage flex flex-col gap-sm py-sm">
-        {/* The style's own name, then the line that says what it does. The
-            name is set in the heading face and is not a heading element:
-            the page under this band owns its h1. */}
-        <div aria-live="polite">
-          <p className="font-heading text-h3 font-semibold text-text-primary">
-            {activeStyle.label}
+      <div className="stage py-xs">
+        <div className="demo-toolbar flex flex-wrap items-center gap-xs">
+          <p className="min-w-0 flex-1 text-caption text-text-secondary">
+            <strong className="text-text-primary">Historical 2026 demo.</strong>{' '}
+            Read-only. Registration and email actions are off.
           </p>
-          <p className="mt-3xs max-w-prose text-body text-text-secondary text-pretty">
-            {activeStyle.summary}
-          </p>
+          <button
+            ref={settingsButtonRef}
+            type="button"
+            className={bandActionClass}
+            aria-expanded={settingsOpen}
+            aria-controls={settingsId}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            Demo settings
+            <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" className="disclosure-chevron">
+              <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </button>
+          <button
+            ref={previewButtonRef}
+            type="button"
+            className={bandActionClass}
+            onClick={enterPreview}
+          >
+            Preview full screen
+          </button>
         </div>
-
-        <Rule weight="hairline" />
-
+        <div id={settingsId} hidden={!settingsOpen} className="demo-settings pt-sm">
+          <div aria-live="polite" className="mb-sm">
+            <p className="font-heading text-h3 font-semibold text-text-primary">{activeStyle.label}</p>
+            <p className="mt-3xs max-w-prose text-body text-text-secondary text-pretty">{activeStyle.summary}</p>
+          </div>
         <div
           className="flex flex-wrap items-center gap-xs"
           aria-label="Demo display settings"
@@ -266,20 +283,8 @@ export function DemoBannerContent({
             {mode === 'dark' ? 'Use light mode' : 'Use dark mode'}
           </button>
 
-          <button
-            ref={previewButtonRef}
-            type="button"
-            className={bandActionClass}
-            onClick={enterPreview}
-          >
-            Preview full screen
-          </button>
         </div>
-
-        <p className="max-w-prose text-caption text-text-secondary">
-          <strong className="text-text-primary">Demo site.</strong>{' '}
-          Past-event demo · Historical 2026 program. Registration and email actions are off.
-        </p>
+        </div>
       </div>
     </section>
   );

@@ -4,8 +4,8 @@
 // is fictional and distinct from the committed snapshot so nothing here
 // accidentally passes by matching demo copy.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
@@ -124,9 +124,12 @@ function renderSchedule({
   pageDoc = null,
   auth = { user: null, isAdmin: false, loading: false },
   profile = { attendeeAccess: false },
+  initialEntries = ['/schedule'],
+  historyControls = false,
 } = {}) {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={initialEntries} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {historyControls ? <HistoryControls /> : null}
       <EventConfigContext.Provider
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
@@ -158,6 +161,17 @@ function renderSchedule({
   );
 }
 
+function HistoryControls() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  return (
+    <>
+      <button type="button" onClick={() => navigate(-1)}>Go back</button>
+      <output aria-label="Current URL">{location.pathname}{location.search}</output>
+    </>
+  );
+}
+
 /**
  * The view a reader is looking at right now.
  *
@@ -184,29 +198,6 @@ describe('SchedulePage', () => {
   it('marks the repeated event identity as the compact interior-page hero', () => {
     const { container } = renderSchedule();
     expect(container.querySelector('.event-hero')).toHaveClass('event-hero--compact');
-  });
-
-  it('keeps every phone schedule tool in one collapsed disclosure', () => {
-    const original = window.matchMedia;
-    window.matchMedia = (query) => ({
-      matches: query === '(max-width: 639px)',
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    });
-    try {
-      renderSchedule();
-      const summary = screen.getByText('Search, filter, and export');
-      const tools = summary.closest('details');
-
-      expect(tools).not.toHaveAttribute('open');
-      expect(within(tools).getByLabelText('Search this day')).toBeInTheDocument();
-      expect(within(tools).getByRole('button', { name: 'Print the schedule' }))
-        .toBeInTheDocument();
-      expect(within(tools).getByText('Format')).toBeInTheDocument();
-    } finally {
-      if (original) window.matchMedia = original;
-      else delete window.matchMedia;
-    }
   });
 
   it('groups sessions by day and sorts the active day by start time', () => {
@@ -409,8 +400,8 @@ describe('the two views of a day', () => {
   // stub the query the way a wide browser would answer it.
   function withViewport(matches, run) {
     const original = window.matchMedia;
-    window.matchMedia = () => ({
-      matches,
+    window.matchMedia = (query) => ({
+      matches: query === '(min-width: 64rem)' && matches,
       addEventListener: () => {},
       removeEventListener: () => {},
     });
@@ -561,6 +552,142 @@ describe('the two views of a day', () => {
   });
 });
 
+describe('compact program controls', () => {
+  function viewport(initialWidth) {
+    let width = initialWidth;
+    const queries = new Map();
+    const matches = (query) => query === '(max-width: 639px)' ? width <= 639 : width >= 1024;
+    vi.stubGlobal('matchMedia', (query) => {
+      if (!queries.has(query)) {
+        const listeners = new Set();
+        queries.set(query, {
+          get matches() { return matches(query); },
+          addEventListener: (_, listener) => listeners.add(listener),
+          removeEventListener: (_, listener) => listeners.delete(listener),
+          notify: () => listeners.forEach((listener) => listener({ matches: matches(query) })),
+        });
+      }
+      return queries.get(query);
+    });
+    return (nextWidth) => act(() => {
+      width = nextWidth;
+      queries.forEach((media) => media.notify());
+    });
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([485, 639])('keeps search and Print visible with facets closed at %ipx', (width) => {
+    viewport(width);
+    renderSchedule();
+    const toggle = screen.getByRole('button', { name: 'Filters' });
+    const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(panel).not.toBeVisible();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getByRole('searchbox', { name: 'Search this day' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Print the schedule' })).toBeVisible();
+
+    toggle.focus();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'workshop (1)' })).toBeVisible();
+    fireEvent.click(toggle);
+    expect(panel).not.toBeVisible();
+    expect(toggle).toHaveFocus();
+  });
+
+  it('searches, states no results, and clears without opening Filters', () => {
+    viewport(485);
+    renderSchedule();
+    const search = screen.getByRole('searchbox', { name: 'Search this day' });
+    fireEvent.change(search, { target: { value: 'nothing names this' } });
+    expect(onScreen().getByText(/No sessions on Day one match “nothing names this”/)).toBeVisible();
+    const clear = screen.getByRole('button', { name: 'Clear search' });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(search).toHaveValue('');
+    expect(search).toHaveFocus();
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Filters' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('keeps combined filters and their count when closed, with Back undoing each selection', () => {
+    viewport(485);
+    renderSchedule({
+      scheduleData: [{ ...fixtureSessions[1], track: 'A' }, { ...fixtureSessions[0], track: 'B' }],
+      eventConfig: { ...fixtureConfig, tracks: [{ letter: 'A', name: 'Practice' }, { letter: 'B', name: 'Craft' }] },
+      historyControls: true,
+    });
+    const toggle = screen.getByRole('button', { name: 'Filters' });
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'workshop (1)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'B · Craft (1)' }));
+    expect(toggle).toHaveAccessibleName('Filters 2 active');
+    expect(screen.getByLabelText('Current URL')).toHaveTextContent('format=workshop&track=B');
+    expect(onScreen().queryByText('[Fixture] Morning kickoff')).toBeNull();
+    expect(onScreen().getByText('[Fixture] Afternoon editing lab')).toBeVisible();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('1 sessions match the selected filters')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    expect(toggle).toHaveAccessibleName('Filters 1 active');
+    expect(screen.getByLabelText('Current URL')).not.toHaveTextContent('track=B');
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    expect(toggle).toHaveAccessibleName('Filters');
+    expect(screen.getByLabelText('Current URL')).toHaveTextContent('/schedule');
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeVisible();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('preserves shared-link selections on both sides of the 639/640px breakpoint', () => {
+    const resize = viewport(639);
+    renderSchedule({ initialEntries: ['/schedule?format=workshop'] });
+    const toggle = screen.getByRole('button', { name: 'Filters 1 active' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    resize(640);
+    expect(screen.queryByRole('button', { name: /Filters/ })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'workshop (1)' })).toBeChecked();
+    resize(639);
+    expect(screen.getByRole('button', { name: 'Filters 1 active' })).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Filters 1 active' }));
+    const workshop = screen.getByRole('checkbox', { name: 'workshop (1)' });
+    expect(workshop).toBeChecked();
+    resize(1165);
+    expect(workshop).toBeVisible();
+    resize(485);
+    expect(screen.getByRole('button', { name: 'Filters 1 active' })).toHaveAttribute('aria-expanded', 'true');
+    expect(workshop).toBeVisible();
+  });
+
+  it('keeps a focused facet visible across the breakpoint and returns focus on Escape', () => {
+    const resize = viewport(1165);
+    renderSchedule();
+    const workshop = screen.getByRole('checkbox', { name: 'workshop (1)' });
+    workshop.focus();
+    resize(485);
+    const toggle = screen.getByRole('button', { name: 'Filters' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(workshop).toHaveFocus();
+    expect(workshop).toBeVisible();
+    fireEvent.keyDown(workshop, { key: 'Escape' });
+    expect(toggle).toHaveFocus();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
+  it('offers no Filters control when the day has no formats or tracks', () => {
+    viewport(485);
+    renderSchedule({ scheduleData: [{ ...fixtureSessions[0], type: null }] });
+    expect(screen.queryByRole('button', { name: /Filters/ })).toBeNull();
+    expect(screen.getByRole('searchbox')).toBeVisible();
+  });
+});
+
 describe('schedule search', () => {
   // The fixture speakers resolve fx-speaker-1 to a name the schedule can be
   // searched by (issue #162).
@@ -609,8 +736,8 @@ describe('schedule search', () => {
 
   it('narrows the grid too', () => {
     const original = window.matchMedia;
-    window.matchMedia = () => ({
-      matches: true,
+    window.matchMedia = (query) => ({
+      matches: query === '(min-width: 64rem)',
       addEventListener: () => {},
       removeEventListener: () => {},
     });
@@ -674,8 +801,8 @@ describe('schedule filters', () => {
 
   it('a track filter narrows both views, and clearing restores them', () => {
     const original = window.matchMedia;
-    window.matchMedia = () => ({
-      matches: true,
+    window.matchMedia = (query) => ({
+      matches: query === '(min-width: 64rem)',
       addEventListener: () => {},
       removeEventListener: () => {},
     });
@@ -812,8 +939,8 @@ describe('bookmark counts on the schedule', () => {
 
   it('the figure appears in the grid too', () => {
     const original = window.matchMedia;
-    window.matchMedia = () => ({
-      matches: true,
+    window.matchMedia = (query) => ({
+      matches: query === '(min-width: 64rem)',
       addEventListener: () => {},
       removeEventListener: () => {},
     });

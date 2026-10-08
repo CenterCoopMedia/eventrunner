@@ -4,9 +4,9 @@ import { isSafeHref } from '../lib/sanitizeHtml.js';
 
 // One live content contract; each preset composes its own artwork and marks.
 // Home owns the h1; the schedule uses a paragraph before its own heading.
-// `compact` is the Schedule-only interior-page treatment: on a phone it
-// keeps the event name and dateline, drops the repeated tagline, and uses a
-// shorter art crop while preserving meaningful alt text and captions.
+// `compact` is the Schedule-only interior-page treatment at every width.
+// It keeps the event name and dateline, drops the repeated tagline, and uses
+// a shorter art crop while preserving meaningful alt text and captions.
 export default function EventHero({
   name,
   dates,

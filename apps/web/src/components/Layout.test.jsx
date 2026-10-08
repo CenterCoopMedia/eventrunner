@@ -1344,3 +1344,58 @@ describe('deployed historical demo shell', () => {
     expect(screen.getByRole('link', { name: 'Contact support' })).toHaveAttribute('href', 'mailto:support@example.test');
   });
 });
+
+
+describe('Layout mobile navigation', () => {
+  it('keeps the menu button hidden above the mobile breakpoint despite action display utilities', () => {
+    expect(indexCss).toMatch(/\.site-header-treatment \.site-header-menu\s*\{\s*display: none;/);
+    expect(indexCss).toMatch(/@media \(max-width: 639px\)[\s\S]*?\.site-header-treatment \.site-header-menu\s*\{\s*display: inline-flex;/);
+  });
+  it('uses one navigation landmark with a labeled disclosure, repeatable close, and Escape focus restoration', () => {
+    renderShell({});
+    const menu = screen.getByRole('button', { name: 'Menu' });
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    expect(menu).toHaveAttribute('aria-controls', nav.id);
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(nav).toHaveAttribute('data-mobile-open', 'false');
+    for (let i = 0; i < 2; i += 1) {
+      fireEvent.click(menu);
+      expect(menu).toHaveAttribute('aria-expanded', 'true');
+      const schedule = within(nav).getByRole('link', { name: 'Schedule' });
+      schedule.focus();
+      fireEvent.keyDown(schedule, { key: 'Escape' });
+      expect(menu).toHaveFocus();
+      expect(menu).toHaveAttribute('aria-expanded', 'false');
+    }
+    fireEvent.click(menu);
+    within(nav).getByRole('link', { name: 'Schedule' }).focus();
+    fireEvent.click(within(nav).getByRole('link', { name: 'Schedule' }));
+    expect(menu).toHaveFocus();
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(within(nav).getByRole('link', { name: 'Schedule' })).toHaveAttribute('aria-current', 'page');
+  });
+});
+
+
+describe('nested mobile navigation disclosures', () => {
+  it('closes More on first Escape and Menu on second Escape', () => {
+    renderShell({}, { pageDocs: [...FIXTURE_PAGES,
+      { id: 'about', label: 'About', path: '/about', order: 6, visible: true },
+      { id: 'contact', label: 'Contact', path: '/contact', order: 7, visible: true },
+    ] });
+    const menu = screen.getByRole('button', { name: 'Menu' });
+    const nav = screen.getByRole('navigation', { name: 'Main' });
+    const more = within(nav).getByText('More');
+    fireEvent.click(menu);
+    more.closest('details').open = true;
+    const contact = within(nav).getByRole('link', { name: 'Contact' });
+    contact.focus();
+    fireEvent.keyDown(contact, { key: 'Escape' });
+    expect(more.closest('details').open).toBe(false);
+    expect(more).toHaveFocus();
+    expect(menu).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.keyDown(more, { key: 'Escape' });
+    expect(menu).toHaveAttribute('aria-expanded', 'false');
+    expect(menu).toHaveFocus();
+  });
+});

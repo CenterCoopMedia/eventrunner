@@ -2541,8 +2541,6 @@
     background: var(--schedule-day-active-background);
     border-color: var(--schedule-day-active-border-color);
   }
-  .schedule-optional-controls > summary { display: none; }
-  .schedule-optional-controls__body { padding-block-start: 0; }
   .schedule-route { padding-inline-start: var(--schedule-route-pad-inline-start); }
   .schedule-page-header { margin-block-start: var(--space-xl); }
   .schedule-route > .session-block::after {
@@ -2562,8 +2560,42 @@
     background: rgb(var(--color-surface-rgb));
     z-index: 1;
   }
+  .site-header-treatment .site-header-menu { display: none; }
+  .disclosure-chevron { flex: none; }
+  [aria-expanded="true"] > .disclosure-chevron { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .disclosure-chevron { transition: transform var(--motion-base) var(--motion-ease); }
+  }
   @media (max-width: 639px) {
-    .site-masthead__bar { align-items: flex-start; flex-direction: column; gap: var(--space-sm); }
+    .site-masthead__bar,
+    .site-header-identity-row {
+      display: flex;
+      align-items: center;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      padding-block: var(--space-xs);
+    }
+    .site-header-treatment .site-header-menu { display: inline-flex; margin-inline-start: auto; flex-shrink: 0; }
+    .site-header-nav { inline-size: 100%; flex-basis: 100%; }
+    .site-header-nav[data-mobile-open="false"] { display: none; }
+    .site-header-nav > ul { gap: 0 var(--space-sm); padding-block: var(--space-xs); }
+    .site-header-treatment .site-header-identity,
+    .site-header-treatment .site-masthead__identity,
+    .site-header-identity-row > .nameplate {
+      flex: 1 1 0;
+      min-inline-size: 0;
+      max-inline-size: none;
+      font-size: var(--text-body);
+    }
+    .site-header-identity-row > .nameplate { padding: 0; border: 0; }
+    .site-header-identity-row .nameplate__name { font-size: var(--text-body); }
+    .site-header-identity-row .nameplate__meta,
+    .site-header-dateline { display: none; }
+    .site-header-treatment .historical-demo-logo { max-inline-size: 100%; }
+    .demo-toolbar > p { flex-basis: 100%; }
+    .demo-toolbar > button { flex: 1 1 auto; }
+
     .site-masthead__bar nav ul { justify-content: flex-start; }
     .site-header-nav a,
     .site-header-nav summary { font-size: var(--text-body); }
@@ -2598,14 +2630,7 @@
     .event-hero--compact .event-hero__media { block-size: 7rem; }
     .schedule-page-header { margin-block-start: var(--space-md); }
     .schedule-screen > .schedule-days { margin-block-start: var(--space-md); }
-    .schedule-optional-controls { margin-block-start: var(--space-sm); }
     .schedule-screen > .map-grid { margin-block-start: var(--space-md); }
-    .schedule-optional-controls > summary {
-      display: flex;
-      align-items: center;
-      padding-block: var(--space-xs);
-    }
-    .schedule-optional-controls__body { padding-block-start: var(--space-sm); }
   }
 }
 
