@@ -9,10 +9,11 @@
  *   - resolve from/replyTo from config/event.sender
  *   - bounded retry on adapter-REPORTED retryable statuses only
  *   - send-once claims (onceKey) in email_claims
- *   - exactly one sent_emails audit row per send() call
+ *   - exactly one sent_emails audit row per permitted send() call
  */
 
 const crypto = require('node:crypto');
+const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { internals: renderInternals } = require('./render.cjs');
 
 const MAX_ATTEMPTS = 3;
@@ -77,7 +78,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    *   source?, storeRendered? }
    * @returns {Promise<object>} EmailSendResult
    */
-  /** One sent_emails row per send() call, whatever the outcome. */
+  /** One sent_emails row per permitted send() call, whatever the outcome. */
   async function writeAuditRow(message, fromEmail, toEmail, outcome) {
     const bodyStored = message.storeRendered !== false;
     const html = bodyStored ? truncateForAudit(message.html) : { value: null, truncated: false };
@@ -111,6 +112,16 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
   }
 
   async function send(message) {
+    // The final boundary protects every mail caller, including delayed
+    // triggers. Refusal must not itself create claims or audit records.
+    const policy = await checkDemoWrites({ db });
+    // Preserve retryable background-trigger semantics for a transient read
+    // failure, rather than acknowledging mail that never reached a provider.
+    throwIfDemoPolicyUnavailable(policy);
+    if (!policy.ok) {
+      return { providerMessageId: null, status: 'failed', error: policy.code, retries: 0 };
+    }
+
     const config = await getConfig();
     const sender = config?.event?.sender || {};
 

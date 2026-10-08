@@ -14,6 +14,8 @@
  */
 
 const crypto = require('node:crypto');
+const { checkDemoWrites } = require('../core/demoWrites.cjs');
+const { sendError } = require('../core/errors.cjs');
 const { isAlreadyExists } = require('../email/send.cjs').internals;
 
 const {
@@ -143,6 +145,9 @@ function createSendOtpHandler({
       res.status(400).json({ error: { code: 'bad-request', message: 'A valid email address is required.' } });
       return;
     }
+
+    const policy = await checkDemoWrites({ db });
+    if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
 
     const config = await getConfig();
     const code = generateOtpCode();
@@ -324,6 +329,10 @@ function createVerifyOtpHandler({ db, auth, now = Date.now, log = console }) {
       res.status(400).json({ error: { code: 'bad-request', message: 'challengeId, email, and the 6-digit code are required.' } });
       return;
     }
+
+    // Check before even consuming an attempt or a valid existing challenge.
+    const policy = await checkDemoWrites({ db });
+    if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
 
     const verdict = await verifyChallenge({ db, token: challengeId, email, code, now });
     if (!verdict.ok) {

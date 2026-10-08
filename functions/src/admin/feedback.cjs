@@ -52,6 +52,7 @@
  */
 
 const crypto = require('node:crypto');
+const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
@@ -234,6 +235,10 @@ function createSubmitFeedbackHandler({ db, sendEmail, getConfig, now = Date.now,
       res.status(201).json({ ok: true });
       return;
     }
+
+    // No rate-limit row, feedback record, or confirmation mail in a demo.
+    const policy = await checkDemoWrites({ db });
+    if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
 
     const clientIpHash = hashIp(extractClientIp(req));
     const docId = rawSubmissionKey !== undefined ? String(rawSubmissionKey) : crypto.randomUUID();

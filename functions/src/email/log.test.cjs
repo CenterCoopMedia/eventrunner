@@ -248,7 +248,7 @@ test('an absent config/bootstrap admits nobody (the gate fails closed)', async (
 // --- the done line: a sent code email appears in the log ----------------------
 
 test('a code email sent through the real email core appears in the log, with no subject and no body', async () => {
-  const db = makeFakeDb(BOOTSTRAP);
+  const db = makeFakeDb({ ...BOOTSTRAP, 'config/event': {} });
   const provider = { async send() { return { providerMessageId: 'pm-otp', status: 'sent' }; } };
   const core = createEmailCore({ db, provider, getConfig: async () => ({}), sleep: async () => {}, log: quietLog });
   const rendered = render({

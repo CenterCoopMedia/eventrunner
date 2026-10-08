@@ -25,6 +25,9 @@ function fakeDb() {
       __id: id,
       get id() { return id; },
       async get() {
+        if (c === 'config' && id === 'event' && !store.has(key(c, id))) {
+          return { exists: true, data: () => ({}) };
+        }
         // requireAdmin reads config/bootstrap live from this db (fails
         // closed on an absent document); served outside `store` so the
         // "writes nothing" assertions keep counting only what a handler wrote.
@@ -572,4 +575,41 @@ test('updateFeedbackStatus 404s on an unknown id, gates on admin', async () => {
   );
   assert.equal(res.statusCode, 401);
   assert.equal(db.store.get('feedback/f1').status, 'new');
+});
+
+test('historical demos refuse feedback with or without email before any row, rate slot, or mail', async () => {
+  for (const email of [undefined, 'attendee@example.org']) {
+    const db = fakeDb();
+    db.store.set('config/event', { historicalDemo: true });
+    const before = structuredClone(db.store);
+    const handler = createSubmitFeedbackHandler({
+      db,
+      now: () => NOW,
+      getConfig: async () => { assert.fail('render config must not be read'); },
+      sendEmail: async () => { assert.fail('mail must not be sent'); },
+    });
+    const res = fakeRes();
+    await handler(fakeReq({ body: realBody({ email, historicalDemo: false }) }), res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.code, 'read-only-demo');
+    assert.deepEqual(db.store, before);
+  }
+});
+
+test('feedback fails closed for missing, malformed, or unreadable policy', async () => {
+  for (const event of [null, { historicalDemo: 'false' }]) {
+    const db = fakeDb();
+    db.store.set('config/event', event);
+    const before = structuredClone(db.store);
+    const res = fakeRes();
+    await createSubmitFeedbackHandler({ db, now: () => NOW })(fakeReq({ body: realBody() }), res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error.code, 'config-unavailable');
+    assert.deepEqual(db.store, before);
+  }
+  const db = { collection() { throw new Error('config read failed'); } };
+  const res = fakeRes();
+  await createSubmitFeedbackHandler({ db, now: () => NOW })(fakeReq({ body: realBody() }), res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.error.code, 'config-unavailable');
 });
