@@ -497,7 +497,7 @@ function AdminDesk() {
         {/* Above the stone, never inside it: the title band pulls itself
             up by the stone's top padding and would slide over it. */}
         <PendingChangesBanner />
-        <div className="admin-stone mx-auto w-full max-w-admin-canvas">
+        <div className="admin-stone w-full">
           {/* The tour is the one thing in the stone before the page:
               `.admin-tour` (index.css) keeps room under it for the title
               band's pull, so the band lands below it, never over it. */}

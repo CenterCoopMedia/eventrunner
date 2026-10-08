@@ -9,7 +9,7 @@ export default function EditorDisclosure({ title, description, children, default
     if (reveal) setOpen(true);
   }, [reveal]);
   return (
-    <div className={`admin-editor-disclosure ${className}`}>
+    <div className={`admin-editor-disclosure ${className}`} data-open={open}>
       <Heading>
         <button type="button" className="admin-editor-disclosure__toggle" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen((value) => !value)}>
           <span className="admin-editor-disclosure__label"><span>{title}</span>{description ? <span className="admin-editor-disclosure__description">{description}</span> : null}</span>

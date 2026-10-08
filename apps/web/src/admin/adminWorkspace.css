@@ -81,3 +81,145 @@
   .admin-branding-preview { position: sticky; top: calc(var(--admin-control-height) + var(--space-3xl)); }
 }
 
+
+/* A fluid canvas with card-sized reading measures. Wide screens gain useful
+   parallel groups; fields never depend on the viewport's width alone. */
+.admin-stone { max-inline-size: none; }
+.admin-panel { overflow-wrap: anywhere; }
+.admin-panel__heading { align-items: center; }
+.admin-figure-breakdown li {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid rgb(var(--admin-rule-hairline-rgb));
+  border-radius: var(--admin-radius);
+  background: rgb(var(--admin-ground-soft-rgb));
+}
+.admin-figure-breakdown { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
+.admin-overview-detail-grid > .admin-readiness-panel { grid-column: auto; }
+.admin-overview-detail-grid > .admin-readiness-panel:nth-child(3) { grid-column: 1 / -1; }
+.admin-editor-layout, .admin-editor-stack, .admin-page-basics, .admin-page-section-list,
+.admin-page-block-list, .admin-settings-grid, .admin-feature-groups {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); align-items: start;
+}
+.admin-editor-layout > *, .admin-editor-stack > *, .admin-page-basics > *,
+.admin-settings-grid > *, .admin-feature-groups > * { min-width: 0; }
+.admin-editor-layout > .admin-panel, .admin-editor-stack > .admin-panel,
+.admin-page-basics > .admin-panel, .admin-content-editor-layout > .admin-panel,
+.admin-branding-section > .admin-panel, .admin-settings-grid > .admin-panel,
+.admin-feature-group { container: admin-card / inline-size; }
+.admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm);
+}
+.admin-editor-card--primary > .flex, .admin-editor-card--primary > .admin-editor-fields,
+.admin-content-fields { max-inline-size: 88ch; }
+.admin-settings-field--wide { grid-column: 1 / -1; }
+.admin-page-section-list > li:has(> .admin-editor-disclosure[data-open='true']) { grid-column: 1 / -1; }
+.admin-page-block-list > li { min-width: 0; }
+.admin-object-row {
+  display: flex; align-items: flex-start; gap: var(--space-sm); padding: var(--space-sm);
+  border: 1px solid rgb(var(--admin-rule-hairline-rgb)); border-radius: var(--admin-radius);
+  background: rgb(var(--admin-ground-soft-rgb));
+}
+.admin-object-row__icon {
+  display: grid; place-items: center; flex-shrink: 0; min-width: var(--admin-control-height);
+  min-height: var(--admin-control-height); border-radius: var(--admin-radius);
+  background: rgb(var(--admin-ground-raised-rgb)); font-family: var(--admin-font-data); font-weight: 700;
+}
+.admin-object-row__body { min-width: 0; }
+.admin-object-row__title { font-family: var(--admin-font-ui); font-weight: 700; overflow-wrap: anywhere; }
+.admin-object-row__description { margin-top: var(--space-3xs); color: rgb(var(--admin-ink-secondary-rgb)); font-size: var(--admin-text-sm); }
+.admin-settings-groups { display: flex; flex-direction: column; gap: var(--space-lg); }
+.admin-section-intro .admin-settings-group-title {
+  display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-sm);
+  font-size: var(--admin-text-xl); font-weight: 700; font-family: var(--admin-font-ui); color: rgb(var(--admin-ink-rgb));
+}
+.admin-settings-group-title::after { content: ''; flex: 1; border-top: 1px solid rgb(var(--admin-rule-hairline-rgb)); }
+.admin-settings-row-list, .admin-feature-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
+.admin-settings-row-card {
+  container: admin-card / inline-size;
+  min-width: 0; padding: var(--space-md); border: 1px solid rgb(var(--admin-rule-hairline-rgb));
+  border-radius: var(--admin-radius); background: rgb(var(--admin-ground-soft-rgb));
+}
+.admin-settings-row-heading { font-weight: 700; font-family: var(--admin-font-ui); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs); margin-bottom: var(--space-sm); }
+.admin-settings-grid > [role='status'] { grid-column: 1 / -1; }
+.admin-feature-card {
+  min-width: 0; border: 1px solid rgb(var(--admin-rule-control-rgb)); border-radius: var(--admin-radius);
+  background: rgb(var(--admin-ground-raised-rgb));
+}
+.admin-feature-card[data-enabled='true'] { background: rgb(var(--admin-action-soft-rgb)); border-inline-start: 4px solid rgb(var(--admin-action-rgb)); }
+.admin-feature-card__label { display: flex; align-items: flex-start; gap: var(--space-sm); min-height: var(--admin-control-height); padding: var(--space-md); cursor: pointer; }
+.admin-feature-card__label > input { flex-shrink: 0; margin-top: var(--space-3xs); }
+.admin-feature-card__content { min-width: 0; flex: 1; }
+.admin-feature-card__heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs); }
+.admin-feature-card__title { font-size: var(--admin-text-base); font-weight: 700; }
+.admin-feature-card__description { display: block; margin-top: var(--space-xs); color: rgb(var(--admin-ink-secondary-rgb)); font-size: var(--admin-text-sm); }
+.admin-feature-card__state { font-size: var(--admin-text-xs); font-weight: 700; }
+.admin-feature-card__key { display: block; margin-top: var(--space-xs); color: rgb(var(--admin-ink-data-rgb)); font-family: var(--admin-font-data); font-size: var(--admin-text-xs); overflow-wrap: anywhere; }
+.admin-feature-card:focus-within { outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb)); outline-offset: var(--admin-focus-offset); }
+.admin-editor-layout input:not([type='checkbox']):not([type='radio']),
+.admin-editor-layout select, .admin-editor-layout button,
+.admin-settings-groups input:not([type='checkbox']):not([type='radio']),
+.admin-settings-groups select, .admin-settings-groups button { min-height: var(--admin-control-height); }
+.admin-settings-grid > .admin-panel .sm\:grid-cols-2,
+.admin-settings-grid > .admin-panel .sm\:grid-cols-3 { grid-template-columns: minmax(0, 1fr); }
+.admin-settings-grid > .admin-panel .sm\:col-span-2,
+.admin-settings-grid > .admin-panel .sm\:col-span-3 { grid-column: 1 / -1; }
+@container admin-card (min-width: 30rem) {
+  .admin-editor-fields, .admin-page-fields, .admin-settings-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-settings-grid > .admin-panel .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container admin-card (min-width: 44rem) {
+  .admin-settings-grid > .admin-panel .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .admin-settings-grid > .admin-panel .sm\:grid-cols-3 > .sm\:col-span-2 { grid-column: span 2; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .admin-feature-card:hover { border-color: rgb(var(--admin-action-rgb)); }
+}
+@media (min-width: 1280px) {
+  .admin-editor-layout { grid-template-columns: minmax(0, min(42rem, 40%)) minmax(0, 1fr); }
+  .admin-editor-stack { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+  .admin-editor-layout--speaker { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr); }
+  .admin-page-basics { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
+  .admin-page-section-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }
+  .admin-page-block-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr)); }
+  .admin-section-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-content-editor-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; }
+  .admin-content-editor-layout[data-creating='true'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+  .admin-settings-grid, .admin-feature-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-settings-grid--essentials > :last-child:nth-child(3) { grid-column: 1 / -1; }
+  .admin-settings-row-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+}
+@media (min-width: 1800px) {
+  .admin-settings-grid--essentials { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .admin-settings-grid--essentials > :last-child:nth-child(3) { grid-column: auto; }
+  .admin-branding-workspace { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .admin-page-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .admin-section-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@container (min-width: 54rem) {
+  .admin-branding-section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .admin-branding-section > .admin-panel:only-child { grid-column: 1 / -1; }
+}
+.admin-room input[type='checkbox'] + div > label { display: flex; align-items: center; min-height: var(--admin-control-height); }
+.admin-room input[type='checkbox']:has(+ div > label) { margin-block-start: calc((var(--admin-control-height) - 1.25rem) / 2); }
+
+.admin-editor-fields > .sm\:col-span-2, .admin-editor-fields > .sm\:col-span-3,
+.admin-section-fields > .sm\:col-span-2 { grid-column: 1 / -1; }
+
+.admin-settings-time-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); }
+@container admin-card (min-width: 18rem) {
+  .admin-settings-time-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.admin-block-type-choices { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+
+.admin-feature-card[data-invalid='true'] { border-color: rgb(var(--admin-rule-alarm-rgb)); }
+.admin-feature-card > p { padding: 0 var(--space-md) var(--space-sm); }
+/* Date rows need room to sit alongside each other, rather than stacking a
+   whole event into one narrow column between shorter cards. */
+@media (min-width: 1280px) {
+  .admin-settings-grid--essentials { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .admin-settings-grid--essentials > :nth-child(2) { grid-column: span 2; }
+  .admin-settings-grid > .admin-panel:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .admin-settings-row-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
+}

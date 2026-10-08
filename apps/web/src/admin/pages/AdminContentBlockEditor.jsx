@@ -94,7 +94,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
     );
   }
   return (
-    <div className="grid gap-sm sm:grid-cols-2">
+    <div className="admin-content-fields grid gap-sm sm:grid-cols-2">
       {fields.map((field) => {
         const label = `${field.id}${field.required ? '' : ' (optional)'}`;
         const value = values[field.id];

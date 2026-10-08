@@ -235,11 +235,13 @@ test.describe.serial('the event statistics endpoint', () => {
     try {
       for (const viewport of [
         { name: 'desktop', width: 1440, height: 1000 },
+        { name: 'ultrawide', width: 2560, height: 1440 },
         { name: 'narrow', width: 390, height: 844 },
       ]) {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
         await expect(page.getByRole('article')).toHaveCount(5);
+        await page.locator('.admin-rail').evaluate((element) => { element.scrollTop = 0; });
         await page.locator('html').evaluate((element) => element.ownerDocument.fonts.ready);
         await page.screenshot({
           path: path.join(evidenceDir, `overview-${viewport.name}-${viewport.width}.png`),

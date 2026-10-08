@@ -407,8 +407,9 @@ export default function AdminPageEditor({ mode }) {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel title="Page" description="How the page is identified, ordered, and linked.">
-        <div className="grid gap-sm sm:grid-cols-2">
+      <div className="admin-page-basics">
+      <Panel title="Page" description="How the page is identified, ordered, and linked." className="admin-page-identity">
+        <div className="admin-page-fields">
           <TextField
             label="Page id"
             value={page.id}
@@ -510,6 +511,7 @@ export default function AdminPageEditor({ mode }) {
 
       <Panel
         title="Page template"
+        className="admin-page-template"
         description={
           isSystemPage
             ? 'What kind of page this is. The page keeps its built-in feature; the template shapes everything around it.'
@@ -609,6 +611,8 @@ export default function AdminPageEditor({ mode }) {
         </div>
       </Panel>
 
+      </div>
+
       <Panel
         title="Sections"
         description="Expand a section to edit its name and content structure. Open its allowed block types only when you need to change the available formats."
@@ -627,7 +631,7 @@ export default function AdminPageEditor({ mode }) {
             No sections yet. A page with no sections renders nothing.
           </p>
         ) : (
-          <ol className="flex flex-col gap-md">
+          <ol className="admin-page-section-list">
             {page.sections.map((section, sectionIndex) => {
               const at = `sections[${sectionIndex}]`;
               return (
@@ -681,7 +685,7 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </div>
 
-                  <div className="grid gap-sm sm:grid-cols-2">
+                  <div className="admin-section-fields">
                     <TextField
                       label={`Section ${sectionIndex + 1} id`}
                       value={section.id}
@@ -804,7 +808,7 @@ export default function AdminPageEditor({ mode }) {
                         No blocks yet.
                       </p>
                     ) : (
-                      <ol className="mt-2xs flex flex-col gap-sm">
+                      <ol className="admin-page-block-list mt-sm">
                         {section.defaultBlocks.map((block, blockIndex) => {
                           const bat = `${at}.defaultBlocks[${blockIndex}]`;
                           const allowed = section.allowedBlocks.length

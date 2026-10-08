@@ -98,6 +98,54 @@ beforeEach(() => {
 });
 
 describe('admin Sessions workspace', () => {
+  it('groups the session into content, time, location, and publishing cards without changing field order', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    const form = screen.getByLabelText('Public title').closest('form');
+    const layout = form.querySelector('.admin-editor-layout--session');
+    expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
+      .toEqual(['Public session', 'Time and structure', 'Location', 'Publishing']);
+    expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
+      'Session id', 'Public title', 'Public description', 'Recording link',
+      'Event day', 'Parent session', 'Start time', 'End time', 'Track',
+      'Recorded place', 'Public location text', 'Show this session when it is published',
+    ]);
+    const location = within(layout).getByRole('heading', { name: 'Location' }).closest('section');
+    expect(within(location).getByLabelText('Recorded place')).toBeInTheDocument();
+    expect(within(location).getByLabelText('Public location text')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves every saved scheduling and publishing value across the new cards', async () => {
+    await renderAt('/admin/sessions/panel');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    act(() => configSubscriptions.get('event')({
+      days: [{ id: 'day-1', label: 'Day one', date: '2026-03-27', startTime: '08:00', endTime: '16:30' }],
+      tracks: [{ letter: 'A', name: 'Main stage' }],
+      venue: { places: [{ id: 'hall', name: 'Hall' }] },
+    }));
+    const saved = {
+      title: 'Panel', description: 'Panel description.', dayId: 'day-1',
+      startTime: '09:15', endTime: '10:00', track: 'A', placeId: 'hall',
+      location: 'Main hall, level 1', parentId: 'opening',
+      recordingUrl: 'https://example.org/recording',
+    };
+    pushSessions([], [
+      { id: 'opening', dayId: 'day-1', title: 'Opening', status: 'dirty' },
+      { id: 'panel', ...saved, visible: false, status: 'dirty' },
+    ]);
+    expect(await screen.findByLabelText('Public title')).toHaveValue('Panel');
+    expect(screen.getByLabelText('Parent session')).toHaveValue('opening');
+    expect(screen.getByLabelText('Recorded place')).toHaveValue('hall');
+    expect(screen.getByLabelText('Show this session when it is published')).not.toBeChecked();
+    fetch.mockResolvedValueOnce(response({ docId: 'panel', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toEqual({
+      collection: 'cmsSchedule', docId: 'panel', fields: saved, visible: false,
+    });
+  });
+
   it('waits for both revisions before it fills the form and saves the draft values', async () => {
     reportAdminCollectionsAtOnce = false;
     await renderAt('/admin/sessions/keynote');

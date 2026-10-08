@@ -10,7 +10,7 @@
 //                fallback §4.3 names.
 //   • Server 400 → surfaced VERBATIM, including each `field: reason`.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
@@ -159,6 +159,25 @@ describe('speakers list', () => {
 });
 
 describe('speaker editor', () => {
+  it('keeps identity, public profile, and contact cards in reading order with the account link read-only', async () => {
+    speakerDocs = [{ ...RAE, uid: 'linked-attendee' }];
+    await renderAt('/admin/speakers/rae-okonkwo');
+    const form = screen.getByLabelText('First name').closest('form');
+    const layout = form.querySelector('.admin-editor-layout--speaker');
+    expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
+      .toEqual(['Name', 'Profile', 'Contact and status']);
+    expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
+      'First name', 'Last name', 'URL slug', 'Job title', 'Organization',
+      'Bio', 'Headshot path', 'Email', 'Status',
+    ]);
+    const account = within(layout).getByRole('heading', { name: 'Linked attendee account' })
+      .closest('.admin-object-row');
+    expect(account).toHaveTextContent('cannot be edited here');
+    expect(account.querySelector('input, select, textarea, button, a')).toBeNull();
+    expect(form).not.toHaveTextContent('linked-attendee');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('creates a speaker without ever sending the server-owned link fields', async () => {
     fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
     await renderAt('/admin/speakers/new');
