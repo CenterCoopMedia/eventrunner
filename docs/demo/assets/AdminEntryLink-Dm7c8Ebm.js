@@ -1,1 +1,0 @@
-import{b as t,I as a,j as o,L as m,a1 as r}from"./index-DcJjTWo9.js";function u({account:s}){const{eventConfig:e}=t(),n=s?.views??[];return a(e)||n.length<2||!n.some(i=>i.id==="admin")?null:o.jsx(m,{to:"/admin",className:`${r} mt-sm`,children:"Manage event"})}export{u as A};

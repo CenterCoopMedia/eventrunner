@@ -194,6 +194,7 @@ test.describe.serial('the event statistics endpoint', () => {
       for (const expected of figureCards(response.body)) {
         const card = figures.getByRole('article', { name: expected.title, exact: true });
         await expect(card).toBeVisible();
+        await expect(card.getByRole('heading', { level: 3 })).toHaveCSS('font-family', /Source Sans 3/);
         await expect(card.locator('.admin-figure-total')).toHaveText(expected.total);
         await expect(card.getByRole('listitem')).toHaveText(expected.breakdown);
         if (expected.note) await expect(card.getByText(expected.note, { exact: true })).toBeVisible();
