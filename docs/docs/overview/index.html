@@ -113,6 +113,7 @@
           <nav class="contents" aria-labelledby="contents-title">
             <p class="contents-title" id="contents-title">On this page</p>
             <ul>
+              <li><a href="#demos">Demos</a></li>
               <li><a href="#who-it-is-for">Who it is for</a></li>
               <li><a href="#what-v1-includes">What v1 includes</a></li>
               <li><a href="#operating-model">Operating model</a></li>
@@ -129,9 +130,13 @@
           <p>Site: <a href="https://centercoopmedia.github.io/eventrunner/">centercoopmedia.github.io/eventrunner</a>
           Documentation: <a href="https://centercoopmedia.github.io/eventrunner/docs/">centercoopmedia.github.io/eventrunner/docs</a>
           Handbook: <a href="https://github.com/CenterCoopMedia/eventrunner/wiki">wiki</a></p>
-          <p>A public demo instance and README screenshots are pending the operator&#39;s deploy of that instance
-          (see <a href="https://github.com/CenterCoopMedia/eventrunner/issues/35">#35</a>) — this section gets the link
-          and images once that deployment exists.</p>
+          <h2 id="demos">Demos<a class="heading-anchor" href="#demos" aria-label="Link to this section">#</a></h2>
+          <h3 id="static-visitor-preview">Static visitor preview<a class="heading-anchor" href="#static-visitor-preview" aria-label="Link to this section">#</a></h3>
+          <p><a href="https://centercoopmedia.github.io/eventrunner/demo/">Open the static visitor preview</a>. It is an NC Local past-event mock-up of the March 27, 2026 NC News &amp; Information Summit in Raleigh. Its selected historical program includes eight named sessions, 25 public speakers, and documented partner roles. It does not reproduce the full agenda or represent an official NC Local site, endorsement, or future event. See the <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/nclocal-demo.md">historical content and sources</a>.</p>
+          <p>The preview is read-only, needs no account, and has no admin panel. Sign-in, registration, ticket claims, email actions, the attendee directory, and calendar exports are disabled. Compare all six site styles in light or dark mode, or open the <a href="https://centercoopmedia.github.io/eventrunner/demo/#/specimen">specimen book</a> for interface components.</p>
+          <h3 id="hosted-adminclient-demo">Hosted admin/client demo<a class="heading-anchor" href="#hosted-adminclient-demo" aria-label="Link to this section">#</a></h3>
+          <p><a href="https://eventrunner-demo.web.app/">Open the hosted client demo</a> or its <a href="https://eventrunner-demo.web.app/admin">admin panel</a>. This separate Firebase-hosted deployment demonstrates client and admin workflows. Admin screens require an authorized account; opening the link does not grant access. The <a href="/eventrunner/docs/admin-guide/">admin guide</a> explains the staff editing screens.</p>
+          <p>Checked October 8, 2026: The hosted demo still shows the fictional Harborlight event. Its content and release can differ from the static preview. The NC Local content refresh is tracked separately in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/346">#346</a>; hosted-demo verification remains tracked in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/35">#35</a>.</p>
           <h2 id="who-it-is-for">Who it is for<a class="heading-anchor" href="#who-it-is-for" aria-label="Link to this section">#</a></h2>
           <p>Nonprofit and journalism organizations, universities, and event producers who want a staff-run event site: schedule, speakers, registration, materials, and a block-based CMS.</p>
           <p>The reference implementation is the <a href="https://summit.collaborativejournalism.org">2026 Collaborative Journalism Summit</a> site (<code>jamditis/cjs2026</code>). That repo stays the live production event. This repo is a new extract, not a fork. Features cut from v1 stay in the summit repo.</p>

@@ -58,6 +58,7 @@
  * `account_created`.
  */
 
+const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const TICKETS = require('./index.cjs').internals.TICKETS;
 const USERS = 'users';
 
@@ -127,6 +128,12 @@ async function sendRegistrationPrompt({
   if (typeof uid !== 'string' || uid.length === 0) {
     return { sent: false, reason: 'no-uid' };
   }
+
+  // Delayed/retried deliveries and manually seeded users can bypass auth
+  // seeding. Apply the same policy before provider/template work as well.
+  const policy = await checkDemoWrites({ db });
+  throwIfDemoPolicyUnavailable(policy);
+  if (!policy.ok) return { sent: false, reason: policy.code };
 
   const userSnap = await db.collection(USERS).doc(uid).get();
   if (!userSnap.exists) {
@@ -202,6 +209,9 @@ async function sendRegistrationPrompt({
     hasLegalFooterText: rendered.hasLegalFooterText,
   });
 
+  // Policy may have changed since the trigger's first read. An intentional
+  // refusal at the final send boundary is still a non-retrying demo skip.
+  if (result.error === 'read-only-demo') return { sent: false, reason: 'read-only-demo' };
   if (result.status !== 'sent') {
     log.error(`registration prompt: send failed for ${uid}`, result.error);
     return { sent: false, reason: 'send-failed', templateId: prompt.templateId };

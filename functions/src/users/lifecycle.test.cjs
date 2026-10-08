@@ -14,7 +14,7 @@ const NOW = new Date('2026-08-21T12:00:00Z');
 
 /** Minimal Firestore fake: doc create/update plus a write audit. */
 function fakeDb(seed = {}) {
-  const docs = new Map(Object.entries(seed));
+  const docs = new Map(Object.entries({ 'config/event': {}, ...seed }));
   const writes = [];
   return {
     docs,
@@ -164,4 +164,28 @@ test('maintainProfileComplete ignores a deleted account', async () => {
   const result = await createMaintainProfileComplete({ db })({ uid: 'u1', after: null });
   assert.equal(result.action, 'unchanged');
   assert.deepEqual(db.writes, []);
+});
+
+test('onUserCreated suppresses account records for historical demos, including repeat Auth deliveries', async () => {
+  const db = fakeDb({ 'config/event': { historicalDemo: true } });
+  const create = createOnUserCreated({ db });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    assert.deepEqual(await create({ uid: 'u1', email: 'rae@example.org' }), {
+      created: false, reason: 'read-only-demo',
+    });
+  }
+  assert.equal(db.docs.has('users/u1'), false);
+  assert.deepEqual(db.writes, []);
+});
+
+test('onUserCreated retries unavailable policy without writing and recovers after configuration is restored', async () => {
+  const db = fakeDb();
+  const create = createOnUserCreated({ db });
+  db.docs.delete('config/event');
+  await assert.rejects(create({ uid: 'u1' }), { code: 'config-unavailable' });
+  db.docs.set('config/event', { historicalDemo: 'false' });
+  await assert.rejects(create({ uid: 'u1' }), { code: 'config-unavailable' });
+  assert.deepEqual(db.writes, []);
+  db.docs.set('config/event', { historicalDemo: false });
+  assert.deepEqual(await create({ uid: 'u1' }), { created: true });
 });

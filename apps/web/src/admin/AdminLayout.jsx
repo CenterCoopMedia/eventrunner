@@ -46,6 +46,7 @@
 // THE TOUR (issue #198). A first visit opens the editor tour at the head of
 // the stone; "Take the tour" on the rail opens it again. It is its own lazy
 // chunk (components/AdminTour.jsx), and its steps are this docket.
+import './adminWorkspace.css';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import useAccountViews from '../hooks/useAccountViews.js';
@@ -496,7 +497,7 @@ function AdminDesk() {
         {/* Above the stone, never inside it: the title band pulls itself
             up by the stone's top padding and would slide over it. */}
         <PendingChangesBanner />
-        <div className="admin-stone mx-auto w-full max-w-admin-canvas">
+        <div className="admin-stone w-full">
           {/* The tour is the one thing in the stone before the page:
               `.admin-tour` (index.css) keeps room under it for the title
               band's pull, so the band lands below it, never over it. */}

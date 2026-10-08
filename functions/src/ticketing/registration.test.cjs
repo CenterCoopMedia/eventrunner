@@ -9,7 +9,7 @@ const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
 // #186 review: it fails closed on an absent document), so every fake this
 // file builds carries the document the file's getConfig describes.
 const BOOTSTRAP_DOC = { adminEmails: ['admin@example.com'] };
-const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, 'config/event': {}, ...seed });
 const {
   createTicketingVerifyOrderHandler,
   createCreateUserFromTicketHandler,
@@ -365,4 +365,41 @@ test('a ticket with no email address cannot mint an account', async () => {
 
   assert.equal(res.statusCode, 422);
   assert.equal(authImpl.created.length, 0);
+});
+
+test('createUserFromTicket refuses historical demos before account lookup, creation, or ticket writes', async () => {
+  const ticket = { ...fakeTicket(), claimedByUid: null };
+  const db = makeFakeDb({ 'config/event': { historicalDemo: true }, 'tickets/tkt-1': ticket });
+  const authImpl = {
+    verifyIdToken: auth.verifyIdToken,
+    getUserByEmail() { assert.fail('account lookup must not run'); },
+    createUser() { assert.fail('account creation must not run'); },
+  };
+  const res = makeRes();
+  await createUserHandler({ db, authImpl })(adminReq({ externalId: 'tkt-1', historicalDemo: false }), res);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'read-only-demo');
+  assert.deepEqual(db.read('tickets', 'tkt-1'), ticket);
+  assert.deepEqual(db.ids('users'), []);
+  assert.deepEqual(db.writes, []);
+});
+
+test('createUserFromTicket fails closed on unavailable policy and still creates accounts for explicit ordinary events', async () => {
+  for (const event of [null, { historicalDemo: 'false' }]) {
+    const db = makeFakeDb({ 'config/event': event, 'tickets/tkt-1': fakeTicket() });
+    const authImpl = fakeAuth();
+    const res = makeRes();
+    await createUserHandler({ db, authImpl })(adminReq({ externalId: 'tkt-1' }), res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error.code, 'config-unavailable');
+    assert.deepEqual(authImpl.created, []);
+    assert.deepEqual(db.writes, []);
+  }
+  const db = makeFakeDb({ 'config/event': { historicalDemo: false }, 'tickets/tkt-1': fakeTicket() });
+  const authImpl = fakeAuth();
+  const res = makeRes();
+  await createUserHandler({ db, authImpl })(adminReq({ externalId: 'tkt-1' }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.created, true);
+  assert.equal(authImpl.created.length, 1);
 });

@@ -37,11 +37,61 @@ async function openPhoneProof(page) {
   // live config/theme document. Measure only after that adoption so the
   // candidate and the public page are the same saved document.
   await expect(page.getByLabel('Site style')).toHaveValue('civic');
+  await page.getByRole('button', { name: 'Page style', exact: true }).click();
+  await expect(page.getByLabel('Site style')).toBeVisible();
   await page.getByRole('button', { name: 'Phone (390px)' }).click();
   const iframe = page.locator('iframe[title="Home preview, light mode, 390px wide"]');
   await expect(iframe).toBeVisible();
   return iframe;
 }
+
+test('phone public Menu supports repeated Escape and closes after navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.locator('article[data-content-source="live"]')).toBeVisible();
+
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  const nav = page.getByRole('navigation', { name: 'Main', includeHidden: true });
+  const scheduleLink = nav.locator('a[href="/schedule"]');
+  await expect(menu).toBeVisible();
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(nav).toBeHidden();
+  await expect(menu).toHaveAttribute('aria-controls', await nav.getAttribute('id'));
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await menu.press('Enter');
+    await expect(menu).toHaveAttribute('aria-expanded', 'true');
+    await expect(nav).toBeVisible();
+    await scheduleLink.press('Escape');
+    await expect(menu).toBeFocused();
+    await expect(menu).toHaveAttribute('aria-expanded', 'false');
+    await expect(nav).toBeHidden();
+  }
+
+  await menu.press('Enter');
+  await scheduleLink.press('Enter');
+  await expect(page).toHaveURL(/\/schedule$/);
+  await expect(page.locator('.session-block').first()).toBeVisible();
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(nav).toBeHidden();
+
+  // Searching and clearing remain available without revealing the facets.
+  const search = page.getByRole('searchbox', { name: 'Search this day', exact: true });
+  const filters = page.getByRole('button', { name: 'Filters', exact: true });
+  await expect(search).toBeVisible();
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.schedule-facets')).toBeHidden();
+  await search.fill('e2e-no-session-match-398399');
+  await expect(page.getByText(/No sessions on .+ match “e2e-no-session-match-398399”/)).toBeVisible();
+  await expect(page.locator('.session-block')).toHaveCount(0);
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(page.locator('.session-block').first()).toBeVisible();
+  await expect(filters).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.schedule-facets')).toBeHidden();
+});
 
 test('phone proof uses its own viewport and public inheritance for every theme and mode', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
@@ -121,12 +171,14 @@ test('phone proof uses its own viewport and public inheritance for every theme a
         'The Fifteenth Annual Regional Convening',
       );
       await expect(stressedSchedule.locator('.session-block')).toHaveCount(28);
-      const optionalControls = stressedSchedule.locator('.schedule-optional-controls');
-      await expect(optionalControls).not.toHaveAttribute('open', '');
-      const filtersSummary = optionalControls.locator('summary');
-      await expect(filtersSummary).toBeVisible();
-      expect((await filtersSummary.boundingBox()).height).toBeGreaterThanOrEqual(44);
-      await filtersSummary.press('Enter');
+      const filters = stressedSchedule.getByRole('button', { name: 'Filters', exact: true });
+      await expect(stressedSchedule.getByRole('searchbox', { name: 'Search this day', exact: true })).toBeVisible();
+      await expect(filters).toHaveAttribute('aria-expanded', 'false');
+      await expect(stressedSchedule.locator('.schedule-facets')).toBeHidden();
+      await expect(filters).toBeVisible();
+      expect((await filters.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      await filters.press('Enter');
+      await expect(filters).toHaveAttribute('aria-expanded', 'true');
       await expect(stressedSchedule.getByText('Format', { exact: true })).toBeVisible();
       const stressedScheduleFrame = page.locator(
         `iframe[title="Schedule preview, ${mode} mode, 390px wide"]`,
@@ -187,6 +239,9 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
 
     await publicPage.goto('/schedule');
     await expect(publicPage.locator('.session-block').first()).toBeVisible();
+    await expect(publicPage.getByRole('searchbox', { name: 'Search this day', exact: true })).toBeVisible();
+    await expect(publicPage.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    await expect(publicPage.locator('.schedule-facets')).toBeHidden();
     const firstPublicSession = await publicPage.locator('.session-block').first().evaluate(
       (element) => ({
         top: element.getBoundingClientRect().top,
@@ -221,7 +276,9 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
   await expect(scheduleFrame.locator('.schedule-screen')).toBeVisible();
   await expect(scheduleFrame.locator('.schedule-grid')).toHaveCount(0);
   await expect(scheduleFrame.locator('.event-hero')).toHaveClass(/event-hero--compact/);
-  await expect(scheduleFrame.locator('.schedule-optional-controls')).not.toHaveAttribute('open', '');
+  await expect(scheduleFrame.getByRole('searchbox', { name: 'Search this day', exact: true })).toBeVisible();
+  await expect(scheduleFrame.getByRole('button', { name: 'Filters', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(scheduleFrame.locator('.schedule-facets')).toBeHidden();
   const firstSession = await scheduleFrame.locator('.session-block').first().evaluate(
     (element) => ({
       top: element.getBoundingClientRect().top,
@@ -388,29 +445,34 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   await page.getByLabel('Square icon').fill(
     'branding/a-populated-square-icon-path-with-a-long-unbroken-file-name.png',
   );
-  await page.getByRole('button', { name: 'Show the advanced settings' }).click();
+  // Each task owns a separate view. Check the populated identity fields as
+  // well as the advanced controls, rather than measuring them while hidden.
+  for (const task of ['Identity', 'Page style', 'Workspace', 'Advanced']) {
+    const taskButton = page.getByRole('button', { name: task, exact: true });
+    await taskButton.click();
+    await expect(taskButton).toHaveAttribute('aria-pressed', 'true');
+    const measurements = await page.evaluate(() => {
+      const visibleControls = [...document.querySelectorAll('input, select, button')]
+        .filter((element) => element.getClientRects().length > 0);
+      return {
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        railHeight: document.querySelector('.admin-rail').getBoundingClientRect().height,
+        jobPosition: getComputedStyle(document.querySelector('.admin-job-line')).position,
+        actionPadding: Number.parseFloat(
+          getComputedStyle(document.querySelector('.admin-job-line__actions > *')).paddingLeft,
+        ),
+        controlsInside: visibleControls.every((element) => {
+          const box = element.getBoundingClientRect();
+          return box.left >= 0 && box.right <= document.documentElement.clientWidth;
+        }),
+      };
+    });
 
-  const measurements = await page.evaluate(() => {
-    const visibleControls = [...document.querySelectorAll('input, select, button')]
-      .filter((element) => element.getClientRects().length > 0);
-    return {
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-      railHeight: document.querySelector('.admin-rail').getBoundingClientRect().height,
-      jobPosition: getComputedStyle(document.querySelector('.admin-job-line')).position,
-      actionPadding: Number.parseFloat(
-        getComputedStyle(document.querySelector('.admin-job-line__actions > *')).paddingLeft,
-      ),
-      controlsInside: visibleControls.every((element) => {
-        const box = element.getBoundingClientRect();
-        return box.left >= 0 && box.right <= document.documentElement.clientWidth;
-      }),
-    };
-  });
-
-  expect(measurements.scrollWidth).toBe(measurements.clientWidth);
-  expect(measurements.railHeight).toBe(56);
-  expect(measurements.jobPosition).toBe('static');
-  expect(measurements.actionPadding).toBe(8);
-  expect(measurements.controlsInside).toBe(true);
+    expect(measurements.scrollWidth, task).toBe(measurements.clientWidth);
+    expect(measurements.railHeight, task).toBe(56);
+    expect(measurements.jobPosition, task).toBe('static');
+    expect(measurements.actionPadding, task).toBe(8);
+    expect(measurements.controlsInside, task).toBe(true);
+  }
 });

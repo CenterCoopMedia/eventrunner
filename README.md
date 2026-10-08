@@ -10,9 +10,19 @@ Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/
 Documentation: [centercoopmedia.github.io/eventrunner/docs](https://centercoopmedia.github.io/eventrunner/docs/)
 Handbook: [wiki](https://github.com/CenterCoopMedia/eventrunner/wiki)
 
-A public demo instance and README screenshots are pending the operator's deploy of that instance
-(see [#35](https://github.com/CenterCoopMedia/eventrunner/issues/35)) — this section gets the link
-and images once that deployment exists.
+## Demos
+
+### Static visitor preview
+
+[Open the static visitor preview](https://centercoopmedia.github.io/eventrunner/demo/). It is an NC Local past-event mock-up of the March 27, 2026 NC News & Information Summit in Raleigh. Its selected historical program includes eight named sessions, 25 public speakers, and documented partner roles. It does not reproduce the full agenda or represent an official NC Local site, endorsement, or future event. See the [historical content and sources](docs/nclocal-demo.md).
+
+The preview is read-only, needs no account, and has no admin panel. Sign-in, registration, ticket claims, email actions, the attendee directory, and calendar exports are disabled. Compare all six site styles in light or dark mode, or open the [specimen book](https://centercoopmedia.github.io/eventrunner/demo/#/specimen) for interface components.
+
+### Hosted admin/client demo
+
+[Open the hosted client demo](https://eventrunner-demo.web.app/) or its [admin panel](https://eventrunner-demo.web.app/admin). This separate Firebase-hosted deployment demonstrates client and admin workflows. Admin screens require an authorized account; opening the link does not grant access. The [admin guide](docs/ADMIN_GUIDE.md) explains the staff editing screens.
+
+Checked October 8, 2026: The hosted demo still shows the fictional Harborlight event. Its content and release can differ from the static preview. The NC Local content refresh is tracked separately in [#346](https://github.com/CenterCoopMedia/eventrunner/issues/346); hosted-demo verification remains tracked in [#35](https://github.com/CenterCoopMedia/eventrunner/issues/35).
 
 ## Who it is for
 

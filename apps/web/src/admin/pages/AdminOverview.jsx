@@ -9,12 +9,6 @@
 // polling. A figure changes when somebody asks for it again, and the "read
 // at" time says when that was.
 //
-// FIGURE SENTENCES, NOT TILES (design vocabulary §3.4). Each figure sits in
-// a sentence that says what it counts: "412 accounts: 120 pending, …". The
-// number is in the data face, bold and tabular, and the words around it are
-// the label, so no figure is ever a bare number and nothing is said by
-// colour. Zero is printed as "0", never left out.
-//
 // THE REFRESH CONTROL is never `disabled`: while a request runs it says
 // "Refreshing…", carries aria-busy and aria-disabled, and its handler
 // ignores the press, so the focus stays on it and a second press sends
@@ -29,12 +23,14 @@
 // #180), then the registration funnel and the content readiness table
 // (issue #181), both read from the same response.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';
-import { Notice, Panel, SaveStatus, secondaryButtonClass } from '../components/formControls.jsx';
+import { Notice, primaryButtonClass, secondaryButtonClass } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState } from '../components/adminChrome.jsx';
-import { Figure, plural } from '../overview/figures.jsx';
+import EventFigures from '../overview/EventFigures.jsx';
 import MilestonesPanel from '../overview/MilestonesPanel.jsx';
 import FunnelPanel from '../overview/FunnelPanel.jsx';
 import ReadinessPanel from '../overview/ReadinessPanel.jsx';
@@ -59,84 +55,9 @@ export function formatReadAt(iso, timeZone) {
   }
 }
 
-/** "120 pending, 30 ticketed, …": each part a figure and its word. */
-function Parts({ parts }) {
-  return parts.map(([word, value], index) => (
-    <span key={word}>
-      {index > 0 ? ', ' : ''}
-      <Figure value={value} /> {word}
-    </span>
-  ));
-}
-
-const REGISTRATION_WORDS = [
-  ['pending', 'pending'],
-  ['ticketed', 'ticketed'],
-  ['approved', 'approved'],
-  ['revoked', 'revoked'],
-];
-const TICKET_WORDS = [
-  ['valid', 'valid'],
-  ['refunded', 'refunded'],
-  ['cancelled', 'cancelled'],
-  ['pending_info', 'waiting for details'],
-];
-const SPEAKER_WORDS = [
-  ['draft', 'draft'],
-  ['invited', 'invited'],
-  ['accepted', 'accepted'],
-  ['approved', 'approved'],
-  ['removed', 'removed'],
-];
-
-const partsOf = (byStatus, words) => words.map(([key, word]) => [word, byStatus?.[key] ?? 0]);
-
-/** The six figure sentences, straight from the response. */
-function EventFigures({ stats }) {
-  const registrations = stats.registrations ?? {};
-  const tickets = stats.tickets ?? {};
-  const speakers = stats.speakers ?? {};
-  const sessions = stats.content?.cmsSchedule ?? {};
-  const unresolved = stats.errors?.unresolved ?? 0;
-  const accounts = registrations.total ?? 0;
-  const sessionsLive = sessions.published ?? 0;
-  const sessionsDirty = sessions.drafts ?? 0;
-  return (
-    <Panel
-      title="Event figures"
-      description="Counted on the server when you open this page or refresh it. A ticket is one ticket record, not one seat."
-    >
-      <ul className="flex flex-col gap-2xs text-admin-base text-admin-ink">
-        <li>
-          <Figure value={accounts} /> {plural(accounts, 'account', 'accounts')}:{' '}
-          <Parts parts={partsOf(registrations.byStatus, REGISTRATION_WORDS)} />.
-        </li>
-        <li>
-          <Figure value={registrations.profileComplete} /> of <Figure value={accounts} />{' '}
-          {plural(accounts, 'profile', 'profiles')} complete.
-        </li>
-        <li>
-          <Figure value={tickets.total} /> {plural(tickets.total ?? 0, 'ticket', 'tickets')}:{' '}
-          <Parts parts={partsOf(tickets.byStatus, TICKET_WORDS)} />.
-        </li>
-        <li>
-          <Figure value={speakers.total} /> {plural(speakers.total ?? 0, 'speaker', 'speakers')}:{' '}
-          <Parts parts={partsOf(speakers.byStatus, SPEAKER_WORDS)} />.
-        </li>
-        <li>
-          <Figure value={sessionsLive} /> {plural(sessionsLive, 'session', 'sessions')} on the site.{' '}
-          <Figure value={sessionsDirty} /> with unpublished changes.
-        </li>
-        <li>
-          <Figure value={unresolved} /> unresolved {plural(unresolved, 'error', 'errors')}.
-        </li>
-      </ul>
-    </Panel>
-  );
-}
-
 export default function AdminOverview() {
   const call = useAdminApi();
+  const { isOperator } = useAuth();
   const { eventConfig } = useEventConfig();
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
@@ -168,13 +89,14 @@ export default function AdminOverview() {
   const readAt = stats ? formatReadAt(stats.readAt, eventConfig.timezone) : null;
 
   return (
-    <div className="flex flex-col gap-md">
+    <div className="admin-overview flex flex-col gap-md">
       <AdminPageHeader
         title="Overview"
         identifiers={readAt ? `Read at ${readAt}` : null}
-        description="How the event is going: Accounts, tickets, speakers, the schedule, and errors, counted on the server."
+        description={`${eventConfig.shortName || eventConfig.name || 'Your event'} at a glance. Check progress and go straight to the work that needs you.`}
         actions={
-          <button
+          <>
+            <button
             type="button"
             className={secondaryButtonClass}
             onClick={refresh}
@@ -183,6 +105,8 @@ export default function AdminOverview() {
           >
             {busy ? 'Refreshing…' : 'Refresh figures'}
           </button>
+            <Link to="/admin/unpublished" className={primaryButtonClass}>Review unpublished changes</Link>
+          </>
         }
       />
 
@@ -194,10 +118,11 @@ export default function AdminOverview() {
           message={`We could not refresh the figures. These are the figures read at ${readAt}.`}
         />
       ) : null}
-      {stats && !error ? <SaveStatus message={`Figures read at ${readAt}.`} /> : null}
+      {stats && !error ? <p role="status" className="sr-only">Figures read at {readAt}.</p> : null}
 
-      {stats ? <EventFigures stats={stats} /> : null}
+      {stats ? <EventFigures stats={stats} isOperator={isOperator} /> : null}
 
+      <div className="admin-overview-detail-grid">
       <MilestonesPanel
         milestones={eventConfig.milestones}
         goal={eventConfig.registration?.goal}
@@ -211,6 +136,7 @@ export default function AdminOverview() {
           <ReadinessPanel content={stats.content} />
         </>
       ) : null}
+      </div>
     </div>
   );
 }

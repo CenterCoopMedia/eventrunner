@@ -53,7 +53,7 @@
 // So: what the page states, then what the site states, then the default.
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config';
@@ -76,6 +76,7 @@ import DemoBanner from './DemoBanner.jsx';
 import AnnouncementBanners from './AnnouncementBanners.jsx';
 import { IS_DEMO } from '../lib/demoMode.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
+import { useMediaQuery } from '../lib/viewport.js';
 
 // The feedback dialog and the change request dialog (issue #188) each sit
 // behind a flag that is off by default and open only on a press, so they
@@ -259,7 +260,38 @@ export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
   const { pages, getPage } = useContent();
   const { user, loading: authLoading } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, key: locationKey } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef(null);
+  const navId = useId();
+  const navRef = useRef(null);
+  const compactHeader = useMediaQuery('(max-width: 639px)');
+  const [settledCompactHeader, setSettledCompactHeader] = useState(compactHeader);
+  useLayoutEffect(() => {
+    const menu = menuButtonRef.current;
+    const doc = menu?.ownerDocument;
+    const activeElement = doc?.activeElement;
+    if (compactHeader && navRef.current?.contains(activeElement)) {
+      menu?.focus();
+    } else if (!compactHeader && activeElement === menu) {
+      // Both controls remain visible for this layout pass. Move focus
+      // before the next render hides Menu; More uses its visible summary.
+      const candidates = [...(navRef.current?.querySelectorAll('a[href], summary, button:not([disabled])') ?? [])]
+        .filter((element) => !element.closest('[hidden]'));
+      const current = candidates.find((element) => element.getAttribute('aria-current') === 'page')
+        ?? candidates[0];
+      const disclosure = current?.closest('details:not([open])');
+      (disclosure?.querySelector('summary') ?? current ?? doc?.getElementById('main-content'))?.focus();
+    }
+    setMenuOpen(false);
+    setSettledCompactHeader(compactHeader);
+  }, [locationKey, compactHeader]);
+  const closeMenuOnEscape = (event) => {
+    if (event.key !== 'Escape' || !menuOpen) return;
+    event.stopPropagation();
+    setMenuOpen(false);
+    menuButtonRef.current?.focus();
+  };
   const accountViews = useAccountViews();
   // Branding slots come from config/theme (spec §7.2 logos). A slot holds
   // either a flat seeded path (`branding/mark.svg`, which also ships in the
@@ -344,6 +376,16 @@ export default function Layout() {
   const nav = (
     <nav
       aria-label="Main"
+      id={navId}
+      ref={navRef}
+      data-mobile-open={menuOpen}
+      data-mobile-hidden={compactHeader && settledCompactHeader && !menuOpen}
+      onKeyDown={closeMenuOnEscape}
+      onClick={(event) => {
+        if (!event.target.closest('a') || !menuOpen) return;
+        menuButtonRef.current?.focus();
+        setMenuOpen(false);
+      }}
       data-placement={navPlacement}
       className={
         navPlacement === 'side'
@@ -368,7 +410,8 @@ export default function Layout() {
         {moreNavItems.length ? (
           <li>
             <details className="site-nav-more" onKeyDown={(event) => {
-              if (event.key !== 'Escape') return;
+              if (event.key !== 'Escape' || !event.currentTarget.open) return;
+              event.stopPropagation();
               event.currentTarget.open = false;
               event.currentTarget.querySelector('summary').focus();
             }}>
@@ -442,6 +485,23 @@ export default function Layout() {
       <header id={TOP_LANDMARK_ID} tabIndex={-1} className="bg-surface">
         <div className="stage">
           <Header
+            mobileControl={
+              <button
+                ref={menuButtonRef}
+                type="button"
+                className={`site-header-menu no-print ${quietActionClass}`}
+                aria-expanded={menuOpen}
+                data-mobile-visible={compactHeader || settledCompactHeader}
+                aria-controls={navId}
+                onClick={() => setMenuOpen((open) => !open)}
+                onKeyDown={closeMenuOnEscape}
+              >
+                Menu
+                <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16" className="disclosure-chevron">
+                  <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+              </button>
+            }
             variant={headerVariant}
             name={historicalDemo && markSrc && !markFailed ? '' : plate.name}
             dates={plate.dates}

@@ -1,0 +1,149 @@
+/* Interior-page rhythm only: the full Home hero and the shared controls
+   keep their own compositions. Spacing, typography and identity continue
+   to resolve through the active theme and density tokens. */
+@media screen {
+  .event-hero.event-hero--compact {
+    min-block-size: 0;
+  }
+
+  .event-hero.event-hero--compact .event-hero__title {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3-leading);
+  }
+
+  .event-hero.event-hero--compact .event-hero__dateline {
+    margin-block-start: var(--space-xs);
+    font-size: var(--text-caption);
+  }
+
+  .event-hero.event-hero--compact .event-hero__tagline {
+    display: none;
+  }
+
+  .event-hero--compact + .schedule-page-header {
+    margin-block-start: var(--space-md);
+  }
+
+  .schedule-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-xs) var(--space-md);
+  }
+
+  .schedule-search {
+    flex: 1 1 22rem;
+    min-inline-size: 0;
+  }
+
+  .schedule-search input[type='search'] {
+    flex: 1;
+    inline-size: 0;
+    min-inline-size: min(100%, 12rem);
+  }
+
+  .schedule-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-xs);
+  }
+
+  .schedule-filters-toggle {
+    gap: var(--space-xs);
+  }
+
+  .schedule-filters-toggle__chevron {
+    inline-size: 1em;
+    block-size: 1em;
+    flex: none;
+  }
+
+  .schedule-filters-toggle[aria-expanded='true'] .schedule-filters-toggle__chevron {
+    transform: rotate(180deg);
+  }
+
+  .schedule-facets {
+    margin-block-start: var(--space-sm);
+  }
+
+  /* Each facet owns its row. A long set of formats cannot make a sparse
+     track or tool column as tall as the old checkbox stack. */
+  .schedule-facet + .schedule-facet {
+    margin-block-start: var(--space-xs);
+  }
+
+  .schedule-facet > fieldset {
+    min-inline-size: 0;
+    padding-block-start: var(--space-2xs);
+    gap: var(--space-2xs);
+  }
+
+  .schedule-facet > fieldset > div:first-of-type {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 var(--space-md);
+  }
+
+  .schedule-facet label {
+    gap: var(--space-xs);
+  }
+}
+
+@media screen and (min-width: 640px) {
+  /* Interior artwork gets its own column. Full-hero overlays and route
+     decoration cannot cross the compact title or dateline. */
+  .event-hero.event-hero--compact.event-hero--illustrated {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: stretch;
+  }
+
+  .event-hero.event-hero--compact .event-hero__copy {
+    inline-size: 100%;
+  }
+
+  .event-hero--compact .event-hero__figure {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .event-hero--compact .event-hero__media {
+    position: relative;
+    flex: 1;
+    min-block-size: 6rem;
+  }
+
+  .event-hero--compact .event-hero__art {
+    inset: 0;
+    inline-size: 100%;
+    z-index: 0;
+  }
+
+  .event-hero--compact .event-hero__caption {
+    position: static;
+    max-inline-size: none;
+  }
+
+  .event-hero--compact .event-hero__veil,
+  .event-hero--compact .event-hero__route,
+  .event-hero--compact .event-hero__press,
+  .event-hero--compact .event-hero__sign {
+    display: none;
+  }
+
+  .event-hero.event-hero--compact .event-hero__copy {
+    padding-block: var(--space-md);
+  }
+
+  .schedule-toolbar__actions {
+    align-self: flex-end;
+  }
+}
+
+@media screen and (max-width: 639px) {
+  .schedule-search {
+    flex-basis: 100%;
+  }
+}

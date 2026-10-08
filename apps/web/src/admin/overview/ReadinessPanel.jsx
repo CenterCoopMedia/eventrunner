@@ -12,7 +12,8 @@
 // endpoint answered it, zero as "0". When nothing at all is on the site the
 // panel says so in a sentence as well, so an empty deployment reads as one
 // rather than as a table of zeros to add up.
-import { Panel } from '../components/formControls.jsx';
+import { Link } from 'react-router-dom';
+import { Panel, secondaryButtonClass } from '../components/formControls.jsx';
 import RuledTable from '../components/RuledTable.jsx';
 import { Figure } from './figures.jsx';
 
@@ -44,7 +45,7 @@ export default function ReadinessPanel({ content }) {
   }));
   const nothingLive = COLLECTIONS.every(([id]) => (content?.[id]?.published ?? 0) === 0);
   return (
-    <Panel title="Content readiness">
+    <Panel title="Content readiness" className="admin-readiness-panel" actions={<Link to="/admin/unpublished" className={secondaryButtonClass}>Review changes</Link>}>
       <div className="flex flex-col gap-sm">
         {nothingLive ? (
           <p className="text-admin-base text-admin-ink">Nothing is on the site yet.</p>

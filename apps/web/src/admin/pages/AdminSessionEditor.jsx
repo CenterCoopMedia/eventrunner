@@ -318,115 +318,134 @@ export default function AdminSessionEditor({ mode }) {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel title="Public session">
-        <div className="flex flex-col gap-sm">
-          {mode === 'create' ? (
+      <div className="admin-editor-layout admin-editor-layout--session">
+        <Panel
+          title="Public session"
+          description="The title, description, and recording attendees see."
+          className="admin-editor-card--primary"
+        >
+          <div className="flex flex-col gap-sm">
+            {mode === 'create' ? (
+              <TextField
+                label="Session id"
+                hint="A stable identifier. Use lowercase words and hyphens."
+                value={form.id}
+                onChange={(value) => {
+                  setIdTouched(true);
+                  set({ id: value });
+                }}
+                error={errorFor('id')}
+                required
+              />
+            ) : null}
             <TextField
-              label="Session id"
-              hint="A stable identifier. Use lowercase words and hyphens."
-              value={form.id}
+              label="Public title"
+              value={form.title}
               onChange={(value) => {
-                setIdTouched(true);
-                set({ id: value });
+                setForm((current) => ({
+                  ...current,
+                  title: value,
+                  id: mode === 'create' && !idTouched ? sessionIdFromTitle(value) : current.id,
+                }));
               }}
-              error={errorFor('id')}
+              error={errorFor('title')}
               required
             />
-          ) : null}
-          <TextField
-            label="Public title"
-            value={form.title}
-            onChange={(value) => {
-              setForm((current) => ({
-                ...current,
-                title: value,
-                id: mode === 'create' && !idTouched ? sessionIdFromTitle(value) : current.id,
-              }));
-            }}
-            error={errorFor('title')}
-            required
-          />
-          <TextAreaField
-            label="Public description"
-            rows={5}
-            value={form.description}
-            onChange={(value) => set({ description: value })}
-            error={errorFor('description')}
-            required
-          />
-          <TextField
-            label="Recording link"
-            type="url"
-            hint="Where attendees can watch this session afterwards. Leave it empty until the recording is public. The public pages show the link only when it is filled in."
-            value={form.recordingUrl}
-            onChange={(value) => set({ recordingUrl: value })}
-            error={errorFor('recordingUrl')}
-          />
-        </div>
-      </Panel>
-
-      <Panel title="Time and structure">
-        <div className="grid gap-sm sm:grid-cols-2">
-          <SelectField
-            label="Event day"
-            value={form.dayId}
-            onChange={(value) => set({ dayId: value, parentId: '' })}
-            options={dayOptions}
-            error={errorFor('dayId')}
-          />
-          <SelectField
-            label="Parent session"
-            hint="Only same-day top-level sessions can be parents."
-            value={form.parentId}
-            onChange={(value) => set({ parentId: value })}
-            options={parentOptions}
-            error={errorFor('parentId')}
-          />
-          <TextField
-            label="Start time"
-            type="time"
-            value={form.startTime}
-            onChange={(value) => set({ startTime: value })}
-            error={errorFor('startTime')}
-          />
-          <TextField
-            label="End time"
-            type="time"
-            value={form.endTime}
-            onChange={(value) => set({ endTime: value })}
-            error={errorFor('endTime')}
-          />
-          <SelectField
-            label="Track"
-            hint="A child can leave this unset to inherit its parent’s track."
-            value={form.track}
-            onChange={(value) => set({ track: value })}
-            options={trackOptions}
-            error={errorFor('track')}
-          />
-          <SelectField
-            label="Recorded place"
-            value={form.placeId}
-            onChange={(value) => set({ placeId: value })}
-            options={placeOptions}
-            error={errorFor('placeId')}
-          />
-          <div className="sm:col-span-2">
+            <TextAreaField
+              label="Public description"
+              rows={5}
+              value={form.description}
+              onChange={(value) => set({ description: value })}
+              error={errorFor('description')}
+              required
+            />
             <TextField
-              label="Public location text"
-              hint="This is the wording attendees read. It does not change the recorded place."
-              value={form.location}
-              onChange={(value) => set({ location: value })}
-              error={errorFor('location')}
+              label="Recording link"
+              type="url"
+              hint="Where attendees can watch this session afterwards. Leave it empty until the recording is public. The public pages show the link only when it is filled in."
+              value={form.recordingUrl}
+              onChange={(value) => set({ recordingUrl: value })}
+              error={errorFor('recordingUrl')}
             />
           </div>
-          <CheckboxField
-            label="Show this session when it is published"
-            checked={form.visible}
-            onChange={(value) => set({ visible: value })}
-          />
+        </Panel>
+
+        <div className="admin-editor-stack">
+          <Panel
+            title="Time and structure"
+            description="Place this session in the event day and programme."
+          >
+            <div className="admin-editor-fields grid gap-sm sm:grid-cols-2">
+              <SelectField
+                label="Event day"
+                value={form.dayId}
+                onChange={(value) => set({ dayId: value, parentId: '' })}
+                options={dayOptions}
+                error={errorFor('dayId')}
+              />
+              <SelectField
+                label="Parent session"
+                hint="Only same-day top-level sessions can be parents."
+                value={form.parentId}
+                onChange={(value) => set({ parentId: value })}
+                options={parentOptions}
+                error={errorFor('parentId')}
+              />
+              <TextField
+                label="Start time"
+                type="time"
+                value={form.startTime}
+                onChange={(value) => set({ startTime: value })}
+                error={errorFor('startTime')}
+              />
+              <TextField
+                label="End time"
+                type="time"
+                value={form.endTime}
+                onChange={(value) => set({ endTime: value })}
+                error={errorFor('endTime')}
+              />
+              <SelectField
+                label="Track"
+                hint="A child can leave this unset to inherit its parent’s track."
+                value={form.track}
+                onChange={(value) => set({ track: value })}
+                options={trackOptions}
+                error={errorFor('track')}
+              />
+            </div>
+          </Panel>
+
+          <Panel title="Location" description="Choose the recorded place and the wording attendees read.">
+            <div className="flex flex-col gap-sm">
+              <SelectField
+                label="Recorded place"
+                value={form.placeId}
+                onChange={(value) => set({ placeId: value })}
+                options={placeOptions}
+                error={errorFor('placeId')}
+              />
+              <div>
+                <TextField
+                  label="Public location text"
+                  hint="This is the wording attendees read. It does not change the recorded place."
+                  value={form.location}
+                  onChange={(value) => set({ location: value })}
+                  error={errorFor('location')}
+                />
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Publishing" description="Visibility takes effect when this draft is published.">
+            <CheckboxField
+              label="Show this session when it is published"
+              checked={form.visible}
+              onChange={(value) => set({ visible: value })}
+            />
+          </Panel>
         </div>
-      </Panel>
+      </div>
 
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={secondaryButtonClass} onClick={() => navigate(SESSIONS_LIST)}>

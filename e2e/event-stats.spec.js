@@ -8,7 +8,7 @@
 // them was counted by Firestore itself.
 //
 // The overview is then driven in a real browser: the seeded operator signs
-// in, opens /admin, lands on the overview, and every figure sentence on the
+// in, opens /admin, lands on the overview, and every figure in its cards on the
 // page is compared with the endpoint's own answer. Milestones (issue #180)
 // are saved and then emptied through the event settings form, and the
 // overview is read after each save; config/event is put back afterwards.
@@ -17,6 +17,8 @@
 //
 // The spec adds one ticket record per status (the seed writes none) under its
 // own ids and deletes them when it is done, so no later spec meets them.
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import {
   ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, signIn,
@@ -36,23 +38,51 @@ async function countDocs(collection, predicate = () => true) {
 
 const one = (count, singular, pluralWord) => (count === 1 ? singular : pluralWord);
 
-/** The six figure sentences the overview should print for an answer. */
-function figureSentences(stats) {
+/** Every card's total, breakdown, and numeric note from the endpoint answer. */
+function figureCards(stats) {
   const r = stats.registrations;
   const t = stats.tickets;
   const s = stats.speakers;
   const sessions = stats.content.cmsSchedule;
   return [
-    `${r.total} ${one(r.total, 'account', 'accounts')}: ${r.byStatus.pending} pending, ${r.byStatus.ticketed} ticketed, `
-      + `${r.byStatus.approved} approved, ${r.byStatus.revoked} revoked.`,
-    `${r.profileComplete} of ${r.total} ${one(r.total, 'profile', 'profiles')} complete.`,
-    `${t.total} ${one(t.total, 'ticket', 'tickets')}: ${t.byStatus.valid} valid, ${t.byStatus.refunded} refunded, `
-      + `${t.byStatus.cancelled} cancelled, ${t.byStatus.pending_info} waiting for details.`,
-    `${s.total} ${one(s.total, 'speaker', 'speakers')}: ${s.byStatus.draft} draft, ${s.byStatus.invited} invited, `
-      + `${s.byStatus.accepted} accepted, ${s.byStatus.approved} approved, ${s.byStatus.removed} removed.`,
-    `${sessions.published} ${one(sessions.published, 'session', 'sessions')} on the site. `
-      + `${sessions.drafts} with unpublished changes.`,
-    `${stats.errors.unresolved} unresolved ${one(stats.errors.unresolved, 'error', 'errors')}.`,
+    {
+      title: 'Attendees',
+      total: `${r.total} ${one(r.total, 'account', 'accounts')}`,
+      breakdown: REGISTRATION_STATUSES.map((status) => `${r.byStatus[status]} ${status}`),
+      note: `${r.profileComplete} of ${r.total} ${one(r.total, 'profile', 'profiles')} complete.`,
+      action: 'Manage attendees',
+      href: '/admin/attendees',
+    },
+    {
+      title: 'System health',
+      total: `${stats.errors.unresolved} unresolved ${one(stats.errors.unresolved, 'error', 'errors')}`,
+      breakdown: [],
+      action: 'Review system errors',
+      href: '/admin/system-errors',
+    },
+    {
+      title: 'Tickets',
+      total: `${t.total} ${one(t.total, 'ticket', 'tickets')}`,
+      breakdown: TICKET_STATUSES.map((status) => `${t.byStatus[status]} ${status === 'pending_info' ? 'waiting for details' : status}`),
+      note: 'One ticket record, not one seat.',
+      action: 'Open ticketing',
+      href: '/admin/ticketing',
+    },
+    {
+      title: 'Speakers',
+      total: `${s.total} ${one(s.total, 'speaker', 'speakers')}`,
+      breakdown: SPEAKER_STATUSES.map((status) => `${s.byStatus[status]} ${status}`),
+      action: 'Manage speakers',
+      href: '/admin/speakers',
+    },
+    {
+      title: 'Program',
+      total: `${sessions.published} ${one(sessions.published, 'session', 'sessions')} on the site`,
+      breakdown: [],
+      note: `${sessions.drafts} with unpublished changes.`,
+      action: 'Manage sessions',
+      href: '/admin/sessions',
+    },
   ];
 }
 
@@ -158,12 +188,19 @@ test.describe.serial('the event statistics endpoint', () => {
       await expect(nav.getByRole('link', { name: 'Overview', exact: true })).toHaveAttribute('aria-current', 'page');
 
       const figures = page.locator('section', { has: page.getByRole('heading', { name: 'Event figures' }) });
-      await expect(figures.getByRole('listitem')).toHaveCount(6);
-      const printed = (await figures.getByRole('listitem').allTextContents())
-        .map((text) => text.replace(/\s+/g, ' ').trim());
+      await expect(figures.getByRole('article')).toHaveCount(5);
       const response = await callFunction('getEventStats', {}, token);
       expect(response.status).toBe(200);
-      expect(printed).toEqual(figureSentences(response.body));
+      for (const expected of figureCards(response.body)) {
+        const card = figures.getByRole('article', { name: expected.title, exact: true });
+        await expect(card).toBeVisible();
+        await expect(card.getByRole('heading', { level: 3 })).toHaveCSS('font-family', /Source Sans 3/);
+        await expect(card.locator('.admin-figure-total')).toHaveText(expected.total);
+        await expect(card.getByRole('listitem')).toHaveText(expected.breakdown);
+        if (expected.note) await expect(card.getByText(expected.note, { exact: true })).toBeVisible();
+        await expect(card.getByRole('link', { name: expected.action, exact: true }))
+          .toHaveAttribute('href', expected.href);
+      }
 
       // The funnel and the readiness table read the same answer (issue #181).
       const funnel = page.locator('section', { has: page.getByRole('heading', { name: 'Registration funnel' }) });
@@ -186,6 +223,35 @@ test.describe.serial('the event statistics endpoint', () => {
     // Refresh reads the figures again and says when.
     await page.getByRole('button', { name: 'Refresh figures' }).click();
     await expect(page.getByRole('status').filter({ hasText: /^Figures read at / })).toBeVisible();
+
+    // Only this emulator's synthetic admin overview is saved as visual
+    // evidence. Keep it separate from traces, captured mail, and other output.
+    await expect(page.getByRole('button', { name: 'Refresh figures', exact: true })).toBeVisible();
+    const evidenceDir = path.resolve('test-results/admin-visual-evidence');
+    await fs.mkdir(evidenceDir, { recursive: true });
+    const endTour = page.getByRole('button', { name: 'End tour', exact: true });
+    if (await endTour.isVisible()) await endTour.click();
+    const originalViewport = page.viewportSize();
+    try {
+      for (const viewport of [
+        { name: 'desktop', width: 1440, height: 1000 },
+        { name: 'ultrawide', width: 2560, height: 1440 },
+        { name: 'narrow', width: 390, height: 844 },
+      ]) {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+        await expect(page.getByRole('article')).toHaveCount(5);
+        await page.locator('.admin-rail').evaluate((element) => { element.scrollTop = 0; });
+        await page.locator('html').evaluate((element) => element.ownerDocument.fonts.ready);
+        await page.screenshot({
+          path: path.join(evidenceDir, `overview-${viewport.name}-${viewport.width}.png`),
+          fullPage: true,
+          animations: 'disabled',
+        });
+      }
+    } finally {
+      if (originalViewport) await page.setViewportSize(originalViewport);
+    }
   });
 
   test('a milestone saved on the Event page appears on the overview, and an empty set renders nothing', async ({ page }) => {

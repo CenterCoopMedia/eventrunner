@@ -29,6 +29,8 @@ const {
   isProfileComplete,
 } = require('shared/profile');
 
+const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
+
 const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
 
@@ -89,6 +91,12 @@ function createOnUserCreated({ db, now = () => new Date(), log = console }) {
       log.error('onUserCreated called without a uid');
       return { created: false };
     }
+    // Auth onCreate runs after the identity exists (including Google sign-in).
+    // Suppress our account record and downstream signup work, not the identity.
+    const policy = await checkDemoWrites({ db });
+    throwIfDemoPolicyUnavailable(policy);
+    if (!policy.ok) return { created: false, reason: policy.code };
+
     try {
       await db.collection(USERS).doc(authUser.uid).create(buildNewUserDoc(authUser, now()));
       return { created: true };

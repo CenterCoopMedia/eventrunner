@@ -356,3 +356,83 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(JSON.parse(call[1].body).fields.limit).toBe('__cms_delete_field__');
   });
 });
+
+
+describe('content editing workspace', () => {
+  beforeEach(() => {
+    contentLive = [{
+      id: 'hero__register', section: 'hero', field: 'register', blockType: 'cta',
+      label: 'Register now', url: 'https://example.org/register', order: 2, visible: true,
+    }];
+  });
+
+  it('puts the value first and keeps existing technical settings behind a summary', async () => {
+    await renderAt('/admin/content/home/hero/register');
+    expect(screen.getByLabelText('label')).toBeVisible();
+    const valueHeading = screen.getByRole('heading', { name: 'Value' });
+    const settingsHeading = screen.getByRole('heading', { name: 'Block settings' });
+    expect(valueHeading.compareDocumentPosition(settingsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('Call to action · Order 2 · Visible')).toBeVisible();
+    const toggle = screen.getByRole('button', { name: 'Edit block settings' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('combobox', { name: 'Block type' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('label'), { target: { value: 'Reserve a place' } });
+    fireEvent.click(toggle);
+    expect(screen.getByRole('combobox', { name: 'Block type' })).toHaveValue('cta');
+    expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
+    fireEvent.change(screen.getByLabelText('Order'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Hide block settings' }));
+    expect(screen.getByText('Call to action · Order 3 · Visible')).toBeVisible();
+    expect(screen.getByLabelText('label')).toHaveValue('Reserve a place');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsUpdateContent'))).toBe(true));
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
+    expect(JSON.parse(call[1].body)).toMatchObject({
+      section: 'hero', field: 'register', visible: true,
+      fields: { blockType: 'cta', label: 'Reserve a place', url: 'https://example.org/register', order: 3 },
+    });
+  });
+
+  it('keeps creation setup visible before the value and retains it after saving', async () => {
+    await renderAt('/admin/content/home/hero/_new');
+    const setupHeading = screen.getByRole('heading', { name: 'Set up the block' });
+    const valueHeading = screen.getByRole('heading', { name: 'Value' });
+    expect(setupHeading.compareDocumentPosition(valueHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Block type' })).toBeVisible();
+    expect(screen.getByLabelText('Field id')).not.toHaveAttribute('readonly');
+    fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'banner' } });
+    fireEvent.change(screen.getByLabelText('url'), { target: { value: 'cms-images/banner.jpg' } });
+    fireEvent.change(screen.getByLabelText('alt'), { target: { value: 'Event banner' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved. It is not public until you publish.');
+    expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
+    expect(screen.getByLabelText('Field id')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('opens block settings when a server error names a hidden setting', async () => {
+    await renderAt('/admin/content/home/hero/register');
+    fetch.mockImplementation((url) => Promise.resolve(String(url).includes('cmsUpdateContent')
+      ? { ok: false, status: 400, json: async () => ({ error: { code: 'bad-request', message: 'order: must be a non-negative number' } }) }
+      : okResponse({})));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('alert')).toHaveFocus();
+    await waitFor(() => expect(screen.getByLabelText('Order')).toBeVisible());
+    expect(screen.getByLabelText('Order')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('label')).toHaveValue('Register now');
+  });
+
+  it('keeps value validation in view without expanding unrelated settings', async () => {
+    await renderAt('/admin/content/home/hero/register');
+    fireEvent.change(screen.getByLabelText('label'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('alert')).toHaveFocus();
+    expect(screen.getByLabelText('label')).toBeVisible();
+    expect(screen.getByLabelText('label')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Edit block settings' })).toHaveAttribute('aria-expanded', 'false');
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsUpdateContent'))).toBe(false);
+  });
+});

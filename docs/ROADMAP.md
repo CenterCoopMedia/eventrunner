@@ -65,7 +65,7 @@ Issues #92 and #79 moved to a new milestone, M5.1: Operator follow-ups, because 
 
 Five items remain. Each needs an operator account this sandbox does not have.
 
-- [ ] Public demo instance with synthetic event (#35)
+- [ ] Hosted demo end-to-end verification and screenshots (#35); the [static visitor preview](https://centercoopmedia.github.io/eventrunner/demo/) and [hosted client demo](https://eventrunner-demo.web.app/) are available.
 - [ ] Complete Postmark deployment, webhook setup, and delivery tests (#91)
 - [ ] Demo discoverability: crawlable public demo routes (#96)
 - [ ] Claim the Eventrunner npm package names and scopes (#99)

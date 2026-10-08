@@ -120,12 +120,10 @@ async function renderAt(path) {
   return result;
 }
 
-/** The sentence (list item) that holds `text`, as its whole text. */
-function sentence(panelTitle, text) {
-  const panel = screen.getByRole('heading', { name: panelTitle }).closest('section');
-  const item = within(panel).getAllByRole('listitem').find((li) => li.textContent.includes(text));
-  return item?.textContent.replace(/\s+/g, ' ').trim();
-}
+/** A labeled card keeps its total and every server breakdown together. */
+function card(title) { return screen.getByRole('article', { name: title }); }
+function total(title) { return card(title).querySelector('.admin-figure-total').textContent.replace(/\s+/g, ' ').trim(); }
+function breakdown(title) { return within(card(title)).getAllByRole('listitem').map((item) => item.textContent); }
 
 /** Push a config/event doc through the live listener, the way a save echoes back. */
 async function pushEvent(data) {
@@ -147,7 +145,7 @@ afterEach(() => {
 });
 
 describe('the admin overview', () => {
-  it('opens at /admin and prints every figure the endpoint answered, each in its own sentence', async () => {
+  it('opens at /admin and groups every server figure into labeled actionable cards', async () => {
     fetch.mockResolvedValueOnce(okResponse(STATS));
     await renderAt('/admin');
 
@@ -157,18 +155,16 @@ describe('the admin overview', () => {
     expect(String(fetch.mock.calls[0][0])).toMatch(/\/getEventStats$/);
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer id-token');
 
-    expect(sentence('Event figures', 'accounts:')).toBe(
-      '412 accounts: 120 pending, 30 ticketed, 250 approved, 12 revoked.',
-    );
-    expect(sentence('Event figures', 'profiles complete')).toBe('300 of 412 profiles complete.');
-    expect(sentence('Event figures', 'tickets:')).toBe(
-      '280 tickets: 260 valid, 13 refunded, 5 cancelled, 2 waiting for details.',
-    );
-    expect(sentence('Event figures', 'speakers:')).toBe(
-      '24 speakers: 6 draft, 7 invited, 3 accepted, 4 approved, 1 removed.',
-    );
-    expect(sentence('Event figures', 'on the site')).toBe('48 sessions on the site. 9 with unpublished changes.');
-    expect(sentence('Event figures', 'unresolved')).toBe('21 unresolved errors.');
+    expect(total('Attendees')).toBe('412 accounts');
+    expect(breakdown('Attendees')).toEqual(['120 pending', '30 ticketed', '250 approved', '12 revoked']);
+    expect(card('Attendees')).toHaveTextContent('300 of 412 profiles complete.');
+    expect(total('Tickets')).toBe('280 tickets');
+    expect(breakdown('Tickets')).toEqual(['260 valid', '13 refunded', '5 cancelled', '2 waiting for details']);
+    expect(total('Speakers')).toBe('24 speakers');
+    expect(breakdown('Speakers')).toEqual(['6 draft', '7 invited', '3 accepted', '4 approved', '1 removed']);
+    expect(total('Program')).toBe('48 sessions on the site');
+    expect(card('Program')).toHaveTextContent('9 with unpublished changes.');
+    expect(total('System health')).toBe('21 unresolved errors');
 
     // The number is in the data face, bold and tabular, beside its words.
     const [figure] = screen.getAllByText('412', { selector: 'span' });
@@ -179,7 +175,7 @@ describe('the admin overview', () => {
     // When the figures were read, on the event's clock.
     expect(screen.getByText('Read at 9:14 AM EDT')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Figures read at 9:14 AM EDT.');
-    // No tiles, no rings: the figures are a list of sentences.
+    // No decorative rings: every figure remains labeled in words.
     expect(document.querySelector('svg circle')).toBeNull();
   });
 
@@ -195,12 +191,16 @@ describe('the admin overview', () => {
     await renderAt('/admin/overview');
     await screen.findByRole('heading', { name: 'Event figures' });
 
-    expect(sentence('Event figures', 'account:')).toBe('1 account: 1 pending, 0 ticketed, 0 approved, 0 revoked.');
-    expect(sentence('Event figures', 'complete')).toBe('0 of 1 profile complete.');
-    expect(sentence('Event figures', 'ticket:')).toBe('1 ticket: 1 valid, 0 refunded, 0 cancelled, 0 waiting for details.');
-    expect(sentence('Event figures', 'speaker:')).toBe('1 speaker: 1 draft, 0 invited, 0 accepted, 0 approved, 0 removed.');
-    expect(sentence('Event figures', 'on the site')).toBe('1 session on the site. 1 with unpublished changes.');
-    expect(sentence('Event figures', 'unresolved')).toBe('1 unresolved error.');
+    expect(total('Attendees')).toBe('1 account');
+    expect(breakdown('Attendees')).toEqual(['1 pending', '0 ticketed', '0 approved', '0 revoked']);
+    expect(card('Attendees')).toHaveTextContent('0 of 1 profile complete.');
+    expect(total('Tickets')).toBe('1 ticket');
+    expect(breakdown('Tickets')).toEqual(['1 valid', '0 refunded', '0 cancelled', '0 waiting for details']);
+    expect(total('Speakers')).toBe('1 speaker');
+    expect(breakdown('Speakers')).toEqual(['1 draft', '0 invited', '0 accepted', '0 approved', '0 removed']);
+    expect(total('Program')).toBe('1 session on the site');
+    expect(card('Program')).toHaveTextContent('1 with unpublished changes.');
+    expect(total('System health')).toBe('1 unresolved error');
   });
 
   it('states zero for every figure of an empty deployment', async () => {
@@ -208,9 +208,10 @@ describe('the admin overview', () => {
     await renderAt('/admin/overview');
     await screen.findByRole('heading', { name: 'Event figures' });
 
-    expect(sentence('Event figures', 'accounts:')).toBe('0 accounts: 0 pending, 0 ticketed, 0 approved, 0 revoked.');
-    expect(sentence('Event figures', 'complete')).toBe('0 of 0 profiles complete.');
-    expect(sentence('Event figures', 'unresolved')).toBe('0 unresolved errors.');
+    expect(total('Attendees')).toBe('0 accounts');
+    expect(breakdown('Attendees')).toEqual(['0 pending', '0 ticketed', '0 approved', '0 revoked']);
+    expect(card('Attendees')).toHaveTextContent('0 of 0 profiles complete.');
+    expect(total('System health')).toBe('0 unresolved errors');
   });
 
   it('says what is loading until the first answer arrives', async () => {
@@ -280,7 +281,7 @@ describe('the admin overview', () => {
     });
     expect(await screen.findByText('Read at 9:20 AM EDT')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Figures read at 9:20 AM EDT.');
-    expect(sentence('Event figures', 'accounts:')).toMatch(/^413 accounts:/);
+    expect(total('Attendees')).toBe('413 accounts');
     expect(refresh).toHaveTextContent('Refresh figures');
     expect(refresh).not.toHaveAttribute('aria-busy');
     expect(document.activeElement).toBe(refresh);
@@ -297,7 +298,7 @@ describe('the admin overview', () => {
     expect(
       await screen.findByText('We could not refresh the figures. These are the figures read at 9:14 AM EDT.'),
     ).toBeInTheDocument();
-    expect(sentence('Event figures', 'accounts:')).toMatch(/^412 accounts:/);
+    expect(total('Attendees')).toBe('412 accounts');
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -439,7 +440,7 @@ describe('the admin overview', () => {
       expect(cells.filter((text) => /^\d+$/.test(text))).toEqual(Array(12).fill('0'));
     });
 
-    it('keeps the keyboard path short: Refresh figures, then the readiness table', async () => {
+    it('provides a predictable keyboard path through the overview actions', async () => {
       fetch.mockResolvedValueOnce(okResponse({
         ...STATS,
         registrations: { ...STATS.registrations, byStatus: { ...STATS.registrations.byStatus, revoked: 1 } },
@@ -450,8 +451,15 @@ describe('the admin overview', () => {
       const main = document.getElementById('admin-content');
       const stops = [...main.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
         .filter((el) => el.getAttribute('tabindex') !== '-1');
-      expect(stops.map((el) => el.getAttribute('aria-label') ?? el.textContent)).toEqual([
+      expect(stops.map((el) => el.getAttribute('aria-label') ?? el.textContent.replace('→', '').trim())).toEqual([
         'Refresh figures',
+        'Review unpublished changes',
+        'Manage attendees',
+        'Review system errors',
+        'Open ticketing',
+        'Manage speakers',
+        'Manage sessions',
+        'Review changes',
         'Records on the site and records with unpublished changes, by collection.',
       ]);
       const region = screen.getByRole('region', { name: 'Records on the site and records with unpublished changes, by collection.' });

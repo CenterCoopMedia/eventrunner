@@ -6,35 +6,14 @@
 // frame is the only place a client's design renders inside the admin, and the
 // room around it never adopts it.
 //
-// BROAD UNDERNEATH, SIMPLE AT FIRST CONTACT. Every one of the six styles is
-// complete and offered without a warning label, and every control the system
-// has is still here. What changed is the ORDER a staff member meets them in.
-//
-// THE WORKFLOW — six decisions, then look, then publish:
-//
-//   1. Site style          which of the six, each with one recommended
-//                          configuration that works the moment it is picked.
-//   2. Logo and icon       the two slots every site needs; the other three
-//                          sit behind "More image slots".
-//   3. Main brand colour   ONE colour. The supporting shades are derived
-//                          from it for both modes, contrast-safe by
-//                          construction (shared/theme deriveBrandSteps).
-//   4. Header style        the style's own header treatments.
-//   5. Schedule style      how the programme is set.
-//   6. Light or dark       the mode policy.
-//
-// Then one decision about the ROOM rather than the page: Admin colours. The
-// rail, the filled button, the links and the focus ring take the main brand
-// colour by default, worked into a safe family for both modes
-// (shared/theme deriveAdminScheme), or one of the house schemes. It never
-// reaches the public site, so the frame beside it never shows it.
-//
-// Then the page preview, then Publish. That is the whole normal job.
-//
-// ADVANCED holds everything else, behind one disclosure: typography (the
-// heading face and the four font roles), Illustrations, surface and shape,
-// any style-specific extras, and the per-token colour overrides. Nothing was
-// removed to get here — an operator who wants a token still edits a token.
+// BROAD UNDERNEATH, SIMPLE AT FIRST CONTACT. Task navigation groups the
+// choices by what staff are trying to do, keeping one useful set in view:
+//   • Identity: logo, icon and main brand colour; extra image slots disclose.
+//   • Page style: complete styles, header, schedule and light/dark policy.
+//   • Workspace: the admin's own colour scheme.
+//   • Advanced: navigation, typography, illustrations, shape and overrides.
+// All controls stay mounted, and the real preview stays beside the work.
+// A server rejection reveals the offending task and nested controls.
 //
 // CONTRAST. A failing pair is stated inline in the control that caused it,
 // naming the pair, the mode, and the measured ratio, and the frame keeps
@@ -338,6 +317,22 @@ const MOTIF_SET_LABELS = {
   cartographic: 'Survey linework',
 };
 
+const BRANDING_TASKS = [
+  { id: 'identity', label: 'Identity', description: 'Logos and brand colour' },
+  { id: 'page-style', label: 'Page style', description: 'Style, layout and light or dark' },
+  { id: 'workspace', label: 'Workspace', description: 'Colours for the admin' },
+  { id: 'advanced', label: 'Advanced', description: 'Type, shape and colour overrides' },
+];
+
+/** Route a rejected field back to its task, including nested overrides. */
+function brandingTaskForField(field) {
+  if (field === 'theme.brandColor' || field?.startsWith('theme.logos')) return 'identity';
+  if (field === 'theme.adminScheme') return 'workspace';
+  if (['theme.preset', 'theme.mode', 'theme.header', 'theme.optionPicks.nameplate',
+    'theme.optionPicks.component'].includes(field)) return 'page-style';
+  return 'advanced';
+}
+
 export default function AdminBranding() {
   const { theme, sources } = useEventConfig();
   const call = useAdminApi();
@@ -347,7 +342,7 @@ export default function AdminBranding() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [activeTask, setActiveTask] = useState('identity');
   const [moreLogosOpen, setMoreLogosOpen] = useState(false);
   const [overrideMode, setOverrideMode] = useState('light');
   const errorRef = useRef(null);
@@ -385,6 +380,19 @@ export default function AdminBranding() {
     }
     return map;
   }, [error]);
+
+  // Hidden controls stay mounted so changing tasks never loses a draft.
+  // A rejected field brings its task and any nested disclosure back into view.
+  useEffect(() => {
+    const fields = [...fieldErrors.keys()];
+    if (!fields.length) return;
+    setActiveTask(brandingTaskForField(fields[0]));
+    if (fields.some((field) => EXTRA_LOGO_SLOTS.some((slot) => field === `theme.logos.${slot}`))) {
+      setMoreLogosOpen(true);
+    }
+    const tokenField = fields.find((field) => /^theme\.tokens\.(light|dark)\./.test(field));
+    if (tokenField) setOverrideMode(tokenField.split('.')[2]);
+  }, [fieldErrors]);
 
   // The same three facts the publish path states, shown here first: the
   // pair, the mode, and the measured ratio. Keyed by the foreground role in
@@ -460,7 +468,7 @@ export default function AdminBranding() {
         title="Branding"
         state={<RecordState state={isDirty ? state('dirty') : state('live')} />}
         identifiers="config/theme"
-        description="Six decisions make a finished site: The style, the logo, the brand colour, the header, the schedule, and light or dark. The page preview beside them renders the client’s real pages with the draft applied; nothing reaches the public site until you publish."
+        description="Shape the site’s identity and page style, then review the real page preview. Your changes stay in this draft until you publish."
         actions={
           <>
             <button type="submit" className={primaryButtonClass} disabled={saving}>
@@ -491,80 +499,48 @@ export default function AdminBranding() {
         />
       ) : null}
 
-      <div className="grid gap-md xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+      <div className="admin-branding-task-nav" role="group" aria-label="Branding tasks">
+        {BRANDING_TASKS.map((task) => {
+          const errorCount = [...fieldErrors.keys()].filter(
+            (field) => brandingTaskForField(field) === task.id,
+          ).length;
+          return (
+            <button
+              key={task.id}
+              id={`admin-theme-task-${task.id}`}
+              type="button"
+              className="admin-branding-task-button"
+              aria-label={task.label}
+              aria-describedby={`admin-theme-task-description-${task.id}`}
+              aria-pressed={activeTask === task.id}
+              aria-controls={`admin-theme-${task.id}`}
+              onClick={() => setActiveTask(task.id)}
+            >
+              <span className="font-semibold">{task.label}</span>
+              <span id={`admin-theme-task-description-${task.id}`} className="admin-branding-task-description">
+                {task.description}{errorCount ? ` · ${errorCount} to fix` : ''}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="admin-branding-workspace">
         {/* ------------------------------------------- the staff decisions */}
         <div className="admin-branding-controls flex min-w-0 flex-col gap-md">
-          {/* 1 ------------------------------------------------ site style */}
-          <Panel
-            title="Site style"
-            description="Six complete styles. Each one arrives set up and ready — you can publish it as it stands. Picking a style replaces every value you have not set yourself."
+          <section
+            id="admin-theme-identity"
+            aria-labelledby="admin-theme-task-identity"
+            hidden={activeTask !== 'identity'}
+            className="admin-branding-section"
           >
-            <div className="flex flex-col gap-sm">
-              <SelectField
-                label="Site style"
-                value={form.preset}
-                options={[
-                  { value: '', label: 'None — this deployment’s stored palette' },
-                  ...PRESET_IDS.map((id) => ({ value: id, label: presetCopy(id).label })),
-                ]}
-                onChange={(value) =>
-                  setForm((c) => ({
-                    ...c,
-                    preset: value,
-                    // A pick from another style's groups means nothing here,
-                    // and the server rejects it by name.
-                    optionPicks: value ? resolveOptionPicks({ preset: value }) : {},
-                  }))
-                }
-                error={fieldErrors.get('theme.preset')}
-              />
-              {copy ? (
-                <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
-                  {copy.summary}
-                  <span className="mt-3xs block text-admin-ink-data">
-                    Best for: {copy.bestFor}
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          </Panel>
-
-          {/* 2 --------------------------------------------- logo and icon */}
-          <Panel
-            title="Logo and icon"
-            description="Each slot points at a file in the media library. Choose an existing file or upload a new one."
-          >
-            <div className="admin-branding-grid grid gap-md">
-              {WORKFLOW_LOGO_SLOTS.map((slot) => (
-                <ImagePicker
-                  key={slot}
-                  folder="branding"
-                  label={LOGO_SLOT_LABELS[slot] ?? slot}
-                  hint={LOGO_SLOT_HINTS[slot]}
-                  value={form.logos[slot]}
-                  onChange={(value) =>
-                    setForm((c) => ({ ...c, logos: { ...c.logos, [slot]: value } }))
-                  }
-                  error={fieldErrors.get(`theme.logos.${slot}`)}
-                />
-              ))}
-            </div>
-            <div className="mt-sm">
-              <button
-                type="button"
-                className={secondaryButtonClass}
-                aria-expanded={moreLogosOpen}
-                aria-controls="admin-theme-more-logos"
-                onClick={() => setMoreLogosOpen((open) => !open)}
-              >
-                {moreLogosOpen ? 'Hide the other image slots' : 'More image slots'}
-              </button>
-              <div
-                id="admin-theme-more-logos"
-                hidden={!moreLogosOpen}
-                className="admin-branding-grid mt-sm grid gap-md"
-              >
-                {EXTRA_LOGO_SLOTS.map((slot) => (
+            {/* 2 --------------------------------------------- logo and icon */}
+            <Panel
+              title="Logo and icon"
+              description="Each slot points at a file in the media library. Choose an existing file or upload a new one."
+            >
+              <div className="admin-branding-grid grid gap-md">
+                {WORKFLOW_LOGO_SLOTS.map((slot) => (
                   <ImagePicker
                     key={slot}
                     folder="branding"
@@ -578,158 +554,237 @@ export default function AdminBranding() {
                   />
                 ))}
               </div>
-            </div>
-          </Panel>
-
-          {/* 3 ----------------------------------------- main brand colour */}
-          <Panel
-            title="Main brand colour"
-            description="One colour. The darker and lighter shades that go with it are worked out for light mode and dark mode, and they are always readable on the page they land on."
-          >
-            <div className="flex flex-col gap-sm">
-              <div className="admin-branding-color-row flex flex-wrap items-end gap-sm">
-                {toPickerHex(form.brandColor) ? (
-                  <input
-                    type="color"
-                    aria-label="Main brand colour picker"
-                    value={toPickerHex(form.brandColor)}
-                    onChange={(event) =>
-                      setForm((c) => ({ ...c, brandColor: event.target.value }))
-                    }
-                    className="admin-target h-9 w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
-                  />
-                ) : null}
-                <div className="min-w-0 flex-1">
-                  <TextField
-                    label="Main brand colour"
-                    value={form.brandColor}
-                    onChange={(value) => setForm((c) => ({ ...c, brandColor: value }))}
-                    hint="A hex colour, like the one in the client’s brand guide. Leave it blank to keep the style’s own colour."
-                    error={fieldErrors.get('theme.brandColor')}
-                  />
+              <div className="mt-sm">
+                <button
+                  type="button"
+                  className={secondaryButtonClass}
+                  aria-expanded={moreLogosOpen}
+                  aria-controls="admin-theme-more-logos"
+                  onClick={() => setMoreLogosOpen((open) => !open)}
+                >
+                  {moreLogosOpen ? 'Hide the other image slots' : 'More image slots'}
+                </button>
+                <div
+                  id="admin-theme-more-logos"
+                  hidden={!moreLogosOpen}
+                  className="admin-branding-grid mt-sm grid gap-md"
+                >
+                  {EXTRA_LOGO_SLOTS.map((slot) => (
+                    <ImagePicker
+                      key={slot}
+                      folder="branding"
+                      label={LOGO_SLOT_LABELS[slot] ?? slot}
+                      hint={LOGO_SLOT_HINTS[slot]}
+                      value={form.logos[slot]}
+                      onChange={(value) =>
+                        setForm((c) => ({ ...c, logos: { ...c.logos, [slot]: value } }))
+                      }
+                      error={fieldErrors.get(`theme.logos.${slot}`)}
+                    />
+                  ))}
                 </div>
-              </div>
-              {/* The admin mark's legibility floor, stated plainly. The
-                  site keeps painting the client's colour; only the admin
-                  mark beside the page title steps aside, and it says so. */}
-              {accent.fellBack ? (
-                <Notice
-                  tone="caution"
-                  message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${previewMode} admin title band, below the ${accent.floor}:1 floor a position marker needs. The mark beside the page title falls back to the admin’s own ink. The site itself is unaffected.`}
-                />
-              ) : null}
-            </div>
-          </Panel>
-
-          {/* 4 and 5 --------------------- header style and schedule style */}
-          {preset && workflowGroups.length > 0 ? (
-            <Panel
-              title="Header and schedule"
-              description={`How ${copy.label} sets the top of a page and the programme. Each choice belongs to this style — it remaps values the style already declares and never invents one.`}
-            >
-              <div className="flex flex-col gap-sm">
-                {workflowGroups.map((group) => optionField(group, preset.options[group]))}
               </div>
             </Panel>
-          ) : null}
 
-          {/* 6 -------------------------------------------- light or dark */}
-          <Panel title="Light or dark">
-            <SelectField
-              label="Light or dark"
-              value={form.mode}
-              options={MODE_POLICY_IDS.map((id) => ({ value: id, label: MODE_LABELS[id] ?? id }))}
-              onChange={(value) => setForm((c) => ({ ...c, mode: value }))}
-              hint="Every style defines both. Follow the reader lets each visitor’s own setting decide."
-              error={fieldErrors.get('theme.mode')}
-            />
-          </Panel>
-
-          {/* 7 ------------------------------------ the admin's own colours */}
-          {/* THE ROOM, NOT THE PAGE. Every other decision on this tab is
-              about the client's site. This one is about the admin around
-              it: the rail, the filled button, the links and the focus ring.
-              Whatever seeds it — the main brand colour by default, or a
-              house scheme — is worked into a family that holds its contrast
-              in both modes (shared/theme deriveAdminScheme), so there is no
-              wrong answer here either. The frame never shows it, because the
-              public site never gets it. */}
-          <Panel
-            title="Admin colours"
-            description="The colour of this admin’s rail, buttons and links. The public site never uses it."
-          >
-            <SelectField
-              label="Admin colours"
-              value={form.adminScheme}
-              options={ADMIN_SCHEME_IDS.map((id) => ({
-                value: id,
-                label: ADMIN_SCHEME_LABELS[id] ?? id,
-              }))}
-              onChange={(value) => setForm((c) => ({ ...c, adminScheme: value }))}
-              hint="Whichever colour you pick is adjusted until white text and the focus ring hold their contrast in light and dark. The admin changes colour when the theme is published."
-              error={fieldErrors.get('theme.adminScheme')}
-            />
-          </Panel>
-
-          {/* ----------------------------------------------- the Advanced */}
-          <Panel
-            title="Advanced"
-            description="Everything else the system can do. Nothing here is needed for a finished site."
-          >
-            <button
-              type="button"
-              className={secondaryButtonClass}
-              aria-expanded={advancedOpen}
-              aria-controls="admin-theme-advanced"
-              onClick={() => setAdvancedOpen((open) => !open)}
+            {/* 3 ----------------------------------------- main brand colour */}
+            <Panel
+              title="Main brand colour"
+              description="One colour. The darker and lighter shades that go with it are worked out for light mode and dark mode, and they are always readable on the page they land on."
             >
-              {advancedOpen ? 'Hide the advanced settings' : 'Show the advanced settings'}
-            </button>
-            <div id="admin-theme-advanced" hidden={!advancedOpen} className="mt-sm flex flex-col gap-md">
-              {/* ------------------------------------------ navigation */}
-              {/* ONE SETTING FOR THE WHOLE SITE. The navigation is part of
-                  what the site IS, not part of what one page is about: a
-                  reader who meets a top nav on the home page and a rail on
-                  the schedule has been handed two sites, and the nav stops
-                  being furniture they can stop noticing. It sits here rather
-                  than among the six questions because almost no deployment
-                  moves it — a site that never opens this panel gets the row
-                  across the top, which is the right answer for nearly all of
-                  them.
-
-                  The words come from lib/themeRuntime.js, which is also where
-                  the page editor's per-page exception reads them, so an
-                  operator meets one name per placement. */}
-              <section aria-labelledby="admin-theme-navigation">
-                <h3
-                  id="admin-theme-navigation"
-                  className="font-admin-ui text-admin-lg font-bold text-admin-ink"
-                >
-                  Navigation
-                </h3>
-                <div className="mt-sm">
-                  <SelectField
-                    label="Where the navigation sits"
-                    value={form.navPlacement}
-                    options={[
-                      {
-                        value: '',
-                        // Blank is a real answer and not a repeat of "top":
-                        // it stores nothing, which is what leaves the
-                        // placement to the house. The label says which way
-                        // that falls so nobody has to guess.
-                        label: `Follow the house default — ${NAV_PLACEMENT_LABELS.top}`,
-                      },
-                      ...NAV_PLACEMENT_IDS.map((id) => ({
-                        value: id,
-                        label: NAV_PLACEMENT_LABELS[id] ?? id,
-                      })),
-                    ]}
-                    onChange={(value) => setForm((c) => ({ ...c, navPlacement: value }))}
-                    hint="One choice for every page. Down the side becomes a rail on wide screens; on a phone it is the same list across the top either way."
-                    error={fieldErrors.get('theme.navPlacement')}
-                  />
+              <div className="flex flex-col gap-sm">
+                <div className="admin-branding-color-row flex flex-wrap items-end gap-sm">
+                  {toPickerHex(form.brandColor) ? (
+                    <input
+                      type="color"
+                      aria-label="Main brand colour picker"
+                      value={toPickerHex(form.brandColor)}
+                      onChange={(event) =>
+                        setForm((c) => ({ ...c, brandColor: event.target.value }))
+                      }
+                      className="min-h-admin-control w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <TextField
+                      label="Main brand colour"
+                      value={form.brandColor}
+                      onChange={(value) => setForm((c) => ({ ...c, brandColor: value }))}
+                      hint="A hex colour, like the one in the client’s brand guide. Leave it blank to keep the style’s own colour."
+                      error={fieldErrors.get('theme.brandColor')}
+                    />
+                  </div>
                 </div>
+                {/* The admin mark's legibility floor, stated plainly. The
+                    site keeps painting the client's colour; only the admin
+                    mark beside the page title steps aside, and it says so. */}
+                {accent.fellBack ? (
+                  <Notice
+                    tone="caution"
+                    message={`This colour reads at ${accent.ratio.toFixed(2)}:1 against the ${previewMode} admin title band, below the ${accent.floor}:1 floor a position marker needs. The mark beside the page title falls back to the admin’s own ink. The site itself is unaffected.`}
+                  />
+                ) : null}
+              </div>
+            </Panel>
+
+          </section>
+
+          <section
+            id="admin-theme-page-style"
+            aria-labelledby="admin-theme-task-page-style"
+            hidden={activeTask !== 'page-style'}
+            className="admin-branding-section"
+          >
+            {/* 1 ------------------------------------------------ site style */}
+            <Panel
+              title="Site style"
+              description="Six complete styles. Each one arrives set up and ready — you can publish it as it stands. Picking a style replaces every value you have not set yourself."
+            >
+              <div className="flex flex-col gap-sm">
+                <SelectField
+                  label="Site style"
+                  value={form.preset}
+                  options={[
+                    { value: '', label: 'None — this deployment’s stored palette' },
+                    ...PRESET_IDS.map((id) => ({ value: id, label: presetCopy(id).label })),
+                  ]}
+                  onChange={(value) =>
+                    setForm((c) => ({
+                      ...c,
+                      preset: value,
+                      // A pick from another style's groups means nothing here,
+                      // and the server rejects it by name.
+                      optionPicks: value ? resolveOptionPicks({ preset: value }) : {},
+                    }))
+                  }
+                  error={fieldErrors.get('theme.preset')}
+                />
+                {copy ? (
+                  <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
+                    {copy.summary}
+                    <span className="mt-3xs block text-admin-ink-data">
+                      Best for: {copy.bestFor}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            </Panel>
+
+            {/* 4 and 5 --------------------- header style and schedule style */}
+            {preset && workflowGroups.length > 0 ? (
+              <Panel
+                title="Header and schedule"
+                description={`How ${copy.label} sets the top of a page and the programme. Each choice belongs to this style — it remaps values the style already declares and never invents one.`}
+              >
+                <div className="flex flex-col gap-sm">
+                  {workflowGroups.map((group) => optionField(group, preset.options[group]))}
+                </div>
+              </Panel>
+            ) : null}
+
+            {/* 6 -------------------------------------------- light or dark */}
+            <Panel title="Light or dark">
+              <SelectField
+                label="Light or dark"
+                value={form.mode}
+                options={MODE_POLICY_IDS.map((id) => ({ value: id, label: MODE_LABELS[id] ?? id }))}
+                onChange={(value) => setForm((c) => ({ ...c, mode: value }))}
+                hint="Every style defines both. Follow the reader lets each visitor’s own setting decide."
+                error={fieldErrors.get('theme.mode')}
+              />
+            </Panel>
+
+          </section>
+
+          <section
+            id="admin-theme-workspace"
+            aria-labelledby="admin-theme-task-workspace"
+            hidden={activeTask !== 'workspace'}
+            className="admin-branding-section"
+          >
+            {/* 7 ------------------------------------ the admin's own colours */}
+            {/* THE ROOM, NOT THE PAGE. Every other decision on this tab is
+                about the client's site. This one is about the admin around
+                it: the rail, the filled button, the links and the focus ring.
+                Whatever seeds it — the main brand colour by default, or a
+                house scheme — is worked into a family that holds its contrast
+                in both modes (shared/theme deriveAdminScheme), so there is no
+                wrong answer here either. The frame never shows it, because the
+                public site never gets it. */}
+            <Panel
+              title="Admin colours"
+              description="The colour of this admin’s rail, buttons and links. The public site never uses it."
+            >
+              <SelectField
+                label="Admin colours"
+                value={form.adminScheme}
+                options={ADMIN_SCHEME_IDS.map((id) => ({
+                  value: id,
+                  label: ADMIN_SCHEME_LABELS[id] ?? id,
+                }))}
+                onChange={(value) => setForm((c) => ({ ...c, adminScheme: value }))}
+                hint="Whichever colour you pick is adjusted until white text and the focus ring hold their contrast in light and dark. The admin changes colour when the theme is published."
+                error={fieldErrors.get('theme.adminScheme')}
+              />
+            </Panel>
+
+          </section>
+
+          <section
+            id="admin-theme-advanced"
+            aria-labelledby="admin-theme-task-advanced"
+            hidden={activeTask !== 'advanced'}
+            className="admin-branding-section"
+          >
+            {/* ----------------------------------------------- the Advanced */}
+            <Panel
+              title="Advanced"
+              description="Everything else the system can do. Nothing here is needed for a finished site."
+            >
+              <div className="flex flex-col gap-md">
+                {/* ------------------------------------------ navigation */}
+                {/* ONE SETTING FOR THE WHOLE SITE. The navigation is part of
+                    what the site IS, not part of what one page is about: a
+                    reader who meets a top nav on the home page and a rail on
+                    the schedule has been handed two sites, and the nav stops
+                    being furniture they can stop noticing. It sits here rather
+                    than among the six questions because almost no deployment
+                    moves it — a site that never opens this panel gets the row
+                    across the top, which is the right answer for nearly all of
+                    them.
+
+                    The words come from lib/themeRuntime.js, which is also where
+                    the page editor's per-page exception reads them, so an
+                    operator meets one name per placement. */}
+                <section aria-labelledby="admin-theme-navigation">
+                  <h3
+                    id="admin-theme-navigation"
+                    className="font-admin-ui text-admin-lg font-bold text-admin-ink"
+                  >
+                    Navigation
+                  </h3>
+                  <div className="mt-sm">
+                    <SelectField
+                      label="Where the navigation sits"
+                      value={form.navPlacement}
+                      options={[
+                        {
+                          value: '',
+                          // Blank is a real answer and not a repeat of "top":
+                          // it stores nothing, which is what leaves the
+                          // placement to the house. The label says which way
+                          // that falls so nobody has to guess.
+                          label: `Follow the house default — ${NAV_PLACEMENT_LABELS.top}`,
+                        },
+                        ...NAV_PLACEMENT_IDS.map((id) => ({
+                          value: id,
+                          label: NAV_PLACEMENT_LABELS[id] ?? id,
+                        })),
+                      ]}
+                      onChange={(value) => setForm((c) => ({ ...c, navPlacement: value }))}
+                      hint="One choice for every page. Down the side becomes a rail on wide screens; on a phone it is the same list across the top either way."
+                      error={fieldErrors.get('theme.navPlacement')}
+                    />
+                  </div>
               </section>
               {/* ------------------------------------------- typography */}
               <section aria-labelledby="admin-theme-typography">
@@ -959,7 +1014,7 @@ export default function AdminBranding() {
                                 colors: { ...c.colors, [key]: event.target.value },
                               }))
                             }
-                            className="admin-target h-9 w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
+                            className="min-h-admin-control w-12 rounded-admin-small border-admin-hairline border-admin-rule-control bg-admin-ground-input p-3xs"
                           />
                         ) : null}
                         <div className="min-w-0 flex-1">
@@ -979,15 +1034,19 @@ export default function AdminBranding() {
               </section>
             </div>
           </Panel>
+          </section>
+
         </div>
 
         {/* --------------------------------------------- the page preview */}
-        <ThemeProof
-          themeDoc={candidate}
-          isDirty={isDirty}
-          mode={previewMode}
-          onModeChange={setPreviewMode}
-        />
+        <div className="admin-branding-preview">
+          <ThemeProof
+            themeDoc={candidate}
+            isDirty={isDirty}
+            mode={previewMode}
+            onModeChange={setPreviewMode}
+          />
+        </div>
       </div>
     </form>
   );

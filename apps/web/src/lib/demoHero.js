@@ -9,7 +9,7 @@ const HERO_ART = {
   zine: ['zine.webp', 'A bold print collage of a microphone and community voices.'],
 };
 
-export function demoHero(theme) {
+export function demoHero(theme, { compact = false } = {}) {
   if (!IS_DEMO) return null;
   const [file, alt] = HERO_ART[theme?.preset] ?? HERO_ART.newsroom;
   return {
@@ -18,6 +18,10 @@ export function demoHero(theme) {
     caption: theme?.preset === 'newsroom' ? 'Historical 2026 summit · Photo: Elon University' : null,
     demoTransitSign: theme?.preset === 'atlas',
     focalX: { civic: 80, broadsheet: 85, 'field-guide': 75, atlas: 50 }[theme?.preset] ?? 70,
-    focalY: theme?.preset === 'field-guide' ? 45 : 50,
+    // The shallow Program strip needs its own authored crop: keep the
+    // panelists' faces and the heron's head, without altering Home's art.
+    focalY: compact && theme?.preset === 'newsroom' ? 25
+      : compact && theme?.preset === 'field-guide' ? 5
+        : theme?.preset === 'field-guide' ? 45 : 50,
   };
 }

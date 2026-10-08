@@ -37,6 +37,9 @@ function fakeDb() {
       Object.assign(store.get(key(c, id)), patch);
     },
     async get() {
+      if (c === 'config' && id === 'event' && !store.has(key(c, id))) {
+        return { exists: true, data: () => ({}) };
+      }
       const data = store.get(key(c, id));
       return { exists: data !== undefined, data: () => data };
     },
@@ -595,4 +598,77 @@ test('verifyOtpCode: an unexpected auth error is a 500, not user creation', asyn
   // same code verifies again without a new email/rate slot.
   const retry = await verifyChallenge({ db, token, email: 'a@example.org', code: '123456' });
   assert.equal(retry.ok, true);
+});
+
+// Historical-demo policy is server-owned and precedes every mutation.
+test('sendOtpCode refuses historical demos before mail, templates, limits, or challenges', async () => {
+  const db = fakeDb();
+  db.store.set('config/event', { historicalDemo: true });
+  // A broken template would write a system error and notify without the gate.
+  db.store.set('email_templates/auth.otp', { html: '<p>Broken</p>', text: 'Broken' });
+  const before = structuredClone(db.store);
+  const { handler, sent, notices } = sendDeps({ db });
+  const res = fakeRes();
+  await handler({ method: 'POST', body: { email: 'a@example.org', historicalDemo: false } }, res);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'read-only-demo');
+  assert.deepEqual(db.store, before);
+  assert.deepEqual(sent, []);
+  assert.deepEqual(notices, []);
+});
+
+test('verifyOtpCode refuses valid and wrong codes without consuming a preexisting challenge or touching Auth', async () => {
+  const db = fakeDb();
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  db.store.set('config/event', { historicalDemo: true });
+  const before = structuredClone(db.store);
+  const auth = new Proxy({}, { get() { assert.fail('Auth must not be touched'); } });
+  const handler = createVerifyOtpHandler({ db, auth });
+  for (const code of ['123456', '654321']) {
+    const res = fakeRes();
+    await handler({ method: 'POST', body: { challengeId: token, email: 'a@example.org', code, historicalDemo: false } }, res);
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.code, 'read-only-demo');
+    assert.deepEqual(db.store, before);
+  }
+  // Once policy permits ordinary writes, the unconsumed code still works.
+  db.store.set('config/event', { historicalDemo: false });
+  const res = fakeRes();
+  await createVerifyOtpHandler({ db, auth: fakeAuth() })({
+    method: 'POST', body: { challengeId: token, email: 'a@example.org', code: '123456' },
+  }, res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('both OTP endpoints fail closed when config cannot establish write permission', async () => {
+  for (const event of [null, { historicalDemo: 'false' }]) {
+    const db = fakeDb();
+    db.store.set('config/event', event);
+    const before = structuredClone(db.store);
+    const { handler, sent } = sendDeps({ db });
+    for (const endpoint of [handler, createVerifyOtpHandler({ db, auth: fakeAuth() })]) {
+      const res = fakeRes();
+      await endpoint({ method: 'POST', body: { email: 'a@example.org', challengeId: 'x', code: '123456' } }, res);
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.body.error.code, 'config-unavailable');
+      assert.deepEqual(db.store, before);
+    }
+    assert.deepEqual(sent, []);
+  }
+});
+
+test('OTP send sees changed server policy even when the rendered config is stale', async () => {
+  const db = fakeDb();
+  const { handler, sent } = sendDeps({ db });
+  const req = { method: 'POST', body: { email: 'a@example.org' } };
+  const first = fakeRes();
+  await handler(req, first);
+  assert.equal(first.statusCode, 200);
+  db.store.set('config/event', { historicalDemo: true });
+  const before = structuredClone(db.store);
+  const blocked = fakeRes();
+  await handler(req, blocked);
+  assert.equal(blocked.statusCode, 403);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(db.store, before);
 });

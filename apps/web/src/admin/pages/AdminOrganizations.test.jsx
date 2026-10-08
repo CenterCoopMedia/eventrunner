@@ -285,6 +285,24 @@ describe('the organizations list, resuming a publish', () => {
 });
 
 describe('the organization editor', () => {
+  it('keeps public details, placement, and logo in separate cards with every control reachable', async () => {
+    await openNewOrganization();
+    const form = screen.getByLabelText('Name').closest('form');
+    const layout = form.querySelector('.admin-editor-layout--organization');
+    expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
+      .toEqual(['Public details', 'Placement', 'Logo']);
+    expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
+      'Name', 'Page address', 'Description', 'Website', 'Tier', 'Order',
+      'Show this organization when it is published', 'Logo',
+    ]);
+    const logo = within(layout).getByRole('heading', { name: 'Logo' }).closest('section');
+    expect(within(logo).getByLabelText('Logo')).toBeInTheDocument();
+    expect(within(logo).getByRole('button', { name: 'Choose or upload…' })).toBeEnabled();
+    expect(within(form).getByRole('button', { name: 'Save draft' })).toBeEnabled();
+    expect(within(form).getByRole('button', { name: 'Save and publish' })).toBeEnabled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('creates a draft at the address the name suggests', async () => {
     holdAdminCollections = true;
     await openNewOrganization();

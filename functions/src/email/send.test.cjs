@@ -15,10 +15,18 @@ function alreadyExistsError() {
 
 /** Minimal Firestore fake covering what send.cjs touches. */
 function fakeDb() {
-  const state = { claims: new Map(), sentRows: [], updates: [] };
+  const state = { claims: new Map(), sentRows: [], updates: [], event: {} };
   return {
     state,
     collection(name) {
+      if (name === 'config') {
+        return { doc: (id) => ({
+          async get() {
+            assert.equal(id, 'event');
+            return { exists: state.event !== null, data: () => state.event };
+          },
+        }) };
+      }
       if (name === 'email_claims') {
         return {
           doc: (id) => ({
@@ -390,4 +398,59 @@ test('delivery webhook rejects non-POST', async () => {
   const res = fakeRes();
   await handler({ method: 'GET', headers: {} }, res);
   assert.equal(res.statusCode, 405);
+});
+
+test('historical demo mail refusal has no provider, claim, audit, or config-render side effects', async () => {
+  const db = fakeDb();
+  db.state.event = { historicalDemo: true };
+  const c = createEmailCore({
+    db,
+    provider: { send: async () => { assert.fail('provider must not be called'); } },
+    getConfig: async () => { assert.fail('render config must not be read'); },
+  });
+  for (const message of [
+    { to: 'a@example.org', subject: 'Secret 123456', text: '123456', onceKey: 'auth:test' },
+    { to: 'a@example.org', subject: 'Welcome', onceKey: 'get-ticket:test' },
+    {},
+  ]) {
+    assert.deepEqual(await c.send(message), {
+      providerMessageId: null, status: 'failed', error: 'read-only-demo', retries: 0,
+    });
+  }
+  assert.equal(db.state.claims.size, 0);
+  assert.deepEqual(db.state.sentRows, []);
+});
+
+test('mail fails closed on missing, invalid, or failed policy reads without consuming onceKey', async () => {
+  const db = fakeDb();
+  let sends = 0;
+  const { core: c } = core({ db, provider: {
+    send: async () => { sends += 1; return { status: 'sent', providerMessageId: 'ok' }; },
+  } });
+  const message = { to: 'a@example.org', subject: 'Welcome', onceKey: 'welcome:test' };
+  for (const event of [null, { historicalDemo: 'false' }]) {
+    db.state.event = event;
+    await assert.rejects(c.send(message), { code: 'config-unavailable' });
+    assert.equal(db.state.claims.size, 0);
+    assert.deepEqual(db.state.sentRows, []);
+    assert.equal(sends, 0);
+  }
+  db.state.event = { historicalDemo: false };
+  assert.equal((await c.send(message)).status, 'sent');
+  assert.equal(sends, 1);
+  db.state.event = { historicalDemo: true };
+  assert.equal((await c.send({ ...message, onceKey: 'second' })).error, 'read-only-demo');
+  assert.equal(sends, 1);
+  assert.equal(db.state.claims.size, 1);
+  assert.equal(db.state.sentRows.length, 1);
+
+  const broken = createEmailCore({
+    db: { collection() { throw new Error('private connection detail'); } },
+    provider: { send() { assert.fail('provider must not be called'); } },
+  });
+  await assert.rejects(broken.send(message), (error) => {
+    assert.equal(error.code, 'config-unavailable');
+    assert.doesNotMatch(error.message, /private connection/);
+    return true;
+  });
 });
