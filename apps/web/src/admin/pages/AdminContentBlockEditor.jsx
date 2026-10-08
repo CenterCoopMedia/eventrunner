@@ -220,6 +220,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const [status, setStatus] = useState('');
   const [savedDocId, setSavedDocId] = useState(null);
   const [resumeQueueId, setResumeQueueId] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(mode !== 'edit');
   const errorRef = useRef(null);
   // Load the stored revision (or pick a default block type for a fresh
   // create form) once; later listener updates must not clobber an
@@ -281,6 +282,12 @@ export default function AdminContentBlockEditor({ mode }) {
     return map;
   }, [error]);
   const errorFor = (name) => fieldErrors.get(name);
+
+  useEffect(() => {
+    if (['field', 'blockType', 'order', 'visible', 'section'].some((field) => fieldErrors.has(field))) {
+      setSettingsOpen(true);
+    }
+  }, [fieldErrors]);
 
   // Show the loading state until BOTH revisions have reported AND this
   // doc's adoption effect has actually run — not just until `existingRow`
@@ -446,8 +453,91 @@ export default function AdminContentBlockEditor({ mode }) {
       : registryOptions
   ).map((id) => ({ value: id, label: blockTypeLabel(id) }));
 
+  const settingsPanel = (
+    <Panel
+      key="settings"
+      title={isExisting ? 'Block settings' : 'Set up the block'}
+      description={isExisting ? 'Type, order and visibility for this block.' : 'Choose the block type and field id, then add its value below.'}
+      className="admin-content-settings"
+    >
+      {isExisting ? (
+        <div className="admin-content-settings-summary">
+          <p className="text-admin-sm text-admin-ink-secondary">
+            {blockTypeLabel(content.blockType)} · Order {content.order === '' ? 'not set' : content.order} · {content.visible ? 'Visible' : 'Hidden'}
+          </p>
+          <button
+            type="button"
+            className={`${secondaryButtonClass} admin-content-settings-toggle`}
+            aria-expanded={settingsOpen}
+            aria-controls="admin-content-block-settings"
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            {settingsOpen ? 'Hide block settings' : 'Edit block settings'}
+          </button>
+        </div>
+      ) : null}
+      <div id="admin-content-block-settings" hidden={isExisting && !settingsOpen}>
+        <div className="mt-sm grid gap-sm sm:grid-cols-2">
+          <TextField
+            label="Field id"
+            value={currentFieldId}
+            onChange={setFieldId}
+            error={errorFor('field')}
+            readOnly={isExisting}
+            hint={
+              isExisting
+                ? 'The field id cannot change after creation.'
+                : 'Letters, digits, hyphen, underscore. Ties this block to the section’s default block.'
+            }
+          />
+          <SelectField
+            label="Block type"
+            value={content.blockType}
+            options={options}
+            onChange={changeBlockType}
+            error={errorFor('blockType')}
+            hint={
+              allowed.length
+                ? `This section allows: ${allowed.map(blockTypeLabel).join(', ')}.`
+                : 'This section does not allow any block types yet — add one in Pages.'
+            }
+          />
+          <TextField
+            label="Order"
+            type="number"
+            value={content.order}
+            onChange={(value) =>
+              setContent((current) => ({ ...current, order: value === '' ? '' : Number(value) }))
+            }
+            error={errorFor('order')}
+            hint="Lower numbers sort first within the section."
+          />
+          <div className="flex items-center">
+            <CheckboxField
+              label="Visible"
+              checked={content.visible}
+              onChange={(checked) => setContent((current) => ({ ...current, visible: checked }))}
+              hint="Hidden blocks stay out of the public site even once published."
+            />
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+  const valuePanel = (
+    <Panel key="value" title="Value" description={blockTypeFor(content.blockType)?.description} className="admin-content-value">
+      <BlockValueFields
+        blockTypeId={content.blockType}
+        values={content.values}
+        onChange={changeValue}
+        errorFor={errorFor}
+      />
+    </Panel>
+  );
+
   return (
     <form
+      noValidate
       className="flex flex-col gap-md"
       onSubmit={(event) => {
         event.preventDefault();
@@ -495,64 +585,9 @@ export default function AdminContentBlockEditor({ mode }) {
       />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel
-        title="Block"
-        description="The field id ties this block to the public page’s block slot."
-      >
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Field id"
-            value={currentFieldId}
-            onChange={setFieldId}
-            error={errorFor('field')}
-            readOnly={isExisting}
-            hint={
-              isExisting
-                ? 'The field id cannot change after creation.'
-                : 'Letters, digits, hyphen, underscore. Ties this block to the section’s default block.'
-            }
-          />
-          <SelectField
-            label="Block type"
-            value={content.blockType}
-            options={options}
-            onChange={changeBlockType}
-            error={errorFor('blockType')}
-            hint={
-              allowed.length
-                ? `This section allows: ${allowed.map(blockTypeLabel).join(', ')}.`
-                : 'This section does not allow any block types yet — add one in Pages.'
-            }
-          />
-          <TextField
-            label="Order"
-            type="number"
-            value={content.order}
-            onChange={(value) =>
-              setContent((current) => ({ ...current, order: value === '' ? '' : Number(value) }))
-            }
-            error={errorFor('order')}
-            hint="Lower numbers sort first within the section."
-          />
-          <div className="flex items-center">
-            <CheckboxField
-              label="Visible"
-              checked={content.visible}
-              onChange={(checked) => setContent((current) => ({ ...current, visible: checked }))}
-              hint="Hidden blocks stay out of the public site even once published."
-            />
-          </div>
-        </div>
-      </Panel>
-
-      <Panel title="Value" description={blockTypeFor(content.blockType)?.description}>
-        <BlockValueFields
-          blockTypeId={content.blockType}
-          values={content.values}
-          onChange={changeValue}
-          errorFor={errorFor}
-        />
-      </Panel>
+      <div className="admin-content-editor-layout" data-creating={!isExisting}>
+        {isExisting ? <>{valuePanel}{settingsPanel}</> : <>{settingsPanel}{valuePanel}</>}
+      </div>
 
       <div className="flex flex-wrap items-center gap-xs">
         {resumeQueueId ? (

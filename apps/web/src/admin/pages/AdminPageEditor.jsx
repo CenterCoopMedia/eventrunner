@@ -69,6 +69,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import EditorDisclosure from '../components/EditorDisclosure.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -107,6 +108,8 @@ import AdminPageHeader, {
 
 /** The value the template select shows for a page that named no task. */
 const CUSTOM_TEMPLATE = 'custom';
+// Survives edits and reordering without becoming part of the persisted payload.
+const EDITOR_SECTION_KEY = Symbol('editor section');
 
 /** Plain words for the layout variants (design brief §6.1, §8.5). */
 const LAYOUT_LABELS = Object.freeze({
@@ -209,6 +212,7 @@ export default function AdminPageEditor({ mode }) {
   // Load the stored revision once; later listener updates (e.g. the echo of
   // our own save) must not clobber whatever is being typed.
   const loadedIdRef = useRef(null);
+  const nextSectionKey = useRef(0);
 
   const row = mode === 'edit' ? findRow(pageId) : null;
 
@@ -219,7 +223,9 @@ export default function AdminPageEditor({ mode }) {
     const found = rows.find((candidate) => candidate.id === pageId);
     if (!found) return;
     loadedIdRef.current = pageId;
-    setPage(toEditablePage(found.draft ?? found.live));
+    const editable = toEditablePage(found.draft ?? found.live);
+    editable.sections = editable.sections.map((section) => ({ ...section, [EDITOR_SECTION_KEY]: nextSectionKey.current++ }));
+    setPage(editable);
   }, [mode, pageId, ready, rows]);
 
   useEffect(() => {
@@ -366,7 +372,8 @@ export default function AdminPageEditor({ mode }) {
 
   return (
     <form
-      className="flex flex-col gap-md"
+      className="admin-page-editor flex flex-col gap-md"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         save({ publish: false });
@@ -604,12 +611,12 @@ export default function AdminPageEditor({ mode }) {
 
       <Panel
         title="Sections"
-        description="Each section is a named slot on the page. Its allowed block types come from the block registry; its default blocks are the blocks it seeds."
+        description="Expand a section to edit its name and content structure. Open its allowed block types only when you need to change the available formats."
         actions={
           <button
             type="button"
             className={secondaryButtonClass}
-            onClick={() => update({ sections: [...page.sections, blankSection()] })}
+            onClick={() => update({ sections: [...page.sections, { ...blankSection(), [EDITOR_SECTION_KEY]: nextSectionKey.current++ }] })}
           >
             Add section
           </button>
@@ -625,13 +632,17 @@ export default function AdminPageEditor({ mode }) {
               const at = `sections[${sectionIndex}]`;
               return (
                 <li
-                  key={sectionIndex}
-                  className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-soft p-md"
+                  key={section[EDITOR_SECTION_KEY]}
+                  className="min-w-0"
                 >
-                  <div className="mb-sm flex flex-wrap items-center justify-between gap-xs border-admin-rule-hairline border-b-admin-hairline pb-xs">
-                    <h3 className="font-admin-ui text-admin-lg font-bold text-admin-ink">
-                      {section.label || section.id || `Section ${sectionIndex + 1}`}
-                    </h3>
+                  <EditorDisclosure
+                    title={section.label || section.id || `Section ${sectionIndex + 1}`}
+                    description={`${section.defaultBlocks.length} ${section.defaultBlocks.length === 1 ? 'block' : 'blocks'} · ${section.allowedBlocks.length} allowed ${section.allowedBlocks.length === 1 ? 'type' : 'types'}`}
+                    defaultOpen={!section.id}
+                    reveal={[...fieldErrors.keys()].some((field) => field.startsWith(`${at}.`))}
+                  >
+                  <div className="mb-md flex flex-wrap items-center justify-between gap-xs">
+                    <p className="text-admin-sm text-admin-ink-secondary">Section {sectionIndex + 1} settings</p>
                     <div className="flex flex-wrap gap-2xs">
                       <button
                         type="button"
@@ -731,15 +742,22 @@ export default function AdminPageEditor({ mode }) {
                     </div>
                   </div>
 
-                  <fieldset className="mt-sm">
-                    <legend className={fieldLabelClass}>
+                  <EditorDisclosure
+                    title="Allowed block types"
+                    description="Choose which kinds of content this section accepts."
+                    headingLevel="h4"
+                    className="mt-md"
+                    reveal={[...fieldErrors.keys()].some((field) => field === `${at}.allowedBlocks` || field.startsWith(`${at}.allowedBlocks[`))}
+                  >
+                  <fieldset>
+                    <legend className="sr-only">
                       Allowed block types
                     </legend>
                     <p className="text-admin-sm text-admin-ink-secondary">
-                      Which of the registry’s block types this section accepts.
+                      Select the content formats editors can add. The saved choices stay unchanged until you edit them.
                     </p>
                     <FieldError message={errorFor(`${at}.allowedBlocks`)} />
-                    <div className="mt-2xs grid gap-2xs sm:grid-cols-2">
+                    <div className="admin-block-type-choices mt-sm grid gap-sm sm:grid-cols-2">
                       {BLOCK_TYPE_IDS.map((blockTypeId) => (
                         <CheckboxField
                           key={blockTypeId}
@@ -757,6 +775,7 @@ export default function AdminPageEditor({ mode }) {
                       ))}
                     </div>
                   </fieldset>
+                  </EditorDisclosure>
 
                   <div className="mt-sm border-admin-rule-hairline border-t-admin-hairline pt-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2xs">
@@ -887,6 +906,7 @@ export default function AdminPageEditor({ mode }) {
                       </ol>
                     )}
                   </div>
+                  </EditorDisclosure>
                 </li>
               );
             })}

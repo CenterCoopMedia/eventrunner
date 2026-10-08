@@ -407,6 +407,14 @@ jobs:
         # it before Playwright starts. Reimplementing the emulators:exec
         # call here instead would silently drop that tee.
         run: bash scripts/dev/run-e2e.sh
+      - name: Upload synthetic admin visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-visual-evidence
+          path: test-results/admin-visual-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

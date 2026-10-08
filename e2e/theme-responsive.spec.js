@@ -37,6 +37,8 @@ async function openPhoneProof(page) {
   // live config/theme document. Measure only after that adoption so the
   // candidate and the public page are the same saved document.
   await expect(page.getByLabel('Site style')).toHaveValue('civic');
+  await page.getByRole('button', { name: 'Page style', exact: true }).click();
+  await expect(page.getByLabel('Site style')).toBeVisible();
   await page.getByRole('button', { name: 'Phone (390px)' }).click();
   const iframe = page.locator('iframe[title="Home preview, light mode, 390px wide"]');
   await expect(iframe).toBeVisible();
@@ -388,29 +390,34 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   await page.getByLabel('Square icon').fill(
     'branding/a-populated-square-icon-path-with-a-long-unbroken-file-name.png',
   );
-  await page.getByRole('button', { name: 'Show the advanced settings' }).click();
+  // Each task owns a separate view. Check the populated identity fields as
+  // well as the advanced controls, rather than measuring them while hidden.
+  for (const task of ['Identity', 'Page style', 'Workspace', 'Advanced']) {
+    const taskButton = page.getByRole('button', { name: task, exact: true });
+    await taskButton.click();
+    await expect(taskButton).toHaveAttribute('aria-pressed', 'true');
+    const measurements = await page.evaluate(() => {
+      const visibleControls = [...document.querySelectorAll('input, select, button')]
+        .filter((element) => element.getClientRects().length > 0);
+      return {
+        clientWidth: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        railHeight: document.querySelector('.admin-rail').getBoundingClientRect().height,
+        jobPosition: getComputedStyle(document.querySelector('.admin-job-line')).position,
+        actionPadding: Number.parseFloat(
+          getComputedStyle(document.querySelector('.admin-job-line__actions > *')).paddingLeft,
+        ),
+        controlsInside: visibleControls.every((element) => {
+          const box = element.getBoundingClientRect();
+          return box.left >= 0 && box.right <= document.documentElement.clientWidth;
+        }),
+      };
+    });
 
-  const measurements = await page.evaluate(() => {
-    const visibleControls = [...document.querySelectorAll('input, select, button')]
-      .filter((element) => element.getClientRects().length > 0);
-    return {
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-      railHeight: document.querySelector('.admin-rail').getBoundingClientRect().height,
-      jobPosition: getComputedStyle(document.querySelector('.admin-job-line')).position,
-      actionPadding: Number.parseFloat(
-        getComputedStyle(document.querySelector('.admin-job-line__actions > *')).paddingLeft,
-      ),
-      controlsInside: visibleControls.every((element) => {
-        const box = element.getBoundingClientRect();
-        return box.left >= 0 && box.right <= document.documentElement.clientWidth;
-      }),
-    };
-  });
-
-  expect(measurements.scrollWidth).toBe(measurements.clientWidth);
-  expect(measurements.railHeight).toBe(56);
-  expect(measurements.jobPosition).toBe('static');
-  expect(measurements.actionPadding).toBe(8);
-  expect(measurements.controlsInside).toBe(true);
+    expect(measurements.scrollWidth, task).toBe(measurements.clientWidth);
+    expect(measurements.railHeight, task).toBe(56);
+    expect(measurements.jobPosition, task).toBe('static');
+    expect(measurements.actionPadding, task).toBe(8);
+    expect(measurements.controlsInside, task).toBe(true);
+  }
 });

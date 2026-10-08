@@ -46,6 +46,7 @@
 // THE TOUR (issue #198). A first visit opens the editor tour at the head of
 // the stone; "Take the tour" on the rail opens it again. It is its own lazy
 // chunk (components/AdminTour.jsx), and its steps are this docket.
+import './adminWorkspace.css';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import useAccountViews from '../hooks/useAccountViews.js';

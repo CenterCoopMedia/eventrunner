@@ -514,10 +514,57 @@ describe('page editor', () => {
     expect(bodyOf(0)).toEqual({ id: 'scholarships' });
   });
 
+  it('starts existing sections collapsed and keeps changes through reopening', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    const section = await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' });
+    expect(section).toHaveAttribute('aria-expanded', 'false');
+    // Hidden number constraints must not stop the server validation path.
+    expect(section.closest('form')).toHaveAttribute('novalidate');
+    expect(screen.getByLabelText('Section 1 label')).not.toBeVisible();
+    fireEvent.click(section);
+    fireEvent.change(screen.getByLabelText('Section 1 label'), { target: { value: 'Introduction' } });
+    fireEvent.click(section);
+    fireEvent.click(section);
+    expect(screen.getByLabelText('Section 1 label')).toHaveValue('Introduction');
+    expect(screen.getByLabelText('Rich text — section 1')).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Allowed block types Choose/ }));
+    expect(screen.getByLabelText('Rich text — section 1')).toBeVisible();
+  });
+
+  it('keeps the open section and focused move control with their record after reordering', async () => {
+    draftDocs = [{ ...SCHOLARSHIPS_DRAFT, sections: ['Intro', 'Details', 'Closing'].map((label, index) => ({ ...SCHOLARSHIPS_DRAFT.sections[0], id: `section-${index}`, label })) }];
+    await renderAt('/admin/pages/scholarships');
+    const intro = await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' });
+    fireEvent.click(intro);
+    const move = screen.getByRole('button', { name: 'Move section 1 down' });
+    move.focus();
+    fireEvent.click(move);
+    expect(intro).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Details 1 block · 1 allowed type' })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(move);
+    expect(move).toHaveAccessibleName('Move section 2 down');
+    fireEvent.click(move);
+    expect(screen.getByLabelText('Section 3 label')).toHaveValue('Intro');
+    expect(intro).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('reveals a collapsed section and palette when their validation fails', async () => {
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    await renderAt('/admin/pages/scholarships');
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'Invalid page: sections[0].allowedBlocks: choose at least one type'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Intro 1 block · 1 allowed type' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Allowed block types Choose/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Rich text — section 1')).toBeVisible();
+  });
+
   it('adds, reorders, and removes blocks within a section', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/scholarships');
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add block to section 1' }));
     fireEvent.change(screen.getByLabelText('Block 2 field — section 1'), {
@@ -702,6 +749,7 @@ describe('page editor', () => {
     draftDocs = [{ ...SCHOLARSHIPS_DRAFT, id: 'home', label: 'Home page', systemPage: true }];
     fetch.mockResolvedValueOnce(okResponse({ id: 'home', status: 'dirty' }));
     await renderAt('/admin/pages/home');
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' }));
 
     // A section stored before this schema landed carries no slot; it reads
     // as main, which is where it has always rendered — and "after the main
@@ -753,11 +801,13 @@ describe('page editor', () => {
   it('offers only the section’s allowed block types in the block picker', async () => {
     draftDocs = [SCHOLARSHIPS_DRAFT];
     await renderAt('/admin/pages/scholarships');
+    fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' }));
 
     const picker = await screen.findByLabelText('Block 1 type — section 1');
     expect(within(picker).getAllByRole('option').map((o) => o.textContent)).toEqual(['Rich text']);
 
     // Widening the palette widens the picker — the registry drives both.
+    fireEvent.click(screen.getByRole('button', { name: /Allowed block types Choose/ }));
     fireEvent.click(screen.getByLabelText('Statistic — section 1'));
     expect(
       within(screen.getByLabelText('Block 1 type — section 1'))
