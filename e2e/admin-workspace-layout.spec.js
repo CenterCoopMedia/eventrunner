@@ -86,6 +86,8 @@ test('admin workspaces fill desktop width and group readable cards without narro
           }),
           timeInputsReadable: controls.filter((control) => control.matches('input[type="time"]'))
             .every((control) => control.getBoundingClientRect().width >= 128),
+          singleContentFieldUsesReadingWidth: [...document.querySelectorAll('.admin-content-fields > :only-child')]
+            .every((field) => Math.abs(field.getBoundingClientRect().width - field.parentElement.getBoundingClientRect().width) <= 1),
           controlsInside: controls.every((control) => {
             const box = control.getBoundingClientRect();
             return box.left >= -1 && box.right <= document.documentElement.clientWidth + 1;
@@ -97,6 +99,7 @@ test('admin workspaces fill desktop width and group readable cards without narro
       expect(geometry.cardsFit, `${task.name} cards contain their content at ${viewport.width}`).toBe(true);
       expect(geometry.controlsFitCards, `${task.name} controls fit their cards at ${viewport.width}`).toBe(true);
       expect(geometry.timeInputsReadable, `${task.name} native time controls remain readable at ${viewport.width}`).toBe(true);
+      expect(geometry.singleContentFieldUsesReadingWidth, `${task.name} single content fields use their reading width at ${viewport.width}`).toBe(true);
       expect(geometry.controlsInside, `${task.name} controls fit at ${viewport.width}`).toBe(true);
       await page.screenshot({ path: path.join(evidenceDir, `${task.name}-${viewport.name}-${viewport.width}.png`), fullPage: true, animations: 'disabled' });
     }

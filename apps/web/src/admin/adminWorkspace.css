@@ -111,6 +111,7 @@
 }
 .admin-editor-card--primary > .flex, .admin-editor-card--primary > .admin-editor-fields,
 .admin-content-fields { max-inline-size: 88ch; }
+.admin-content-fields > :only-child { grid-column: 1 / -1; }
 .admin-settings-field--wide { grid-column: 1 / -1; }
 .admin-page-section-list > li:has(> .admin-editor-disclosure[data-open='true']) { grid-column: 1 / -1; }
 .admin-page-block-list > li { min-width: 0; }
