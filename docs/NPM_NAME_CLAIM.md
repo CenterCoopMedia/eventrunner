@@ -65,13 +65,20 @@ Do not infer control from matching names or an empty member response.
 
 - Agree with the maintainer which package has a genuine function and which
   names and organizations are needed. Revise issue #99's placeholder acceptance
-  criteria before treating publication as ready.
+  criteria before treating publication as ready. For each proposed organization,
+  identify the active package to publish under its scope. Omit organizations
+  without an approved active package.
 - Review the release files, license, version, README, and package metadata.
   Preview the tarball file list with `npm pack --dry-run --ignore-scripts` from
   the approved package directory. This does not create or test the tarball.
 - Review lifecycle scripts and generated build files before approving the final
   release contents. The preview above skips scripts; publishing from a directory
   can run them and produce different contents.
+- After approving the build and lifecycle scripts, create the final tarball with
+  [`npm pack`](https://docs.npmjs.com/cli/v11/commands/npm-pack/). Inspect its
+  actual file contents, including generated files, and check for private data.
+  Record its path and SHA-256 checksum with the release approval. Publish that
+  exact reviewed tarball; rebuilding or changing it requires another review.
 - Confirm the package's behavior with the relevant checks for that release.
 - Keep secrets and private files out of the tarball. Do not publish from the
   repository root or remove a workspace's `private` flag to reserve a name.
@@ -89,9 +96,10 @@ script around 2FA or store a token that bypasses it.
 ## 4. Recheck and obtain the final go-ahead
 
 Repeat all four registry checks immediately before any public change. Ask the
-maintainer to approve the exact names, reviewed package, and organization actions
-in that execution session. Earlier planning approval is insufficient. Stop if
-the observed ownership changed or any prerequisite is unverified.
+maintainer to approve the exact names, reviewed tarball and checksum, and
+organization actions in that execution session. Confirm the tarball checksum
+still matches. Earlier planning approval is insufficient. Stop if the observed
+ownership changed or any prerequisite is unverified.
 
 ## 5. Create only the approved organizations and publish
 
@@ -99,13 +107,17 @@ Follow npm's [organization creation instructions](https://docs.npmjs.com/creatin
 on the website. Select the free public-package plan unless a paid plan is
 separately authorized. Add the approved maintainers and verify their roles.
 An organization's name is its scope.
+Create an organization only when the approved release includes its active
+scoped package. A member roster alone does not satisfy the active-use policy.
 
 The documented [`npm org` command](https://docs.npmjs.com/cli/v11/commands/npm-org/)
 manages members with `set`, `rm`, and `ls`; it does not provide `npm org create`.
 
-Publish only the reviewed functional package from its approved directory, with
-the agreed name and access level. Complete 2FA interactively. This runbook
-provides no publish command until that release is defined and approved.
+Publish only the exact reviewed tarball, with the agreed name and access level.
+[`npm publish`](https://docs.npmjs.com/cli/v11/commands/npm-publish/) accepts a
+local tarball path. Do not publish from the source directory or repack after
+approval. Complete 2FA interactively. This runbook provides no publish command
+until that release is defined and approved.
 
 ## 6. Verify ownership and record the result
 
@@ -113,6 +125,9 @@ provides no publish command until that release is defined and approved.
   the exact version, description, and maintainers against the approved release.
 - Check each approved organization with `npm org ls <org-name>` while signed in
   as the operator, and verify owner and maintainer roles on the npm website.
+- For every created organization, verify its approved scoped package exists in
+  the registry and is associated with that organization. Record the package URL
+  and the organization's access to it. An empty organization is incomplete.
 - Record ownership, recovery details, publication date, and roles in the team's
   operator password/secrets manager, as used by
   [`docs/POSTMARK_PROVISIONING.md`](POSTMARK_PROVISIONING.md). Store recovery codes
