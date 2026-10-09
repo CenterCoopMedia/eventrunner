@@ -165,7 +165,7 @@ export default function AttendeeRecordPanel({
       aria-label={`Record for ${name}`}
       className="flex flex-col gap-md border-admin-rule-hairline border-t-admin-hairline px-md py-sm"
     >
-      <form className="flex max-w-[65ch] flex-col gap-sm" onSubmit={save}>
+      <form className="flex flex-col gap-sm" onSubmit={save}>
         <ServerErrorSummary error={error} errorRef={errorRef} />
         <TextAreaField
           label="Past attendance"

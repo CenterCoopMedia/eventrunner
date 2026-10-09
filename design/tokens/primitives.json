@@ -44,10 +44,10 @@
       "2xl": "4rem",
       "3xl": "6rem"
     },
-    "$stage-note": "The two widths the page is built on (2026-09-10 vocabulary expansion). `frame` is the stage: the full measure of the page, which the header, the navigation, the schedule grid, the directories, the logo wall, the footer, and every section head run to. `measure` is the text measure: a paragraph, a list, a rich text block, a stat description, or an answer never exceeds it.",
+    "$stage-note": "The frame fills the available width with a stage gutter from the spacing scale. The measure fills that content box, so paragraphs, lists, rich text and section rules share the same width.",
     "stage": {
-      "frame": "72.5rem",
-      "measure": "44rem"
+      "frame": "100%",
+      "measure": "100%"
     },
     "width": {
       "hairline": "1px",

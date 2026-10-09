@@ -75,7 +75,7 @@ export default function LayoutSection({ folio }) {
       id="specimen-layout"
       title="Layout"
       folio={folio}
-      standfirst="Two widths: a stage for the frame of the page, and a measure for the text a person reads."
+      standfirst="The stage fills the available width, and running text fills the same content box as the section rule."
     >
       <Figure
         name="Stage and measure"
@@ -91,10 +91,10 @@ export default function LayoutSection({ folio }) {
       </Figure>
 
       <Figure
-        name="Margin column"
+        name="Full-width track"
         file="apps/web/src/index.css"
         contract="page"
-        note="At lg and above the stage becomes two tracks: the measure takes the leading one and a margin opens beside it, which is where a folio, a picture or a line of metadata may sit. Below lg the margin closes and the measure fills the stage."
+        note="Running text and supporting details share one full-width track at every viewport size. Folios stay inside the stage at the end of the section rule."
       >
         <div className="stage-split">
           <div>
@@ -102,8 +102,7 @@ export default function LayoutSection({ folio }) {
               {eventConfig.tagline}
             </p>
             <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">
-              Running text sits in the leading track and stops at the measure, so a line never runs
-              past the length a reader can follow back to the start of the next one.
+              Running text fills the stage's content box and aligns with the section rule.
             </p>
           </div>
           <p className="font-data text-caption text-text-secondary">

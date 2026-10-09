@@ -158,17 +158,17 @@ They take the site's own ink and never carry a colour of their own, so a set can
 
 ## Layout
 
-### Two widths: The stage and the measure
+### The stage and the measure
 
-Every page is built on two widths, and picking a style is what sets them.
+The frame and running text each have a width token. Both default to `100%`.
 
 **The stage** is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It is the width of the page.
 
-**The measure** is running text. A paragraph, a list, a description under a figure, an answer under a question: none of them runs wider than the measure, at any screen size. Long lines are hard to read, and a paragraph set the width of a timetable is a paragraph nobody finishes.
+**The measure** is running text. Paragraphs, lists, rich text, descriptions and answers fill the stage's content box, matching the section rule.
 
-At wide screen sizes a **margin** opens beside the measure. A small label, a picture, or a line of detail can sit there. On a narrow screen the margin closes and the text fills the page.
+The stage retains its `--space-lg` inline gutter for the Atlas coordinate mark. At viewports of 1024px and wider, its content box uses at least 90 percent of the viewport. The specimen split uses one full-width track, and folios stay inside the stage at the end of the rule.
 
-**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. A style retunes either one in its own preset file — a broadsheet may run wider and tighter, a zine may keep the stage narrow — and nothing states a fixed width. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure.
+**Engine.** Both widths are tokens: `--stage-max` and `--measure-text`, declared in the page contract over a tier 2 stage family. Their source is `design/tokens/primitives.json`; regenerate the committed CSS with `node scripts/generate-content.cjs --demo`. The `arrangement` variant maps onto them: `grid` uses the stage's columns and `list` uses the measure. Admin long-text fields fill their panel content box; short helper paragraphs, date fields and category controls retain their own limits.
 
 ### Pages are chosen by task
 

@@ -423,8 +423,8 @@
      that measure, and half the canvas stayed empty. Every style shared the
      shape, so every style read as the same narrow template.
 
-     There are TWO widths now, and both are tokens the page contract
-     declares, so a style retunes either one in its own preset file:
+     Both widths are tokens the page contract declares. The frame fills
+     the available width; running text fills the frame's content box:
 
        .stage     the frame. The header, the navigation, the schedule grid,
                   the directories, the logo wall, the footer, and every
@@ -437,7 +437,7 @@
      `minmax(0, …)` so a long word narrows the column instead of widening
      the page.
 
-     THE GUTTER IS --space-lg, NOT --space-md, and that is load-bearing. The
+     The gutter stays at --space-lg to hold the coordinate mark. The
      Atlas coordinate mark is drawn 20px outside the title block, so a 16px
      gutter pushed it 4px past the viewport and every style scrolled
      sideways by 4px on a phone. The stage gives the mark the room its
@@ -452,19 +452,15 @@
     max-inline-size: var(--measure-text);
   }
 
-  /* THE MARGIN COLUMN. At lg and above the stage is a grid: the measure
-     takes the leading track and a margin opens beside it, which is where a
-     folio, a picture, or a line of metadata may sit (brief §2.1: a folio
-     lives beside a rule, in a margin, or in a running header). Below lg the
-     margin closes and the measure fills the stage. */
+  /* Running text and supporting content share one full-width track.
+     A percentage measure plus a second track would overflow the stage. */
   .stage-split {
     display: grid;
     row-gap: var(--space-lg);
   }
   @media (min-width: 64rem) {
     .stage-split {
-      grid-template-columns: minmax(0, var(--measure-text)) minmax(0, 1fr);
-      column-gap: var(--space-2xl);
+      grid-template-columns: minmax(0, 1fr);
       align-items: start;
     }
   }
@@ -747,23 +743,14 @@
     position: relative;
     margin-block-start: calc(var(--section-rule-gap) * var(--density-step, 1));
   }
-  /* THE SECTION BOUNDARY OPTION (2026-09-10 record, §4). The folio beside
-     the head is drawn or not, and sits at the far end of the rule or is
-     knocked out of the rule where the margin column opens beside the
-     measure — the same geometry .stage-split uses, so a folio in the margin
-     lines up with whatever else the page puts there. Below lg the margin is
-     closed and the folio takes its end placement. The switch is a style
-     query, and a browser that cannot read one keeps the end placement. */
+  /* Folios stay in the section head's flex flow, at the end of the rule.
+     This also keeps margin-style folios inside the full-width stage. */
   .section-head__folio {
     display: var(--section-folio-display);
   }
   @container style(--section-folio-placement: margin) {
     @media (min-width: 64rem) {
       .section-head__folio {
-        position: absolute;
-        inset-block-start: 50%;
-        inset-inline-start: calc(var(--measure-text) + var(--space-2xl));
-        transform: translateY(-50%);
         margin: 0;
         padding-inline: var(--space-2xs);
         background-color: rgb(var(--color-surface-rgb));
