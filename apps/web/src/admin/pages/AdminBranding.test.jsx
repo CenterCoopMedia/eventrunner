@@ -6,9 +6,8 @@
 //     frame carries data-theme/data-mode/data-motif-set for the draft, and
 //     the room around it never adopts any of them.
 //   • The frame renders the client's REAL page, not swatches.
-//   • The workflow is six decisions in order: site style, logo and icon,
-//     main brand colour, header style, schedule style, light or dark. Every
-//     other control is behind the Advanced disclosure.
+//   • Task navigation groups Identity, Page style, Workspace and Advanced.
+//     Switching tasks preserves every field and the real page preview.
 //   • Admin colours is the one decision about the room rather than the
 //     page: it follows the brand colour unless a house scheme is chosen,
 //     and the choice is written on every publish, brand included, because
@@ -189,7 +188,7 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
 
 /** Open Advanced. Nothing behind it is needed for a finished site. */
 function openAdvanced() {
-  fireEvent.click(screen.getByRole('button', { name: 'Show the advanced settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Advanced', exact: true }));
 }
 
 /** The panel titles the bench shows, in the order a staff member meets them. */
@@ -343,24 +342,34 @@ describe('the proof', () => {
 });
 
 describe('the staff workflow', () => {
-  it('asks six questions, in order, and shows the page preview beside them', async () => {
-    // Owner calibration, 2026-08-27: "staff complete the normal workflow
-    // with a small set of clear decisions". This is that list, and the order
-    // is the workflow.
+  it('groups the work into four tasks and keeps the real preview mounted', async () => {
     await renderBranding(PRESET_THEME);
-    // Admin colours is the one decision about the room rather than the
-    // page. It follows the six and sits before Advanced, because it is not
-    // advanced: the default already works.
-    expect(panelTitles()).toEqual([
-      'Site style',
-      'Logo and icon',
-      'Main brand colour',
-      'Header and schedule',
-      'Light or dark',
-      'Admin colours',
-      'Advanced',
-      'Page preview',
-    ]);
+    const taskNav = screen.getByRole('group', { name: 'Branding tasks' });
+    expect(within(taskNav).getAllByRole('button').map((button) => button.getAttribute('aria-label')))
+      .toEqual(['Identity', 'Page style', 'Workspace', 'Advanced']);
+    const proof = previewIframe();
+    expect(screen.getByRole('button', { name: 'Identity', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(panelTitles()).toEqual(['Logo and icon', 'Main brand colour', 'Page preview']);
+
+    fireEvent.change(screen.getByLabelText('Primary logo'), { target: { value: 'branding/draft.svg' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Page style', exact: true }));
+    expect(panelTitles()).toEqual(['Site style', 'Header and schedule', 'Light or dark', 'Page preview']);
+    expect(screen.getByLabelText('Primary logo')).not.toBeVisible();
+    expect(screen.getByLabelText('Site style')).toBeVisible();
+    expect(previewIframe()).toBe(proof);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace', exact: true }));
+    expect(panelTitles()).toEqual(['Admin colours', 'Page preview']);
+    expect(screen.getByLabelText('Admin colours')).toBeVisible();
+    expect(previewIframe()).toBe(proof);
+
+    openAdvanced();
+    expect(panelTitles()).toEqual(['Advanced', 'Page preview']);
+    expect(screen.getByLabelText('Surface')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Identity', exact: true }));
+    expect(screen.getByLabelText('Primary logo')).toHaveValue('branding/draft.svg');
+    expect(screen.getByLabelText('Primary logo')).toBeVisible();
+    expect(previewIframe()).toBe(proof);
   });
 
   it('offers all six styles with no second tier, and says who each suits', async () => {
@@ -417,8 +426,8 @@ describe('the staff workflow', () => {
 
   it('keeps typography, illustrations, shape, and raw colours behind Advanced', async () => {
     await renderBranding(PRESET_THEME);
-    expect(screen.getByRole('button', { name: 'Show the advanced settings' })).toHaveAttribute(
-      'aria-expanded',
+    expect(screen.getByRole('button', { name: 'Advanced', exact: true })).toHaveAttribute(
+      'aria-pressed',
       'false',
     );
     for (const label of ['Heading face', 'Illustration set', 'Surface', 'Corners', 'Spacing']) {
@@ -427,8 +436,8 @@ describe('the staff workflow', () => {
     expect(screen.getByLabelText('Surface — light').closest('[hidden]')).not.toBeNull();
 
     openAdvanced();
-    expect(screen.getByRole('button', { name: 'Hide the advanced settings' })).toHaveAttribute(
-      'aria-expanded',
+    expect(screen.getByRole('button', { name: 'Advanced', exact: true })).toHaveAttribute(
+      'aria-pressed',
       'true',
     );
     for (const label of ['Heading face', 'Illustration set', 'Surface', 'Corners', 'Spacing']) {
@@ -598,6 +607,7 @@ describe('publishing the theme', () => {
 
   it('offers the brand colour first and every house scheme by name', async () => {
     await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace', exact: true }));
     const options = within(screen.getByLabelText('Admin colours'))
       .getAllByRole('option')
       .map((option) => option.textContent);
@@ -639,6 +649,33 @@ describe('publishing the theme', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('theme.colors.primary: must be a hex color');
     expect(screen.getByLabelText('Primary')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('reveals the rejected task and the dark-mode override automatically', async () => {
+    await renderBranding(PRESET_THEME);
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'theme.tokens.dark.ink: must be a hex color'));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+
+    expect(await screen.findByRole('alert')).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Advanced', exact: true }))
+      .toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByLabelText('Ink — dark')).toBeVisible();
+    expect(screen.getByLabelText('Ink — dark')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Advanced', exact: true })).toHaveAccessibleDescription(/1 to fix/);
+    expect(previewIframe()).not.toBeNull();
+  });
+
+  it('reveals an extra image slot when the server rejects it from another task', async () => {
+    await renderBranding(PRESET_THEME);
+    fireEvent.click(screen.getByRole('button', { name: 'Workspace', exact: true }));
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'theme.logos.favicon: must name an image'));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
+
+    await screen.findByRole('alert');
+    await waitFor(() => expect(screen.getByLabelText('Favicon')).toBeVisible());
+    expect(screen.getByRole('button', { name: 'Identity', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Hide the other image slots' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('Favicon')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('reverts to the saved theme on request', async () => {

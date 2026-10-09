@@ -471,7 +471,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised ${
+      className={`admin-panel min-w-0 rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised ${
         flush ? '' : 'p-md'
       } ${className}`}
     >
@@ -479,7 +479,7 @@ export function Panel({
         <div
           className={`${
             flush ? 'px-md pt-md ' : ''
-          }mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-sm`}
+          }admin-panel__heading mb-sm flex flex-wrap items-start justify-between gap-sm border-admin-rule-hairline border-b-admin-hairline pb-sm`}
         >
           <div className="min-w-0">
             <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">{title}</h2>

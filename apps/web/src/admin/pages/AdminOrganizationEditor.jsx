@@ -283,99 +283,107 @@ export default function AdminOrganizationEditor({ mode }) {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel title="Public details">
-        <div className="flex flex-col gap-sm">
-          <TextField
-            label="Name"
-            value={form.name}
-            onChange={(value) => {
-              set('name', value);
-              if (creating && !slugTouched) {
-                setForm((current) => ({ ...current, slug: organizationSlugFromName(value) }));
-              }
-            }}
-            error={errorFor('name')}
-            required
-          />
-          {creating ? (
+      <div className="admin-editor-layout admin-editor-layout--organization">
+        <Panel
+          title="Public details"
+          description="The name, introduction, and website shown to attendees."
+          className="admin-editor-card--primary"
+        >
+          <div className="flex flex-col gap-sm">
             <TextField
-              label="Page address"
-              hint="The end of this organization’s page address. Lowercase letters, digits, and hyphens. It cannot change after the first save."
-              value={form.slug}
+              label="Name"
+              value={form.name}
               onChange={(value) => {
-                setSlugTouched(true);
-                set('slug', value);
+                set('name', value);
+                if (creating && !slugTouched) {
+                  setForm((current) => ({ ...current, slug: organizationSlugFromName(value) }));
+                }
               }}
-              error={errorFor('slug')}
-              autoCapitalize="none"
-              spellCheck={false}
-              className="font-admin-data"
+              error={errorFor('name')}
               required
             />
-          ) : null}
-          <TextAreaField
-            label="Description"
-            hint="One or two sentences on what this organization supports."
-            rows={3}
-            value={form.description}
-            onChange={(value) => set('description', value)}
-            error={errorFor('description')}
-          />
-          <TextField
-            label="Website"
-            type="url"
-            value={form.url}
-            onChange={(value) => set('url', value)}
-            error={errorFor('url')}
-          />
-        </div>
-      </Panel>
-
-      <Panel title="Placement">
-        <div className="grid gap-sm sm:grid-cols-2">
-          <div>
-            <TextField
-              label="Tier"
-              hint="Organizations with the same tier text form one group. Gold and gold are two groups."
-              value={form.tier}
-              onChange={(value) => set('tier', value)}
-              error={errorFor('tier')}
-              list={tiers.length > 0 ? tierListId : undefined}
-            />
-            {tiers.length > 0 ? (
-              <datalist id={tierListId}>
-                {tiers.map((tier) => <option key={tier} value={tier} />)}
-              </datalist>
+            {creating ? (
+              <TextField
+                label="Page address"
+                hint="The end of this organization’s page address. Lowercase letters, digits, and hyphens. It cannot change after the first save."
+                value={form.slug}
+                onChange={(value) => {
+                  setSlugTouched(true);
+                  set('slug', value);
+                }}
+                error={errorFor('slug')}
+                autoCapitalize="none"
+                spellCheck={false}
+                className="font-admin-data"
+                required
+              />
             ) : null}
-          </div>
-          <TextField
-            label="Order"
-            hint="Lower numbers come first. The first tier in this order draws the largest logos."
-            inputMode="decimal"
-            value={form.order}
-            onChange={(value) => set('order', value)}
-            error={errorFor('order')}
-          />
-          <div className="sm:col-span-2">
-            <CheckboxField
-              label="Show this organization when it is published"
-              checked={form.visible}
-              onChange={(value) => set('visible', value)}
+            <TextAreaField
+              label="Description"
+              hint="One or two sentences on what this organization supports."
+              rows={3}
+              value={form.description}
+              onChange={(value) => set('description', value)}
+              error={errorFor('description')}
+            />
+            <TextField
+              label="Website"
+              type="url"
+              value={form.url}
+              onChange={(value) => set('url', value)}
+              error={errorFor('url')}
             />
           </div>
-        </div>
-      </Panel>
+        </Panel>
 
-      <Panel title="Logo">
-        <ImagePicker
-          label="Logo"
-          hint="Choose the logo from the media library, or upload it there. The sponsors page shows it whole."
-          folder="cms-images"
-          value={form.logoPath}
-          onChange={(value) => set('logoPath', value)}
-          error={errorFor('logoPath')}
-        />
-      </Panel>
+        <div className="admin-editor-stack">
+          <Panel title="Placement" description="Set the group, order, and visibility on the sponsors page.">
+            <div className="admin-editor-fields grid gap-sm sm:grid-cols-2">
+              <div>
+                <TextField
+                  label="Tier"
+                  hint="Organizations with the same tier text form one group. Gold and gold are two groups."
+                  value={form.tier}
+                  onChange={(value) => set('tier', value)}
+                  error={errorFor('tier')}
+                  list={tiers.length > 0 ? tierListId : undefined}
+                />
+                {tiers.length > 0 ? (
+                  <datalist id={tierListId}>
+                    {tiers.map((tier) => <option key={tier} value={tier} />)}
+                  </datalist>
+                ) : null}
+              </div>
+              <TextField
+                label="Order"
+                hint="Lower numbers come first. The first tier in this order draws the largest logos."
+                inputMode="decimal"
+                value={form.order}
+                onChange={(value) => set('order', value)}
+                error={errorFor('order')}
+              />
+              <div className="sm:col-span-2">
+                <CheckboxField
+                  label="Show this organization when it is published"
+                  checked={form.visible}
+                  onChange={(value) => set('visible', value)}
+                />
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Logo" description="The organization’s mark on its page and the sponsor wall.">
+            <ImagePicker
+              label="Logo"
+              hint="Choose the logo from the media library, or upload it there. The sponsors page shows it whole."
+              folder="cms-images"
+              value={form.logoPath}
+              onChange={(value) => set('logoPath', value)}
+              error={errorFor('logoPath')}
+            />
+          </Panel>
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={secondaryButtonClass} onClick={() => navigate(ORGANIZATIONS_LIST)}>

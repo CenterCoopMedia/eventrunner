@@ -31,6 +31,25 @@ demo builds also keep their build-time gate. Existing demo projects need
 The project guard still applies, and `--force` preserves edited CMS records,
 protected speakers and real bootstrap access.
 
+The Functions backend enforces this flag independently of the UI. It reads
+`config/event` without the general configuration cache before accepting an OTP
+send or verification, feedback submission, account-document creation, the
+staff-only `createUserFromTicket` endpoint, or a registration-prompt trigger. The central email sender also checks before writing
+an email claim or audit row or contacting any provider. Direct HTTP calls and
+previously issued OTP challenges cannot bypass these checks. Refused HTTP
+requests return `403` with `read-only-demo`; a missing, malformed, or unreadable
+policy returns `503` with `config-unavailable`. Account and registration-prompt
+triggers retry unavailable configuration and skip intentional historical demos.
+Existing event documents with an absent or false flag retain ordinary behavior.
+
+These guards suppress EventRunner account records and outbound mail. Firebase
+Auth's background `onCreate` trigger runs after the identity exists, so it cannot
+prevent identity creation through an enabled external sign-in provider. They do
+not revoke existing sessions or replace Firestore rules, staff authorization, or
+identity-provider configuration. Cleanup and other authorized administration
+remain available; this flag is not a global database write lock. The static
+build's network-write gate remains separate.
+
 The approved historical-data exception in ADR 0001 §5.4 covers the public names,
 affiliations, session details, documented partner roles, Catherine Komp's public
 ecosystem engagement and annual-summit role, official logo, the later

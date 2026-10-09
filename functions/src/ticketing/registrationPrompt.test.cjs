@@ -3,7 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { makeFakeDb: makeStoreDb } = require('../cms/firestoreFake.cjs');
+const makeFakeDb = (seed = {}) => makeStoreDb({ 'config/event': {}, ...seed });
 const { createEventbriteProvider } = require('./providers/eventbrite.cjs');
 const { createManualProvider } = require('./providers/manual.cjs');
 const { createNoneProvider } = require('./providers/none.cjs');
@@ -273,4 +274,82 @@ test('createOnUserRegistrationPromptCreated wires the account_created trigger th
   const result = await handler({ uid: 'uid-ada' });
   assert.equal(result.sent, true);
   assert.equal(calls.length, 1);
+});
+
+test('historical demos suppress delayed registration prompts before provider, template, or mail work', async () => {
+  const db = makeFakeDb({ 'config/event': { historicalDemo: true }, 'users/uid-ada': user() });
+  const handler = createOnUserRegistrationPromptCreated({
+    db,
+    provider: { getRegistrationPrompt() { assert.fail('provider must not be called'); } },
+    sendEmail() { assert.fail('mail must not be called'); },
+    getConfig() { assert.fail('render config must not be loaded'); },
+  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    assert.deepEqual(await handler({ uid: 'uid-ada' }), { sent: false, reason: 'read-only-demo' });
+  }
+});
+
+test('registration prompt retries unavailable policy without contacting the provider or sending mail', async () => {
+  const db = makeFakeDb({ 'config/event': null, 'users/uid-ada': user() });
+  const handler = createOnUserRegistrationPromptCreated({
+    db,
+    provider: { getRegistrationPrompt() { assert.fail('provider must not be called'); } },
+    sendEmail() { assert.fail('mail must not be called'); },
+  });
+  await assert.rejects(handler({ uid: 'uid-ada' }), { code: 'config-unavailable' });
+});
+
+test('registration trigger retries when policy becomes unavailable at the final mail boundary', async () => {
+  const { createEmailCore } = require('../email/send.cjs');
+  const store = makeFakeDb({ 'users/uid-ada': user() });
+  let policyReads = 0;
+  let unavailable = true;
+  let sent = 0;
+  const db = {
+    collection(name) {
+      if (name === 'sent_emails') return { async add(row) {
+        const ref = store.collection(name).doc('mail-1');
+        await ref.create(row);
+        return ref;
+      } };
+      if (name !== 'config') return store.collection(name);
+      return { doc(id) {
+        assert.equal(id, 'event');
+        return { async get() {
+          policyReads += 1;
+          if (unavailable && policyReads > 1) throw new Error('temporary read failure');
+          return { exists: true, data: () => ({}) };
+        } };
+      } };
+    },
+  };
+  const getConfig = async () => baseConfig();
+  const emailCore = createEmailCore({
+    db, getConfig,
+    provider: { async send() { sent += 1; return { status: 'sent', providerMessageId: 'msg-1' }; } },
+  });
+  const handler = createOnUserRegistrationPromptCreated({
+    db, getConfig, provider: manual(db, getConfig), sendEmail: emailCore.send,
+  });
+  await assert.rejects(handler({ uid: 'uid-ada' }), { code: 'config-unavailable' });
+  assert.equal(policyReads, 2);
+  assert.equal(sent, 0);
+  assert.deepEqual(store.writes, []);
+  unavailable = false;
+  assert.equal((await handler({ uid: 'uid-ada' })).sent, true);
+  assert.equal(sent, 1);
+  assert.equal(store.ids('email_claims').length, 1);
+  assert.equal(store.ids('sent_emails').length, 1);
+});
+
+test('a historical-demo refusal at the final mail boundary is an intentional non-retrying skip', async () => {
+  const db = makeFakeDb({ 'users/uid-ada': user() });
+  const getConfig = async () => baseConfig();
+  const handler = createOnUserRegistrationPromptCreated({
+    db, getConfig, provider: manual(db, getConfig),
+    sendEmail: async () => ({ status: 'failed', error: 'read-only-demo', retries: 0 }),
+    log: { error() { assert.fail('an intentional demo skip is not a provider failure'); } },
+  });
+  assert.deepEqual(await handler({ uid: 'uid-ada' }), { sent: false, reason: 'read-only-demo' });
+  assert.deepEqual(db.writes, []);
 });

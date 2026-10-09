@@ -23,6 +23,8 @@
  */
 
 const { isValidTransition } = require('shared/registration');
+const { checkDemoWrites } = require('../core/demoWrites.cjs');
+const { sendError } = require('../core/errors.cjs');
 const {
   internals: { TICKETS, safeDocId },
 } = require('./index.cjs');
@@ -282,6 +284,10 @@ function createCreateUserFromTicketHandler({ db, auth, getConfig, now = () => ne
       res.status(400).json({ error: { code: 'bad-request', message: 'externalId is required.' } });
       return;
     }
+
+    // Staff authorization does not override the historical account policy.
+    const policy = await checkDemoWrites({ db });
+    if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
 
     const snap = await db.collection(TICKETS).doc(externalId).get();
     if (!snap.exists) {

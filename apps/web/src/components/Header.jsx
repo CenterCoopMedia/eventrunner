@@ -30,6 +30,7 @@ function Dateline({ dates, place, className = '' }) {
  *   place?: string | null,       // the venue's city and region, or its name
  *   mark?: import('react').ReactNode,
  *   to?: string,                 // where the identity links
+ *   mobileControl?: import('react').ReactNode, // small-screen navigation disclosure
  *   children?: import('react').ReactNode,  // the navigation
  * }} props
  */
@@ -41,6 +42,7 @@ export default function Header({
   mark = null,
   to = '/',
   children = null,
+  mobileControl = null,
 }) {
   // A theme document is unvalidated runtime data (spec §2.4 fail-soft
   // overlay), so an unrecognized value renders the base header.
@@ -74,9 +76,10 @@ export default function Header({
 
   if (treatment === 'masthead') {
     return (
-      <div className="site-masthead">
+      <div className="site-masthead site-header-treatment">
         <div className="site-masthead__bar">
           <p className="site-masthead__identity font-heading">{identityLink(wordmark)}</p>
+          {mobileControl}
           {children}
         </div>
       </div>
@@ -87,8 +90,8 @@ export default function Header({
     // Where a deployment has no mark the name stands in for it, and either
     // way a screen reader hears the name.
     return (
-      <div className="flex flex-wrap items-center gap-x-md gap-y-2xs border-b-hairline border-b-rule-hairline py-sm">
-        <p className="font-heading text-body text-text-primary">
+      <div className="site-header-treatment site-header-minimal flex flex-wrap items-center gap-x-md gap-y-2xs border-b-hairline border-b-rule-hairline py-sm">
+        <p className="site-header-identity font-heading text-body text-text-primary">
           {identityLink(
             mark ? (
               <>
@@ -100,6 +103,7 @@ export default function Header({
             ),
           )}
         </p>
+        {mobileControl}
         {children}
       </div>
     );
@@ -108,15 +112,18 @@ export default function Header({
   if (treatment === 'compact') {
     // The nameplate device at running-header size.
     return (
-      <div className="border-b-hairline border-b-rule-hairline">
-        <Nameplate
-          variant="compact"
-          name={name}
-          dates={dates}
-          edition={place}
-          to={to}
-          mark={mark}
-        />
+      <div className="site-header-treatment border-b-hairline border-b-rule-hairline">
+        <div className="site-header-identity-row">
+          <Nameplate
+            variant="compact"
+            name={name}
+            dates={dates}
+            edition={place}
+            to={to}
+            mark={mark}
+          />
+          {mobileControl}
+        </div>
         {children}
       </div>
     );
@@ -125,10 +132,11 @@ export default function Header({
   // standard — the base: the name at normal weight, the dates, the
   // navigation. No device, nothing decorative.
   return (
-    <div className="border-b-hairline border-b-rule-hairline">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs pt-md">
-        <p className="font-heading text-h3 text-text-primary">{identityLink(wordmark)}</p>
-        <Dateline dates={dates} place={place} />
+    <div className="site-header-treatment border-b-hairline border-b-rule-hairline">
+      <div className="site-header-identity-row flex flex-wrap items-baseline justify-between gap-x-md gap-y-3xs pt-md">
+        <p className="site-header-identity font-heading text-h3 text-text-primary">{identityLink(wordmark)}</p>
+        <Dateline dates={dates} place={place} className="site-header-dateline" />
+        {mobileControl}
       </div>
       {children}
     </div>

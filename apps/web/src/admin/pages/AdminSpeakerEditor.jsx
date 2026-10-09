@@ -262,114 +262,136 @@ export default function AdminSpeakerEditor({ mode }) {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel title="Name">
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="First name"
-            value={form.firstName}
-            onChange={(value) => set({ firstName: value })}
-            error={errorFor('firstName')}
-            required
-          />
-          <TextField
-            label="Last name"
-            value={form.lastName}
-            onChange={(value) => set({ lastName: value })}
-            error={errorFor('lastName')}
-            required
-          />
-        </div>
-        <div className="mt-sm">
-          <TextField
-            label="URL slug"
-            hint="Leave blank to derive it from the name. Lowercase letters, digits, and hyphens."
-            value={form.slug}
-            onChange={(value) => set({ slug: value })}
-            error={errorFor('slug')}
-          />
-        </div>
-      </Panel>
-
-      <Panel title="Profile" description="Everything here appears on the public speaker directory.">
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Job title"
-            value={form.jobTitle}
-            onChange={(value) => set({ jobTitle: value })}
-            error={errorFor('jobTitle')}
-          />
-          <TextField
-            label="Organization"
-            value={form.organization}
-            onChange={(value) => set({ organization: value })}
-            error={errorFor('organization')}
-          />
-        </div>
-        <div className="mt-sm flex flex-col gap-sm">
-          <TextAreaField
-            label="Bio"
-            rows={5}
-            value={form.bio}
-            onChange={(value) => set({ bio: value })}
-            error={errorFor('bio')}
-          />
-          <TextField
-            label="Headshot path"
-            hint="A path in this deployment’s Storage bucket, e.g. speakers/name.jpg."
-            value={form.headshotPath}
-            onChange={(value) => set({ headshotPath: value })}
-            error={errorFor('headshotPath')}
-          />
-        </div>
-      </Panel>
-
-      <Panel
-        title="Contact and status"
-        description="The email address is used for invitations and is never published."
-      >
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Email"
-            type="email"
-            value={form.email}
-            onChange={(value) => set({ email: value })}
-            error={errorFor('email')}
-          />
-          {ADMIN_SETTABLE_STATUSES.includes(form.status) ? (
-            <SelectField
-              label="Status"
-              value={form.status}
-              onChange={(value) => {
-                setStatusPicked(true);
-                set({ status: value });
-              }}
-              options={STATUS_OPTIONS}
-              error={errorFor('status')}
+      <div className="admin-editor-layout admin-editor-layout--speaker">
+        <Panel
+          title="Name"
+          description="Identify this speaker and their directory address."
+          className="admin-editor-card--identity"
+        >
+          <div className="flex flex-col gap-sm">
+            <TextField
+              label="First name"
+              value={form.firstName}
+              onChange={(value) => set({ firstName: value })}
+              error={errorFor('firstName')}
+              required
             />
-          ) : (
-            // A speaker mid-invite is shown, not offered. The pipeline
-            // states belong to the invitation flow — they mean nothing
-            // without the token it issues — so the editor reports where
-            // this speaker stands and leaves the state alone. Editing any
-            // other field on this page no longer disturbs it.
-            <div className="flex flex-col gap-3xs">
-              <span className={fieldLabelClass}>Status</span>
-              <p className="text-admin-sm text-admin-ink-secondary">
-                {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
-              </p>
-              <p className="text-admin-sm text-admin-ink-secondary">
-                Managed by the invitation flow. Saving this form leaves it unchanged.
-              </p>
+            <TextField
+              label="Last name"
+              value={form.lastName}
+              onChange={(value) => set({ lastName: value })}
+              error={errorFor('lastName')}
+              required
+            />
+          </div>
+          <div className="mt-sm">
+            <TextField
+              label="URL slug"
+              hint="Leave blank to derive it from the name. Lowercase letters, digits, and hyphens."
+              value={form.slug}
+              onChange={(value) => set({ slug: value })}
+              error={errorFor('slug')}
+            />
+          </div>
+        </Panel>
+
+        <Panel
+          title="Profile"
+          description="Everything here appears on the public speaker directory."
+          className="admin-editor-card--primary"
+        >
+          <div className="grid gap-sm sm:grid-cols-2">
+            <TextField
+              label="Job title"
+              value={form.jobTitle}
+              onChange={(value) => set({ jobTitle: value })}
+              error={errorFor('jobTitle')}
+            />
+            <TextField
+              label="Organization"
+              value={form.organization}
+              onChange={(value) => set({ organization: value })}
+              error={errorFor('organization')}
+            />
+          </div>
+          <div className="mt-sm flex flex-col gap-sm">
+            <TextAreaField
+              label="Bio"
+              rows={5}
+              value={form.bio}
+              onChange={(value) => set({ bio: value })}
+              error={errorFor('bio')}
+            />
+            <TextField
+              label="Headshot path"
+              hint="A path in this deployment’s Storage bucket, e.g. speakers/name.jpg."
+              value={form.headshotPath}
+              onChange={(value) => set({ headshotPath: value })}
+              error={errorFor('headshotPath')}
+            />
+          </div>
+        </Panel>
+
+        <Panel
+          title="Contact and status"
+          description="The email address is used for invitations and is never published."
+          className="admin-editor-card--contact"
+        >
+          <div className="flex flex-col gap-sm">
+            <TextField
+              label="Email"
+              type="email"
+              value={form.email}
+              onChange={(value) => set({ email: value })}
+              error={errorFor('email')}
+            />
+            {ADMIN_SETTABLE_STATUSES.includes(form.status) ? (
+              <SelectField
+                label="Status"
+                value={form.status}
+                onChange={(value) => {
+                  setStatusPicked(true);
+                  set({ status: value });
+                }}
+                options={STATUS_OPTIONS}
+                error={errorFor('status')}
+              />
+            ) : (
+              // A speaker mid-invite is shown, not offered. The pipeline
+              // states belong to the invitation flow — they mean nothing
+              // without the token it issues — so the editor reports where
+              // this speaker stands and leaves the state alone. Editing any
+              // other field on this page no longer disturbs it.
+              <div className="flex flex-col gap-3xs">
+                <span className={fieldLabelClass}>Status</span>
+                <p className="text-admin-sm text-admin-ink-secondary">
+                  {PIPELINE_STATUS_LABELS[form.status] ?? form.status}
+                </p>
+                <p className="text-admin-sm text-admin-ink-secondary">
+                  Managed by the invitation flow. Saving this form leaves it unchanged.
+                </p>
+              </div>
+            )}
+          </div>
+          {speaker?.uid ? (
+            <div className="admin-object-row mt-sm">
+              <span className="admin-object-row__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="8" r="3" />
+                  <path d="M5 20v-2a7 7 0 0 1 14 0v2" />
+                </svg>
+              </span>
+              <div className="admin-object-row__body">
+                <h3 className="admin-object-row__title">Linked attendee account</h3>
+                <p className="admin-object-row__description">
+                  This speaker is linked to an attendee account. The link is managed
+                  by the invitation flow and cannot be edited here.
+                </p>
+              </div>
             </div>
-          )}
-        </div>
-        {speaker?.uid ? (
-          <p className="mt-sm text-admin-sm text-admin-ink-secondary">
-            This speaker is linked to an attendee account. The link is managed
-            by the invitation flow and cannot be edited here.
-          </p>
-        ) : null}
-      </Panel>
+          ) : null}
+        </Panel>
+      </div>
 
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={secondaryButtonClass} onClick={() => navigate(SPEAKERS_LIST)}>

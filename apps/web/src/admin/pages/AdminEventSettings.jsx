@@ -433,396 +433,434 @@ export default function AdminEventSettings() {
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
 
-      <Panel title="Identity">
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Event name"
-            value={form.name}
-            onChange={(value) => setForm((c) => ({ ...c, name: value }))}
-            error={errorFor('name')}
-          />
-          <TextField
-            label="Short name"
-            value={form.shortName}
-            onChange={(value) => setForm((c) => ({ ...c, shortName: value }))}
-            error={errorFor('shortName')}
-            hint="Used in the header and in email subjects."
-          />
-          <div className="sm:col-span-2">
-            <TextField
-              label="Tagline"
-              value={form.tagline}
-              onChange={(value) => setForm((c) => ({ ...c, tagline: value }))}
-              error={errorFor('tagline')}
-            />
+      <div className="admin-settings-groups">
+        <div role="group" aria-labelledby="event-settings-essentials">
+          <div className="admin-section-intro">
+            <p id="event-settings-essentials" className="admin-settings-group-title">Event essentials</p>
+            <p>The name, event days, and session tracks that shape the schedule.</p>
           </div>
-          <TextField
-            label="Timezone"
-            value={form.timezone}
-            onChange={(value) => setForm((c) => ({ ...c, timezone: value }))}
-            error={errorFor('timezone')}
-            hint="An IANA timezone name, e.g. America/New_York."
-          />
-        </div>
-      </Panel>
-
-      <Panel
-        title="Days"
-        description="Listed in ascending date order; each day needs an id, a date, and start/end times."
-        actions={
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            onClick={() => setForm((c) => ({ ...c, days: [...c.days, blankDay()] }))}
-          >
-            Add day
-          </button>
-        }
-      >
-        {form.days.length === 0 ? (
-          <p className="text-admin-sm text-admin-ink-secondary">No days configured yet.</p>
-        ) : (
-          <ol className="flex flex-col">
-            {form.days.map((day, index) => (
-              <li
-                key={index}
-                className="border-admin-rule-hairline border-t-admin-hairline pt-sm mt-sm first:border-t-0 first:pt-0 first:mt-0"
-              >
-                <div className="grid gap-sm sm:grid-cols-2">
+          <div className="admin-settings-grid admin-settings-grid--essentials">
+            <Panel className="admin-settings-card" title="Identity" description="The event name and timezone used on the site and in email.">
+              <div className="admin-settings-fields">
+                <TextField
+                  label="Event name"
+                  value={form.name}
+                  onChange={(value) => setForm((c) => ({ ...c, name: value }))}
+                  error={errorFor('name')}
+                />
+                <TextField
+                  label="Short name"
+                  value={form.shortName}
+                  onChange={(value) => setForm((c) => ({ ...c, shortName: value }))}
+                  error={errorFor('shortName')}
+                  hint="Used in the header and in email subjects."
+                />
+                <div className="admin-settings-field--wide">
                   <TextField
-                    label={`Day ${index + 1} id`}
-                    value={day.id}
-                    onChange={(value) => setDay(index, { id: value })}
-                    error={errorFor(`days[${index}].id`)}
-                  />
-                  <TextField
-                    label={`Day ${index + 1} label`}
-                    value={day.label}
-                    onChange={(value) => setDay(index, { label: value })}
-                    error={errorFor(`days[${index}].label`)}
-                  />
-                  <TextField
-                    label={`Day ${index + 1} date`}
-                    type="date"
-                    value={day.date}
-                    onChange={(value) => setDay(index, { date: value })}
-                    error={errorFor(`days[${index}].date`) ?? errorFor(`days[${index}]`)}
-                  />
-                  <div className="grid grid-cols-2 gap-sm">
-                    <TextField
-                      label={`Day ${index + 1} start`}
-                      type="time"
-                      value={day.startTime}
-                      onChange={(value) => setDay(index, { startTime: value })}
-                      error={errorFor(`days[${index}].startTime`)}
-                    />
-                    <TextField
-                      label={`Day ${index + 1} end`}
-                      type="time"
-                      value={day.endTime}
-                      onChange={(value) => setDay(index, { endTime: value })}
-                      error={errorFor(`days[${index}].endTime`)}
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={`${dangerButtonClass} mt-sm`}
-                  onClick={() =>
-                    setForm((c) => ({ ...c, days: c.days.filter((_, i) => i !== index) }))
-                  }
-                >
-                  Remove day {index + 1}
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Panel>
-
-      <Panel
-        title="Tracks"
-        description="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
-        actions={
-          <button
-            type="button"
-            className={secondaryButtonClass}
-            onClick={() => setForm((c) => ({ ...c, tracks: [...c.tracks, blankTrack()] }))}
-          >
-            Add track
-          </button>
-        }
-      >
-        {form.tracks.length === 0 ? (
-          <p className="text-admin-sm text-admin-ink-secondary">No tracks configured yet.</p>
-        ) : (
-          <ol className="flex flex-col">
-            {form.tracks.map((track, index) => (
-              <li
-                key={index}
-                className="border-admin-rule-hairline border-t-admin-hairline pt-sm mt-sm first:border-t-0 first:pt-0 first:mt-0"
-              >
-                <div className="grid gap-sm sm:grid-cols-2">
-                  <TextField
-                    label={`Track ${index + 1} letter`}
-                    value={track.letter}
-                    onChange={(value) => setTrack(index, { letter: value })}
-                    error={errorFor(`tracks[${index}].letter`)}
-                    maxLength={1}
-                    hint="One letter, A to Z. It is how a reader tells the lines apart."
-                  />
-                  <TextField
-                    label={`Track ${index + 1} name`}
-                    value={track.name}
-                    onChange={(value) => setTrack(index, { name: value })}
-                    error={errorFor(`tracks[${index}].name`)}
-                    hint="Shown beside the letter, e.g. Practice."
+                    label="Tagline"
+                    value={form.tagline}
+                    onChange={(value) => setForm((c) => ({ ...c, tagline: value }))}
+                    error={errorFor('tagline')}
                   />
                 </div>
+                <TextField
+                  label="Timezone"
+                  value={form.timezone}
+                  onChange={(value) => setForm((c) => ({ ...c, timezone: value }))}
+                  error={errorFor('timezone')}
+                  hint="An IANA timezone name, e.g. America/New_York."
+                />
+              </div>
+            </Panel>
+            <Panel className="admin-settings-card"
+              title="Days"
+              description="Listed in ascending date order; each day needs an id, a date, and start/end times."
+              actions={
                 <button
                   type="button"
-                  className={`${dangerButtonClass} mt-sm`}
-                  onClick={() =>
-                    setForm((c) => ({ ...c, tracks: c.tracks.filter((_, i) => i !== index) }))
-                  }
+                  className={secondaryButtonClass}
+                  onClick={() => setForm((c) => ({ ...c, days: [...c.days, blankDay()] }))}
                 >
-                  Remove track {index + 1}
+                  Add day
                 </button>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Panel>
-
-      <Panel title="Venue">
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Venue name"
-            value={form.venue.name}
-            onChange={(value) => setGroup('venue', { name: value })}
-            error={errorFor('venue.name')}
-          />
-          <TextField
-            label="Address line 1"
-            value={form.venue.addressLine1}
-            onChange={(value) => setGroup('venue', { addressLine1: value })}
-          />
-          <TextField
-            label="Address line 2"
-            value={form.venue.addressLine2}
-            onChange={(value) => setGroup('venue', { addressLine2: value })}
-          />
-          <TextField
-            label="City"
-            value={form.venue.city}
-            onChange={(value) => setGroup('venue', { city: value })}
-          />
-          <TextField
-            label="Region"
-            value={form.venue.region}
-            onChange={(value) => setGroup('venue', { region: value })}
-          />
-          <TextField
-            label="Postal code"
-            value={form.venue.postalCode}
-            onChange={(value) => setGroup('venue', { postalCode: value })}
-          />
-          <TextField
-            label="Country"
-            value={form.venue.country}
-            onChange={(value) => setGroup('venue', { country: value })}
-          />
-          <TextField
-            label="Map URL"
-            value={form.venue.mapUrl}
-            onChange={(value) => setGroup('venue', { mapUrl: value })}
-          />
+              }
+            >
+              {form.days.length === 0 ? (
+                <p className="text-admin-sm text-admin-ink-secondary">No days configured yet.</p>
+              ) : (
+                <ol className="admin-settings-row-list">
+                  {form.days.map((day, index) => (
+                    <li
+                      key={index}
+                      className="admin-settings-row-card"
+                    >
+                      <p className="admin-settings-row-heading">Day {index + 1}</p>
+                      <div className="admin-settings-fields">
+                        <TextField
+                          label={`Day ${index + 1} id`}
+                          value={day.id}
+                          onChange={(value) => setDay(index, { id: value })}
+                          error={errorFor(`days[${index}].id`)}
+                        />
+                        <TextField
+                          label={`Day ${index + 1} label`}
+                          value={day.label}
+                          onChange={(value) => setDay(index, { label: value })}
+                          error={errorFor(`days[${index}].label`)}
+                        />
+                        <TextField
+                          label={`Day ${index + 1} date`}
+                          type="date"
+                          value={day.date}
+                          onChange={(value) => setDay(index, { date: value })}
+                          error={errorFor(`days[${index}].date`) ?? errorFor(`days[${index}]`)}
+                        />
+                        <div className="admin-settings-field--wide admin-settings-time-fields">
+                          <TextField
+                            label={`Day ${index + 1} start`}
+                            type="time"
+                            value={day.startTime}
+                            onChange={(value) => setDay(index, { startTime: value })}
+                            error={errorFor(`days[${index}].startTime`)}
+                          />
+                          <TextField
+                            label={`Day ${index + 1} end`}
+                            type="time"
+                            value={day.endTime}
+                            onChange={(value) => setDay(index, { endTime: value })}
+                            error={errorFor(`days[${index}].endTime`)}
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`${dangerButtonClass} mt-sm`}
+                        onClick={() =>
+                          setForm((c) => ({ ...c, days: c.days.filter((_, i) => i !== index) }))
+                        }
+                      >
+                        Remove day {index + 1}
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Panel>
+            <Panel className="admin-settings-card"
+              title="Tracks"
+              description="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
+              actions={
+                <button
+                  type="button"
+                  className={secondaryButtonClass}
+                  onClick={() => setForm((c) => ({ ...c, tracks: [...c.tracks, blankTrack()] }))}
+                >
+                  Add track
+                </button>
+              }
+            >
+              {form.tracks.length === 0 ? (
+                <p className="text-admin-sm text-admin-ink-secondary">No tracks configured yet.</p>
+              ) : (
+                <ol className="admin-settings-row-list">
+                  {form.tracks.map((track, index) => (
+                    <li
+                      key={index}
+                      className="admin-settings-row-card"
+                    >
+                      <p className="admin-settings-row-heading">Track {index + 1}</p>
+                      <div className="admin-settings-fields">
+                        <TextField
+                          label={`Track ${index + 1} letter`}
+                          value={track.letter}
+                          onChange={(value) => setTrack(index, { letter: value })}
+                          error={errorFor(`tracks[${index}].letter`)}
+                          maxLength={1}
+                          hint="One letter, A to Z. It is how a reader tells the lines apart."
+                        />
+                        <TextField
+                          label={`Track ${index + 1} name`}
+                          value={track.name}
+                          onChange={(value) => setTrack(index, { name: value })}
+                          error={errorFor(`tracks[${index}].name`)}
+                          hint="Shown beside the letter, e.g. Practice."
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className={`${dangerButtonClass} mt-sm`}
+                        onClick={() =>
+                          setForm((c) => ({ ...c, tracks: c.tracks.filter((_, i) => i !== index) }))
+                        }
+                      >
+                        Remove track {index + 1}
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Panel>
+          </div>
         </div>
-      </Panel>
-
-      <VenueReferenceEditor
-        venue={form.venue}
-        onChange={(patch) => setGroup('venue', patch)}
-        errorFor={errorFor}
-        placeUsage={placeUsage}
-      />
-
-      <Panel
-        title="Speaker resources"
-        description="Set the external slide template link shown on the speaker dashboard. Leave both fields empty to omit it."
-      >
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Slide template label"
-            value={form.speakerResources.slideTemplate.label}
-            onChange={(value) => setSlideTemplate({ label: value })}
-            error={errorFor('speakerResources.slideTemplate.label')}
-          />
-          <TextField
-            label="Slide template URL"
-            type="url"
-            value={form.speakerResources.slideTemplate.url}
-            onChange={(value) => setSlideTemplate({ url: value })}
-            error={errorFor('speakerResources.slideTemplate.url')}
-            hint="Use an absolute http:// or https:// link."
-          />
-        </div>
-      </Panel>
-
-      <Panel
-        title="Registration"
-        description="Dates are naive local datetimes (YYYY-MM-DDTHH:MM) in the event’s timezone. The URL and label below are the register control the site shows."
-      >
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Registration opens"
-            type="datetime-local"
-            value={form.registration.opensAt}
-            onChange={(value) => setGroup('registration', { opensAt: value })}
-            error={errorFor('registration.opensAt') ?? errorFor('registration')}
-          />
-          <TextField
-            label="Registration closes"
-            type="datetime-local"
-            value={form.registration.closesAt}
-            onChange={(value) => setGroup('registration', { closesAt: value })}
-            error={errorFor('registration.closesAt')}
-          />
-          {/* The registration action (M7 issue 8). One destination, used
-              both by the control the site draws and by the registration
-              email the manual ticket provider sends, so the two can never
-              point at different places. Leaving the URL empty is a real
-              answer: no control is drawn anywhere. */}
-          <div className="sm:col-span-2">
-            <TextField
-              label="External registration URL"
-              value={form.registration.externalUrl}
-              onChange={(value) => setGroup('registration', { externalUrl: value })}
-              error={errorFor('registration.externalUrl')}
-              hint="Must start with https://. Leave it empty and no register control is shown."
+        <div role="group" aria-labelledby="event-settings-venue">
+          <div className="admin-section-intro">
+            <p id="event-settings-venue" className="admin-settings-group-title">Venue and wayfinding</p>
+            <p>Address, rooms, walking routes, and the venue map.</p>
+          </div>
+          <div className="admin-settings-grid">
+            <Panel className="admin-settings-card" title="Venue" description="The main event location and its street address.">
+              <div className="admin-settings-fields">
+                <TextField
+                  label="Venue name"
+                  value={form.venue.name}
+                  onChange={(value) => setGroup('venue', { name: value })}
+                  error={errorFor('venue.name')}
+                />
+                <TextField
+                  label="Address line 1"
+                  value={form.venue.addressLine1}
+                  onChange={(value) => setGroup('venue', { addressLine1: value })}
+                />
+                <TextField
+                  label="Address line 2"
+                  value={form.venue.addressLine2}
+                  onChange={(value) => setGroup('venue', { addressLine2: value })}
+                />
+                <TextField
+                  label="City"
+                  value={form.venue.city}
+                  onChange={(value) => setGroup('venue', { city: value })}
+                />
+                <TextField
+                  label="Region"
+                  value={form.venue.region}
+                  onChange={(value) => setGroup('venue', { region: value })}
+                />
+                <TextField
+                  label="Postal code"
+                  value={form.venue.postalCode}
+                  onChange={(value) => setGroup('venue', { postalCode: value })}
+                />
+                <TextField
+                  label="Country"
+                  value={form.venue.country}
+                  onChange={(value) => setGroup('venue', { country: value })}
+                />
+                <TextField
+                  label="Map URL"
+                  value={form.venue.mapUrl}
+                  onChange={(value) => setGroup('venue', { mapUrl: value })}
+                />
+              </div>
+            </Panel>
+            <VenueReferenceEditor
+              venue={form.venue}
+              onChange={(patch) => setGroup('venue', patch)}
+              errorFor={errorFor}
+              placeUsage={placeUsage}
             />
           </div>
-          <div className="sm:col-span-2">
-            <TextField
-              label="Register button label"
-              value={form.registration.actionLabel}
-              onChange={(value) => setGroup('registration', { actionLabel: value })}
-              error={errorFor('registration.actionLabel')}
-              hint="What the register control says. Empty means it says Register."
+        </div>
+        <div role="group" aria-labelledby="event-settings-registration">
+          <div className="admin-section-intro">
+            <p id="event-settings-registration" className="admin-settings-group-title">Registration and deadlines</p>
+            <p>Registration links, goals, and the dates your team is working toward.</p>
+          </div>
+          <div className="admin-settings-grid">
+            <Panel className="admin-settings-card"
+              title="Registration"
+              description="Dates are naive local datetimes (YYYY-MM-DDTHH:MM) in the event’s timezone. The URL and label below are the register control the site shows."
+            >
+              <div className="admin-settings-fields">
+                <TextField
+                  label="Registration opens"
+                  type="datetime-local"
+                  value={form.registration.opensAt}
+                  onChange={(value) => setGroup('registration', { opensAt: value })}
+                  error={errorFor('registration.opensAt') ?? errorFor('registration')}
+                />
+                <TextField
+                  label="Registration closes"
+                  type="datetime-local"
+                  value={form.registration.closesAt}
+                  onChange={(value) => setGroup('registration', { closesAt: value })}
+                  error={errorFor('registration.closesAt')}
+                />
+                {/* The registration action (M7 issue 8). One destination, used
+                    both by the control the site draws and by the registration
+                    email the manual ticket provider sends, so the two can never
+                    point at different places. Leaving the URL empty is a real
+                    answer: no control is drawn anywhere. */}
+                <div className="admin-settings-field--wide">
+                  <TextField
+                    label="External registration URL"
+                    value={form.registration.externalUrl}
+                    onChange={(value) => setGroup('registration', { externalUrl: value })}
+                    error={errorFor('registration.externalUrl')}
+                    hint="Must start with https://. Leave it empty and no register control is shown."
+                  />
+                </div>
+                <div className="admin-settings-field--wide">
+                  <TextField
+                    label="Register button label"
+                    value={form.registration.actionLabel}
+                    onChange={(value) => setGroup('registration', { actionLabel: value })}
+                    error={errorFor('registration.actionLabel')}
+                    hint="What the register control says. Empty means it says Register."
+                  />
+                </div>
+                {/* The goal (issue #180): the overview sets the approved count
+                    against it. A text field with a numeric keyboard rather than
+                    type="number", because a number field reads an entry it cannot
+                    parse as empty, and an empty goal is sent as null, which would
+                    clear the stored goal instead of refusing the entry. */}
+                <TextField
+                  label="Registration goal"
+                  inputMode="numeric"
+                  value={form.registration.goal}
+                  onChange={(value) => setGroup('registration', { goal: value })}
+                  error={errorFor('registration.goal')}
+                  hint="The number of approved attendees you are aiming for. Anyone can read it. The overview compares the approved count with it. Leave it empty for no goal."
+                  className="font-admin-data"
+                />
+              </div>
+            </Panel>
+            <MilestonesEditor
+              milestones={form.milestones}
+              onChange={(milestones) => setForm((current) => ({ ...current, milestones }))}
+              errorFor={errorFor}
             />
           </div>
-          {/* The goal (issue #180): the overview sets the approved count
-              against it. A text field with a numeric keyboard rather than
-              type="number", because a number field reads an entry it cannot
-              parse as empty, and an empty goal is sent as null, which would
-              clear the stored goal instead of refusing the entry. */}
-          <TextField
-            label="Registration goal"
-            inputMode="numeric"
-            value={form.registration.goal}
-            onChange={(value) => setGroup('registration', { goal: value })}
-            error={errorFor('registration.goal')}
-            hint="The number of approved attendees you are aiming for. Anyone can read it. The overview compares the approved count with it. Leave it empty for no goal."
-            className="font-admin-data"
-          />
         </div>
-      </Panel>
-
-      <MilestonesEditor
-        milestones={form.milestones}
-        onChange={(milestones) => setForm((current) => ({ ...current, milestones }))}
-        errorFor={errorFor}
-      />
-
-      <Panel
-        title="Sender"
-        description={
-          canEditSender
-            ? 'The From address every transactional email uses.'
-            : 'The From address every transactional email uses. You can read it here. An operator changes it.'
-        }
-      >
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Sender email"
-            type="email"
-            value={form.sender.email}
-            onChange={(value) => setGroup('sender', { email: value })}
-            error={errorFor('sender.email')}
-            readOnly={!canEditSender}
-          />
-          <TextField
-            label="Sender name"
-            value={form.sender.name}
-            onChange={(value) => setGroup('sender', { name: value })}
-            error={errorFor('sender.name')}
-            readOnly={!canEditSender}
-          />
-          <TextField
-            label="Reply-to"
-            type="email"
-            value={form.sender.replyTo}
-            onChange={(value) => setGroup('sender', { replyTo: value })}
-            error={errorFor('sender.replyTo')}
-            readOnly={!canEditSender}
-          />
-          <p className="self-center text-admin-sm text-admin-ink-secondary">
-            Sender domain:{' '}
-            <StatusBadge tone={verified ? 'ok' : 'caution'}>
-              {verified ? 'verified' : 'not verified'}
-            </StatusBadge>
-            . Verification is set by the sender-domain job, not from here.
-          </p>
+        <div role="group" aria-labelledby="event-settings-communications">
+          <div className="admin-section-intro">
+            <p id="event-settings-communications" className="admin-settings-group-title">Email and organizer</p>
+            <p>The sender details and contact addresses used across the event.</p>
+          </div>
+          <div className="admin-settings-grid">
+            <Panel className="admin-settings-card"
+              title="Sender"
+              description={
+                canEditSender
+                  ? 'The From address every transactional email uses.'
+                  : 'The From address every transactional email uses. You can read it here. An operator changes it.'
+              }
+            >
+              <div className="admin-settings-fields">
+                <TextField
+                  label="Sender email"
+                  type="email"
+                  value={form.sender.email}
+                  onChange={(value) => setGroup('sender', { email: value })}
+                  error={errorFor('sender.email')}
+                  readOnly={!canEditSender}
+                />
+                <TextField
+                  label="Sender name"
+                  value={form.sender.name}
+                  onChange={(value) => setGroup('sender', { name: value })}
+                  error={errorFor('sender.name')}
+                  readOnly={!canEditSender}
+                />
+                <TextField
+                  label="Reply-to"
+                  type="email"
+                  value={form.sender.replyTo}
+                  onChange={(value) => setGroup('sender', { replyTo: value })}
+                  error={errorFor('sender.replyTo')}
+                  readOnly={!canEditSender}
+                />
+                <p className="self-center text-admin-sm text-admin-ink-secondary">
+                  Sender domain:{' '}
+                  <StatusBadge tone={verified ? 'ok' : 'caution'}>
+                    {verified ? 'verified' : 'not verified'}
+                  </StatusBadge>
+                  . Verification is set by the sender-domain job, not from here.
+                </p>
+              </div>
+            </Panel>
+            <Panel className="admin-settings-card" title="Operator contacts" description="Who runs the event and where attendees can ask for help.">
+              <div className="admin-settings-fields">
+                <TextField
+                  label="Operator name"
+                  value={form.legal.operatorName}
+                  onChange={(value) => setGroup('legal', { operatorName: value })}
+                  error={errorFor('legal.operatorName')}
+                />
+                <TextField
+                  label="Support email"
+                  type="email"
+                  value={form.legal.supportEmail}
+                  onChange={(value) => setGroup('legal', { supportEmail: value })}
+                  error={errorFor('legal.supportEmail')}
+                />
+                <TextField
+                  label="Conduct email"
+                  type="email"
+                  value={form.legal.conductEmail}
+                  onChange={(value) => setGroup('legal', { conductEmail: value })}
+                  error={errorFor('legal.conductEmail')}
+                />
+              </div>
+            </Panel>
+          </div>
         </div>
-      </Panel>
-
-      <Panel title="Operator and search">
-        <div className="grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Operator name"
-            value={form.legal.operatorName}
-            onChange={(value) => setGroup('legal', { operatorName: value })}
-            error={errorFor('legal.operatorName')}
-          />
-          <TextField
-            label="Support email"
-            type="email"
-            value={form.legal.supportEmail}
-            onChange={(value) => setGroup('legal', { supportEmail: value })}
-            error={errorFor('legal.supportEmail')}
-          />
-          <TextField
-            label="Conduct email"
-            type="email"
-            value={form.legal.conductEmail}
-            onChange={(value) => setGroup('legal', { conductEmail: value })}
-            error={errorFor('legal.conductEmail')}
-          />
-          <div className="sm:col-span-2">
-            <TextField
-              label="Search description"
-              value={form.seo.description}
-              onChange={(value) => setGroup('seo', { description: value })}
+        <div role="group" aria-labelledby="event-settings-resources">
+          <div className="admin-section-intro">
+            <p id="event-settings-resources" className="admin-settings-group-title">Public links and resources</p>
+            <p>Search details, speaker materials, and the event’s social accounts.</p>
+          </div>
+          <div className="admin-settings-grid admin-settings-grid--essentials">
+            <Panel className="admin-settings-card" title="Search presence" description="The event description and organizer links used by search engines.">
+              <div className="admin-settings-fields">
+                <div className="admin-settings-field--wide">
+                  <TextField
+                    label="Search description"
+                    value={form.seo.description}
+                    onChange={(value) => setGroup('seo', { description: value })}
+                  />
+                </div>
+                <TextField
+                  label="Organizer name"
+                  value={form.seo.organizerName}
+                  onChange={(value) => setGroup('seo', { organizerName: value })}
+                />
+                <TextField
+                  label="Organizer URL"
+                  value={form.seo.organizerUrl}
+                  onChange={(value) => setGroup('seo', { organizerUrl: value })}
+                />
+              </div>
+            </Panel>
+            <Panel className="admin-settings-card"
+              title="Speaker resources"
+              description="Set the external slide template link shown on the speaker dashboard. Leave both fields empty to omit it."
+            >
+              <div className="admin-settings-fields">
+                <TextField
+                  label="Slide template label"
+                  value={form.speakerResources.slideTemplate.label}
+                  onChange={(value) => setSlideTemplate({ label: value })}
+                  error={errorFor('speakerResources.slideTemplate.label')}
+                />
+                <TextField
+                  label="Slide template URL"
+                  type="url"
+                  value={form.speakerResources.slideTemplate.url}
+                  onChange={(value) => setSlideTemplate({ url: value })}
+                  error={errorFor('speakerResources.slideTemplate.url')}
+                  hint="Use an absolute http:// or https:// link."
+                />
+              </div>
+            </Panel>
+            <SocialHandlesEditor
+              social={form.social}
+              onChange={(patch) => setGroup('social', patch)}
+              errorFor={errorFor}
             />
           </div>
-          <TextField
-            label="Organizer name"
-            value={form.seo.organizerName}
-            onChange={(value) => setGroup('seo', { organizerName: value })}
-          />
-          <TextField
-            label="Organizer URL"
-            value={form.seo.organizerUrl}
-            onChange={(value) => setGroup('seo', { organizerUrl: value })}
-          />
         </div>
-      </Panel>
-
-      <SocialHandlesEditor
-        social={form.social}
-        onChange={(patch) => setGroup('social', patch)}
-        errorFor={errorFor}
-      />
+      </div>
     </form>
   );
 }

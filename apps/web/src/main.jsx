@@ -7,6 +7,9 @@ import { IS_DEMO } from './lib/demoMode.js';
 // then the Tailwind layers that consume them.
 import '@generated/theme.css';
 import './index.css';
+// The admin Branding proof copies these initial styles into its iframe.
+// Keep Program styling eager so a later preview-route change gets it too.
+import './styles/schedule.css';
 import { initErrorReporting } from './lib/errorReporting.js';
 import { installChunkReload } from './lib/chunkReload.js';
 
