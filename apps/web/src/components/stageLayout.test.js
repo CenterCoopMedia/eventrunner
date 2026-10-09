@@ -132,11 +132,12 @@ describe('the stage and the measure', () => {
     expect(rem(scale[gutter[1]])).toBeGreaterThanOrEqual(needed);
   });
 
-  it('opens the margin column only at lg and above', () => {
+  it('keeps the split in one full-width track without an empty margin column', () => {
     const split = rule('.stage-split');
     expect(split).toMatch(/display:\s*grid/);
     expect(split).not.toMatch(/grid-template-columns/);
-    expect(wideBlock('.stage-split')).toMatch(/minmax\(0, var\(--measure-text\)\)/);
+    expect(wideBlock('.stage-split')).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\);/);
+    expect(indexCss).not.toMatch(/inset-inline-start:\s*calc\(var\(--measure-text\)/);
   });
 
   it('rules the row and never boxes a cell', () => {
@@ -154,9 +155,10 @@ describe('the stage and the measure', () => {
     expect(themeCss).toMatch(/--stage-measure:\s*var\(--er-stage-measure\);/);
     expect(themeCss).toMatch(/--stage-max:\s*var\(--stage-frame\);/);
     expect(themeCss).toMatch(/--measure-text:\s*var\(--stage-measure\);/);
-    // The frame is the wider of the two, or the measure is not a measure.
-    expect(rem(primitives.scalar.stage.frame)).toBeGreaterThan(
-      rem(primitives.scalar.stage.measure),
-    );
+    // The frame uses the available width; running text fills its content box.
+    expect(primitives.scalar.stage.frame).toBe('100%');
+    expect(primitives.scalar.stage.measure).toBe('100%');
+    expect(themeCss).toMatch(/--er-stage-frame:\s*100%;/);
+    expect(themeCss).toMatch(/--er-stage-measure:\s*100%;/);
   });
 });

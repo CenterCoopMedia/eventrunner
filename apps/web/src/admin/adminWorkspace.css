@@ -82,8 +82,8 @@
 }
 
 
-/* A fluid canvas with card-sized reading measures. Wide screens gain useful
-   parallel groups; fields never depend on the viewport's width alone. */
+/* A fluid canvas with fields that fill their panels. Wide screens gain
+   useful parallel groups; compact controls keep their own size limits. */
 .admin-stone { max-inline-size: none; }
 .admin-panel { overflow-wrap: anywhere; }
 .admin-panel__heading { align-items: center; }
@@ -109,8 +109,6 @@
 .admin-editor-fields, .admin-page-fields, .admin-section-fields, .admin-settings-fields {
   display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm);
 }
-.admin-editor-card--primary > .flex, .admin-editor-card--primary > .admin-editor-fields,
-.admin-content-fields { max-inline-size: 88ch; }
 .admin-content-fields > :only-child { grid-column: 1 / -1; }
 .admin-settings-field--wide { grid-column: 1 / -1; }
 .admin-page-section-list > li:has(> .admin-editor-disclosure[data-open='true']) { grid-column: 1 / -1; }
