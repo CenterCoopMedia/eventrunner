@@ -2622,8 +2622,8 @@
     .event-hero--compact .event-hero__dateline { margin-block-start: var(--space-xs); }
     .event-hero--compact .event-hero__tagline { display: none; }
     .event-hero--compact .event-hero__media { block-size: 7rem; }
-    .schedule-page-header { margin-block-start: var(--space-md); }
-    .schedule-screen > .schedule-days { margin-block-start: var(--space-md); }
+    .schedule-page-header { margin-block-start: var(--space-xs); }
+    .schedule-screen > .schedule-days { margin-block-start: var(--space-xs); }
     .schedule-screen > .map-grid { margin-block-start: var(--space-md); }
   }
 }
