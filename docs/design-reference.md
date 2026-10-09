@@ -160,9 +160,9 @@ They take the site's own ink and never carry a colour of their own, so a set can
 
 ### The stage and the measure
 
-The frame and running text each have a width token. Both default to `100%`.
+The frame and running text each have a width token. The frame defaults to `95%` and centers. The measure defaults to `100%` of that content box.
 
-**The stage** is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It is the width of the page.
+**The stage** is the frame. The header, the navigation, the schedule, the speaker shelf, the sponsor wall, the footer, and every section heading run to it. It leaves a small margin on both sides.
 
 **The measure** is running text. Paragraphs, lists, rich text, descriptions and answers fill the stage's content box, matching the section rule.
 

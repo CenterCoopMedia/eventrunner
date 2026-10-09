@@ -24,7 +24,9 @@ own identities.
 
 The seeded `config/event` carries `historicalDemo: true`. Normal Hosting builds
 read this flag at runtime to hide account and support email links and show the
-disabled sign-in notice at `/signin` and in the shared sign-in panel. Static
+disabled sign-in notice at `/signin` and in the shared sign-in panel. A visit
+the admin gate sends to `/signin` is the exception: it shows Google sign-in
+and hides the one-time code form, because this demo does not send email. Static
 demo builds also keep their build-time gate. Existing demo projects need
 `node scripts/seed-demo-event.cjs --force` to refresh configuration; run
 `--dry-run --force` first to review protected records and planned removals.

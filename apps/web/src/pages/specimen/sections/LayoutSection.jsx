@@ -75,7 +75,7 @@ export default function LayoutSection({ folio }) {
       id="specimen-layout"
       title="Layout"
       folio={folio}
-      standfirst="The stage fills the available width, and running text fills the same content box as the section rule."
+      standfirst="The stage keeps a small side margin, and running text fills the same content box as the section rule."
     >
       <Figure
         name="Stage and measure"

@@ -155,10 +155,10 @@ describe('the stage and the measure', () => {
     expect(themeCss).toMatch(/--stage-measure:\s*var\(--er-stage-measure\);/);
     expect(themeCss).toMatch(/--stage-max:\s*var\(--stage-frame\);/);
     expect(themeCss).toMatch(/--measure-text:\s*var\(--stage-measure\);/);
-    // The frame uses the available width; running text fills its content box.
-    expect(primitives.scalar.stage.frame).toBe('100%');
+    // The frame keeps a 5 percent margin. Running text fills its content box.
+    expect(primitives.scalar.stage.frame).toBe('95%');
     expect(primitives.scalar.stage.measure).toBe('100%');
-    expect(themeCss).toMatch(/--er-stage-frame:\s*100%;/);
+    expect(themeCss).toMatch(/--er-stage-frame:\s*95%;/);
     expect(themeCss).toMatch(/--er-stage-measure:\s*100%;/);
   });
 });

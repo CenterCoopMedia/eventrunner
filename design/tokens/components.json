@@ -71,7 +71,7 @@
     "--section-folio-placement": "end"
   },
   "$page-note": "The hybrid page shell (brief §6.1, §6.2). A system page's composable sections sit at --page-section-gap from what comes before them, and a ruled directory row is padded at --page-row-pad-block. Both are what the `density` layout variant moves: tight, comfortable, and loose remap them in index.css, and a page that states no density keeps the preset's own.",
-  "$stage-note": "--stage-max fills the available width with a spacing-scale gutter. --measure-text fills that content box so running text and section rules align. Both read the tier 2 stage family as maximum inline sizes. Stage splits use one full-width track, and folios remain at the end of the rule inside the stage.",
+  "$stage-note": "--stage-max uses 95 percent of the available width and centers, leaving a small margin on both sides. A spacing-scale gutter sits inside that frame. --measure-text fills that content box so running text and section rules align. Both read the tier 2 stage family as maximum inline sizes. Stage splits use one full-width track, and folios remain at the end of the rule inside the stage.",
   "page": {
     "--page-section-gap": "var(--space-2xl)",
     "--page-row-pad-block": "var(--space-md)",

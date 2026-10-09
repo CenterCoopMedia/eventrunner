@@ -315,7 +315,7 @@ test('the stage and the measure are declared once and read by name', () => {
   // wider stage moves --stage-max and never mints a width of its own.
   const css = buildTokenCss(THEME);
   for (const [name, value] of [
-    ['--er-stage-frame', '100%'],
+    ['--er-stage-frame', '95%'],
     ['--er-stage-measure', '100%'],
     ['--stage-frame', 'var(--er-stage-frame)'],
     ['--stage-measure', 'var(--er-stage-measure)'],
@@ -330,9 +330,9 @@ test('the stage and the measure are declared once and read by name', () => {
     const declared = css.match(new RegExp(`${name}:`, 'g')) || [];
     assert.equal(declared.length, 1, `${name} is declared once`);
   }
-  // The frame uses the available width; running text fills its content box.
+  // The frame keeps a 5 percent margin. Running text fills its content box.
   const { primitives } = loadTokens();
-  assert.equal(primitives.scalar.stage.frame, '100%');
+  assert.equal(primitives.scalar.stage.frame, '95%');
   assert.equal(primitives.scalar.stage.measure, '100%');
 });
 

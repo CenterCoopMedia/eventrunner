@@ -261,12 +261,12 @@ The admin CMS is the seventh design surface and it is not a preset. The full spe
 
 ## Layout
 
-**The frame and reading column fill the available width through two tokens.**
+**The frame keeps a small side margin. The reading column fills that frame.**
 
-- **The stage** (`--stage-max`) is the frame. The header, the navigation, the schedule grid, the four directories, the logo wall, the footer, and every section head run to it. It is a maximum inline size with a gutter from the spacing scale, never a fixed width.
+- **The stage** (`--stage-max`) is the frame. The header, the navigation, the schedule grid, the four directories, the logo wall, the footer, and every section head run to it. It is a maximum inline size of 95 percent, centered, with a gutter from the spacing scale. It is never a fixed width.
 - **The measure** (`--measure-text`) is running text. Paragraphs, lists, rich text, descriptions and answers fill the same content box as the section rule. `max-w-prose` resolves to this token too.
 - **The stage split** uses one full-width track without an empty margin column. Folios, including margin-style folios, stay inside the stage at the end of the rule.
-- **Both width tokens default to `100%`.** They are declared in the `page` contract (`design/tokens/components.json`) over the tier-2 stage family. At viewports of 1024px and wider, the stage content box after its gutter uses at least 90 percent of the viewport.
+- **The frame token defaults to `95%` and the measure token defaults to `100%`.** They are declared in the `page` contract (`design/tokens/components.json`) over the tier-2 stage family. At viewports of 1024px and wider, the stage content box after its gutter uses at least 90 percent of the viewport.
 - **The arrangement variant maps onto the stage.** `grid` gives a section the stage's columns; `list` sets it on the measure. The section head runs to the stage either way, because a section boundary is the width of the page it opens.
 - **The stage gutter holds every device drawn outside it.** The Atlas coordinate mark sits `--space-sm` plus `--space-xs` outside the title block, so the gutter is `--space-lg`. A narrower gutter pushes the mark past the viewport and the whole page scrolls sideways.
 - The gap between groups is at least twice the gap inside one: 8px within, 16px+ between. Use the named spacing steps (`--space-3xs` through `--space-3xl`), which are built to that rule: `xs` pairs with `md`, `sm` with `lg`, `md` with `xl`.
