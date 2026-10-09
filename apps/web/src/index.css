@@ -423,8 +423,9 @@
      that measure, and half the canvas stayed empty. Every style shared the
      shape, so every style read as the same narrow template.
 
-     Both widths are tokens the page contract declares. The frame fills
-     the available width; running text fills the frame's content box:
+     Both widths are tokens the page contract declares. The frame uses
+     95 percent of the available width and centers. Running text fills
+     the frame's content box:
 
        .stage     the frame. The header, the navigation, the schedule grid,
                   the directories, the logo wall, the footer, and every

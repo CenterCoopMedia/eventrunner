@@ -44,9 +44,9 @@
       "2xl": "4rem",
       "3xl": "6rem"
     },
-    "$stage-note": "The frame fills the available width with a stage gutter from the spacing scale. The measure fills that content box, so paragraphs, lists, rich text and section rules share the same width.",
+    "$stage-note": "The frame uses 95 percent of the available width and centers, so a small margin remains on both sides. The stage gutter from the spacing scale sits inside that frame. The measure fills that content box, so paragraphs, lists, rich text and section rules share the same width.",
     "stage": {
-      "frame": "100%",
+      "frame": "95%",
       "measure": "100%"
     },
     "width": {
