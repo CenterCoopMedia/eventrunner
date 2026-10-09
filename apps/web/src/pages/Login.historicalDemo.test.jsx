@@ -15,9 +15,10 @@ const sendOtpCode = vi.fn();
 const verifyOtpCode = vi.fn();
 const signOut = vi.fn();
 
-function renderSignIn({ eventConfig = {}, user = null, loading = false, panel = false } = {}) {
+function renderSignIn({ eventConfig = {}, user = null, loading = false, panel = false, from = null } = {}) {
+  const entry = from ? { pathname: '/signin', state: { from } } : '/signin';
   return render(
-    <MemoryRouter initialEntries={['/signin']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[entry]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <EventConfigContext.Provider value={{ eventConfig }}>
         <AuthContext.Provider value={{ user, loading, signInWithGoogle, sendOtpCode, verifyOtpCode, signOut }}>
           <ToastContext.Provider value={{ showToast: vi.fn() }}>
@@ -68,6 +69,22 @@ describe('/signin read-only demo gate', () => {
     renderSignIn();
     expectDisabled();
   });
+
+  it('opens Google sign-in when the admin CMS sent the visitor here', () => {
+    renderSignIn({ eventConfig: { historicalDemo: true }, from: '/admin/pages' });
+    expect(screen.getByRole('button', { name: /Google/ })).toBeInTheDocument();
+    expect(screen.getByText(/does not send email codes/)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sign-in is disabled in this demo')).not.toBeInTheDocument();
+  });
+
+  it.each(['https://evil.test/admin', '//admin', '/administrator', '/signin'])(
+    'keeps the notice for a return path outside the admin CMS: %s',
+    (from) => {
+      renderSignIn({ eventConfig: { historicalDemo: true }, from });
+      expectDisabled();
+    },
+  );
 
   it.each([{}, { historicalDemo: false }])('keeps normal client sign-in available: %j', (eventConfig) => {
     renderSignIn({ eventConfig });

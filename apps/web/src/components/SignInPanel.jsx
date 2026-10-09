@@ -29,9 +29,11 @@
 // that is a control label, the one exemption the eyebrow ban names (§2.4),
 // never an eyebrow to "fix".
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { adminReturnPath } from '../lib/adminReturnPath.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import {
   inputClass,
@@ -88,13 +90,14 @@ export function FormError({ id, message, errorRef }) {
 }
 
 /**
- * @param {{ onSignedIn?: () => void, initialEmail?: string }} props
+ * @param {{ onSignedIn?: () => void, initialEmail?: string, allowEmailCode?: boolean }} props
  *   `onSignedIn` fires after either path completes — the caller decides
  *   where that leads (the home page from /signin, staying put on the
  *   acceptance page). `initialEmail` prefills the address the invitation
- *   was sent to, when the caller knows it.
+ *   was sent to, when the caller knows it. `allowEmailCode` is false when
+ *   the server refuses one-time codes. Google sign-in stays available.
  */
-function SignInForm({ onSignedIn, initialEmail = '' }) {
+function SignInForm({ onSignedIn, initialEmail = '', allowEmailCode = true }) {
   const { signInWithGoogle, sendOtpCode, verifyOtpCode } = useAuth();
   const { showToast } = useToast();
 
@@ -247,6 +250,8 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
         {busy === 'google' ? 'Waiting for Google…' : 'Continue with Google'}
       </button>
 
+      {allowEmailCode ? (
+      <>
       <div className="flex items-center gap-sm" aria-hidden="true">
         <span className="h-0 flex-1 border-t-hairline border-t-rule-hairline" />
         <span className="font-data text-caption text-text-secondary">or</span>
@@ -412,16 +417,16 @@ function SignInForm({ onSignedIn, initialEmail = '' }) {
           </div>
         </form>
       )}
+      </>
+      ) : null}
     </div>
   );
 }
 
 /**
- * The read-only demo's stand-in for the whole sign-in panel.
- * Saying so plainly beats a form that cannot work — and it keeps every
- * existing "Sign in" link in the app (SessionCard, Attendees, MySchedule,
- * Profile, the admin gate) landing somewhere honest, without touching any of
- * them.
+ * The read-only demo's stand-in for the public sign-in panel.
+ * A visitor sent here from the admin CMS is the exception: that path shows
+ * Google sign-in, because the public tour stays closed.
  */
 function DemoSignInNotice() {
   return (
@@ -446,5 +451,8 @@ export default function SignInPanel(props) {
   // is a hooks-heavy component and rules-of-hooks forbids returning before
   // them. In a normal client build IS_DEMO is a compile-time `false`.
   const { eventConfig } = useEventConfig();
-  return isReadOnlyDemo(eventConfig) ? <DemoSignInNotice /> : <SignInForm {...props} />;
+  const readOnly = isReadOnlyDemo(eventConfig);
+  const adminEntry = adminReturnPath(useLocation().state?.from);
+  if (readOnly && !adminEntry) return <DemoSignInNotice />;
+  return <SignInForm {...props} allowEmailCode={!readOnly} />;
 }

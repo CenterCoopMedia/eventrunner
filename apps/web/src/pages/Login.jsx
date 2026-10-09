@@ -12,20 +12,23 @@
 // state sits in a hairline-ruled block tinted by --color-surface-alt, the
 // same flat-tint device SignInPanel itself uses — never a shadowed,
 // rounded card.
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import { primaryButtonClass, secondaryButtonClass } from '../components/controlClasses.js';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { adminReturnPath } from '../lib/adminReturnPath.js';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 
 export default function Login() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { eventConfig } = useEventConfig();
   const readOnlyDemo = isReadOnlyDemo(eventConfig);
+  const returnPath = adminReturnPath(location.state?.from);
 
-  if (readOnlyDemo) {
+  if (readOnlyDemo && !returnPath) {
     return (
       <article className="mx-auto max-w-md">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in</h1>
@@ -50,8 +53,8 @@ export default function Login() {
           <p className="text-text-primary">
             You are signed in{user.email ? ` as ${user.email}` : ''}.
           </p>
-          <Link to="/" className={primaryButtonClass}>
-            Go to the home page
+          <Link to={returnPath || '/'} className={primaryButtonClass}>
+            {returnPath ? 'Go to the admin CMS' : 'Go to the home page'}
           </Link>
           <button type="button" onClick={() => signOut()} className={secondaryButtonClass}>
             Sign out
@@ -65,12 +68,13 @@ export default function Login() {
     <article className="mx-auto max-w-md">
       <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in</h1>
       <p className="mt-xs max-w-prose text-body text-text-secondary text-pretty">
-        Use your Google account, or get a one-time code by email. No password
-        needed.
+        {readOnlyDemo
+          ? 'Use the Google account for your admin email. This demo does not send email codes.'
+          : 'Use your Google account, or get a one-time code by email. No password needed.'}
       </p>
 
       <div className="mt-lg">
-        <SignInPanel onSignedIn={() => navigate('/', { replace: true })} />
+        <SignInPanel onSignedIn={() => navigate(returnPath || '/', { replace: true })} />
       </div>
     </article>
   );
