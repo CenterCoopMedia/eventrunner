@@ -6,6 +6,7 @@ const {
   prepareAnnouncement,
   createSaveAnnouncementHandler,
   createDeleteAnnouncementHandler,
+  syncPublicAnnouncements,
 } = require('./announcements.cjs');
 
 function fakeDb(seed = {}) {
@@ -15,6 +16,17 @@ function fakeDb(seed = {}) {
     docs,
     collection(name) {
       return {
+        async get() {
+          const prefix = `${name}/`;
+          const found = [];
+          for (const [key, data] of docs) {
+            if (!key.startsWith(prefix)) continue;
+            const id = key.slice(prefix.length);
+            if (id.includes('/')) continue;
+            found.push({ id, data: () => data });
+          }
+          return { docs: found };
+        },
         doc(id) {
           const key = `${name}/${id ?? `auto${(autoId += 1)}`}`;
           return {
@@ -107,6 +119,23 @@ test('saveAnnouncement writes only sanitized public content and records the acto
   assert.equal('updatedBy' in stored, false);
   const logKey = [...db.docs.keys()].find((key) => key.startsWith('admin_logs/'));
   assert.equal(db.docs.get(logKey).email, 'admin@example.org');
+  assert.deepEqual(db.docs.get('announcements_public/current').announcements, []);
+});
+
+test('saveAnnouncement publishes a row only while its window contains now', async () => {
+  const db = fakeDb();
+  const response = res();
+  const live = deps(db);
+  live.now = () => Date.parse('2026-10-02T14:00:00.000Z');
+  await createSaveAnnouncementHandler(live)(req({
+    id: 'entry-change',
+    announcement: input(),
+  }), response);
+  assert.equal(response.statusCode, 200);
+  const published = db.docs.get('announcements_public/current').announcements;
+  assert.deepEqual(published.map((row) => row.id), ['entry-change']);
+  assert.equal(published[0].message, 'The entrance has moved.');
+  assert.equal(JSON.stringify(published).includes('admin@example.org'), false);
 });
 
 test('deleteAnnouncement removes an existing row and logs the action', async () => {
@@ -115,7 +144,33 @@ test('deleteAnnouncement removes an existing row and logs the action', async () 
   await createDeleteAnnouncementHandler(deps(db))(req({ id: 'a1' }), response);
   assert.equal(response.statusCode, 200);
   assert.equal(db.docs.has('announcements/a1'), false);
+  assert.deepEqual(db.docs.get('announcements_public/current').announcements, []);
   assert.ok([...db.docs.keys()].some((key) => key.startsWith('admin_logs/')));
+});
+
+test('syncPublicAnnouncements adds a row when its window opens and drops it when the window ends', async () => {
+  const db = fakeDb({
+    'announcements/later': input(),
+    'announcements/ended': input({
+      startsAt: '2026-10-01T13:00:00.000Z',
+      endsAt: '2026-10-01T15:00:00.000Z',
+    }),
+  });
+  const before = await syncPublicAnnouncements({
+    db,
+    now: new Date('2026-10-02T12:00:00.000Z'),
+  });
+  assert.deepEqual(before, []);
+  const during = await syncPublicAnnouncements({
+    db,
+    now: new Date('2026-10-02T14:00:00.000Z'),
+  });
+  assert.deepEqual(during.map((row) => row.id), ['later']);
+  const after = await syncPublicAnnouncements({
+    db,
+    now: new Date('2026-10-02T16:00:00.000Z'),
+  });
+  assert.deepEqual(after, []);
 });
 
 test('announcement handlers require an existing row for delete and a valid record for save', async () => {

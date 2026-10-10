@@ -13,13 +13,55 @@ const {
   ANNOUNCEMENT_LEVELS,
   MAX_ANNOUNCEMENT_MESSAGE_LENGTH,
   MAX_ANNOUNCEMENT_LINK_LABEL_LENGTH,
+  announcementTimeMs,
   sanitizeAnnouncementText,
 } = require('shared/announcement');
 const { safeUrlHref } = require('shared/urlSafety');
 
 const { DOC_ID_RE } = pagesInternals;
 const ANNOUNCEMENTS_COLLECTION = 'announcements';
+const PUBLIC_COLLECTION = 'announcements_public';
+const PUBLIC_DOC_ID = 'current';
 const ANNOUNCEMENT_KEYS = Object.freeze(['message', 'level', 'startsAt', 'endsAt', 'link']);
+
+/**
+ * Rebuild the one public document from canonical rows whose window contains
+ * `now`. A scheduled or ended row is left out, so a visitor cannot read it.
+ * Save, delete, and the minute scheduler all call this.
+ *
+ * @param {{ db: object, now?: Date }} args
+ * @returns {Promise<object[]>}
+ */
+async function syncPublicAnnouncements({ db, now = new Date() }) {
+  const nowMs = announcementTimeMs(now);
+  const snap = await db.collection(ANNOUNCEMENTS_COLLECTION).get();
+  const announcements = [];
+  for (const docSnap of snap.docs) {
+    const data = docSnap.data() || {};
+    const startsAt = announcementTimeMs(data.startsAt);
+    const endsAt = announcementTimeMs(data.endsAt);
+    if (startsAt === null || endsAt === null || nowMs === null || startsAt > nowMs || nowMs >= endsAt) {
+      continue;
+    }
+    const level = ANNOUNCEMENT_LEVELS.includes(data.level) ? data.level : 'info';
+    const link = data.link && typeof data.link.url === 'string' && typeof data.link.label === 'string'
+      ? { url: data.link.url, label: data.link.label }
+      : null;
+    announcements.push({
+      id: docSnap.id,
+      message: typeof data.message === 'string' ? data.message : '',
+      level,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+      link,
+    });
+  }
+  announcements.sort((a, b) => (
+    announcementTimeMs(b.startsAt) - announcementTimeMs(a.startsAt) || a.id.localeCompare(b.id)
+  ));
+  await db.collection(PUBLIC_COLLECTION).doc(PUBLIC_DOC_ID).set({ announcements });
+  return announcements;
+}
 
 function parsedDate(value) {
   if (typeof value !== 'string' || value.trim() === '') return null;
@@ -103,6 +145,7 @@ function createSaveAnnouncementHandler({ db, auth, getConfig, now = Date.now, lo
         createdAt: snap.exists && snap.data()?.createdAt ? snap.data().createdAt : at,
         updatedAt: at,
       });
+      await syncPublicAnnouncements({ db, now: at });
     } catch (err) {
       log.error('saveAnnouncement write failed', err);
       return internal(res, 'The announcement could not be saved.');
@@ -133,6 +176,7 @@ function createDeleteAnnouncementHandler({ db, auth, getConfig, now = Date.now, 
     if (!snap.exists) return notFound(res, 'Announcement not found.');
     try {
       await ref.delete();
+      await syncPublicAnnouncements({ db, now: new Date(now()) });
     } catch (err) {
       log.error('deleteAnnouncement failed', err);
       return internal(res, 'The announcement could not be deleted.');
@@ -165,9 +209,15 @@ function buildHandlers() {
     await handler(req, res);
   };
   const expose = (create) => onRequest({ region }, withCors(async (req, res) => create(buildDeps())(req, res)));
+  const { onSchedule } = require('firebase-functions/v2/scheduler');
   return {
     saveAnnouncement: expose(createSaveAnnouncementHandler),
     deleteAnnouncement: expose(createDeleteAnnouncementHandler),
+    // A saved future row stays out of the public document until this runs.
+    publishActiveAnnouncements: onSchedule({ region, schedule: 'every 1 minutes' }, async () => {
+      const { getDb } = require('../core/firestore.cjs');
+      await syncPublicAnnouncements({ db: getDb(), now: new Date() });
+    }),
   };
 }
 
@@ -175,6 +225,7 @@ module.exports = {
   prepareAnnouncement,
   createSaveAnnouncementHandler,
   createDeleteAnnouncementHandler,
+  syncPublicAnnouncements,
   get handlers() { return buildHandlers(); },
-  internals: { ANNOUNCEMENTS_COLLECTION, ANNOUNCEMENT_KEYS },
+  internals: { ANNOUNCEMENTS_COLLECTION, ANNOUNCEMENT_KEYS, PUBLIC_COLLECTION, PUBLIC_DOC_ID },
 };
