@@ -1010,6 +1010,17 @@ describe("users account documents (spec §3.4)", () => {
     }
   });
 
+  it("allows this account's photo and a default avatar, and refuses another attendee's photo", async () => {
+    const ref = doc(attendee("pending-1"), "users/pending-1");
+    await assertSucceeds(updateDoc(ref, { photoPath: "profile-photos/pending-1/photo.png" }));
+    await assertSucceeds(updateDoc(ref, { photoPath: "profile-photos/pending-1/fresh-id/photo.png" }));
+    await assertSucceeds(updateDoc(ref, { photoPath: "default-avatars/avatar-01.svg" }));
+    await assertSucceeds(updateDoc(ref, { photoPath: null }));
+    await assertFails(updateDoc(ref, { photoPath: "profile-photos/approved-1/photo.png" }));
+    await assertFails(updateDoc(ref, { photoPath: "profile-photos/pending-1/../../approved-1/photo.png" }));
+    await assertFails(updateDoc(ref, { photoPath: "demo/speakers/marisol-reyes.webp" }));
+  });
+
   it("allows the same fields with the right types", async () => {
     await assertSucceeds(
       updateDoc(doc(attendee("pending-1"), "users/pending-1"), {

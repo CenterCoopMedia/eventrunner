@@ -316,6 +316,7 @@ export default function Attendees() {
                             undo the compactness this page is for. */}
                         <ProfilePhoto
                           size="sm"
+                          uid={profile.id}
                           photoPath={profile.photoPath}
                           displayName={profile.displayName}
                           className="self-center"

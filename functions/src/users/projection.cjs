@@ -162,7 +162,7 @@ function createSyncUserPublic({
       }
 
       const previousPhoto = publicSnap.exists ? publicSnap.data()?.photoPath : null;
-      const payload = buildPublicProfile(userSnap.data(), badgesConfig, featuresConfig);
+      const payload = buildPublicProfile(userSnap.data(), badgesConfig, featuresConfig, uid);
       if (publicSnap.exists && sameProjection(stripStamps(publicSnap.data()), payload)) {
         return { action: 'unchanged' };
       }

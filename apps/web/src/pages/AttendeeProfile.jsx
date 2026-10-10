@@ -105,6 +105,7 @@ export default function AttendeeProfile() {
         <div className="flex items-start gap-sm">
           <ProfilePhoto
             size="lg"
+            uid={uid}
             photoPath={profile.photoPath}
             displayName={text(profile.displayName)}
           />
