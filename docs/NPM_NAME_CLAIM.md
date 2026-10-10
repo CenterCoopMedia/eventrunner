@@ -1,178 +1,138 @@
-# npm name claim
+# npm names and publication readiness
 
-Operator runbook for claiming the `eventrunner` / `event-runner` npm package names and the
-matching `@eventrunner` / `@event-runner` scopes, before anyone else can take them. See issue #99
-for the full scope and safety boundaries this runbook implements.
+Operator runbook for issue #99: Evaluate the `eventrunner` / `event-runner` package
+names and the matching `@eventrunner` / `@event-runner` scopes.
 
-**Who runs this:** a human operator with an authenticated, 2FA-protected npm account for the
-Center for Cooperative Media (CCM) organization. Nothing here should be delegated to an unattended
-session — steps 4 and 5 are explicit safety stops that need a human's go-ahead in the moment, and
-they come *before* the first publish command in step 6.
+## Stop before reserving names
 
-## 0. Before you start
+Issue #99 originally proposed non-functional placeholder packages and empty
+organizations. [npm's name policy](https://docs.npmjs.com/policies/disputes/)
+prohibits registering names solely for future use. A package with no genuine
+function counts as squatting. An organization with no packages published within
+a reasonable time can also count as squatting. Empty placeholders do not meet
+this policy, even when the intended project exists elsewhere.
 
-- Confirm you're logged into the **organization's** npm account, not a personal one: `npm whoami`
-  should print the CCM org account name, not your personal handle.
-- Confirm that account has 2FA and organization-controlled recovery information configured (npm
-  website → Account → Two-Factor Authentication, and Account → Profile for the recovery email).
-  This is a one-time console check, not a command.
+Do not execute the original placeholder plan. Before publication, the maintainer
+must approve a revised scope that identifies a useful package, its release
+contents, and any organizations needed for active use. This runbook does not
+select that package or authorize a release.
 
-## 1. Check availability (do this first, and again in step 4 immediately before publishing)
+**Who runs publication:** A human operator using the intended CCM-controlled npm
+user account with 2FA and organization-controlled recovery information. An npm
+organization is separate from the user account that logs in. Unattended sessions
+can perform the public read-only checks below; publication and organization
+creation need the maintainer's explicit final go-ahead in the execution session.
 
-Package names and scopes are two different registry objects and need two different checks.
+## 1. Check the public registry
 
-**The two package names** — `npm view` is the right tool here:
+Package names and organizations are different registry objects. Record the time,
+registry, exit code, and response for each check.
 
-```sh
-npm view eventrunner
-npm view event-runner
-```
-
-Expected result for both: `npm error code E404` / `404 Not Found` (the npm CLI's "not found"
-message). Anything that prints real package metadata means the name is taken.
-
-**The two scopes** — `npm view @eventrunner` does *not* work: npm parses the part after `@` as a
-version or dist-tag, so a bare scope fails with `EINVALIDTAGNAME` ("Tags may not have any
-characters that encodeURIComponent encodes") no matter whether the scope is free or taken. That
-error tells you nothing about availability. Use the org endpoint instead:
+Human operators can use the npm CLI commands below. An installed npm client can
+attach saved registry credentials even for read-only requests. Unattended checks
+must use the credential-free HTTP commands later in this section.
 
 ```sh
-npm org ls eventrunner
-npm org ls event-runner
+npm view eventrunner --registry=https://registry.npmjs.org/
+npm view event-runner --registry=https://registry.npmjs.org/
+npm org ls eventrunner --registry=https://registry.npmjs.org/
+npm org ls event-runner --registry=https://registry.npmjs.org/
 ```
 
-What distinguishes the two states:
-
-| Result | What it means |
+| Result | What it proves |
 | --- | --- |
-| `npm error code E404` … `Scope not found` | the scope is **free** |
-| exits 0 (member list, or empty when you are not a member) | the scope **already exists** |
+| Package metadata | A package exists. Check its maintainers before any publication. |
+| Package `E404` / `Not found` | The lookup found no package. Publication permission remains unverified. |
+| Organization member response | An organization exists. This does not establish CCM control. |
+| Organization `E404` / `Scope not found` | The lookup found no organization. Name acceptance remains unverified. |
+| Authentication, network, rate-limit, or other error | The check is inconclusive. |
 
-The same distinction without the CLI, if you would rather not shell out — the registry answers
-this endpoint unauthenticated:
-
-```sh
-curl -o /dev/null -w '%{http_code}\n' https://registry.npmjs.org/-/org/eventrunner/user
-curl -o /dev/null -w '%{http_code}\n' https://registry.npmjs.org/-/org/event-runner/user
-```
-
-`404` means the scope is free; `200` means an org already holds it. (The
-`https://www.npmjs.com/org/<name>` web page is *not* a usable check from a script — npmjs.com
-answers `403` to non-browser clients for both free and taken scopes. Open it in a browser if you
-want the human-readable view.)
-
-If any of the four is already claimed, stop — someone else has taken it — and tell the maintainer
-before doing anything else in this runbook.
-
-## 2. Create the placeholder packages (scratch directory, outside this repo)
+A bare scope, such as `npm view @eventrunner`, is not an organization lookup.
+For a public HTTP check, use these endpoints without credentials:
 
 ```sh
-mkdir -p /tmp/eventrunner-npm-claim/eventrunner
-mkdir -p /tmp/eventrunner-npm-claim/event-runner
+curl -i https://registry.npmjs.org/eventrunner
+curl -i https://registry.npmjs.org/event-runner
+curl -i https://registry.npmjs.org/-/org/eventrunner/user
+curl -i https://registry.npmjs.org/-/org/event-runner/user
 ```
 
-For each directory, write a `package.json` with this content (only the `name` field differs
-between the two):
+A 404 is an observation, not a reservation or a guarantee that npm will accept
+the name. If a name exists, stop and confirm its ownership with the maintainer.
+Do not infer control from matching names or an empty member response.
 
-```json
-{
-  "name": "eventrunner",
-  "version": "0.0.0",
-  "private": false,
-  "description": "Reserved. Not a published product yet — see https://github.com/CenterCoopMedia/eventrunner.",
-  "license": "UNLICENSED"
-}
-```
+## 2. Prepare an approved functional release
 
-Do not add any other files (no README, no code) — this is a placeholder claim, not a release. Do
-not commit the placeholder packages to this repo; they are published from a scratch directory
-outside it.
+- Agree with the maintainer which package has a genuine function and which
+  names and organizations are needed. Revise issue #99's placeholder acceptance
+  criteria before treating publication as ready. For each proposed organization,
+  identify the active package to publish under its scope. Omit organizations
+  without an approved active package.
+- Review the release files, license, version, README, and package metadata.
+  Preview the tarball file list with `npm pack --dry-run --ignore-scripts` from
+  the approved package directory. This does not create or test the tarball.
+- Review lifecycle scripts and generated build files before approving the final
+  release contents. The preview above skips scripts; publishing from a directory
+  can run them and produce different contents.
+- After approving the build and lifecycle scripts, create the final tarball with
+  [`npm pack`](https://docs.npmjs.com/cli/v11/commands/npm-pack/). Inspect its
+  actual file contents, including generated files, and check for private data.
+  Record its path and SHA-256 checksum with the release approval. Publish that
+  exact reviewed tarball; rebuilding or changing it requires another review.
+- Confirm the package's behavior with the relevant checks for that release.
+- Keep secrets and private files out of the tarball. Do not publish from the
+  repository root or remove a workspace's `private` flag to reserve a name.
+  The existing root and workspaces are private application packages.
 
-## 3. Confirm npm login and 2FA before publishing
+## 3. Confirm the operator account
 
-```sh
-npm login
-```
+Run `npm whoami` against the public registry. Confirm the returned user is the
+approved operator. On the npm website, verify that user's 2FA, recovery details,
+and required organization role. A successful login does not prove those checks.
 
-If prompted, complete 2FA. If you already have a session (`npm whoami` succeeds), you can skip
-`npm login`, but still confirm you're the org account, not a personal one (see step 0).
+If login is needed, the human operator completes `npm login` and 2FA. Do not
+script around 2FA or store a token that bypasses it.
 
-## 4. Safety stop: recheck immediately before publication
+## 4. Recheck and obtain the final go-ahead
 
-Re-run all four of step 1's checks **now**, immediately before the publish in step 6, in case
-someone else claimed a name since you started. If you are working through this runbook in one
-sitting with no gap, the step-1 check already satisfies this. If any time has passed — a different
-day, a paused session — re-run step 1 before going on.
+Repeat all four registry checks immediately before any public change. Ask the
+maintainer to approve the exact names, reviewed tarball and checksum, and
+organization actions in that execution session. Confirm the tarball checksum
+still matches. Earlier planning approval is insufficient. Stop if the observed
+ownership changed or any prerequisite is unverified.
 
-## 5. Safety stop: explicit final go-ahead
+## 5. Create only the approved organizations and publish
 
-Publishing an npm package and creating an npm organization are both public, externally-visible
-actions with no undo (an unpublished name is typically not immediately re-claimable, and org
-creation is similarly hard to walk back cleanly). Before running step 6 (publish) and step 7
-(create orgs), get an explicit "yes, go ahead" from the maintainer in the same session — a plan
-approval from an earlier conversation does not count as this go-ahead.
+Follow npm's [organization creation instructions](https://docs.npmjs.com/creating-an-organization/)
+on the website. Select the free public-package plan unless a paid plan is
+separately authorized. Add the approved maintainers and verify their roles.
+An organization's name is its scope.
+Create an organization only when the approved release includes its active
+scoped package. A member roster alone does not satisfy the active-use policy.
 
-## 6. Publish the placeholders
+The documented [`npm org` command](https://docs.npmjs.com/cli/v11/commands/npm-org/)
+manages members with `set`, `rm`, and `ls`; it does not provide `npm org create`.
 
-```sh
-cd /tmp/eventrunner-npm-claim/eventrunner && npm publish --access public
-cd /tmp/eventrunner-npm-claim/event-runner && npm publish --access public
-```
+Publish only the exact reviewed tarball, with the agreed name and access level.
+[`npm publish`](https://docs.npmjs.com/cli/v11/commands/npm-publish/) accepts a
+local tarball path. Do not publish from the source directory or repack after
+approval. Complete 2FA interactively. This runbook provides no publish command
+until that release is defined and approved.
 
-`npm publish` with 2FA enabled prompts for a one-time code (or an npm-website approval, if you've
-configured "Authorization for publishing" instead). Complete that prompt interactively. Do not
-script around the 2FA prompt or store an automation token that skips it for this account.
+## 6. Verify ownership and record the result
 
-## 7. Create the two npm organizations/scopes
-
-Via the npm website (Account → Add Organization) or, if the installed npm CLI version supports it:
-
-```sh
-npm org create eventrunner
-npm org create event-runner
-```
-
-An org claims the `@eventrunner` / `@event-runner` scope even before anything is published under
-it — this step alone secures the scope. Add the maintainer (and anyone else who should have
-publish rights) as an org member with the appropriate role.
-
-## 8. Verify
-
-```sh
-npm view eventrunner
-npm view event-runner
-```
-
-Both should now return the placeholder package's metadata (version `0.0.0`, the description text
-above), not a 404.
-
-```sh
-npm org ls eventrunner
-npm org ls event-runner
-```
-
-Both should now exit 0 and list you as an org member (the same check that returned `Scope not
-found` in step 1). The npm website's org page, opened in a browser, is the human-readable view of
-the same fact.
-
-## 9. Record ownership — operator storage only, never this repo
-
-Record the following in the team's operator password/secrets manager (the same store
-[`docs/POSTMARK_PROVISIONING.md`](POSTMARK_PROVISIONING.md) uses for the Postmark account token),
-**not** in this repository, any issue, or any commit:
-
-- Which npm account (username/email) owns the `eventrunner` and `event-runner` packages and the
-  two org scopes.
-- Recovery email and 2FA recovery codes for that account.
-- Date the placeholders were published and the orgs created.
-- Who else was added as an org member and with what role.
-
-Do not paste any npm token, one-time code, or recovery code into this repo, an issue comment, or
-any doc — only *where* the ownership record lives.
-
-## Done when
-
-- `npm view eventrunner` and `npm view event-runner` both return the placeholder metadata.
-- `npm org ls eventrunner` and `npm org ls event-runner` both exit 0 against orgs owned by the
-  intended CCM account, with 2FA and recoverable ownership confirmed.
-- Ownership and recovery details are recorded in operator storage, not in this repo.
+- Run `npm view <approved-package-name>` against the public registry and check
+  the exact version, description, and maintainers against the approved release.
+- Check each approved organization with `npm org ls <org-name>` while signed in
+  as the operator, and verify owner and maintainer roles on the npm website.
+- For every created organization, verify its approved scoped package exists in
+  the registry and is associated with that organization. Record the package URL
+  and the organization's access to it. An empty organization is incomplete.
+- Record ownership, recovery details, publication date, and roles in the team's
+  operator password/secrets manager, as used by
+  [`docs/POSTMARK_PROVISIONING.md`](POSTMARK_PROVISIONING.md). Store recovery codes
+  and any approved credentials only in operator storage. Enter one-time 2FA
+  codes at the interactive prompt; never record them.
+- Report the verified public result and the ownership-record location. Keep
+  issue #99 open until its revised acceptance criteria are met. A missing public
+  package, successful login, or new organization alone does not complete it.
