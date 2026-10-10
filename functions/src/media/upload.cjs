@@ -643,12 +643,26 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
         throw err;
       }
     }
+    const snap = await db.collection('speakers').doc(speakerId).get();
+    const stored = snap.exists ? (snap.data() || {}) : null;
     if (!isAdmin) {
-      const snap = await db.collection('speakers').doc(speakerId).get();
-      const stored = snap.exists ? (snap.data() || {}) : null;
       if (!stored || typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
         return sendError(res, 403, 'forbidden', 'You may only delete a photo from your own speaker profile.');
       }
+    }
+    // A path the live profile or a queued edit still names is the photo
+    // attendees can see, or the one an organizer has not applied yet.
+    // Cleanup from a stale client must not remove it (issue #392).
+    const pendingPath = stored && stored.pendingEdits && typeof stored.pendingEdits === 'object'
+      ? stored.pendingEdits.headshotPath
+      : null;
+    if (stored && (stored.headshotPath === path || pendingPath === path)) {
+      return res.status(409).json({
+        error: {
+          code: 'photo-in-use',
+          message: 'That photo is still on the speaker profile.',
+        },
+      });
     }
 
     try {

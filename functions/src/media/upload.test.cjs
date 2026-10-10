@@ -549,6 +549,45 @@ test('speakerPhotoDelete refuses a caller who does not own the speaker record', 
   assert.equal(res.statusCode, 403);
 });
 
+test('speakerPhotoDelete refuses a path the live profile still uses', async () => {
+  const path = 'speaker-photos/rae/live/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld({ headshotPath: path }), bucket))(
+    post({ speakerId: 'rae', path }),
+    res,
+  );
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'photo-in-use');
+  assert.equal(bucket.objects.has(path), true);
+});
+
+test('speakerPhotoDelete refuses a path a queued edit still uses', async () => {
+  const path = 'speaker-photos/rae/queued/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld({
+    headshotPath: 'speaker-photos/rae/live/photo.png',
+    pendingEdits: { headshotPath: path },
+  }), bucket))(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(bucket.objects.has(path), true);
+});
+
+test('speakerPhotoDelete refuses the live path for an admin too', async () => {
+  const path = 'speaker-photos/rae/live/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(
+    speakerAuthDeps(speakerWorld({ headshotPath: path }), bucket, { uid: 'admin-1', email: ADMIN_EMAIL }),
+  )(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(bucket.objects.has(path), true);
+});
+
 test('speakerPhotoDelete lets an admin delete on a speaker\'s behalf', async () => {
   const bucket = fakeBucket();
   await bucket.file('speaker-photos/rae/old/photo.png').save(Buffer.from('x'), {});
