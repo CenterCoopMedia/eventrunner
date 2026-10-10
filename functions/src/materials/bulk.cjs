@@ -103,14 +103,16 @@ function toMillis(value) {
 /**
  * One material as the admin table reads it. `createdBy` (a uid) and
  * `createdAt` stay on the server. A file has no `url` and a link has no
- * `storagePath`, so each row carries only the address it has.
+ * `storagePath`, so each row carries only the address it has. A browser
+ * upload sets `managedStorageObject`, and the delete confirm needs that
+ * flag: only that file is removed from Storage.
  *
  * @param {string} id
  * @param {object} data a session_materials document
  */
 function listRow(id, data) {
   const source = data && typeof data === 'object' ? data : {};
-  return {
+  const row = {
     id,
     sessionId: typeof source.sessionId === 'string' ? source.sessionId : null,
     type: source.type ?? null,
@@ -121,6 +123,8 @@ function listRow(id, data) {
     submittedBySpeakerId: source.submittedBySpeakerId ?? null,
     updatedAt: toMillis(source.updatedAt),
   };
+  if (row.type === 'file' && source.managedStorageObject === true) row.managedStorageObject = true;
+  return row;
 }
 
 /**

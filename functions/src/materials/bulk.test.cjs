@@ -579,6 +579,15 @@ test('listAllSessionMaterials answers every material without createdBy, with upd
   assert.equal(listRow('m3', { type: 'link', url: 'https://x.test', storagePath: 'session-materials/s1/x' }).storagePath, null);
 });
 
+test('listRow marks only a browser-uploaded file, so delete copy can name the stored file', () => {
+  const owned = listRow('owned', { type: 'file', sessionId: 's1', filename: 'Upload.pdf', managedStorageObject: true });
+  const shared = listRow('shared', { type: 'file', sessionId: 's1', filename: 'Slides.pdf' });
+  const link = listRow('link', { type: 'link', url: 'https://example.org/deck', managedStorageObject: true });
+  assert.equal(owned.managedStorageObject, true);
+  assert.equal(Object.hasOwn(shared, 'managedStorageObject'), false);
+  assert.equal(Object.hasOwn(link, 'managedStorageObject'), false);
+});
+
 test('listAllSessionMaterials says truncated at 2,001 rows and answers 2,000', async () => {
   const materials = {};
   for (let index = 0; index < 2001; index += 1) materials[`m${index}`] = fileMaterial('s1', `f${index}.pdf`);
