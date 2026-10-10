@@ -10,7 +10,9 @@
 // `import.meta.env`, so a normal client build — which never sets
 // VITE_DEMO_MODE — compiles it to `false` and the bundler drops every demo
 // branch. The per-client pipeline (deploy-client.yml, scripts/publish-site.cjs)
-// is therefore byte-for-byte unaffected.
+// is therefore byte-for-byte unaffected. Keep these two comparisons inline.
+// A function call here stays in the client bundle, and the demo branches
+// come with it. generatedDir.js uses the same two values.
 export const IS_DEMO =
   import.meta.env.VITE_DEMO_MODE === '1' ||
   import.meta.env.VITE_DEMO_MODE === 'true';
