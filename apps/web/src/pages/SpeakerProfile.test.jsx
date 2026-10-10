@@ -280,6 +280,45 @@ describe('SpeakerProfile', () => {
     expect(deleteSpeakerPhotoMock).not.toHaveBeenCalled();
   });
 
+  it('deletes a replaced live photo when the server applied the save, even if the loaded status was approved', async () => {
+    getOwnSpeakerProfileMock.mockResolvedValue({
+      ...SEEDED_SPEAKER,
+      status: 'approved',
+      headshotPath: 'speaker-photos/rae-okonkwo/live/photo.png',
+    });
+    updateOwnSpeakerProfileMock.mockResolvedValue({ ok: true, staged: false });
+    renderPage();
+    await screen.findByDisplayValue('Rae');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+
+    await waitFor(() =>
+      expect(deleteSpeakerPhotoMock).toHaveBeenCalledWith({
+        user: authValue.user,
+        speakerId: 'rae-okonkwo',
+        path: 'speaker-photos/rae-okonkwo/live/photo.png',
+      }),
+    );
+  });
+
+  it('does not delete the live photo when the server staged the save, even if the loaded status was not approved', async () => {
+    getOwnSpeakerProfileMock.mockResolvedValue({
+      ...SEEDED_SPEAKER,
+      status: 'accepted',
+      headshotPath: 'speaker-photos/rae-okonkwo/live/photo.png',
+    });
+    updateOwnSpeakerProfileMock.mockResolvedValue({ ok: true, staged: true });
+    renderPage();
+    await screen.findByDisplayValue('Rae');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+
+    await waitFor(() => expect(updateOwnSpeakerProfileMock).toHaveBeenCalled());
+    expect(deleteSpeakerPhotoMock).not.toHaveBeenCalled();
+  });
+
   it('deletes a superseded QUEUED photo (a second staged edit) — it was never the live object', async () => {
     getOwnSpeakerProfileMock.mockResolvedValue({
       ...SEEDED_SPEAKER,

@@ -549,6 +549,155 @@ test('speakerPhotoDelete refuses a caller who does not own the speaker record', 
   assert.equal(res.statusCode, 403);
 });
 
+test('speakerPhotoDelete refuses a path the live profile still uses', async () => {
+  const path = 'speaker-photos/rae/live/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld({ headshotPath: path }), bucket))(
+    post({ speakerId: 'rae', path }),
+    res,
+  );
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'photo-in-use');
+  assert.equal(bucket.objects.has(path), true);
+});
+
+test('speakerPhotoDelete refuses a path a queued edit still uses', async () => {
+  const path = 'speaker-photos/rae/queued/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(speakerWorld({
+    headshotPath: 'speaker-photos/rae/live/photo.png',
+    pendingEdits: { headshotPath: path },
+  }), bucket))(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(bucket.objects.has(path), true);
+});
+
+test('speakerPhotoDelete refuses the live path for an admin too', async () => {
+  const path = 'speaker-photos/rae/live/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(
+    speakerAuthDeps(speakerWorld({ headshotPath: path }), bucket, { uid: 'admin-1', email: ADMIN_EMAIL }),
+  )(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(bucket.objects.has(path), true);
+});
+
+test('speakerPhotoDelete refuses a path the public profile still shows', async () => {
+  const path = 'speaker-photos/rae/live/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const db = makeFakeDb({
+    'speakers/rae': {
+      firstName: 'Rae',
+      lastName: 'Okonkwo',
+      uid: SPEAKER_UID,
+      status: 'approved',
+      headshotPath: 'speaker-photos/rae/new/photo.png',
+    },
+    'speakers_public/rae': { headshotPath: path },
+  });
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(db, bucket))(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'photo-in-use');
+  assert.equal(bucket.objects.has(path), true);
+  assert.equal(db.read('speakers', 'rae').headshotDeleteClaims, undefined);
+});
+
+test('speakerPhotoDelete claims the path before it removes the object', async () => {
+  const path = 'speaker-photos/rae/old/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const db = speakerWorld({
+    headshotPath: 'speaker-photos/rae/new/photo.png',
+    headshotDeleteClaims: ['speaker-photos/rae/older/photo.png'],
+  });
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(db, bucket))(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(bucket.objects.has(path), false);
+  assert.deepEqual(db.read('speakers', 'rae').headshotDeleteClaims, [
+    'speaker-photos/rae/older/photo.png',
+    path,
+  ]);
+});
+
+test('speakerPhotoDelete keeps the photo when a save adopts it before the delete commits', async () => {
+  const path = 'speaker-photos/rae/old/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const db = speakerWorld({ headshotPath: 'speaker-photos/rae/new/photo.png' });
+  db.beforeCommit = async () => {
+    await db.collection('speakers').doc('rae').set({ headshotPath: path }, { merge: true });
+  };
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(db, bucket))(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'photo-in-use');
+  assert.equal(bucket.objects.has(path), true);
+  assert.equal(db.read('speakers', 'rae').headshotPath, path);
+  assert.equal(db.read('speakers', 'rae').headshotDeleteClaims, undefined);
+});
+
+test('speakerPhotoDelete releases the claim when storage delete fails', async () => {
+  const path = 'speaker-photos/rae/old/photo.png';
+  const kept = 'speaker-photos/rae/older/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const orig = bucket.file.bind(bucket);
+  bucket.file = (objectPath) => {
+    const file = orig(objectPath);
+    return {
+      save: (buffer, options) => file.save(buffer, options),
+      delete: async () => {
+        throw new Error('bucket down');
+      },
+    };
+  };
+  const db = speakerWorld({ headshotDeleteClaims: [kept] });
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(speakerAuthDeps(db, bucket))(post({ speakerId: 'rae', path }), res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(bucket.objects.has(path), true);
+  assert.deepEqual(db.read('speakers', 'rae').headshotDeleteClaims, [kept]);
+});
+
+test('speakerPhotoDelete lets an admin remove an object when the speaker record is gone', async () => {
+  const path = 'speaker-photos/ghost/old/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const db = makeFakeDb({});
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(
+    speakerAuthDeps(db, bucket, { uid: 'admin-1', email: ADMIN_EMAIL }),
+  )(post({ speakerId: 'ghost', path }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(bucket.objects.has(path), false);
+  assert.equal(db.read('speakers', 'ghost'), undefined);
+});
+
+test('speakerPhotoDelete refuses a public path when the speaker record is gone', async () => {
+  const path = 'speaker-photos/ghost/old/photo.png';
+  const bucket = fakeBucket();
+  await bucket.file(path).save(Buffer.from('x'), {});
+  const db = makeFakeDb({
+    'speakers_public/ghost': { headshotPath: path },
+  });
+  const res = fakeRes();
+  await createSpeakerPhotoDeleteHandler(
+    speakerAuthDeps(db, bucket, { uid: 'admin-1', email: ADMIN_EMAIL }),
+  )(post({ speakerId: 'ghost', path }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(bucket.objects.has(path), true);
+  assert.equal(db.read('speakers', 'ghost'), undefined);
+});
+
 test('speakerPhotoDelete lets an admin delete on a speaker\'s behalf', async () => {
   const bucket = fakeBucket();
   await bucket.file('speaker-photos/rae/old/photo.png').save(Buffer.from('x'), {});

@@ -588,6 +588,22 @@ async function applyUpdateOwnSpeakerProfile({ db, speakerId, uid, isAdmin, paylo
         throw err;
       }
 
+      // speakerPhotoDelete claims a path in the same transaction that proves
+      // it is unused. A save that lands after that claim must not point the
+      // profile at an object the delete is about to remove (issue #392).
+      if ('headshotPath' in verdict.fields && typeof verdict.fields.headshotPath === 'string') {
+        const claims = Array.isArray(stored.headshotDeleteClaims) ? stored.headshotDeleteClaims : [];
+        if (claims.includes(verdict.fields.headshotPath)) {
+          const err = new Error('PHOTO_IN_USE');
+          err.conflict = {
+            status: 409,
+            code: 'photo-in-use',
+            message: 'That photo was removed. Upload it again to use it.',
+          };
+          throw err;
+        }
+      }
+
       if (stored.status === 'approved') {
         staged = true;
         const existingPending = isPlainObject(stored.pendingEdits) ? stored.pendingEdits : {};

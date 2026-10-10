@@ -127,11 +127,10 @@ export default function SpeakerProfile() {
   //   • photoBaselineRef  — the EFFECTIVE path the form started from this
   //     load (a queued pendingEdits.headshotPath if one exists, else the
   //     live value). Safe to delete once superseded, UNLESS it equals the
-  //     live path AND this save is itself going to be staged (i.e., it is
-  //     not yet safe to delete the still-public photo).
+  //     live path AND the save result says the edit is staged. That flag
+  //     comes from the server, not from the status read at load.
   const livePhotoPathRef = useRef(null);
   const photoBaselineRef = useRef(null);
-  const statusAtLoadRef = useRef(null);
 
   const loadProfile = useCallback(() => {
     if (!user || !speakerId) return;
@@ -153,7 +152,6 @@ export default function SpeakerProfile() {
         });
         livePhotoPathRef.current = speaker.headshotPath ?? null;
         photoBaselineRef.current = effective.headshotPath ?? null;
-        statusAtLoadRef.current = speaker.status;
       })
       .catch((err) => {
         if (requestIdRef.current !== requestId) return; // superseded by a newer request
@@ -289,7 +287,9 @@ export default function SpeakerProfile() {
       // excluded from a staged save.
       const previousPath = photoBaselineRef.current;
       const newPath = fields.headshotPath;
-      const wasStaged = statusAtLoadRef.current === 'approved';
+      // The server says whether this save is queued. The status from load
+      // can be stale, and a stale "not approved" would delete the live photo.
+      const wasStaged = result?.staged === true;
       const changed = previousPath !== newPath;
       const safeToDelete = changed && previousPath && (!wasStaged || previousPath !== livePhotoPathRef.current);
       if (safeToDelete) {
