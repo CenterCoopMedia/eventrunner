@@ -36,7 +36,7 @@ VITE_DEMO_MODE=1 \
   VITE_FIREBASE_STORAGE_BUCKET=demo-run-of-show.appspot.com \
   VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000 \
   VITE_FIREBASE_APP_ID=1:000000000000:web:0000000000000000000000 \
-  npm run build -w apps/web -- --base /eventrunner/demo/ --outDir /tmp/specimen-demo
+  env -u GENERATED_DIR npm run build -w apps/web -- --base /eventrunner/demo/ --outDir /tmp/specimen-demo
 for section in specimen-controls specimen-layout specimen-feedback; do
   PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/dev/capture-specimen.mjs \
     --dist /tmp/specimen-demo --out docs/plans/evidence/specimen \
@@ -61,6 +61,8 @@ The six `VITE_FIREBASE_*` values are the non-secret placeholders
 build reads them at start-up: without them the app never mounts and the
 capture times out waiting for the page. Drop `--only` for the whole page, and
 `--scale 0.5` to keep a full-page file under about 1.5MB.
+
+The command drops `GENERATED_DIR`. That variable is a client export, and demo mode ignores it, so the captures stay on the committed snapshot.
 
 ## What to look at
 
