@@ -24,43 +24,73 @@ const PUBLIC_COLLECTION = 'announcements_public';
 const PUBLIC_DOC_ID = 'current';
 const ANNOUNCEMENT_KEYS = Object.freeze(['message', 'level', 'startsAt', 'endsAt', 'link']);
 
+function publicRow(id, data, nowMs) {
+  const startsAt = announcementTimeMs(data.startsAt);
+  const endsAt = announcementTimeMs(data.endsAt);
+  if (startsAt === null || endsAt === null || nowMs === null || startsAt > nowMs || nowMs >= endsAt) {
+    return null;
+  }
+  const level = ANNOUNCEMENT_LEVELS.includes(data.level) ? data.level : 'info';
+  const link = data.link && typeof data.link.url === 'string' && typeof data.link.label === 'string'
+    ? { url: data.link.url, label: data.link.label }
+    : null;
+  return {
+    id,
+    message: typeof data.message === 'string' ? data.message : '',
+    level,
+    startsAt: data.startsAt,
+    endsAt: data.endsAt,
+    link,
+  };
+}
+
+// `overlay` is the write this transaction has not committed yet. Firestore
+// hides those writes from a later read in the same transaction.
+function projectAnnouncements(docSnaps, nowMs, overlay) {
+  const byId = new Map();
+  for (const docSnap of docSnaps) byId.set(docSnap.id, docSnap.data() || {});
+  if (overlay?.remove) byId.delete(overlay.id);
+  else if (overlay) byId.set(overlay.id, overlay.data);
+  const announcements = [];
+  for (const [id, data] of byId) {
+    const row = publicRow(id, data, nowMs);
+    if (row) announcements.push(row);
+  }
+  announcements.sort((a, b) => (
+    announcementTimeMs(b.startsAt) - announcementTimeMs(a.startsAt) || a.id.localeCompare(b.id)
+  ));
+  return announcements;
+}
+
+// Ended rows stay out of the read. One inequality uses the automatic index.
+// startsAt is applied in projectAnnouncements.
+function activeAnnouncementQuery(db, now) {
+  return db.collection(ANNOUNCEMENTS_COLLECTION).where('endsAt', '>', now);
+}
+
+function publicDoc(db) {
+  return db.collection(PUBLIC_COLLECTION).doc(PUBLIC_DOC_ID);
+}
+
 /**
  * Rebuild the one public document from canonical rows whose window contains
- * `now`. A scheduled or ended row is left out, so a visitor cannot read it.
- * Save, delete, and the minute scheduler all call this.
+ * `now`. The read and the write commit together, so a slower rebuild cannot
+ * replace a newer save or delete.
  *
  * @param {{ db: object, now?: Date }} args
  * @returns {Promise<object[]>}
  */
 async function syncPublicAnnouncements({ db, now = new Date() }) {
   const nowMs = announcementTimeMs(now);
-  const snap = await db.collection(ANNOUNCEMENTS_COLLECTION).get();
-  const announcements = [];
-  for (const docSnap of snap.docs) {
-    const data = docSnap.data() || {};
-    const startsAt = announcementTimeMs(data.startsAt);
-    const endsAt = announcementTimeMs(data.endsAt);
-    if (startsAt === null || endsAt === null || nowMs === null || startsAt > nowMs || nowMs >= endsAt) {
-      continue;
-    }
-    const level = ANNOUNCEMENT_LEVELS.includes(data.level) ? data.level : 'info';
-    const link = data.link && typeof data.link.url === 'string' && typeof data.link.label === 'string'
-      ? { url: data.link.url, label: data.link.label }
-      : null;
-    announcements.push({
-      id: docSnap.id,
-      message: typeof data.message === 'string' ? data.message : '',
-      level,
-      startsAt: data.startsAt,
-      endsAt: data.endsAt,
-      link,
-    });
-  }
-  announcements.sort((a, b) => (
-    announcementTimeMs(b.startsAt) - announcementTimeMs(a.startsAt) || a.id.localeCompare(b.id)
-  ));
-  await db.collection(PUBLIC_COLLECTION).doc(PUBLIC_DOC_ID).set({ announcements });
-  return announcements;
+  return db.runTransaction(async (tx) => {
+    // Read the public document first. A commit that changes it retries this
+    // body, so an older snapshot cannot overwrite a newer rebuild.
+    await tx.get(publicDoc(db));
+    const snap = await tx.get(activeAnnouncementQuery(db, now));
+    const announcements = projectAnnouncements(snap.docs, nowMs);
+    tx.set(publicDoc(db), { announcements });
+    return announcements;
+  });
 }
 
 function parsedDate(value) {
@@ -139,13 +169,21 @@ function createSaveAnnouncementHandler({ db, auth, getConfig, now = Date.now, lo
     const ref = db.collection(ANNOUNCEMENTS_COLLECTION).doc(id);
     const at = new Date(now());
     try {
-      const snap = await ref.get();
-      await ref.set({
-        ...verdict.value,
-        createdAt: snap.exists && snap.data()?.createdAt ? snap.data().createdAt : at,
-        updatedAt: at,
+      // The canonical row and the public document commit together. A failed
+      // projection leaves nothing, so a retry cannot create a second row.
+      await db.runTransaction(async (tx) => {
+        const existing = await tx.get(ref);
+        await tx.get(publicDoc(db));
+        const snap = await tx.get(activeAnnouncementQuery(db, at));
+        const record = {
+          ...verdict.value,
+          createdAt: existing.exists && existing.data()?.createdAt ? existing.data().createdAt : at,
+          updatedAt: at,
+        };
+        const announcements = projectAnnouncements(snap.docs, announcementTimeMs(at), { id, data: record });
+        tx.set(ref, record);
+        tx.set(publicDoc(db), { announcements });
       });
-      await syncPublicAnnouncements({ db, now: at });
     } catch (err) {
       log.error('saveAnnouncement write failed', err);
       return internal(res, 'The announcement could not be saved.');
@@ -172,15 +210,28 @@ function createDeleteAnnouncementHandler({ db, auth, getConfig, now = Date.now, 
       return badRequest(res, 'id: must be a valid announcement id');
     }
     const ref = db.collection(ANNOUNCEMENTS_COLLECTION).doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) return notFound(res, 'Announcement not found.');
+    const at = new Date(now());
+    let outcome;
     try {
-      await ref.delete();
-      await syncPublicAnnouncements({ db, now: new Date(now()) });
+      outcome = await db.runTransaction(async (tx) => {
+        const existing = await tx.get(ref);
+        if (!existing.exists) return 'missing';
+        await tx.get(publicDoc(db));
+        const snap = await tx.get(activeAnnouncementQuery(db, at));
+        const announcements = projectAnnouncements(
+          snap.docs,
+          announcementTimeMs(at),
+          { id, remove: true },
+        );
+        tx.delete(ref);
+        tx.set(publicDoc(db), { announcements });
+        return 'deleted';
+      });
     } catch (err) {
       log.error('deleteAnnouncement failed', err);
       return internal(res, 'The announcement could not be deleted.');
     }
+    if (outcome === 'missing') return notFound(res, 'Announcement not found.');
     await logAdminAction({
       db,
       action: 'deleteAnnouncement',
