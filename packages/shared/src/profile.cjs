@@ -92,6 +92,41 @@ function isValidProfileVisibility(v) {
   return typeof v === 'string' && PROFILE_VISIBILITIES.includes(v);
 }
 
+const DEFAULT_AVATAR_PATHS = new Set([
+  'default-avatars/avatar-01.svg',
+  'default-avatars/avatar-02.svg',
+  'default-avatars/avatar-03.svg',
+  'default-avatars/avatar-04.svg',
+  'default-avatars/avatar-05.svg',
+  'default-avatars/avatar-06.svg',
+]);
+
+/**
+ * A photoPath the directory may show for this account.
+ *
+ * An uploaded object must sit under `profile-photos/{uid}/`, one or two
+ * segments deep, so a saved path cannot name another attendee's object.
+ * The six bundled defaults are not bucket objects. Anything else,
+ * including `..`, is not published. firestore.rules validPhotoPath mirrors
+ * this check on the client write.
+ *
+ * @param {string} uid
+ * @param {*} path
+ * @returns {boolean}
+ */
+function isPublishablePhotoPath(uid, path) {
+  if (typeof path !== 'string' || typeof uid !== 'string' || uid.length === 0 || uid.includes('/')) {
+    return false;
+  }
+  if (DEFAULT_AVATAR_PATHS.has(path)) return true;
+  const parts = path.split('/');
+  if (parts.length < 3 || parts.length > 4) return false;
+  if (parts[0] !== 'profile-photos' || parts[1] !== uid) return false;
+  if (parts[2].length === 0 || parts[2] === '..') return false;
+  if (parts.length === 4 && (parts[3].length === 0 || parts[3] === '..')) return false;
+  return true;
+}
+
 /**
  * A profile is "complete" once it carries the two fields every directory
  * card and profile page renders — a display name and a chosen visibility.
@@ -126,11 +161,16 @@ function isProfileComplete(user) {
  * @param {object | null | undefined} badgesConfig - the config/badges document
  * @param {object | null | undefined} [features] - the config/features document;
  *   custom badges project only when `features.customBadges` is exactly true
+ * @param {string} [uid] - the account id. The document path wins; `user.uid`
+ *   is the fallback for callers that hold the account document alone.
  * @returns {object} the users_public/{uid} payload (no timestamps — the
  *   caller stamps `updatedAt` with a server value)
  */
-function buildPublicProfile(user, badgesConfig, features = null) {
+function buildPublicProfile(user, badgesConfig, features = null, uid = null) {
   const source = user && typeof user === 'object' ? user : {};
+  const ownerId = typeof uid === 'string' && uid.length > 0
+    ? uid
+    : (typeof source.uid === 'string' ? source.uid : '');
   const out = {};
   for (const field of PUBLIC_PROFILE_FIELDS) {
     const value = source[field];
@@ -161,6 +201,8 @@ function buildPublicProfile(user, badgesConfig, features = null) {
   }
   if (typeof out.photoPath !== 'string') {
     if (out.photoPath !== undefined) out.photoPath = null;
+  } else if (!isPublishablePhotoPath(ownerId, out.photoPath)) {
+    out.photoPath = null;
   }
   // socialHandles is a flat label → handle map; non-string values are
   // dropped rather than published as objects.
@@ -198,4 +240,5 @@ module.exports = {
   isValidProfileVisibility,
   isProfileComplete,
   buildPublicProfile,
+  isPublishablePhotoPath,
 };

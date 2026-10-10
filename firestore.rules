@@ -253,14 +253,44 @@ service cloud.firestore {
             && custom.toSet().size() == custom.size());
     }
 
-    function validSelfProfileTypes() {
+    // Mirrors packages/shared/src/profile.cjs isPublishablePhotoPath.
+    // An upload must name this account's own object. The six bundled
+    // defaults are not bucket objects. A path outside those two shapes,
+    // including another attendee's photo, is not a profile photo.
+    function isDefaultAvatar(path) {
+      return path == 'default-avatars/avatar-01.svg'
+        || path == 'default-avatars/avatar-02.svg'
+        || path == 'default-avatars/avatar-03.svg'
+        || path == 'default-avatars/avatar-04.svg'
+        || path == 'default-avatars/avatar-05.svg'
+        || path == 'default-avatars/avatar-06.svg';
+    }
+
+    function isOwnProfilePhoto(userId, path) {
+      let parts = path.split('/');
+      return parts.size() >= 3
+        && parts.size() <= 4
+        && parts[0] == 'profile-photos'
+        && parts[1] == userId
+        && parts[2].size() > 0
+        && parts[2] != '..'
+        && (parts.size() == 3 || (parts[3].size() > 0 && parts[3] != '..'));
+    }
+
+    function validPhotoPath(userId) {
+      let path = request.resource.data.get('photoPath', null);
+      return path == null
+        || (path is string && (isDefaultAvatar(path) || isOwnProfilePhoto(userId, path)));
+    }
+
+    function validSelfProfileTypes(userId) {
       let d = request.resource.data;
       return d.get('displayName', '') is string
         && d.get('pronouns', '') is string
         && d.get('bio', '') is string
         && d.get('organization', '') is string
         && d.get('jobTitle', '') is string
-        && (d.get('photoPath', null) == null || d.get('photoPath', '') is string)
+        && validPhotoPath(userId)
         && d.get('socialHandles', {}) is map
         && validBadgesList()
         && validCustomBadgesList()
@@ -282,8 +312,8 @@ service cloud.firestore {
              .data.get('publicAttendeeProfiles', false) == true;
     }
 
-    function validSelfProfileValues() {
-      return validSelfProfileTypes()
+    function validSelfProfileValues(userId) {
+      return validSelfProfileTypes(userId)
         && (request.resource.data.profileVisibility != 'public'
             || resource.data.profileVisibility == 'public'
             || publicProfilesEnabled());
@@ -298,7 +328,7 @@ service cloud.firestore {
       allow create, delete: if false;
       allow update: if isSelf(userId)
         && editsOnlySelfProfileFields()
-        && validSelfProfileValues();
+        && validSelfProfileValues(userId);
 
       // Private per-session bookmark membership (spec §4.1, §9). Every WRITE
       // goes through the Admin SDK (bookmarkSession, functions/src/schedule/

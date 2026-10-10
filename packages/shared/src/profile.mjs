@@ -5,5 +5,6 @@ export {
   PUBLIC_PROFILE_FIELDS,
   isValidProfileVisibility,
   isProfileComplete,
+  isPublishablePhotoPath,
   buildPublicProfile,
 } from './profile.cjs';

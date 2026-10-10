@@ -1,10 +1,9 @@
 // The attendee avatar (issue #24 review follow-up: photoPath was saved and
 // projected but never rendered).
 //
-// Guards pinned here: only a `profile-photos/` object is fetched — the rules
-// type-check photoPath but never constrain WHICH object it names — and any
-// other value, or a failed load, falls back to the lettered stand-in rather
-// than a broken image.
+// Guards pinned here: an uploaded photo is fetched only when it belongs to
+// this account. Another attendee's object, and any other value, or a failed
+// load, falls back to the lettered stand-in rather than a broken image.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,8 +22,11 @@ const avatarTokens = JSON.parse(
 
 describe('profilePhotoUrl', () => {
   it('resolves a photo under the owner-bound namespace', () => {
-    expect(profilePhotoUrl('profile-photos/u1/photo.png')).toContain(
+    expect(profilePhotoUrl('profile-photos/u1/photo.png', 'u1')).toContain(
       encodeURIComponent('profile-photos/u1/photo.png'),
+    );
+    expect(profilePhotoUrl('profile-photos/u1/fresh/photo.png', 'u1')).toContain(
+      encodeURIComponent('profile-photos/u1/fresh/photo.png'),
     );
   });
 
@@ -39,9 +41,12 @@ describe('profilePhotoUrl', () => {
       'https://evil.example/x.png',
       { path: 'profile-photos/u1/photo.png' },
       null,
+      'profile-photos/someone-else/photo.png',
+      'profile-photos/u1/../../someone-else/photo.png',
     ]) {
-      expect(profilePhotoUrl(value)).toBeNull();
+      expect(profilePhotoUrl(value, 'u1')).toBeNull();
     }
+    expect(profilePhotoUrl('profile-photos/u1/photo.png')).toBeNull();
   });
 });
 
@@ -70,7 +75,7 @@ describe('ProfilePhoto', () => {
 
   it('renders the photo with an empty alt — the name is already text beside it', () => {
     const { container } = render(
-      <ProfilePhoto photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
+      <ProfilePhoto uid="u1" photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
     );
     const image = container.querySelector('img');
     expect(image).toBeInTheDocument();
@@ -79,7 +84,7 @@ describe('ProfilePhoto', () => {
 
   it('is the avatar device: a square portrait on the brand radius, never a circle', () => {
     const { container } = render(
-      <ProfilePhoto photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
+      <ProfilePhoto uid="u1" photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
     );
     const image = container.querySelector('img');
     // The radius is the `--avatar-radius` token (the brand radius by
@@ -101,7 +106,7 @@ describe('ProfilePhoto', () => {
   // rule reads is a tier 2 role token, never a brand-* custom property.
   it('reads the tier 2 role tokens, not the old compatibility names (issue 247)', () => {
     const { container } = render(
-      <ProfilePhoto photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
+      <ProfilePhoto uid="u1" photoPath="profile-photos/u1/photo.png" displayName="Rae Okonkwo" />,
     );
     const image = container.querySelector('img');
     expect(image).toHaveClass('avatar');
@@ -131,7 +136,7 @@ describe('ProfilePhoto', () => {
 
   it('falls back to the initial when the object fails to load', () => {
     const { container } = render(
-      <ProfilePhoto photoPath="profile-photos/u1/gone.png" displayName="Rae Okonkwo" />,
+      <ProfilePhoto uid="u1" photoPath="profile-photos/u1/gone.png" displayName="Rae Okonkwo" />,
     );
     fireEvent.error(container.querySelector('img'));
     expect(screen.getByText('R')).toBeInTheDocument();
