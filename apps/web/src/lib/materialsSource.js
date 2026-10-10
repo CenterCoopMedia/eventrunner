@@ -206,7 +206,23 @@ export async function downloadSessionMaterialFile({ user, materialId, filename }
     });
   }
   const blob = await response.blob();
+  const declared = declaredDownloadLength(response);
+  if (declared !== null && blob.size !== declared) {
+    throw new MaterialRequestError({
+      code: 'incomplete',
+      status: response.status,
+      message: 'The download stopped before the file finished. Try again.',
+    });
+  }
   saveBlobAs(blob, filename);
+}
+
+/** The Storage size, when the response states one. A missing header stays null. */
+function declaredDownloadLength(response) {
+  const raw = response.headers?.get?.('content-length');
+  if (typeof raw !== 'string' || !/^\d+$/u.test(raw)) return null;
+  const size = Number(raw);
+  return Number.isSafeInteger(size) ? size : null;
 }
 
 /**

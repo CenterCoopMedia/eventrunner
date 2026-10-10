@@ -213,4 +213,22 @@ describe('downloadSessionMaterialFile', () => {
 
     clickSpy.mockRestore();
   });
+
+  it('does not save a file shorter than Content-Length', async () => {
+    const blob = new Blob(['short']);
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (name) => (name === 'content-length' ? '100' : null) },
+      blob: async () => blob,
+    });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    await expect(
+      downloadSessionMaterialFile({ user: fakeUser(), materialId: 'm1', filename: 'slides.pdf' }),
+    ).rejects.toMatchObject({ name: 'MaterialRequestError', code: 'incomplete', status: 200 });
+    expect(clickSpy).not.toHaveBeenCalled();
+
+    clickSpy.mockRestore();
+  });
 });
