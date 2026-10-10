@@ -481,8 +481,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
  * now-superseded old object once the new one actually goes live).
  *
  * @param {{ bucket: object, speakerId: string, contentType: string,
- *           buffer: Buffer, filename: unknown,
- *           actor: { uid: string, email: string }, newId?: () => string }} args
+ *           buffer: Buffer, filename: unknown, newId?: () => string }} args
  * @returns {Promise<{ path: string }>}
  */
 async function storeSpeakerPhoto({
@@ -491,19 +490,20 @@ async function storeSpeakerPhoto({
   contentType,
   buffer,
   filename,
-  actor,
   newId = () => require('node:crypto').randomBytes(12).toString('hex'),
 }) {
   const assetId = newId();
   const name = safeObjectName(filename, contentType);
   const path = `speaker-photos/${speakerId}/${assetId}/${name}`;
+  // speaker-photos allows public get, and a public get returns custom
+  // metadata. Do not stamp the uploader email (or any account identifier)
+  // on the object. Issue #362.
   await bucket.file(path).save(buffer, {
     resumable: false,
     contentType,
     metadata: {
       contentType,
       cacheControl: CACHE_CONTROL,
-      metadata: { uploadedBy: actor.email },
     },
   });
   return { path };
@@ -587,7 +587,6 @@ function createSpeakerPhotoUploadHandler({
         contentType,
         buffer: decodedUpload.buffer,
         filename: req.body?.filename,
-        actor: { uid: decoded.uid, email: typeof decoded.email === 'string' ? decoded.email : '' },
         newId,
       });
     } catch (err) {
