@@ -9,9 +9,11 @@
 // exactly backwards.
 //
 // The upload lands BEFORE the profile is saved, and the field only reports
-// the new path upward. That ordering is deliberate: an object with no
-// profile pointing at it is invisible and costs a few kilobytes, while a
-// saved path with no object is a broken image on the attendee directory.
+// the new path upward. That ordering is deliberate: a saved path with no
+// object is a broken image on the attendee directory. The new object uses a
+// fresh id, so it does not replace the object the saved profile already
+// names. The directory keeps showing that saved photo until this form is
+// saved. An object nobody's profile names is not the public photo.
 //
 // DELETION FOLLOWS THE SAME RULE, which is why this field never deletes
 // anything. "Remove photo" only clears the path in the form; the object is

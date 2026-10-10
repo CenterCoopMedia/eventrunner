@@ -95,14 +95,22 @@ describe('ProfilePhotoField', () => {
     expect(label).toHaveClass('file-input-label');
   });
 
-  it('uploads to the signed-in user’s own prefix and reports the path, after the crop', async () => {
+  it('uploads to a fresh object under the signed-in user’s prefix and reports that path', async () => {
     const onChange = vi.fn();
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
     await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
 
     await waitFor(() => expect(onChange).toHaveBeenCalled());
-    expect(uploadBytes.mock.calls[0][0]).toEqual({ path: 'profile-photos/attendee-1/photo.png' });
-    expect(onChange).toHaveBeenCalledWith('profile-photos/attendee-1/photo.png');
+    const first = uploadBytes.mock.calls[0][0].path;
+    expect(first).toMatch(/^profile-photos\/attendee-1\/[0-9a-f-]{36}\/photo\.png$/);
+    expect(first).not.toBe('profile-photos/attendee-1/photo.png');
+    expect(onChange).toHaveBeenCalledWith(first);
+
+    await chooseAndApplyCrop(new File(['y'], 'me.png', { type: 'image/png' }), /your profile photo/);
+    await waitFor(() => expect(uploadBytes).toHaveBeenCalledTimes(2));
+    const second = uploadBytes.mock.calls[1][0].path;
+    expect(second).toMatch(/^profile-photos\/attendee-1\/[0-9a-f-]{36}\/photo\.png$/);
+    expect(second).not.toBe(first);
   });
 
   it('refuses a type the rules refuse, without uploading', async () => {

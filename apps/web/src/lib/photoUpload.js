@@ -31,9 +31,10 @@ function storageClient() {
 
 /**
  * Upload an attendee's own photo directly to their owner-bound prefix.
- * The filename is fixed per content type rather than taken from the file, so
- * a person replacing their photo overwrites one object instead of
- * accumulating every avatar they have ever picked.
+ * Each choice gets a new object id. The saved profile still points at the
+ * previous object, and that object stays the public photo until the save
+ * writes the new path. A fixed name would replace the public photo while
+ * the form is still open.
  *
  * @param {{ uid: string, file: File }} args
  * @returns {Promise<{ path: string }>}
@@ -46,7 +47,8 @@ export async function uploadProfilePhoto({ uid, file }) {
   });
   if (problem) throw new Error(problem);
   const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  const path = `profile-photos/${uid}/photo.${extension}`;
+  const id = globalThis.crypto.randomUUID();
+  const path = `profile-photos/${uid}/${id}/photo.${extension}`;
   await uploadBytes(ref(storageClient(), path), file, { contentType: file.type });
   return { path };
 }
