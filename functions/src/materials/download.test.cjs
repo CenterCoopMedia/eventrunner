@@ -63,6 +63,9 @@ function fakeRes() {
     end() {
       this.ended = true;
     },
+    removeHeader(name) {
+      delete headers[name];
+    },
     status(code) {
       this.statusCode = code;
       return this;
@@ -128,7 +131,7 @@ test('streamMaterialFile: sets Content-Type from Storage metadata and a Content-
   assert.equal(served, true);
   assert.equal(res.headers['Content-Type'], 'application/pdf');
   assert.equal(res.headers['Content-Disposition'], 'attachment; filename="Opening slides.pdf"');
-  assert.equal(res.headers['Content-Length'], undefined);
+  assert.equal(res.headers['Content-Length'], '10');
 });
 
 test('streamMaterialFile: emits a valid Unicode download header and preserves the Storage MIME type', async () => {
@@ -173,7 +176,7 @@ test('streamMaterialFile: streams a file at the exact cap', async () => {
     filename: 'largest.pdf',
   });
   assert.equal(served, true);
-  assert.equal(res.headers['Content-Length'], undefined);
+  assert.equal(res.headers['Content-Length'], String(MAX_MATERIAL_FILE_BYTES));
   assert.equal(state.streams, 1);
 });
 
@@ -208,6 +211,60 @@ test('streamMaterialFile: an error before the first byte ends a complete 500 res
   assert.equal(res.headers['Content-Length'], undefined);
   assert.equal(res.ended, true);
   assert.equal(logged, 1);
+});
+
+test('streamMaterialFile: does not declare Content-Length for a gzip-stored object', async () => {
+  const file = fakeFile({ contentType: 'application/pdf' });
+  const metadata = file.getMetadata.bind(file);
+  file.getMetadata = async () => {
+    const [data] = await metadata();
+    return [{ ...data, contentEncoding: 'gzip' }];
+  };
+  const res = fakeRes();
+  const served = await streamMaterialFile({ file, res, filename: 'slides.pdf' });
+  assert.equal(served, true);
+  assert.equal(res.headers['Content-Length'], undefined);
+  assert.equal(res.headers['Content-Type'], 'application/pdf');
+});
+
+test('streamMaterialFile: a failure after the first byte destroys the response instead of ending it', async () => {
+  const file = {
+    async exists() {
+      return [true];
+    },
+    async getMetadata() {
+      return [{ contentType: 'application/pdf', size: 10 }];
+    },
+    createReadStream() {
+      const stream = new EventEmitter();
+      stream.pipe = (dest) => {
+        queueMicrotask(() => {
+          dest.write?.('partial');
+          dest.headersSent = true;
+          stream.emit('error', new Error('Storage read failed'));
+        });
+        return dest;
+      };
+      return stream;
+    },
+  };
+  const res = fakeRes();
+  let destroyed = null;
+  res.destroy = (err) => {
+    destroyed = err;
+  };
+
+  const served = await streamMaterialFile({
+    file,
+    res,
+    filename: 'slides.pdf',
+    log: { error() {} },
+  });
+
+  assert.equal(served, true);
+  assert.equal(res.headers['Content-Length'], '10');
+  assert.equal(res.ended, false);
+  assert.equal(destroyed?.message, 'Storage read failed');
 });
 
 test('downloadSessionMaterial: refuses a legacy file over the cap before its stream opens', async () => {

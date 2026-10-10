@@ -87,27 +87,41 @@ async function streamMaterialFile({ file, res, filename, log = console }) {
   if (!exists) return false;
 
   const [metadata] = await file.getMetadata();
-  requireAllowedMaterialFileSize(metadata?.size);
+  const size = requireAllowedMaterialFileSize(metadata?.size);
   const contentType = typeof metadata?.contentType === 'string' && metadata.contentType
     ? metadata.contentType
     : 'application/octet-stream';
+  // createReadStream() gunzips a gzip-stored object. metadata.size is then the
+  // compressed size, not the bytes that leave this response. State a length
+  // only when the stored encoding is identity, so the header matches the file.
+  const storedEncoding = typeof metadata?.contentEncoding === 'string'
+    ? metadata.contentEncoding.trim().toLowerCase()
+    : '';
+  const lengthMatchesStream = storedEncoding === '' || storedEncoding === 'identity';
 
   // Express delegates to content-disposition, which emits an ASCII fallback
   // plus RFC 5987 filename* for Unicode. Set the authoritative Storage MIME
   // type afterwards because attachment() first guesses from the extension.
   res.attachment(sanitizeForHeader(filename));
   res.set('Content-Type', contentType);
+  if (lengthMatchesStream) res.set('Content-Length', String(size));
   res.set('Cache-Control', 'private, max-age=0, no-store');
 
   await new Promise((resolve, reject) => {
     const stream = file.createReadStream();
     stream.on('error', (err) => {
       log.error('downloadSessionMaterial: Storage read stream failed', err);
-      // Headers may already be flushed once bytes started flowing — end
-      // the response either way rather than trying to send a second
-      // status/body onto a stream already in progress.
-      if (!res.headersSent) res.status(500);
-      res.end();
+      stream.unpipe?.(res);
+      stream.destroy?.();
+      if (!res.headersSent) {
+        // No file byte has left. A complete 500 must not carry the file length.
+        res.removeHeader('Content-Length');
+        res.status(500);
+        res.end();
+      } else {
+        // An ended response is a whole file. Destroy it so the client rejects.
+        res.destroy(err);
+      }
       reject(err);
     });
     stream.on('end', resolve);
