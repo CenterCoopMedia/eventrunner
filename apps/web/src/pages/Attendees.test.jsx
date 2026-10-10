@@ -26,7 +26,7 @@ vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({ getPage: () => null, getSectionBlocks: () => [] }),
 }));
 
-const { default: Attendees } = await import('./Attendees.jsx');
+const { default: Attendees, visibleDirectorySnapshot } = await import('./Attendees.jsx');
 
 function renderPage() {
   return render(
@@ -211,6 +211,66 @@ describe('Attendees', () => {
     renderPage();
 
     expect(screen.getByText('2 selected')).toBeInTheDocument();
+  });
+
+  it('drops the full directory when attendee access is removed', () => {
+    const view = renderPage();
+    pushProfiles([
+      { id: 'u1', displayName: 'Private Person' },
+      { id: 'u2', displayName: 'Public Person' },
+    ]);
+    expect(screen.getByText('Private Person')).toBeInTheDocument();
+
+    const previousOnNext = subscribeDirectoryMock.mock.calls.at(-1)[1];
+    profileValue = { status: 'ready', attendeeAccess: false, profile: null, needsProfileSetup: false };
+    view.rerender(
+      <MemoryRouter>
+        <Attendees />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('Private Person')).toBeNull();
+    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' })).toBeInTheDocument();
+    expect(subscribeDirectoryMock.mock.calls.at(-1)[0]).toEqual({ includeAttendeesOnly: false });
+
+    act(() => previousOnNext([{ id: 'u1', displayName: 'Private Person' }]));
+    expect(screen.queryByText('Private Person')).toBeNull();
+
+    pushProfiles([{ id: 'u2', displayName: 'Public Person' }]);
+    expect(screen.getByText('Public Person')).toBeInTheDocument();
+    expect(screen.queryByText('Private Person')).toBeNull();
+  });
+
+  it('hides a stored directory when the access key changes before the effect', () => {
+    const stored = {
+      key: 'full',
+      profiles: [{ id: 'u1', displayName: 'Private Person' }],
+      failed: false,
+    };
+    expect(visibleDirectorySnapshot(stored, 'public')).toEqual({ profiles: null, failed: false });
+    expect(visibleDirectorySnapshot(stored, 'closed')).toEqual({ profiles: null, failed: false });
+    expect(visibleDirectorySnapshot(stored, 'full').profiles).toEqual(stored.profiles);
+    expect(visibleDirectorySnapshot(
+      { key: 'public', profiles: null, failed: true },
+      'public',
+    )).toEqual({ profiles: null, failed: true });
+  });
+
+  it('drops the full directory when a viewer with public profiles signs out', () => {
+    features.publicAttendeeProfiles = true;
+    const view = renderPage();
+    pushProfiles([{ id: 'u1', displayName: 'Private Person' }]);
+
+    profileValue = { status: 'signed-out', attendeeAccess: false, profile: null, needsProfileSetup: false };
+    view.rerender(
+      <MemoryRouter>
+        <Attendees />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('Private Person')).toBeNull();
+    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' })).toBeInTheDocument();
+    expect(subscribeDirectoryMock.mock.calls.at(-1)[0]).toEqual({ includeAttendeesOnly: false });
   });
 
   it('says the directory is unavailable when the listener fails, rather than showing it empty', () => {

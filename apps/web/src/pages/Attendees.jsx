@@ -9,7 +9,8 @@
 // approved/speaker/admin. This page asks for the narrower query when it
 // believes it lacks that access, because a Firestore list fails outright if
 // any returned document is unreadable — guessing wrong costs a query, never
-// a leak.
+// a leak. The page also drops the list it already rendered when access or
+// sign-in changes, before the next snapshot arrives.
 //
 // AN INDEX, NOT A DIRECTORY OF PROFILES (design brief §5.1; this review).
 //
@@ -98,6 +99,12 @@ export function groupByLetter(sorted) {
   return groups;
 }
 
+/** The render may run before the effect. A snapshot from another query is hidden. */
+export function visibleDirectorySnapshot(snapshot, directoryKey) {
+  if (snapshot.key !== directoryKey) return { profiles: null, failed: false };
+  return { profiles: snapshot.profiles, failed: snapshot.failed };
+}
+
 const homeLink = (
   <Link to="/" className={primaryActionClass}>
     Go to the home page
@@ -107,8 +114,7 @@ const homeLink = (
 export default function Attendees() {
   const { features, badges: badgesConfig } = useEventConfig();
   const { status, attendeeAccess } = useProfile();
-  const [profiles, setProfiles] = useState(null);
-  const [failed, setFailed] = useState(false);
+  const [snapshot, setSnapshot] = useState({ key: null, profiles: null, failed: false });
 
   const directoryEnabled = features.attendeeDirectory;
   const includeAttendeesOnly = attendeeAccess;
@@ -117,19 +123,36 @@ export default function Attendees() {
   // rather than running a query whose result is known to be empty.
   const signedOutWithNothingToSee =
     !IS_DEMO && status === 'signed-out' && !features.publicAttendeeProfiles;
+  const directoryKey = !directoryEnabled || signedOutWithNothingToSee
+    ? 'closed'
+    : includeAttendeesOnly
+      ? 'full'
+      : 'public';
+  // A passive effect runs after paint. Match the snapshot to this render's
+  // query so the downgrade itself cannot show the previous full directory.
+  const visible = visibleDirectorySnapshot(snapshot, directoryKey);
+  const profiles = visible.profiles;
+  const failed = visible.failed;
 
   useEffect(() => {
-    if (!directoryEnabled || signedOutWithNothingToSee) return undefined;
-    setFailed(false);
-    return subscribeDirectory(
+    if (directoryKey === 'closed') return undefined;
+    let current = true;
+    const unsubscribe = subscribeDirectory(
       { includeAttendeesOnly },
       (docs) => {
-        setProfiles(docs);
-        setFailed(false);
+        if (!current) return;
+        setSnapshot({ key: directoryKey, profiles: docs, failed: false });
       },
-      () => setFailed(true),
+      () => {
+        if (!current) return;
+        setSnapshot({ key: directoryKey, profiles: null, failed: true });
+      },
     );
-  }, [directoryEnabled, includeAttendeesOnly, signedOutWithNothingToSee]);
+    return () => {
+      current = false;
+      unsubscribe();
+    };
+  }, [directoryKey, includeAttendeesOnly]);
 
   const sorted = useMemo(
     () =>
