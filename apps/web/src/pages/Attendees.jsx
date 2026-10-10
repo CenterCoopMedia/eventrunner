@@ -99,6 +99,12 @@ export function groupByLetter(sorted) {
   return groups;
 }
 
+/** The render may run before the effect. A snapshot from another query is hidden. */
+export function visibleDirectorySnapshot(snapshot, directoryKey) {
+  if (snapshot.key !== directoryKey) return { profiles: null, failed: false };
+  return { profiles: snapshot.profiles, failed: snapshot.failed };
+}
+
 const homeLink = (
   <Link to="/" className={primaryActionClass}>
     Go to the home page
@@ -108,8 +114,7 @@ const homeLink = (
 export default function Attendees() {
   const { features, badges: badgesConfig } = useEventConfig();
   const { status, attendeeAccess } = useProfile();
-  const [profiles, setProfiles] = useState(null);
-  const [failed, setFailed] = useState(false);
+  const [snapshot, setSnapshot] = useState({ key: null, profiles: null, failed: false });
 
   const directoryEnabled = features.attendeeDirectory;
   const includeAttendeesOnly = attendeeAccess;
@@ -118,35 +123,36 @@ export default function Attendees() {
   // rather than running a query whose result is known to be empty.
   const signedOutWithNothingToSee =
     !IS_DEMO && status === 'signed-out' && !features.publicAttendeeProfiles;
+  const directoryKey = !directoryEnabled || signedOutWithNothingToSee
+    ? 'closed'
+    : includeAttendeesOnly
+      ? 'full'
+      : 'public';
+  // A passive effect runs after paint. Match the snapshot to this render's
+  // query so the downgrade itself cannot show the previous full directory.
+  const visible = visibleDirectorySnapshot(snapshot, directoryKey);
+  const profiles = visible.profiles;
+  const failed = visible.failed;
 
   useEffect(() => {
-    if (!directoryEnabled || signedOutWithNothingToSee) {
-      setProfiles(null);
-      return undefined;
-    }
-    // Drop the previous query's profiles before the next snapshot. A
-    // callback after unsubscribe is ignored, so the old full directory
-    // cannot paint again after access or sign-in changes.
+    if (directoryKey === 'closed') return undefined;
     let current = true;
-    setProfiles(null);
-    setFailed(false);
     const unsubscribe = subscribeDirectory(
       { includeAttendeesOnly },
       (docs) => {
         if (!current) return;
-        setProfiles(docs);
-        setFailed(false);
+        setSnapshot({ key: directoryKey, profiles: docs, failed: false });
       },
       () => {
         if (!current) return;
-        setFailed(true);
+        setSnapshot({ key: directoryKey, profiles: null, failed: true });
       },
     );
     return () => {
       current = false;
       unsubscribe();
     };
-  }, [directoryEnabled, includeAttendeesOnly, signedOutWithNothingToSee]);
+  }, [directoryKey, includeAttendeesOnly]);
 
   const sorted = useMemo(
     () =>
