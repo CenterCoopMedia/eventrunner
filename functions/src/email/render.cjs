@@ -207,6 +207,19 @@ function referencedTokens(body) {
 }
 
 /**
+ * Token names that substitution will replace. A conditional guard is not
+ * one of these: `{{#if code}}{{/if}}` names `code` but never inserts it.
+ * @param {string} body
+ */
+function substitutedTokens(body) {
+  const names = new Set();
+  for (const match of String(body).matchAll(TOKEN_RE)) {
+    names.add(match[1].toLowerCase());
+  }
+  return names;
+}
+
+/**
  * The two token checks (spec §6.1), run at render time against the
  * effective bodies and at save time by saveEmailTemplate.
  *
@@ -244,12 +257,14 @@ function validateTemplateBody(template, candidate) {
     }
   }
 
-  // Required tokens must be referenced in every body that is sent — a
-  // required token present in html but missing from text still produces a
-  // useless mail for plain-text readers.
+  // Required tokens must be substituted in every body that is sent. A
+  // conditional guard does not count: an empty `{{#if code}}{{/if}}` names
+  // the token and still sends a mail without it. A required token present
+  // in html but missing from text still produces a useless mail for
+  // plain-text readers.
   for (const required of template.requiredTokens) {
     for (const field of ['html', 'text']) {
-      if (!referencedTokens(candidate[field] || '').has(required.toLowerCase())) {
+      if (!substitutedTokens(candidate[field] || '').has(required.toLowerCase())) {
         errors.push(`${field}: missing required token {{${required}}}`);
       }
     }

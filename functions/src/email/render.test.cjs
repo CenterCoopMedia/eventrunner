@@ -220,6 +220,26 @@ test('validateTemplateBody accepts a well-formed {{#if}}/{{/if}} pair and treats
   assert.equal(check.ok, true);
 });
 
+test('validateTemplateBody does not accept an empty conditional as a required token', () => {
+  const check = validateTemplateBody(TEMPLATE, {
+    subject: 'Your code',
+    html: '{{#if code}}{{/if}}',
+    text: '{{#if code}}{{/if}}',
+  });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((e) => e === 'html: missing required token {{code}}'));
+  assert.ok(check.errors.some((e) => e === 'text: missing required token {{code}}'));
+});
+
+test('validateTemplateBody accepts a required token substituted inside a conditional', () => {
+  const check = validateTemplateBody(TEMPLATE, {
+    subject: 'Your code',
+    html: '{{#if code}}{{code}}{{/if}}',
+    text: '{{#if code}}{{code}}{{/if}}',
+  });
+  assert.deepEqual(check.errors, []);
+});
+
 test('validateTemplateBody rejects an unbalanced {{#if}}/{{/if}}', () => {
   const check = validateTemplateBody(CONDITIONAL_TEMPLATE, {
     subject: 'ok',
