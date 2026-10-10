@@ -280,8 +280,13 @@ export default function AdminContentBlockEditor({ mode }) {
     if (baseline.nextContent) setContent(baseline.nextContent);
   }, [mode, allowed, content.blockType, pagesLoading, content, fieldId]);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    // Strict mode runs this cleanup once during development, then the setup
+    // again. The flag has to come back, or a later save skips its result.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {

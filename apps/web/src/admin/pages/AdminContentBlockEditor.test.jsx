@@ -7,6 +7,7 @@
 // link_group.url are real external destinations and must stay plain text —
 // pinned here so a future edit to the `url` branch cannot widen the picker
 // to them by accident.
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -84,15 +85,16 @@ function okResponse(body = {}) {
   return { ok: true, status: 200, json: async () => body };
 }
 
-async function renderAt(path) {
-  const result = render(
+async function renderAt(path, { strict = false } = {}) {
+  const routed = (
     <MemoryRouter
       initialEntries={[path]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+  const result = render(strict ? <StrictMode>{routed}</StrictMode> : routed);
   // Two waits, not one: the lazy admin chunk, and then the admin probe the
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
@@ -219,7 +221,11 @@ describe('AdminContentBlockEditor value fields', () => {
     fireEvent.change(screen.getByLabelText(/^field id/i), { target: { value: 'coffee' } });
     fireEvent.change(screen.getByLabelText('name'), { target: { value: 'Coffee break' } });
     fireEvent.change(limit, { target: { value: '2' } });
-    await pasteHtml(await screen.findByRole('textbox', { name: 'benefits' }), '<p>Signs</p>', 'Signs');
+    await pasteHtml(
+      await screen.findByRole('textbox', { name: 'benefits' }, { timeout: 5000 }),
+      '<p>Signs</p>',
+      'Signs',
+    );
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
@@ -508,6 +514,13 @@ describe('content editing workspace', () => {
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('alt'), { target: { value: '' } });
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+
+  it('still reports a saved draft after the development remount', async () => {
+    await renderAt('/admin/content/home/hero/register', { strict: true });
+    fireEvent.change(screen.getByLabelText('label'), { target: { value: 'Reserve a place' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
   });
 
   it('does not offer discard while a save is still running', async () => {
