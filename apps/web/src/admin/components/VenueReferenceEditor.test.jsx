@@ -446,6 +446,60 @@ describe('VenueReferenceEditor places panel', () => {
     expect(renamed.map.markers[0].placeId).toBe('loft');
   });
 
+  // The colliding row is not the only way the id becomes unique. Renaming
+  // or removing the other row must collect the references that waited.
+  function mountCollidingPlaces() {
+    const changes = [];
+    const initial = {
+      places: [
+        { id: 'main-hall', name: 'Main hall', floor: '', persisted: false, idTouched: true },
+        { id: 'stage', name: 'Stage', floor: '', persisted: false, idTouched: true },
+        { id: 'lobby', name: 'Lobby', floor: '', persisted: true },
+      ],
+      movements: [{ from: 'stage', to: 'lobby', walkingMinutes: '2', accessibleRoute: '' }],
+      map: {
+        image: 'cms-images/a/plan.png',
+        alt: 'A floor plan.',
+        markers: [{ placeId: 'stage', x: '10', y: '20' }],
+      },
+    };
+    function RecordingHarness() {
+      const [venue, setVenue] = useState(initial);
+      return (
+        <VenueReferenceEditor
+          venue={venue}
+          onChange={(patch) => {
+            changes.push(patch);
+            setVenue((current) => ({ ...current, ...patch }));
+          }}
+          errorFor={() => undefined}
+          placeUsage={new Map()}
+        />
+      );
+    }
+    render(<RecordingHarness />);
+    fireEvent.change(screen.getByLabelText('Place 2 id'), { target: { value: 'main-hall' } });
+    return changes;
+  }
+
+  it('collects held references when the other row leaves that id', () => {
+    const changes = mountCollidingPlaces();
+    fireEvent.change(screen.getByLabelText('Place 1 id'), { target: { value: 'atrium' } });
+    const released = changes[changes.length - 1];
+    expect(released.movements[0].from).toBe('main-hall');
+    expect(released.movements[0].to).toBe('lobby');
+    expect(released.map.markers[0].placeId).toBe('main-hall');
+  });
+
+  it('collects held references when the other row is removed', () => {
+    const changes = mountCollidingPlaces();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Main hall' }));
+    const released = changes[changes.length - 1];
+    expect(released.movements[0].from).toBe('main-hall');
+    expect(released.movements[0].to).toBe('lobby');
+    expect(released.map.markers[0].placeId).toBe('main-hall');
+  });
+
   it('never changes a saved place’s id when it is renamed', () => {
     render(
       <EditorHarness
