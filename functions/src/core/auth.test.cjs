@@ -24,9 +24,10 @@ function reqWithAuth(value) {
  * Fake Firebase Auth: resolves tokens present in the map, rejects (like the
  * Admin SDK on an expired/garbage token) for everything else.
  */
-function fakeAuth(tokens) {
+function fakeAuth(tokens, { revoked = new Set() } = {}) {
   return {
-    async verifyIdToken(t) {
+    async verifyIdToken(t, checkRevoked = false) {
+      if (checkRevoked && revoked.has(t)) throw new Error('auth/id-token-revoked');
       if (t in tokens) return tokens[t];
       throw new Error('auth/argument-error');
     },
@@ -67,9 +68,22 @@ test('extractBearerToken prefers Express req.get when present', () => {
 });
 
 test('verifyAuthToken returns the decoded token for a valid Bearer header', async () => {
-  const auth = fakeAuth({ good: ADMIN_TOKEN });
+  let sawRevocationCheck = false;
+  const auth = {
+    async verifyIdToken(token, checkRevoked) {
+      sawRevocationCheck = checkRevoked === true;
+      if (token === 'good') return ADMIN_TOKEN;
+      throw new Error('auth/argument-error');
+    },
+  };
   const decoded = await verifyAuthToken({ auth }, reqWithAuth('Bearer good'));
   assert.equal(decoded.uid, 'u1');
+  assert.equal(sawRevocationCheck, true);
+});
+
+test('verifyAuthToken rejects a revoked token from a deleted account', async () => {
+  const auth = fakeAuth({ gone: ADMIN_TOKEN }, { revoked: new Set(['gone']) });
+  assert.equal(await verifyAuthToken({ auth }, reqWithAuth('Bearer gone')), null);
 });
 
 test('verifyAuthToken returns null (never throws) on missing or bad tokens', async () => {

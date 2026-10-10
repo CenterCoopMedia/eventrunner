@@ -683,7 +683,14 @@ describe("the private bookmarks subcollection under users/{uid}", () => {
 describe("the private session notes under users/{uid}/sessionNotes", () => {
   const noteRef = (uid, sessionId) => doc(nonAdmin(), `users/${uid}/sessionNotes/${sessionId}`);
 
+  async function seedAccount(uid) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `users/${uid}`), { registrationStatus: "approved" });
+    });
+  }
+
   it("allows the owner to create, read, and rewrite their own note", async () => {
+    await seedAccount("attendee-1");
     await assertSucceeds(setDoc(noteRef("attendee-1", "session-1"), { text: "Ask about funding" }));
     await assertSucceeds(getDoc(noteRef("attendee-1", "session-1")));
     await assertSucceeds(
@@ -692,6 +699,7 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
   });
 
   it("allows the owner to clear a note by deleting the document", async () => {
+    await seedAccount("attendee-1");
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), "users/attendee-1/sessionNotes/session-1"), {
         text: "temporary",
@@ -721,7 +729,22 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
     await assertFails(getDoc(doc(admin(), "users/attendee-1/sessionNotes/session-1")));
   });
 
+  it("denies a deleted account whose ID token still names the path", async () => {
+    const uid = "gone-1";
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `users/${uid}`), { registrationStatus: "approved" });
+      await setDoc(doc(db, `users/${uid}/sessionNotes/session-9`), { text: "kept" });
+      await deleteDoc(doc(db, `users/${uid}`));
+    });
+    const note = doc(attendee(uid), `users/${uid}/sessionNotes/session-9`);
+    await assertFails(getDoc(note));
+    await assertFails(setDoc(note, { text: "back" }));
+    await assertFails(deleteDoc(note));
+  });
+
   it("refuses a note that is not text, or text past the cap", async () => {
+    await seedAccount("attendee-1");
     await assertFails(setDoc(noteRef("attendee-1", "session-2"), { body: "nope" }));
     await assertFails(setDoc(noteRef("attendee-1", "session-2"), { text: 42 }));
     await assertFails(
@@ -733,6 +756,7 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
   });
 
   it("refuses a note that smuggles extra fields", async () => {
+    await seedAccount("attendee-1");
     await assertFails(
       setDoc(noteRef("attendee-1", "session-3"), {
         text: "fine",
