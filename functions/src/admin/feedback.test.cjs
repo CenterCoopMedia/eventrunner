@@ -176,6 +176,18 @@ test('rejects an invalid email with 400', async () => {
   assert.equal(db.store.size, 0);
 });
 
+test('accepts a local part the browser email field allows', async () => {
+  for (const email of ["o'connor@example.org", 'user!tag@example.org']) {
+    const db = fakeDb();
+    const handler = createSubmitFeedbackHandler({ db, now: () => NOW });
+    const res = fakeRes();
+    await handler(fakeReq({ body: realBody({ email }) }), res);
+    assert.equal(res.statusCode, 201, email);
+    const [, row] = [...db.store.entries()].find(([key]) => key.startsWith('feedback/'));
+    assert.equal(row.email, email, email);
+  }
+});
+
 test('rejects an email that would add a mailto header or a second recipient', async () => {
   for (const email of [
     'ada@example.org?bcc=other@example.org',

@@ -24,18 +24,23 @@ function pushRows(rows) {
 }
 
 describe('AdminFeedback', () => {
-  it('encodes the address in the mailto link', () => {
+  it('encodes reserved characters in a mailto link and keeps the @', () => {
     render(<AdminFeedback />);
-    pushRows([{
-      id: 'f1',
-      message: 'Hi',
-      status: 'new',
-      email: 'ada@example.org?bcc=other@example.org',
-      createdAt: new Date('2026-08-01T00:00:00Z'),
-    }]);
+    pushRows([
+      { id: 'f1', message: 'Plain', status: 'new', email: 'ada@example.org', createdAt: new Date('2026-08-01T00:00:00Z') },
+      { id: 'f2', message: 'Name', status: 'new', email: "o'connor@example.org", createdAt: new Date('2026-08-02T00:00:00Z') },
+      { id: 'f3', message: 'Local', status: 'new', email: 'ada?bcc=other@example.org', createdAt: new Date('2026-08-03T00:00:00Z') },
+      { id: 'f4', message: 'Domain', status: 'new', email: 'ada@example.org?bcc=other@example.org', createdAt: new Date('2026-08-04T00:00:00Z') },
+    ]);
+    expect(screen.getByRole('link', { name: 'ada@example.org' })).toHaveAttribute('href', 'mailto:ada@example.org');
+    expect(screen.getByRole('link', { name: "o'connor@example.org" })).toHaveAttribute('href', "mailto:o'connor@example.org");
+    expect(screen.getByRole('link', { name: 'ada?bcc=other@example.org' })).toHaveAttribute(
+      'href',
+      'mailto:ada%3Fbcc%3Dother@example.org',
+    );
     expect(screen.getByRole('link', { name: 'ada@example.org?bcc=other@example.org' })).toHaveAttribute(
       'href',
-      'mailto:ada%40example.org%3Fbcc%3Dother%40example.org',
+      'mailto:ada@example.org%3Fbcc%3Dother%40example.org',
     );
   });
 

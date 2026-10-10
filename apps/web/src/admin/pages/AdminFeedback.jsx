@@ -41,6 +41,14 @@ const STATUS_FILTERS = [
   ...STATUS_OPTIONS,
 ];
 
+/** A mailto recipient keeps its one @. Each side is encoded so a ? or & cannot add a header. */
+function feedbackMailtoHref(email) {
+  const value = String(email);
+  const at = value.indexOf('@');
+  if (at <= 0 || at === value.length - 1) return `mailto:${encodeURIComponent(value)}`;
+  return `mailto:${encodeURIComponent(value.slice(0, at))}@${encodeURIComponent(value.slice(at + 1))}`;
+}
+
 function toDate(value) {
   if (!value) return null;
   if (typeof value.toDate === 'function') return value.toDate();
@@ -178,7 +186,7 @@ export default function AdminFeedback() {
                       {row.message}
                     </p>
                     {row.email ? (
-                      <a href={`mailto:${encodeURIComponent(row.email)}`} className={`mt-3xs ${linkButtonClass}`}>
+                      <a href={feedbackMailtoHref(row.email)} className={`mt-3xs ${linkButtonClass}`}>
                         {row.email}
                       </a>
                     ) : null}
