@@ -400,6 +400,52 @@ describe('VenueReferenceEditor places panel', () => {
     expect(screen.getByLabelText('Movement 1 from')).toHaveValue('loft');
   });
 
+  // A new id that another place already has is not a rename of this place.
+  // The select cannot show an id that left the place list, so the test reads
+  // the change itself. A later unique id still collects those references.
+  it('does not retarget references onto an id another place already has', () => {
+    const changes = [];
+    const initial = {
+      places: [
+        { id: 'main-hall', name: 'Main hall', floor: '', persisted: true },
+        { id: 'stage', name: 'Stage', floor: '', persisted: false, idTouched: true },
+      ],
+      movements: [{ from: 'stage', to: 'main-hall', walkingMinutes: '2', accessibleRoute: '' }],
+      map: {
+        image: 'cms-images/a/plan.png',
+        alt: 'A floor plan.',
+        markers: [{ placeId: 'stage', x: '10', y: '20' }],
+      },
+    };
+    function RecordingHarness() {
+      const [venue, setVenue] = useState(initial);
+      return (
+        <VenueReferenceEditor
+          venue={venue}
+          onChange={(patch) => {
+            changes.push(patch);
+            setVenue((current) => ({ ...current, ...patch }));
+          }}
+          errorFor={() => undefined}
+          placeUsage={new Map()}
+        />
+      );
+    }
+    render(<RecordingHarness />);
+
+    fireEvent.change(screen.getByLabelText('Place 2 id'), { target: { value: 'main-hall' } });
+    const collided = changes[changes.length - 1];
+    expect(collided.places[1]).toMatchObject({ id: 'main-hall', refId: 'stage' });
+    expect(collided.movements).toBeUndefined();
+    expect(collided.map).toBeUndefined();
+
+    fireEvent.change(screen.getByLabelText('Place 2 id'), { target: { value: 'loft' } });
+    const renamed = changes[changes.length - 1];
+    expect(renamed.movements[0].from).toBe('loft');
+    expect(renamed.movements[0].to).toBe('main-hall');
+    expect(renamed.map.markers[0].placeId).toBe('loft');
+  });
+
   it('never changes a saved place’s id when it is renamed', () => {
     render(
       <EditorHarness

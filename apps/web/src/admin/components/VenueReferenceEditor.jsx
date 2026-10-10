@@ -298,15 +298,20 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
    * id as it stands. Clearing a name or an id before typing its replacement
    * empties the id for a moment; the references wait on the old id and move
    * when the next one arrives. Nothing moves from an id another row also
-   * carries, because then there is no one place the references mean.
+   * carries, and nothing moves onto an id another row already carries.
+   * Either way there is no one place the references mean. A colliding id
+   * does not become `refId`, so a later unique id can still collect them.
    */
   const changePlace = (index, patch) => {
     const place = places[index];
     const nextId = patch.id;
     const idChanges = !place.persisted && typeof nextId === 'string' && nextId !== place.id;
     const refId = place.refId || place.id;
+    const sameIdAs = (id) => places.some(
+      (other, otherIndex) => otherIndex !== index && other.id === id,
+    );
     const next = { ...place, ...patch };
-    if (idChanges) next.refId = nextId || refId;
+    if (idChanges) next.refId = sameIdAs(nextId) ? refId : (nextId || refId);
     const change = {
       places: places.map((entry, placeIndex) => (placeIndex === index ? next : entry)),
     };
@@ -314,7 +319,8 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
       && refId
       && nextId
       && nextId !== refId
-      && !places.some((other, otherIndex) => otherIndex !== index && other.id === refId);
+      && !sameIdAs(refId)
+      && !sameIdAs(nextId);
     if (idMoves) {
       const follow = (id) => (id === refId ? nextId : id);
       if (movements.some((movement) => movement.from === refId || movement.to === refId)) {
