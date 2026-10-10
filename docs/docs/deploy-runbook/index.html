@@ -600,8 +600,9 @@
           before looking for a real fault. The one cost the CDN does not absorb is scanner traffic:
           requests for addresses that do not exist (<code>/wp-login.php</code> and its friends) each miss the cache
           and reach the function, where they cost one Firestore page lookup and return the plain shell.
-          That is a line on the functions invocation graph, not an incident; if a client&#39;s graph is
-          dominated by it, the answer is a Cloud Functions max-instances limit, not a rewrite change.</li>
+          That is a line on the functions invocation graph. <code>routeMeta</code> sets <code>maxInstances</code> to 20
+          so that traffic stays bounded. The rewrite stays, because this function is the front door.
+          App Check stays off this function. A crawler and a first visit have no App Check token.</li>
           <li><strong>The card image a deployment falls back to is a PNG, not the SVG placeholder.</strong> The Open Graph
           and Twitter crawlers fetch the image themselves and do not reliably decode SVG, so a card built
           on <code>branding/og-default.svg</code> unfurls with an empty frame, which a reader takes for a broken link
