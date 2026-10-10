@@ -30,10 +30,20 @@ const APP_HOST = appUrl.hostname;
 const APP_PORT = appUrl.port || (appUrl.protocol === 'https:' ? '443' : '80');
 // new URL('http://127.0.0.1;id') keeps the semicolon in the hostname. The
 // webServer command is a shell string, so that value would run as a second
-// command. Only a loopback host and a numeric port are accepted, and both
-// are quoted before they reach the shell.
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-if (!LOOPBACK_HOSTS.has(APP_HOST)) {
+// command. The whole 127.0.0.0/8 range is loopback, as are localhost and ::1.
+// The port must be numeric. Quotes match the shell Playwright uses: cmd.exe
+// on Windows, and a POSIX shell elsewhere.
+function isIpv4Loopback(hostname) {
+  const parts = hostname.split('.');
+  if (parts.length !== 4 || parts[0] !== '127') return false;
+  return parts.every((part) => /^(0|[1-9]\d{0,2})$/.test(part) && Number(part) <= 255);
+}
+
+function isLoopbackHost(hostname) {
+  return hostname === 'localhost' || hostname === '::1' || hostname === '[::1]' || isIpv4Loopback(hostname);
+}
+
+if (!isLoopbackHost(APP_HOST)) {
   throw new Error(`E2E_APP_URL host must be a loopback address. Received "${APP_HOST}".`);
 }
 if (!/^[1-9]\d{0,4}$/.test(APP_PORT) || Number(APP_PORT) > 65535) {
@@ -41,7 +51,9 @@ if (!/^[1-9]\d{0,4}$/.test(APP_PORT) || Number(APP_PORT) > 65535) {
 }
 
 function shellQuote(value) {
-  return `'${String(value).replaceAll("'", "'\\''")}'`;
+  const text = String(value);
+  if (process.platform === 'win32') return `"${text.replaceAll('"', '""')}"`;
+  return `'${text.replaceAll("'", "'\\''")}'`;
 }
 
 export default defineConfig({
