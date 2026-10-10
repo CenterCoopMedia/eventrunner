@@ -195,11 +195,6 @@ function publishRow(doc) {
   };
 }
 
-async function countedDocs(source) {
-  const counted = await source.count().get();
-  return counted.data().count;
-}
-
 function boundedRows(items, total) {
   return {
     items,
@@ -208,17 +203,34 @@ function boundedRows(items, total) {
   };
 }
 
+/** Count and page share one snapshot, so a write between them cannot disagree. */
+async function readCountedPage(db, source, page) {
+  return db.runTransaction(async (tx) => {
+    const counted = await tx.get(source.count());
+    const snapshot = await tx.get(page);
+    return { total: counted.data().count, docs: snapshot.docs };
+  });
+}
+
 async function readPublishQueue({ db }) {
   const source = db.collection('cmsPublishQueue');
-  const total = await countedDocs(source);
-  const snapshot = await source.orderBy('requestedAt', 'desc').limit(PUBLISH_QUEUE_LIMIT).get();
-  return { rows: boundedRows(snapshot.docs.map(publishRow), total) };
+  const page = await readCountedPage(
+    db,
+    source,
+    source.orderBy('requestedAt', 'desc').limit(PUBLISH_QUEUE_LIMIT),
+  );
+  return { rows: boundedRows(page.docs.map(publishRow), page.total) };
 }
 
 async function readSystemErrors({ db }) {
   const source = db.collection('system_errors').where('resolved', '==', false);
-  const total = await countedDocs(source);
-  const snapshot = await source.orderBy('createdAt', 'desc').limit(SYSTEM_ERROR_LIMIT).get();
+  const page = await readCountedPage(
+    db,
+    source,
+    source.orderBy('createdAt', 'desc').limit(SYSTEM_ERROR_LIMIT),
+  );
+  const snapshot = { docs: page.docs };
+  const total = page.total;
   const rows = snapshot.docs
     .map((doc) => {
       const data = doc.data() || {};
@@ -234,17 +246,20 @@ async function readSystemErrors({ db }) {
 
 async function readMediaUsage({ db }) {
   const source = db.collection('media_assets');
-  const total = await countedDocs(source);
-  const snapshot = await source.limit(MEDIA_ASSET_LIMIT).get();
-  const assets = snapshot.docs
+  const page = await readCountedPage(db, source, source.limit(MEDIA_ASSET_LIMIT));
+  const assets = page.docs
     .map((doc) => doc.data() || {})
     .filter((asset) => typeof asset.path === 'string' && asset.path.length > 0);
   const paths = [...new Set(assets.map((asset) => asset.path))];
+  const sampleMissingIndexData = page.docs.length - assets.length;
+  const truncated = Math.max(0, page.total - page.docs.length);
   const sample = {
     checked: assets.length,
-    total,
-    truncated: Math.max(0, total - snapshot.docs.length),
-    missingIndexData: snapshot.docs.length - assets.length,
+    total: page.total,
+    truncated,
+    // The page count is global only when the page is the whole collection.
+    missingIndexData: truncated === 0 ? sampleMissingIndexData : null,
+    sampleMissingIndexData,
   };
   let usage;
   try {

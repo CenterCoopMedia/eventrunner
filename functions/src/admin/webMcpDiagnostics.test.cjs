@@ -205,6 +205,19 @@ test('publish, error, and media diagnostics do not download the whole collection
   assert.ok(limits.includes('media_assets:50'));
 });
 
+test('a media page does not claim a global missing-index count', async () => {
+  const rows = {};
+  for (let index = 0; index < 50; index += 1) {
+    rows[`media_assets/asset-${index}`] = { path: `media/asset-${index}.png` };
+  }
+  rows['media_assets/malformed'] = { size: 10 };
+  const media = await internals.readMediaUsage({ db: makeFakeDb(rows) });
+  assert.equal(media.assets.total, 51);
+  assert.equal(media.assets.truncated, 1);
+  assert.equal(media.assets.missingIndexData, null);
+  assert.equal(media.assets.sampleMissingIndexData, 0);
+});
+
 test('a media diagnostic does not call an unfinished usage scan unused', async () => {
   const rows = seed();
   for (let index = 0; index < 101; index += 1) {
@@ -232,6 +245,7 @@ test('media and ticketing diagnostics return counts and health without identifie
     unused: 1,
     references: 1,
     missingIndexData: 1,
+    sampleMissingIndexData: 1,
   });
   assert.equal(ticketing.integration, 'manual');
   assert.equal(ticketing.queue.pending, 1);
