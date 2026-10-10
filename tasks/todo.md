@@ -190,7 +190,7 @@ M11 and M12 specs: workflow run `wf_13b84c3f-590` writes `/home/user/specs/d1.md
 The `AdminSpeakers.test.jsx` failure under load was a real bug (see `4f82523`).
 The demo's initial chunk is at 291,069 of 292,000 gzip bytes after b4.
 `tasks/director/checks.sh` now keeps a failing step's whole output in
-`/tmp/claude-0/checks-<step>-<time>.log`; run it from the top branch's
+a private file from `mktemp`; run it from the top branch's
 worktree, since the main worktree holds the #269 branch.
 
 Filed: #271 (a session material's storage path is not confined to its
