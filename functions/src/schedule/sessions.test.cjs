@@ -601,6 +601,56 @@ test('an unpublished child counts, and its draft revision is what it is judged b
   assert.match(verdict.errors[0], /carries 1 child session \(clinic-b\)/);
 });
 
+test('a draft that changed parent replaces the stale live child', async () => {
+  // The live document still names session-old. The draft names session-new.
+  // Parent checks read the draft, so session-old no longer carries clinic-a
+  // and session-new does.
+  const db = makeFakeDb({
+    'cmsSchedule/session-old': { dayId: 'day-2' },
+    'cmsSchedule/session-new': { dayId: 'day-2' },
+    'cmsSchedule/session-top': { dayId: 'day-2' },
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-old' },
+    'cmsSchedule_drafts/clinic-a': { dayId: 'day-2', parentId: 'session-new' },
+    'cmsSchedule/clinic-b': { dayId: 'day-2', parentId: 'session-old' },
+  });
+
+  const moved = await checkSessionChildren({
+    db,
+    docId: 'session-old',
+    fields: session({ dayId: 'day-3' }),
+  });
+  assert.equal(moved.ok, false);
+  assert.match(moved.errors[0], /1 child session \(clinic-b\)/);
+  assert.equal(moved.errors[0].includes('clinic-a'), false);
+
+  const held = await checkSessionChildren({
+    db,
+    docId: 'session-new',
+    fields: session({ dayId: 'day-3' }),
+  });
+  assert.equal(held.ok, false);
+  assert.match(held.errors[0], /1 child session \(clinic-a\)/);
+
+  const cycle = await checkSessionParent({
+    db,
+    docId: 'session-old',
+    fields: session({ parentId: 'session-top' }),
+  });
+  assert.equal(cycle.ok, false);
+  assert.ok(cycle.errors.some((e) => e.includes('already has child sessions (clinic-b)')));
+  assert.equal(cycle.errors.some((e) => e.includes('clinic-a')), false);
+
+  await db.runTransaction(async (tx) => {
+    const inside = await checkSessionChildren({
+      db,
+      tx,
+      docId: 'session-new',
+      fields: session({ dayId: 'day-3' }),
+    });
+    assert.match(inside.errors[0], /1 child session \(clinic-a\)/);
+  });
+});
+
 test('moving a parent to another line is rejected by the children that state one', async () => {
   const db = makeFakeDb({
     'cmsSchedule/inherits': { dayId: 'day-2', parentId: 'session-parent' },

@@ -71,6 +71,9 @@ const { isValidDocId } = require('../cms/store.cjs');
 const SESSIONS = 'cmsSchedule';
 const SESSIONS_DRAFTS = 'cmsSchedule_drafts';
 
+/** getAll in fixed batches, so a 2000-id publish is not one giant read. */
+const READ_CHUNK = 100;
+
 /** Where the event's track definitions live (shared/config validates them). */
 const CONFIG_COLLECTION = 'config';
 const CONFIG_EVENT_DOC = 'event';
@@ -389,7 +392,8 @@ async function readSession({ db, tx, docId }) {
  * The sessions naming `docId` as their parent, across both revisions, each
  * as the editor sees it: the draft revision when there is one, the live
  * document otherwise (same rule as readSession). A child that exists only
- * as an unpublished draft is a child.
+ * as an unpublished draft is a child. A draft that names a different parent
+ * is not a child of this session, even when the live document still is.
  *
  * @returns {Promise<Array<{ id: string, data: object }>>}
  */
@@ -402,8 +406,25 @@ async function findChildren({ db, tx, docId }) {
   const snaps = await Promise.all(queries.map((q) => (tx ? tx.get(q) : q.get())));
   const byId = new Map();
   for (const snap of snaps) for (const doc of snap.docs) byId.set(doc.id, doc.data());
+
+  // A draft that changed parent is absent from the draft query above, so the
+  // live row would stay attached here. Read those drafts by id and let them
+  // replace the live row. The parentId filter below then drops them.
+  const covered = new Set(snaps[1].docs.map((doc) => doc.id));
+  const uncovered = snaps[0].docs
+    .map((doc) => doc.id)
+    .filter((id) => id !== docId && !covered.has(id));
+  for (let i = 0; i < uncovered.length; i += READ_CHUNK) {
+    const ids = uncovered.slice(i, i + READ_CHUNK);
+    const refs = ids.map((id) => db.collection(SESSIONS_DRAFTS).doc(id));
+    const drafts = tx ? await tx.getAll(...refs) : await db.getAll(...refs);
+    drafts.forEach((draft, index) => {
+      if (draft.exists) byId.set(ids[index], draft.data());
+    });
+  }
+
   return [...byId.entries()]
-    .filter(([id]) => id !== docId)
+    .filter(([id, data]) => id !== docId && data?.parentId === docId)
     .map(([id, data]) => ({ id, data }));
 }
 
@@ -619,8 +640,6 @@ async function checkSessionDeletable({ db, tx = null, docId }) {
   };
 }
 
-/** getAll in fixed batches, so a 2000-id publish is not one giant read. */
-const READ_CHUNK = 100;
 async function getAllChunked(db, refs) {
   const snaps = [];
   for (let i = 0; i < refs.length; i += READ_CHUNK) {
