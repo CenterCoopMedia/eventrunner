@@ -106,6 +106,50 @@ test('autoApproveTicketHolders approves with approvalSource ticket, never admin 
   assert.equal(user.approvalSource, 'ticket');
 });
 
+test('a refunded order is the same 404 and does not approve the account', async () => {
+  const db = seededDb();
+  const provider = createFakeTicketingProvider({
+    orders: { 'ord-1': { tickets: [fakeTicket({ status: 'refunded' })] } },
+  });
+  const res = makeRes();
+
+  await verifyHandler({
+    db,
+    provider,
+    config: async () => ({ bootstrap: { adminEmails: [ADMIN] }, features: { autoApproveTicketHolders: true } }),
+  })(claimReq('ada'), res);
+
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(res.body, { error: { code: 'not-found', message: 'No ticket matches that order number.' } });
+  assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
+  assert.equal(db.read('users', 'uid-ada').approvalSource, null);
+});
+
+test('a mixed order claims the valid ticket and leaves the refunded one', async () => {
+  const db = seededDb();
+  const provider = createFakeTicketingProvider({
+    orders: {
+      'ord-1': {
+        tickets: [
+          fakeTicket({ status: 'refunded' }),
+          fakeTicket({ externalId: 'tkt-2', status: 'valid' }),
+        ],
+      },
+    },
+  });
+  const res = makeRes();
+
+  await verifyHandler({ db, provider })(claimReq('ada'), res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.claimed, 1);
+  assert.equal(res.body.registrationStatus, 'ticketed');
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(db.read('tickets', 'tkt-2').claimedByUid, 'uid-ada');
+});
+
 test('every failure answers the SAME 404 — no order or address oracle', async () => {
   const db = seededDb();
   const provider = createFakeTicketingProvider({
@@ -211,6 +255,25 @@ test('claimTicket refuses a ticket held by someone else or addressed elsewhere',
     await claimTicket({ db, externalId: '../users/uid-ada', uid: 'uid-ada' }),
     { claimed: false, reason: 'invalid_id' },
   );
+});
+
+test('claimTicket refuses a ticket that is not valid, and does not auto-approve', async () => {
+  const config = async () => ({
+    bootstrap: { adminEmails: [ADMIN] },
+    features: { autoApproveTicketHolders: true },
+  });
+  for (const status of ['refunded', 'cancelled', 'pending_info', undefined]) {
+    const db = seededDb({ 'tickets/tkt-1': { ...fakeTicket(), status } });
+    const result = await claimTicketsForUser({
+      db, uid: 'uid-ada', email: 'attendee@example.com', externalIds: ['tkt-1'], getConfig: config, now: () => T0,
+    });
+
+    assert.deepEqual(result.claimed, []);
+    assert.equal(result.refused[0].reason, 'not_valid');
+    assert.equal(db.read('tickets', 'tkt-1').claimedByUid, undefined);
+    assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
+    assert.equal(db.read('users', 'uid-ada').approvalSource, null);
+  }
 });
 
 test('two concurrent claims on one ticket cannot both win', async () => {
@@ -354,6 +417,21 @@ test('an already-claimed ticket reports the holder instead of creating a second 
 
   assert.deepEqual(res.body, { ok: true, uid: 'uid-ada', created: false, alreadyClaimed: true });
   assert.equal(authImpl.created.length, 0);
+});
+
+test('createUserFromTicket does not mint an account for a ticket that is not valid', async () => {
+  for (const status of ['refunded', 'cancelled', 'pending_info']) {
+    const db = makeFakeDb({ 'tickets/tkt-1': { ...fakeTicket(), status, claimedByUid: null } });
+    const authImpl = fakeAuth();
+    const res = makeRes();
+
+    await createUserHandler({ db, authImpl })(adminReq({ externalId: 'tkt-1' }), res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(authImpl.created.length, 0);
+    assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+    assert.deepEqual(db.ids('users'), []);
+  }
 });
 
 test('a ticket with no email address cannot mint an account', async () => {

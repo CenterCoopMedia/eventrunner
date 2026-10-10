@@ -106,6 +106,11 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
     if (wanted && typeof data.email === 'string' && data.email.toLowerCase() !== wanted) {
       return { claimed: false, reason: 'email_mismatch' };
     }
+    // Refunded, cancelled, and not-yet-described tickets stay in the
+    // collection so a sync can record them. A claim is what marks the
+    // account ticketed and, when the flag is on, approved. Only a valid
+    // ticket may do that (issues #358, #359, #360).
+    if (data.status !== 'valid') return { claimed: false, reason: 'not_valid' };
     const at = now();
     tx.set(ref, { claimedByUid: uid, claimedAt: at, updatedAt: at }, { merge: true });
     return { claimed: true };
@@ -228,6 +233,7 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, getConfig, now 
 
     const mine = found.tickets
       .filter((t) => typeof t?.email === 'string' && t.email.trim().toLowerCase() === email)
+      .filter((t) => t?.status === 'valid')
       .map((t) => t.externalId);
     if (mine.length === 0) {
       res.status(404).json(notFound);
@@ -297,6 +303,12 @@ function createCreateUserFromTicketHandler({ db, auth, getConfig, now = () => ne
     const ticket = snap.data() || {};
     if (ticket.claimedByUid) {
       res.status(200).json({ ok: true, uid: ticket.claimedByUid, created: false, alreadyClaimed: true });
+      return;
+    }
+    if (ticket.status !== 'valid') {
+      res.status(409).json({
+        error: { code: 'conflict', message: 'Only a valid ticket can be claimed.' },
+      });
       return;
     }
     const email = typeof ticket.email === 'string' ? ticket.email.trim().toLowerCase() : '';
