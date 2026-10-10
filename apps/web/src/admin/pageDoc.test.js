@@ -6,6 +6,7 @@ import {
   PAGE_KEYS,
   SECTION_KEYS,
   DEFAULT_BLOCK_KEYS,
+  assignPageIds,
   mergePageRevisions,
   publishStateOf,
   toEditablePage,
@@ -302,5 +303,57 @@ describe('mergePageRevisions', () => {
 
   it('treats no result yet as an empty list rather than throwing', () => {
     expect(mergePageRevisions(null, null)).toEqual([]);
+  });
+});
+
+describe('assignPageIds', () => {
+  it('keeps established ids and mints empty ones once', () => {
+    const page = {
+      id: 'home',
+      label: 'Welcome',
+      path: '/',
+      sections: [
+        {
+          id: 'hero',
+          label: 'Opening',
+          defaultBlocks: [{ field: 'title', blockType: 'text', description: 'Headline' }],
+        },
+        {
+          id: '',
+          label: 'Notes',
+          defaultBlocks: [{ field: '', blockType: 'richtext', description: 'Body' }],
+        },
+        { id: '', label: 'Notes', defaultBlocks: [] },
+      ],
+    };
+    const assigned = assignPageIds(page, { pageIds: ['other'], sectionIds: ['intro'] });
+    expect(assigned.id).toBe('home');
+    expect(assigned.path).toBe('/');
+    expect(assigned.sections[0].id).toBe('hero');
+    expect(assigned.sections[0].defaultBlocks[0].field).toBe('title');
+    expect(assigned.sections[1].id).toBe('notes');
+    expect(assigned.sections[1].defaultBlocks[0].field).toBe('body');
+    expect(assigned.sections[2].id).toBe('notes-2');
+
+    const again = assignPageIds(
+      { ...assigned, label: 'Start here', path: '/' },
+      { sectionIds: ['intro', 'hero'] },
+    );
+    expect(again.id).toBe('home');
+    expect(again.path).toBe('/');
+    expect(again.sections[0].id).toBe('hero');
+    expect(again.sections[0].defaultBlocks[0].field).toBe('title');
+  });
+
+  it('avoids a section id another page already uses', () => {
+    const assigned = assignPageIds({
+      id: '',
+      label: 'Scholarships',
+      path: '/scholarships',
+      sections: [{ id: '', label: 'Intro', defaultBlocks: [] }],
+    }, { sectionIds: ['intro'] });
+    expect(assigned.id).toBe('scholarships');
+    expect(assigned.path).toBe('/scholarships');
+    expect(assigned.sections[0].id).toBe('intro-2');
   });
 });

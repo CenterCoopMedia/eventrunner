@@ -136,8 +136,8 @@ describe('validateRequiredContent', () => {
     const content = blankContent('image'); // url + alt required, caption optional
     const errors = validateRequiredContent(content);
     expect(errors).toEqual([
-      { field: 'url', message: 'url: is required.' },
-      { field: 'alt', message: 'alt: is required.' },
+      { field: 'url', message: 'Image: is required.' },
+      { field: 'alt', message: 'Alt text: is required.' },
     ]);
   });
 
@@ -158,7 +158,7 @@ describe('validateRequiredContent', () => {
   it('treats empty editor markup as an empty required rich-text field', () => {
     for (const value of ['', '<p><br></p>', '<p>&nbsp;</p>']) {
       expect(validateRequiredContent({ blockType: 'richtext', values: { value } })).toEqual([
-        { field: 'value', message: 'value: is required.' },
+        { field: 'value', message: 'Text: is required.' },
       ]);
     }
     expect(validateRequiredContent({

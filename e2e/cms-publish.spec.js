@@ -16,6 +16,7 @@
 import { test, expect } from '@playwright/test';
 import seed from '../scripts/lib/seed.cjs';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, signIn } from './helpers.mjs';
+import { editorialId } from '../apps/web/src/admin/editorialId.js';
 import { RETRY_DELAY_MS } from '../apps/web/src/lib/retrySubscription.js';
 
 const CONTENT_TIMEOUT_MS = RETRY_DELAY_MS + 15_000;
@@ -194,9 +195,9 @@ test.describe.serial('CMS edit -> publish -> public visibility', () => {
 // browser receives the same formatting from the live collection.
 test.describe.serial('rich text editor -> publish -> public formatting', () => {
   const stamp = Date.now();
-  const field = `formatted-answer-${stamp}`;
-  const docId = `faq_items__${field}`;
   const question = `Does formatted text round trip ${stamp}?`;
+  const field = editorialId(question);
+  const docId = `faq_items__${field}`;
   const answer = `Yes, formatting survives ${stamp}.`;
   let idToken;
 
@@ -216,10 +217,9 @@ test.describe.serial('rich text editor -> publish -> public formatting', () => {
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/faq/faq_items/_new');
     await expect(page.getByRole('heading', { level: 1, name: 'New content block' })).toBeVisible();
-    await page.getByLabel(/^Field id/).fill(field);
-    await page.getByLabel('question').fill(question);
+    await page.getByLabel('Question').fill(question);
 
-    const editor = page.getByRole('textbox', { name: 'answer' });
+    const editor = page.getByRole('textbox', { name: 'Answer' });
     await editor.fill(answer);
     await editor.press('Control+A');
     await page.getByRole('button', { name: 'Bold' }).click();

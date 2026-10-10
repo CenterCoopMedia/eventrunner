@@ -33,12 +33,16 @@ import {
 import { SPONSOR_PACKAGE_HINTS } from '../sponsorPackageHints.js';
 import {
   blankContent,
+  contentBlockTitle,
+  contentIdSource,
+  editorialFieldLabel,
   staleFieldDeletions,
   toContentFields,
   toEditableContent,
   validateRequiredContent,
   valueFieldsOf,
 } from '../contentDoc.js';
+import { uniqueEditorialId } from '../editorialId.js';
 import { contentEditIsDirty, contentEditSnapshot, createFormBaseline } from '../contentEditState.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
@@ -100,7 +104,8 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
   return (
     <div className="admin-content-fields grid gap-sm sm:grid-cols-2">
       {fields.map((field) => {
-        const label = `${field.id}${field.required ? '' : ' (optional)'}`;
+        const name = editorialFieldLabel(blockTypeId, field.id);
+        const label = field.required ? name : `${name} (optional)`;
         const value = values[field.id];
         const error = errorFor(field.id);
         const hint = hintFor(blockTypeId, field.id);
@@ -391,6 +396,15 @@ export default function AdminContentBlockEditor({ mode }) {
       });
       return;
     }
+    let nextFieldId = String(fieldId ?? '').trim();
+    if (!isExisting && !nextFieldId) {
+      const taken = new Set();
+      for (const row of contentRows) {
+        if (row.current?.section === sectionId && row.current?.field) taken.add(row.current.field);
+      }
+      nextFieldId = uniqueEditorialId(contentIdSource(content), taken, content.blockType || 'block');
+      setFieldId(nextFieldId);
+    }
     setBusy(publish ? 'publish' : 'draft');
     const endpoint = isExisting ? 'cmsUpdateContent' : 'cmsCreateContent';
     // cmsUpdateContent merges submitted fields onto the prior draft/live
@@ -405,23 +419,23 @@ export default function AdminContentBlockEditor({ mode }) {
     const request = {
       section: sectionId,
       fields,
-      field: currentFieldId,
+      field: nextFieldId,
       visible: content.visible,
     };
     if (!isExisting) request.pageId = pageId;
     try {
       const response = await call(endpoint, request);
       if (!mountedRef.current) return;
-      const docId = response.docId ?? `${sectionId}__${currentFieldId}`;
+      const docId = response.docId ?? `${sectionId}__${nextFieldId}`;
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt — the same reasoning AdminPageEditor applies:
       // a failed publish must not leave the field id editable, or a retry
       // under a different id would create a second document and orphan the
       // draft that just landed.
       setSavedDocId(docId);
-      loadedKeyRef.current = `${sectionId}__${currentFieldId}`;
+      loadedKeyRef.current = `${sectionId}__${nextFieldId}`;
       savedBlockTypeRef.current = content.blockType;
-      setSavedEdit(contentEditSnapshot(currentFieldId, content));
+      setSavedEdit(contentEditSnapshot(nextFieldId, content));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         showToast('Draft saved.');
@@ -488,7 +502,7 @@ export default function AdminContentBlockEditor({ mode }) {
     <Panel
       key="settings"
       title={isExisting ? 'Block settings' : 'Set up the block'}
-      description={isExisting ? 'Type, order and visibility for this block.' : 'Choose the block type and field id, then add its value below.'}
+      description={isExisting ? 'Type, order, and visibility for this block.' : 'Choose the block type, then write the content below.'}
       className="admin-content-settings"
     >
       {isExisting ? (
@@ -509,18 +523,16 @@ export default function AdminContentBlockEditor({ mode }) {
       ) : null}
       <div id="admin-content-block-settings" hidden={isExisting && !settingsOpen}>
         <div className="mt-sm grid gap-sm sm:grid-cols-2">
-          <TextField
-            label="Field id"
-            value={currentFieldId}
-            onChange={setFieldId}
-            error={errorFor('field')}
-            readOnly={isExisting}
-            hint={
-              isExisting
-                ? 'The field id cannot change after creation.'
-                : 'Letters, digits, hyphen, underscore. Ties this block to the section’s default block.'
-            }
-          />
+          {isExisting ? (
+            <TextField
+              label="Field id"
+              value={currentFieldId}
+              onChange={() => {}}
+              error={errorFor('field')}
+              readOnly
+              hint="This id stays the same when the text changes."
+            />
+          ) : null}
           <SelectField
             label="Block type"
             value={content.blockType}
@@ -556,7 +568,7 @@ export default function AdminContentBlockEditor({ mode }) {
     </Panel>
   );
   const valuePanel = (
-    <Panel key="value" title="Value" description={blockTypeFor(content.blockType)?.description} className="admin-content-value">
+    <Panel key="value" title="Content" description={blockTypeFor(content.blockType)?.description} className="admin-content-value">
       <BlockValueFields
         blockTypeId={content.blockType}
         values={content.values}
@@ -577,14 +589,16 @@ export default function AdminContentBlockEditor({ mode }) {
       }}
     >
       <AdminPageHeader
-        title={mode === 'create' ? 'New content block' : currentFieldId || 'Content block'}
+        title={mode === 'create'
+          ? 'New content block'
+          : contentBlockTitle({ ...content.values, field: currentFieldId, blockType: content.blockType })}
         state={(
           <>
             {existingRow ? <RecordState state={existingRow.state} /> : null}
             {unsaved ? <UnsavedEditBadge /> : null}
           </>
         )}
-        identifiers={`${pageId} · ${sectionId}`}
+        identifiers={`${page?.current?.label || pageId} · ${section?.label || sectionId}`}
         description={
           // JSX children, not a template literal: while the page listener is
           // still loading, `page` is null and a template literal would print
@@ -648,7 +662,7 @@ export default function AdminContentBlockEditor({ mode }) {
         {isExisting ? (
           <DestructiveConfirm
             trigger="Delete this block"
-            title={`Delete ${currentFieldId}`}
+            title={`Delete ${contentBlockTitle({ ...content.values, field: currentFieldId, blockType: content.blockType })}`}
             confirmLabel="Delete this block"
             busyLabel="Deleting…"
             busy={busy === 'delete'}

@@ -252,20 +252,21 @@ describe('page editor', () => {
     fetch.mockResolvedValueOnce(okResponse({ id: 'scholarships', status: 'dirty' }));
     await renderAt('/admin/pages/new');
 
-    fireEvent.change(screen.getByLabelText('Page id'), { target: { value: 'scholarships' } });
+    expect(screen.queryByLabelText('Page id')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Scholarships' } });
     fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/scholarships' } });
 
     // One section, one block, driven by the registry palette.
     fireEvent.click(screen.getByRole('button', { name: 'Add section' }));
-    fireEvent.change(screen.getByLabelText('Section 1 id'), { target: { value: 'intro' } });
     fireEvent.change(screen.getByLabelText('Section 1 label'), { target: { value: 'Intro' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add block to section 1' }));
-    fireEvent.change(screen.getByLabelText('Block 1 field — section 1'), {
-      target: { value: 'body' },
-    });
+    expect(screen.queryByLabelText('Section 1 id')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Block 1 field — section 1')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Block 1 type — section 1'), {
       target: { value: 'richtext' },
+    });
+    fireEvent.change(screen.getByLabelText('Block 1 description — section 1'), {
+      target: { value: 'Body' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -284,7 +285,7 @@ describe('page editor', () => {
           id: 'intro',
           label: 'Intro',
           defaultBlocks: [
-            { field: 'body', blockType: 'richtext', description: '' },
+            { field: 'body', blockType: 'richtext', description: 'Body' },
           ],
         }),
       ],
@@ -292,6 +293,17 @@ describe('page editor', () => {
     // Saving is explicitly NOT publishing.
     expect(fetch.mock.calls.some((call) => String(call[0]).endsWith('/cmsPublish'))).toBe(false);
     expect(await screen.findByText(/not public until you publish/i)).toBeInTheDocument();
+  });
+
+  it('asks before leaving a page with unsaved edits', async () => {
+    await renderAt('/admin/pages/new');
+    const label = await screen.findByLabelText('Navigation label');
+    fireEvent.change(label, { target: { value: 'Scholarships' } });
+    fireEvent.click(screen.getByRole('link', { name: 'Back to pages' }));
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(label).toHaveValue('Scholarships');
   });
 
   it('publishes with cmsSavePage followed by cmsPublish for that one page', async () => {
@@ -569,8 +581,8 @@ describe('page editor', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' }));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add block to section 1' }));
-    fireEvent.change(screen.getByLabelText('Block 2 field — section 1'), {
-      target: { value: 'closing' },
+    fireEvent.change(screen.getByLabelText('Block 2 description — section 1'), {
+      target: { value: 'Closing' },
     });
     // Move the new block above the first one.
     fireEvent.click(
@@ -962,7 +974,6 @@ describe('publish results and recovery', () => {
       });
     await renderAt('/admin/pages/new');
 
-    fireEvent.change(screen.getByLabelText('Page id'), { target: { value: 'scholarships' } });
     fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'Scholarships' } });
     fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/scholarships' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));

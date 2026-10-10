@@ -108,7 +108,7 @@ describe('admin Sessions workspace', () => {
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
       .toEqual(['Public session', 'Time and structure', 'Location', 'Publishing']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'Session id', 'Public title', 'Public description', 'Recording link',
+      'Public title', 'Public description', 'Recording link',
       'Event day', 'Parent session', 'Start time', 'End time', 'Track',
       'Recorded place', 'Public location text', 'Show this session when it is published',
     ]);
@@ -229,7 +229,7 @@ describe('admin Sessions workspace', () => {
     await screen.findByRole('heading', { name: 'New session' });
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
-    expect(screen.getByLabelText('Session id')).toHaveValue('opening-session');
+    expect(screen.queryByLabelText('Session id')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Public description'), { target: { value: 'Welcome everyone.' } });
     fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
     fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
@@ -243,6 +243,31 @@ describe('admin Sessions workspace', () => {
       docId: 'opening-session',
       fields: { title: 'Opening session', dayId: 'day-1', startTime: '09:00', endTime: '10:00' },
     });
+  });
+
+  it('reuses the first session id when a save fails and the title changes', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { message: 'The draft service is down.' } }),
+    });
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
+    fireEvent.change(screen.getByLabelText('Public description'), { target: { value: 'Welcome everyone.' } });
+    fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('The draft service is down.')).toBeInTheDocument();
+    expect(bodyOf(0).docId).toBe('opening-session');
+
+    fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Welcome remarks' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).docId).toBe('opening-session');
+    expect(bodyOf(1).fields.title).toBe('Welcome remarks');
   });
 
   it('sends the recording link, and refuses an unsafe one before it reaches the server', async () => {

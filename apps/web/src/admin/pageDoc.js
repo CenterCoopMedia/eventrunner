@@ -6,6 +6,7 @@
 // bookkeeping (`seeded`, `seededAt`). So a doc loaded for editing is filtered
 // down to the accepted key set before it goes back over the wire — otherwise
 // every edit of a seeded page would fail with "seeded: unknown field".
+import { lockEditorialId } from './editorialId.js';
 import { recordStateOf } from './recordState.js';
 import { DEFAULT_SECTION_SLOT, slotOf, statedPageLayout } from '../lib/pageLayout.js';
 import { templateOf } from '../lib/pageTemplates.js';
@@ -190,6 +191,50 @@ export function toPagePayload(page) {
       };
     }),
   };
+}
+
+/** Stable comparison for the unsaved-edit guard. Editor-only keys are omitted. */
+export function pageSnapshot(page) {
+  return JSON.stringify(toPagePayload(page));
+}
+
+/**
+ * Fill empty page, section, and default-block ids once.
+ * A non-empty id is kept, including one that a failed save already locked.
+ * Section ids are unique against `sectionIds` and against siblings on this page.
+ * Block field ids are unique inside their section. The public path is not copied
+ * from the page id.
+ *
+ * @param {object} page
+ * @param {{ pageIds?: Iterable<string>, sectionIds?: Iterable<string> }} taken
+ */
+export function assignPageIds(page, { pageIds = [], sectionIds = [] } = {}) {
+  const usedPages = pageIds instanceof Set ? pageIds : new Set(pageIds);
+  const usedSections = sectionIds instanceof Set ? sectionIds : new Set(sectionIds);
+  const next = {
+    ...page,
+    id: lockEditorialId(page?.id, page?.label, usedPages, 'page'),
+    sections: (page?.sections ?? []).map((section) => {
+      const id = lockEditorialId(section?.id, section?.label, usedSections, 'section');
+      usedSections.add(id);
+      const usedFields = new Set(
+        (section?.defaultBlocks ?? [])
+          .map((block) => String(block?.field ?? '').trim())
+          .filter(Boolean),
+      );
+      return {
+        ...section,
+        id,
+        defaultBlocks: (section?.defaultBlocks ?? []).map((block) => {
+          const source = String(block?.description ?? '').trim() || block?.blockType || 'block';
+          const field = lockEditorialId(block?.field, source, usedFields, block?.blockType || 'block');
+          if (!String(block?.field ?? '').trim()) usedFields.add(field);
+          return { ...block, field };
+        }),
+      };
+    }),
+  };
+  return next;
 }
 
 /**
