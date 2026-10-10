@@ -185,17 +185,16 @@ async function applyCreateSpeaker({
   if (!isValidDocId(docId)) {
     return { ok: false, status: 500, code: 'internal', message: 'The speaker id could not be assigned.' };
   }
-  // The same prefix rule the self-service path applies (isOwnHeadshotPath):
-  // an admin payload could otherwise point a speaker at a branding file or
-  // another speaker's photo, and applySpeakerPendingEdits would later treat
-  // that path as this speaker's own to delete. Checked against the id the
-  // record will actually carry.
-  if (!isOwnHeadshotPath(docId, fields.headshotPath)) {
+  // The document id does not exist until this function mints it, so the
+  // caller cannot name speaker-photos/{id}/ yet. A bucket path here is
+  // refused. Null and a default avatar are safe. Set a speaker photo on
+  // a later update, when the id is known. Issue #361.
+  if (!(fields.headshotPath === null || (typeof fields.headshotPath === 'string' && fields.headshotPath.startsWith('default-avatars/')))) {
     return {
       ok: false,
       status: 400,
       code: 'bad-request',
-      message: `headshotPath: must be null or under speaker-photos/${docId}/`,
+      message: 'headshotPath: must be null or a default avatar. Set a speaker photo after the speaker is created.',
     };
   }
 

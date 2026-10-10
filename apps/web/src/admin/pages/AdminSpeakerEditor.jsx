@@ -117,17 +117,21 @@ function toForm(speaker) {
  * it issues), and an editor that echoed a status back on every save would
  * either be rejected or, worse, quietly rewrite the pipeline.
  */
-function toPayload(form, { includeStatus }) {
+function toPayload(form, { includeStatus, includeHeadshot = true }) {
   const payload = {
     firstName: form.firstName,
     lastName: form.lastName,
     slug: form.slug,
     email: form.email.trim() === '' ? null : form.email.trim(),
     bio: form.bio,
-    headshotPath: form.headshotPath.trim() === '' ? null : form.headshotPath.trim(),
     organization: form.organization,
     jobTitle: form.jobTitle,
   };
+  // Create does not know the document id yet, so it cannot name a
+  // speaker-photos path. The photo is set on the edit screen.
+  payload.headshotPath = includeHeadshot && form.headshotPath.trim() !== ''
+    ? form.headshotPath.trim()
+    : null;
   if (includeStatus) payload.status = form.status;
   return payload;
 }
@@ -188,7 +192,7 @@ export default function AdminSpeakerEditor({ mode }) {
     try {
       if (mode === 'create') {
         const response = await call('createSpeaker', {
-          speaker: toPayload(form, { includeStatus: true }),
+          speaker: toPayload(form, { includeStatus: true, includeHeadshot: false }),
         });
         showToast('Speaker created.');
         navigate(`/admin/speakers/${encodeURIComponent(response.speakerId)}`, { replace: true });
@@ -322,13 +326,15 @@ export default function AdminSpeakerEditor({ mode }) {
               onChange={(value) => set({ bio: value })}
               error={errorFor('bio')}
             />
-            <TextField
-              label="Headshot path"
-              hint="A path in this deployment’s Storage bucket, e.g. speakers/name.jpg."
-              value={form.headshotPath}
-              onChange={(value) => set({ headshotPath: value })}
-              error={errorFor('headshotPath')}
-            />
+            {mode === 'edit' ? (
+              <TextField
+                label="Headshot path"
+                hint={`A default avatar, or a path under speaker-photos/${speakerId}/.`}
+                value={form.headshotPath}
+                onChange={(value) => set({ headshotPath: value })}
+                error={errorFor('headshotPath')}
+              />
+            ) : null}
           </div>
         </Panel>
 

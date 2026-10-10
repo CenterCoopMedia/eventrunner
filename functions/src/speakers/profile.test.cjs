@@ -1044,38 +1044,23 @@ test("an admin create refuses a headshotPath outside the speaker's own prefix", 
     });
     assert.equal(result.ok, false, headshotPath);
     assert.equal(result.status, 400);
-    assert.match(result.message, /^headshotPath: must be null or under speaker-photos\/rae\//);
+    assert.match(result.message, /^headshotPath: must be null or a default avatar/);
   }
   assert.deepEqual(db.writes, []);
 });
 
-test('an admin create accepts a headshotPath under the id the record will carry', async () => {
+test('an admin create refuses a speaker photo until the speaker id exists', async () => {
   const db = makeSpeakersDb();
-  const explicit = await applyCreateSpeaker({
+  const photo = await applyCreateSpeaker({
     db,
     payload: { firstName: 'Rae', lastName: 'Okonkwo', headshotPath: 'speaker-photos/rae/a1/photo.png' },
     actor: ACTOR, now: NOW,
     newId: () => 'rae',
   });
-  assert.equal(explicit.ok, true);
-  assert.equal(db.read('speakers', 'rae').headshotPath, 'speaker-photos/rae/a1/photo.png');
-
-  // The record takes the server id, and the prefix is checked against that id.
-  const derived = await applyCreateSpeaker({
-    db,
-    payload: { firstName: 'Sam', lastName: 'Adeyemi', headshotPath: 'speaker-photos/sam-id/b2/photo.png' },
-    actor: ACTOR, now: NOW,
-    newId: () => 'sam-id',
-  });
-  assert.equal(derived.ok, true);
-  const wrongId = await applyCreateSpeaker({
-    db,
-    payload: { firstName: 'Kim', lastName: 'Lee', headshotPath: 'speaker-photos/rae/b2/photo.png' },
-    actor: ACTOR, now: NOW,
-    newId: () => 'kim-id',
-  });
-  assert.equal(wrongId.ok, false);
-  assert.match(wrongId.message, /^headshotPath: must be null or under speaker-photos\/kim-id\//);
+  assert.equal(photo.ok, false);
+  assert.equal(photo.status, 400);
+  assert.match(photo.message, /^headshotPath: must be null or a default avatar/);
+  assert.deepEqual(db.writes, []);
 
   const avatar = await applyCreateSpeaker({
     db,
@@ -1084,6 +1069,7 @@ test('an admin create accepts a headshotPath under the id the record will carry'
     newId: () => 'ada',
   });
   assert.equal(avatar.ok, true);
+  assert.equal(db.read('speakers', 'ada').headshotPath, 'default-avatars/03.svg');
 });
 
 test("an admin update refuses a headshotPath outside the speaker's own prefix and writes nothing", async () => {
