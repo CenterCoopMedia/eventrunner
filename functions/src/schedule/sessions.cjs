@@ -62,7 +62,7 @@
  */
 
 const { TRACK_LETTER_RE } = require('shared/config');
-const { CLOCK_TIME_RE } = require('shared/time');
+const { CLOCK_TIME_RE, ISO_DATETIME_RE } = require('shared/time');
 const { PLACE_ID_RE } = require('shared/venue');
 const { isSafeUrl, safeUrlHref } = require('shared/urlSafety');
 const { isValidDocId } = require('../cms/store.cjs');
@@ -80,19 +80,25 @@ const IN_QUERY = 30;
 const CONFIG_COLLECTION = 'config';
 const CONFIG_EVENT_DOC = 'event';
 
-/** The current stored clock shape. Legacy rows may use CLOCK_TIME_RE instead. */
+/** The current stored clock shape. Legacy rows may use a 12-hour clock or a full ISO datetime. */
 const TIME_24H_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 /**
- * Parse either stored 24-hour time or the shared legacy 12-hour grammar to
- * minutes after midnight. A number gives validateSessionShape one canonical
- * basis for both validity and chronological comparison.
+ * Parse a stored 24-hour time, the shared legacy 12-hour grammar, or a full
+ * ISO datetime to minutes after midnight. A number gives validateSessionShape
+ * one canonical basis for both validity and chronological comparison.
  */
 function sessionClockMinutes(value) {
   if (typeof value !== 'string') return null;
   const clock = value.trim();
   if (TIME_24H_RE.test(clock)) {
     const [hour, minute] = clock.split(':').map(Number);
+    return hour * 60 + minute;
+  }
+  // The same naive datetime isSessionPast already accepts. The date is not
+  // part of the clock comparison; seconds, when present, are ignored.
+  if (ISO_DATETIME_RE.test(clock)) {
+    const [hour, minute] = clock.slice(11, 16).split(':').map(Number);
     return hour * 60 + minute;
   }
   if (!CLOCK_TIME_RE.test(clock)) return null;
