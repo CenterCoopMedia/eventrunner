@@ -11,6 +11,8 @@ const PAGE_ISSUE_LIMIT = 20;
 const PUBLISH_QUEUE_LIMIT = 10;
 const SYSTEM_ERROR_LIMIT = 20;
 const MEDIA_ASSET_LIMIT = 50;
+/** Documents read from each content collection while sampling media use. */
+const DIAGNOSTIC_USAGE_DOC_LIMIT = 100;
 const SAFE_KIND_RE = /^[a-z0-9-]{1,80}$/;
 const SENSITIVE_KEY_PARTS = Object.freeze([
   'email',
@@ -193,20 +195,43 @@ function publishRow(doc) {
   };
 }
 
+function boundedRows(items, total) {
+  return {
+    items,
+    total,
+    truncated: Math.max(0, total - items.length),
+  };
+}
+
+/** Count and page share one snapshot, so a write between them cannot disagree. */
+async function readCountedPage(db, source, page) {
+  return db.runTransaction(async (tx) => {
+    const counted = await tx.get(source.count());
+    const snapshot = await tx.get(page);
+    return { total: counted.data().count, docs: snapshot.docs };
+  });
+}
+
 async function readPublishQueue({ db }) {
-  const snapshot = await db.collection('cmsPublishQueue').get();
-  const rows = snapshot.docs
-    .slice()
-    .sort((a, b) => (toMillis(b.data()?.requestedAt) ?? 0) - (toMillis(a.data()?.requestedAt) ?? 0))
-    .map(publishRow);
-  return { rows: bounded(rows, PUBLISH_QUEUE_LIMIT) };
+  const source = db.collection('cmsPublishQueue');
+  const page = await readCountedPage(
+    db,
+    source,
+    source.orderBy('requestedAt', 'desc').limit(PUBLISH_QUEUE_LIMIT),
+  );
+  return { rows: boundedRows(page.docs.map(publishRow), page.total) };
 }
 
 async function readSystemErrors({ db }) {
-  const snapshot = await db.collection('system_errors').where('resolved', '==', false).get();
+  const source = db.collection('system_errors').where('resolved', '==', false);
+  const page = await readCountedPage(
+    db,
+    source,
+    source.orderBy('createdAt', 'desc').limit(SYSTEM_ERROR_LIMIT),
+  );
+  const snapshot = { docs: page.docs };
+  const total = page.total;
   const rows = snapshot.docs
-    .slice()
-    .sort((a, b) => (toMillis(b.data()?.createdAt) ?? 0) - (toMillis(a.data()?.createdAt) ?? 0))
     .map((doc) => {
       const data = doc.data() || {};
       return {
@@ -216,27 +241,40 @@ async function readSystemErrors({ db }) {
         state: 'open',
       };
     });
-  return { rows: bounded(rows, SYSTEM_ERROR_LIMIT) };
+  return { rows: boundedRows(rows, total) };
 }
 
 async function readMediaUsage({ db }) {
-  const snapshot = await db.collection('media_assets').get();
-  const assets = snapshot.docs
+  const source = db.collection('media_assets');
+  const page = await readCountedPage(db, source, source.limit(MEDIA_ASSET_LIMIT));
+  const assets = page.docs
     .map((doc) => doc.data() || {})
     .filter((asset) => typeof asset.path === 'string' && asset.path.length > 0);
-  const checked = assets.slice(0, MEDIA_ASSET_LIMIT);
-  const paths = [...new Set(checked.map((asset) => asset.path))];
-  const usage = await scanUsage({ db, paths });
+  const paths = [...new Set(assets.map((asset) => asset.path))];
+  const sampleMissingIndexData = page.docs.length - assets.length;
+  const truncated = Math.max(0, page.total - page.docs.length);
+  const sample = {
+    checked: assets.length,
+    total: page.total,
+    truncated,
+    // The page count is global only when the page is the whole collection.
+    missingIndexData: truncated === 0 ? sampleMissingIndexData : null,
+    sampleMissingIndexData,
+  };
+  let usage;
+  try {
+    usage = await scanUsage({ db, paths, maxDocs: DIAGNOSTIC_USAGE_DOC_LIMIT });
+  } catch (error) {
+    if (error?.code !== 'usage-scan-incomplete') throw error;
+    return { assets: { ...sample, incomplete: true } };
+  }
   const referenceCounts = paths.map((path) => usage[path]?.length ?? 0);
   return {
     assets: {
-      checked: checked.length,
-      total: snapshot.docs.length,
-      truncated: Math.max(0, assets.length - checked.length),
+      ...sample,
       referenced: referenceCounts.filter((count) => count > 0).length,
       unused: referenceCounts.filter((count) => count === 0).length,
-      references: referenceCounts.reduce((total, count) => total + count, 0),
-      missingIndexData: snapshot.docs.length - assets.length,
+      references: referenceCounts.reduce((sum, count) => sum + count, 0),
     },
   };
 }
