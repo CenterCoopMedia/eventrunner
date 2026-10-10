@@ -101,6 +101,8 @@ test('verifyAuthToken asks Auth once for the same request', async () => {
   const second = await verifyAuthToken({ auth }, req);
   assert.equal(first, second);
   assert.equal(calls, 1);
+  assert.equal(await verifyAuthToken({ auth }, { ...req, headers: {} }), null);
+  assert.equal(calls, 1);
   await verifyAuthToken({ auth }, reqWithAuth('Bearer good'));
   assert.equal(calls, 2);
 });
