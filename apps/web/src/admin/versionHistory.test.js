@@ -222,6 +222,10 @@ describe('restoreRequestFor', () => {
     });
     expect(restoreRequestFor('cmsUpdates', 'u1', entry({ title: 'T', publishAt: '2026-09-23T18:02:00.000Z' }), null)).toEqual({
       endpoint: 'cmsSaveUpdate',
+      body: { id: 'u1', update: { title: 'T', publishAt: '2026-09-23T18:02:00.000Z' }, visible: true, restore: true },
+    });
+    expect(restoreRequestFor('cmsUpdates', 'u1', entry({ title: 'T', publishAt: '2026-09-23T18:02:00.000Z' }), { id: 'u1' })).toEqual({
+      endpoint: 'cmsSaveUpdate',
       body: { id: 'u1', update: { title: 'T', publishAt: '2026-09-23T18:02:00.000Z' }, visible: true },
     });
   });

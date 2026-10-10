@@ -122,7 +122,7 @@ export default function AdminUpdateEditor({ mode }) {
   // moves to the update's own address. The router keeps this component
   // (the two routes render the same element), and the draft listener may
   // not have reported the new draft yet, so the form stays up rather than
-  // saying there is no such update.
+  // saying there is no such update. The hold ends once that row is adopted.
   const [createdId, setCreatedId] = useState(null);
   const newIdRef = useRef(null);
   if (newIdRef.current === null) newIdRef.current = mintUpdateId();
@@ -137,8 +137,12 @@ export default function AdminUpdateEditor({ mode }) {
 
   useEffect(() => {
     if (mode !== 'edit' || !ready || !row) return;
-    if (adoptedId === updateId || createdId === updateId) return;
+    if (adoptedId === updateId) return;
     setAdoptedId(updateId);
+    // A create keeps the text the operator just saved. Filling from the
+    // listener would replace it. Adoption still happens, so a later delete
+    // closes this form the same way it closes any other loaded update.
+    if (createdId === updateId) return;
     setForm(toUpdateForm(row, timeZone));
   }, [mode, ready, row, updateId, adoptedId, createdId, timeZone]);
 
@@ -239,9 +243,9 @@ export default function AdminUpdateEditor({ mode }) {
   }
 
   // A delete that lands after the form was filled used to leave the form
-  // open, and the next save wrote the update back. The create race is the
-  // exception: the draft may not be in the listener yet, and createdId
-  // keeps that form up until the listener reports.
+  // open, and the next save wrote the update back. A create stays open
+  // only until the listener reports that draft. Adoption then makes a
+  // later delete close the form.
   if (mode === 'edit' && ready && !row && adoptedId === updateId) {
     return (
       <AdminEmptyState

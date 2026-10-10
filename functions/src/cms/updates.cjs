@@ -4,11 +4,14 @@
  * News/announcement post admin endpoints (spec §4.1 cmsUpdates, §8.4,
  * issue #13).
  *
- *   cmsSaveUpdate   POST { id?, update, visible? } — validate and write the
- *                   DRAFT revision only (cmsUpdates_drafts, status 'dirty').
- *                   Omitting `id` creates a new update with a random id.
- *   cmsDeleteUpdate POST { id } — remove live + draft in one batch, and
- *                   record the id so a later save cannot recreate it.
+ *   cmsSaveUpdate   POST { id?, update, visible?, restore? } — validate and
+ *                   write the DRAFT revision only (cmsUpdates_drafts, status
+ *                   'dirty'). Omitting `id` creates a new update with a
+ *                   random id. A provided id whose tombstone is the only
+ *                   remaining record is refused, unless `restore` is true.
+ *                   That check and the draft write share one transaction.
+ *   cmsDeleteUpdate POST { id } — remove live + draft and record the id in
+ *                   one transaction, so a later save cannot recreate it.
  *
  * cmsUpdates content fields: { title, body, publishAt | null, pinned,
  * category | null, featured }, plus the optional featuredImage and content.
@@ -36,9 +39,18 @@ const { writeAdminLog, DOC_ID_RE } = pagesInternals;
 
 const UPDATES_COLLECTION = 'cmsUpdates';
 const UPDATES_DRAFTS = 'cmsUpdates_drafts';
-// Written before the live and draft docs are removed. A later save of that
-// id is a resurrection, and it is refused while both docs stay gone.
+// Written in the same transaction that removes the live and draft docs.
+// A later save of that id is refused while both docs stay gone. Version
+// history is the one authorized recreate: it sends restore:true.
 const UPDATES_DELETED = 'cmsUpdates_deleted';
+
+/** Thrown inside the save transaction. The handler turns it into a 404. */
+class DeletedUpdate extends Error {
+  constructor() {
+    super('Update not found.');
+    this.name = 'DeletedUpdate';
+  }
+}
 
 /** Keys a cmsUpdates doc may carry — anything else is rejected by name. */
 const UPDATE_KEYS = Object.freeze([
@@ -116,18 +128,16 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
     if (visible !== undefined && typeof visible !== 'boolean') {
       return badRequest(res, 'visible: must be a boolean');
     }
-    const id = rawId === undefined ? crypto.randomUUID() : rawId;
-
-    if (rawId !== undefined) {
-      const [draftSnap, liveSnap, deletedSnap] = await Promise.all([
-        db.collection(UPDATES_DRAFTS).doc(id).get(),
-        db.collection(UPDATES_COLLECTION).doc(id).get(),
-        db.collection(UPDATES_DELETED).doc(id).get(),
-      ]);
-      if (deletedSnap.exists && !draftSnap.exists && !liveSnap.exists) {
-        return notFound(res, 'Update not found.');
-      }
+    // Version history sends true to put a deleted update back as a draft.
+    // A stale editor save does not, and that save stays a 404.
+    const restore = req.body?.restore;
+    if (restore !== undefined && typeof restore !== 'boolean') {
+      return badRequest(res, 'restore: must be a boolean');
     }
+    if (restore === true && rawId === undefined) {
+      return badRequest(res, 'restore: requires an update id');
+    }
+    const id = rawId === undefined ? crypto.randomUUID() : rawId;
 
     const contentFields = {
       title: update.title,
@@ -142,20 +152,42 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
       ...(update.content !== undefined ? { content: update.content } : {}),
     };
     try {
-      await store.writeDraft({
-        db,
-        collection: UPDATES_COLLECTION,
-        docId: id,
-        fields: contentFields,
-        // Omitted => undefined, so the store preserves the prior draft/live
-        // visibility (§8.4: visibility changes are explicit admin actions,
-        // never a side effect of editing). Forcing a default here would
-        // silently re-show an unpublished update on its next edit.
-        visible,
-        actor: { uid: gate.uid, email: gate.email },
-        now,
+      // The tombstone read has to be in this transaction. A check that
+      // runs first can see the old docs, and the draft write can then
+      // land after the delete has committed.
+      await db.runTransaction(async (tx) => {
+        let deletedRef = null;
+        if (rawId !== undefined) {
+          deletedRef = db.collection(UPDATES_DELETED).doc(id);
+          const [deletedSnap, draftSnap, liveSnap] = await Promise.all([
+            tx.get(deletedRef),
+            tx.get(db.collection(UPDATES_DRAFTS).doc(id)),
+            tx.get(db.collection(UPDATES_COLLECTION).doc(id)),
+          ]);
+          const gone = deletedSnap.exists && !draftSnap.exists && !liveSnap.exists;
+          if (gone && restore !== true) throw new DeletedUpdate();
+          if (!deletedSnap.exists || restore !== true) deletedRef = null;
+        }
+        await store.writeDraft({
+          db,
+          tx,
+          collection: UPDATES_COLLECTION,
+          docId: id,
+          fields: contentFields,
+          // Omitted => undefined, so the store preserves the prior draft/live
+          // visibility (§8.4: visibility changes are explicit admin actions,
+          // never a side effect of editing). Forcing a default here would
+          // silently re-show an unpublished update on its next edit.
+          visible,
+          actor: { uid: gate.uid, email: gate.email },
+          now,
+        });
+        // After writeDraft's reads. A restore clears the tombstone in the
+        // same commit as the new draft, or neither write lands.
+        if (deletedRef) tx.delete(deletedRef);
       });
     } catch (err) {
+      if (err instanceof DeletedUpdate) return notFound(res, 'Update not found.');
       log.error('cmsSaveUpdate draft write failed', err);
       return internal(res, 'The update could not be saved.');
     }
@@ -193,11 +225,15 @@ function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now,
     if (!draftSnap.exists && !liveSnap.exists) return notFound(res, 'Update not found.');
 
     try {
-      await db.collection(UPDATES_DELETED).doc(id).set({
-        deletedAt: new Date(now()),
-        deletedBy: gate.uid,
+      // Tombstone and both deletes commit together. A tombstone that lands
+      // first can be followed by a save that already read the old docs.
+      await db.runTransaction(async (tx) => {
+        await store.deleteBoth({ db, tx, collection: UPDATES_COLLECTION, docId: id });
+        tx.set(db.collection(UPDATES_DELETED).doc(id), {
+          deletedAt: new Date(now()),
+          deletedBy: gate.uid,
+        });
       });
-      await store.deleteBoth({ db, collection: UPDATES_COLLECTION, docId: id });
     } catch (err) {
       log.error('cmsDeleteUpdate failed', err);
       return internal(res, 'The update could not be deleted.');

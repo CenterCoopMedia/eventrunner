@@ -9,6 +9,8 @@ const {
   createDeleteUpdateHandler,
   internals,
 } = require('./updates.cjs');
+const { makeFakeDb } = require('./firestoreFake.cjs');
+const realStore = require('./store.cjs');
 
 // ---------------------------------------------------------------- fixtures
 
@@ -47,6 +49,9 @@ function fakeDb(seed = {}) {
             async set(data) {
               docs.set(key, data);
             },
+            async delete() {
+              docs.delete(key);
+            },
           };
         },
         async add(data) {
@@ -54,6 +59,22 @@ function fakeDb(seed = {}) {
           return { id: `auto${added.length}` };
         },
       };
+    },
+    // Writes stay buffered until the body returns, so a thrown body leaves
+    // the map unchanged. This is the property the tombstone transaction uses.
+    async runTransaction(fn) {
+      const ops = [];
+      const tx = {
+        async get(ref) { return ref.get(); },
+        set(ref, data) { ops.push({ ref, data }); },
+        delete(ref) { ops.push({ ref, drop: true }); },
+      };
+      const result = await fn(tx);
+      for (const op of ops) {
+        if (op.drop) await op.ref.delete();
+        else await op.ref.set(op.data);
+      }
+      return result;
     },
   };
 }
@@ -170,6 +191,68 @@ test('cmsSaveUpdate does not recreate an update that was deleted', async () => {
   assert.equal(res.statusCode, 404);
   assert.equal(res.body.error.message, 'Update not found.');
   assert.equal(d.store.writes.length, 0);
+
+  res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'gone', update: validUpdate(), restore: false }), res);
+  assert.equal(res.statusCode, 404);
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('cmsSaveUpdate restores a deleted update when version history asks, and clears the tombstone', async () => {
+  const d = deps({ db: fakeDb({ 'cmsUpdates_drafts/gone': { title: 'Gone' } }) });
+  let res = fakeRes();
+  await createDeleteUpdateHandler(d)(adminReq({ id: 'gone' }), res);
+  assert.equal(res.statusCode, 200);
+  d.db.docs.delete('cmsUpdates_drafts/gone');
+  assert.equal(d.db.docs.has('cmsUpdates_deleted/gone'), true);
+  res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'gone', update: validUpdate(), restore: true }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.id, 'gone');
+  assert.equal(d.store.writes.length, 1);
+  assert.equal(d.store.writes[0].docId, 'gone');
+  assert.equal(d.db.docs.has('cmsUpdates_deleted/gone'), false);
+});
+
+test('cmsSaveUpdate refuses a restore that does not name an update, and a restore that is not a boolean', async () => {
+  const d = deps();
+  let res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ update: validUpdate(), restore: true }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /restore: requires an update id/);
+  res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'u1', update: validUpdate(), restore: 'yes' }), res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /restore: must be a boolean/);
+  assert.equal(d.store.writes.length, 0);
+});
+
+test('a save that already read the update does not write it back after a delete commits', async () => {
+  const db = makeFakeDb({
+    'config/bootstrap': BOOTSTRAP_DOC,
+    'cmsUpdates_drafts/gone': {
+      title: 'Gone',
+      body: 'Gone.',
+      publishAt: null,
+      pinned: false,
+      visible: true,
+      status: 'dirty',
+      basedOnRevision: null,
+    },
+  });
+  const d = deps({ db, store: realStore, now: () => 1700000000000 });
+  db.beforeCommit = async () => {
+    const deleted = fakeRes();
+    await createDeleteUpdateHandler(d)(adminReq({ id: 'gone' }), deleted);
+    assert.equal(deleted.statusCode, 200);
+  };
+  const res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'gone', update: validUpdate() }), res);
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.error.message, 'Update not found.');
+  assert.equal(db.read('cmsUpdates_drafts', 'gone'), undefined);
+  assert.equal(db.read('cmsUpdates', 'gone'), undefined);
+  assert.equal(typeof db.read('cmsUpdates_deleted', 'gone')?.deletedBy, 'string');
 });
 
 test('cmsSaveUpdate writes the DRAFT collection only', async () => {
@@ -266,9 +349,27 @@ test('cmsDeleteUpdate deletes both revisions and logs', async () => {
   const res = fakeRes();
   await createDeleteUpdateHandler(d)(adminReq({ id: 'u1' }), res);
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(d.store.deletes[0], { db, collection: 'cmsUpdates', docId: 'u1' });
+  // deleteBoth now runs inside the caller's transaction, so the call carries
+  // tx. The three fields the old assertion named are unchanged.
+  const call = d.store.deletes[0];
+  assert.equal(call.db, db);
+  assert.equal(call.collection, 'cmsUpdates');
+  assert.equal(call.docId, 'u1');
+  assert.equal(typeof call.tx.set, 'function');
+  assert.equal(db.docs.get('cmsUpdates_deleted/u1').deletedBy, 'admin1');
   assert.equal(d.store.logs[0].action, 'cmsDeleteUpdate');
   assert.equal(d.store.logs[0].docPath, 'cmsUpdates/u1');
+});
+
+test('cmsDeleteUpdate leaves no tombstone when the delete does not commit', async () => {
+  const db = fakeDb({ 'cmsUpdates_drafts/u1': { title: 't' } });
+  const d = deps({ db });
+  d.store.deleteBoth = async () => { throw new Error('delete failed'); };
+  const res = fakeRes();
+  await createDeleteUpdateHandler(d)(adminReq({ id: 'u1' }), res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(db.docs.has('cmsUpdates_deleted/u1'), false);
+  assert.equal(db.docs.has('cmsUpdates_drafts/u1'), true);
 });
 
 test('cmsDeleteUpdate works when only a never-published draft exists', async () => {

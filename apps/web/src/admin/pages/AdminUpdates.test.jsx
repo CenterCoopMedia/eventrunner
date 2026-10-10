@@ -519,6 +519,37 @@ describe('the update editor', () => {
     await waitFor(() => expect(currentPath).toBe('/admin/updates'));
   });
 
+  it('closes a created update after the listener has seen it and a later delete removes it', async () => {
+    await renderAt('/admin/updates/new/update');
+    await screen.findByRole('heading', { level: 1, name: 'New update' });
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: '  Room change  ' } });
+    fireEvent.change(screen.getByLabelText('Text'), { target: { value: 'The clinic moves to Room B.' } });
+    fetch.mockImplementation(async (_url, init) => response({ id: JSON.parse(init.body).id, status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(callsTo('cmsSaveUpdate')).toHaveLength(1));
+    const id = bodyOf(callsTo('cmsSaveUpdate')[0]).id;
+    await waitFor(() => expect(currentPath).toBe(`/admin/updates/${id}`));
+    // The listener has not reported the new draft. The form stays open.
+    expect(screen.getByLabelText('Title')).toHaveValue('  Room change  ');
+    expect(screen.queryByRole('heading', { name: 'No such update' })).toBeNull();
+
+    pushUpdates([], [{
+      id,
+      title: 'Room change',
+      body: 'The clinic moves to Room B.',
+      publishAt: null,
+      pinned: false,
+      visible: true,
+      status: 'dirty',
+    }]);
+    // Adoption does not replace the text the operator typed.
+    expect(screen.getByLabelText('Title')).toHaveValue('  Room change  ');
+
+    pushUpdates([], []);
+    expect(await screen.findByRole('heading', { name: 'No such update' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+  });
+
   it('closes the form when a loaded update is deleted, so a save cannot write it back', async () => {
     await renderAt('/admin/updates/published');
     pushUpdates([PUBLISHED], [PUBLISHED_CLEAN]);
