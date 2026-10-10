@@ -214,6 +214,25 @@ describe('downloadSessionMaterialFile', () => {
     clickSpy.mockRestore();
   });
 
+  it('turns a failed body read into an incomplete download error', async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      blob: async () => {
+        throw new TypeError('Failed to fetch');
+      },
+    });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    await expect(
+      downloadSessionMaterialFile({ user: fakeUser(), materialId: 'm1', filename: 'slides.pdf' }),
+    ).rejects.toMatchObject({ name: 'MaterialRequestError', code: 'incomplete', status: 200 });
+    expect(clickSpy).not.toHaveBeenCalled();
+
+    clickSpy.mockRestore();
+  });
+
   it('does not save a file shorter than Content-Length', async () => {
     const blob = new Blob(['short']);
     globalThis.fetch.mockResolvedValue({

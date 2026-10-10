@@ -91,14 +91,20 @@ async function streamMaterialFile({ file, res, filename, log = console }) {
   const contentType = typeof metadata?.contentType === 'string' && metadata.contentType
     ? metadata.contentType
     : 'application/octet-stream';
+  // createReadStream() gunzips a gzip-stored object. metadata.size is then the
+  // compressed size, not the bytes that leave this response. State a length
+  // only when the stored encoding is identity, so the header matches the file.
+  const storedEncoding = typeof metadata?.contentEncoding === 'string'
+    ? metadata.contentEncoding.trim().toLowerCase()
+    : '';
+  const lengthMatchesStream = storedEncoding === '' || storedEncoding === 'identity';
 
   // Express delegates to content-disposition, which emits an ASCII fallback
   // plus RFC 5987 filename* for Unicode. Set the authoritative Storage MIME
   // type afterwards because attachment() first guesses from the extension.
-  // Content-Length is the Storage size. A later short body is then incomplete.
   res.attachment(sanitizeForHeader(filename));
   res.set('Content-Type', contentType);
-  res.set('Content-Length', String(size));
+  if (lengthMatchesStream) res.set('Content-Length', String(size));
   res.set('Cache-Control', 'private, max-age=0, no-store');
 
   await new Promise((resolve, reject) => {

@@ -213,6 +213,20 @@ test('streamMaterialFile: an error before the first byte ends a complete 500 res
   assert.equal(logged, 1);
 });
 
+test('streamMaterialFile: does not declare Content-Length for a gzip-stored object', async () => {
+  const file = fakeFile({ contentType: 'application/pdf' });
+  const metadata = file.getMetadata.bind(file);
+  file.getMetadata = async () => {
+    const [data] = await metadata();
+    return [{ ...data, contentEncoding: 'gzip' }];
+  };
+  const res = fakeRes();
+  const served = await streamMaterialFile({ file, res, filename: 'slides.pdf' });
+  assert.equal(served, true);
+  assert.equal(res.headers['Content-Length'], undefined);
+  assert.equal(res.headers['Content-Type'], 'application/pdf');
+});
+
 test('streamMaterialFile: a failure after the first byte destroys the response instead of ending it', async () => {
   const file = {
     async exists() {
