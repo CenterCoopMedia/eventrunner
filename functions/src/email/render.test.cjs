@@ -240,6 +240,26 @@ test('validateTemplateBody accepts a required token substituted inside a conditi
   assert.deepEqual(check.errors, []);
 });
 
+test('validateTemplateBody rejects a required token that only sits inside an unrelated conditional', () => {
+  const check = validateTemplateBody(TEMPLATE, {
+    subject: 'Your code',
+    html: '{{#if first_name}}{{code}}{{/if}}',
+    text: '{{#if first_name}}{{code}}{{/if}}',
+  });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((e) => e === 'html: missing required token {{code}}'));
+  assert.ok(check.errors.some((e) => e === 'text: missing required token {{code}}'));
+});
+
+test('validateTemplateBody accepts a required token that also appears outside an unrelated conditional', () => {
+  const check = validateTemplateBody(TEMPLATE, {
+    subject: 'Your code',
+    html: '{{code}}{{#if first_name}}{{code}}{{/if}}',
+    text: '{{#if first_name}}{{code}}{{/if}} {{code}}',
+  });
+  assert.deepEqual(check.errors, []);
+});
+
 test('validateTemplateBody rejects an unbalanced {{#if}}/{{/if}}', () => {
   const check = validateTemplateBody(CONDITIONAL_TEMPLATE, {
     subject: 'ok',

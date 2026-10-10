@@ -213,10 +213,28 @@ function referencedTokens(body) {
  */
 function substitutedTokens(body) {
   const names = new Set();
-  for (const match of String(body).matchAll(TOKEN_RE)) {
+  const token = new RegExp(TOKEN_RE.source, 'gi');
+  for (const match of String(body).matchAll(token)) {
     names.add(match[1].toLowerCase());
   }
   return names;
+}
+
+/**
+ * A required token counts only when substitution will emit it whenever the
+ * token itself has a value. A copy inside `{{#if other}}` disappears when
+ * `other` is empty. A copy inside `{{#if code}}` remains whenever `code`
+ * is non-empty, which is the same condition that makes the value worth sending.
+ * @param {string} body
+ * @param {string} required
+ */
+function requiredTokenIsPresent(body, required) {
+  const name = required.toLowerCase();
+  const conditional = new RegExp(CONDITIONAL_RE.source, 'gi');
+  const kept = String(body).replace(conditional, (_, rawName, inner) => (
+    rawName.toLowerCase() === name ? inner : ''
+  ));
+  return substitutedTokens(kept).has(name);
 }
 
 /**
@@ -257,14 +275,14 @@ function validateTemplateBody(template, candidate) {
     }
   }
 
-  // Required tokens must be substituted in every body that is sent. A
-  // conditional guard does not count: an empty `{{#if code}}{{/if}}` names
-  // the token and still sends a mail without it. A required token present
-  // in html but missing from text still produces a useless mail for
-  // plain-text readers.
+  // Required tokens must survive in every body that is sent. A guard does
+  // not count, and neither does a copy inside an unrelated conditional:
+  // `{{#if first_name}}{{code}}{{/if}}` is dropped when the name is empty.
+  // A required token present in html but missing from text still produces
+  // a useless mail for plain-text readers.
   for (const required of template.requiredTokens) {
     for (const field of ['html', 'text']) {
-      if (!substitutedTokens(candidate[field] || '').has(required.toLowerCase())) {
+      if (!requiredTokenIsPresent(candidate[field] || '', required)) {
         errors.push(`${field}: missing required token {{${required}}}`);
       }
     }
