@@ -275,7 +275,7 @@ test('one address cannot spend the whole deployment ceiling', async () => {
   );
 });
 
-test('a failed provider send returns its ceiling slot, so an outage cannot trip the breaker', async () => {
+test('a failed provider send keeps its ceiling slot', async () => {
   const db = fakeDb();
   const { sent, handler } = sendDeps({
     db,
@@ -284,34 +284,58 @@ test('a failed provider send returns its ceiling slot, so an outage cannot trip 
     sendCeilingWindowMs: 60_000,
   });
 
-  // Four failed sends against a ceiling of three: without the release the
-  // breaker would be tripped on zero delivered codes.
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < 3; i += 1) {
     const res = fakeRes();
     await handler({ method: 'POST', body: { email: `v${i}@example.org` } }, res);
     assert.equal(res.statusCode, 502);
   }
-  assert.equal(sent.length, 4, 'each attempt reached the provider');
-  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 0);
-
-  // The provider recovers: sign-in works immediately, no lingering 429.
-  const { handler: healthy } = sendDeps({ db, sendCeilingMax: 3, sendCeilingWindowMs: 60_000 });
-  const res = fakeRes();
-  await healthy({ method: 'POST', body: { email: 'v9@example.org' } }, res);
-  assert.equal(res.statusCode, 200);
+  const blocked = fakeRes();
+  await handler({ method: 'POST', body: { email: 'v3@example.org' } }, blocked);
+  assert.equal(blocked.statusCode, 429);
+  assert.equal(sent.length, 3, 'the request past the ceiling never reaches the provider');
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 3);
 });
 
-test('a throw between reservation and send also returns the ceiling slot', async () => {
+test('a throw from the provider keeps the ceiling slot', async () => {
   const db = fakeDb();
-  const boom = new Error('firestore unavailable');
   const { handler } = sendDeps({ db, sendCeilingMax: 2, sendCeilingWindowMs: 60_000 });
-  // One good send establishes a slot that must survive the failure below.
   await handler({ method: 'POST', body: { email: 'ok@example.org' } }, fakeRes());
 
   const failing = createSendOtpHandler({
     db,
     getConfig: async () => CONFIG,
-    sendEmail: async () => { throw boom; },
+    sendEmail: async () => { throw new Error('provider down'); },
+    sendCeilingMax: 2,
+    sendCeilingWindowMs: 60_000,
+    log: { error() {}, warn() {} },
+  });
+  await assert.rejects(
+    failing({ method: 'POST', body: { email: 'bad@example.org' } }, fakeRes()),
+    /provider down/,
+  );
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 2);
+});
+
+test('a challenge write failure returns the ceiling slot, because the provider was not called', async () => {
+  const db = fakeDb();
+  const { handler } = sendDeps({ db, sendCeilingMax: 2, sendCeilingWindowMs: 60_000 });
+  await handler({ method: 'POST', body: { email: 'ok@example.org' } }, fakeRes());
+
+  const realCollection = db.collection.bind(db);
+  db.collection = (name) => {
+    const col = realCollection(name);
+    if (name !== 'auth_challenges') return col;
+    return {
+      doc(id) {
+        const ref = col.doc(id);
+        return { ...ref, async set() { throw new Error('firestore unavailable'); } };
+      },
+    };
+  };
+  const failing = createSendOtpHandler({
+    db,
+    getConfig: async () => CONFIG,
+    sendEmail: async () => { throw new Error('provider should not be called'); },
     sendCeilingMax: 2,
     sendCeilingWindowMs: 60_000,
     log: { error() {}, warn() {} },
@@ -320,7 +344,6 @@ test('a throw between reservation and send also returns the ceiling slot', async
     failing({ method: 'POST', body: { email: 'bad@example.org' } }, fakeRes()),
     /firestore unavailable/,
   );
-  // The failed request gave its slot back; the successful one kept its own.
   assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 1);
 });
 

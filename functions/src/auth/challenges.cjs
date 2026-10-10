@@ -204,11 +204,10 @@ async function takeGlobalSendSlot({
 }
 
 /**
- * Give back a reservation taken by `takeGlobalSendSlot` when the send it
- * was reserved for did not happen — a provider outage, a failed challenge
- * write. Without this, a deployment whose email provider is down burns the
- * whole hourly ceiling on zero delivered codes and keeps refusing sign-ins
- * after the provider recovers.
+ * Give back a reservation taken by `takeGlobalSendSlot` when the provider
+ * was never called, such as a failed challenge write. A provider response
+ * that is not `sent`, and a throw from the provider, keep the slot. Giving
+ * those back lets failed calls bypass the ceiling.
  *
  * Removes exactly one timestamp equal to `takenAt`. Two requests reserving
  * in the same millisecond are indistinguishable, but returning "one slot"

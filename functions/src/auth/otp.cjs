@@ -264,10 +264,10 @@ function createSendOtpHandler({
       return;
     }
 
-    // The ceiling slot above is a reservation. Everything from here to a
-    // delivered mail can fail, and a failure that leaves the reservation
-    // behind would let a provider outage burn the whole hourly ceiling on
-    // zero delivered codes — and keep 429ing after the provider recovers.
+    // A call that reaches the provider keeps its slot, including a failed
+    // response and a throw. Releasing those lets a caller burn provider
+    // attempts without ever filling the ceiling (issue #366). A failure
+    // before the provider is called still gives the slot back.
     const releaseCeiling = async () => {
       try {
         await releaseGlobalSendSlot({ db, takenAt: ceiling.takenAt, now, windowMs: sendCeilingWindowMs });
@@ -279,28 +279,27 @@ function createSendOtpHandler({
     };
 
     let token;
-    let result;
     try {
       ({ token } = await createChallenge({ db, email, code, now }));
-
-      // No onceKey — every request must send a new code (spec §3.1).
-      result = await sendEmail({
-        to: email,
-        subject: rendered.subject,
-        html: rendered.html,
-        text: rendered.text,
-        tag: 'auth.otp',
-        source: 'auth-otp',
-        storeRendered: rendered.storeRendered,
-        hasLegalFooterHtml: rendered.hasLegalFooterHtml,
-        hasLegalFooterText: rendered.hasLegalFooterText,
-      });
     } catch (err) {
       await releaseCeiling();
       throw err;
     }
+
+    // No onceKey — every request must send a new code (spec §3.1).
+    // A throw here keeps the ceiling slot.
+    const result = await sendEmail({
+      to: email,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      tag: 'auth.otp',
+      source: 'auth-otp',
+      storeRendered: rendered.storeRendered,
+      hasLegalFooterHtml: rendered.hasLegalFooterHtml,
+      hasLegalFooterText: rendered.hasLegalFooterText,
+    });
     if (result.status !== 'sent') {
-      await releaseCeiling();
       res.status(502).json({ error: { code: 'send-failed', message: 'The sign-in email could not be sent. Try again.' } });
       return;
     }
