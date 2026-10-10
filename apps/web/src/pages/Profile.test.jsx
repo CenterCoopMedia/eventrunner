@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { installPhotoCropStubs, uninstallPhotoCropStubs } from '../test/photoCropStubs.js';
 
 let features;
 let badgesConfig;
@@ -334,10 +335,9 @@ describe('Profile', () => {
   });
 });
 
-// The photo's delete ordering (issue #24 review follow-up): the object that
-// a saved profile — and the users_public projection built from it — still
-// references must survive an abandoned edit, so nothing is deleted until a
-// save has actually committed.
+// The browser never deletes the photo object. syncUserPublic does that
+// after users_public names the new path. An abandoned edit, a failed save,
+// and a successful save all leave the object in place from this page.
 describe('the profile photo lifecycle', () => {
   const withPhoto = { ...SEEDED_PROFILE, photoPath: 'profile-photos/u1/old.png' };
 
@@ -348,7 +348,7 @@ describe('the profile photo lifecycle', () => {
     expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
   });
 
-  it('deletes the previous object once the save commits', async () => {
+  it('saves a removal without deleting the object from the browser', async () => {
     profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
@@ -356,9 +356,7 @@ describe('the profile photo lifecycle', () => {
 
     await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
     expect(saveProfileMock.mock.calls[0][0].photoPath).toBeNull();
-    await waitFor(() =>
-      expect(deleteOwnPhotoMock).toHaveBeenCalledWith('profile-photos/u1/old.png'),
-    );
+    expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
   });
 
   it('keeps the object when a save fails', async () => {
@@ -378,5 +376,35 @@ describe('the profile photo lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
     await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
     expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
+  });
+
+  it('does not save while a replacement photo is still in progress', async () => {
+    installPhotoCropStubs();
+    try {
+      let release;
+      uploadProfilePhotoMock.mockImplementationOnce(
+        () => new Promise((resolve) => { release = resolve; }),
+      );
+      profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
+      renderPage();
+      fireEvent.change(screen.getByLabelText('Replace photo'), {
+        target: { files: [new File(['x'], 'me.png', { type: 'image/png' })] },
+      });
+      const save = screen.getByRole('button', { name: 'Save profile' });
+      expect(save).toBeDisabled();
+      fireEvent.submit(save.closest('form'));
+      expect(saveProfileMock).not.toHaveBeenCalled();
+
+      await screen.findByRole('button', { name: 'Use this crop' });
+      fireEvent.click(screen.getByRole('button', { name: 'Use this crop' }));
+      expect(save).toBeDisabled();
+      fireEvent.submit(save.closest('form'));
+      expect(saveProfileMock).not.toHaveBeenCalled();
+
+      release({ path: 'profile-photos/u1/fresh/photo.png' });
+      await waitFor(() => expect(save).toBeEnabled());
+    } finally {
+      uninstallPhotoCropStubs();
+    }
   });
 });

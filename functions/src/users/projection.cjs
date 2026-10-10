@@ -25,6 +25,12 @@
  * byte-identical (a `lastSeenAt` touch, a registrationStatus change —
  * private, so not projected) writes nothing, so trigger retries and
  * unrelated account churn do not amplify into writes.
+ *
+ * A replaced profile photo is deleted only after that write. The directory
+ * reads `users_public.photoPath`, so deleting the previous object any
+ * sooner leaves a broken image. The delete is limited to
+ * `profile-photos/{uid}/`: a stored path outside that prefix is not this
+ * account's object.
  */
 
 const { buildPublicProfile } = require('shared/profile');
@@ -34,6 +40,24 @@ const USERS_PUBLIC = 'users_public';
 const BADGES_CONFIG = 'badges';
 const FEATURES_CONFIG = 'features';
 const REFRESH_CONCURRENCY = 25;
+
+/**
+ * The previous public photo, when this account owns it and the new
+ * projection no longer names it. Anything else is left alone: another
+ * account's object, a path with `..`, or the photo the directory still shows.
+ *
+ * @param {string} uid
+ * @param {*} previous
+ * @param {*} next
+ * @returns {string|null}
+ */
+function replacedOwnPhoto(uid, previous, next) {
+  if (typeof uid !== 'string' || uid.length === 0 || uid.includes('/')) return null;
+  if (typeof previous !== 'string' || previous === next) return null;
+  const prefix = `profile-photos/${uid}/`;
+  if (!previous.startsWith(prefix) || previous.includes('..')) return null;
+  return previous;
+}
 
 /** Shallow-equal over the projection payload (values are scalars, string
  * arrays, and a flat socialHandles map). */
@@ -73,6 +97,7 @@ function sameProjection(a, b) {
  *
  * @param {{ db: object, getBadgesConfig?: (tx: object) => Promise<object|null>,
  *           failClosedOnConfigError?: boolean,
+ *           deleteReplacedPhoto?: (path: string) => Promise<void>,
  *           now?: () => Date, log?: { error: Function } }} deps
  * @returns {(change: { uid: string }) =>
  *   Promise<{ action: 'deleted'|'written'|'unchanged' }>}
@@ -82,6 +107,7 @@ function createSyncUserPublic({
   getBadgesConfig,
   getFeaturesConfig,
   failClosedOnConfigError = true,
+  deleteReplacedPhoto,
   now = () => new Date(),
   log = console,
 }) {
@@ -105,7 +131,7 @@ function createSyncUserPublic({
     const userRef = db.collection(USERS).doc(uid);
     const publicRef = db.collection(USERS_PUBLIC).doc(uid);
 
-    return db.runTransaction(async (tx) => {
+    const result = await db.runTransaction(async (tx) => {
       let badgesConfig = null;
       let featuresConfig = null;
       try {
@@ -127,19 +153,37 @@ function createSyncUserPublic({
 
       // The account is gone: its public projection must go with it. A
       // delete of an already-absent doc is a no-op in Firestore, so this
-      // needs no existence check.
+      // needs no existence check. The account sweep removes the photo
+      // objects; this trigger does not, because the user document is
+      // already gone and is no longer the source of the path.
       if (!userSnap.exists) {
         tx.delete(publicRef);
         return { action: 'deleted' };
       }
 
+      const previousPhoto = publicSnap.exists ? publicSnap.data()?.photoPath : null;
       const payload = buildPublicProfile(userSnap.data(), badgesConfig, featuresConfig);
       if (publicSnap.exists && sameProjection(stripStamps(publicSnap.data()), payload)) {
         return { action: 'unchanged' };
       }
       tx.set(publicRef, { ...payload, uid, updatedAt: now() });
-      return { action: 'written' };
+      return {
+        action: 'written',
+        replacedPhoto: replacedOwnPhoto(uid, previousPhoto, payload.photoPath),
+      };
     });
+
+    // After the public document names the new path. A failed delete leaves
+    // the old object in place, which keeps the directory working on a retry
+    // that finds the projection already current and therefore deletes nothing.
+    if (result.replacedPhoto && typeof deleteReplacedPhoto === 'function') {
+      try {
+        await deleteReplacedPhoto(result.replacedPhoto);
+      } catch (err) {
+        log.error('syncUserPublic: replaced photo delete failed', err);
+      }
+    }
+    return { action: result.action };
   };
 }
 
@@ -200,8 +244,12 @@ function buildHandlers() {
       document: 'users/{uid}',
     }, async (event) => {
       const { getDb } = require('../core/firestore.cjs');
+      const { getStorage } = require('firebase-admin/storage');
       const db = getDb();
-      const handler = createSyncUserPublic({ db });
+      const handler = createSyncUserPublic({
+        db,
+        deleteReplacedPhoto: (path) => getStorage().bucket().file(path).delete({ ignoreNotFound: true }),
+      });
       // The event's snapshots are deliberately unused — see
       // createSyncUserPublic: the handler re-reads the source document.
       await handler({ uid: event.params.uid });
@@ -239,6 +287,7 @@ module.exports = {
   },
   internals: {
     sameProjection,
+    replacedOwnPhoto,
     USERS,
     USERS_PUBLIC,
     BADGES_CONFIG,

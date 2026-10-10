@@ -20,6 +20,16 @@ import { PROFILE_PHOTO_MAX_BYTES, PROFILE_PHOTO_TYPES, checkFile } from './media
 
 let client = null;
 
+/**
+ * A fresh object id. `randomUUID` needs a secure context; the fallback is
+ * the same shape mintUpdateId and newSubmissionKey use when it is absent.
+ */
+function newPhotoObjectId() {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') return cryptoObj.randomUUID();
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+}
+
 /** The Storage client, made on first use so importing this module is cheap. */
 function storageClient() {
   if (!client) {
@@ -47,7 +57,7 @@ export async function uploadProfilePhoto({ uid, file }) {
   });
   if (problem) throw new Error(problem);
   const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  const id = globalThis.crypto.randomUUID();
+  const id = newPhotoObjectId();
   const path = `profile-photos/${uid}/${id}/photo.${extension}`;
   await uploadBytes(ref(storageClient(), path), file, { contentType: file.type });
   return { path };
