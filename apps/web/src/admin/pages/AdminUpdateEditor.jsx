@@ -238,6 +238,19 @@ export default function AdminUpdateEditor({ mode }) {
     }
   }
 
+  // A delete that lands after the form was filled used to leave the form
+  // open, and the next save wrote the update back. The create race is the
+  // exception: the draft may not be in the listener yet, and createdId
+  // keeps that form up until the listener reports.
+  if (mode === 'edit' && ready && !row && adoptedId === updateId) {
+    return (
+      <AdminEmptyState
+        title="No such update"
+        description="That update does not exist. It may have been deleted."
+      />
+    );
+  }
+
   if (mode === 'edit' && adoptedId !== updateId && createdId !== updateId) {
     if (ready && !row) {
       return (

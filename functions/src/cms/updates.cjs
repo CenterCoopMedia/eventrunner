@@ -7,7 +7,8 @@
  *   cmsSaveUpdate   POST { id?, update, visible? } — validate and write the
  *                   DRAFT revision only (cmsUpdates_drafts, status 'dirty').
  *                   Omitting `id` creates a new update with a random id.
- *   cmsDeleteUpdate POST { id } — remove live + draft in one batch.
+ *   cmsDeleteUpdate POST { id } — remove live + draft in one batch, and
+ *                   record the id so a later save cannot recreate it.
  *
  * cmsUpdates content fields: { title, body, publishAt | null, pinned,
  * category | null, featured }, plus the optional featuredImage and content.
@@ -35,6 +36,9 @@ const { writeAdminLog, DOC_ID_RE } = pagesInternals;
 
 const UPDATES_COLLECTION = 'cmsUpdates';
 const UPDATES_DRAFTS = 'cmsUpdates_drafts';
+// Written before the live and draft docs are removed. A later save of that
+// id is a resurrection, and it is refused while both docs stay gone.
+const UPDATES_DELETED = 'cmsUpdates_deleted';
 
 /** Keys a cmsUpdates doc may carry — anything else is rejected by name. */
 const UPDATE_KEYS = Object.freeze([
@@ -114,6 +118,17 @@ function createSaveUpdateHandler({ db, auth, getConfig, store, now = Date.now, l
     }
     const id = rawId === undefined ? crypto.randomUUID() : rawId;
 
+    if (rawId !== undefined) {
+      const [draftSnap, liveSnap, deletedSnap] = await Promise.all([
+        db.collection(UPDATES_DRAFTS).doc(id).get(),
+        db.collection(UPDATES_COLLECTION).doc(id).get(),
+        db.collection(UPDATES_DELETED).doc(id).get(),
+      ]);
+      if (deletedSnap.exists && !draftSnap.exists && !liveSnap.exists) {
+        return notFound(res, 'Update not found.');
+      }
+    }
+
     const contentFields = {
       title: update.title,
       body: update.body,
@@ -178,6 +193,10 @@ function createDeleteUpdateHandler({ db, auth, getConfig, store, now = Date.now,
     if (!draftSnap.exists && !liveSnap.exists) return notFound(res, 'Update not found.');
 
     try {
+      await db.collection(UPDATES_DELETED).doc(id).set({
+        deletedAt: new Date(now()),
+        deletedBy: gate.uid,
+      });
       await store.deleteBoth({ db, collection: UPDATES_COLLECTION, docId: id });
     } catch (err) {
       log.error('cmsDeleteUpdate failed', err);

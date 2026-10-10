@@ -44,6 +44,9 @@ function fakeDb(seed = {}) {
               const data = docs.get(key);
               return { exists: data !== undefined, data: () => data };
             },
+            async set(data) {
+              docs.set(key, data);
+            },
           };
         },
         async add(data) {
@@ -155,6 +158,19 @@ test('normalizePublishAt: null passes through, invalid Date rejected', () => {
 });
 
 // ----------------------------------------------------------- cmsSaveUpdate
+
+test('cmsSaveUpdate does not recreate an update that was deleted', async () => {
+  const d = deps({ db: fakeDb({ 'cmsUpdates_drafts/gone': { title: 'Gone' } }) });
+  let res = fakeRes();
+  await createDeleteUpdateHandler(d)(adminReq({ id: 'gone' }), res);
+  assert.equal(res.statusCode, 200);
+  d.db.docs.delete('cmsUpdates_drafts/gone');
+  res = fakeRes();
+  await createSaveUpdateHandler(d)(adminReq({ id: 'gone', update: validUpdate() }), res);
+  assert.equal(res.statusCode, 404);
+  assert.equal(res.body.error.message, 'Update not found.');
+  assert.equal(d.store.writes.length, 0);
+});
 
 test('cmsSaveUpdate writes the DRAFT collection only', async () => {
   const d = deps();

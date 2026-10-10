@@ -519,6 +519,18 @@ describe('the update editor', () => {
     await waitFor(() => expect(currentPath).toBe('/admin/updates'));
   });
 
+  it('closes the form when a loaded update is deleted, so a save cannot write it back', async () => {
+    await renderAt('/admin/updates/published');
+    pushUpdates([PUBLISHED], [PUBLISHED_CLEAN]);
+    await screen.findByRole('heading', { level: 1, name: PUBLISHED.title });
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeInTheDocument();
+
+    pushUpdates([], []);
+    expect(await screen.findByRole('heading', { name: 'No such update' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('says an unknown update does not exist', async () => {
     await renderAt('/admin/updates/ghost');
     expect(await screen.findByRole('heading', { name: 'No such update' })).toBeInTheDocument();
