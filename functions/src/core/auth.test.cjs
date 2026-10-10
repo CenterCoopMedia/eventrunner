@@ -24,9 +24,10 @@ function reqWithAuth(value) {
  * Fake Firebase Auth: resolves tokens present in the map, rejects (like the
  * Admin SDK on an expired/garbage token) for everything else.
  */
-function fakeAuth(tokens) {
+function fakeAuth(tokens, { revoked = new Set() } = {}) {
   return {
-    async verifyIdToken(t) {
+    async verifyIdToken(t, checkRevoked = false) {
+      if (checkRevoked && revoked.has(t)) throw new Error('auth/id-token-revoked');
       if (t in tokens) return tokens[t];
       throw new Error('auth/argument-error');
     },
@@ -67,9 +68,43 @@ test('extractBearerToken prefers Express req.get when present', () => {
 });
 
 test('verifyAuthToken returns the decoded token for a valid Bearer header', async () => {
-  const auth = fakeAuth({ good: ADMIN_TOKEN });
+  let sawRevocationCheck = false;
+  const auth = {
+    async verifyIdToken(token, checkRevoked) {
+      sawRevocationCheck = checkRevoked === true;
+      if (token === 'good') return ADMIN_TOKEN;
+      throw new Error('auth/argument-error');
+    },
+  };
   const decoded = await verifyAuthToken({ auth }, reqWithAuth('Bearer good'));
   assert.equal(decoded.uid, 'u1');
+  assert.equal(sawRevocationCheck, true);
+});
+
+test('verifyAuthToken rejects a revoked token from a deleted account', async () => {
+  const auth = fakeAuth({ gone: ADMIN_TOKEN }, { revoked: new Set(['gone']) });
+  assert.equal(await verifyAuthToken({ auth }, reqWithAuth('Bearer gone')), null);
+});
+
+test('verifyAuthToken asks Auth once for the same request', async () => {
+  let calls = 0;
+  const auth = {
+    async verifyIdToken(token, checkRevoked) {
+      calls += 1;
+      assert.equal(checkRevoked, true);
+      if (token === 'good') return ADMIN_TOKEN;
+      throw new Error('auth/argument-error');
+    },
+  };
+  const req = reqWithAuth('Bearer good');
+  const first = await verifyAuthToken({ auth }, req);
+  const second = await verifyAuthToken({ auth }, req);
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+  assert.equal(await verifyAuthToken({ auth }, { ...req, headers: {} }), null);
+  assert.equal(calls, 1);
+  await verifyAuthToken({ auth }, reqWithAuth('Bearer good'));
+  assert.equal(calls, 2);
 });
 
 test('verifyAuthToken returns null (never throws) on missing or bad tokens', async () => {
