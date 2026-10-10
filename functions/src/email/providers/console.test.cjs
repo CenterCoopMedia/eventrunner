@@ -64,15 +64,26 @@ test('a sign-in code stays out of the log outside the emulator', async () => {
   });
   await provider.send({
     to: 'a@example.com',
-    subject: 'Your sign-in code',
+    subject: 'Custom: 482913',
     text: 'Your code is 482913',
     html: '<p>Your code is 482913</p>',
+    tag: 'auth.otp',
+    storeRendered: false,
   });
   assert.equal(log.lines.length, 1);
   assert.equal(log.lines[0].includes('482913'), false);
+  assert.equal(log.lines[0].includes('Custom:'), false);
   assert.equal(log.lines[0].includes('<p>'), false);
   assert.match(log.lines[0], /a@example\.com/);
-  assert.match(log.lines[0], /Your sign-in code/);
+
+  await provider.send({
+    to: 'b@example.com',
+    subject: 'Schedule update',
+    text: 'Doors at noon',
+    storeRendered: true,
+  });
+  assert.match(log.lines[1], /Schedule update/);
+  assert.equal(log.lines[1].includes('Doors at noon'), false);
 });
 
 test('a sign-in code stays out of the log when the e2e mail file is the sink', async () => {
@@ -85,13 +96,16 @@ test('a sign-in code stays out of the log when the e2e mail file is the sink', a
   });
   await provider.send({
     to: 'a@example.com',
-    subject: 'Your sign-in code',
+    subject: 'Custom: 482913',
     tag: 'auth.otp',
+    storeRendered: false,
     text: 'Your code is 482913',
     html: '<p>Your code is 482913</p>',
   });
   assert.equal(log.lines[0].includes('482913'), false);
-  assert.equal(JSON.parse(writes[0]).text, 'Your code is 482913');
+  const stored = JSON.parse(writes[0]);
+  assert.equal(stored.text, 'Your code is 482913');
+  assert.equal(stored.subject, 'Custom: 482913');
 });
 
 test('the emulator log keeps the body when no mail file is set', async () => {
@@ -102,10 +116,12 @@ test('the emulator log keeps the body when no mail file is set', async () => {
   });
   await provider.send({
     to: 'a@example.com',
-    subject: 'Your sign-in code',
+    subject: 'Custom: 482913',
     text: 'Your code is 482913',
+    storeRendered: false,
   });
   assert.match(log.lines[0], /482913/);
+  assert.match(log.lines[0], /Custom: 482913/);
 });
 
 test('send returns a fresh id per call', async () => {

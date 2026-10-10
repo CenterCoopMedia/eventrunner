@@ -44,9 +44,9 @@ function createConsoleProvider({
   // only scripts/dev/run-e2e.sh ever sets.
   //
   // The stdout log omits the message body unless this is the local emulator
-  // and that file is unset. A deployed console provider must not write a
-  // sign-in code into Cloud Logging, and the Actions log must not keep the
-  // code once the file sink has it. login-smoke still reads the emulator log.
+  // and that file is unset. When storeRendered is false, that log also omits
+  // the subject, because a sign-in or invite subject can hold the same secret.
+  // login-smoke still reads the emulator log.
   const mailFile = typeof env.E2E_MAIL_FILE === 'string' ? env.E2E_MAIL_FILE.trim() : '';
 
   /** @param {object} message EmailMessage @returns {Promise<object>} EmailSendResult */
@@ -61,8 +61,9 @@ function createConsoleProvider({
       html: message.html,
     };
     // Local smoke reads the body from the emulator log. Everywhere else the
-    // body stays out of stdout: a deployed function would ship it to Cloud
-    // Logging, and the e2e file already holds it for the test runner.
+    // body stays out of stdout. A bearer-secret template can put the secret
+    // in the subject too, and the audit row already drops that subject when
+    // storeRendered is false, so the log drops it on the same sends.
     const logBody = env.FUNCTIONS_EMULATOR === 'true' && !mailFile;
     const logged = logBody
       ? captured
@@ -70,7 +71,7 @@ function createConsoleProvider({
           to: captured.to,
           from: captured.from,
           replyTo: captured.replyTo,
-          subject: captured.subject,
+          ...(message.storeRendered === false ? {} : { subject: captured.subject }),
           tag: captured.tag,
         };
     log.log('[email:console]', JSON.stringify(logged, null, 2));
