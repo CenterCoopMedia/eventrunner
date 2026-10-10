@@ -90,8 +90,16 @@ export default function ModalShell({ title, description = null, onClose, childre
               <p className="mt-3xs text-admin-sm text-admin-ink-secondary">{description}</p>
             ) : null}
           </div>
-          <button type="button" onClick={onClose} className={secondaryButtonClass}>
-            Close
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            title="Close dialog"
+            className={`${secondaryButtonClass} min-w-[var(--admin-control-height)] shrink-0`}
+          >
+            <svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
           </button>
         </div>
         <div className="mt-sm">{children}</div>

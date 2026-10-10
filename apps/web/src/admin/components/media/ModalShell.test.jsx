@@ -7,10 +7,35 @@
 // moves in on open, Escape closes, focus returns to the opener on close) so
 // a future restyle cannot silently drop either.
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ModalShell from './ModalShell.jsx';
 
 describe('ModalShell', () => {
+  it('names the icon-only close control and returns focus after dismissal', () => {
+    function Example() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>Choose image</button>
+          {open && <ModalShell title="Choose an image — Primary logo" onClose={() => setOpen(false)}>Images</ModalShell>}
+        </>
+      );
+    }
+    render(<Example />);
+    const opener = screen.getByRole('button', { name: 'Choose image' });
+    opener.focus();
+    fireEvent.click(opener);
+    const close = screen.getByRole('button', { name: 'Close' });
+    expect(close).toHaveTextContent('');
+    expect(close).toHaveAttribute('title', 'Close dialog');
+    close.focus();
+    expect(close).toHaveFocus();
+    fireEvent.click(close);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+
   it('lifts the panel with a strong-rule frame, never a shadow', () => {
     render(
       <ModalShell title="Upload a file" onClose={() => {}}>
