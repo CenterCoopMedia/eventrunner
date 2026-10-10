@@ -69,7 +69,16 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/ci/classify-changes.cjs
+        # The classifier decides which security tiers run. A pull request
+        # loads the copy from its base commit, so it cannot replace those
+        # rules. A manual run has no base commit and uses the checked-out file.
+        run: |
+          script=scripts/ci/classify-changes.cjs
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            script="$RUNNER_TEMP/classify-changes.cjs"
+            git show "$GITHUB_BASE_SHA:scripts/ci/classify-changes.cjs" > "$script"
+          fi
+          node "$script"
 
   dco:
     name: DCO sign-off
