@@ -689,8 +689,18 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
     });
   }
 
+  async function seedSession(sessionId) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `cmsSchedule/${sessionId}`), {
+        visible: true,
+        revision: 1,
+      });
+    });
+  }
+
   it("allows the owner to create, read, and rewrite their own note", async () => {
     await seedAccount("attendee-1");
+    await seedSession("session-1");
     await assertSucceeds(setDoc(noteRef("attendee-1", "session-1"), { text: "Ask about funding" }));
     await assertSucceeds(getDoc(noteRef("attendee-1", "session-1")));
     await assertSucceeds(
@@ -743,8 +753,33 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
     await assertFails(deleteDoc(note));
   });
 
+  it("denies a pending account a note on a real session", async () => {
+    await assertFails(
+      setDoc(doc(attendee("pending-1"), "users/pending-1/sessionNotes/pub"), { text: "nope" }),
+    );
+  });
+
+  it("allows a speaker whose registration is still pending to keep a note", async () => {
+    await assertSucceeds(
+      setDoc(doc(attendee("speaker-1"), "users/speaker-1/sessionNotes/pub"), {
+        text: "Ask after the talk",
+      }),
+    );
+  });
+
+  it("denies a note whose id is not a session", async () => {
+    await seedAccount("attendee-1");
+    await assertFails(setDoc(noteRef("attendee-1", "not-a-session"), { text: "unbounded" }));
+  });
+
+  it("allows a note on a session that is not visible", async () => {
+    await seedAccount("attendee-1");
+    await assertSucceeds(setDoc(noteRef("attendee-1", "hidden"), { text: "Still mine" }));
+  });
+
   it("refuses a note that is not text, or text past the cap", async () => {
     await seedAccount("attendee-1");
+    await seedSession("session-2");
     await assertFails(setDoc(noteRef("attendee-1", "session-2"), { body: "nope" }));
     await assertFails(setDoc(noteRef("attendee-1", "session-2"), { text: 42 }));
     await assertFails(
