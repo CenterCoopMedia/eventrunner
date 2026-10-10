@@ -161,20 +161,36 @@ function extractBearerToken(req) {
  *
  * `checkRevoked` is required. A deleted or disabled account keeps a valid
  * ID token until it expires, and Firebase Auth reports that only when the
- * caller asks. Security rules do not perform this check.
+ * caller asks. Security rules do not perform this check. That ask is a
+ * remote lookup, so one request remembers the result and does not ask again.
  *
  * @param {{ auth: { verifyIdToken: (t: string, checkRevoked?: boolean) => Promise<object> } }} deps
  * @param {object} req
  * @returns {Promise<object|null>} decoded token or null
  */
+const verifiedAuthToken = Symbol('verifiedAuthToken');
+
 async function verifyAuthToken({ auth }, req) {
-  const token = extractBearerToken(req);
-  if (!token) return null;
-  try {
-    return await auth.verifyIdToken(token, true);
-  } catch {
-    return null;
+  if (req && typeof req === 'object' && verifiedAuthToken in req) {
+    return req[verifiedAuthToken];
   }
+  const token = extractBearerToken(req);
+  let decoded = null;
+  if (token) {
+    try {
+      decoded = await auth.verifyIdToken(token, true);
+    } catch {
+      decoded = null;
+    }
+  }
+  if (req && typeof req === 'object') {
+    try {
+      req[verifiedAuthToken] = decoded;
+    } catch {
+      // A frozen request cannot remember the result. The check still ran.
+    }
+  }
+  return decoded;
 }
 
 /**

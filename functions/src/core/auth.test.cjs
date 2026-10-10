@@ -86,6 +86,25 @@ test('verifyAuthToken rejects a revoked token from a deleted account', async () 
   assert.equal(await verifyAuthToken({ auth }, reqWithAuth('Bearer gone')), null);
 });
 
+test('verifyAuthToken asks Auth once for the same request', async () => {
+  let calls = 0;
+  const auth = {
+    async verifyIdToken(token, checkRevoked) {
+      calls += 1;
+      assert.equal(checkRevoked, true);
+      if (token === 'good') return ADMIN_TOKEN;
+      throw new Error('auth/argument-error');
+    },
+  };
+  const req = reqWithAuth('Bearer good');
+  const first = await verifyAuthToken({ auth }, req);
+  const second = await verifyAuthToken({ auth }, req);
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+  await verifyAuthToken({ auth }, reqWithAuth('Bearer good'));
+  assert.equal(calls, 2);
+});
+
 test('verifyAuthToken returns null (never throws) on missing or bad tokens', async () => {
   const auth = fakeAuth({ good: ADMIN_TOKEN });
   assert.equal(await verifyAuthToken({ auth }, reqWithAuth(undefined)), null);
