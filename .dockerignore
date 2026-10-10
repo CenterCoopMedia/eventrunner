@@ -11,6 +11,12 @@ node_modules
 .github
 apps/web/dist
 functions/.env.*
+# Local env files. .gitignore already ignores these. The image copies the
+# workspace, so a developer file must not be baked in. .env.example is
+# committed and is not a secret, so it stays.
+.env
+.env.*
+!.env.example
 # google-github-actions/auth writes this file into the workspace before
 # the publisher image is built. COPY . would bake it into the image.
 gha-creds-*.json
