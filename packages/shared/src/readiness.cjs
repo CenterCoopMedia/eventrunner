@@ -25,7 +25,13 @@ function evaluateReadiness({
     'Have the client review the seeded privacy and terms pages, then clear the flag from admin Settings.',
   );
 
-  const verified = event?.sender?.domainVerified === true;
+  const recordedDomain = typeof event?.sender?.domainVerifiedDomain === 'string'
+    ? event.sender.domainVerifiedDomain.trim().toLowerCase()
+    : '';
+  const senderEmail = typeof event?.sender?.email === 'string' ? event.sender.email.trim().toLowerCase() : '';
+  const at = senderEmail.lastIndexOf('@');
+  const senderDomain = at > 0 ? senderEmail.slice(at + 1) : '';
+  const verified = event?.sender?.domainVerified === true && recordedDomain !== '' && recordedDomain === senderDomain;
   row(
     'sender',
     'Sender domain',

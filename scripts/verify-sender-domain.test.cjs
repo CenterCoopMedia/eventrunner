@@ -124,6 +124,19 @@ test('a provider with no domain API can still satisfy readiness, by operator att
   assert.ok(sender.domainVerifiedAt);
 });
 
+test('attestation refuses a domain that is not the configured sender domain', async () => {
+  const db = dbWithSender('hello@example.org');
+  const code = await run({
+    args: { attest: true, domain: 'other.example' },
+    env: { EVENT_EMAIL_PROVIDER: 'webhook' },
+    deps: fakeDeps({ provider: { name: 'webhook' }, db }),
+  });
+  assert.equal(code, 2);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.domainVerified, false);
+  assert.equal(sender.email, 'hello@example.org');
+});
+
 test('a capable provider refuses --attest — its own check is the answer', async () => {
   const db = dbWithSender('hello@example.org');
   const code = await run({

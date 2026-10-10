@@ -214,6 +214,12 @@ async function run({ args, env = process.env, deps = {} }) {
       console.error('Cannot attest: config/event.sender.email is unset and --domain was not passed.');
       return 2;
     }
+    if (!configuredDomain || senderDomain(`a@${domain}`) !== senderDomain(`a@${configuredDomain}`)) {
+      console.error(configuredDomain
+        ? `Cannot attest ${domain}: this deployment sends from ${senderEmail} (${configuredDomain}).`
+        : 'Cannot attest: config/event.sender.email is unset.');
+      return 2;
+    }
     if (args['no-write'] || !db) {
       console.log('--no-write: attestation not recorded.');
       return 0;

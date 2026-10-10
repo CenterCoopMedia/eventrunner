@@ -22,6 +22,7 @@ function config() {
         email: 'private@example.org',
         domainVerified: true,
         domainVerifiedAt: '2026-08-28T00:00:00Z',
+        domainVerifiedDomain: 'example.org',
       },
       auth: {
         googleProviderEnabled: true,

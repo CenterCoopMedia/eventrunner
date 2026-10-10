@@ -10,7 +10,12 @@ function readySnapshot(overrides = {}) {
   return {
     event: {
       legal: { reviewRequired: false },
-      sender: { email: 'hello@example.org', domainVerified: true, domainVerifiedAt: '2027-01-01T00:00:00Z' },
+      sender: {
+        email: 'hello@example.org',
+        domainVerified: true,
+        domainVerifiedAt: '2027-01-01T00:00:00Z',
+        domainVerifiedDomain: 'example.org',
+      },
       auth: { googleProviderEnabled: true, authorizedDomainsConfigured: true, attestedAt: '2027-01-01', attestedBy: 'ops' },
     },
     providers: { ticketing: { provider: 'none' } },
@@ -71,6 +76,22 @@ test('the seeded-content row honors a configured threshold', () => {
     evaluateReadiness(readySnapshot({ seededContentCount: 3, seededThreshold: 5 })).find((r) => r.id === 'seeded').ok,
     true,
   );
+});
+
+test('a verified flag for a different domain does not pass the sender row', () => {
+  const rows = evaluateReadiness(readySnapshot({
+    event: {
+      legal: { reviewRequired: false },
+      sender: {
+        email: 'hello@example.org',
+        domainVerified: true,
+        domainVerifiedAt: '2027-01-01T00:00:00Z',
+        domainVerifiedDomain: 'other.example',
+      },
+      auth: { googleProviderEnabled: true, authorizedDomainsConfigured: true, attestedAt: '2027-01-01', attestedBy: 'ops' },
+    },
+  }));
+  assert.equal(rows.find((row) => row.id === 'sender').ok, false);
 });
 
 test('one admin is not enough — config/bootstrap must not be a single point of failure', () => {

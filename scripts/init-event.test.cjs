@@ -526,7 +526,12 @@ test('--check passes once every row is satisfied', async () => {
   await db.collection('config').doc('event').set({
     ...event,
     legal: { ...event.legal, reviewRequired: false },
-    sender: { ...event.sender, domainVerified: true, domainVerifiedAt: '2027-01-01T00:00:00Z' },
+    sender: {
+      ...event.sender,
+      domainVerified: true,
+      domainVerifiedAt: '2027-01-01T00:00:00Z',
+      domainVerifiedDomain: String(event.sender.email).split('@')[1],
+    },
   });
   await quietly(() => runAttestAuth({ db, store, dryRun: false, env: ENV, now: () => 0 }));
   const theme = (await db.collection('config').doc('theme').get()).data();
