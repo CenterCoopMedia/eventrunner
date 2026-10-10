@@ -80,7 +80,7 @@ const LIVE_EVENT = {
     { id: 'day-1', label: 'Day one', date: '2026-10-15', startTime: '09:00', endTime: '17:00' },
   ],
   venue: { name: 'Riverside Hall', city: 'Springfield' },
-  sender: { email: 'summit@example.org', name: 'Summit', domainVerified: true },
+  sender: { email: 'summit@example.org', name: 'Summit', domainVerified: true, domainVerifiedDomain: 'example.org' },
 };
 
 function okResponse(body = {}) {
@@ -622,6 +622,24 @@ describe('event settings', () => {
     await pushConfig('event', LIVE_EVENT);
     expect(screen.getByText('verified')).toBeInTheDocument();
     expect(screen.queryByLabelText(/domain verified/i)).toBeNull();
+  });
+
+  it('shows not verified when the recorded domain is missing or different', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    expect(screen.getByText('verified')).toBeInTheDocument();
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      sender: { email: 'summit@example.org', name: 'Summit', domainVerified: true },
+    });
+    expect(screen.getByText('not verified')).toBeInTheDocument();
+    await pushConfig('event', LIVE_EVENT);
+    expect(screen.getByText('verified')).toBeInTheDocument();
+    await pushConfig('event', {
+      ...LIVE_EVENT,
+      sender: { ...LIVE_EVENT.sender, domainVerifiedDomain: 'other.example' },
+    });
+    expect(screen.getByText('not verified')).toBeInTheDocument();
   });
 
   it('surfaces per-field server validation errors verbatim', async () => {

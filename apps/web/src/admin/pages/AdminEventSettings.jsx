@@ -7,12 +7,13 @@
 //     preserved by the server's deep merge.
 //   • Tier A deploy mirrors (slug, project id, region, providers, …) are
 //     read-only and rejected BY NAME, so they are not fields here.
-//   • sender.domainVerified / domainVerifiedAt belong to the sender-domain
-//     verification job alone; the form shows the current state read-only and
-//     never sends it.
+//   • sender.domainVerified, domainVerifiedAt, and domainVerifiedDomain belong
+//     to the sender-domain job. The badge uses the same check as launch
+//     readiness. The form shows that state read-only and never sends it.
 //   • Current values come from EventConfigContext, whose onSnapshot listener
 //     also delivers the saved result back — no reload, nothing optimistic.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { senderDomainVerified } from 'shared/readiness';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -407,7 +408,7 @@ export default function AdminEventSettings() {
     }
   }
 
-  const verified = eventConfig?.sender?.domainVerified === true;
+  const verified = senderDomainVerified(eventConfig?.sender);
 
   return (
     // noValidate: the form answers for its own fields (issue #219). Left to

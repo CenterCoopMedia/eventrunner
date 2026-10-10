@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { evaluateReadiness, allReady, formatReadinessTable } = require('./readiness.cjs');
+const { evaluateReadiness, allReady, formatReadinessTable, senderDomainVerified } = require('./readiness.cjs');
 
 /** A deployment that passes every row; individual tests break one at a time. */
 function readySnapshot(overrides = {}) {
@@ -92,6 +92,9 @@ test('a verified flag for a different domain does not pass the sender row', () =
     },
   }));
   assert.equal(rows.find((row) => row.id === 'sender').ok, false);
+  assert.equal(senderDomainVerified(readySnapshot().event.sender), true);
+  assert.equal(senderDomainVerified({ ...readySnapshot().event.sender, domainVerifiedDomain: 'other.example' }), false);
+  assert.equal(senderDomainVerified({ ...readySnapshot().event.sender, domainVerifiedDomain: '' }), false);
 });
 
 test('one admin is not enough — config/bootstrap must not be a single point of failure', () => {
