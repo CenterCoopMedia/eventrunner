@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const zlib = require('node:zlib');
 
 const {
   buildSchedulePdf,
@@ -542,6 +543,75 @@ test('createBuildMySchedulePdfHandler: 200 with a PDF of the caller own bookmark
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Content-Type'], 'application/pdf');
   assert.equal(res.sent.toString('latin1', 0, 5), '%PDF-');
+});
+
+// pdf-lib writes WinAnsi text as hex strings inside Flate streams.
+// Decode those strings. The title below is the fixture input, not a captured run.
+function pdfDrawnText(bytes) {
+  const chunks = [];
+  function walk(buf, depth) {
+    if (depth > 6) return;
+    const text = Buffer.from(buf).toString('latin1');
+    chunks.push(text);
+    const re = /stream\r?\n/g;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const start = match.index + match[0].length;
+      const end = text.indexOf('endstream', start);
+      if (end < 0) break;
+      let slice = text.slice(start, end);
+      if (slice.endsWith('\n')) slice = slice.slice(0, -1);
+      if (slice.endsWith('\r')) slice = slice.slice(0, -1);
+      try {
+        walk(zlib.inflateSync(Buffer.from(slice, 'latin1')), depth + 1);
+      } catch {
+        // This slice is not a zlib stream.
+      }
+    }
+  }
+  walk(bytes, 0);
+  const drawn = [];
+  const hexRe = /<([0-9A-Fa-f\s]+)>/g;
+  let hexMatch;
+  const joined = chunks.join('\n');
+  while ((hexMatch = hexRe.exec(joined)) !== null) {
+    const digits = hexMatch[1].replace(/\s/g, '');
+    if (digits.length < 2 || digits.length % 2 !== 0) continue;
+    drawn.push(Buffer.from(digits, 'hex').toString('latin1'));
+  }
+  return drawn.join('\n');
+}
+
+test('createBuildMySchedulePdfHandler: a bookmark matches the document id when the body has none', async () => {
+  const kept = session({ title: 'Kept session title' });
+  delete kept.id;
+  const other = session({ title: 'Other session title' });
+  delete other.id;
+  const db = makeFakeDb({
+    'users/u1': { displayName: 'Alex Rivera', registrationStatus: 'approved' },
+    'cmsSchedule/kept-doc': kept,
+    'cmsSchedule/stale-doc': session({ id: 'not-the-doc', title: 'Stale id session' }),
+    'cmsSchedule/other-doc': other,
+  });
+  // makeFakeDb splits a seed path on the first slash, so a nested bookmark
+  // seed lands in collection "users" instead of "users/u1/bookmarks".
+  await db.collection('users/u1/bookmarks').doc('kept-doc').set({ bookmarkedAt: new Date() });
+  await db.collection('users/u1/bookmarks').doc('stale-doc').set({ bookmarkedAt: new Date() });
+  const handler = createBuildMySchedulePdfHandler({
+    db,
+    auth: fakeAuth('u1'),
+    getConfig: async () => ({ features: { schedulePdf: true }, event: EVENT, theme: THEME }),
+  });
+  const res = fakeRes();
+  await handler(
+    { method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: {} },
+    res,
+  );
+  assert.equal(res.statusCode, 200);
+  const drawn = pdfDrawnText(res.sent);
+  assert.equal(drawn.includes('Kept session title'), true);
+  assert.equal(drawn.includes('Stale id session'), true);
+  assert.equal(drawn.includes('Other session title'), false);
 });
 
 test('createBuildMySchedulePdfHandler: a request naming another uid is refused, never substituted', async () => {
