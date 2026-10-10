@@ -11,4 +11,7 @@ node_modules
 .github
 apps/web/dist
 functions/.env.*
+# google-github-actions/auth writes this file into the workspace before
+# the publisher image is built. COPY . would bake it into the image.
+gha-creds-*.json
 *.log
