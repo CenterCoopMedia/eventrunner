@@ -122,10 +122,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Site-wide messages are public content. Staff mutations go through
-    // saveAnnouncement/deleteAnnouncement so each one has an admin log.
+    // Site-wide messages. The canonical row is admin-readable so staff can
+    // see scheduled and ended copy. A public get is allowed only inside
+    // the window. A public list is not, because rules cannot prove a
+    // client clock against request.time. Visitors read
+    // announcements_public/current instead. Issue #348.
     match /announcements/{docId} {
-      allow read: if true;
+      allow get: if isAdmin();
+      allow get: if resource.data.startsAt <= request.time
+        && resource.data.endsAt > request.time;
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // The visitor projection. publishActiveAnnouncements rewrites this one
+    // document from the canonical rows whose window contains server time.
+    // A list of the collection is denied because only `current` is public.
+    match /announcements_public/{docId} {
+      allow read: if docId == 'current';
       allow write: if false;
     }
 

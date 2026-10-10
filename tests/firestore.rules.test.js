@@ -1468,20 +1468,58 @@ describe("live_updates dashboard feed", () => {
 
 describe("site-wide announcements", () => {
   beforeAll(async () => {
+    const now = Date.now();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), "announcements/a1"), {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "announcements/a1"), {
         message: "Use the east entrance.",
         level: "info",
-        startsAt: new Date(),
-        endsAt: new Date(Date.now() + 60_000),
+        startsAt: new Date(now - 60_000),
+        endsAt: new Date(now + 60_000),
+      });
+      await setDoc(doc(db, "announcements/later"), {
+        message: "Doors open at noon.",
+        level: "info",
+        startsAt: new Date(now + 3_600_000),
+        endsAt: new Date(now + 7_200_000),
+      });
+      await setDoc(doc(db, "announcements/ended"), {
+        message: "Yesterday's notice.",
+        level: "info",
+        startsAt: new Date(now - 7_200_000),
+        endsAt: new Date(now - 60_000),
+      });
+      await setDoc(doc(db, "announcements_public/current"), {
+        announcements: [{ id: "a1", message: "Use the east entrance." }],
+      });
+      await setDoc(doc(db, "announcements_public/other"), {
+        announcements: [{ id: "secret", message: "Not yet." }],
       });
     });
   });
 
-  it("allows anyone to read one row and list the collection", async () => {
+  it("allows anyone to read one active canonical row", async () => {
     await assertSucceeds(getDoc(doc(anon(), "announcements/a1")));
-    await assertSucceeds(getDocs(collection(anon(), "announcements")));
     await assertSucceeds(getDoc(doc(nonAdmin(), "announcements/a1")));
+  });
+
+  it("denies an anonymous read of a scheduled or ended row, and an unfiltered list", async () => {
+    await assertFails(getDoc(doc(anon(), "announcements/later")));
+    await assertFails(getDoc(doc(anon(), "announcements/ended")));
+    await assertFails(getDocs(collection(anon(), "announcements")));
+  });
+
+  it("allows anyone to read the public projection and no other document in that collection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "announcements_public/current")));
+    await assertFails(getDoc(doc(anon(), "announcements_public/other")));
+    await assertFails(getDocs(collection(anon(), "announcements_public")));
+    await assertFails(setDoc(doc(anon(), "announcements_public/current"), { announcements: [] }));
+  });
+
+  it("allows an admin or a staff member to read a scheduled row and list every row", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "announcements/later")));
+    await assertSucceeds(getDoc(doc(staff(), "announcements/ended")));
+    await assertSucceeds(getDocs(collection(admin(), "announcements")));
   });
 
   it("denies every client write, admin included", async () => {

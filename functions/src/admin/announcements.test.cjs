@@ -2,22 +2,49 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { announcementTimeMs } = require('shared/announcement');
 const {
   prepareAnnouncement,
   createSaveAnnouncementHandler,
   createDeleteAnnouncementHandler,
+  syncPublicAnnouncements,
 } = require('./announcements.cjs');
 
 function fakeDb(seed = {}) {
   const docs = new Map(Object.entries(seed));
   let autoId = 0;
-  return {
+  const db = {
     docs,
+    failPublicWrite: false,
+    transactionReads: [],
     collection(name) {
-      return {
+      const filters = [];
+      const query = {
+        where(field, op, value) {
+          filters.push({ field, op, value });
+          return query;
+        },
+        async get() {
+          const prefix = `${name}/`;
+          const found = [];
+          for (const [key, data] of docs) {
+            if (!key.startsWith(prefix)) continue;
+            const id = key.slice(prefix.length);
+            if (id.includes('/')) continue;
+            const matches = filters.every((filter) => {
+              const left = announcementTimeMs(data?.[filter.field]);
+              const right = announcementTimeMs(filter.value);
+              return filter.op === '>' && left !== null && right !== null && left > right;
+            });
+            if (!matches) continue;
+            found.push({ id, data: () => data });
+          }
+          return { docs: found };
+        },
         doc(id) {
           const key = `${name}/${id ?? `auto${(autoId += 1)}`}`;
           return {
+            _key: key,
             async get() {
               if (key === 'config/bootstrap') {
                 return { exists: true, data: () => ({ adminEmails: ['admin@example.org'] }) };
@@ -30,8 +57,30 @@ function fakeDb(seed = {}) {
           };
         },
       };
+      return query;
+    },
+    // Writes land only after the body returns. A throw leaves the map unchanged.
+    async runTransaction(fn) {
+      const staged = [];
+      const tx = {
+        async get(target) {
+          db.transactionReads.push(target._key || 'query');
+          return target.get();
+        },
+        set(target, data) {
+          if (db.failPublicWrite && target._key === 'announcements_public/current') {
+            throw new Error('projection failed');
+          }
+          staged.push(() => target.set(data));
+        },
+        delete(target) { staged.push(() => target.delete()); },
+      };
+      const result = await fn(tx);
+      for (const apply of staged) await apply();
+      return result;
     },
   };
+  return db;
 }
 
 const auth = {
@@ -107,6 +156,23 @@ test('saveAnnouncement writes only sanitized public content and records the acto
   assert.equal('updatedBy' in stored, false);
   const logKey = [...db.docs.keys()].find((key) => key.startsWith('admin_logs/'));
   assert.equal(db.docs.get(logKey).email, 'admin@example.org');
+  assert.deepEqual(db.docs.get('announcements_public/current').announcements, []);
+});
+
+test('saveAnnouncement publishes a row only while its window contains now', async () => {
+  const db = fakeDb();
+  const response = res();
+  const live = deps(db);
+  live.now = () => Date.parse('2026-10-02T14:00:00.000Z');
+  await createSaveAnnouncementHandler(live)(req({
+    id: 'entry-change',
+    announcement: input(),
+  }), response);
+  assert.equal(response.statusCode, 200);
+  const published = db.docs.get('announcements_public/current').announcements;
+  assert.deepEqual(published.map((row) => row.id), ['entry-change']);
+  assert.equal(published[0].message, 'The entrance has moved.');
+  assert.equal(JSON.stringify(published).includes('admin@example.org'), false);
 });
 
 test('deleteAnnouncement removes an existing row and logs the action', async () => {
@@ -115,7 +181,51 @@ test('deleteAnnouncement removes an existing row and logs the action', async () 
   await createDeleteAnnouncementHandler(deps(db))(req({ id: 'a1' }), response);
   assert.equal(response.statusCode, 200);
   assert.equal(db.docs.has('announcements/a1'), false);
+  assert.deepEqual(db.docs.get('announcements_public/current').announcements, []);
   assert.ok([...db.docs.keys()].some((key) => key.startsWith('admin_logs/')));
+});
+
+test('syncPublicAnnouncements adds a row when its window opens and drops it when the window ends', async () => {
+  const db = fakeDb({
+    'announcements/later': input(),
+    'announcements/ended': input({
+      startsAt: '2026-10-01T13:00:00.000Z',
+      endsAt: '2026-10-01T15:00:00.000Z',
+    }),
+  });
+  const before = await syncPublicAnnouncements({
+    db,
+    now: new Date('2026-10-02T12:00:00.000Z'),
+  });
+  assert.deepEqual(before, []);
+  const during = await syncPublicAnnouncements({
+    db,
+    now: new Date('2026-10-02T14:00:00.000Z'),
+  });
+  assert.deepEqual(during.map((row) => row.id), ['later']);
+  const after = await syncPublicAnnouncements({
+    db,
+    now: new Date('2026-10-02T16:00:00.000Z'),
+  });
+  assert.deepEqual(after, []);
+  assert.ok(db.transactionReads.includes('announcements_public/current'));
+});
+
+test('saveAnnouncement leaves no canonical row when the public document does not commit', async () => {
+  const db = fakeDb();
+  db.failPublicWrite = true;
+  const failed = res();
+  await createSaveAnnouncementHandler(deps(db))(req({ announcement: input() }), failed);
+  assert.equal(failed.statusCode, 500);
+  assert.equal([...db.docs.keys()].some((key) => key.startsWith('announcements/')), false);
+  assert.equal([...db.docs.keys()].some((key) => key.startsWith('admin_logs/')), false);
+
+  db.failPublicWrite = false;
+  const saved = res();
+  await createSaveAnnouncementHandler(deps(db))(req({ announcement: input() }), saved);
+  assert.equal(saved.statusCode, 200);
+  const stored = [...db.docs.keys()].filter((key) => key.startsWith('announcements/'));
+  assert.deepEqual(stored, [`announcements/${saved.body.id}`]);
 });
 
 test('announcement handlers require an existing row for delete and a valid record for save', async () => {

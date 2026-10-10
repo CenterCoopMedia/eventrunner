@@ -57,6 +57,8 @@ vi.mock('firebase/auth', () => ({
 let operatorProbeShouldSucceed = true;
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, name) => ({ name })),
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
   query: vi.fn((ref) => ref),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn((ref) => (ref?.name === 'admin_logs' && !operatorProbeShouldSucceed
