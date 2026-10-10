@@ -38,6 +38,9 @@ import {
   validateRequiredContent,
   valueFieldsOf,
 } from '../contentDoc.js';
+import { contentEditIsDirty, contentEditSnapshot } from '../contentEditState.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
@@ -221,7 +224,10 @@ export default function AdminContentBlockEditor({ mode }) {
   const [savedDocId, setSavedDocId] = useState(null);
   const [resumeQueueId, setResumeQueueId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(mode !== 'edit');
+  const [savedEdit, setSavedEdit] = useState(null);
   const errorRef = useRef(null);
+  const unsaved = contentEditIsDirty(savedEdit, fieldId, content);
+  const leaveGuard = useUnsavedNavigation(unsaved);
   // Load the stored revision (or pick a default block type for a fresh
   // create form) once; later listener updates must not clobber an
   // in-progress edit.
@@ -246,8 +252,11 @@ export default function AdminContentBlockEditor({ mode }) {
     if (!existingRow) return;
     loadedKeyRef.current = key;
     const doc = existingRow.draft ?? existingRow.live;
-    setFieldId(doc?.field ?? fieldParam ?? '');
-    setContent(toEditableContent(doc, doc?.blockType));
+    const nextField = doc?.field ?? fieldParam ?? '';
+    const editable = toEditableContent(doc, doc?.blockType);
+    setFieldId(nextField);
+    setContent(editable);
+    setSavedEdit(contentEditSnapshot(nextField, editable));
     savedBlockTypeRef.current = doc?.blockType ?? null;
   }, [mode, sectionId, fieldParam, existingRow, contentReady]);
 
@@ -263,12 +272,15 @@ export default function AdminContentBlockEditor({ mode }) {
     if (pagesLoading) return;
     if (content.blockType) {
       loadedKeyRef.current = 'create-defaults';
+      setSavedEdit(contentEditSnapshot(fieldId, content));
       return;
     }
     const fallback = allowed[0] ?? BLOCK_TYPE_IDS[0];
     loadedKeyRef.current = 'create-defaults';
-    setContent(blankContent(fallback));
-  }, [mode, allowed, content.blockType, pagesLoading]);
+    const next = blankContent(fallback);
+    setContent(next);
+    setSavedEdit(contentEditSnapshot(fieldId, next));
+  }, [mode, allowed, content.blockType, pagesLoading, content, fieldId]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -393,6 +405,7 @@ export default function AdminContentBlockEditor({ mode }) {
       setSavedDocId(docId);
       loadedKeyRef.current = `${sectionId}__${currentFieldId}`;
       savedBlockTypeRef.current = content.blockType;
+      setSavedEdit(contentEditSnapshot(currentFieldId, content));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         showToast('Draft saved.');
@@ -546,7 +559,12 @@ export default function AdminContentBlockEditor({ mode }) {
     >
       <AdminPageHeader
         title={mode === 'create' ? 'New content block' : currentFieldId || 'Content block'}
-        state={existingRow ? <RecordState state={existingRow.state} /> : null}
+        state={(
+          <>
+            {existingRow ? <RecordState state={existingRow.state} /> : null}
+            {unsaved ? <UnsavedEditBadge /> : null}
+          </>
+        )}
         identifiers={`${pageId} · ${sectionId}`}
         description={
           // JSX children, not a template literal: while the page listener is
@@ -584,6 +602,9 @@ export default function AdminContentBlockEditor({ mode }) {
         title={error?.clientValidation ? 'Fill in the required fields' : undefined}
       />
       {status ? <SaveStatus message={status} /> : null}
+      {leaveGuard.pending ? (
+        <UnsavedChangesDialog onStay={leaveGuard.stay} onDiscard={leaveGuard.discard} />
+      ) : null}
 
       <div className="admin-content-editor-layout" data-creating={!isExisting}>
         {isExisting ? <>{valuePanel}{settingsPanel}</> : <>{settingsPanel}{valuePanel}</>}
