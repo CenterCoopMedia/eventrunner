@@ -197,6 +197,8 @@ describe('speaker editor', () => {
     expect(body.speaker).not.toHaveProperty('uid');
     expect(body.speaker).not.toHaveProperty('inviteToken');
     expect(body.speaker).not.toHaveProperty('approvedAt');
+    expect(screen.queryByLabelText('Headshot path')).toBeNull();
+    expect(body.speaker.headshotPath).toBeNull();
   });
 
   it('sends an empty optional field as null rather than an empty string', async () => {

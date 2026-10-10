@@ -18,7 +18,6 @@ import {
 
 test.describe.serial('Speaker invite -> accept -> wizard', () => {
   const stamp = Date.now();
-  const speakerId = `e2e-speaker-${stamp}`;
   const speakerEmail = `speaker-e2e-${stamp}@example.test`;
   const speakerName = `E2E Speaker ${stamp}`;
 
@@ -27,10 +26,11 @@ test.describe.serial('Speaker invite -> accept -> wizard', () => {
 
     const since = mailFileSize();
     const created = await callFunction('createSpeaker', {
-      speakerId,
       speaker: { firstName: 'E2E', lastName: `Speaker ${stamp}`, email: speakerEmail, status: 'draft' },
     }, idToken);
     expect(created.status, `createSpeaker answered 200 (${JSON.stringify(created.body)})`).toBe(200);
+    const speakerId = created.body?.speakerId;
+    expect(typeof speakerId).toBe('string');
 
     const sent = await callFunction('sendSpeakerInvite', { speakerId }, idToken);
     expect(sent.status, `sendSpeakerInvite answered 200 (${JSON.stringify(sent.body)})`).toBe(200);

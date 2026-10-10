@@ -560,9 +560,10 @@ function createSpeakerPhotoUploadHandler({
 
     if (!isAdmin) {
       const snap = await db.collection('speakers').doc(speakerId).get();
-      if (!snap.exists) return notFound(res, `No speaker with id "${speakerId}".`);
-      const stored = snap.data() || {};
-      if (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
+      const stored = snap.exists ? (snap.data() || {}) : null;
+      // A missing speaker and someone else's speaker answer the same way.
+      // Issue #361.
+      if (!stored || typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
         return sendError(res, 403, 'forbidden', 'You may only upload a photo for your own speaker profile.');
       }
     }
@@ -644,9 +645,8 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
     }
     if (!isAdmin) {
       const snap = await db.collection('speakers').doc(speakerId).get();
-      if (!snap.exists) return notFound(res, `No speaker with id "${speakerId}".`);
-      const stored = snap.data() || {};
-      if (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
+      const stored = snap.exists ? (snap.data() || {}) : null;
+      if (!stored || typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
         return sendError(res, 403, 'forbidden', 'You may only delete a photo from your own speaker profile.');
       }
     }

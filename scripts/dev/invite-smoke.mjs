@@ -62,7 +62,7 @@ const args = parseArgs(process.argv.slice(2));
 const ORIGIN = `http://127.0.0.1:${args.functionsPort}/${args.projectId}/${args.region}`;
 const ADMIN_EMAIL = 'invite-smoke-admin@example.test';
 const SPEAKER_EMAIL = `invite-smoke-speaker-${Date.now()}@example.test`;
-const SPEAKER_ID = `invite-smoke-${Date.now()}`;
+
 // Unique per run: `speaker_slugs` reservations survive between runs against
 // a persisted emulator, and a re-used name would 409 on the slug rather than
 // on anything this script is testing.
@@ -227,23 +227,24 @@ async function main() {
   const created = await call(
     'createSpeaker',
     {
-      speakerId: SPEAKER_ID,
       speaker: { firstName: SPEAKER_FIRST, lastName: SPEAKER_LAST, email: SPEAKER_EMAIL, status: 'draft' },
     },
     adminToken,
   );
   check(created.status === 200, `createSpeaker answered 200 (${created.status})`);
+  const speakerId = created.body && created.body.speakerId;
+  check(typeof speakerId === 'string' && speakerId.length > 0, 'createSpeaker returned a server id');
 
   console.log('admin sends the invitation');
   const logSize = fs.existsSync(args.emulatorLog) ? fs.statSync(args.emulatorLog).size : 0;
-  const sent = await call('sendSpeakerInvite', { speakerId: SPEAKER_ID }, adminToken);
+  const sent = await call('sendSpeakerInvite', { speakerId: speakerId }, adminToken);
   check(sent.status === 200, `sendSpeakerInvite answered 200 (${sent.status}: ${JSON.stringify(sent.body)})`);
   check(sent.body?.status === 'invited', 'the speaker moved draft → invited');
 
   const token = await waitForInviteUrl(logSize, deadline());
   check(Boolean(token), 'the invitation email was captured, carrying the accept URL');
 
-  const stored = (await db.collection('speakers').doc(SPEAKER_ID).get()).data();
+  const stored = (await db.collection('speakers').doc(speakerId).get()).data();
   check(stored.inviteToken && stored.inviteToken !== token, 'the stored token is a digest, not the token');
 
   console.log('the link validates before sign-in');
@@ -276,7 +277,7 @@ async function main() {
       !stranger.body.error.invitedEmailMasked.includes(SPEAKER_EMAIL),
     'the refusal names the invited inbox, masked',
   );
-  const afterStranger = (await db.collection('speakers').doc(SPEAKER_ID).get()).data();
+  const afterStranger = (await db.collection('speakers').doc(speakerId).get()).data();
   check(afterStranger.uid == null, 'the refused attempt linked nothing');
   check(afterStranger.status === 'invited', 'the invitation is still outstanding');
   check(
@@ -313,10 +314,10 @@ async function main() {
   check(accepted.status === 200, `acceptSpeakerInvite answered 200 (${accepted.status}: ${JSON.stringify(accepted.body)})`);
   check(accepted.body?.status === 'accepted', 'the response reports the accepted status');
 
-  const afterAccept = (await db.collection('speakers').doc(SPEAKER_ID).get()).data();
+  const afterAccept = (await db.collection('speakers').doc(speakerId).get()).data();
   const userDoc = (await db.collection('users').doc(speakerUid).get()).data();
   check(afterAccept.uid === speakerUid, 'speakers.uid names the account');
-  check(userDoc.speakerId === SPEAKER_ID, 'users.speakerId names the speaker');
+  check(userDoc.speakerId === speakerId, 'users.speakerId names the speaker');
   check(afterAccept.status === 'accepted', 'the speaker is accepted');
   check(afterAccept.inviteToken === null, 'the token is burned');
 
@@ -335,13 +336,13 @@ async function main() {
   check(reaccepted.status !== 200, `a consumed token gets nobody else in (${reaccepted.status})`);
 
   console.log('admin approves, and the public projection appears');
-  const approved = await call('updateSpeaker', { speakerId: SPEAKER_ID, speaker: { status: 'approved' } }, adminToken);
+  const approved = await call('updateSpeaker', { speakerId: speakerId, speaker: { status: 'approved' } }, adminToken);
   check(approved.status === 200, `updateSpeaker answered 200 (${approved.status})`);
 
   const until = deadline();
   let publicDoc = null;
   while (Date.now() < until) {
-    const snap = await db.collection('speakers_public').doc(SPEAKER_ID).get();
+    const snap = await db.collection('speakers_public').doc(speakerId).get();
     if (snap.exists) {
       publicDoc = snap.data();
       break;
