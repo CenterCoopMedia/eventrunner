@@ -73,6 +73,8 @@ const SESSIONS_DRAFTS = 'cmsSchedule_drafts';
 
 /** getAll in fixed batches, so a 2000-id publish is not one giant read. */
 const READ_CHUNK = 100;
+/** Firestore `in` filters accept at most 30 values. */
+const IN_QUERY = 30;
 
 /** Where the event's track definitions live (shared/config validates them). */
 const CONFIG_COLLECTION = 'config';
@@ -394,6 +396,8 @@ async function readSession({ db, tx, docId }) {
  * document otherwise (same rule as readSession). A child that exists only
  * as an unpublished draft is a child. A draft that names a different parent
  * is not a child of this session, even when the live document still is.
+ * Delete and publish do not use this set alone: a live child stays attached
+ * until its draft is published.
  *
  * @returns {Promise<Array<{ id: string, data: object }>>}
  */
@@ -603,6 +607,15 @@ async function checkSessionChildren({ db, tx = null, docId, fields, children = n
   return { ok: errors.length === 0, errors };
 }
 
+/** Live sessions whose parentId is `docId`, ignoring a draft that moved. */
+async function publishedChildren({ db, tx, docId }) {
+  const query = db.collection(SESSIONS).where('parentId', '==', docId);
+  const snap = tx ? await tx.get(query) : await query.get();
+  return snap.docs
+    .filter((doc) => doc.id !== docId)
+    .map((doc) => ({ id: doc.id, data: doc.data() }));
+}
+
 /**
  * May this session be deleted? (spec §8.4 step 4, brief §4.6.)
  *
@@ -620,6 +633,9 @@ async function checkSessionChildren({ db, tx = null, docId, fields, children = n
  * names them and hands the decision back: re-parent them or delete them,
  * then delete this.
  *
+ * A draft that already names another parent does not clear the live link.
+ * The published child still points here until that draft is published.
+ *
  * MUST RUN INSIDE THE DELETING TRANSACTION. As a pre-check it is only
  * advisory — a child can be created between the check and the batch, which
  * is exactly the window the session-save seam closes on its own writes.
@@ -628,9 +644,16 @@ async function checkSessionChildren({ db, tx = null, docId, fields, children = n
  * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
  */
 async function checkSessionDeletable({ db, tx = null, docId }) {
-  const children = await findChildren({ db, tx, docId });
-  if (children.length === 0) return { ok: true };
-  const ids = children.map((child) => child.id);
+  const editor = await findChildren({ db, tx, docId });
+  const published = await publishedChildren({ db, tx, docId });
+  const ids = [];
+  const seen = new Set();
+  for (const child of [...editor, ...published]) {
+    if (seen.has(child.id)) continue;
+    seen.add(child.id);
+    ids.push(child.id);
+  }
+  if (ids.length === 0) return { ok: true };
   return {
     ok: false,
     message:
@@ -668,33 +691,113 @@ async function getAllChunked(db, refs) {
  * A docId with no draft publishes nothing (publishDocs reports it as
  * `no-draft`), so it neither needs a parent nor counts as one.
  *
+ * A later draft may move a child to another parent before that draft is
+ * published. The live child still points here. Publishing a day, line, or
+ * parent change for this session has to take that live child with it, or
+ * include the child draft in the same set. A title-only publish does not.
+ *
  * @param {{ db: object, docIds: string[] }} args
  * @returns {Promise<{ ok: boolean, errors: string[] }>}
  */
+function parentLink(data) {
+  return hasParent(data) ? data.parentId.trim() : '';
+}
+
+function structureChanged(liveSnap, draft) {
+  if (!liveSnap?.exists) return false;
+  const live = liveSnap.data();
+  return live.dayId !== draft.dayId
+    || statedTrack(live.track) !== statedTrack(draft.track)
+    || parentLink(live) !== parentLink(draft);
+}
+
+async function sessionsWhereParentIn(db, parentIds) {
+  const docs = [];
+  for (let i = 0; i < parentIds.length; i += IN_QUERY) {
+    const chunk = parentIds.slice(i, i + IN_QUERY);
+    const snap = await db.collection(SESSIONS).where('parentId', 'in', chunk).get();
+    docs.push(...snap.docs);
+  }
+  return docs;
+}
+
+function liveChildPublishErrors(parentId, parentDraft, childId, childFields) {
+  const errors = [];
+  if (childFields?.dayId !== parentDraft?.dayId) {
+    errors.push(
+      `${parentId}: publishing this session on day ${JSON.stringify(parentDraft?.dayId)} would leave ` +
+      `live child "${childId}" on day ${JSON.stringify(childFields?.dayId)} — publish that child's ` +
+      'draft in this set, or keep this session on its day',
+    );
+  }
+  const parentTrack = statedTrack(parentDraft?.track);
+  const childTrack = statedTrack(childFields?.track);
+  if (childTrack !== null && childTrack !== parentTrack) {
+    errors.push(
+      `${parentId}: publishing this session on ${parentTrack === null ? 'no track' : JSON.stringify(parentTrack)} ` +
+      `would leave live child "${childId}" on ${JSON.stringify(childTrack)} — publish that child's ` +
+      'draft in this set, or keep this session on its line',
+    );
+  }
+  const nextParent = parentLink(parentDraft);
+  if (nextParent !== '') {
+    errors.push(
+      `${parentId}: publishing this session as a child of "${nextParent}" would leave ` +
+      `live child "${childId}" inside it — publish that child's draft in this set`,
+    );
+  }
+  return errors;
+}
+
 async function checkSchedulePublishSet({ db, docIds }) {
   const ids = [...new Set((docIds || []).filter((id) => typeof id === 'string' && id.length > 0))];
   if (ids.length === 0) return { ok: true, errors: [] };
 
   const draftSnaps = await getAllChunked(db, ids.map((id) => db.collection(SESSIONS_DRAFTS).doc(id)));
   const publishing = new Set();
+  const draftById = new Map();
   const parentOf = new Map();
   ids.forEach((id, i) => {
     if (!draftSnaps[i].exists) return;
+    const data = draftSnaps[i].data();
+    draftById.set(id, data);
     publishing.add(id);
-    const parentId = draftSnaps[i].data()?.parentId;
+    const parentId = data?.parentId;
     if (typeof parentId === 'string' && parentId.trim().length > 0) parentOf.set(id, parentId);
   });
 
+  const errors = [];
   const elsewhere = [...new Set([...parentOf.values()].filter((id) => !publishing.has(id)))];
-  if (elsewhere.length === 0) return { ok: true, errors: [] };
+  if (elsewhere.length > 0) {
+    const liveSnaps = await getAllChunked(db, elsewhere.map((id) => db.collection(SESSIONS).doc(id)));
+    const unpublished = new Set(elsewhere.filter((_, i) => !liveSnaps[i].exists));
+    errors.push(...[...parentOf.entries()]
+      .filter(([, parentId]) => unpublished.has(parentId))
+      .map(([childId, parentId]) =>
+        `${childId}: this session runs inside "${parentId}", which is not published — ` +
+        'publish them together, or publish the parent first'));
+  }
 
-  const liveSnaps = await getAllChunked(db, elsewhere.map((id) => db.collection(SESSIONS).doc(id)));
-  const unpublished = new Set(elsewhere.filter((_, i) => !liveSnaps[i].exists));
-  const errors = [...parentOf.entries()]
-    .filter(([, parentId]) => unpublished.has(parentId))
-    .map(([childId, parentId]) =>
-      `${childId}: this session runs inside "${parentId}", which is not published — ` +
-      'publish them together, or publish the parent first');
+  const parentIds = [...publishing];
+  if (parentIds.length > 0) {
+    const liveParents = await getAllChunked(
+      db,
+      parentIds.map((id) => db.collection(SESSIONS).doc(id)),
+    );
+    const changed = parentIds.filter((id, i) => structureChanged(liveParents[i], draftById.get(id)));
+    const changedSet = new Set(changed);
+    const kids = changed.length === 0 ? [] : await sessionsWhereParentIn(db, changed);
+    for (const kid of kids) {
+      const parentId = kid.data()?.parentId;
+      if (!changedSet.has(parentId) || kid.id === parentId) continue;
+      const draft = draftById.get(kid.id);
+      const leaves = publishing.has(kid.id) && parentLink(draft) !== parentId;
+      if (leaves) continue;
+      const fields = publishing.has(kid.id) ? draft : kid.data();
+      errors.push(...liveChildPublishErrors(parentId, draftById.get(parentId), kid.id, fields));
+    }
+  }
+
   return { ok: errors.length === 0, errors };
 }
 

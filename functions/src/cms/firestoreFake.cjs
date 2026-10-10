@@ -159,7 +159,12 @@ function makeFakeDb(seed = {}) {
       // transaction that writes the account).
       _kind: 'query',
       where(field, op, value) {
-        if (op !== '==' && op !== '<') throw new Error(`fake supports only '==' and '<', got ${op}`);
+        if (op !== '==' && op !== '<' && op !== 'in') {
+          throw new Error(`fake supports only '==', '<', and 'in', got ${op}`);
+        }
+        if (op === 'in' && (!Array.isArray(value) || value.length < 1 || value.length > 30)) {
+          throw new Error(`fake 'in' wants 1 to 30 values, got ${Array.isArray(value) ? value.length : typeof value}`);
+        }
         return query(col, [...filters, { field, op, value }], order, limitN, startAfterValue);
       },
       orderBy(field, direction = 'asc') {
@@ -177,6 +182,7 @@ function makeFakeDb(seed = {}) {
           .filter(({ data }) => filters.every((f) => {
             const actual = readPath(data, f.field);
             if (f.op === '<') return orderValue(actual) < orderValue(f.value);
+            if (f.op === 'in') return f.value.includes(actual);
             return actual === f.value;
           }));
         if (order) {

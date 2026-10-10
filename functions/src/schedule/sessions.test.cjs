@@ -10,6 +10,7 @@ const {
   checkSessionPlace,
   checkSessionParent,
   checkSessionChildren,
+  checkSessionDeletable,
   checkSchedulePublishSet,
   validateSessionStructure,
   resolveSessionTrack,
@@ -738,6 +739,66 @@ test('every stranded child is named, not just the first', async () => {
 test('an empty publish set reads nothing', async () => {
   const db = makeFakeDb();
   assert.deepEqual(await checkSchedulePublishSet({ db, docIds: [] }), { ok: true, errors: [] });
+});
+
+test('deleting a parent still honors a live child whose draft moved', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-old': { dayId: 'day-2', title: 'Workshop' },
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-old' },
+    'cmsSchedule_drafts/clinic-a': { dayId: 'day-2', parentId: 'session-new' },
+  });
+  const verdict = await checkSessionDeletable({ db, docId: 'session-old' });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /clinic-a/);
+});
+
+test('publishing a parent change leaves a moved live child behind unless its draft is in the set', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-old': { dayId: 'day-2', title: 'Workshop' },
+    'cmsSchedule/session-new': { dayId: 'day-2', title: 'Other' },
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-old' },
+    'cmsSchedule_drafts/clinic-a': { dayId: 'day-2', parentId: 'session-new' },
+    'cmsSchedule_drafts/session-old': { dayId: 'day-3', title: 'Workshop' },
+  });
+  const alone = await checkSchedulePublishSet({ db, docIds: ['session-old'] });
+  assert.equal(alone.ok, false);
+  assert.match(alone.errors[0], /clinic-a/);
+
+  const together = await checkSchedulePublishSet({ db, docIds: ['session-old', 'clinic-a'] });
+  assert.deepEqual(together, { ok: true, errors: [] });
+});
+
+test('publishing a parent as a child leaves a live grandchild unless the child draft is in the set', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-old': { dayId: 'day-2', title: 'Workshop' },
+    'cmsSchedule/session-top': { dayId: 'day-2', title: 'Block' },
+    'cmsSchedule/session-new': { dayId: 'day-2', title: 'Other' },
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-old' },
+    'cmsSchedule_drafts/clinic-a': { dayId: 'day-2', parentId: 'session-new' },
+    'cmsSchedule_drafts/session-old': { dayId: 'day-2', title: 'Workshop', parentId: 'session-top' },
+  });
+  const alone = await checkSchedulePublishSet({ db, docIds: ['session-old'] });
+  assert.equal(alone.ok, false);
+  assert.match(alone.errors[0], /clinic-a/);
+
+  const together = await checkSchedulePublishSet({
+    db,
+    docIds: ['session-old', 'clinic-a'],
+  });
+  assert.deepEqual(together, { ok: true, errors: [] });
+});
+
+test('a title-only publish does not wait on a child draft that moved', async () => {
+  const db = makeFakeDb({
+    'cmsSchedule/session-old': { dayId: 'day-2', title: 'Workshop' },
+    'cmsSchedule/clinic-a': { dayId: 'day-2', parentId: 'session-old' },
+    'cmsSchedule_drafts/clinic-a': { dayId: 'day-2', parentId: 'session-new' },
+    'cmsSchedule_drafts/session-old': { dayId: 'day-2', title: 'Workshop, renamed' },
+  });
+  assert.deepEqual(
+    await checkSchedulePublishSet({ db, docIds: ['session-old'] }),
+    { ok: true, errors: [] },
+  );
 });
 
 test('validateSessionStructure joins the halves, shape first', async () => {
