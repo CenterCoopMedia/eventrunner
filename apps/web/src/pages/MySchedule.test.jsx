@@ -20,8 +20,8 @@ const fixtureConfig = {
   name: '[Fixture] Lakeshore Docs Camp',
   timezone: 'America/Chicago',
   days: [
-    { id: 'fx-day-1', label: 'Day one', date: '2026-10-15' },
-    { id: 'fx-day-2', label: 'Day two', date: '2026-10-16' },
+    { id: 'fx-day-1', label: 'Day one', date: '2099-10-15' },
+    { id: 'fx-day-2', label: 'Day two', date: '2099-10-16' },
   ],
   // A surveyed venue: three places, and ONE recorded move between two of
   // them. The gaps are the point — hall → lab is recorded, lab → annex is
@@ -110,12 +110,13 @@ function renderMySchedule({
   profile = { attendeeAccess: true },
   bookmarkedIds = new Set(),
   bookmarksLoading = false,
+  eventConfig = fixtureConfig,
 } = {}) {
   useMyBookmarksMock.mockReturnValue({ bookmarkedIds, loading: bookmarksLoading });
   return render(
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <EventConfigContext.Provider
-        value={{ eventConfig: fixtureConfig, features, theme: {}, badges: null, source: 'snapshot' }}
+        value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <AuthContext.Provider value={auth}>
           <ProfileContext.Provider value={profile}>
@@ -194,6 +195,23 @@ describe('MySchedule', () => {
     // Both day headings render since each has a bookmarked session.
     expect(screen.getByRole('heading', { level: 2, name: /Day one/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /Day two/ })).toBeInTheDocument();
+  });
+
+  it('keeps a past day on the page and takes off its live controls', () => {
+    renderMySchedule({
+      bookmarkedIds: new Set(['fx-early']),
+      features: { schedule: true, sessionBookmarks: true, icsExport: true },
+      eventConfig: {
+        ...fixtureConfig,
+        days: [
+          { id: 'fx-day-1', label: 'Day one', date: '2020-01-01' },
+          { id: 'fx-day-2', label: 'Day two', date: '2020-01-02' },
+        ],
+      },
+    });
+    expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Morning kickoff' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
   });
 
   it('omits a day heading entirely when it has no bookmarked sessions', () => {

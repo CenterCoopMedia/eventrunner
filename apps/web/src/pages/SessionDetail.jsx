@@ -13,6 +13,7 @@ import { SpeakerNames, useSessionSpeakerNames } from '../components/SessionCard.
 import SessionActions from '../components/session/SessionActions.jsx';
 import SessionFormat from '../components/session/SessionFormat.jsx';
 import SessionMaterialsList from '../components/SessionMaterialsList.jsx';
+import { eventIsArchived, isBackIssue } from '../lib/backIssue.js';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
 import { primaryActionClass } from '../components/controlClasses.js';
@@ -84,6 +85,9 @@ export default function SessionDetail() {
   const day = Array.isArray(eventConfig.days)
     ? eventConfig.days.find((d) => d?.id === session.dayId)
     : null;
+  // Same rule as the schedule list. A past day or an archived event keeps
+  // the recording and drops the controls that act on a live event.
+  const backIssue = day ? isBackIssue(day, eventConfig) : eventIsArchived(eventConfig);
 
   return (
     <article>
@@ -140,6 +144,7 @@ export default function SessionDetail() {
           eventConfig={eventConfig}
           features={features}
           bookmarked={bookmarkedIds.has(session.id)}
+          backIssue={backIssue}
         />
       </div>
 

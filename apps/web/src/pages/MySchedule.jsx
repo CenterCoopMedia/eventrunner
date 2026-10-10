@@ -24,6 +24,7 @@ import ShareSchedule from '../components/schedule/ShareSchedule.jsx';
 import CalendarSyncCard from '../components/schedule/CalendarSyncCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import TransferLine from '../components/TransferLine.jsx';
+import { isBackIssue } from '../lib/backIssue.js';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { buildIcsCalendar, downloadIcs, icsFileName } from '../utils/calendar.js';
@@ -250,6 +251,7 @@ export default function MySchedule() {
                         eventConfig={eventConfig}
                         features={features}
                         bookmarked
+                        backIssue={isBackIssue(day, eventConfig)}
                         // The attendee's private note on this session
                         // (issue #170): the row is theirs, and so is the
                         // text under it. The public page passes nothing.

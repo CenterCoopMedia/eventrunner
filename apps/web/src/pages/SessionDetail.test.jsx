@@ -33,7 +33,7 @@ beforeEach(() => {
 const fixtureConfig = {
   name: '[Fixture] Lakeshore Docs Camp',
   timezone: 'America/Chicago',
-  days: [{ id: 'fx-day-1', label: 'Day one', date: '2026-10-15' }],
+  days: [{ id: 'fx-day-1', label: 'Day one', date: '2099-10-15' }],
 };
 
 const fixtureSessions = [
@@ -229,6 +229,30 @@ describe('SessionDetail', () => {
   it('offers a signed-out visitor the sign-in path when features.sessionBookmarks is on', () => {
     renderDetail('fx-early', { features: { schedule: true, sessionBookmarks: true } });
     expect(screen.getByRole('link', { name: 'Sign in to save sessions' })).toBeInTheDocument();
+  });
+
+  it('takes live controls off a past day and keeps the recording', () => {
+    renderDetail('fx-recorded', {
+      eventConfig: {
+        ...fixtureConfig,
+        days: [{ id: 'fx-day-1', label: 'Day one', date: '2020-01-01' }],
+      },
+      features: {
+        schedule: true,
+        sessionBookmarks: true,
+        sessionReactions: true,
+        icsExport: true,
+      },
+      auth: { user: { uid: 'u1' } },
+      profile: { attendeeAccess: true },
+    });
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Sign in to save sessions' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
+    expect(screen.queryByRole('group', { name: /session reactions/i })).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /^Watch the recording of \[Fixture\] Recorded panel\b/ }),
+    ).toBeInTheDocument();
   });
 
   it('puts the reactions on the session\u2019s own page, where a row never had them', () => {

@@ -23,7 +23,7 @@ vi.mock('../lib/scheduleShareSource.js', () => ({
 const EVENT = {
   name: '[Fixture] Lakeshore Docs Camp',
   timezone: 'America/Chicago',
-  days: [{ id: 'fx-day-1', label: 'Day one', date: '2026-10-15' }],
+  days: [{ id: 'fx-day-1', label: 'Day one', date: '2099-10-15' }],
 };
 
 const SESSIONS = [
@@ -45,14 +45,14 @@ const SESSIONS = [
   },
 ];
 
-function sharedTree({ share, error = false, auth = { user: null, isAdmin: false, loading: false }, profile = { attendeeAccess: false }, features = { schedule: true, sessionBookmarks: true } } = {}) {
+function sharedTree({ share, error = false, auth = { user: null, isAdmin: false, loading: false }, profile = { attendeeAccess: false }, features = { schedule: true, sessionBookmarks: true }, eventConfig = EVENT } = {}) {
   holder.share = share;
   holder.error = error;
   return (
     <MemoryRouter initialEntries={['/schedule/user/owner-1']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="schedule/user/:uid" element={
-          <EventConfigContext.Provider value={{ eventConfig: EVENT, features, theme: {}, badges: null, source: 'snapshot' }}>
+          <EventConfigContext.Provider value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}>
             <AuthContext.Provider value={auth}>
               <ProfileContext.Provider value={profile}>
                 <ToastContext.Provider value={{ showToast: () => {}, dismiss: () => {} }}>
@@ -84,6 +84,22 @@ function sharedTree({ share, error = false, auth = { user: null, isAdmin: false,
 function renderShared(options) { return render(sharedTree(options)); }
 
 describe('the shared schedule page', () => {
+  it('keeps a saved session on a past day and takes off the live controls', () => {
+    renderShared({
+      share: { scheduleVisibility: 'public', displayName: '[Fixture] Alex Rivera', sessionIds: ['fx-s1'] },
+      auth: { user: { uid: 'viewer-1' }, isAdmin: false, loading: false },
+      profile: { attendeeAccess: true },
+      features: { schedule: true, sessionBookmarks: true, icsExport: true },
+      eventConfig: {
+        ...EVENT,
+        days: [{ id: 'fx-day-1', label: 'Day one', date: '2020-01-01' }],
+      },
+    });
+    expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Morning kickoff' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
+  });
+
   it('a permitted viewer sees the owner named and their saved sessions, as the usual rows', () => {
     renderShared({
       share: { scheduleVisibility: 'public', displayName: '[Fixture] Alex Rivera', sessionIds: ['fx-s1'] },

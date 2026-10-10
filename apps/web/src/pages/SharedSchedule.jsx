@@ -28,6 +28,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import { isBackIssue } from '../lib/backIssue.js';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
@@ -202,6 +203,7 @@ export default function SharedSchedule() {
                   eventConfig={eventConfig}
                   features={features}
                   bookmarked={bookmarkedIds.has(session.id)}
+                  backIssue={isBackIssue(day, eventConfig)}
                 />
               ))}
             </ul>
