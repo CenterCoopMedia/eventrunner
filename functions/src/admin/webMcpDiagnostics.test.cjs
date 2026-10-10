@@ -153,6 +153,68 @@ test('publish and system-error diagnostics are bounded and omit raw records', as
   assert.doesNotMatch(json, /private@example\.org|private-token|private message|private\.example/);
 });
 
+test('publish, error, and media diagnostics do not download the whole collection', async () => {
+  const db = makeFakeDb(seed());
+  const original = db.collection.bind(db);
+  const limits = [];
+  db.collection = (name) => {
+    const column = original(name);
+    return {
+      ...column,
+      get() {
+        throw new Error(`unbounded read of ${name}`);
+      },
+      limit(n) {
+        limits.push(`${name}:${n}`);
+        return column.limit(n);
+      },
+      orderBy(field, direction) {
+        const ordered = column.orderBy(field, direction);
+        return {
+          ...ordered,
+          limit(n) {
+            limits.push(`${name}:${n}`);
+            return ordered.limit(n);
+          },
+        };
+      },
+      where(field, op, value) {
+        const filtered = column.where(field, op, value);
+        return {
+          ...filtered,
+          orderBy(orderField, direction) {
+            const ordered = filtered.orderBy(orderField, direction);
+            return {
+              ...ordered,
+              limit(n) {
+                limits.push(`${name}:${n}`);
+                return ordered.limit(n);
+              },
+            };
+          },
+        };
+      },
+    };
+  };
+
+  await internals.readPublishQueue({ db });
+  await internals.readSystemErrors({ db });
+  await internals.readMediaUsage({ db });
+  assert.ok(limits.includes('cmsPublishQueue:10'));
+  assert.ok(limits.includes('system_errors:20'));
+  assert.ok(limits.includes('media_assets:50'));
+});
+
+test('a media diagnostic does not call an unfinished usage scan unused', async () => {
+  const rows = seed();
+  for (let index = 0; index < 101; index += 1) {
+    rows[`cmsContent/page-${index}`] = { body: `page ${index}` };
+  }
+  const media = await internals.readMediaUsage({ db: makeFakeDb(rows) });
+  assert.equal(media.assets.incomplete, true);
+  assert.equal(media.assets.unused, undefined);
+});
+
 test('media and ticketing diagnostics return counts and health without identifiers', async () => {
   const db = makeFakeDb(seed());
   const media = await internals.readMediaUsage({ db });

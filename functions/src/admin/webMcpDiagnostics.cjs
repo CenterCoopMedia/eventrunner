@@ -11,6 +11,8 @@ const PAGE_ISSUE_LIMIT = 20;
 const PUBLISH_QUEUE_LIMIT = 10;
 const SYSTEM_ERROR_LIMIT = 20;
 const MEDIA_ASSET_LIMIT = 50;
+/** Documents read from each content collection while sampling media use. */
+const DIAGNOSTIC_USAGE_DOC_LIMIT = 100;
 const SAFE_KIND_RE = /^[a-z0-9-]{1,80}$/;
 const SENSITIVE_KEY_PARTS = Object.freeze([
   'email',
@@ -193,20 +195,31 @@ function publishRow(doc) {
   };
 }
 
+async function countedDocs(source) {
+  const counted = await source.count().get();
+  return counted.data().count;
+}
+
+function boundedRows(items, total) {
+  return {
+    items,
+    total,
+    truncated: Math.max(0, total - items.length),
+  };
+}
+
 async function readPublishQueue({ db }) {
-  const snapshot = await db.collection('cmsPublishQueue').get();
-  const rows = snapshot.docs
-    .slice()
-    .sort((a, b) => (toMillis(b.data()?.requestedAt) ?? 0) - (toMillis(a.data()?.requestedAt) ?? 0))
-    .map(publishRow);
-  return { rows: bounded(rows, PUBLISH_QUEUE_LIMIT) };
+  const source = db.collection('cmsPublishQueue');
+  const total = await countedDocs(source);
+  const snapshot = await source.orderBy('requestedAt', 'desc').limit(PUBLISH_QUEUE_LIMIT).get();
+  return { rows: boundedRows(snapshot.docs.map(publishRow), total) };
 }
 
 async function readSystemErrors({ db }) {
-  const snapshot = await db.collection('system_errors').where('resolved', '==', false).get();
+  const source = db.collection('system_errors').where('resolved', '==', false);
+  const total = await countedDocs(source);
+  const snapshot = await source.orderBy('createdAt', 'desc').limit(SYSTEM_ERROR_LIMIT).get();
   const rows = snapshot.docs
-    .slice()
-    .sort((a, b) => (toMillis(b.data()?.createdAt) ?? 0) - (toMillis(a.data()?.createdAt) ?? 0))
     .map((doc) => {
       const data = doc.data() || {};
       return {
@@ -216,27 +229,37 @@ async function readSystemErrors({ db }) {
         state: 'open',
       };
     });
-  return { rows: bounded(rows, SYSTEM_ERROR_LIMIT) };
+  return { rows: boundedRows(rows, total) };
 }
 
 async function readMediaUsage({ db }) {
-  const snapshot = await db.collection('media_assets').get();
+  const source = db.collection('media_assets');
+  const total = await countedDocs(source);
+  const snapshot = await source.limit(MEDIA_ASSET_LIMIT).get();
   const assets = snapshot.docs
     .map((doc) => doc.data() || {})
     .filter((asset) => typeof asset.path === 'string' && asset.path.length > 0);
-  const checked = assets.slice(0, MEDIA_ASSET_LIMIT);
-  const paths = [...new Set(checked.map((asset) => asset.path))];
-  const usage = await scanUsage({ db, paths });
+  const paths = [...new Set(assets.map((asset) => asset.path))];
+  const sample = {
+    checked: assets.length,
+    total,
+    truncated: Math.max(0, total - snapshot.docs.length),
+    missingIndexData: snapshot.docs.length - assets.length,
+  };
+  let usage;
+  try {
+    usage = await scanUsage({ db, paths, maxDocs: DIAGNOSTIC_USAGE_DOC_LIMIT });
+  } catch (error) {
+    if (error?.code !== 'usage-scan-incomplete') throw error;
+    return { assets: { ...sample, incomplete: true } };
+  }
   const referenceCounts = paths.map((path) => usage[path]?.length ?? 0);
   return {
     assets: {
-      checked: checked.length,
-      total: snapshot.docs.length,
-      truncated: Math.max(0, assets.length - checked.length),
+      ...sample,
       referenced: referenceCounts.filter((count) => count > 0).length,
       unused: referenceCounts.filter((count) => count === 0).length,
-      references: referenceCounts.reduce((total, count) => total + count, 0),
-      missingIndexData: snapshot.docs.length - assets.length,
+      references: referenceCounts.reduce((sum, count) => sum + count, 0),
     },
   };
 }

@@ -110,6 +110,31 @@ test('scanUsage does not scan cmsVersionHistory — old revisions are not live u
   assert.deepEqual(usage[HERO], []);
 });
 
+test('a capped scan stops instead of calling a later reference unused', async () => {
+  const db = makeFakeDb({
+    'cmsContent/first': { image: 'other' },
+    'cmsContent/second': { image: HERO },
+  });
+  const uncapped = await scanUsage({
+    db,
+    paths: [HERO],
+    collections: ['cmsContent'],
+    configDocs: [],
+  });
+  assert.deepEqual(uncapped[HERO], [{ docPath: 'cmsContent/second', field: 'image' }]);
+
+  await assert.rejects(
+    () => scanUsage({
+      db,
+      paths: [HERO],
+      collections: ['cmsContent'],
+      configDocs: [],
+      maxDocs: 1,
+    }),
+    (error) => error.code === 'usage-scan-incomplete',
+  );
+});
+
 test('scanUsage propagates a read failure rather than reporting "unused"', async () => {
   const db = makeFakeDb({});
   const broken = {
