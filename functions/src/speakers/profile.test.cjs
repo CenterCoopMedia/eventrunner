@@ -38,10 +38,11 @@ test('create writes a canonical record with server-owned defaults', async () => 
     payload: { firstName: 'Rae', lastName: 'Okonkwo', email: 'RAE@Example.org ', bio: 'Reporter.' },
     actor: ACTOR,
     now: NOW,
+    newId: () => 'minted-rae',
   });
 
-  assert.deepEqual(result, { ok: true, speakerId: 'rae-okonkwo', docPath: 'speakers/rae-okonkwo' });
-  const stored = db.read('speakers', 'rae-okonkwo');
+  assert.deepEqual(result, { ok: true, speakerId: 'minted-rae', docPath: 'speakers/minted-rae' });
+  const stored = db.read('speakers', 'minted-rae');
   assert.equal(stored.slug, 'rae-okonkwo');
   assert.equal(stored.email, 'rae@example.org');
   assert.equal(stored.status, 'draft');
@@ -71,34 +72,40 @@ test('creating as approved stamps approvedAt', async () => {
     payload: { firstName: 'Rae', lastName: 'Okonkwo', status: 'approved' },
     actor: ACTOR,
     now: NOW,
+    newId: () => 'minted-rae',
   });
-  assert.deepEqual(db.read('speakers', 'rae-okonkwo').approvedAt, AT);
+  assert.deepEqual(db.read('speakers', 'minted-rae').approvedAt, AT);
 });
 
-test('an explicit speakerId is honoured; an invalid one is refused', async () => {
+test('a caller-chosen speakerId is refused and the server mints the id', async () => {
   const db = makeSpeakersDb();
-  const ok = await applyCreateSpeaker({
+  const refused = await applyCreateSpeaker({
     db, speakerId: 'spk-7', payload: { firstName: 'A', lastName: 'B' }, actor: ACTOR, now: NOW,
   });
-  assert.equal(ok.speakerId, 'spk-7');
+  assert.equal(refused.ok, false);
+  assert.equal(refused.status, 400);
+  assert.match(refused.message, /^speakerId: the server assigns the document id$/);
+  assert.deepEqual(db.writes, []);
 
-  const bad = await applyCreateSpeaker({
-    db, speakerId: 'a/b', payload: { firstName: 'C', lastName: 'D' }, actor: ACTOR, now: NOW,
+  const minted = await applyCreateSpeaker({
+    db, payload: { firstName: 'C', lastName: 'D' }, actor: ACTOR, now: NOW, newId: () => 'minted-1',
   });
-  assert.equal(bad.ok, false);
-  assert.equal(bad.status, 400);
-  assert.match(bad.message, /^speakerId: /);
+  assert.equal(minted.ok, true);
+  assert.equal(minted.speakerId, 'minted-1');
+  assert.equal(db.read('speakers', 'minted-1').slug, 'c-d');
 });
 
 test('a duplicate id is a 409 and does not clobber the first record', async () => {
   const db = makeSpeakersDb();
-  await applyCreateSpeaker({ db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW });
+  await applyCreateSpeaker({
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW, newId: () => 'same-id',
+  });
   const again = await applyCreateSpeaker({
-    db, payload: { firstName: 'Rae', lastName: 'Okonkwo', bio: 'clobber' }, actor: ACTOR, now: NOW,
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo', bio: 'clobber' }, actor: ACTOR, now: NOW, newId: () => 'same-id',
   });
   assert.equal(again.ok, false);
   assert.equal(again.status, 409);
-  assert.equal(db.read('speakers', 'rae-okonkwo').bio, '');
+  assert.equal(db.read('speakers', 'same-id').bio, '');
 });
 
 test('a slug already owned by another speaker is a 409 naming the owner', async () => {
@@ -106,7 +113,7 @@ test('a slug already owned by another speaker is a 409 naming the owner', async 
     'speakers/existing': { firstName: 'Rae', lastName: 'Okonkwo', slug: 'rae-okonkwo', status: 'draft' },
   });
   const result = await applyCreateSpeaker({
-    db, speakerId: 'other', payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW,
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW, newId: () => 'other',
   });
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
@@ -239,16 +246,16 @@ test('create reserves the slug, and the reservation blocks a second create', asy
   // cannot be: an empty query result puts nothing in the read set.
   const db = makeSpeakersDb();
   await applyCreateSpeaker({
-    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW,
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW, newId: () => 'minted-rae',
   });
-  assert.deepEqual(db.read('speaker_slugs', 'rae-okonkwo'), { speakerId: 'rae-okonkwo', updatedAt: AT });
+  assert.deepEqual(db.read('speaker_slugs', 'rae-okonkwo'), { speakerId: 'minted-rae', updatedAt: AT });
 
   const clash = await applyCreateSpeaker({
-    db, speakerId: 'other', payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW,
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW, newId: () => 'other',
   });
   assert.equal(clash.ok, false);
   assert.equal(clash.status, 409);
-  assert.match(clash.message, /^slug: "rae-okonkwo" is already used by speaker "rae-okonkwo"$/);
+  assert.match(clash.message, /^slug: "rae-okonkwo" is already used by speaker "minted-rae"$/);
   assert.equal(db.read('speakers', 'other'), undefined);
 });
 
@@ -257,7 +264,7 @@ test('a reservation with no matching speaker record still blocks the slug', asyn
   // the check atomic, so it has to be authoritative on its own.
   const db = makeSpeakersDb({ 'speaker_slugs/taken-name': { speakerId: 'someone' } });
   const result = await applyCreateSpeaker({
-    db, speakerId: 'new-one', payload: { firstName: 'Taken', lastName: 'Name' }, actor: ACTOR, now: NOW,
+    db, payload: { firstName: 'Taken', lastName: 'Name' }, actor: ACTOR, now: NOW, newId: () => 'new-one',
   });
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
@@ -266,7 +273,9 @@ test('a reservation with no matching speaker record still blocks the slug', asyn
 
 test('renaming moves the reservation and releases the old slug', async () => {
   const db = makeSpeakersDb();
-  await applyCreateSpeaker({ db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW });
+  await applyCreateSpeaker({
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW, newId: () => 'rae-okonkwo',
+  });
   await applyUpdateSpeaker({
     db, speakerId: 'rae-okonkwo', payload: { lastName: 'Adeyemi' }, actor: ACTOR, now: NOW,
   });
@@ -275,14 +284,17 @@ test('renaming moves the reservation and releases the old slug', async () => {
   assert.deepEqual(db.read('speaker_slugs', 'rae-adeyemi'), { speakerId: 'rae-okonkwo', updatedAt: AT });
   // The freed slug is claimable again.
   const reuse = await applyCreateSpeaker({
-    db, speakerId: 'second', payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW,
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW, newId: () => 'second',
   });
   assert.equal(reuse.ok, true);
+  assert.equal(reuse.speakerId, 'second');
 });
 
 test('a save that does not move the slug leaves the reservation alone', async () => {
   const db = makeSpeakersDb();
-  await applyCreateSpeaker({ db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW });
+  await applyCreateSpeaker({
+    db, payload: { firstName: 'Rae', lastName: 'Okonkwo' }, actor: ACTOR, now: NOW, newId: () => 'rae-okonkwo',
+  });
   const before = db.writes.length;
   await applyUpdateSpeaker({ db, speakerId: 'rae-okonkwo', payload: { bio: 'x' }, actor: ACTOR, now: NOW });
   assert.deepEqual(db.writes.slice(before).map((w) => w.path), ['speakers/rae-okonkwo']);
@@ -344,12 +356,13 @@ test('both handlers are admin-gated and POST-only', async () => {
 test('a successful create is audited and answers with the id', async () => {
   const db = makeSpeakersDb();
   const res = fakeRes();
-  await createCreateSpeakerHandler(adminDeps(db))(
+  await createCreateSpeakerHandler({ ...adminDeps(db), newId: () => 'minted-rae' })(
     adminReq({ speaker: { firstName: 'Rae', lastName: 'Okonkwo' } }),
     res,
   );
   assert.equal(res.statusCode, 200);
-  assert.equal(res.body.speakerId, 'rae-okonkwo');
+  assert.equal(res.body.speakerId, 'minted-rae');
+  assert.equal(db.read('speakers', 'minted-rae').slug, 'rae-okonkwo');
   const logs = db.ids('admin_logs').map((id) => db.read('admin_logs', id));
   assert.equal(logs[0].action, 'createSpeaker');
 });
@@ -519,6 +532,7 @@ test('applyGetOwnSpeakerProfile: a different uid is refused with 403', async () 
   const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'rae', uid: OTHER_UID, isAdmin: false });
   assert.equal(result.ok, false);
   assert.equal(result.status, 403);
+  assert.equal(result.message, 'You may only view your own speaker profile.');
 });
 
 test('applyGetOwnSpeakerProfile: an admin may view any speaker', async () => {
@@ -528,9 +542,17 @@ test('applyGetOwnSpeakerProfile: an admin may view any speaker', async () => {
   assert.equal(result.speaker.speakerId, 'rae');
 });
 
-test('applyGetOwnSpeakerProfile: a missing speaker is a 404', async () => {
+test('applyGetOwnSpeakerProfile: a missing speaker answers the same 403 as someone else\'s', async () => {
   const db = makeSpeakersDb();
   const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'ghost', uid: SPEAKER_UID, isAdmin: false });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(result.message, 'You may only view your own speaker profile.');
+});
+
+test('applyGetOwnSpeakerProfile: an admin still gets 404 for a missing speaker', async () => {
+  const db = makeSpeakersDb();
+  const result = await applyGetOwnSpeakerProfile({ db, speakerId: 'ghost', uid: 'admin-1', isAdmin: true });
   assert.equal(result.ok, false);
   assert.equal(result.status, 404);
 });
@@ -620,10 +642,21 @@ test('applyUpdateOwnSpeakerProfile: an admin may edit on behalf of a speaker', a
   assert.equal(db.read('speakers', 'rae').bio, 'admin edit');
 });
 
-test('applyUpdateOwnSpeakerProfile: a missing speaker is a 404', async () => {
+test('applyUpdateOwnSpeakerProfile: a missing speaker answers the same 403 as someone else\'s', async () => {
   const db = makeSpeakersDb();
   const result = await applyUpdateOwnSpeakerProfile({
     db, speakerId: 'ghost', uid: SPEAKER_UID, isAdmin: false, payload: { bio: 'x' }, actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(result.message, 'You may only edit your own speaker profile.');
+  assert.equal(db.read('speakers', 'ghost'), undefined);
+});
+
+test('applyUpdateOwnSpeakerProfile: an admin still gets 404 for a missing speaker', async () => {
+  const db = makeSpeakersDb();
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'ghost', uid: 'admin-1', isAdmin: true, payload: { bio: 'x' }, actor: ACTOR, now: NOW,
   });
   assert.equal(result.ok, false);
   assert.equal(result.status, 404);
@@ -1004,9 +1037,10 @@ test("an admin create refuses a headshotPath outside the speaker's own prefix", 
   const db = makeSpeakersDb();
   for (const headshotPath of ['branding/logo.svg', 'speaker-photos/someone-else/photo.png', 'cms-images/x.png']) {
     const result = await applyCreateSpeaker({
-      db, speakerId: 'rae',
+      db,
       payload: { firstName: 'Rae', lastName: 'Okonkwo', headshotPath },
       actor: ACTOR, now: NOW,
+      newId: () => 'rae',
     });
     assert.equal(result.ok, false, headshotPath);
     assert.equal(result.status, 400);
@@ -1018,33 +1052,36 @@ test("an admin create refuses a headshotPath outside the speaker's own prefix", 
 test('an admin create accepts a headshotPath under the id the record will carry', async () => {
   const db = makeSpeakersDb();
   const explicit = await applyCreateSpeaker({
-    db, speakerId: 'rae',
+    db,
     payload: { firstName: 'Rae', lastName: 'Okonkwo', headshotPath: 'speaker-photos/rae/a1/photo.png' },
     actor: ACTOR, now: NOW,
+    newId: () => 'rae',
   });
   assert.equal(explicit.ok, true);
   assert.equal(db.read('speakers', 'rae').headshotPath, 'speaker-photos/rae/a1/photo.png');
 
-  // Without an explicit id the record takes the slug, and the prefix is
-  // checked against that id — not against the (absent) speakerId argument.
+  // The record takes the server id, and the prefix is checked against that id.
   const derived = await applyCreateSpeaker({
     db,
-    payload: { firstName: 'Sam', lastName: 'Adeyemi', headshotPath: 'speaker-photos/sam-adeyemi/b2/photo.png' },
+    payload: { firstName: 'Sam', lastName: 'Adeyemi', headshotPath: 'speaker-photos/sam-id/b2/photo.png' },
     actor: ACTOR, now: NOW,
+    newId: () => 'sam-id',
   });
   assert.equal(derived.ok, true);
   const wrongId = await applyCreateSpeaker({
     db,
     payload: { firstName: 'Kim', lastName: 'Lee', headshotPath: 'speaker-photos/rae/b2/photo.png' },
     actor: ACTOR, now: NOW,
+    newId: () => 'kim-id',
   });
   assert.equal(wrongId.ok, false);
-  assert.match(wrongId.message, /^headshotPath: must be null or under speaker-photos\/kim-lee\//);
+  assert.match(wrongId.message, /^headshotPath: must be null or under speaker-photos\/kim-id\//);
 
   const avatar = await applyCreateSpeaker({
-    db, speakerId: 'ada',
+    db,
     payload: { firstName: 'Ada', lastName: 'Ng', headshotPath: 'default-avatars/03.svg' },
     actor: ACTOR, now: NOW,
+    newId: () => 'ada',
   });
   assert.equal(avatar.ok, true);
 });

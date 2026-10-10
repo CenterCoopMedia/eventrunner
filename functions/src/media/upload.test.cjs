@@ -440,13 +440,14 @@ test('speakerPhotoUpload refuses a caller who does not own the speaker record', 
   assert.equal(res.statusCode, 403);
 });
 
-test('speakerPhotoUpload 404s for an unknown speaker', async () => {
+test('speakerPhotoUpload answers 403 for an unknown speaker, the same as someone else\'s', async () => {
   const res = fakeRes();
   await createSpeakerPhotoUploadHandler(speakerAuthDeps(makeFakeDb({}), fakeBucket()))(
     post({ speakerId: 'ghost', contentType: 'image/png', data: PNG }),
     res,
   );
-  assert.equal(res.statusCode, 404);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.message, 'You may only upload a photo for your own speaker profile.');
 });
 
 test('speakerPhotoUpload lets an admin upload on a speaker’s behalf even without ownership', async () => {
@@ -567,13 +568,14 @@ test('speakerPhotoDelete succeeds (ignoreNotFound) for an object already gone', 
   assert.equal(res.statusCode, 200);
 });
 
-test('speakerPhotoDelete 404s for an unknown speaker', async () => {
+test('speakerPhotoDelete answers 403 for an unknown speaker, the same as someone else\'s', async () => {
   const res = fakeRes();
   await createSpeakerPhotoDeleteHandler(speakerAuthDeps(makeFakeDb({}), fakeBucket()))(
     post({ speakerId: 'ghost', path: 'speaker-photos/ghost/x/photo.png' }),
     res,
   );
-  assert.equal(res.statusCode, 404);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.message, 'You may only delete a photo from your own speaker profile.');
 });
 
 test('speakerPhotoDelete is POST-only', async () => {

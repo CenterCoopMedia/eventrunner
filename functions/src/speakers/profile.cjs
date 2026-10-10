@@ -79,6 +79,14 @@ function isOwnHeadshotPath(speakerId, path) {
   );
 }
 
+/** The signed-in account is the speaker this record is linked to. */
+function callerOwnsSpeaker(stored, uid) {
+  return Boolean(stored)
+    && typeof stored.uid === 'string'
+    && stored.uid.length > 0
+    && stored.uid === uid;
+}
+
 /** Defaults a brand-new canonical record carries for every optional field. */
 function newSpeakerDefaults() {
   return {
@@ -141,36 +149,47 @@ async function findSlugOwner({ tx, db, slug, exceptId = null }) {
 /**
  * Create one canonical speaker.
  *
- * The doc id is the caller's `speakerId` when they supplied one, else the
- * slug — human-readable ids make a dangling `speakerIds` entry legible in
- * an admin payload, which is the whole reason §4.3's seam #1 names the id
- * it rejects.
+ * The document id is minted here. A caller-chosen id, and the slug, are
+ * both guessable, and a guessable id lets a later 403 confirm that a
+ * speaker exists. Issue #361. The public URL stays the slug.
  *
  * @param {{ db: object, speakerId?: unknown, payload: unknown,
- *           actor: { uid: string, email: string }, now?: () => number }} args
+ *           actor: { uid: string, email: string }, now?: () => number,
+ *           newId?: () => string }} args
  * @returns {Promise<{ ok: true, speakerId: string, docPath: string } |
  *                    { ok: false, status: number, code: string, message: string }>}
  */
-async function applyCreateSpeaker({ db, speakerId, payload, actor, now = Date.now }) {
+async function applyCreateSpeaker({
+  db,
+  speakerId,
+  payload,
+  actor,
+  now = Date.now,
+  newId = () => require('node:crypto').randomBytes(12).toString('hex'),
+}) {
   const verdict = validateSpeaker(payload);
   if (!verdict.ok) {
     return { ok: false, status: 400, code: 'bad-request', message: verdict.errors.join('; ') };
   }
   const fields = { ...newSpeakerDefaults(), ...verdict.fields };
 
-  let docId;
-  if (speakerId === undefined || speakerId === null || speakerId === '') {
-    docId = fields.slug;
-  } else if (!isValidDocId(speakerId)) {
-    return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: not a valid document id' };
-  } else {
-    docId = speakerId;
+  if (speakerId !== undefined && speakerId !== null && speakerId !== '') {
+    return {
+      ok: false,
+      status: 400,
+      code: 'bad-request',
+      message: 'speakerId: the server assigns the document id',
+    };
+  }
+  const docId = newId();
+  if (!isValidDocId(docId)) {
+    return { ok: false, status: 500, code: 'internal', message: 'The speaker id could not be assigned.' };
   }
   // The same prefix rule the self-service path applies (isOwnHeadshotPath):
   // an admin payload could otherwise point a speaker at a branding file or
   // another speaker's photo, and applySpeakerPendingEdits would later treat
   // that path as this speaker's own to delete. Checked against the id the
-  // record will actually carry — the slug when none was sent.
+  // record will actually carry.
   if (!isOwnHeadshotPath(docId, fields.headshotPath)) {
     return {
       ok: false,
@@ -466,12 +485,14 @@ async function applyGetOwnSpeakerProfile({ db, speakerId, uid, isAdmin }) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
   const snap = await db.collection(SPEAKERS).doc(speakerId).get();
+  const stored = snap.exists ? snap.data() : null;
+  // A missing record and someone else's record answer the same way.
+  // A 404 here would confirm that the id exists. Issue #361.
+  if (!isAdmin && !callerOwnsSpeaker(stored, uid)) {
+    return { ok: false, status: 403, code: 'forbidden', message: 'You may only view your own speaker profile.' };
+  }
   if (!snap.exists) {
     return { ok: false, status: 404, code: 'not-found', message: `No speaker with id "${speakerId}".` };
-  }
-  const stored = snap.data();
-  if (!isAdmin && (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== uid)) {
-    return { ok: false, status: 403, code: 'forbidden', message: 'You may only view your own speaker profile.' };
   }
   return { ok: true, speaker: buildOwnSpeakerView(stored, speakerId) };
 }
@@ -554,15 +575,17 @@ async function applyUpdateOwnSpeakerProfile({ db, speakerId, uid, isAdmin, paylo
   try {
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
+      const stored = snap.exists ? snap.data() : null;
+      // Same answer for a missing record and someone else's record.
+      // Issue #361.
+      if (!isAdmin && !callerOwnsSpeaker(stored, uid)) {
+        const err = new Error('FORBIDDEN');
+        err.conflict = { status: 403, code: 'forbidden', message: 'You may only edit your own speaker profile.' };
+        throw err;
+      }
       if (!snap.exists) {
         const err = new Error('NOT_FOUND');
         err.conflict = { status: 404, code: 'not-found', message: `No speaker with id "${speakerId}".` };
-        throw err;
-      }
-      const stored = snap.data();
-      if (!isAdmin && (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== uid)) {
-        const err = new Error('FORBIDDEN');
-        err.conflict = { status: 403, code: 'forbidden', message: 'You may only edit your own speaker profile.' };
         throw err;
       }
 
@@ -840,7 +863,7 @@ function createDiscardSpeakerPendingEditsHandler({ db, auth, getConfig, now = Da
 /**
  * @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps
  */
-function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console, newId }) {
   return async function createSpeaker(req, res) {
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
@@ -852,6 +875,7 @@ function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
         payload: req.body?.speaker,
         actor,
         now,
+        newId,
       });
     } catch (err) {
       log.error('createSpeaker failed', err);
