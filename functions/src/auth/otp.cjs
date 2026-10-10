@@ -244,18 +244,20 @@ function createSendOtpHandler({
     // which control refused it.
     const ceiling = await takeGlobalSendSlot({ db, now, max: sendCeilingMax, windowMs: sendCeilingWindowMs });
     if (ceiling.limited) {
-      log.error(`OTP send ceiling reached: ${ceiling.count} sends in the window (max ${sendCeilingMax})`);
+      log.error(`OTP send ceiling reached: ${ceiling.count} attempts in the window (max ${sendCeilingMax})`);
       if (ceiling.firstTrip && notifyOperator) {
         // firstTrip is the durable, cross-container once-per-episode gate;
         // dedupeKey is the notifier's own in-memory window on top of it.
+        // The count includes provider refusals, so it is attempts, not
+        // delivered codes.
         await notifyOperator({
           kind: 'error',
-          title: 'OTP send ceiling reached; sign-in codes are paused',
-          summary: `${ceiling.count} sign-in codes were sent in the last ${Math.round(sendCeilingWindowMs / 60000)} minutes, reaching this deployment's ceiling of ${sendCeilingMax}. New code requests are refused until the window drains. Check for an email-bomb or a stuck client before raising the ceiling.`,
+          title: 'OTP send ceiling reached; sign-in code attempts are paused',
+          summary: `${ceiling.count} sign-in code attempts were counted in the last ${Math.round(sendCeilingWindowMs / 60000)} minutes, reaching this deployment's ceiling of ${sendCeilingMax}. The count includes attempts the provider refused. New code requests are refused until the window drains. Check for an email bomb or a stuck client before raising the ceiling.`,
           fields: {
             ceiling: String(sendCeilingMax),
             windowMinutes: String(Math.round(sendCeilingWindowMs / 60000)),
-            sendsInWindow: String(ceiling.count),
+            attemptsInWindow: String(ceiling.count),
           },
           dedupeKey: 'otp-send-ceiling-tripped',
         });
@@ -264,10 +266,10 @@ function createSendOtpHandler({
       return;
     }
 
-    // A call that reaches the provider keeps its slot, including a failed
-    // response and a throw. Releasing those lets a caller burn provider
-    // attempts without ever filling the ceiling (issue #366). A failure
-    // before the provider is called still gives the slot back.
+    // A provider result other than sent keeps its slot (issue #366). The
+    // email core turns a provider throw into that failed result. A throw
+    // from sendEmail itself is a policy or config failure before the
+    // provider, so that slot goes back.
     const releaseCeiling = async () => {
       try {
         await releaseGlobalSendSlot({ db, takenAt: ceiling.takenAt, now, windowMs: sendCeilingWindowMs });
@@ -287,18 +289,23 @@ function createSendOtpHandler({
     }
 
     // No onceKey — every request must send a new code (spec §3.1).
-    // A throw here keeps the ceiling slot.
-    const result = await sendEmail({
-      to: email,
-      subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
-      tag: 'auth.otp',
-      source: 'auth-otp',
-      storeRendered: rendered.storeRendered,
-      hasLegalFooterHtml: rendered.hasLegalFooterHtml,
-      hasLegalFooterText: rendered.hasLegalFooterText,
-    });
+    let result;
+    try {
+      result = await sendEmail({
+        to: email,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        tag: 'auth.otp',
+        source: 'auth-otp',
+        storeRendered: rendered.storeRendered,
+        hasLegalFooterHtml: rendered.hasLegalFooterHtml,
+        hasLegalFooterText: rendered.hasLegalFooterText,
+      });
+    } catch (err) {
+      await releaseCeiling();
+      throw err;
+    }
     if (result.status !== 'sent') {
       res.status(502).json({ error: { code: 'send-failed', message: 'The sign-in email could not be sent. Try again.' } });
       return;

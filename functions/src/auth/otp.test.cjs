@@ -225,8 +225,11 @@ test('the send ceiling trips on distinct addresses the per-email bucket never se
   assert.equal(notices.length, 1);
   assert.equal(notices[0].kind, 'error');
   assert.match(notices[0].title, /send ceiling/);
+  assert.match(notices[0].summary, /sign-in code attempts were counted/);
+  assert.equal(notices[0].summary.includes('were sent'), false);
   assert.equal(notices[0].dedupeKey, 'otp-send-ceiling-tripped');
   assert.equal(notices[0].fields.ceiling, '3');
+  assert.equal(notices[0].fields.attemptsInWindow, '3');
 
   clock += 1000;
   const again = fakeRes();
@@ -296,24 +299,26 @@ test('a failed provider send keeps its ceiling slot', async () => {
   assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 3);
 });
 
-test('a throw from the provider keeps the ceiling slot', async () => {
+test('a throw before the provider returns the ceiling slot', async () => {
   const db = fakeDb();
   const { handler } = sendDeps({ db, sendCeilingMax: 2, sendCeilingWindowMs: 60_000 });
   await handler({ method: 'POST', body: { email: 'ok@example.org' } }, fakeRes());
 
+  // The email core turns a provider throw into status failed. A throw from
+  // sendEmail is a policy or config failure, and the provider was not called.
   const failing = createSendOtpHandler({
     db,
     getConfig: async () => CONFIG,
-    sendEmail: async () => { throw new Error('provider down'); },
+    sendEmail: async () => { throw new Error('config unavailable'); },
     sendCeilingMax: 2,
     sendCeilingWindowMs: 60_000,
     log: { error() {}, warn() {} },
   });
   await assert.rejects(
     failing({ method: 'POST', body: { email: 'bad@example.org' } }, fakeRes()),
-    /provider down/,
+    /config unavailable/,
   );
-  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 2);
+  assert.equal(db.store.get('auth_send_ceiling/global').sends.length, 1);
 });
 
 test('a challenge write failure returns the ceiling slot, because the provider was not called', async () => {

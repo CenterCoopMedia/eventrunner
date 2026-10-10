@@ -205,9 +205,9 @@ async function takeGlobalSendSlot({
 
 /**
  * Give back a reservation taken by `takeGlobalSendSlot` when the provider
- * was never called, such as a failed challenge write. A provider response
- * that is not `sent`, and a throw from the provider, keep the slot. Giving
- * those back lets failed calls bypass the ceiling.
+ * was never called, such as a failed challenge write or a sendEmail throw
+ * during policy or config. A provider result other than `sent` keeps the
+ * slot. The email core turns a provider throw into that failed result.
  *
  * Removes exactly one timestamp equal to `takenAt`. Two requests reserving
  * in the same millisecond are indistinguishable, but returning "one slot"
