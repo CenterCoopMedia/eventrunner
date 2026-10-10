@@ -176,7 +176,8 @@ describe('the admin shell', () => {
       await waitFor(() =>
         expect(container.querySelector('#admin-content')).toHaveAttribute('inert'),
       );
-      expect(document.documentElement.style.overflow).toBe('hidden');
+      // The scroll lock is applied in an effect after the sheet opens.
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe('hidden'));
       // A media dialog owns body overflow. If it closes while this sheet is
       // open, closing the sheet must not restore the dialog's stale lock.
       document.body.style.overflow = '';
