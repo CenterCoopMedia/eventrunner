@@ -213,6 +213,51 @@ describe('Attendees', () => {
     expect(screen.getByText('2 selected')).toBeInTheDocument();
   });
 
+  it('drops the full directory when attendee access is removed', () => {
+    const view = renderPage();
+    pushProfiles([
+      { id: 'u1', displayName: 'Private Person' },
+      { id: 'u2', displayName: 'Public Person' },
+    ]);
+    expect(screen.getByText('Private Person')).toBeInTheDocument();
+
+    const previousOnNext = subscribeDirectoryMock.mock.calls.at(-1)[1];
+    profileValue = { status: 'ready', attendeeAccess: false, profile: null, needsProfileSetup: false };
+    view.rerender(
+      <MemoryRouter>
+        <Attendees />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('Private Person')).toBeNull();
+    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' })).toBeInTheDocument();
+    expect(subscribeDirectoryMock.mock.calls.at(-1)[0]).toEqual({ includeAttendeesOnly: false });
+
+    act(() => previousOnNext([{ id: 'u1', displayName: 'Private Person' }]));
+    expect(screen.queryByText('Private Person')).toBeNull();
+
+    pushProfiles([{ id: 'u2', displayName: 'Public Person' }]);
+    expect(screen.getByText('Public Person')).toBeInTheDocument();
+    expect(screen.queryByText('Private Person')).toBeNull();
+  });
+
+  it('drops the full directory when a viewer with public profiles signs out', () => {
+    features.publicAttendeeProfiles = true;
+    const view = renderPage();
+    pushProfiles([{ id: 'u1', displayName: 'Private Person' }]);
+
+    profileValue = { status: 'signed-out', attendeeAccess: false, profile: null, needsProfileSetup: false };
+    view.rerender(
+      <MemoryRouter>
+        <Attendees />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('Private Person')).toBeNull();
+    expect(screen.getByRole('status', { name: 'Loading the attendee directory…' })).toBeInTheDocument();
+    expect(subscribeDirectoryMock.mock.calls.at(-1)[0]).toEqual({ includeAttendeesOnly: false });
+  });
+
   it('says the directory is unavailable when the listener fails, rather than showing it empty', () => {
     renderPage();
     const [, , onFail] = subscribeDirectoryMock.mock.calls[0];

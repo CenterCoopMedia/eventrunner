@@ -9,7 +9,8 @@
 // approved/speaker/admin. This page asks for the narrower query when it
 // believes it lacks that access, because a Firestore list fails outright if
 // any returned document is unreadable — guessing wrong costs a query, never
-// a leak.
+// a leak. The page also drops the list it already rendered when access or
+// sign-in changes, before the next snapshot arrives.
 //
 // AN INDEX, NOT A DIRECTORY OF PROFILES (design brief §5.1; this review).
 //
@@ -119,16 +120,32 @@ export default function Attendees() {
     !IS_DEMO && status === 'signed-out' && !features.publicAttendeeProfiles;
 
   useEffect(() => {
-    if (!directoryEnabled || signedOutWithNothingToSee) return undefined;
+    if (!directoryEnabled || signedOutWithNothingToSee) {
+      setProfiles(null);
+      return undefined;
+    }
+    // Drop the previous query's profiles before the next snapshot. A
+    // callback after unsubscribe is ignored, so the old full directory
+    // cannot paint again after access or sign-in changes.
+    let current = true;
+    setProfiles(null);
     setFailed(false);
-    return subscribeDirectory(
+    const unsubscribe = subscribeDirectory(
       { includeAttendeesOnly },
       (docs) => {
+        if (!current) return;
         setProfiles(docs);
         setFailed(false);
       },
-      () => setFailed(true),
+      () => {
+        if (!current) return;
+        setFailed(true);
+      },
     );
+    return () => {
+      current = false;
+      unsubscribe();
+    };
   }, [directoryEnabled, includeAttendeesOnly, signedOutWithNothingToSee]);
 
   const sorted = useMemo(
