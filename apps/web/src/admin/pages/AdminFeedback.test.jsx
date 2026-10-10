@@ -24,6 +24,21 @@ function pushRows(rows) {
 }
 
 describe('AdminFeedback', () => {
+  it('encodes the address in the mailto link', () => {
+    render(<AdminFeedback />);
+    pushRows([{
+      id: 'f1',
+      message: 'Hi',
+      status: 'new',
+      email: 'ada@example.org?bcc=other@example.org',
+      createdAt: new Date('2026-08-01T00:00:00Z'),
+    }]);
+    expect(screen.getByRole('link', { name: 'ada@example.org?bcc=other@example.org' })).toHaveAttribute(
+      'href',
+      'mailto:ada%40example.org%3Fbcc%3Dother%40example.org',
+    );
+  });
+
   it('lists submissions newest first, defaulting to the open filter', () => {
     render(<AdminFeedback />);
     pushRows([

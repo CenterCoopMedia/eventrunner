@@ -178,7 +178,7 @@ export default function AdminFeedback() {
                       {row.message}
                     </p>
                     {row.email ? (
-                      <a href={`mailto:${row.email}`} className={`mt-3xs ${linkButtonClass}`}>
+                      <a href={`mailto:${encodeURIComponent(row.email)}`} className={`mt-3xs ${linkButtonClass}`}>
                         {row.email}
                       </a>
                     ) : null}

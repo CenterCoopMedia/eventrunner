@@ -76,7 +76,9 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 // than this; a submission that arrives faster is treated as scripted.
 const MIN_ELAPSED_MS = 3000;
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Letters, digits, and . _ + - only. A `?`, `&`, `=`, `,`, or `%` would add
+// a header or a second recipient when an admin opens the mailto link.
+const EMAIL_RE = /^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
 const CATEGORIES = Object.freeze(['bug', 'feedback', 'other']);
 const STATUSES = Object.freeze(['new', 'reviewed', 'archived']);
 // Bounded and restricted to characters safe as a bare Firestore doc-id
