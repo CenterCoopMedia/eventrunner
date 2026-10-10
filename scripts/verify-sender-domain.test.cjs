@@ -40,6 +40,25 @@ test('a verified domain exits 0 and stamps config/event.sender', async () => {
   assert.equal(event.sender.email, 'hello@example.org', 'the merge must not drop the address');
 });
 
+test('a pass does not stamp verification after the sender domain changes', async () => {
+  const db = dbWithSender('hello@example.org');
+  db.beforeCommit = async () => {
+    await db.collection('config').doc('event').set({
+      sender: { email: 'other@other.org', domainVerified: false, domainVerifiedAt: null },
+    });
+  };
+  const code = await run({
+    args: {},
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({ provider: { name: 'postmark', verifySenderDomain: async () => PASS }, db }),
+  });
+  assert.equal(code, 1);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.email, 'other@other.org');
+  assert.equal(sender.domainVerified, false);
+  assert.equal(sender.domainVerifiedAt, null);
+});
+
 test('an unverified domain exits 1 and stamps nothing', async () => {
   const db = dbWithSender('hello@example.org');
   const code = await run({
