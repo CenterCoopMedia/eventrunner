@@ -28,6 +28,21 @@ const REGION = process.env.EVENT_FIREBASE_REGION || 'us-central1';
 const appUrl = new URL(APP_URL);
 const APP_HOST = appUrl.hostname;
 const APP_PORT = appUrl.port || (appUrl.protocol === 'https:' ? '443' : '80');
+// new URL('http://127.0.0.1;id') keeps the semicolon in the hostname. The
+// webServer command is a shell string, so that value would run as a second
+// command. Only a loopback host and a numeric port are accepted, and both
+// are quoted before they reach the shell.
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+if (!LOOPBACK_HOSTS.has(APP_HOST)) {
+  throw new Error(`E2E_APP_URL host must be a loopback address. Received "${APP_HOST}".`);
+}
+if (!/^[1-9]\d{0,4}$/.test(APP_PORT) || Number(APP_PORT) > 65535) {
+  throw new Error(`E2E_APP_URL port must be a number from 1 to 65535. Received "${APP_PORT}".`);
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
 
 export default defineConfig({
   testDir: './e2e',
@@ -63,7 +78,7 @@ export default defineConfig({
     // than hardcoded, so binding and probing stay the SAME literal address
     // under an E2E_APP_URL override too, instead of just by coincidence at
     // the default.
-    command: `npm run dev -w apps/web -- --host ${APP_HOST} --port ${APP_PORT} --strictPort`,
+    command: `npm run dev -w apps/web -- --host ${shellQuote(APP_HOST)} --port ${shellQuote(APP_PORT)} --strictPort`,
     url: APP_URL,
     reuseExistingServer: !process.env.CI,
     // Modest headroom for a cold CI cache (first Vite dependency
