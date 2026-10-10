@@ -23,7 +23,15 @@ vi.mock('../lib/materialsSource.js', () => ({
   fetchSessionMaterialUrl: vi.fn(),
 }));
 
+// During the 2099 fixture day. A test that moves this past the day end
+// checks that the open page reads the event clock.
+const clockHolder = { now: new Date('2099-10-15T16:00:00Z') };
+vi.mock('../hooks/useEventClock.js', () => ({
+  useEventClock: () => clockHolder.now,
+}));
+
 beforeEach(() => {
+  clockHolder.now = new Date('2099-10-15T16:00:00Z');
   subscribeSessionMaterialsMock.mockReset().mockImplementation((sessionId, onNext) => {
     onNext([]);
     return () => {};
@@ -33,7 +41,7 @@ beforeEach(() => {
 const fixtureConfig = {
   name: '[Fixture] Lakeshore Docs Camp',
   timezone: 'America/Chicago',
-  days: [{ id: 'fx-day-1', label: 'Day one', date: '2026-10-15' }],
+  days: [{ id: 'fx-day-1', label: 'Day one', date: '2099-10-15' }],
 };
 
 const fixtureSessions = [
@@ -72,7 +80,7 @@ const fixtureSessions = [
   },
 ];
 
-function renderDetail(
+function detailElement(
   sessionId,
   {
     eventConfig = fixtureConfig,
@@ -84,7 +92,7 @@ function renderDetail(
     search = '',
   } = {},
 ) {
-  return render(
+  return (
     <MemoryRouter
       initialEntries={[`/schedule/${sessionId}${search}`]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
@@ -114,8 +122,12 @@ function renderDetail(
           </ProfileContext.Provider>
         </AuthContext.Provider>
       </EventConfigContext.Provider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderDetail(sessionId, options) {
+  return render(detailElement(sessionId, options));
 }
 
 describe('SessionDetail', () => {
@@ -229,6 +241,47 @@ describe('SessionDetail', () => {
   it('offers a signed-out visitor the sign-in path when features.sessionBookmarks is on', () => {
     renderDetail('fx-early', { features: { schedule: true, sessionBookmarks: true } });
     expect(screen.getByRole('link', { name: 'Sign in to save sessions' })).toBeInTheDocument();
+  });
+
+  it('takes live controls off a past day and keeps the recording', () => {
+    renderDetail('fx-recorded', {
+      eventConfig: {
+        ...fixtureConfig,
+        days: [{ id: 'fx-day-1', label: 'Day one', date: '2020-01-01' }],
+      },
+      features: {
+        schedule: true,
+        sessionBookmarks: true,
+        sessionReactions: true,
+        icsExport: true,
+      },
+      auth: { user: { uid: 'u1' } },
+      profile: { attendeeAccess: true },
+    });
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Sign in to save sessions' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
+    expect(screen.queryByRole('group', { name: /session reactions/i })).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /^Watch the recording of \[Fixture\] Recorded panel\b/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('drops live controls when the open page clock passes the day end', () => {
+    const options = {
+      features: { schedule: true, sessionBookmarks: true, sessionReactions: true, icsExport: true },
+      auth: { user: { uid: 'u1' } },
+      profile: { attendeeAccess: true },
+    };
+    const view = renderDetail('fx-early', options);
+    expect(screen.getByRole('group', { name: /session reactions/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add to calendar' })).toBeInTheDocument();
+    clockHolder.now = new Date('2099-10-16T06:00:00Z');
+    view.rerender(detailElement('fx-early', options));
+    expect(screen.getByRole('heading', { level: 1, name: '[Fixture] Morning kickoff' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /session reactions/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
   });
 
   it('puts the reactions on the session\u2019s own page, where a row never had them', () => {
