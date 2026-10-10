@@ -9,20 +9,19 @@
 // exactly backwards.
 //
 // The upload lands BEFORE the profile is saved, and the field only reports
-// the new path upward. That ordering is deliberate: an object with no
-// profile pointing at it is invisible and costs a few kilobytes, while a
-// saved path with no object is a broken image on the attendee directory.
+// the new path upward. That ordering is deliberate: a saved path with no
+// object is a broken image on the attendee directory. The new object uses a
+// fresh id, so it does not replace the object the saved profile already
+// names. The directory keeps showing that saved photo until this form is
+// saved. An object nobody's profile names is not the public photo.
 //
 // DELETION FOLLOWS THE SAME RULE, which is why this field never deletes
-// anything. "Remove photo" only clears the path in the form; the object is
-// removed by Profile.jsx AFTER the save commits, once the stored profile —
-// and the users_public projection built from it — has stopped referencing
-// it. Deleting on click instead would mean an abandoned edit (navigate away,
-// failed save, closed tab) leaves the directory pointing at an object that
-// no longer exists, which is the one failure mode a photo field must not
-// have. The cost is an orphaned object when a save never happens; that is
-// cheap, invisible, and collectable by a later maintenance sweep (§9
-// cleanup.cjs), whereas a broken avatar is neither.
+// anything. "Remove photo" only clears the path in the form. The old object
+// stays until syncUserPublic has written the new path onto users_public,
+// and that trigger deletes it. Deleting here, or in the save handler before
+// that write, leaves the directory pointing at an object that is gone.
+// The cost is an orphaned object when a save never happens; that is cheap
+// next to a broken avatar.
 import { useRef, useState } from 'react';
 import {
   PROFILE_PHOTO_MAX_BYTES,
@@ -37,7 +36,7 @@ import AssetImage from './AssetImage.jsx';
 import PhotoCrop from './PhotoCrop.jsx';
 import DefaultAvatarPicker from './DefaultAvatarPicker.jsx';
 
-export default function ProfilePhotoField({ uid, value, onChange }) {
+export default function ProfilePhotoField({ uid, value, onChange, onPendingChange }) {
   const inputRef = useRef(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -45,8 +44,13 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
   // between the file picker and the upload.
   const [cropFile, setCropFile] = useState(null);
 
+  function reportPending(pending) {
+    onPendingChange?.(pending);
+  }
+
   async function upload(file) {
     setBusy(true);
+    reportPending(true);
     setError(null);
     try {
       const { path } = await uploadProfilePhoto({ uid, file });
@@ -58,6 +62,7 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
     } finally {
       setBusy(false);
       setCropFile(null);
+      reportPending(false);
       if (inputRef.current) inputRef.current.value = '';
     }
   }
@@ -81,11 +86,12 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
     // cancel re-fires the change event.
     if (inputRef.current) inputRef.current.value = '';
     setCropFile(file);
+    reportPending(true);
   }
 
   function remove() {
-    // Clear the form value only. Profile.jsx deletes the object once the
-    // save has committed — see the module header.
+    // Clear the form value only. syncUserPublic deletes the object once
+    // users_public no longer names it — see the module header.
     onChange('');
   }
 
@@ -150,7 +156,10 @@ export default function ProfilePhotoField({ uid, value, onChange }) {
           file={cropFile}
           label="your profile photo"
           onApply={(file) => upload(file)}
-          onCancel={() => setCropFile(null)}
+          onCancel={() => {
+            setCropFile(null);
+            reportPending(false);
+          }}
         />
       ) : null}
       <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="profile" />

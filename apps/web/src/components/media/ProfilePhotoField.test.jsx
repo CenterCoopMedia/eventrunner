@@ -4,9 +4,8 @@
 // (not the admin endpoints), it refuses a file storage.rules would refuse
 // before spending the upload — including one of EXACTLY the cap, since the
 // rule is a strict `<` — it reports the PATH upward so the profile save
-// writes `photoPath`, and it never deletes an object itself (Profile.jsx
-// does that after the save commits, so an abandoned edit cannot leave the
-// directory pointing at a deleted object).
+// writes `photoPath`, and it never deletes an object itself. The public
+// projection deletes a replaced object after users_public names the new path.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { chooseAndApplyCrop, installPhotoCropStubs, uninstallPhotoCropStubs } from '../../test/photoCropStubs.js';
@@ -95,14 +94,22 @@ describe('ProfilePhotoField', () => {
     expect(label).toHaveClass('file-input-label');
   });
 
-  it('uploads to the signed-in user’s own prefix and reports the path, after the crop', async () => {
+  it('uploads to a fresh object under the signed-in user’s prefix and reports that path', async () => {
     const onChange = vi.fn();
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
     await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
 
     await waitFor(() => expect(onChange).toHaveBeenCalled());
-    expect(uploadBytes.mock.calls[0][0]).toEqual({ path: 'profile-photos/attendee-1/photo.png' });
-    expect(onChange).toHaveBeenCalledWith('profile-photos/attendee-1/photo.png');
+    const first = uploadBytes.mock.calls[0][0].path;
+    expect(first).toMatch(/^profile-photos\/attendee-1\/[0-9a-f-]{36}\/photo\.png$/);
+    expect(first).not.toBe('profile-photos/attendee-1/photo.png');
+    expect(onChange).toHaveBeenCalledWith(first);
+
+    await chooseAndApplyCrop(new File(['y'], 'me.png', { type: 'image/png' }), /your profile photo/);
+    await waitFor(() => expect(uploadBytes).toHaveBeenCalledTimes(2));
+    const second = uploadBytes.mock.calls[1][0].path;
+    expect(second).toMatch(/^profile-photos\/attendee-1\/[0-9a-f-]{36}\/photo\.png$/);
+    expect(second).not.toBe(first);
   });
 
   it('refuses a type the rules refuse, without uploading', async () => {
@@ -177,5 +184,40 @@ describe('ProfilePhotoField', () => {
     expect(await screen.findByLabelText(/Upload a photo/)).toBeInTheDocument();
     expect(uploadBytes).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('reports pending from the file choice until the upload finishes', async () => {
+    let release;
+    uploadBytes.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+    const onPendingChange = vi.fn();
+    render(<ProfilePhotoField uid="attendee-1" value="" onChange={vi.fn()} onPendingChange={onPendingChange} />);
+
+    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+    expect(onPendingChange).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onPendingChange).toHaveBeenLastCalledWith(false);
+
+    await chooseAndApplyCrop(new File(['y'], 'me.png', { type: 'image/png' }), /your profile photo/);
+    await waitFor(() => expect(uploadBytes).toHaveBeenCalledTimes(1));
+    expect(onPendingChange).toHaveBeenLastCalledWith(true);
+    release({});
+    await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it('uploads when randomUUID is missing', async () => {
+    const real = globalThis.crypto;
+    vi.stubGlobal('crypto', { subtle: real.subtle, getRandomValues: real.getRandomValues?.bind(real) });
+    try {
+      const onChange = vi.fn();
+      render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
+      await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
+      await waitFor(() => expect(onChange).toHaveBeenCalled());
+      const path = uploadBytes.mock.calls.at(-1)[0].path;
+      expect(path).toMatch(/^profile-photos\/attendee-1\/[A-Za-z0-9]+\/photo\.png$/);
+      expect(path).not.toBe('profile-photos/attendee-1/photo.png');
+    } finally {
+      vi.unstubAllGlobals();
+      installPhotoCropStubs();
+    }
   });
 });
