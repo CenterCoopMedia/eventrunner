@@ -656,7 +656,11 @@ describe('publishing the theme', () => {
     fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'theme.tokens.dark.ink: must be a hex color'));
     fireEvent.click(screen.getByRole('button', { name: 'Publish the theme' }));
 
-    expect(await screen.findByRole('alert')).toHaveFocus();
+    // The alert is in the document before the effect moves focus to it.
+    // The publish button is disabled while the request runs, so focus is on
+    // the document until that effect.
+    const alert = await screen.findByRole('alert');
+    await waitFor(() => expect(alert).toHaveFocus());
     await waitFor(() => expect(screen.getByRole('button', { name: 'Advanced', exact: true }))
       .toHaveAttribute('aria-pressed', 'true'));
     expect(screen.getByLabelText('Ink — dark')).toBeVisible();

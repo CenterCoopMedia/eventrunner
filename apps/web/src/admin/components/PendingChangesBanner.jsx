@@ -19,11 +19,30 @@ import { usePendingChanges } from '../PendingChangesContext.jsx';
 
 export const UNPUBLISHED_PATH = '/admin/unpublished';
 
+// matchPath does not decode percent-encoding. The router still renders this
+// page for an encoded spelling, so decode each segment first. A decoded
+// slash is put back as %2F: the router does not treat that as a separator,
+// and /admin/unpublished%2F is the not-found screen, not this page. A bad
+// escape stays unmatched rather than throwing.
+function decodePathname(pathname) {
+  try {
+    return String(pathname ?? '')
+      .split('/')
+      .map((segment) => {
+        if (segment === '') return '';
+        return decodeURIComponent(segment).replaceAll('/', '%2F');
+      })
+      .join('/');
+  } catch {
+    return pathname;
+  }
+}
+
 export default function PendingChangesBanner() {
   const { ready, error, total, sentence } = usePendingChanges();
   // The router's own matcher: any case, a trailing slash allowed. (matchPath
   // is already in the first-paint bundle; useMatch would add itself there.)
-  const onOwnPage = matchPath(UNPUBLISHED_PATH, useLocation().pathname);
+  const onOwnPage = matchPath(UNPUBLISHED_PATH, decodePathname(useLocation().pathname));
   // A count that failed before it ever arrived says so; a count that
   // arrived keeps showing through a later failure while the read retries.
   const failed = !ready && Boolean(error);
