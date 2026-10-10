@@ -106,6 +106,95 @@ test('autoApproveTicketHolders approves with approvalSource ticket, never admin 
   assert.equal(user.approvalSource, 'ticket');
 });
 
+test('a refunded order is the same 404 and does not approve the account', async () => {
+  const db = seededDb();
+  const provider = createFakeTicketingProvider({
+    orders: { 'ord-1': { tickets: [fakeTicket({ status: 'refunded' })] } },
+  });
+  const res = makeRes();
+
+  await verifyHandler({
+    db,
+    provider,
+    config: async () => ({ bootstrap: { adminEmails: [ADMIN] }, features: { autoApproveTicketHolders: true } }),
+  })(claimReq('ada'), res);
+
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(res.body, { error: { code: 'not-found', message: 'No ticket matches that order number.' } });
+  assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
+  assert.equal(db.read('users', 'uid-ada').approvalSource, null);
+});
+
+test('a mixed order claims the valid ticket and leaves the refunded one', async () => {
+  const db = seededDb();
+  const provider = createFakeTicketingProvider({
+    orders: {
+      'ord-1': {
+        tickets: [
+          fakeTicket({ status: 'refunded' }),
+          fakeTicket({ externalId: 'tkt-2', status: 'valid' }),
+        ],
+      },
+    },
+  });
+  const res = makeRes();
+
+  await verifyHandler({ db, provider })(claimReq('ada'), res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.claimed, 1);
+  assert.equal(res.body.registrationStatus, 'ticketed');
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(db.read('tickets', 'tkt-2').claimedByUid, 'uid-ada');
+});
+
+test('a manual claim does not write a stale valid status over a newer refund', async () => {
+  const db = seededDb({
+    'tickets/tkt-1': { ...fakeTicket({ status: 'refunded' }), provider: 'manual', claimedByUid: null },
+  });
+  const provider = {
+    name: 'manual',
+    async lookupByOrderNumber() {
+      return [fakeTicket({ status: 'valid' })];
+    },
+  };
+  const res = makeRes();
+
+  await verifyHandler({
+    db,
+    provider,
+    config: async () => ({ bootstrap: { adminEmails: [ADMIN] }, features: { autoApproveTicketHolders: true } }),
+  })(claimReq('ada'), res);
+
+  assert.equal(res.statusCode, 404);
+  assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
+  assert.equal(db.read('users', 'uid-ada').approvalSource, null);
+});
+
+test('a manual claim of a stored valid ticket still claims it', async () => {
+  const db = seededDb({
+    'tickets/tkt-1': { ...fakeTicket(), provider: 'manual', claimedByUid: null },
+  });
+  const provider = {
+    name: 'manual',
+    async lookupByOrderNumber() {
+      return [fakeTicket()];
+    },
+  };
+  const res = makeRes();
+
+  await verifyHandler({ db, provider })(claimReq('ada'), res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.claimed, 1);
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, 'uid-ada');
+  assert.equal(db.read('tickets', 'tkt-1').status, 'valid');
+});
+
 test('every failure answers the SAME 404 — no order or address oracle', async () => {
   const db = seededDb();
   const provider = createFakeTicketingProvider({
@@ -213,6 +302,25 @@ test('claimTicket refuses a ticket held by someone else or addressed elsewhere',
   );
 });
 
+test('claimTicket refuses a ticket that is not valid, and does not auto-approve', async () => {
+  const config = async () => ({
+    bootstrap: { adminEmails: [ADMIN] },
+    features: { autoApproveTicketHolders: true },
+  });
+  for (const status of ['refunded', 'cancelled', 'pending_info', undefined]) {
+    const db = seededDb({ 'tickets/tkt-1': { ...fakeTicket(), status } });
+    const result = await claimTicketsForUser({
+      db, uid: 'uid-ada', email: 'attendee@example.com', externalIds: ['tkt-1'], getConfig: config, now: () => T0,
+    });
+
+    assert.deepEqual(result.claimed, []);
+    assert.equal(result.refused[0].reason, 'not_valid');
+    assert.equal(db.read('tickets', 'tkt-1').claimedByUid, undefined);
+    assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
+    assert.equal(db.read('users', 'uid-ada').approvalSource, null);
+  }
+});
+
 test('two concurrent claims on one ticket cannot both win', async () => {
   const db = makeFakeDb({ 'tickets/tkt-1': fakeTicket() });
   // Bob's claim commits between Ada's read and her commit; the read set
@@ -261,6 +369,7 @@ function fakeAuth(existing = {}) {
   let next = 1;
   return {
     created: [],
+    deleted: [],
     async verifyIdToken(token) { return auth.verifyIdToken(token); },
     async getUserByEmail(email) {
       if (!users.has(email)) throw new Error('auth/user-not-found');
@@ -271,6 +380,12 @@ function fakeAuth(existing = {}) {
       users.set(email, user);
       this.created.push(user);
       return user;
+    },
+    async deleteUser(uid) {
+      this.deleted.push(uid);
+      for (const [email, user] of users) {
+        if (user.uid === uid) users.delete(email);
+      }
     },
   };
 }
@@ -354,6 +469,41 @@ test('an already-claimed ticket reports the holder instead of creating a second 
 
   assert.deepEqual(res.body, { ok: true, uid: 'uid-ada', created: false, alreadyClaimed: true });
   assert.equal(authImpl.created.length, 0);
+});
+
+test('createUserFromTicket does not mint an account for a ticket that is not valid', async () => {
+  for (const status of ['refunded', 'cancelled', 'pending_info']) {
+    const db = makeFakeDb({ 'tickets/tkt-1': { ...fakeTicket(), status, claimedByUid: null } });
+    const authImpl = fakeAuth();
+    const res = makeRes();
+
+    await createUserHandler({ db, authImpl })(adminReq({ externalId: 'tkt-1' }), res);
+
+    assert.equal(res.statusCode, 409);
+    assert.equal(authImpl.created.length, 0);
+    assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+    assert.deepEqual(db.ids('users'), []);
+  }
+});
+
+test('a refund during account creation removes the account this request created', async () => {
+  const db = makeFakeDb({
+    'tickets/tkt-1': { ...fakeTicket(), status: 'valid', claimedByUid: null },
+  });
+  db.beforeCommit = async () => {
+    await db.collection('tickets').doc('tkt-1').set({ status: 'refunded' }, { merge: true });
+  };
+  const authImpl = fakeAuth();
+  const res = makeRes();
+
+  await createUserHandler({ db, authImpl })(adminReq({ externalId: 'tkt-1' }), res);
+
+  assert.equal(res.statusCode, 409);
+  assert.deepEqual(authImpl.deleted, ['new-1']);
+  assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
+  assert.equal(db.read('tickets', 'tkt-1').claimedByUid, null);
+  assert.equal(db.read('users', 'new-1'), undefined);
+  await assert.rejects(() => authImpl.getUserByEmail('attendee@example.com'));
 });
 
 test('a ticket with no email address cannot mint an account', async () => {

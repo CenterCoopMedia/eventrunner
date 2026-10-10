@@ -25,8 +25,9 @@
  *     paginated by document id. A full sync (`ticketingSync`) walking this
  *     provider is therefore a no-op confirmation, never a duplicate import.
  *   • lookupByOrderNumber → exact match on `orderId` among manual tickets
- *     (§3.3: "returns lookupByOrderNumber as an exact match on imported
- *     rows").
+ *     that are still valid (§3.3). A refunded, cancelled, or undecided row
+ *     stays stored. fetchOrder still returns it so a sync can record the
+ *     status. This lookup does not hand it to a claim.
  *   • fetchOrder      → the manual tickets for one orderId. `complete` is
  *     always `true`: a CSV row is either imported or it is not, and there
  *     is no eventually-consistent read to wait out. §3.3's retry queue
@@ -172,7 +173,10 @@ function createManualProvider({ env = process.env, db = null, getConfig = null }
         .where('orderId', '==', id)
         .get();
       if (snap.empty) return null;
-      return snap.docs.map(ticketRecordFromDoc);
+      const tickets = snap.docs
+        .map(ticketRecordFromDoc)
+        .filter((ticket) => ticket.status === 'valid');
+      return tickets.length > 0 ? tickets : null;
     },
 
     // No registerWebhook: capability, not enablement, is the gate (§3.3) —
