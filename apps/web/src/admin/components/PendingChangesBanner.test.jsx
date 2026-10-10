@@ -85,12 +85,32 @@ describe('the pending-changes banner', () => {
   });
 
   it('is hidden on the row-counted page for every supported path spelling', () => {
-    for (const path of ['/admin/unpublished', '/admin/unpublished/', '/admin/Unpublished', '/ADMIN/UNPUBLISHED']) {
+    for (const path of [
+      '/admin/unpublished',
+      '/admin/unpublished/',
+      '/admin/Unpublished',
+      '/ADMIN/UNPUBLISHED',
+      '/admin/%75npublished',
+      '/admin/%75npublished/',
+      '/%41dmin/%75npublished',
+    ]) {
       const { container, unmount } = renderBanner(path);
       deliver({ cmsContent: 3 });
       expect(container, path).toBeEmptyDOMElement();
       unmount();
     }
+  });
+
+  it('still shows the banner on an encoded path that is not this page', () => {
+    renderBanner('/admin/%70ages');
+    deliver({ cmsContent: 1 });
+    expect(banner()).not.toBeNull();
+  });
+
+  it('does not throw when a segment has a bad percent escape', () => {
+    renderBanner('/admin/%E0%A4%A');
+    deliver({ cmsContent: 1 });
+    expect(banner()).not.toBeNull();
   });
 
   it('states initial failure, retains a known count on failure, and recovers', () => {
