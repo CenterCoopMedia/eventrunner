@@ -88,6 +88,34 @@ test('legacy 12-hour session clocks compare by time instead of by string', () =>
   assert.ok(reversed.errors.includes('endTime: must be after startTime'));
 });
 
+test('a full ISO session time stays editable and still orders by the clock', async () => {
+  const fields = session({
+    startTime: '2027-06-10T09:00',
+    endTime: '2027-06-10T10:30:00',
+  });
+  assert.equal(validateSessionShape(fields, 'session-1').ok, true);
+  assert.deepEqual(
+    await validateSessionStructure({ db: makeFakeDb(), docId: 'session-1', fields }),
+    { ok: true },
+  );
+
+  const reversed = validateSessionShape(session({
+    startTime: '2027-06-10T15:00',
+    endTime: '2027-06-10T09:00',
+  }), 'session-1');
+  assert.equal(reversed.ok, false);
+  assert.ok(reversed.errors.includes('endTime: must be after startTime'));
+});
+
+test('a full ISO time with trailing garbage is still an invalid clock', () => {
+  const result = validateSessionShape(session({
+    startTime: '2027-06-10T09:00garbage',
+    endTime: '10:00',
+  }), 'session-1');
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes('startTime: must be a valid clock time'));
+});
+
 test('malformed session clocks are rejected by field name', () => {
   const result = validateSessionShape(session({
     startTime: '25:00',
