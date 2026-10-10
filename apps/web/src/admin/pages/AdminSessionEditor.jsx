@@ -207,7 +207,9 @@ export default function AdminSessionEditor({ mode }) {
     try {
       const docId = await saveDraft();
       if (publish) {
-        const publishRow = row ?? { id: docId, current: sessionFields(form), draft: {} };
+        // Use the fields just saved. `row` still has the parent from before
+        // this edit, so publishing from it can include an unrelated draft.
+        const publishRow = { id: docId, current: sessionFields(form) };
         const ids = publishSetForSession(publishRow, rows);
         const response = await call('cmsPublish', { collection: 'cmsSchedule', docIds: ids });
         const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');

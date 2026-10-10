@@ -386,6 +386,36 @@ describe('admin Sessions workspace', () => {
     expect(bodyOf(1).docIds).toEqual(['parent', 'child']);
   });
 
+  it('publishes the parent chosen in the form, not the parent stored before the edit', async () => {
+    await renderAt('/admin/sessions/child');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    pushSessions([], [
+      {
+        id: 'old-parent', dayId: 'day-1', startTime: '09:00', endTime: '11:00',
+        title: 'Old parent', description: 'The stored parent.', status: 'dirty',
+      },
+      {
+        id: 'new-parent', dayId: 'day-1', startTime: '11:00', endTime: '12:00',
+        title: 'New parent', description: 'The chosen parent.', status: 'dirty',
+      },
+      {
+        id: 'child', dayId: 'day-1', startTime: '09:30', endTime: '10:00',
+        title: 'Child', description: 'Child session.', parentId: 'old-parent', status: 'dirty',
+      },
+    ]);
+    expect(await screen.findByDisplayValue('Child')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Parent session'), { target: { value: 'new-parent' } });
+    fetch
+      .mockResolvedValueOnce(response({ docId: 'child', status: 'dirty' }))
+      .mockResolvedValueOnce(response({
+        results: { cmsSchedule: { published: ['new-parent', 'child'], skipped: [] } },
+      }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).docIds).toEqual(['new-parent', 'child']);
+  });
+
   it('names a saved day that no longer exists, rather than showing "no day chosen" (issue 248)', async () => {
     // A <select> whose value matches none of its <option>s falls back to
     // showing the first option — "Select a day" — even though the stored
