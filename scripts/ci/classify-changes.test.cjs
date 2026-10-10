@@ -124,6 +124,8 @@ test('the documentation and gate jobs retain their required checks', () => {
 
   assert.match(workflow, /if \[ -f scripts\/build-pages\.cjs \]; then\s+test -f scripts\/build-pages\.test\.cjs\s+node --test scripts\/build-pages\.test\.cjs/s);
   assert.doesNotMatch(workflow, /if \[ -f scripts\/build-pages\.test\.cjs \]; then/);
+  assert.match(workflow, /git show "\$GITHUB_BASE_SHA:scripts\/ci\/classify-changes\.cjs"/);
+  assert.doesNotMatch(workflow, /run: node scripts\/ci\/classify-changes\.cjs/);
   assert.match(workflow, /run: node scripts\/ci\/verify-gate\.cjs/);
   const gate = workflow.slice(workflow.indexOf('\n  gate:'));
   assert.match(gate, /steps:\s+- uses: actions\/checkout@v4\s+- name: Verify the selected CI tiers passed[\s\S]*run: node scripts\/ci\/verify-gate\.cjs/);
