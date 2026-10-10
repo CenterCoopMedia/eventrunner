@@ -16,6 +16,7 @@
 // AdminPageEditor's block-type picker uses), and a section already at its
 // cap has no "Add block" link pointing here in the first place.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -38,6 +39,9 @@ import {
   validateRequiredContent,
   valueFieldsOf,
 } from '../contentDoc.js';
+import { contentEditIsDirty, contentEditSnapshot, createFormBaseline } from '../contentEditState.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 import {
@@ -221,7 +225,12 @@ export default function AdminContentBlockEditor({ mode }) {
   const [savedDocId, setSavedDocId] = useState(null);
   const [resumeQueueId, setResumeQueueId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(mode !== 'edit');
+  const [savedEdit, setSavedEdit] = useState(null);
   const errorRef = useRef(null);
+  const unsaved = contentEditIsDirty(savedEdit, fieldId, content);
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: busy !== null });
+  const formRef = useRef(null);
+  const mountedRef = useRef(true);
   // Load the stored revision (or pick a default block type for a fresh
   // create form) once; later listener updates must not clobber an
   // in-progress edit.
@@ -246,8 +255,11 @@ export default function AdminContentBlockEditor({ mode }) {
     if (!existingRow) return;
     loadedKeyRef.current = key;
     const doc = existingRow.draft ?? existingRow.live;
-    setFieldId(doc?.field ?? fieldParam ?? '');
-    setContent(toEditableContent(doc, doc?.blockType));
+    const nextField = doc?.field ?? fieldParam ?? '';
+    const editable = toEditableContent(doc, doc?.blockType);
+    setFieldId(nextField);
+    setContent(editable);
+    setSavedEdit(contentEditSnapshot(nextField, editable));
     savedBlockTypeRef.current = doc?.blockType ?? null;
   }, [mode, sectionId, fieldParam, existingRow, contentReady]);
 
@@ -261,14 +273,29 @@ export default function AdminContentBlockEditor({ mode }) {
     if (mode !== 'create') return;
     if (loadedKeyRef.current === 'create-defaults') return;
     if (pagesLoading) return;
-    if (content.blockType) {
-      loadedKeyRef.current = 'create-defaults';
-      return;
-    }
     const fallback = allowed[0] ?? BLOCK_TYPE_IDS[0];
+    const baseline = createFormBaseline({ fieldId, content, fallbackType: fallback });
     loadedKeyRef.current = 'create-defaults';
-    setContent(blankContent(fallback));
-  }, [mode, allowed, content.blockType, pagesLoading]);
+    setSavedEdit(baseline.snapshot);
+    if (baseline.nextContent) setContent(baseline.nextContent);
+  }, [mode, allowed, content.blockType, pagesLoading, content, fieldId]);
+
+  useEffect(() => {
+    // Strict mode runs this cleanup once during development, then the setup
+    // again. The flag has to come back, or a later save skips its result.
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return undefined;
+    if (leaveGuard.pending) form.setAttribute('inert', '');
+    else form.removeAttribute('inert');
+    return () => form.removeAttribute('inert');
+  }, [leaveGuard.pending]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
@@ -384,6 +411,7 @@ export default function AdminContentBlockEditor({ mode }) {
     if (!isExisting) request.pageId = pageId;
     try {
       const response = await call(endpoint, request);
+      if (!mountedRef.current) return;
       const docId = response.docId ?? `${sectionId}__${currentFieldId}`;
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt — the same reasoning AdminPageEditor applies:
@@ -393,6 +421,7 @@ export default function AdminContentBlockEditor({ mode }) {
       setSavedDocId(docId);
       loadedKeyRef.current = `${sectionId}__${currentFieldId}`;
       savedBlockTypeRef.current = content.blockType;
+      setSavedEdit(contentEditSnapshot(currentFieldId, content));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         showToast('Draft saved.');
@@ -402,12 +431,14 @@ export default function AdminContentBlockEditor({ mode }) {
         collection: 'cmsContent',
         docIds: [docId],
       });
+      if (!mountedRef.current) return;
       reportPublish(publishResponse, [docId]);
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(err);
       if (err?.queueId) setResumeQueueId(err.queueId);
     } finally {
-      setBusy(null);
+      if (mountedRef.current) setBusy(null);
     }
   }
 
@@ -537,6 +568,7 @@ export default function AdminContentBlockEditor({ mode }) {
 
   return (
     <form
+      ref={formRef}
       noValidate
       className="flex flex-col gap-md"
       onSubmit={(event) => {
@@ -546,7 +578,12 @@ export default function AdminContentBlockEditor({ mode }) {
     >
       <AdminPageHeader
         title={mode === 'create' ? 'New content block' : currentFieldId || 'Content block'}
-        state={existingRow ? <RecordState state={existingRow.state} /> : null}
+        state={(
+          <>
+            {existingRow ? <RecordState state={existingRow.state} /> : null}
+            {unsaved ? <UnsavedEditBadge /> : null}
+          </>
+        )}
         identifiers={`${pageId} · ${sectionId}`}
         description={
           // JSX children, not a template literal: while the page listener is
@@ -584,6 +621,14 @@ export default function AdminContentBlockEditor({ mode }) {
         title={error?.clientValidation ? 'Fill in the required fields' : undefined}
       />
       {status ? <SaveStatus message={status} /> : null}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
 
       <div className="admin-content-editor-layout" data-creating={!isExisting}>
         {isExisting ? <>{valuePanel}{settingsPanel}</> : <>{settingsPanel}{valuePanel}</>}

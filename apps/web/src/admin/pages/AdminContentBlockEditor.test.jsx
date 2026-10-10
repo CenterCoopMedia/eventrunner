@@ -7,8 +7,9 @@
 // link_group.url are real external destinations and must stay plain text —
 // pinned here so a future edit to the `url` branch cannot widen the picker
 // to them by accident.
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
@@ -84,15 +85,16 @@ function okResponse(body = {}) {
   return { ok: true, status: 200, json: async () => body };
 }
 
-async function renderAt(path) {
-  const result = render(
+async function renderAt(path, { strict = false } = {}) {
+  const routed = (
     <MemoryRouter
       initialEntries={[path]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+  const result = render(strict ? <StrictMode>{routed}</StrictMode> : routed);
   // Two waits, not one: the lazy admin chunk, and then the admin probe the
   // gate holds on (AdminGate renders "Checking your access…" until it
   // answers). Waiting only for the chunk lets an assertion run while the
@@ -219,7 +221,11 @@ describe('AdminContentBlockEditor value fields', () => {
     fireEvent.change(screen.getByLabelText(/^field id/i), { target: { value: 'coffee' } });
     fireEvent.change(screen.getByLabelText('name'), { target: { value: 'Coffee break' } });
     fireEvent.change(limit, { target: { value: '2' } });
-    await pasteHtml(await screen.findByRole('textbox', { name: 'benefits' }), '<p>Signs</p>', 'Signs');
+    await pasteHtml(
+      await screen.findByRole('textbox', { name: 'benefits' }, { timeout: 5000 }),
+      '<p>Signs</p>',
+      'Signs',
+    );
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
@@ -436,5 +442,104 @@ describe('content editing workspace', () => {
     expect(screen.getByLabelText('label')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: 'Edit block settings' })).toHaveAttribute('aria-expanded', 'false');
     expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsUpdateContent'))).toBe(false);
+  });
+
+  it('shows unsaved changes until the field returns or a draft save lands', async () => {
+    await renderAt('/admin/content/home/hero/register');
+    expect(screen.getAllByText('Live').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+
+    const label = screen.getByLabelText('label');
+    fireEvent.change(label, { target: { value: 'Reserve a place' } });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    expect(screen.getAllByText('Live').length).toBeGreaterThan(0);
+
+    fireEvent.change(label, { target: { value: 'Register now' } });
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+
+    fireEvent.change(label, { target: { value: 'Reserve a place' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument());
+    expect(label).toHaveValue('Reserve a place');
+  });
+
+  it('keeps the text and the unsaved state when save fails', async () => {
+    await renderAt('/admin/content/home/hero/register');
+    const label = screen.getByLabelText('label');
+    fireEvent.change(label, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('alert')).toHaveFocus();
+    expect(label).toHaveValue('');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsUpdateContent'))).toBe(false);
+
+    fireEvent.change(label, { target: { value: 'Reserve a place' } });
+    fetch.mockImplementation(() => Promise.resolve({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { message: 'The draft service is down.' } }),
+    }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('The draft service is down.')).toBeInTheDocument();
+    expect(label).toHaveValue('Reserve a place');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  });
+
+  it('asks before leaving and can stay, then discard', async () => {
+    await renderAt('/admin/content/home/hero/register');
+    const label = screen.getByLabelText('label');
+    fireEvent.change(label, { target: { value: 'Reserve a place' } });
+
+    const blocked = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(blocked);
+    expect(blocked.defaultPrevented).toBe(true);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(label).toHaveValue('Reserve a place');
+
+    fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(screen.queryByLabelText('label')).not.toBeInTheDocument());
+  });
+
+  it('marks a new block unsaved only after the operator edits it', async () => {
+    await renderAt('/admin/content/home/hero/_new');
+    expect(await screen.findByRole('combobox', { name: /block type/i })).toHaveValue('image');
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('alt'), { target: { value: 'Banner' } });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('alt'), { target: { value: '' } });
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+
+  it('still reports a saved draft after the development remount', async () => {
+    await renderAt('/admin/content/home/hero/register', { strict: true });
+    fireEvent.change(screen.getByLabelText('label'), { target: { value: 'Reserve a place' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
+  });
+
+  it('does not offer discard while a save is still running', async () => {
+    let release;
+    fetch.mockImplementation(() => new Promise((resolve) => {
+      release = resolve;
+    }));
+    await renderAt('/admin/content/home/hero/register');
+    fireEvent.change(screen.getByLabelText('label'), { target: { value: 'Reserve a place' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Discard changes' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('label')).toHaveValue('Reserve a place');
+    // The token read yields before fetch, so the hang is armed on the next turn.
+    await waitFor(() => expect(typeof release).toBe('function'));
+    await act(async () => {
+      release(okResponse({ docId: 'hero__register' }));
+    });
   });
 });
