@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   mergeSessionRevisions,
   publishSetForSession,
+  lockSessionId,
   sessionFields,
   sessionIdFromTitle,
 } from './sessionDoc.js';
@@ -91,6 +92,14 @@ describe('session document helpers', () => {
       title: 'Session', description: '', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
       track: null, placeId: null, location: null, parentId: null, recordingUrl: null,
     });
+  });
+
+  it('locks a session id once and keeps mine reserved', () => {
+    const first = lockSessionId({ id: '', title: 'Opening session' }, []);
+    expect(first.id).toBe('opening-session');
+    const renamed = lockSessionId({ ...first, title: 'Welcome remarks' }, []);
+    expect(renamed.id).toBe('opening-session');
+    expect(lockSessionId({ id: '', title: 'Mine' }, []).id).toBe('mine-2');
   });
 
   it('trims a recording link and sends it as it was typed', () => {

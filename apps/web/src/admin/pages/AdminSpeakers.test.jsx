@@ -187,6 +187,7 @@ describe('speaker editor', () => {
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Rae' } });
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okonkwo' } });
     fireEvent.change(screen.getByLabelText('Job title'), { target: { value: 'Editor' } });
+    expect(screen.queryByLabelText('URL slug')).not.toBeInTheDocument();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
     });
@@ -196,6 +197,7 @@ describe('speaker editor', () => {
     const body = bodyOf(0);
     expect(body.speaker.firstName).toBe('Rae');
     expect(body.speaker.jobTitle).toBe('Editor');
+    expect(body.speaker.slug).toBe('');
     expect(body.speaker).not.toHaveProperty('uid');
     expect(body.speaker).not.toHaveProperty('inviteToken');
     expect(body.speaker).not.toHaveProperty('approvedAt');
@@ -319,8 +321,35 @@ describe('speaker editor', () => {
   it('returns to the speaker list on Cancel', async () => {
     speakerDocs = [RAE];
     await renderAt('/admin/speakers/rae-okonkwo');
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Cancel' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Speakers' })).toBeInTheDocument();
+  });
+
+  it('keeps the public address when the name changes', async () => {
+    speakerDocs = [RAE];
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
+    await renderAt('/admin/speakers/rae-okonkwo');
+    expect(screen.getByLabelText('URL slug')).toHaveValue('rae-okonkwo');
+    expect(screen.getByLabelText('URL slug')).toHaveAttribute('readonly');
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Raeanne' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker.slug).toBe('rae-okonkwo');
+    expect(bodyOf(0).speaker.firstName).toBe('Raeanne');
+  });
+
+  it('asks before leaving a speaker form with unsaved edits', async () => {
+    speakerDocs = [RAE];
+    await renderAt('/admin/speakers/rae-okonkwo');
+    const firstName = screen.getByLabelText('First name');
+    fireEvent.change(firstName, { target: { value: 'Raeanne' } });
+    fireEvent.click(screen.getByRole('link', { name: 'Cancel' }));
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(firstName).toHaveValue('Raeanne');
   });
 
   it("opens the new speaker's own editor after a create", async () => {

@@ -26,6 +26,7 @@
 // seeds — each one a (field, blockType) pair whose per-type fields the
 // registry describes.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
@@ -39,7 +40,9 @@ import {
   blockTypeFieldSummary,
   blockTypeLabel,
 } from '../blockTypes.js';
-import { blankPage, blankSection, toEditablePage, toPagePayload } from '../pageDoc.js';
+import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import {
   PAGE_LAYOUT_DEFAULTS,
   PAGE_LAYOUT_VALUES,
@@ -197,6 +200,9 @@ export default function AdminPageEditor({ mode }) {
   const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
+  const [savedSnapshot, setSavedSnapshot] = useState(() => (
+    mode === 'create' ? pageSnapshot(blankPage()) : null
+  ));
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'delete'
   const [status, setStatus] = useState('');
@@ -209,6 +215,9 @@ export default function AdminPageEditor({ mode }) {
   // Set when a publish fails part-way: the queue row the retry must resume.
   const [resumeQueueId, setResumeQueueId] = useState(null);
   const errorRef = useRef(null);
+  const formRef = useRef(null);
+  const unsaved = savedSnapshot !== null && pageSnapshot(page) !== savedSnapshot;
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: busy !== null });
   // Load the stored revision once; later listener updates (e.g. the echo of
   // our own save) must not clobber whatever is being typed.
   const loadedIdRef = useRef(null);
@@ -226,11 +235,20 @@ export default function AdminPageEditor({ mode }) {
     const editable = toEditablePage(found.draft ?? found.live);
     editable.sections = editable.sections.map((section) => ({ ...section, [EDITOR_SECTION_KEY]: nextSectionKey.current++ }));
     setPage(editable);
+    setSavedSnapshot(pageSnapshot(editable));
   }, [mode, pageId, ready, rows]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return undefined;
+    if (leaveGuard.pending) form.setAttribute('inert', '');
+    else form.removeAttribute('inert');
+    return () => form.removeAttribute('inert');
+  }, [leaveGuard.pending]);
 
   const fieldErrors = useMemo(() => {
     const map = new Map();
@@ -291,11 +309,28 @@ export default function AdminPageEditor({ mode }) {
     }));
 
   async function save({ publish }) {
-    setBusy(publish ? 'publish' : 'draft');
     setError(null);
     setStatus('');
     setResumeQueueId(null);
-    const payload = toPagePayload(page);
+    if (!String(page.label ?? '').trim()) {
+      setError({
+        message: 'Enter a navigation label.',
+        fieldErrors: [{ field: 'label', message: 'Enter a navigation label.' }],
+      });
+      return;
+    }
+    const pageIds = new Set();
+    const sectionIds = new Set();
+    for (const candidate of rows ?? []) {
+      if (candidate?.id) pageIds.add(candidate.id);
+      for (const section of candidate.current?.sections ?? []) {
+        if (section?.id) sectionIds.add(section.id);
+      }
+    }
+    const assigned = assignPageIds(page, { pageIds, sectionIds });
+    if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
+    const payload = toPagePayload(assigned);
+    setBusy(publish ? 'publish' : 'draft');
     try {
       await call('cmsSavePage', { page: payload });
       // Mark the document existing the moment the DRAFT is written, before
@@ -304,6 +339,7 @@ export default function AdminPageEditor({ mode }) {
       // and orphan the draft that just landed.
       setSavedId(payload.id);
       loadedIdRef.current = payload.id;
+      setSavedSnapshot(pageSnapshot(assigned));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         showToast('Draft saved.');
@@ -372,6 +408,7 @@ export default function AdminPageEditor({ mode }) {
 
   return (
     <form
+      ref={formRef}
       className="admin-page-editor flex flex-col gap-md"
       noValidate
       onSubmit={(event) => {
@@ -381,8 +418,13 @@ export default function AdminPageEditor({ mode }) {
     >
       <AdminPageHeader
         title={mode === 'create' ? 'New page' : page.label || page.id}
-        state={row ? <RecordState state={row.state} /> : null}
-        identifiers={isExisting ? page.id : null}
+        state={(
+          <>
+            {row ? <RecordState state={row.state} /> : null}
+            {unsaved ? <UnsavedEditBadge /> : null}
+          </>
+        )}
+        identifiers={page.path || null}
         description="Saving writes a draft. Publishing copies that draft to the live revision the public site reads."
         actions={
           <>
@@ -406,22 +448,18 @@ export default function AdminPageEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
 
       <div className="admin-page-basics">
       <Panel title="Page" description="How the page is identified, ordered, and linked." className="admin-page-identity">
         <div className="admin-page-fields">
-          <TextField
-            label="Page id"
-            value={page.id}
-            onChange={(value) => update({ id: value })}
-            error={errorFor('id')}
-            readOnly={isExisting}
-            hint={
-              isExisting
-                ? 'The document id cannot change after creation.'
-                : 'Letters, digits, hyphen, underscore. Used as the document id.'
-            }
-          />
           <TextField
             label="Navigation label"
             value={page.label}
@@ -492,6 +530,16 @@ export default function AdminPageEditor({ mode }) {
             error={errorFor('order')}
             hint="Lower numbers sort first."
           />
+          {isExisting ? (
+            <TextField
+              label="Page id"
+              value={page.id}
+              onChange={() => {}}
+              error={errorFor('id')}
+              readOnly
+              hint="This id stays the same when the label changes."
+            />
+          ) : null}
           <div className="flex flex-col justify-center gap-xs">
             <CheckboxField
               label="Visible"
@@ -686,13 +734,16 @@ export default function AdminPageEditor({ mode }) {
                   </div>
 
                   <div className="admin-section-fields">
-                    <TextField
-                      label={`Section ${sectionIndex + 1} id`}
-                      value={section.id}
-                      onChange={(value) => updateSection(sectionIndex, { id: value })}
-                      error={errorFor(`${at}.id`)}
-                      hint="Ties the section to its content blocks."
-                    />
+                    {section.id ? (
+                      <TextField
+                        label={`Section ${sectionIndex + 1} id`}
+                        value={section.id}
+                        onChange={() => {}}
+                        error={errorFor(`${at}.id`)}
+                        readOnly
+                        hint="Content stays attached to this id when the name changes."
+                      />
+                    ) : null}
                     <TextField
                       label={`Section ${sectionIndex + 1} label`}
                       value={section.label}
@@ -825,14 +876,15 @@ export default function AdminPageEditor({ mode }) {
                               className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-sm"
                             >
                               <div className="grid gap-xs sm:grid-cols-2">
-                                <TextField
-                                  label={`Block ${blockIndex + 1} field — section ${sectionIndex + 1}`}
-                                  value={block.field}
-                                  onChange={(value) =>
-                                    updateBlock(sectionIndex, blockIndex, { field: value })
-                                  }
-                                  error={errorFor(`${bat}.field`)}
-                                />
+                                {block.field ? (
+                                  <TextField
+                                    label={`Block ${blockIndex + 1} field — section ${sectionIndex + 1}`}
+                                    value={block.field}
+                                    onChange={() => {}}
+                                    error={errorFor(`${bat}.field`)}
+                                    readOnly
+                                  />
+                                ) : null}
                                 <SelectField
                                   label={`Block ${blockIndex + 1} type — section ${sectionIndex + 1}`}
                                   value={block.blockType}

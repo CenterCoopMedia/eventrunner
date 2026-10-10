@@ -16,7 +16,8 @@
 // button only after the refusal, rather than offering two delete buttons
 // nobody can tell apart.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ADMIN_SETTABLE_STATUSES } from 'shared/speaker';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
@@ -39,6 +40,8 @@ import AdminPageHeader, {
   RecordState,
 } from '../components/adminChrome.jsx';
 import { deadMatter, state as recordStateWord } from '../recordState.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft — hidden from the public site' },
@@ -88,6 +91,10 @@ const EMPTY = {
   jobTitle: '',
   status: 'draft',
 };
+
+function editorSnapshot(form) {
+  return JSON.stringify(form);
+}
 
 function toForm(speaker) {
   if (!speaker) return { ...EMPTY };
@@ -150,6 +157,9 @@ export default function AdminSpeakerEditor({ mode }) {
 
   const speaker = mode === 'edit' ? findSpeaker(speakerId) : null;
   const [form, setForm] = useState(() => toForm(null));
+  const [savedSnapshot, setSavedSnapshot] = useState(() => (
+    mode === 'create' ? editorSnapshot(EMPTY) : null
+  ));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
@@ -159,19 +169,32 @@ export default function AdminSpeakerEditor({ mode }) {
   // is the one the server would apply anyway.
   const [statusPicked, setStatusPicked] = useState(mode === 'create');
   const errorRef = useRef(null);
+  const formRef = useRef(null);
   // Adopt the live record exactly once, so a listener update does not
   // overwrite what the admin is typing.
   const adoptedRef = useRef(false);
+  const unsaved = savedSnapshot !== null && editorSnapshot(form) !== savedSnapshot;
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving });
 
   useEffect(() => {
     if (mode !== 'edit' || adoptedRef.current || !speaker) return;
     adoptedRef.current = true;
-    setForm(toForm(speaker));
+    const next = toForm(speaker);
+    setForm(next);
+    setSavedSnapshot(editorSnapshot(next));
   }, [mode, speaker]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
+
+  useEffect(() => {
+    const node = formRef.current;
+    if (!node) return undefined;
+    if (leaveGuard.pending) node.setAttribute('inert', '');
+    else node.removeAttribute('inert');
+    return () => node.removeAttribute('inert');
+  }, [leaveGuard.pending]);
 
   const fieldErrors = useMemo(() => {
     const map = new Map();
@@ -201,6 +224,7 @@ export default function AdminSpeakerEditor({ mode }) {
           speakerId,
           speaker: toPayload(form, { includeStatus: statusPicked }),
         });
+        setSavedSnapshot(editorSnapshot(form));
         setStatus('Saved. The public directory updates within moments.');
         showToast('Speaker saved.');
       }
@@ -246,15 +270,20 @@ export default function AdminSpeakerEditor({ mode }) {
   }
 
   return (
-    <form className="flex flex-col gap-md" onSubmit={submit}>
+    <form ref={formRef} className="flex flex-col gap-md" onSubmit={submit}>
       <AdminPageHeader
         title={
           mode === 'create' ? 'New speaker' : form.firstName || form.lastName
             ? `${form.firstName} ${form.lastName}`.trim()
-            : speakerId
+            : 'Speaker'
         }
-        state={mode === 'edit' ? <RecordState state={speakerRecordState(speaker)} /> : null}
-        identifiers={mode === 'edit' ? speakerId : null}
+        state={(
+          <>
+            {mode === 'edit' ? <RecordState state={speakerRecordState(speaker)} /> : null}
+            {unsaved ? <UnsavedEditBadge /> : null}
+          </>
+        )}
+        identifiers={null}
         description="This is the one record for this person. Sessions point at it by id, and the public directory shows a published copy of the safe fields."
         actions={
           <button type="submit" className={primaryButtonClass} disabled={saving}>
@@ -265,6 +294,14 @@ export default function AdminSpeakerEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
 
       <div className="admin-editor-layout admin-editor-layout--speaker">
         <Panel
@@ -288,15 +325,18 @@ export default function AdminSpeakerEditor({ mode }) {
               required
             />
           </div>
-          <div className="mt-sm">
-            <TextField
-              label="URL slug"
-              hint="Leave blank to derive it from the name. Lowercase letters, digits, and hyphens."
-              value={form.slug}
-              onChange={(value) => set({ slug: value })}
-              error={errorFor('slug')}
-            />
-          </div>
+          {mode === 'edit' ? (
+            <div className="mt-sm">
+              <TextField
+                label="URL slug"
+                hint="This address stays the same when the name changes."
+                value={form.slug}
+                onChange={() => {}}
+                readOnly
+                error={errorFor('slug')}
+              />
+            </div>
+          ) : null}
         </Panel>
 
         <Panel
@@ -400,9 +440,9 @@ export default function AdminSpeakerEditor({ mode }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="button" className={secondaryButtonClass} onClick={() => navigate(SPEAKERS_LIST)}>
+        <Link to={SPEAKERS_LIST} className={secondaryButtonClass}>
           Cancel
-        </button>
+        </Link>
         {mode === 'edit' ? (
           <DestructiveConfirm
             className="ms-auto"
