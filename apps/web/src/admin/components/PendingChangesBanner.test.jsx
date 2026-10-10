@@ -107,6 +107,12 @@ describe('the pending-changes banner', () => {
     expect(banner()).not.toBeNull();
   });
 
+  it('keeps the banner when an encoded slash is not a path separator', () => {
+    renderBanner('/admin/unpublished%2F');
+    deliver({ cmsContent: 1 });
+    expect(banner()).not.toBeNull();
+  });
+
   it('does not throw when a segment has a bad percent escape', () => {
     renderBanner('/admin/%E0%A4%A');
     deliver({ cmsContent: 1 });
