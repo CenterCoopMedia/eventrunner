@@ -403,12 +403,12 @@ test.describe('editor tour and section edit links', () => {
     await expect(headRow.getByRole('link', { name: `Edit section: ${FAQ_ITEMS}` })).toBeVisible();
 
     // Enter on the focused link opens the editor that holds the section's
-    // blocks: its title band names the section, the page and the section id.
+    // blocks: its title band names the section, the page label, and the section label.
     await link.focus();
     await page.keyboard.press('Enter');
     await page.waitForURL('**/admin/content/faq/faq_items');
     await expect(page.getByRole('heading', { level: 1, name: FAQ_ITEMS })).toBeVisible();
-    await expect(page.locator('main header').getByText(/^faq · faq_items · \d+ blocks?$/)).toBeVisible();
+    await expect(page.locator('main header').getByText(/^FAQ · Questions and answers · \d+ blocks?$/)).toBeVisible();
     await expect(page.getByText('No such section')).toHaveCount(0);
   });
 
