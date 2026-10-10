@@ -203,6 +203,21 @@ function SortHead({ column, sort, onSort }) {
   );
 }
 
+/**
+ * What delete does. A link stays on the web. The projection trigger deletes
+ * a browser upload. A legacy file can share an operator-managed object, so
+ * that object stays.
+ */
+function materialDeleteConsequence(material) {
+  if (material?.type === 'link') {
+    return 'This material leaves the session list, and the page at that address stays.';
+  }
+  if (material?.managedStorageObject === true) {
+    return 'This material leaves the session list, and its stored file is deleted.';
+  }
+  return 'This material leaves the session list, and the stored file stays.';
+}
+
 function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) {
   const call = useAdminApi();
   const { user } = useAuth();
@@ -332,7 +347,7 @@ function MaterialRow({ material, sessionTitle, selected, onToggle, onChanged }) 
             confirmLabel="Delete this material"
             busy={busy}
             disabled={busy}
-            consequence="The file is removed from the session’s materials list, and anyone holding its link gets nothing."
+            consequence={materialDeleteConsequence(material)}
             permanence="This cannot be undone."
             onConfirm={remove}
           />
