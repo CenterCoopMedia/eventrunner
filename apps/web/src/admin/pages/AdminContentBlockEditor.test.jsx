@@ -8,7 +8,7 @@
 // pinned here so a future edit to the `url` branch cannot widen the picker
 // to them by accident.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
@@ -508,5 +508,25 @@ describe('content editing workspace', () => {
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('alt'), { target: { value: '' } });
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+
+  it('does not offer discard while a save is still running', async () => {
+    let release;
+    fetch.mockImplementation(() => new Promise((resolve) => {
+      release = resolve;
+    }));
+    await renderAt('/admin/content/home/hero/register');
+    fireEvent.change(screen.getByLabelText('label'), { target: { value: 'Reserve a place' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Back to section' }));
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Discard changes' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('label')).toHaveValue('Reserve a place');
+    // The token read yields before fetch, so the hang is armed on the next turn.
+    await waitFor(() => expect(typeof release).toBe('function'));
+    await act(async () => {
+      release(okResponse({ docId: 'hero__register' }));
+    });
   });
 });
