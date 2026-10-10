@@ -2,9 +2,9 @@
 //
 // GENERATED_DIR: deploy-time generation (scripts/generate-content.cjs, §8.6)
 // writes snapshot files to an out-of-tree directory instead of overwriting
-// the committed synthetic demo copy. The build reads that directory when the
-// GENERATED_DIR env var is set; otherwise it uses the committed snapshot in
-// src/generated — which is what keeps CI credential-free (§8.1).
+// the committed synthetic demo copy. A real deploy passes that directory.
+// Demo mode ignores it and uses the committed snapshot in src/generated,
+// which keeps a specimen or demo build from embedding a client export (§8.1).
 //
 // Every source import of snapshot data goes through the `@generated` alias
 // so the override applies to the whole app, theme.css included.
@@ -12,11 +12,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveGeneratedDir } from './generatedDir.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const generatedDir = process.env.GENERATED_DIR
-  ? path.resolve(process.env.GENERATED_DIR)
-  : path.resolve(here, 'src/generated');
+const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
 
 export default defineConfig({
   plugins: [react()],
