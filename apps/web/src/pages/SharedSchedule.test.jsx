@@ -1,7 +1,7 @@
 // The public shared schedule page (issue #173). The projection source is
 // mocked; what is under test is who sees what: the permitted viewer, the
 // stated reason, and the nothing at all for an owner who never consented.
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AuthContext from '../contexts/AuthContext.jsx';
@@ -12,6 +12,10 @@ import ToastContext from '../contexts/ToastContext.jsx';
 import SharedSchedule from './SharedSchedule.jsx';
 
 const holder = { share: undefined, error: false };
+const clockHolder = { now: new Date('2099-10-15T16:00:00Z') };
+vi.mock('../hooks/useEventClock.js', () => ({
+  useEventClock: () => clockHolder.now,
+}));
 vi.mock('../lib/scheduleShareSource.js', () => ({
   subscribeScheduleShare: (uid, onNext, onError) => {
     if (holder.error) onError(new Error('denied'));
@@ -84,6 +88,26 @@ function sharedTree({ share, error = false, auth = { user: null, isAdmin: false,
 function renderShared(options) { return render(sharedTree(options)); }
 
 describe('the shared schedule page', () => {
+  beforeEach(() => {
+    clockHolder.now = new Date('2099-10-15T16:00:00Z');
+  });
+
+  it('drops row controls when the open page clock passes the day end', () => {
+    const options = {
+      share: { scheduleVisibility: 'public', displayName: '[Fixture] Alex Rivera', sessionIds: ['fx-s1'] },
+      auth: { user: { uid: 'viewer-1' }, isAdmin: false, loading: false },
+      profile: { attendeeAccess: true },
+      features: { schedule: true, sessionBookmarks: true, icsExport: true },
+    };
+    const view = renderShared(options);
+    expect(screen.getByRole('button', { name: 'Add to calendar' })).toBeInTheDocument();
+    clockHolder.now = new Date('2099-10-16T06:00:00Z');
+    view.rerender(sharedTree(options));
+    expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Morning kickoff' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+  });
+
   it('keeps a saved session on a past day and takes off the live controls', () => {
     renderShared({
       share: { scheduleVisibility: 'public', displayName: '[Fixture] Alex Rivera', sessionIds: ['fx-s1'] },

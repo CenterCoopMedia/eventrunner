@@ -6,6 +6,7 @@
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useEventClock } from '../hooks/useEventClock.js';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
@@ -40,6 +41,9 @@ export default function SessionDetail() {
   const { eventConfig, features } = useEventConfig();
   const { scheduleData, loading } = useContent();
   const { bookmarkedIds } = useMyBookmarks();
+  // The schedule list already refreshes from this clock. A detail page left
+  // open past the day end has to drop its live controls on the same tick.
+  const now = useEventClock();
   // Carries ?preview=1 (and any other query string) back to /schedule —
   // without this, an admin previewing drafts loses the preview the moment
   // they click "back to the schedule" (spec: matches SessionCard.jsx's
@@ -87,7 +91,7 @@ export default function SessionDetail() {
     : null;
   // Same rule as the schedule list. A past day or an archived event keeps
   // the recording and drops the controls that act on a live event.
-  const backIssue = day ? isBackIssue(day, eventConfig) : eventIsArchived(eventConfig);
+  const backIssue = day ? isBackIssue(day, eventConfig, now) : eventIsArchived(eventConfig, now);
 
   return (
     <article>

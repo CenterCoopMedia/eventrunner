@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { useEventClock } from '../hooks/useEventClock.js';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
@@ -53,6 +54,9 @@ export default function MySchedule() {
   const { scheduleData, loading } = useContent();
   const { user, loading: authLoading } = useAuth();
   const { bookmarkedIds, loading: bookmarksLoading } = useMyBookmarks();
+  // Same clock as the schedule list, so a page left open past the day end
+  // drops bookmark and calendar controls without a reload.
+  const now = useEventClock();
   // The personal PDF request's state (issue #171): the only local state on
   // the page.
   const [pdfState, setPdfState] = useState({ status: 'idle', message: '' });
@@ -251,7 +255,7 @@ export default function MySchedule() {
                         eventConfig={eventConfig}
                         features={features}
                         bookmarked
-                        backIssue={isBackIssue(day, eventConfig)}
+                        backIssue={isBackIssue(day, eventConfig, now)}
                         // The attendee's private note on this session
                         // (issue #170): the row is theirs, and so is the
                         // text under it. The public page passes nothing.
