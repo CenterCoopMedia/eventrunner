@@ -406,7 +406,9 @@ test('speakerPhotoUpload writes to a FRESH versioned path, not the fixed live pa
   );
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.path, `speaker-photos/rae/${ASSET_ID}/me.png`);
-  assert.equal(bucket.objects.has(`speaker-photos/rae/${ASSET_ID}/me.png`), true);
+  const saved = bucket.objects.get(`speaker-photos/rae/${ASSET_ID}/me.png`);
+  assert.equal(saved.options.metadata.metadata, undefined);
+  assert.equal(JSON.stringify(saved.options).includes('rae@example.org'), false);
 });
 
 test('speakerPhotoUpload: two uploads for the same speaker land at two different paths', async () => {
