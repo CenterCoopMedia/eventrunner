@@ -23,21 +23,29 @@ export function useMyBookmarks() {
    * real identity change (uid), not every AuthProvider re-render that hands
    * back a new `user` object reference for the same account. */
   useEffect(() => {
+    // Drop the previous account's ids before the next snapshot arrives.
+    // A callback after unsubscribe is ignored, so that account cannot
+    // write its ids back. A listener error for the current account still
+    // leaves this account's last-known set and only clears loading.
+    let current = true;
+    setBookmarkedIds(new Set());
     setLoading(Boolean(user));
     const unsubscribe = subscribeMyBookmarks(
       user?.uid,
       (ids) => {
+        if (!current) return;
         setBookmarkedIds(ids);
         setLoading(false);
       },
-      // Fail soft (bookmarksSource.js): a listener error leaves
-      // bookmarkedIds untouched — only `loading` needs unblocking, so a
-      // permanently-denied or brand-new-account listener doesn't leave a
-      // caller (MySchedule) spinning forever instead of rendering with
-      // (possibly empty) last-known data.
-      () => setLoading(false),
+      () => {
+        if (!current) return;
+        setLoading(false);
+      },
     );
-    return unsubscribe;
+    return () => {
+      current = false;
+      unsubscribe();
+    };
   }, [user?.uid]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
