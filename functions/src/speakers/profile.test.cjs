@@ -828,6 +828,56 @@ test('a second staged edit MERGES onto the first — nothing already queued is d
   });
 });
 
+test('a self-save cannot adopt a headshot a delete already claimed', async () => {
+  const path = 'speaker-photos/rae/old/photo.png';
+  const db = makeSpeakersDb(ownedWorld({
+    headshotPath: 'speaker-photos/rae/new/photo.png',
+    headshotDeleteClaims: [path],
+  }));
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false,
+    payload: { headshotPath: path },
+    actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.equal(result.code, 'photo-in-use');
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speaker-photos/rae/new/photo.png');
+  assert.deepEqual(db.read('speakers', 'rae').headshotDeleteClaims, [path]);
+});
+
+test('an approved speaker cannot stage a headshot a delete already claimed', async () => {
+  const path = 'speaker-photos/rae/old/photo.png';
+  const db = makeSpeakersDb(approvedWorld({
+    headshotPath: 'speaker-photos/rae/live/photo.png',
+    headshotDeleteClaims: [path],
+  }));
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false,
+    payload: { headshotPath: path },
+    actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.equal(result.code, 'photo-in-use');
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speaker-photos/rae/live/photo.png');
+  assert.equal(db.read('speakers', 'rae').pendingEdits, undefined);
+});
+
+test('a self-save of a different headshot keeps an existing delete claim', async () => {
+  const claimed = 'speaker-photos/rae/old/photo.png';
+  const next = 'speaker-photos/rae/newer/photo.png';
+  const db = makeSpeakersDb(ownedWorld({ headshotDeleteClaims: [claimed] }));
+  const result = await applyUpdateOwnSpeakerProfile({
+    db, speakerId: 'rae', uid: SPEAKER_UID, isAdmin: false,
+    payload: { headshotPath: next },
+    actor: SPEAKER_ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').headshotPath, next);
+  assert.deepEqual(db.read('speakers', 'rae').headshotDeleteClaims, [claimed]);
+});
+
 test('pendingEdits and its stamps are rejected by name if a payload names them directly', async () => {
   const db = makeSpeakersDb(approvedWorld());
   const result = await applyUpdateOwnSpeakerProfile({
