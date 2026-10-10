@@ -97,10 +97,11 @@ function looksLikeUrl(s) {
   if (!t) return false;
   if (/^https?:\/\//i.test(t)) return true;
   if (t.includes('://')) return true;
-  // Bare domains like docs.example.org/abc — anything containing a slash
-  // after a dot is URL-shaped enough that we don't trust it on the
-  // public doc.
-  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(t)) return true;
+  // Protocol-relative labels have no scheme, so they miss the :// check.
+  if (t.startsWith('//')) return true;
+  // A query or fragment after the host is still the URL. The old check
+  // treated only "/" or the end of the string as URL syntax.
+  if (/^[a-z0-9.-]+\.[a-z]{2,}([/?#]|$)/i.test(t)) return true;
   return false;
 }
 
