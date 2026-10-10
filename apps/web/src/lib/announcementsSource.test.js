@@ -56,4 +56,18 @@ describe('subscribeAnnouncements', () => {
 
     expect(onNext).toHaveBeenCalledWith([]);
   });
+
+  it('passes an empty list when the snapshot is not a document', () => {
+    let onSuccess;
+    onSnapshotMock.mockImplementation((_target, success) => {
+      onSuccess = success;
+      return vi.fn();
+    });
+    const onNext = vi.fn();
+    subscribeAnnouncements(onNext);
+
+    onSuccess({ docs: [] });
+
+    expect(onNext).toHaveBeenCalledWith([]);
+  });
 });

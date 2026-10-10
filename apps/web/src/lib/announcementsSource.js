@@ -12,7 +12,9 @@ export function subscribeAnnouncements(onNext) {
     (onError) => onSnapshot(
       doc(db, 'announcements_public', 'current'),
       (snapshot) => {
-        const rows = snapshot.exists() ? snapshot.data()?.announcements : [];
+        const rows = typeof snapshot?.exists === 'function' && snapshot.exists()
+          ? snapshot.data()?.announcements
+          : [];
         onNext(Array.isArray(rows) ? rows : []);
       },
       onError,
