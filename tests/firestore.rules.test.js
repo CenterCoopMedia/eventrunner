@@ -792,6 +792,7 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
 
   it("refuses a note that smuggles extra fields", async () => {
     await seedAccount("attendee-1");
+    await seedSession("session-3");
     await assertFails(
       setDoc(noteRef("attendee-1", "session-3"), {
         text: "fine",
