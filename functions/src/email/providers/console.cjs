@@ -41,8 +41,12 @@ function createConsoleProvider({
   // pretty-printed JSON blob below and makes it unparseable. Writing one
   // self-delimiting JSON line per message straight to a file removes that
   // whole channel from the test path. Strictly gated on E2E_MAIL_FILE, which
-  // only scripts/dev/run-e2e.sh ever sets, so normal dev and production
-  // behavior is byte-for-byte unchanged.
+  // only scripts/dev/run-e2e.sh ever sets.
+  //
+  // The stdout log omits the message body unless this is the local emulator
+  // and that file is unset. A deployed console provider must not write a
+  // sign-in code into Cloud Logging, and the Actions log must not keep the
+  // code once the file sink has it. login-smoke still reads the emulator log.
   const mailFile = typeof env.E2E_MAIL_FILE === 'string' ? env.E2E_MAIL_FILE.trim() : '';
 
   /** @param {object} message EmailMessage @returns {Promise<object>} EmailSendResult */
@@ -56,7 +60,20 @@ function createConsoleProvider({
       text: message.text,
       html: message.html,
     };
-    log.log('[email:console]', JSON.stringify(captured, null, 2));
+    // Local smoke reads the body from the emulator log. Everywhere else the
+    // body stays out of stdout: a deployed function would ship it to Cloud
+    // Logging, and the e2e file already holds it for the test runner.
+    const logBody = env.FUNCTIONS_EMULATOR === 'true' && !mailFile;
+    const logged = logBody
+      ? captured
+      : {
+          to: captured.to,
+          from: captured.from,
+          replyTo: captured.replyTo,
+          subject: captured.subject,
+          tag: captured.tag,
+        };
+    log.log('[email:console]', JSON.stringify(logged, null, 2));
     if (mailFile) {
       // Synchronous + append-only + one line per message: no buffering to be
       // lost if the emulator is killed mid-run, and a reader polling by byte

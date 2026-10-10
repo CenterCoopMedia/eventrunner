@@ -56,6 +56,58 @@ test('send logs the rendered message and returns sent with a console- id', async
   assert.match(log.lines[0], /Hello/);
 });
 
+test('a sign-in code stays out of the log outside the emulator', async () => {
+  const log = fakeLog();
+  const provider = createConsoleProvider({
+    env: { EVENT_EMAIL_PROVIDER: 'console' },
+    log,
+  });
+  await provider.send({
+    to: 'a@example.com',
+    subject: 'Your sign-in code',
+    text: 'Your code is 482913',
+    html: '<p>Your code is 482913</p>',
+  });
+  assert.equal(log.lines.length, 1);
+  assert.equal(log.lines[0].includes('482913'), false);
+  assert.equal(log.lines[0].includes('<p>'), false);
+  assert.match(log.lines[0], /a@example\.com/);
+  assert.match(log.lines[0], /Your sign-in code/);
+});
+
+test('a sign-in code stays out of the log when the e2e mail file is the sink', async () => {
+  const log = fakeLog();
+  const writes = [];
+  const provider = createConsoleProvider({
+    env: { FUNCTIONS_EMULATOR: 'true', E2E_MAIL_FILE: '/tmp/mail.jsonl' },
+    log,
+    appendFileSync: (_path, data) => writes.push(data),
+  });
+  await provider.send({
+    to: 'a@example.com',
+    subject: 'Your sign-in code',
+    tag: 'auth.otp',
+    text: 'Your code is 482913',
+    html: '<p>Your code is 482913</p>',
+  });
+  assert.equal(log.lines[0].includes('482913'), false);
+  assert.equal(JSON.parse(writes[0]).text, 'Your code is 482913');
+});
+
+test('the emulator log keeps the body when no mail file is set', async () => {
+  const log = fakeLog();
+  const provider = createConsoleProvider({
+    env: { FUNCTIONS_EMULATOR: 'true' },
+    log,
+  });
+  await provider.send({
+    to: 'a@example.com',
+    subject: 'Your sign-in code',
+    text: 'Your code is 482913',
+  });
+  assert.match(log.lines[0], /482913/);
+});
+
 test('send returns a fresh id per call', async () => {
   const provider = createConsoleProvider({ env: { FUNCTIONS_EMULATOR: 'true' }, log: fakeLog() });
   const first = await provider.send({ to: 'a@example.com', subject: 's' });
