@@ -130,6 +130,7 @@ async function scanUsage({
   paths,
   collections = USAGE_COLLECTIONS,
   configDocs = USAGE_CONFIG_DOCS,
+  maxDocs = null,
 }) {
   /** @type {Record<string, Array<{ docPath: string, field: string }>>} */
   const usage = {};
@@ -142,15 +143,27 @@ async function scanUsage({
     }
   };
 
+  // A capped scan is for a diagnostic sample. It must not return a clean
+  // "unused" list: a reference past the cap would look like no use, and the
+  // delete path relies on the uncapped scan to prove that.
+  const capped = Number.isInteger(maxDocs) && maxDocs > 0;
   for (const name of collections) {
     let snapshot;
     try {
-      snapshot = await db.collection(name).get();
+      const source = db.collection(name);
+      snapshot = capped
+        ? await source.limit(maxDocs + 1).get()
+        : await source.get();
     } catch (err) {
       // A collection that does not exist yet reads as empty in Firestore, so
       // a throw here is a real failure (permissions, transport) and must not
       // be swallowed into a falsely clean "unused" verdict.
       throw new Error(`media usage scan failed reading ${name}: ${err.message}`);
+    }
+    if (capped && snapshot.docs.length > maxDocs) {
+      const incomplete = new Error(`media usage scan stopped before ${name} ended`);
+      incomplete.code = 'usage-scan-incomplete';
+      throw incomplete;
     }
     for (const doc of snapshot.docs) {
       record(referencesInDoc(doc.data() || {}, `${name}/${doc.id}`, paths));

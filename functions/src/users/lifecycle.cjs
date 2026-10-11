@@ -10,7 +10,7 @@
  *                           profile visibility.
  *   onUserDeleted           auth onDelete — removes the account document, so
  *                           a deleted sign-in does not leave an unreachable
- *                           profile listed in the directory forever.
+ *                           profile or a public schedule behind.
  *   maintainProfileComplete users onWrite — recomputes the derived
  *                           `profileComplete` flag.
  *
@@ -33,6 +33,7 @@ const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoW
 
 const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
+const SCHEDULE_SHARES = 'schedule_shares';
 
 /**
  * The server-owned shape of a brand-new account (spec §3.4).
@@ -116,10 +117,10 @@ function createOnUserCreated({ db, now = () => new Date(), log = console }) {
  * a profile nobody can sign in to, edit, or remove — and its `users_public`
  * projection stays readable in the directory forever. Deleting the account
  * document is enough in the normal case: syncUserPublic sees the delete and
- * removes the projection. When there is no account document to delete (a
- * sign-in that never seeded, or a document already removed), no projection
- * trigger will fire, so the projection is removed here directly — that is
- * the one case where this module writes users_public.
+ * removes the profile projection, and syncScheduleShare removes the shared
+ * schedule. When there is no account document to delete (a sign-in that
+ * never seeded, or a document already removed), neither trigger fires, so
+ * the profile and the shared schedule are removed here. Issue #350.
  *
  * @param {{ db: object, log?: { error: Function } }} deps
  * @returns {(authUser: { uid: string }) => Promise<{ deleted: boolean }>}
@@ -138,6 +139,7 @@ function createOnUserDeleted({ db, log = console }) {
       return { deleted: true };
     }
     await db.collection(USERS_PUBLIC).doc(uid).delete();
+    await db.collection(SCHEDULE_SHARES).doc(uid).delete();
     return { deleted: false };
   };
 }

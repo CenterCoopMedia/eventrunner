@@ -481,8 +481,7 @@ function createMediaDeleteHandler({ db, bucket, auth, getConfig, now = Date.now,
  * now-superseded old object once the new one actually goes live).
  *
  * @param {{ bucket: object, speakerId: string, contentType: string,
- *           buffer: Buffer, filename: unknown,
- *           actor: { uid: string, email: string }, newId?: () => string }} args
+ *           buffer: Buffer, filename: unknown, newId?: () => string }} args
  * @returns {Promise<{ path: string }>}
  */
 async function storeSpeakerPhoto({
@@ -491,19 +490,20 @@ async function storeSpeakerPhoto({
   contentType,
   buffer,
   filename,
-  actor,
   newId = () => require('node:crypto').randomBytes(12).toString('hex'),
 }) {
   const assetId = newId();
   const name = safeObjectName(filename, contentType);
   const path = `speaker-photos/${speakerId}/${assetId}/${name}`;
+  // speaker-photos allows public get, and a public get returns custom
+  // metadata. Do not stamp the uploader email (or any account identifier)
+  // on the object. Issue #362.
   await bucket.file(path).save(buffer, {
     resumable: false,
     contentType,
     metadata: {
       contentType,
       cacheControl: CACHE_CONTROL,
-      metadata: { uploadedBy: actor.email },
     },
   });
   return { path };
@@ -560,9 +560,10 @@ function createSpeakerPhotoUploadHandler({
 
     if (!isAdmin) {
       const snap = await db.collection('speakers').doc(speakerId).get();
-      if (!snap.exists) return notFound(res, `No speaker with id "${speakerId}".`);
-      const stored = snap.data() || {};
-      if (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
+      const stored = snap.exists ? (snap.data() || {}) : null;
+      // A missing speaker and someone else's speaker answer the same way.
+      // Issue #361.
+      if (!stored || typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
         return sendError(res, 403, 'forbidden', 'You may only upload a photo for your own speaker profile.');
       }
     }
@@ -587,7 +588,6 @@ function createSpeakerPhotoUploadHandler({
         contentType,
         buffer: decodedUpload.buffer,
         filename: req.body?.filename,
-        actor: { uid: decoded.uid, email: typeof decoded.email === 'string' ? decoded.email : '' },
         newId,
       });
     } catch (err) {
@@ -615,7 +615,36 @@ function createSpeakerPhotoUploadHandler({
  * bug) naming a path outside their own folder, since the object's speakerId
  * segment is client-supplied even though the caller is authorized for that
  * segment specifically.
+ *
+ * The in-use check and the delete claim share one transaction. A one-time
+ * read can miss a public projection that still names the object, and it can
+ * miss a second tab that saves the same path again before Storage deletes
+ * it. `headshotDeleteClaims` is an array because a Storage path contains
+ * slashes, which Firestore rejects in a field name. The claim stays after a
+ * successful delete. A failed delete clears it so a later save is not stuck.
  */
+function photoDeleteClaims(stored) {
+  if (!Array.isArray(stored?.headshotDeleteClaims)) return [];
+  return stored.headshotDeleteClaims.filter((item) => typeof item === 'string');
+}
+
+function speakerNamesPhoto(stored, path) {
+  if (!stored) return false;
+  if (stored.headshotPath === path) return true;
+  const pending = stored.pendingEdits;
+  return Boolean(pending) && typeof pending === 'object' && pending.headshotPath === path;
+}
+
+function publicNamesPhoto(publicData, path) {
+  return Boolean(publicData) && publicData.headshotPath === path;
+}
+
+function httpFailure(status, code, message) {
+  const err = new Error(code);
+  err.http = { status, code, message };
+  return err;
+}
+
 function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = console }) {
   return async function speakerPhotoDelete(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
@@ -643,13 +672,40 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
         throw err;
       }
     }
-    if (!isAdmin) {
-      const snap = await db.collection('speakers').doc(speakerId).get();
-      if (!snap.exists) return notFound(res, `No speaker with id "${speakerId}".`);
-      const stored = snap.data() || {};
-      if (typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
-        return sendError(res, 403, 'forbidden', 'You may only delete a photo from your own speaker profile.');
-      }
+    const speakerRef = db.collection('speakers').doc(speakerId);
+    const publicRef = db.collection('speakers_public').doc(speakerId);
+    let claimed = false;
+    try {
+      await db.runTransaction(async (tx) => {
+        // Reset on every attempt. A conflict discards the previous write,
+        // so a flag set by the failed attempt must not survive the retry.
+        claimed = false;
+        const snap = await tx.get(speakerRef);
+        const stored = snap.exists ? (snap.data() || {}) : null;
+        if (!isAdmin) {
+          if (!stored || typeof stored.uid !== 'string' || !stored.uid || stored.uid !== decoded.uid) {
+            throw httpFailure(403, 'forbidden', 'You may only delete a photo from your own speaker profile.');
+          }
+        }
+        const publicSnap = await tx.get(publicRef);
+        const publicData = publicSnap.exists ? (publicSnap.data() || {}) : null;
+        // Live field, queued edit, or the public projection. The projection
+        // lags the canonical write, and attendees still load it (issue #392).
+        if (speakerNamesPhoto(stored, path) || publicNamesPhoto(publicData, path)) {
+          throw httpFailure(409, 'photo-in-use', 'That photo is still on the speaker profile.');
+        }
+        // No speaker document: an admin may delete an unreferenced object.
+        // Do not create a document only to store the claim.
+        if (!stored) return;
+        const claims = photoDeleteClaims(stored);
+        if (!claims.includes(path)) {
+          tx.set(speakerRef, { headshotDeleteClaims: [...claims, path] }, { merge: true });
+        }
+        claimed = true;
+      });
+    } catch (err) {
+      if (err?.http) return sendError(res, err.http.status, err.http.code, err.http.message);
+      throw err;
     }
 
     try {
@@ -660,6 +716,21 @@ function createSpeakerPhotoDeleteHandler({ db, bucket, auth, getConfig, log = co
       await bucket.file(path).delete({ ignoreNotFound: true });
     } catch (err) {
       log.error('speakerPhotoDelete failed', err);
+      if (claimed) {
+        try {
+          await db.runTransaction(async (tx) => {
+            const snap = await tx.get(speakerRef);
+            if (!snap.exists) return;
+            const claims = photoDeleteClaims(snap.data() || {});
+            if (!claims.includes(path)) return;
+            tx.set(speakerRef, {
+              headshotDeleteClaims: claims.filter((item) => item !== path),
+            }, { merge: true });
+          });
+        } catch (clearErr) {
+          log.error('speakerPhotoDelete claim release failed', clearErr);
+        }
+      }
       return internal(res, 'The photo could not be deleted.');
     }
     res.status(200).json({ path, deleted: true });

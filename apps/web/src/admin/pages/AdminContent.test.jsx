@@ -46,6 +46,8 @@ vi.mock('firebase/auth', () => ({
 }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
@@ -154,7 +156,7 @@ function urlOf(callIndex) {
   return String(fetch.mock.calls[callIndex][0]);
 }
 
-async function findRichText(name = 'value') {
+async function findRichText(name = 'Text') {
   return screen.findByRole('textbox', { name });
 }
 
@@ -195,12 +197,12 @@ describe('content browsing', () => {
     expect(screen.getByText(/1 block/)).toBeInTheDocument();
 
     await renderAt('/admin/content/scholarships/intro');
-    expect(await screen.findByRole('link', { name: 'body' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Scholarships open in spring.' })).toBeInTheDocument();
     expect(screen.getByText('Rich text')).toBeInTheDocument();
     // The title band names the section and its identifiers (the editor a
     // public "Edit section" link opens, issue #198).
     expect(screen.getByRole('heading', { level: 1, name: 'Intro' })).toBeInTheDocument();
-    expect(screen.getByText('scholarships · intro · 1 block')).toBeInTheDocument();
+    expect(screen.getByText('Scholarships · Intro · 1 block')).toBeInTheDocument();
   });
 
   it('opens the right section from the path a public edit link builds, even for an id that needs encoding', async () => {
@@ -212,7 +214,7 @@ describe('content browsing', () => {
 
     await renderAt(sectionEditPath('scholarships', 'a b/c'));
     expect(await screen.findByRole('heading', { level: 1, name: 'Odd section' })).toBeInTheDocument();
-    expect(screen.getByText('scholarships · a b/c · 0 blocks')).toBeInTheDocument();
+    expect(screen.getByText('Scholarships · Odd section · 0 blocks')).toBeInTheDocument();
     expect(screen.queryByText('No such section')).toBeNull();
   });
 
@@ -222,7 +224,7 @@ describe('content browsing', () => {
     listenerError = new Error('permission denied');
 
     await renderAt('/admin/content/scholarships/intro');
-    expect(await screen.findByRole('link', { name: 'body' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Scholarships open in spring.' })).toBeInTheDocument();
     expect(screen.getAllByRole('status').some((el) => /lost the connection/i.test(el.textContent))).toBe(true);
   });
 
@@ -266,7 +268,7 @@ describe('content browsing', () => {
     await renderAt('/admin/content/scholarships/intro/body');
 
     expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'value' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Text' })).toBeNull();
 
     act(() => adminSubscriptions.get('cmsContent_drafts')(sources.cmsContent_drafts));
     expect((await findRichText()).innerHTML).toBe('<p>Scholarships open in spring.</p>');
@@ -287,7 +289,7 @@ describe('content browsing', () => {
     act(() => adminErrors.get('cmsContent_drafts')(new Error('permission denied')));
 
     expect(await screen.findByText(/could not load this block and its saved draft/i)).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'value' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Text' })).toBeNull();
   });
 
   it('keeps a field literally named "new" editable — the create route uses a different segment', async () => {
@@ -306,6 +308,33 @@ describe('content browsing', () => {
   });
 });
 
+describe('content block order', () => {
+  it('saves a moved block order as drafts and does not publish', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT, CTA_BLOCK_DRAFT];
+    fetch.mockResolvedValue(okResponse({ status: 'dirty' }));
+    await renderAt('/admin/content/scholarships/intro');
+    fireEvent.click(await screen.findByRole('button', { name: 'Move Apply now up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Apply now was order 2 and is now first. The other block already sits at index 1.
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      section: 'intro', field: 'cta1', visible: true, fields: { order: 0 },
+    });
+    expect(fetch.mock.calls.some((call) => String(call[0]).includes('cmsPublish'))).toBe(false);
+  });
+
+  it('does not move blocks until both content revisions have loaded', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT, CTA_BLOCK_DRAFT];
+    silentCollections = ['cmsContent'];
+    await renderAt('/admin/content/scholarships/intro');
+    const up = await screen.findByRole('button', { name: 'Move Apply now up' });
+    expect(up).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+  });
+});
+
 describe('creating and editing a block', () => {
   it('creates a block and saves it as a draft only', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
@@ -313,7 +342,7 @@ describe('creating and editing a block', () => {
 
     await renderAt('/admin/content/scholarships/intro/_new');
 
-    fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'body' } });
+    expect(screen.queryByLabelText('Field id')).not.toBeInTheDocument();
     await replaceRichText(await findRichText(), '<p>Hello</p>', 'Hello');
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
@@ -323,12 +352,21 @@ describe('creating and editing a block', () => {
     expect(bodyOf(0)).toEqual({
       pageId: 'scholarships',
       section: 'intro',
-      field: 'body',
-      fields: { blockType: 'richtext', value: '<p>Hello</p>' },
+      field: 'hello',
+      fields: { blockType: 'richtext', value: '<p>Hello</p>', order: 0 },
       visible: true,
     });
     expect(fetch.mock.calls.some((call) => String(call[0]).endsWith('/cmsPublish'))).toBe(false);
     expect(await screen.findByText(/not public until you publish/i)).toBeInTheDocument();
+  });
+
+  it('waits for both content revisions before a new block can take an order', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, status: undefined }];
+    silentCollections = ['cmsContent_drafts'];
+    await renderAt('/admin/content/scholarships/intro/_new');
+    expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
   });
 
   it('offers only the section’s allowed block types, driven by the registry', async () => {
@@ -346,12 +384,11 @@ describe('creating and editing a block', () => {
     // Switching the block type swaps the value fields the registry declares.
     expect(await findRichText()).toBeInTheDocument();
     fireEvent.change(picker, { target: { value: 'stat' } });
-    expect(screen.getByLabelText(/^label/)).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'value' })).toBeInTheDocument();
-    // stat declares its own registry 'order' field, but the editor renders
-    // exactly one shared Order control (the Block panel's) rather than a
-    // second, divergent one from the per-type value fields.
-    expect(screen.getAllByLabelText('Order')).toHaveLength(1);
+    expect(screen.getByLabelText(/^Caption/)).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Figure' })).toBeInTheDocument();
+    // stat declares its own registry 'order' field. The section list sets
+    // order, so the value form renders neither that field nor an Order input.
+    expect(screen.queryByLabelText('Order')).toBeNull();
     expect(screen.queryByLabelText(/^order \(optional\)/)).toBeNull();
   });
 
@@ -406,15 +443,14 @@ describe('creating and editing a block', () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     await renderAt('/admin/content/scholarships/intro/_new');
 
-    fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'stat1' } });
     fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('value: is required.');
-    expect(alert).toHaveTextContent('label: is required.');
-    expect(screen.getByLabelText(/^value/)).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText(/^label/)).toHaveAttribute('aria-invalid', 'true');
+    expect(alert).toHaveTextContent('Figure: is required.');
+    expect(alert).toHaveTextContent('Caption: is required.');
+    expect(screen.getByLabelText(/^Figure/)).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText(/^Caption/)).toHaveAttribute('aria-invalid', 'true');
     // The server never even sees an incomplete block — this is caught
     // client-side, since the generic content endpoints validate only
     // reserved keys, never block shape.
@@ -428,22 +464,21 @@ describe('creating and editing a block', () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
     await renderAt('/admin/content/scholarships/intro/_new');
 
-    fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'stat1' } });
     fireEvent.change(screen.getByLabelText('Block type'), { target: { value: 'stat' } });
-    fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '42' } });
-    fireEvent.change(screen.getByLabelText(/^label/), { target: { value: 'scholarships awarded' } });
+    fireEvent.change(screen.getByLabelText(/^Figure/), { target: { value: '42' } });
+    fireEvent.change(screen.getByLabelText(/^Caption/), { target: { value: 'scholarships awarded' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
 
     const alert = await screen.findByRole('alert');
-    for (const part of ['takeaway', 'description', 'source', 'alt']) {
-      expect(alert).toHaveTextContent(`${part}: is required.`);
-      expect(screen.getByLabelText(new RegExp(`^${part}`))).toHaveAttribute('aria-invalid', 'true');
+    for (const label of ['Finding', 'What it counts', 'Source', 'Screen reader text']) {
+      expect(alert).toHaveTextContent(`${label}: is required.`);
+      expect(screen.getByLabelText(label)).toHaveAttribute('aria-invalid', 'true');
     }
     // Each field says what belongs in it, so "required" is actionable.
-    expect(screen.getByLabelText(/^takeaway/)).toHaveAccessibleDescription(
+    expect(screen.getByLabelText('Finding')).toHaveAccessibleDescription(
       /State the finding in words/,
     );
-    expect(screen.getByLabelText(/^source/)).toHaveAccessibleDescription(/the date you read it/);
+    expect(screen.getByLabelText('Source')).toHaveAccessibleDescription(/the date you read it/);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -454,20 +489,20 @@ describe('creating and editing a block', () => {
 
     await renderAt('/admin/content/scholarships/intro/cta1');
     fireEvent.change(await screen.findByLabelText('Block type'), { target: { value: 'stat' } });
-    fireEvent.change(screen.getByLabelText(/^value/), { target: { value: '42' } });
-    fireEvent.change(screen.getByLabelText(/^label/), { target: { value: 'scholarships awarded' } });
+    fireEvent.change(screen.getByLabelText(/^Figure/), { target: { value: '42' } });
+    fireEvent.change(screen.getByLabelText(/^Caption/), { target: { value: 'scholarships awarded' } });
     // A stat carries its four-part contract (design brief §2.1.1), and the
     // editor will not save one without it.
-    fireEvent.change(screen.getByLabelText(/^takeaway/), {
+    fireEvent.change(screen.getByLabelText('Finding'), {
       target: { value: 'The fund placed every applicant it could' },
     });
-    fireEvent.change(screen.getByLabelText(/^description/), {
+    fireEvent.change(screen.getByLabelText('What it counts'), {
       target: { value: 'Awards made from the 2026 fund, across both rounds.' },
     });
-    fireEvent.change(screen.getByLabelText(/^source/), {
+    fireEvent.change(screen.getByLabelText('Source'), {
       target: { value: 'Scholarship committee minutes, read 1 September 2026.' },
     });
-    fireEvent.change(screen.getByLabelText(/^alt/), {
+    fireEvent.change(screen.getByLabelText('Screen reader text'), {
       target: { value: 'The fund awarded 42 scholarships in 2026.' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -515,7 +550,6 @@ describe('server errors and publish skips', () => {
     );
 
     await renderAt('/admin/content/scholarships/intro/_new');
-    fireEvent.change(screen.getByLabelText('Field id'), { target: { value: 'body' } });
     // Fill the required value field so this reaches the network call at
     // all — an empty one is caught by client-side validation first, which
     // has its own test.

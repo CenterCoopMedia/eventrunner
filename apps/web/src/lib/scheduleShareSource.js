@@ -20,7 +20,7 @@ export const SCHEDULE_VISIBILITIES = Object.freeze(['private', 'attendees_only',
  * the panel opens on.
  *
  * @param {string} uid
- * @param {(share: { scheduleVisibility: string, sessionIds: string[] } | null) => void} onNext
+ * @param {(share: { scheduleVisibility: string, sessionIds: string[], displayName: string | null } | null) => void} onNext
  * @param {(error: unknown) => void} [onError]
  */
 export function subscribeOwnScheduleShare(uid, onNext, onError) {
@@ -38,10 +38,15 @@ export function subscribeOwnScheduleShare(uid, onNext, onError) {
             return;
           }
           const data = snapshot.data() ?? {};
+          const storedName = data.displayName;
+          // The projection stores the owner's name. A blank value is not a name.
+          const displayName =
+            typeof storedName === 'string' && storedName.trim() ? storedName.trim() : null;
           onNext({
             scheduleVisibility:
               typeof data.scheduleVisibility === 'string' ? data.scheduleVisibility : 'private',
             sessionIds: Array.isArray(data.sessionIds) ? data.sessionIds : [],
+            displayName,
           });
         },
         onListenerError,

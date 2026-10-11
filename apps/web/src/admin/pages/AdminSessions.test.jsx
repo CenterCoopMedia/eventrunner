@@ -48,6 +48,8 @@ vi.mock('firebase/auth', () => ({
 }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
@@ -106,7 +108,7 @@ describe('admin Sessions workspace', () => {
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
       .toEqual(['Public session', 'Time and structure', 'Location', 'Publishing']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'Session id', 'Public title', 'Public description', 'Recording link',
+      'Public title', 'Public description', 'Recording link',
       'Event day', 'Parent session', 'Start time', 'End time', 'Track',
       'Recorded place', 'Public location text', 'Show this session when it is published',
     ]);
@@ -227,7 +229,7 @@ describe('admin Sessions workspace', () => {
     await screen.findByRole('heading', { name: 'New session' });
     fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
     fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
-    expect(screen.getByLabelText('Session id')).toHaveValue('opening-session');
+    expect(screen.queryByLabelText('Session id')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Public description'), { target: { value: 'Welcome everyone.' } });
     fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
     fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
@@ -241,6 +243,31 @@ describe('admin Sessions workspace', () => {
       docId: 'opening-session',
       fields: { title: 'Opening session', dayId: 'day-1', startTime: '09:00', endTime: '10:00' },
     });
+  });
+
+  it('reuses the first session id when a save fails and the title changes', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: { message: 'The draft service is down.' } }),
+    });
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Opening session' } });
+    fireEvent.change(screen.getByLabelText('Public description'), { target: { value: 'Welcome everyone.' } });
+    fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByText('The draft service is down.')).toBeInTheDocument();
+    expect(bodyOf(0).docId).toBe('opening-session');
+
+    fetch.mockResolvedValueOnce(response({ docId: 'opening-session', status: 'dirty' }));
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Welcome remarks' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).docId).toBe('opening-session');
+    expect(bodyOf(1).fields.title).toBe('Welcome remarks');
   });
 
   it('sends the recording link, and refuses an unsafe one before it reaches the server', async () => {
@@ -382,6 +409,36 @@ describe('admin Sessions workspace', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(String(fetch.mock.calls[1][0])).toMatch(/\/cmsPublish$/);
     expect(bodyOf(1).docIds).toEqual(['parent', 'child']);
+  });
+
+  it('publishes the parent chosen in the form, not the parent stored before the edit', async () => {
+    await renderAt('/admin/sessions/child');
+    await waitFor(() => expect(adminSubscriptions.has('cmsSchedule_drafts')).toBe(true));
+    pushSessions([], [
+      {
+        id: 'old-parent', dayId: 'day-1', startTime: '09:00', endTime: '11:00',
+        title: 'Old parent', description: 'The stored parent.', status: 'dirty',
+      },
+      {
+        id: 'new-parent', dayId: 'day-1', startTime: '11:00', endTime: '12:00',
+        title: 'New parent', description: 'The chosen parent.', status: 'dirty',
+      },
+      {
+        id: 'child', dayId: 'day-1', startTime: '09:30', endTime: '10:00',
+        title: 'Child', description: 'Child session.', parentId: 'old-parent', status: 'dirty',
+      },
+    ]);
+    expect(await screen.findByDisplayValue('Child')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Parent session'), { target: { value: 'new-parent' } });
+    fetch
+      .mockResolvedValueOnce(response({ docId: 'child', status: 'dirty' }))
+      .mockResolvedValueOnce(response({
+        results: { cmsSchedule: { published: ['new-parent', 'child'], skipped: [] } },
+      }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1).docIds).toEqual(['new-parent', 'child']);
   });
 
   it('names a saved day that no longer exists, rather than showing "no day chosen" (issue 248)', async () => {

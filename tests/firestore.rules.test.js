@@ -683,7 +683,24 @@ describe("the private bookmarks subcollection under users/{uid}", () => {
 describe("the private session notes under users/{uid}/sessionNotes", () => {
   const noteRef = (uid, sessionId) => doc(nonAdmin(), `users/${uid}/sessionNotes/${sessionId}`);
 
+  async function seedAccount(uid) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `users/${uid}`), { registrationStatus: "approved" });
+    });
+  }
+
+  async function seedSession(sessionId) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), `cmsSchedule/${sessionId}`), {
+        visible: true,
+        revision: 1,
+      });
+    });
+  }
+
   it("allows the owner to create, read, and rewrite their own note", async () => {
+    await seedAccount("attendee-1");
+    await seedSession("session-1");
     await assertSucceeds(setDoc(noteRef("attendee-1", "session-1"), { text: "Ask about funding" }));
     await assertSucceeds(getDoc(noteRef("attendee-1", "session-1")));
     await assertSucceeds(
@@ -692,6 +709,7 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
   });
 
   it("allows the owner to clear a note by deleting the document", async () => {
+    await seedAccount("attendee-1");
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), "users/attendee-1/sessionNotes/session-1"), {
         text: "temporary",
@@ -721,7 +739,47 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
     await assertFails(getDoc(doc(admin(), "users/attendee-1/sessionNotes/session-1")));
   });
 
+  it("denies a deleted account whose ID token still names the path", async () => {
+    const uid = "gone-1";
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, `users/${uid}`), { registrationStatus: "approved" });
+      await setDoc(doc(db, `users/${uid}/sessionNotes/session-9`), { text: "kept" });
+      await deleteDoc(doc(db, `users/${uid}`));
+    });
+    const note = doc(attendee(uid), `users/${uid}/sessionNotes/session-9`);
+    await assertFails(getDoc(note));
+    await assertFails(setDoc(note, { text: "back" }));
+    await assertFails(deleteDoc(note));
+  });
+
+  it("denies a pending account a note on a real session", async () => {
+    await assertFails(
+      setDoc(doc(attendee("pending-1"), "users/pending-1/sessionNotes/pub"), { text: "nope" }),
+    );
+  });
+
+  it("allows a speaker whose registration is still pending to keep a note", async () => {
+    await assertSucceeds(
+      setDoc(doc(attendee("speaker-1"), "users/speaker-1/sessionNotes/pub"), {
+        text: "Ask after the talk",
+      }),
+    );
+  });
+
+  it("denies a note whose id is not a session", async () => {
+    await seedAccount("attendee-1");
+    await assertFails(setDoc(noteRef("attendee-1", "not-a-session"), { text: "unbounded" }));
+  });
+
+  it("allows a note on a session that is not visible", async () => {
+    await seedAccount("attendee-1");
+    await assertSucceeds(setDoc(noteRef("attendee-1", "hidden"), { text: "Still mine" }));
+  });
+
   it("refuses a note that is not text, or text past the cap", async () => {
+    await seedAccount("attendee-1");
+    await seedSession("session-2");
     await assertFails(setDoc(noteRef("attendee-1", "session-2"), { body: "nope" }));
     await assertFails(setDoc(noteRef("attendee-1", "session-2"), { text: 42 }));
     await assertFails(
@@ -733,6 +791,8 @@ describe("the private session notes under users/{uid}/sessionNotes", () => {
   });
 
   it("refuses a note that smuggles extra fields", async () => {
+    await seedAccount("attendee-1");
+    await seedSession("session-3");
     await assertFails(
       setDoc(noteRef("attendee-1", "session-3"), {
         text: "fine",
@@ -984,6 +1044,17 @@ describe("users account documents (spec §3.4)", () => {
         updateDoc(doc(attendee("pending-1"), "users/pending-1"), patch),
       );
     }
+  });
+
+  it("allows this account's photo and a default avatar, and refuses another attendee's photo", async () => {
+    const ref = doc(attendee("pending-1"), "users/pending-1");
+    await assertSucceeds(updateDoc(ref, { photoPath: "profile-photos/pending-1/photo.png" }));
+    await assertSucceeds(updateDoc(ref, { photoPath: "profile-photos/pending-1/fresh-id/photo.png" }));
+    await assertSucceeds(updateDoc(ref, { photoPath: "default-avatars/avatar-01.svg" }));
+    await assertSucceeds(updateDoc(ref, { photoPath: null }));
+    await assertFails(updateDoc(ref, { photoPath: "profile-photos/approved-1/photo.png" }));
+    await assertFails(updateDoc(ref, { photoPath: "profile-photos/pending-1/../../approved-1/photo.png" }));
+    await assertFails(updateDoc(ref, { photoPath: "demo/speakers/marisol-reyes.webp" }));
   });
 
   it("allows the same fields with the right types", async () => {
@@ -1433,20 +1504,58 @@ describe("live_updates dashboard feed", () => {
 
 describe("site-wide announcements", () => {
   beforeAll(async () => {
+    const now = Date.now();
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), "announcements/a1"), {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "announcements/a1"), {
         message: "Use the east entrance.",
         level: "info",
-        startsAt: new Date(),
-        endsAt: new Date(Date.now() + 60_000),
+        startsAt: new Date(now - 60_000),
+        endsAt: new Date(now + 60_000),
+      });
+      await setDoc(doc(db, "announcements/later"), {
+        message: "Doors open at noon.",
+        level: "info",
+        startsAt: new Date(now + 3_600_000),
+        endsAt: new Date(now + 7_200_000),
+      });
+      await setDoc(doc(db, "announcements/ended"), {
+        message: "Yesterday's notice.",
+        level: "info",
+        startsAt: new Date(now - 7_200_000),
+        endsAt: new Date(now - 60_000),
+      });
+      await setDoc(doc(db, "announcements_public/current"), {
+        announcements: [{ id: "a1", message: "Use the east entrance." }],
+      });
+      await setDoc(doc(db, "announcements_public/other"), {
+        announcements: [{ id: "secret", message: "Not yet." }],
       });
     });
   });
 
-  it("allows anyone to read one row and list the collection", async () => {
+  it("allows anyone to read one active canonical row", async () => {
     await assertSucceeds(getDoc(doc(anon(), "announcements/a1")));
-    await assertSucceeds(getDocs(collection(anon(), "announcements")));
     await assertSucceeds(getDoc(doc(nonAdmin(), "announcements/a1")));
+  });
+
+  it("denies an anonymous read of a scheduled or ended row, and an unfiltered list", async () => {
+    await assertFails(getDoc(doc(anon(), "announcements/later")));
+    await assertFails(getDoc(doc(anon(), "announcements/ended")));
+    await assertFails(getDocs(collection(anon(), "announcements")));
+  });
+
+  it("allows anyone to read the public projection and no other document in that collection", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "announcements_public/current")));
+    await assertFails(getDoc(doc(anon(), "announcements_public/other")));
+    await assertFails(getDocs(collection(anon(), "announcements_public")));
+    await assertFails(setDoc(doc(anon(), "announcements_public/current"), { announcements: [] }));
+  });
+
+  it("allows an admin or a staff member to read a scheduled row and list every row", async () => {
+    await assertSucceeds(getDoc(doc(admin(), "announcements/later")));
+    await assertSucceeds(getDoc(doc(staff(), "announcements/ended")));
+    await assertSucceeds(getDocs(collection(admin(), "announcements")));
   });
 
   it("denies every client write, admin included", async () => {

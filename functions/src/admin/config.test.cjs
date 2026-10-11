@@ -432,20 +432,57 @@ test('client-supplied updatedAt/updatedBy are stripped, not trusted', async () =
   assert.deepEqual(written.updatedAt, new Date(NOW));
 });
 
-test('an event write preserves the stored sender verification pair', async () => {
+test('a sender email change clears the verification record', async () => {
   const deps = makeDeps({
     'config/event': {
       ...validEvent(),
-      sender: { email: 'old@x.org', name: 'Old', replyTo: null, domainVerified: true, domainVerifiedAt: '2026-02-02T00:00' },
+      sender: {
+        email: 'old@x.org',
+        name: 'Old',
+        replyTo: null,
+        domainVerified: true,
+        domainVerifiedAt: '2026-02-02T00:00',
+        domainVerifiedBy: 'provider-check',
+        domainVerifiedDomain: 'x.org',
+      },
     },
   });
   const res = makeRes();
   await createUpdateEventConfigHandler(deps)(makeReq({ event: validEvent() }), res);
   assert.equal(res.statusCode, 200);
   const written = deps.db.docs.get('config/event');
+  assert.equal(written.sender.email, 'summit@example.org', 'editable sender fields still replace');
+  assert.equal(written.sender.domainVerified, false);
+  assert.equal(written.sender.domainVerifiedAt, null);
+  assert.equal(written.sender.domainVerifiedBy, null);
+  assert.equal(written.sender.domainVerifiedDomain, null);
+});
+
+test('a case-only sender email change keeps the verification record', async () => {
+  const deps = makeDeps({
+    'config/event': {
+      ...validEvent(),
+      sender: {
+        email: 'summit@example.org',
+        name: 'Example Summit',
+        replyTo: null,
+        domainVerified: true,
+        domainVerifiedAt: '2026-02-02T00:00',
+        domainVerifiedBy: 'provider-check',
+        domainVerifiedDomain: 'example.org',
+      },
+    },
+  });
+  const res = makeRes();
+  const event = validEvent();
+  event.sender = { ...event.sender, email: 'SUMMIT@Example.org' };
+  await createUpdateEventConfigHandler(deps)(makeReq({ event }), res);
+  assert.equal(res.statusCode, 200);
+  const written = deps.db.docs.get('config/event');
   assert.equal(written.sender.domainVerified, true);
   assert.equal(written.sender.domainVerifiedAt, '2026-02-02T00:00');
-  assert.equal(written.sender.email, 'summit@example.org', 'editable sender fields still replace');
+  assert.equal(written.sender.domainVerifiedBy, 'provider-check');
+  assert.equal(written.sender.domainVerifiedDomain, 'example.org');
 });
 
 test('the config doc and its cmsVersionHistory row land in ONE atomic commit', async () => {
@@ -468,7 +505,10 @@ test('the config doc and its cmsVersionHistory row land in ONE atomic commit', a
 
 test('a verify-sender-domain write landing mid-save is not clobbered (transactional carry-forward)', async () => {
   const deps = makeDeps({
-    'config/event': { ...validEvent(), sender: { email: 'old@x.org', name: 'Old', domainVerified: false, domainVerifiedAt: null } },
+    'config/event': {
+      ...validEvent(),
+      sender: { email: 'summit@example.org', name: 'Example Summit', replyTo: null, domainVerified: false, domainVerifiedAt: null },
+    },
   });
   // Simulate verify-sender-domain.cjs committing between the admin save's
   // carry-forward read and its commit: the transaction must retry and

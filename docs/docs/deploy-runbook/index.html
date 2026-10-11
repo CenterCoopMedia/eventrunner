@@ -294,7 +294,7 @@
           <tr><td><code>EVENT_PUBLIC_URL</code></td><td>canonical origin, e.g. <code>https://summit.example.org</code></td></tr>
           <tr><td><code>EVENT_STORAGE_BUCKET</code></td><td>the project&#39;s default Storage bucket</td></tr>
           <tr><td><code>EVENT_ALLOWED_ORIGINS</code></td><td>comma-separated CORS origins</td></tr>
-          <tr><td><code>EVENT_EMAIL_PROVIDER</code></td><td><code>postmark</code> | <code>webhook</code> | <code>console</code></td></tr>
+          <tr><td><code>EVENT_EMAIL_PROVIDER</code></td><td><code>postmark</code> | <code>webhook</code>. <code>console</code> is valid only when the GitHub Environment name is exactly <code>demo</code></td></tr>
           <tr><td><code>EVENT_TICKETING_PROVIDER</code></td><td><code>eventbrite</code> | <code>manual</code> | <code>none</code></td></tr>
           <tr><td><code>EVENT_TICKETING_EVENT_ID</code></td><td>required only when the ticketing provider is <code>eventbrite</code></td></tr>
           <tr><td><code>EVENT_OPERATOR_NOTIFIER</code></td><td><code>webhook</code> | <code>email</code> | <code>none</code></td></tr>
@@ -394,7 +394,7 @@
           </code></pre>
           <p><code>deploy-client.yml</code>&#39;s <code>provision</code> job deploys <code>firestore:rules</code>, <code>firestore:indexes</code>, and <code>storage</code>
           on <strong>every</strong> run regardless of the <code>provision</code> input (spec §8.1) — that input exists for operator
-          intent and log clarity, not as a gate. <code>bootstrap: true</code> is the actual gate: it is what skips
+          intent and log clarity, not as a gate. Before that deploy, the job grants <code>roles/firebaserules.firestoreServiceAgent</code> to <code>service-&lt;PROJECT_NUMBER&gt;@gcp-sa-firebasestorage.iam.gserviceaccount.com</code>. <code>storage.rules</code> calls <code>firestore.exists</code> for a profile photo write, and <code>firebase deploy --non-interactive</code> does not grant this role. The binding is idempotent. The deploy service account needs permission to set the project IAM policy. <code>bootstrap: true</code> is the actual gate: it is what skips
           <code>content</code> (and, transitively, <code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code>) on this run. A dispatch run always deploys
           functions regardless of <code>bootstrap</code>, because a fresh project has none yet and gating that on a paths
           filter would provision an empty, broken deployment (spec §8.1).</p>
@@ -600,8 +600,9 @@
           before looking for a real fault. The one cost the CDN does not absorb is scanner traffic:
           requests for addresses that do not exist (<code>/wp-login.php</code> and its friends) each miss the cache
           and reach the function, where they cost one Firestore page lookup and return the plain shell.
-          That is a line on the functions invocation graph, not an incident; if a client&#39;s graph is
-          dominated by it, the answer is a Cloud Functions max-instances limit, not a rewrite change.</li>
+          That is a line on the functions invocation graph. <code>routeMeta</code> sets <code>maxInstances</code> to 20
+          so that traffic stays bounded. The rewrite stays, because this function is the front door.
+          App Check stays off this function. A crawler and a first visit have no App Check token.</li>
           <li><strong>The card image a deployment falls back to is a PNG, not the SVG placeholder.</strong> The Open Graph
           and Twitter crawlers fetch the image themselves and do not reliably decode SVG, so a card built
           on <code>branding/og-default.svg</code> unfurls with an empty frame, which a reader takes for a broken link

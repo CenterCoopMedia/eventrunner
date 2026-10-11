@@ -274,3 +274,68 @@ test('pastAttendance never reaches users_public', async () => {
   assert.equal((await sync({ uid: 'u1' })).action, 'unchanged');
   assert.equal(db.writes.length, before);
 });
+
+test('deletes the previous own photo only after the public projection names the new one', async () => {
+  const oldPath = 'profile-photos/u1/old-id/photo.png';
+  const nextPath = 'profile-photos/u1/new-id/photo.png';
+  const db = fakeDb({
+    'config/badges': BADGES_CONFIG,
+    'users/u1': userDoc({ photoPath: nextPath }),
+    'users_public/u1': { uid: 'u1', displayName: 'Rae Okonkwo', photoPath: oldPath, profileVisibility: 'attendees_only', badges: ['writer'] },
+  });
+  const deleted = [];
+  const sync = createSyncUserPublic({
+    db,
+    now: () => new Date('2026-08-21T12:00:00Z'),
+    deleteReplacedPhoto: async (path) => {
+      assert.equal(db.docs.get('users_public/u1').photoPath, nextPath);
+      deleted.push(path);
+    },
+  });
+
+  assert.equal((await sync({ uid: 'u1' })).action, 'written');
+  assert.deepEqual(deleted, [oldPath]);
+
+  // The projection already matches, so a retry must not delete the new object.
+  assert.equal((await sync({ uid: 'u1' })).action, 'unchanged');
+  assert.deepEqual(deleted, [oldPath]);
+});
+
+test('does not delete a photo path outside this account prefix', async () => {
+  const foreign = 'profile-photos/other/photo.png';
+  const nextPath = 'profile-photos/u1/new-id/photo.png';
+  const db = fakeDb({
+    'config/badges': BADGES_CONFIG,
+    'users/u1': userDoc({ photoPath: nextPath }),
+    'users_public/u1': { photoPath: foreign, profileVisibility: 'attendees_only', badges: ['writer'], displayName: 'Rae Okonkwo' },
+  });
+  const deleted = [];
+  const sync = createSyncUserPublic({
+    db,
+    deleteReplacedPhoto: async (path) => { deleted.push(path); },
+  });
+
+  assert.equal((await sync({ uid: 'u1' })).action, 'written');
+  assert.deepEqual(deleted, []);
+  assert.equal(db.docs.get('users_public/u1').photoPath, nextPath);
+});
+
+test('a failed photo delete still leaves the new public path in place', async () => {
+  const oldPath = 'profile-photos/u1/old-id/photo.png';
+  const nextPath = 'profile-photos/u1/new-id/photo.png';
+  const db = fakeDb({
+    'config/badges': BADGES_CONFIG,
+    'users/u1': userDoc({ photoPath: nextPath }),
+    'users_public/u1': { photoPath: oldPath, profileVisibility: 'attendees_only', badges: ['writer'], displayName: 'Rae Okonkwo' },
+  });
+  const errors = [];
+  const sync = createSyncUserPublic({
+    db,
+    log: { error: (...args) => errors.push(args) },
+    deleteReplacedPhoto: async () => { throw new Error('storage down'); },
+  });
+
+  assert.equal((await sync({ uid: 'u1' })).action, 'written');
+  assert.equal(db.docs.get('users_public/u1').photoPath, nextPath);
+  assert.equal(errors.length, 1);
+});

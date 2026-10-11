@@ -129,6 +129,21 @@ test('rendered text fields are coerced to strings, never published as objects', 
   assert.equal(pub.photoPath, null);
 });
 
+test('a photo path is published only when it belongs to this account', () => {
+  const own = 'profile-photos/u1/photo.png';
+  const fresh = 'profile-photos/u1/abc/photo.png';
+  const avatar = 'default-avatars/avatar-03.svg';
+  assert.equal(buildPublicProfile(user({ uid: 'u1', photoPath: own }), BADGES_CONFIG).photoPath, own);
+  assert.equal(buildPublicProfile(user({ uid: 'u1', photoPath: fresh }), BADGES_CONFIG).photoPath, fresh);
+  assert.equal(buildPublicProfile(user({ uid: 'u1', photoPath: avatar }), BADGES_CONFIG).photoPath, avatar);
+  assert.equal(buildPublicProfile(user({ uid: 'u1', photoPath: 'profile-photos/other/photo.png' }), BADGES_CONFIG).photoPath, null);
+  assert.equal(
+    buildPublicProfile(user({ uid: 'u1', photoPath: 'profile-photos/u1/../../other/photo.png' }), BADGES_CONFIG).photoPath,
+    null,
+  );
+  assert.equal(buildPublicProfile(user({ photoPath: own }), BADGES_CONFIG).photoPath, null);
+});
+
 test('absent optional fields stay absent rather than becoming empty strings', () => {
   const pub = buildPublicProfile({ displayName: 'Rae', profileVisibility: 'public' }, BADGES_CONFIG);
   assert.equal('bio' in pub, false);

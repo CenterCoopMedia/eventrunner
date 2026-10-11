@@ -31,6 +31,25 @@ test('valid env passes', () => {
   assert.deepEqual(result.errors, []);
 });
 
+test('console email is rejected for a real client deployment', () => {
+  const result = validateDeployEnv({ ...VALID_ENV, EVENT_DEPLOY_CLIENT: 'cjs2026' });
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join('\n'), /console is only valid for the demo deployment/);
+});
+
+test('console email stays valid for the demo deployment', () => {
+  const result = validateDeployEnv({ ...VALID_ENV, EVENT_DEPLOY_CLIENT: 'demo' });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.errors, []);
+});
+
+test('a project id that contains demo does not make console valid', () => {
+  for (const client of ['newsroom', 'Demo', 'demo-event', 'eventrunner-demo']) {
+    const result = validateDeployEnv({ ...VALID_ENV, EVENT_DEPLOY_CLIENT: client });
+    assert.equal(result.ok, false, client);
+  }
+});
+
 test('a Firebase web app without Google Analytics does not require a measurement id', () => {
   const { VITE_FIREBASE_MEASUREMENT_ID, ...withoutMeasurementId } = VALID_ENV;
   const result = validateDeployEnv(withoutMeasurementId);

@@ -110,6 +110,16 @@ function validateDeployEnv(env = process.env) {
       !EMAIL_PROVIDERS.includes(source.EVENT_EMAIL_PROVIDER.trim())) {
     errors.push(`EVENT_EMAIL_PROVIDER: must be one of ${EMAIL_PROVIDERS.join(', ')}`);
   }
+  // Console mail is the local and demo inbox. A real client deployment must
+  // not keep it. The deploy workflow sets EVENT_DEPLOY_CLIENT from its
+  // client input, which is the GitHub Environment name. A project id that
+  // merely contains "demo" is not that target.
+  if (present(source.EVENT_EMAIL_PROVIDER) &&
+      source.EVENT_EMAIL_PROVIDER.trim() === 'console' &&
+      present(source.EVENT_DEPLOY_CLIENT) &&
+      source.EVENT_DEPLOY_CLIENT.trim() !== 'demo') {
+    errors.push('EVENT_EMAIL_PROVIDER: console is only valid for the demo deployment');
+  }
   if (present(source.EVENT_TICKETING_PROVIDER) &&
       !TICKETING_PROVIDERS.includes(source.EVENT_TICKETING_PROVIDER.trim())) {
     errors.push(`EVENT_TICKETING_PROVIDER: must be one of ${TICKETING_PROVIDERS.join(', ')}`);

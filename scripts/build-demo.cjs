@@ -24,6 +24,8 @@
  * honored: pointing this at a real client's Firestore export would publish
  * that client's content into a public repository, which §8.6 exists to
  * prevent. It is cleared for the child process even if the caller set it.
+ * The web config also ignores it while VITE_DEMO_MODE=1, so a direct demo
+ * build cannot pick it up either.
  *
  * Output is synced into docs/demo/ — committed, because GitHub Pages serves
  * this repo from /docs. Stale contents are deleted first so a renamed hashed

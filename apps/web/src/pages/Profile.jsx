@@ -37,8 +37,8 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
+
 import SectionHead from '../components/editorial/SectionHead.jsx';
-import { deleteOwnPhoto } from '../lib/photoUpload.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 import { Checkbox, Radio } from '../components/forms/Choice.jsx';
 
@@ -112,17 +112,17 @@ export default function Profile() {
 
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  // True while a crop or an upload is open. The form still holds the saved
+  // path until the upload reports the new one, so a save in that window
+  // would publish the old photo and orphan the replacement.
+  const [photoPending, setPhotoPending] = useState(false);
+  const photoRef = useRef(null);
   const [nameError, setNameError] = useState(null);
   const [customBadgeError, setCustomBadgeError] = useState(null);
   const nameRef = useRef(null);
   const customBadgeRefs = useRef([]);
   const savedCustomBadgesRef = useRef([]);
   const remoteCustomBadgesRef = useRef([]);
-  // The photo path the SAVED profile currently references. Removing or
-  // replacing a photo only changes the form; the old object is deleted once
-  // a save has committed, so an abandoned edit never leaves the directory
-  // pointing at an object that is gone (see ProfilePhotoField).
-  const savedPhotoPathRef = useRef(null);
 
   // Seed the form from the account document the first time it arrives. Later
   // snapshots (e.g. the profileComplete trigger writing back) must not
@@ -144,8 +144,6 @@ export default function Profile() {
       ),
       photoPath: typeof profile.photoPath === 'string' ? profile.photoPath : '',
     });
-    savedPhotoPathRef.current =
-      typeof profile.photoPath === 'string' ? profile.photoPath : null;
   }, [profile, form]);
 
   // Preserve local text, but never restore a badge removed by moderation
@@ -222,6 +220,7 @@ export default function Profile() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (photoPending || saving) return;
     if (form.displayName.trim().length === 0) {
       setNameError('Enter the name you want other attendees to see.');
       nameRef.current?.focus();
@@ -267,7 +266,18 @@ export default function Profile() {
     }
     setCustomBadgeError(null);
     setSaving(true);
+    let uploadedPath = null;
     try {
+      let photoPath = form.photoPath ? form.photoPath : null;
+      if (photoRef.current?.hasPending()) {
+        try {
+          uploadedPath = await photoRef.current.commit();
+        } catch {
+          showToast('Your photo could not be uploaded. Try again.', { tone: 'error' });
+          return;
+        }
+        photoPath = uploadedPath;
+      }
       await saveProfile({
         displayName: form.displayName.trim(),
         pronouns: form.pronouns.trim(),
@@ -280,25 +290,36 @@ export default function Profile() {
         // Empty string means "no photo". The rules accept a string or null
         // for photoPath (firestore.rules validSelfProfileTypes), and the
         // projection coerces either to nothing rendered.
-        photoPath: form.photoPath ? form.photoPath : null,
+        photoPath,
       });
+      photoRef.current?.release();
       if (features.customBadges === true && customBadgesChanged) savedCustomBadgesRef.current = customBadges;
-      // The save committed, so nothing points at the previous object any
-      // more: clean it up. Best effort by design — a failed delete leaves an
-      // orphan, which costs storage and nothing else, while failing the save
-      // here would tell someone their profile did not save when it did.
-      const previousPath = savedPhotoPathRef.current;
-      const currentPath = form.photoPath ? form.photoPath : null;
-      savedPhotoPathRef.current = currentPath;
-      if (previousPath && previousPath !== currentPath) {
-        await deleteOwnPhoto(previousPath);
-      }
+      // The old photo object stays until syncUserPublic has published the
+      // new path. Deleting it here would race that write and break the
+      // directory image.
       showToast('Profile saved.');
     } catch {
+      // The new object is public and no profile names it. Delete it. The
+      // previous object stays for the directory. A failed delete keeps the
+      // same object so the next save does not upload a second public file.
+      let stillPublic = false;
+      if (uploadedPath && uploadedPath !== profile?.photoPath) {
+        try {
+          await photoRef.current?.discard();
+          setField('photoPath', profile?.photoPath ? profile.photoPath : '');
+        } catch {
+          stillPublic = true;
+        }
+      }
       // The rules reject anything outside the self-editable allowlist, and
       // an offline write never lands: say so plainly rather than pretending
       // the save worked.
-      showToast('Your profile could not be saved. Try again.', { tone: 'error' });
+      showToast(
+        stillPublic
+          ? 'Your profile could not be saved. The new photo is still public. Try again.'
+          : 'Your profile could not be saved. Try again.',
+        { tone: 'error' },
+      );
     } finally {
       setSaving(false);
     }
@@ -315,9 +336,11 @@ export default function Profile() {
 
       <form className="mt-xl space-y-lg" onSubmit={handleSubmit} noValidate>
         <ProfilePhotoField
+          ref={photoRef}
           uid={user.uid}
           value={form.photoPath}
           onChange={(path) => setField('photoPath', path)}
+          onPendingChange={setPhotoPending}
         />
         <div>
           <label htmlFor="displayName" className="block font-semibold text-text-primary">
@@ -494,7 +517,7 @@ export default function Profile() {
           </section>
         ) : null}
 
-        <button type="submit" className={primaryActionClass} disabled={saving}>
+        <button type="submit" className={primaryActionClass} disabled={saving || photoPending}>
           {saving ? 'Saving…' : 'Save profile'}
         </button>
       </form>

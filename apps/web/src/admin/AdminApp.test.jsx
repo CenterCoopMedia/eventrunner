@@ -56,6 +56,7 @@ let pendingProbe = null;
 let pendingOperatorProbe = null;
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, name) => ({ name })),
+  doc: vi.fn(() => ({})),
   onSnapshot: vi.fn((_ref, onNext) => {
     onNext({ docs: [] });
     return () => {};

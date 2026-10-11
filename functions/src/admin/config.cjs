@@ -521,15 +521,31 @@ async function applyConfigWrite({ db, docId, payload, actor, now = Date.now }) {
         // the payload alone would let a partial save erase venue/legal/etc.
         written = deepMerge(stored, merged);
         // The merge already preserves a stored verification record (the
-        // payload was proven not to carry any of its fields), but normalize
-        // the pair the readiness check reads so a first write can never
-        // omit it.
+        // payload was proven not to carry any of its fields). Keep that
+        // record only while the sender email is the same address. A
+        // different address has not been verified.
         const storedSender = isPlainObject(stored.sender) ? stored.sender : {};
-        written.sender = {
-          ...(isPlainObject(written.sender) ? written.sender : {}),
-          domainVerified: storedSender.domainVerified === true,
-          domainVerifiedAt: storedSender.domainVerifiedAt ?? null,
-        };
+        const writtenSender = isPlainObject(written.sender) ? written.sender : {};
+        const sameEmail = normalizeSenderField('email', writtenSender.email)
+          === normalizeSenderField('email', storedSender.email);
+        const verification = sameEmail
+          ? {
+            domainVerified: storedSender.domainVerified === true,
+            domainVerifiedAt: storedSender.domainVerifiedAt ?? null,
+          }
+          : {
+            domainVerified: false,
+            domainVerifiedAt: null,
+            domainVerifiedBy: null,
+            domainVerifiedDomain: null,
+          };
+        if (sameEmail && 'domainVerifiedBy' in storedSender) {
+          verification.domainVerifiedBy = storedSender.domainVerifiedBy ?? null;
+        }
+        if (sameEmail && 'domainVerifiedDomain' in storedSender) {
+          verification.domainVerifiedDomain = storedSender.domainVerifiedDomain ?? null;
+        }
+        written.sender = { ...writtenSender, ...verification };
         const verdict = validate(written);
         if (!verdict.ok) throw new MergedConfigInvalidError(verdict.errors);
         const references = await removedPlaceReferences({ db, tx, stored, written });

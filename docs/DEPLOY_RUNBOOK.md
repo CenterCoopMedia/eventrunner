@@ -195,7 +195,7 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_PUBLIC_URL` | canonical origin, e.g. `https://summit.example.org` |
 | `EVENT_STORAGE_BUCKET` | the project's default Storage bucket |
 | `EVENT_ALLOWED_ORIGINS` | comma-separated CORS origins |
-| `EVENT_EMAIL_PROVIDER` | `postmark` \| `webhook` \| `console` |
+| `EVENT_EMAIL_PROVIDER` | `postmark` \| `webhook`. `console` is valid only when the GitHub Environment name is exactly `demo` |
 | `EVENT_TICKETING_PROVIDER` | `eventbrite` \| `manual` \| `none` |
 | `EVENT_TICKETING_EVENT_ID` | required only when the ticketing provider is `eventbrite` |
 | `EVENT_OPERATOR_NOTIFIER` | `webhook` \| `email` \| `none` |
@@ -310,7 +310,7 @@ Actions tab → Deploy → Run workflow
 
 `deploy-client.yml`'s `provision` job deploys `firestore:rules`, `firestore:indexes`, and `storage`
 on **every** run regardless of the `provision` input (spec §8.1) — that input exists for operator
-intent and log clarity, not as a gate. `bootstrap: true` is the actual gate: it is what skips
+intent and log clarity, not as a gate. Before that deploy, the job grants `roles/firebaserules.firestoreServiceAgent` to `service-<PROJECT_NUMBER>@gcp-sa-firebasestorage.iam.gserviceaccount.com`. `storage.rules` calls `firestore.exists` for a profile photo write, and `firebase deploy --non-interactive` does not grant this role. The binding is idempotent. The deploy service account needs permission to set the project IAM policy. `bootstrap: true` is the actual gate: it is what skips
 `content` (and, transitively, `build`/`hosting`/`post`/`smoke`) on this run. A dispatch run always deploys
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).
@@ -535,8 +535,9 @@ client already past step 3 never needs it again.
   before looking for a real fault. The one cost the CDN does not absorb is scanner traffic:
   requests for addresses that do not exist (`/wp-login.php` and its friends) each miss the cache
   and reach the function, where they cost one Firestore page lookup and return the plain shell.
-  That is a line on the functions invocation graph, not an incident; if a client's graph is
-  dominated by it, the answer is a Cloud Functions max-instances limit, not a rewrite change.
+  That is a line on the functions invocation graph. `routeMeta` sets `maxInstances` to 20
+  so that traffic stays bounded. The rewrite stays, because this function is the front door.
+  App Check stays off this function. A crawler and a first visit have no App Check token.
 - **The card image a deployment falls back to is a PNG, not the SVG placeholder.** The Open Graph
   and Twitter crawlers fetch the image themselves and do not reliably decode SVG, so a card built
   on `branding/og-default.svg` unfurls with an empty frame, which a reader takes for a broken link

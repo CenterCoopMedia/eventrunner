@@ -61,9 +61,12 @@ function makeAuth(signIns = { 'uid-ada': 'ada@example.com' }) {
     deleted: [],
     async verifyIdToken(token, checkRevoked = false) {
       if (!TOKENS[token]) throw new Error('invalid token');
-      // A token outlives its deleted sign-in unless the caller asks Auth to
-      // check the account, as submitChangeRequest does.
-      if (checkRevoked && !users.has(TOKENS[token].uid)) throw notFoundError();
+      // A token outlives deleteUser until the caller asks Auth to check the
+      // account. Only a uid this fake has removed is revoked. The admin
+      // account is not in the attendee sign-in map, and that absence is not
+      // a deleted account.
+      const uid = TOKENS[token].uid;
+      if (checkRevoked && auth.deleted.includes(uid)) throw notFoundError();
       return TOKENS[token];
     },
     async getUser(uid) {

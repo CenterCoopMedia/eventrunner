@@ -40,6 +40,25 @@ test('a verified domain exits 0 and stamps config/event.sender', async () => {
   assert.equal(event.sender.email, 'hello@example.org', 'the merge must not drop the address');
 });
 
+test('a pass does not stamp verification after the sender domain changes', async () => {
+  const db = dbWithSender('hello@example.org');
+  db.beforeCommit = async () => {
+    await db.collection('config').doc('event').set({
+      sender: { email: 'other@other.org', domainVerified: false, domainVerifiedAt: null },
+    });
+  };
+  const code = await run({
+    args: {},
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({ provider: { name: 'postmark', verifySenderDomain: async () => PASS }, db }),
+  });
+  assert.equal(code, 1);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.email, 'other@other.org');
+  assert.equal(sender.domainVerified, false);
+  assert.equal(sender.domainVerifiedAt, null);
+});
+
 test('an unverified domain exits 1 and stamps nothing', async () => {
   const db = dbWithSender('hello@example.org');
   const code = await run({
@@ -103,6 +122,66 @@ test('a provider with no domain API can still satisfy readiness, by operator att
   assert.equal(sender.domainVerified, true);
   assert.equal(sender.domainVerifiedBy, 'operator-attested', 'the record says whose word this is');
   assert.ok(sender.domainVerifiedAt);
+});
+
+test('an attestation with --no-write checks the configured domain and does not stamp', async () => {
+  const db = dbWithSender('hello@example.org');
+  const code = await run({
+    args: { attest: true, domain: 'example.org', 'no-write': true },
+    env: { EVENT_EMAIL_PROVIDER: 'webhook' },
+    deps: fakeDeps({ provider: { name: 'webhook' }, db }),
+  });
+  assert.equal(code, 0);
+  assert.equal((await db.collection('config').doc('event').get()).data().sender.domainVerified, false);
+});
+
+test('an attestation with --no-write still refuses a different domain', async () => {
+  const db = dbWithSender('hello@example.org');
+  const code = await run({
+    args: { attest: true, domain: 'other.example', 'no-write': true },
+    env: { EVENT_EMAIL_PROVIDER: 'webhook' },
+    deps: fakeDeps({ provider: { name: 'webhook' }, db }),
+  });
+  assert.equal(code, 2);
+  assert.equal((await db.collection('config').doc('event').get()).data().sender.domainVerified, false);
+});
+
+test('--domain must be a hostname and is stored in lowercase', async () => {
+  const db = dbWithSender('hello@example.org');
+  let asked = false;
+  const rejected = await run({
+    args: { domain: 'wrong@example.org' },
+    env: { EVENT_EMAIL_PROVIDER: 'postmark' },
+    deps: fakeDeps({
+      provider: { name: 'postmark', verifySenderDomain: async () => { asked = true; return PASS; } },
+      db,
+    }),
+  });
+  assert.equal(rejected, 2);
+  assert.equal(asked, false);
+  assert.equal((await db.collection('config').doc('event').get()).data().sender.domainVerified, false);
+
+  const code = await run({
+    args: { attest: true, domain: 'Example.ORG' },
+    env: { EVENT_EMAIL_PROVIDER: 'webhook' },
+    deps: fakeDeps({ provider: { name: 'webhook' }, db }),
+  });
+  assert.equal(code, 0);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.domainVerifiedDomain, 'example.org');
+});
+
+test('attestation refuses a domain that is not the configured sender domain', async () => {
+  const db = dbWithSender('hello@example.org');
+  const code = await run({
+    args: { attest: true, domain: 'other.example' },
+    env: { EVENT_EMAIL_PROVIDER: 'webhook' },
+    deps: fakeDeps({ provider: { name: 'webhook' }, db }),
+  });
+  assert.equal(code, 2);
+  const sender = (await db.collection('config').doc('event').get()).data().sender;
+  assert.equal(sender.domainVerified, false);
+  assert.equal(sender.email, 'hello@example.org');
 });
 
 test('a capable provider refuses --attest — its own check is the answer', async () => {

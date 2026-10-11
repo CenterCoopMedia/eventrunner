@@ -40,17 +40,21 @@ const NAMED_ENTITIES = {
 
 // Named ("&amp;") and numeric, decimal or hex ("&#38;", "&#x26;") entities.
 const ENTITY = /&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g;
+// String.fromCodePoint throws past this value. U+10FFFF is the last scalar.
+const MAX_CODE_POINT = 0x10ffff;
 
 /** Decode the entities a sanitized rich-text value can carry, without ever
  * building DOM (no innerHTML) — a plain string-in, string-out table lookup
- * plus a numeric-codepoint parse. An entity this table doesn't recognize
- * passes through unchanged rather than being guessed at or dropped. */
+ * plus a numeric-codepoint parse. An entity this table doesn't recognize,
+ * and a numeric entity past the last Unicode scalar, passes through
+ * unchanged rather than being guessed at or dropped. */
 function decodeEntities(value) {
   return value.replace(ENTITY, (match, body) => {
     if (body[0] === '#') {
       const isHex = body[1] === 'x' || body[1] === 'X';
       const codePoint = parseInt(body.slice(isHex ? 2 : 1), isHex ? 16 : 10);
-      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+      if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > MAX_CODE_POINT) return match;
+      return String.fromCodePoint(codePoint);
     }
     const decoded = NAMED_ENTITIES[body];
     return decoded !== undefined ? decoded : match;

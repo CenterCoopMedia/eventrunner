@@ -69,6 +69,25 @@ test('lookupByOrderNumber is an exact match on imported rows', async () => {
   assert.equal(await provider.lookupByOrderNumber('', ''), null);
 });
 
+test('lookupByOrderNumber returns only a valid ticket', async () => {
+  const db = makeFakeDb({
+    'tickets/tkt-ok': manualTicket('ord-42'),
+    'tickets/tkt-refunded': manualTicket('ord-42', { status: 'refunded' }),
+    'tickets/tkt-cancelled': manualTicket('ord-9', { status: 'cancelled' }),
+    'tickets/tkt-pending': manualTicket('ord-8', { status: 'pending_info' }),
+  });
+  const provider = createManualProvider({ db });
+
+  const found = await provider.lookupByOrderNumber('ord-42');
+  assert.deepEqual(found.map((ticket) => ticket.externalId), ['tkt-ok']);
+  assert.equal(await provider.lookupByOrderNumber('ord-9'), null);
+  assert.equal(await provider.lookupByOrderNumber('ord-8'), null);
+
+  // fetchOrder still returns the refunded row. A sync has to record that status.
+  const order = await provider.fetchOrder('ord-42');
+  assert.deepEqual(order.tickets.map((ticket) => ticket.externalId).sort(), ['tkt-ok', 'tkt-refunded']);
+});
+
 test('fetchOrder returns complete: true — a CSV row has no eventually-consistent state to wait out', async () => {
   const db = makeFakeDb({ 'tickets/tkt-1': manualTicket('ord-7') });
   const provider = createManualProvider({ db });

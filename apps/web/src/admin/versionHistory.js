@@ -222,7 +222,12 @@ export function restoreRequestFor(collection, docId, entry, current, { pageId = 
     return { endpoint: 'cmsSavePage', body: { page: { ...fields, id: docId, visible } } };
   }
   if (collection === 'cmsUpdates') {
-    return { endpoint: 'cmsSaveUpdate', body: { id: docId, update: fields, visible } };
+    // A deleted update has a tombstone. restore tells the save to clear
+    // it and write the draft. An update that is still there is an ordinary
+    // save, and that save must not carry the flag.
+    const body = { id: docId, update: fields, visible };
+    if (!current) body.restore = true;
+    return { endpoint: 'cmsSaveUpdate', body };
   }
 
   let target;

@@ -33,6 +33,8 @@ vi.mock('firebase/auth', () => ({
 }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })),

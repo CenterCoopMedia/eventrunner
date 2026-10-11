@@ -106,6 +106,11 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
     if (wanted && typeof data.email === 'string' && data.email.toLowerCase() !== wanted) {
       return { claimed: false, reason: 'email_mismatch' };
     }
+    // Refunded, cancelled, and not-yet-described tickets stay in the
+    // collection so a sync can record them. A claim is what marks the
+    // account ticketed and, when the flag is on, approved. Only a valid
+    // ticket may do that (issues #358, #359, #360).
+    if (data.status !== 'valid') return { claimed: false, reason: 'not_valid' };
     const at = now();
     tx.set(ref, { claimedByUid: uid, claimedAt: at, updatedAt: at }, { merge: true });
     return { claimed: true };
@@ -221,13 +226,17 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, getConfig, now 
       return;
     }
 
-    // Persist what the provider returned before claiming it: the claim is
-    // a write to `tickets/{externalId}`, so the document has to exist, and
-    // storing it is also how a later sync recognizes the ticket.
-    await upsertTickets({ db, tickets: found.tickets, providerName: provider.name, now, log });
+    // Persist what an external provider returned before claiming it: the
+    // claim writes `tickets/{externalId}`, so the document has to exist.
+    // A manual lookup already read that document. Writing the snapshot
+    // back can restore a refund that a CSV import stored after the read.
+    if (provider.name !== 'manual') {
+      await upsertTickets({ db, tickets: found.tickets, providerName: provider.name, now, log });
+    }
 
     const mine = found.tickets
       .filter((t) => typeof t?.email === 'string' && t.email.trim().toLowerCase() === email)
+      .filter((t) => t?.status === 'valid')
       .map((t) => t.externalId);
     if (mine.length === 0) {
       res.status(404).json(notFound);
@@ -299,6 +308,12 @@ function createCreateUserFromTicketHandler({ db, auth, getConfig, now = () => ne
       res.status(200).json({ ok: true, uid: ticket.claimedByUid, created: false, alreadyClaimed: true });
       return;
     }
+    if (ticket.status !== 'valid') {
+      res.status(409).json({
+        error: { code: 'conflict', message: 'Only a valid ticket can be claimed.' },
+      });
+      return;
+    }
     const email = typeof ticket.email === 'string' ? ticket.email.trim().toLowerCase() : '';
     if (!email) {
       res.status(422).json({
@@ -337,6 +352,22 @@ function createCreateUserFromTicketHandler({ db, auth, getConfig, now = () => ne
       db, uid: user.uid, email, externalIds: [externalId], getConfig, now,
     });
     if (result.claimed.length === 0) {
+      // The status check above is not the claim. A sync can refund the
+      // ticket after this request creates the account and before the
+      // claim transaction commits. Remove only an account this request
+      // just created. An account that already existed stays.
+      if (created && result.refused[0]?.reason === 'not_valid') {
+        try {
+          await db.collection(USERS).doc(user.uid).delete();
+        } catch (err) {
+          log.warn(`ticketing: could not remove the unclaimed account ${user.uid}`, err);
+        }
+        try {
+          await auth.deleteUser(user.uid);
+        } catch (err) {
+          log.warn(`ticketing: could not remove the unclaimed sign-in ${user.uid}`, err);
+        }
+      }
       log.warn(`ticketing: could not claim ${externalId} for ${user.uid}: ${result.refused[0]?.reason}`);
       res.status(409).json({
         error: { code: 'conflict', message: 'That ticket could not be claimed for this account.' },

@@ -9,8 +9,10 @@
 // The value comes from `users_public/{uid}.photoPath` — a projection of an
 // unvalidated client-written field. Two guards, both deliberate:
 //
-//   • uploaded photos must use `profile-photos/`. Bundled default avatars
-//     and fictional demo portraits do not read from the bucket.
+//   • an uploaded photo must be `profile-photos/{uid}/` for the account
+//     this card is showing. Another attendee's object is treated as no
+//     photo. Bundled default avatars and fictional demo portraits do not
+//     read from the bucket.
 //   • a load failure falls back to the initial. A deleted object, an offline
 //     bucket, and a path that was never uploaded all end the same way — a
 //     directory card that still reads correctly.
@@ -19,6 +21,7 @@
 // text beside it, so the stand-in is aria-hidden and a photo carries an
 // empty alt for the same reason.
 import { useEffect, useState } from 'react';
+import { isPublishablePhotoPath } from 'shared/profile';
 import { assetUrl, isDefaultAvatarPath, storagePath } from '../../lib/mediaSource.js';
 import { bundledDemoAssetUrl } from '../../lib/bundledAssets.js';
 import Avatar, { initialOf } from '../editorial/Avatar.jsx';
@@ -26,17 +29,21 @@ import Avatar, { initialOf } from '../editorial/Avatar.jsx';
 export { initialOf };
 
 /**
- * Uploaded photos use the owner-bound namespace. Default avatars and
+ * Uploaded photos use this account's own prefix. Default avatars and
  * fictional demo speaker portraits resolve only to bundled static assets.
- * Other paths are treated as missing photos.
+ * Another attendee's object, and any other path, is treated as no photo.
+ *
+ * @param {unknown} photoPath
+ * @param {string} [uid] the account this card belongs to
  */
-export function profilePhotoUrl(photoPath) {
+export function profilePhotoUrl(photoPath, uid) {
   if (typeof photoPath === 'string' && photoPath.startsWith('demo/speakers/')) {
     return bundledDemoAssetUrl(photoPath);
   }
   if (isDefaultAvatarPath(photoPath)) return assetUrl(photoPath);
+  if (!isPublishablePhotoPath(uid, photoPath)) return null;
   const path = storagePath(photoPath);
-  if (!path || !path.startsWith('profile-photos/')) return null;
+  if (!path) return null;
   return assetUrl(path);
 }
 
@@ -46,8 +53,8 @@ export function profilePhotoUrl(photoPath) {
  * attendee index — a list read one line per person, where a 48px frame
  * would set the row height and undo the compactness the index is for.
  */
-export default function ProfilePhoto({ photoPath, displayName, size = 'md', className = '' }) {
-  const url = profilePhotoUrl(photoPath);
+export default function ProfilePhoto({ photoPath, displayName, uid, size = 'md', className = '' }) {
+  const url = profilePhotoUrl(photoPath, uid);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {

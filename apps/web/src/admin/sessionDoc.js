@@ -1,5 +1,6 @@
-import { recordStateOf } from './recordState.js';
 import { formatDayDate } from '../lib/eventTime.js';
+import { lockEditorialId } from './editorialId.js';
+import { recordStateOf } from './recordState.js';
 
 const byTimeAndTitle = (a, b) =>
   String(a.current.startTime ?? '').localeCompare(String(b.current.startTime ?? ''))
@@ -91,6 +92,21 @@ export function mergeSessionRevisions(liveDocs, draftDocs, days = [], timeZone) 
         rows: flattened,
       };
     });
+}
+
+const RESERVED_SESSION_IDS = ['mine'];
+
+/**
+ * Allocate a session id once. A later title edit keeps the id already stored
+ * on the form, including one locked before a failed request.
+ * `mine` is reserved for the personal schedule route.
+ */
+export function lockSessionId(form, taken = []) {
+  const used = new Set(taken ?? []);
+  for (const id of RESERVED_SESSION_IDS) used.add(id);
+  const id = lockEditorialId(form?.id, form?.title, used, 'session');
+  if (id === form?.id) return form;
+  return { ...form, id };
 }
 
 export function sessionIdFromTitle(title) {

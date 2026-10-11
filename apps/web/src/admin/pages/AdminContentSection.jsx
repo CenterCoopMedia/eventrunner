@@ -4,13 +4,18 @@
 // (set in Pages) — offered only when the section allows at least one block
 // type, and disabled once the section is at its cap, same guardrail
 // AdminPageEditor's block picker applies to defaultBlocks.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import { blockTypeLabel } from '../blockTypes.js';
+import { contentBlockTitle } from '../contentDoc.js';
+import { byStoredOrder, orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
   DestructiveConfirm,
@@ -22,6 +27,12 @@ import {
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import {
+  OrderAnnouncement,
+  OrderDraftButtons,
+  ReorderControls,
+  bindReorderDrop,
+} from '../components/ReorderControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -37,14 +48,20 @@ export default function AdminContentSection() {
   const { findRow: findPage, loading: pagesLoading, ready: pagesReady } = useAdminPages();
   const { rows: contentRows, loading: contentLoading, ready: contentReady, error: contentError } = useAdminContent();
   const [busyId, setBusyId] = useState(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [spoken, setSpoken] = useState('');
   // Blocks published in THIS session: their proof tint resolves to the base
   // ground rather than vanishing (moment 1).
   const [resolvedIds, setResolvedIds] = useState(() => new Set());
+  const frameRef = useRef(null);
 
   const page = findPage(pageId);
   const section = (page?.current?.sections ?? []).find((candidate) => candidate.id === sectionId);
-  const blocks = contentRows.filter((row) => row.current?.section === sectionId);
+  const serverBlocks = byStoredOrder(contentRows.filter((row) => row.current?.section === sectionId));
+  const draft = useDraftOrder(serverBlocks);
+  const blocks = draft.rows;
+  const leaveGuard = useUnsavedNavigation(draft.dirty, { blocked: savingOrder || busyId !== null });
   const allowed = section?.allowedBlocks ?? [];
   const maxBlocks = Number.isFinite(section?.maxBlocks) ? section.maxBlocks : Infinity;
   // While either cmsContent revision is still loading, `blocks` can be an
@@ -53,7 +70,52 @@ export default function AdminContentSection() {
   // yet) — treating that as "under the cap" would let an operator start a
   // create past maxBlocks on a slow connection. Block the action instead of
   // guessing until both listeners have actually reported.
-  const atMax = !pagesReady || !contentReady || blocks.length >= maxBlocks;
+  const atMax = !pagesReady || !contentReady || serverBlocks.length >= maxBlocks;
+
+  useEffect(() => {
+    const node = frameRef.current;
+    if (!node) return undefined;
+    if (leaveGuard.pending) node.setAttribute('inert', '');
+    else node.removeAttribute('inert');
+    return () => node.removeAttribute('inert');
+  }, [leaveGuard.pending]);
+
+  function moveRow(from, to) {
+    if (!contentReady || savingOrder || busyId !== null) return false;
+    const label = contentBlockTitle(blocks[from]?.current);
+    const count = blocks.length;
+    const moved = draft.move(from, to);
+    if (moved) setSpoken(`${label} moved to position ${to + 1} of ${count}`);
+    return moved;
+  }
+
+  function cancelOrder() {
+    draft.cancel();
+    setSpoken('');
+  }
+
+  async function saveOrder() {
+    if (!contentReady) return;
+    const writes = ordersToWrite(blocks);
+    setSavingOrder(true);
+    setNotice(null);
+    const failed = await saveOrderWrites(
+      writes,
+      async ({ row, order }) => {
+        await call('cmsUpdateContent', {
+          section: sectionId,
+          field: row.current.field,
+          visible: row.current.visible !== false,
+          fields: { order },
+        });
+      },
+      (row) => contentBlockTitle(row.current),
+    );
+    const verdict = orderSaveMessage(failed);
+    setNotice(verdict);
+    showToast(verdict.message, verdict.tone === 'ok' ? { announce: false } : { tone: 'error', announce: false });
+    setSavingOrder(false);
+  }
 
   if ((pagesLoading || contentLoading) && !section) {
     return <AdminLoadingState label="Loading section…" />;
@@ -127,10 +189,10 @@ export default function AdminContentSection() {
     );
 
   return (
-    <div className="flex flex-col gap-md">
+    <div ref={frameRef} className="flex flex-col gap-md">
       <AdminPageHeader
         title={section?.label || sectionId}
-        identifiers={`${pageId} · ${sectionId} · ${blocks.length} block${
+        identifiers={`${page?.current?.label || pageId} · ${section?.label || sectionId} · ${blocks.length} block${
           blocks.length === 1 ? '' : 's'
         }`}
         description={`${page?.current?.label ?? pageId} · allows ${
@@ -138,6 +200,13 @@ export default function AdminContentSection() {
         }`}
         actions={
           <>
+            <OrderDraftButtons
+              dirty={draft.dirty}
+              saving={savingOrder}
+              saveDisabled={!contentReady}
+              onSave={saveOrder}
+              onCancel={cancelOrder}
+            />
             <Link to="../.." relative="path" className={linkButtonClass}>
               Back to content
             </Link>
@@ -146,6 +215,7 @@ export default function AdminContentSection() {
         }
       />
 
+      <OrderAnnouncement message={spoken} />
       {contentError ? (
         <Notice
           tone="caution"
@@ -163,24 +233,25 @@ export default function AdminContentSection() {
       ) : (
         <Panel flush>
           <ul>
-            {blocks.map((row) => (
+            {blocks.map((row, index) => {
+              const label = contentBlockTitle(row.current);
+              return (
               <li
                 key={row.id}
                 className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
                   row.state.id,
                   resolvedIds.has(row.id),
                 )}`}
+                {...(contentReady ? bindReorderDrop('content:', index, moveRow) : {})}
               >
                 <div className={rowClass}>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
-                      {/* A block's name is its field id, so the title keeps
-                          the data face the rest of the room sets ids in. */}
                       <Link
                         to={row.current.field}
-                        className={`${rowTitleLinkClass} font-admin-data`}
+                        className={rowTitleLinkClass}
                       >
-                        {row.current.field}
+                        {label}
                       </Link>
                       <RecordState state={row.state} />
                       <StatusBadge tone="info">{blockTypeLabel(row.current.blockType)}</StatusBadge>
@@ -190,14 +261,22 @@ export default function AdminContentSection() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-xs">
-                    {row.state.id !== 'live' ? (
+                    <ReorderControls
+                      label={label}
+                      index={index}
+                      count={blocks.length}
+                      dragToken={`content:${index}`}
+                      onMove={moveRow}
+                      disabled={!contentReady || savingOrder || busyId !== null}
+                    />
+                    {row.state.id !== 'live' && !draft.dirty ? (
                       <button
                         type="button"
                         className={secondaryButtonClass}
-                        disabled={busyId !== null}
+                        disabled={busyId !== null || savingOrder}
                         onClick={() => publishOne(row)}
                       >
-                        {busyId === row.id ? 'Publishing…' : 'Publish this block'}
+                        {busyId === row.id ? 'Publishing…' : 'Publish'}
                       </button>
                     ) : null}
                     <Link to={row.current.field} className={linkButtonClass}>
@@ -205,22 +284,31 @@ export default function AdminContentSection() {
                     </Link>
                     <DestructiveConfirm
                       trigger="Delete"
-                      title={`Delete ${row.current.field}`}
+                      title={`Delete ${contentBlockTitle(row.current)}`}
                       confirmLabel="Delete this block"
                       busyLabel="Deleting…"
                       busy={busyId === row.id}
                       disabled={busyId !== null}
-                      consequence={`The live revision of ${row.current.field} and its draft both go, and the section renders without it.`}
+                      consequence="The live revision and its draft both go, and the section renders without this block."
                       permanence="This cannot be undone."
                       onConfirm={() => remove(row)}
                     />
                   </div>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </Panel>
       )}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
     </div>
   );
 }

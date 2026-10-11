@@ -2,7 +2,8 @@
 // Pins the v1 rules from docs/adr/0001-event-platform-v1.md §8.5:
 //
 //   • `profile-photos/{uid}/**` is the ONLY client-writable namespace, and
-//     only for its owner, only for an image, only under 2 MiB;
+//     only for its owner, only while users/{uid} exists, only for an image,
+//     only under 2 MiB;
 //   • `cms-images/`, `branding/`, and `speaker-photos/` are fetchable but
 //     never writable by a client — their writers are admin-gated functions
 //     using the Admin SDK, which bypasses these rules;
@@ -25,6 +26,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
+import { doc, setDoc } from "firebase/firestore";
 import { deleteObject, getBytes, listAll, ref, uploadBytes } from "firebase/storage";
 
 const OWNER = "attendee-1";
@@ -72,6 +74,7 @@ function asUser(uid) {
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: "demo-run-of-show",
+    firestore: { rules: readFileSync("firestore.rules", "utf8") },
     storage: { rules: readFileSync("storage.rules", "utf8") },
   });
   await testEnv.withSecurityRulesDisabled(async (context) => {
@@ -79,6 +82,7 @@ beforeAll(async () => {
     for (const path of SEEDED) {
       await uploadBytes(ref(storage, path), bytes(), { contentType: "image/png" });
     }
+    await setDoc(doc(context.firestore(), "users", OWNER), { registrationStatus: "approved" });
   });
 });
 
@@ -160,6 +164,17 @@ describe("profile-photos/{uid} — the one client-writable namespace", () => {
 
   it("denies deleting another user's photo", async () => {
     await assertFails(deleteObject(ref(asUser(OTHER), `profile-photos/${OWNER}/avatar.png`)));
+  });
+
+  it("denies a matching uid whose account document is gone", async () => {
+    const gone = "deleted-1";
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await uploadBytes(ref(context.storage(), `profile-photos/${gone}/gone.png`), bytes(), {
+        contentType: "image/png",
+      });
+    });
+    await assertFails(put(asUser(gone), `profile-photos/${gone}/avatar.png`));
+    await assertFails(deleteObject(ref(asUser(gone), `profile-photos/${gone}/gone.png`)));
   });
 });
 

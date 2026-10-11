@@ -65,6 +65,11 @@ export const secondaryButtonClass =
   `${buttonBase} border-admin-rule-strong bg-admin-ground-raised font-medium text-admin-ink ` +
   'hover:border-admin-action-soft-hover hover:bg-admin-action-soft hover:text-admin-ink-link';
 
+/** A selected choice. It is pressed, not a commit, so it does not use the publish fill. */
+export const choiceButtonClass =
+  `${buttonBase} border-admin-action bg-admin-action-soft font-bold text-admin-ink ` +
+  'hover:border-admin-action-hover hover:bg-admin-action-soft';
+
 /**
  * Unavailable, for a control that must stay focusable to say why it does
  * nothing (`aria-disabled="true"`, its handler refusing every press): the

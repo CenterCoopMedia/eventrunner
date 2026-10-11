@@ -50,4 +50,36 @@ describe('useMyBookmarks', () => {
     expect(result.current.loading).toBe(false);
     expect(result.current.bookmarkedIds).toEqual(new Set(['s1']));
   });
+
+  it('clears bookmark ids when the signed-in account changes', () => {
+    let user = { uid: 'u1' };
+    function accountWrapper({ children }) {
+      return <AuthContext.Provider value={{ user }}>{children}</AuthContext.Provider>;
+    }
+    const { result, rerender } = renderHook(() => useMyBookmarks(), { wrapper: accountWrapper });
+    act(() => capturedOnNext(new Set(['s1'])));
+    expect(result.current.bookmarkedIds).toEqual(new Set(['s1']));
+
+    const previousOnNext = capturedOnNext;
+    user = { uid: 'u2' };
+    rerender();
+    expect(result.current.loading).toBe(true);
+    expect(result.current.bookmarkedIds).toEqual(new Set());
+
+    act(() => previousOnNext(new Set(['s1'])));
+    expect(result.current.bookmarkedIds).toEqual(new Set());
+
+    act(() => capturedOnError(new Error('permission denied')));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.bookmarkedIds).toEqual(new Set());
+
+    act(() => capturedOnNext(new Set(['s2'])));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.bookmarkedIds).toEqual(new Set(['s2']));
+
+    user = null;
+    rerender();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.bookmarkedIds).toEqual(new Set());
+  });
 });

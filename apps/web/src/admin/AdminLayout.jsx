@@ -359,6 +359,21 @@ function AdminDesk() {
       root.style.overflow = rootOverflow;
     };
   }, [wide, mobileDocketOpen]);
+  useEffect(() => {
+    if (wide || !mobileDocketOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const target = event.target;
+      // A dialog inside the sheet, including a nested media dialog, answers
+      // Escape first. The sheet stays open until that dialog is gone.
+      if (target instanceof Element && target.closest('dialog, [role="dialog"]')) return;
+      event.preventDefault();
+      setMobileDocketOpen(false);
+      mobileMenuRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [wide, mobileDocketOpen]);
   const endTour = () => {
     markTourDone(uid);
     setTour(null);

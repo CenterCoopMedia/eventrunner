@@ -402,6 +402,12 @@ const MAX_ROUTE_PATH_LENGTH = 4096;
  * unbounded query key.
  */
 const ROUTE_KEY_RE = /^[A-Za-z0-9_-]{1,128}$/;
+// Enough for an event's real readers. Scanner misses stay within this many copies.
+const ROUTE_META_MAX_INSTANCES = 20;
+
+function routeMetaRuntimeOptions(region) {
+  return { region, maxInstances: ROUTE_META_MAX_INSTANCES };
+}
 
 /**
  * The route path a request names, normalized: no query, no fragment, no
@@ -1012,9 +1018,15 @@ function buildHandlers() {
     updatesMeta: onRequest({ region }, withCors(async (req, res) => {
       await createUpdatesMetaHandler(buildDeps())(req, res);
     })),
-    routeMeta: onRequest({ region }, withCors(async (req, res) => {
-      await createRouteMetaHandler(buildDeps())(req, res);
-    }, ['GET', 'HEAD'])),
+    // Scanner paths miss the CDN and reach this catch-all. The cap keeps
+    // that traffic from scaling the function. App Check stays off: a
+    // crawler and a first visit have no token, and this is the first HTML.
+    routeMeta: onRequest(
+      routeMetaRuntimeOptions(region),
+      withCors(async (req, res) => {
+        await createRouteMetaHandler(buildDeps())(req, res);
+      }, ['GET', 'HEAD']),
+    ),
   };
 }
 
@@ -1044,6 +1056,8 @@ module.exports = {
     imageTypeFor,
     zoneOffset,
     ROUTE_CACHE_CONTROL,
+    ROUTE_META_MAX_INSTANCES,
+    routeMetaRuntimeOptions,
     TEMPLATE_FETCH_TIMEOUT_MS,
     DEFAULT_CARD_IMAGE,
   },

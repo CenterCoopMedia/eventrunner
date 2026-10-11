@@ -118,6 +118,7 @@ CI runs the trust checks and selected tiers on every pull request, credential-fr
 Pull requests run the trust checks (DCO and secret scanning) plus the smallest
 path-selected tier. The repository-owned `scripts/ci/classify-changes.cjs`
 classifier emits the selections; mixed changes take the union of their tiers.
+A pull request runs that classifier from the base commit, so the pull request cannot replace the rules that select the security tiers.
 The `CI gate` job is the stable aggregate check for branch protection. A job
 that the classifier did not select is expected to be skipped. Merges do not
 repeat the matrix that passed on the pull request. Deployment verification

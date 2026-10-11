@@ -39,7 +39,7 @@ async function openPhoneProof(page) {
   await expect(page.getByLabel('Site style')).toHaveValue('civic');
   await page.getByRole('button', { name: 'Page style', exact: true }).click();
   await expect(page.getByLabel('Site style')).toBeVisible();
-  await page.getByRole('button', { name: 'Phone (390px)' }).click();
+  await page.getByRole('button', { name: 'Phone', exact: true }).click();
   const iframe = page.locator('iframe[title="Home preview, light mode, 390px wide"]');
   await expect(iframe).toBeVisible();
   return iframe;
@@ -101,10 +101,7 @@ test('phone proof uses its own viewport and public inheritance for every theme a
   for (const theme of THEMES) {
     await page.getByLabel('Site style').selectOption(theme);
     for (const mode of ['light', 'dark']) {
-      await page.getByRole('button', {
-        name: mode === 'light' ? 'Light' : 'Dark',
-        exact: true,
-      }).click();
+      await page.getByLabel('Mode', { exact: true }).selectOption(mode);
       iframe = page.locator(
         `iframe[title="Home preview, ${mode} mode, 390px wide"]`,
       );
@@ -151,7 +148,7 @@ test('phone proof uses its own viewport and public inheritance for every theme a
       // The long title and dense schedule are the preview's two hostile
       // fixtures. Exercise both while every theme/mode pair is active so a
       // preset cannot pass on the short demo copy alone.
-      await page.getByRole('button', { name: 'Stress test' }).click();
+      await page.getByRole('checkbox', { name: 'Stress test' }).check();
       const stressedHome = page.frameLocator(
         `iframe[title="Home preview, ${mode} mode, 390px wide"]`,
       );
@@ -163,7 +160,7 @@ test('phone proof uses its own viewport and public inheritance for every theme a
         scrollWidth: element.contentDocument.documentElement.scrollWidth,
       }))).toEqual({ clientWidth: 390, scrollWidth: 390 });
 
-      await page.getByRole('button', { name: 'Schedule' }).click();
+      await page.getByLabel('Page', { exact: true }).selectOption('schedule');
       const stressedSchedule = page.frameLocator(
         `iframe[title="Schedule preview, ${mode} mode, 390px wide"]`,
       );
@@ -188,8 +185,8 @@ test('phone proof uses its own viewport and public inheritance for every theme a
         scrollWidth: element.contentDocument.documentElement.scrollWidth,
       }))).toEqual({ clientWidth: 390, scrollWidth: 390 });
 
-      await page.getByRole('button', { name: 'Home' }).click();
-      await page.getByRole('button', { name: 'Real content' }).click();
+      await page.getByLabel('Page', { exact: true }).selectOption('home');
+      await page.getByRole('checkbox', { name: 'Stress test' }).uncheck();
     }
   }
 
@@ -256,7 +253,7 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
 
   await page.getByRole('button', { name: 'Actual size' }).click();
   expect(await iframe.evaluate((element) => element.contentWindow.innerWidth)).toBe(390);
-  await page.getByRole('button', { name: 'Compare light and dark' }).click();
+  await page.getByLabel('Mode', { exact: true }).selectOption('compare');
   for (const mode of ['light', 'dark']) {
     const compared = page.locator(`iframe[title="Home preview, ${mode} mode, 390px wide"]`);
     await expect(compared).toBeVisible();
@@ -266,10 +263,10 @@ test('phone proof matches the public phone geometry and uses the narrow Schedule
       scrollWidth: element.contentDocument.documentElement.scrollWidth,
     }))).toEqual({ innerWidth: 390, clientWidth: 390, scrollWidth: 390 });
   }
-  await page.getByRole('button', { name: 'Light', exact: true }).click();
+  await page.getByLabel('Mode', { exact: true }).selectOption('light');
 
   await page.getByLabel('Site style').selectOption('newsroom');
-  await page.getByRole('button', { name: 'Schedule' }).click();
+  await page.getByLabel('Page', { exact: true }).selectOption('schedule');
   const scheduleFrame = page.frameLocator(
     'iframe[title="Schedule preview, light mode, 390px wide"]',
   );
@@ -298,8 +295,8 @@ test('a light proof keeps public inheritance inside a dark admin', async ({ page
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/branding');
     await expect(page.locator('html')).toHaveAttribute('data-mode', 'dark');
-    await page.getByRole('button', { name: 'Phone (390px)' }).click();
-    await page.getByRole('button', { name: 'Light', exact: true }).click();
+    await page.getByRole('button', { name: 'Phone', exact: true }).click();
+    await page.getByLabel('Mode', { exact: true }).selectOption('light');
 
     const iframe = page.locator('iframe[title="Home preview, light mode, 390px wide"]');
     await expect(iframe).toBeVisible();

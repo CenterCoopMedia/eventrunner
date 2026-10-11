@@ -106,6 +106,8 @@ function contentFieldsOf(data) {
  * two concurrent creates cannot both win: the loser gets an ALREADY_EXISTS
  * rejection (see isAlreadyExistsError) instead of silently clobbering the
  * first writer's draft. An existing draft is refused before writing.
+ * `rejectLive` is the page-create case: a live doc with no draft still owns
+ * the id, and forking a draft from it would replace that page on publish.
  *
  * Pass `tx` to make this write part of the CALLER'S transaction. That is
  * what the session-save seam needs (spec §4.3 rule 1): validating
@@ -124,14 +126,14 @@ function contentFieldsOf(data) {
  *           collection: string,
  *           docId: string, fields: object, visible?: boolean,
  *           actor: { uid: string, email: string }, now?: () => number,
- *           createOnly?: boolean }} args
+ *           createOnly?: boolean, rejectLive?: boolean }} args
  * @returns {Promise<{ docPath: string, existed: boolean }>}
  */
-async function writeDraft({ db, tx = null, collection, docId, fields, visible, actor, now = Date.now, createOnly = false }) {
+async function writeDraft({ db, tx = null, collection, docId, fields, visible, actor, now = Date.now, createOnly = false, rejectLive = false }) {
   const draftCol = draftCollectionFor(collection);
   if (!tx) {
     return db.runTransaction((ownedTx) => writeDraft({
-      db, tx: ownedTx, collection, docId, fields, visible, actor, now, createOnly,
+      db, tx: ownedTx, collection, docId, fields, visible, actor, now, createOnly, rejectLive,
     }));
   }
   const ref = db.collection(draftCol).doc(docId);
@@ -148,6 +150,11 @@ async function writeDraft({ db, tx = null, collection, docId, fields, visible, a
     priorVisible = prior.visible !== false;
   } else {
     const liveSnap = await tx.get(db.collection(collection).doc(docId));
+    // A brand-new page must not fork a draft from a live doc that already
+    // owns this id. createOnly alone only protects the draft slot.
+    if (createOnly && rejectLive && liveSnap.exists) {
+      throw new Error(`ALREADY_EXISTS: ${collection}/${docId}`);
+    }
     if (liveSnap.exists) {
       const live = liveSnap.data();
       basedOnRevision = typeof live.revision === 'number' ? live.revision : null;

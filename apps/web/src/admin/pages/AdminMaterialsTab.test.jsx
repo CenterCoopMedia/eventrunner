@@ -282,6 +282,29 @@ describe('AdminMaterialsTab: selection and the archive', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Workshop.zip' })).not.toBeChecked();
   });
 
+  it('says what delete does for a link, a browser upload, and a shared file', async () => {
+    const managed = { ...file('m6', 's1', 'Upload.pdf', 'approved'), managedStorageObject: true };
+    handlers.listAllSessionMaterials = () => ok({
+      materials: [
+        file('m1', 's1', 'Slides.pdf', 'pending'),
+        link('m2', 's1', 'Deck', 'https://example.org/deck', 'approved'),
+        managed,
+      ],
+      truncated: false,
+    });
+    renderTab();
+    await screen.findByText('Upload.pdf', { selector: 'td p' });
+
+    const open = (name) => {
+      fireEvent.click(within(rowOf(name)).getByRole('button', { name: 'Delete' }));
+      return within(rowOf(name));
+    };
+    expect(open('Deck').getByText(/the page at that address stays/)).toBeTruthy();
+    expect(open('Upload.pdf').getByText(/its stored file is deleted/)).toBeTruthy();
+    expect(open('Slides.pdf').getByText(/the stored file stays/)).toBeTruthy();
+    expect(screen.queryByText(/anyone holding its link gets nothing/)).toBeNull();
+  });
+
   it('a deleted material leaves the selection after the reload', async () => {
     await renderLoaded();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Slides.pdf' }));

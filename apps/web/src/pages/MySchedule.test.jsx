@@ -1,7 +1,7 @@
 // MySchedule — personal schedule view at /schedule/mine (issue #16). No
 // Firebase, no network (spec §8.1); useMyBookmarks is mocked directly so
 // tests drive the bookmarked-id set without a Firestore listener.
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -16,12 +16,18 @@ vi.mock('../hooks/useMyBookmarks.js', () => ({
   useMyBookmarks: () => useMyBookmarksMock(),
 }));
 
+// During day one of the 2099 fixture. A later value checks the open page.
+const clockHolder = { now: new Date('2099-10-15T16:00:00Z') };
+vi.mock('../hooks/useEventClock.js', () => ({
+  useEventClock: () => clockHolder.now,
+}));
+
 const fixtureConfig = {
   name: '[Fixture] Lakeshore Docs Camp',
   timezone: 'America/Chicago',
   days: [
-    { id: 'fx-day-1', label: 'Day one', date: '2026-10-15' },
-    { id: 'fx-day-2', label: 'Day two', date: '2026-10-16' },
+    { id: 'fx-day-1', label: 'Day one', date: '2099-10-15' },
+    { id: 'fx-day-2', label: 'Day two', date: '2099-10-16' },
   ],
   // A surveyed venue: three places, and ONE recorded move between two of
   // them. The gaps are the point — hall → lab is recorded, lab → annex is
@@ -104,18 +110,16 @@ const fixtureSessions = [
   },
 ];
 
-function renderMySchedule({
+function myScheduleElement({
   features = { schedule: true, sessionBookmarks: true },
   auth = { user: { uid: 'u1' }, loading: false },
   profile = { attendeeAccess: true },
-  bookmarkedIds = new Set(),
-  bookmarksLoading = false,
+  eventConfig = fixtureConfig,
 } = {}) {
-  useMyBookmarksMock.mockReturnValue({ bookmarkedIds, loading: bookmarksLoading });
-  return render(
+  return (
     <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <EventConfigContext.Provider
-        value={{ eventConfig: fixtureConfig, features, theme: {}, badges: null, source: 'snapshot' }}
+        value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >
         <AuthContext.Provider value={auth}>
           <ProfileContext.Provider value={profile}>
@@ -137,11 +141,24 @@ function renderMySchedule({
           </ProfileContext.Provider>
         </AuthContext.Provider>
       </EventConfigContext.Provider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
+function renderMySchedule({
+  bookmarkedIds = new Set(),
+  bookmarksLoading = false,
+  ...options
+} = {}) {
+  useMyBookmarksMock.mockReturnValue({ bookmarkedIds, loading: bookmarksLoading });
+  return render(myScheduleElement(options));
+}
+
 describe('MySchedule', () => {
+  beforeEach(() => {
+    clockHolder.now = new Date('2099-10-15T16:00:00Z');
+  });
+
   it('is hidden when config/features.sessionBookmarks is off', () => {
     renderMySchedule({ features: { schedule: true, sessionBookmarks: false } });
     expect(
@@ -194,6 +211,37 @@ describe('MySchedule', () => {
     // Both day headings render since each has a bookmarked session.
     expect(screen.getByRole('heading', { level: 2, name: /Day one/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: /Day two/ })).toBeInTheDocument();
+  });
+
+  it('keeps a past day on the page and takes off its live controls', () => {
+    renderMySchedule({
+      bookmarkedIds: new Set(['fx-early']),
+      features: { schedule: true, sessionBookmarks: true, icsExport: true },
+      eventConfig: {
+        ...fixtureConfig,
+        days: [
+          { id: 'fx-day-1', label: 'Day one', date: '2020-01-01' },
+          { id: 'fx-day-2', label: 'Day two', date: '2020-01-02' },
+        ],
+      },
+    });
+    expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Morning kickoff' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
+  });
+
+  it('drops row controls when the open page clock passes the day end', () => {
+    const options = {
+      bookmarkedIds: new Set(['fx-early']),
+      features: { schedule: true, sessionBookmarks: true, icsExport: true },
+    };
+    const view = renderMySchedule(options);
+    expect(screen.getByRole('button', { name: 'Add to calendar' })).toBeInTheDocument();
+    clockHolder.now = new Date('2099-10-16T06:00:00Z');
+    view.rerender(myScheduleElement(options));
+    expect(screen.getByRole('heading', { level: 3, name: '[Fixture] Morning kickoff' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add to calendar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /bookmark/i })).toBeNull();
   });
 
   it('omits a day heading entirely when it has no bookmarked sessions', () => {

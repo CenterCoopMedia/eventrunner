@@ -13,6 +13,54 @@ const PLACE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const EMPTY_REFERENCES = Object.freeze([]);
 const EMPTY_MAP = Object.freeze({ image: '', alt: '', markers: EMPTY_REFERENCES });
 
+/**
+ * A place that kept its old id while it collided can take those references
+ * once its current id belongs to no other row. Two places waiting on the
+ * same old id stay put.
+ */
+function collectReleasedRefs(nextPlaces, movements, markers) {
+  const idCount = new Map();
+  nextPlaces.forEach((entry) => {
+    if (!entry.id) return;
+    idCount.set(entry.id, (idCount.get(entry.id) ?? 0) + 1);
+  });
+  const waiting = new Map();
+  const ready = [];
+  nextPlaces.forEach((entry) => {
+    if (entry.persisted || !entry.refId || !entry.id || entry.refId === entry.id) return;
+    if (idCount.get(entry.id) !== 1 || idCount.has(entry.refId)) return;
+    waiting.set(entry.refId, (waiting.get(entry.refId) ?? 0) + 1);
+    ready.push(entry);
+  });
+  const moves = ready.filter((entry) => waiting.get(entry.refId) === 1);
+  if (moves.length === 0) return null;
+  const nextIdFor = (id) => {
+    const match = moves.find((entry) => entry.refId === id);
+    return match ? match.id : id;
+  };
+  const released = {
+    places: nextPlaces.map((entry) => (
+      moves.includes(entry) ? { ...entry, refId: entry.id } : entry
+    )),
+  };
+  if (movements.some((movement) => moves.some((entry) => (
+    movement.from === entry.refId || movement.to === entry.refId
+  )))) {
+    released.movements = movements.map((movement) => ({
+      ...movement,
+      from: nextIdFor(movement.from),
+      to: nextIdFor(movement.to),
+    }));
+  }
+  if (markers.some((marker) => moves.some((entry) => marker.placeId === entry.refId))) {
+    released.markers = markers.map((marker) => ({
+      ...marker,
+      placeId: nextIdFor(marker.placeId),
+    }));
+  }
+  return released;
+}
+
 // `persisted`, `idTouched`, and `refId` are the form's own flags, never
 // stored: venueReferencesPayload sends id, name, and floor only. A new
 // place's id follows its name until `idTouched` says somebody typed in the id
@@ -298,15 +346,21 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
    * id as it stands. Clearing a name or an id before typing its replacement
    * empties the id for a moment; the references wait on the old id and move
    * when the next one arrives. Nothing moves from an id another row also
-   * carries, because then there is no one place the references mean.
+   * carries, and nothing moves onto an id another row already carries.
+   * Either way there is no one place the references mean. A colliding id
+   * does not become `refId`. The held references move when this row gets a
+   * unique id, or when another row leaves so this id is the only one.
    */
   const changePlace = (index, patch) => {
     const place = places[index];
     const nextId = patch.id;
     const idChanges = !place.persisted && typeof nextId === 'string' && nextId !== place.id;
     const refId = place.refId || place.id;
+    const sameIdAs = (id) => places.some(
+      (other, otherIndex) => otherIndex !== index && other.id === id,
+    );
     const next = { ...place, ...patch };
-    if (idChanges) next.refId = nextId || refId;
+    if (idChanges) next.refId = sameIdAs(nextId) ? refId : (nextId || refId);
     const change = {
       places: places.map((entry, placeIndex) => (placeIndex === index ? next : entry)),
     };
@@ -314,7 +368,8 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
       && refId
       && nextId
       && nextId !== refId
-      && !places.some((other, otherIndex) => otherIndex !== index && other.id === refId);
+      && !sameIdAs(refId)
+      && !sameIdAs(nextId);
     if (idMoves) {
       const follow = (id) => (id === refId ? nextId : id);
       if (movements.some((movement) => movement.from === refId || movement.to === refId)) {
@@ -330,6 +385,16 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
           markers: markers.map((marker) => ({ ...marker, placeId: follow(marker.placeId) })),
         };
       }
+    }
+    const released = collectReleasedRefs(
+      change.places,
+      change.movements ?? movements,
+      change.map ? change.map.markers : markers,
+    );
+    if (released) {
+      change.places = released.places;
+      if (released.movements) change.movements = released.movements;
+      if (released.markers) change.map = { ...(change.map ?? map), markers: released.markers };
     }
     onChange(change);
   };
@@ -347,14 +412,21 @@ export default function VenueReferenceEditor({ venue, onChange, errorFor, placeU
     const removedMovements = movements.filter(
       (movement) => movement.from === place.id || movement.to === place.id,
     ).length;
+    const nextPlaces = places.filter((_, placeIndex) => placeIndex !== index);
+    const nextMovements = movements.filter(
+      (movement) => movement.from !== place.id && movement.to !== place.id,
+    );
+    const nextMarkers = markers.filter((marker) => marker.placeId !== place.id);
+    const released = collectReleasedRefs(nextPlaces, nextMovements, nextMarkers);
     onChange({
-      places: places.filter((_, placeIndex) => placeIndex !== index),
-      movements: movements.filter(
-        (movement) => movement.from !== place.id && movement.to !== place.id,
-      ),
+      places: released ? released.places : nextPlaces,
+      movements: released && released.movements ? released.movements : nextMovements,
       // A marker for a room that is going leaves a coordinate pointing at
       // nothing, which the server refuses by name. It goes with the room.
-      map: { ...map, markers: markers.filter((marker) => marker.placeId !== place.id) },
+      map: {
+        ...map,
+        markers: released && released.markers ? released.markers : nextMarkers,
+      },
     });
     const removedMarker = markers.some((marker) => marker.placeId === place.id);
     const alsoGoing = [

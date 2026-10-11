@@ -115,13 +115,17 @@ test('deleting the auth account deletes the account document', async () => {
   assert.deepEqual(db.writes, [{ type: 'delete', path: 'users/u1' }]);
 });
 
-test('a deleted account with no document still has its projection removed', async () => {
-  // No users doc means no projection trigger will fire, so a projection
-  // left behind would stay readable in the directory forever.
-  const db = fakeDb({ 'users_public/u1': { uid: 'u1', displayName: 'Rae' } });
+test('a deleted account with no document still has its projection and public schedule removed', async () => {
+  // No users doc means no projection trigger will fire. The public profile
+  // and the shared schedule would stay readable. Issue #350.
+  const db = fakeDb({
+    'users_public/u1': { uid: 'u1', displayName: 'Rae' },
+    'schedule_shares/u1': { sessionIds: ['s1'], scheduleVisibility: 'public', displayName: 'Rae' },
+  });
   const result = await createOnUserDeleted({ db })({ uid: 'u1' });
   assert.equal(result.deleted, false);
   assert.equal(db.docs.has('users_public/u1'), false);
+  assert.equal(db.docs.has('schedule_shares/u1'), false);
 });
 
 test('onUserDeleted without a uid writes nothing', async () => {

@@ -82,6 +82,18 @@ test('scrubLinkLabel: URL-shaped label becomes "External link"', () => {
   assert.equal(scrubLinkLabel('docs.example.org/secret-deck'), 'External link');
 });
 
+test('scrubLinkLabel catches a protocol-relative label and a host with a query', () => {
+  assert.equal(looksLikeUrl('//docs.example.org/secret-deck'), true);
+  assert.equal(looksLikeUrl('//docs.example.org?token=secret'), true);
+  assert.equal(looksLikeUrl('docs.example.org?token=secret'), true);
+  assert.equal(looksLikeUrl('docs.example.org#token=secret'), true);
+  assert.equal(scrubLinkLabel('//docs.example.org/secret-deck'), 'External link');
+  assert.equal(scrubLinkLabel('docs.example.org?token=secret'), 'External link');
+  assert.equal(scrubLinkLabel('docs.example.org#token=secret'), 'External link');
+  assert.equal(scrubLinkLabel('Workshop slides'), 'Workshop slides');
+  assert.equal(looksLikeUrl('Q&A notes from day 1'), false);
+});
+
 test('scrubLinkLabel: empty label becomes "External link"', () => {
   assert.equal(scrubLinkLabel(''), 'External link');
   assert.equal(scrubLinkLabel('   '), 'External link');

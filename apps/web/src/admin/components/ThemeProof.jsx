@@ -69,8 +69,10 @@ import {
   releaseThemePreviewTarget,
 } from '../themePreview.js';
 import {
+  CheckboxField,
   Notice,
-  primaryButtonClass,
+  SelectField,
+  choiceButtonClass,
   rowMetaClass,
   secondaryButtonClass,
 } from './formControls.jsx';
@@ -350,7 +352,7 @@ function PreviewFrame({ path, scopeId, onReady, width, height, scale, identifica
   );
 }
 
-/** A row of toggle buttons that reads as one control to a screen reader. */
+/** A short set of pressed choices. The selected one is not a publish button. */
 function ControlGroup({ label, options, value, onChange }) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap items-center gap-2xs">
@@ -359,7 +361,7 @@ function ControlGroup({ label, options, value, onChange }) {
           key={option.value}
           type="button"
           aria-pressed={value === option.value}
-          className={value === option.value ? primaryButtonClass : secondaryButtonClass}
+          className={value === option.value ? choiceButtonClass : secondaryButtonClass}
           onClick={() => onChange(option.value)}
         >
           {option.label}
@@ -379,6 +381,7 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   const [stress, setStress] = useState(false);
   const [compare, setCompare] = useState(false);
   const [columnWidth, setColumnWidth] = useState(0);
+  const [fontEpoch, setFontEpoch] = useState(0);
 
   const viewport =
     PREVIEW_VIEWPORTS.find((entry) => entry.id === viewportId) ?? PREVIEW_VIEWPORTS[0];
@@ -476,7 +479,45 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
     [realConfig, stress, stressConfig, themeDoc],
   );
 
-  const warnings = useMemo(() => themeFallbackWarnings(themeDoc), [themeDoc]);
+  // The warning reads the preview document, not the admin page. Fonts in
+  // that document finish after the first paint, so the same theme is judged
+  // again when a frame loads, swaps, or reports loading, loadingdone, or
+  // loadingerror. Compare mode has two documents; both have to be ready.
+  const previewDocuments = useMemo(
+    () => [
+      frameRoot?.ownerDocument,
+      compare ? compareRoot?.ownerDocument : null,
+    ].filter(Boolean),
+    [frameRoot, compareRoot, compare],
+  );
+  useEffect(() => {
+    const bump = () => setFontEpoch((value) => value + 1);
+    const stops = [];
+    for (const doc of previewDocuments) {
+      const fonts = doc.fonts;
+      if (!fonts?.addEventListener) continue;
+      for (const type of ['loading', 'loadingdone', 'loadingerror']) {
+        fonts.addEventListener(type, bump);
+        stops.push(() => fonts.removeEventListener(type, bump));
+      }
+      let current = true;
+      fonts.ready?.then?.(() => {
+        if (current) bump();
+      });
+      stops.push(() => {
+        current = false;
+      });
+    }
+    return () => {
+      for (const stop of stops) stop();
+    };
+  }, [previewDocuments]);
+  const warnings = useMemo(() => {
+    // The document object stays the same when a face finishes loading.
+    // fontEpoch is the signal that its font set changed.
+    void fontEpoch;
+    return themeFallbackWarnings(themeDoc, { documents: previewDocuments });
+  }, [themeDoc, previewDocuments, fontEpoch]);
 
   // Which pages can be offered depends on what the frame is showing: session
   // detail needs a session to open. The frame follows the same content, so
@@ -521,24 +562,26 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
 
   return (
     <div ref={columnRef} className="flex min-w-0 flex-col gap-xs">
-      <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rule-hairline border-b-admin-hairline pb-2xs">
+      <div className="flex flex-wrap items-end gap-xs border-admin-rule-hairline border-b-admin-hairline pb-2xs">
         <h2 className="font-admin-ui text-admin-lg font-bold text-admin-ink">Page preview</h2>
-        <ControlGroup
-          label="Page to preview"
-          value={page.id}
-          onChange={setPageId}
-          options={offeredPages.map((entry) => ({ value: entry.id, label: entry.label }))}
-        />
+        <div className="min-w-[12rem] flex-1">
+          <SelectField
+            label="Page"
+            value={page.id}
+            onChange={setPageId}
+            options={offeredPages.map((entry) => ({ value: entry.id, label: entry.label }))}
+          />
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-xs">
+      <div className="flex flex-wrap items-end gap-xs">
         <ControlGroup
           label="Width to preview"
           value={viewportId}
           onChange={setViewportId}
           options={PREVIEW_VIEWPORTS.map((entry) => ({
             value: entry.id,
-            label: `${entry.label} (${entry.width}px)`,
+            label: entry.label,
           }))}
         />
         <ControlGroup
@@ -552,32 +595,26 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
         />
         {/* Two previews of the same forme. Switching re-renders instantly,
             with no animation, because wayfinding is instant (§2.2). */}
-        <ControlGroup
-          label="Mode to preview"
-          value={compare ? 'compare' : mode}
-          onChange={(value) => {
-            if (value === 'compare') {
-              setCompare(true);
-              return;
-            }
-            setCompare(false);
-            onModeChange(value);
-          }}
-          options={[
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-            { value: 'compare', label: 'Compare light and dark' },
-          ]}
-        />
-        <ControlGroup
-          label="Content to preview"
-          value={stress}
-          onChange={setStress}
-          options={[
-            { value: false, label: 'Real content' },
-            { value: true, label: 'Stress test' },
-          ]}
-        />
+        <div className="min-w-[12rem] flex-1">
+          <SelectField
+            label="Mode"
+            value={compare ? 'compare' : mode}
+            onChange={(value) => {
+              if (value === 'compare') {
+                setCompare(true);
+                return;
+              }
+              setCompare(false);
+              onModeChange(value);
+            }}
+            options={[
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+              { value: 'compare', label: 'Compare light and dark' },
+            ]}
+          />
+        </div>
+        <CheckboxField label="Stress test" checked={stress} onChange={setStress} />
       </div>
 
       {stress ? (

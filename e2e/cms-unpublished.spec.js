@@ -27,8 +27,8 @@ async function heroPageId() {
 /** Open the hero subtitle's block editor, change its value, and save a draft. */
 async function saveSubtitle(page, pageId, value) {
   await page.goto(`/admin/content/${pageId}/hero/subtitle`);
-  await expect(page.getByRole('heading', { level: 1, name: 'subtitle' })).toBeVisible();
-  const field = page.getByLabel(/^value/);
+  const field = page.getByLabel('Text', { exact: true });
+  await expect(field).toBeVisible();
   // The editor adopts the stored block once both listeners answer; typing
   // before that would be overwritten.
   await expect(field).not.toHaveValue('');

@@ -491,6 +491,111 @@ export function isFontAvailable(family) {
   }
 }
 
+/** "400 700" covers both ends. One number, or a CSS name, is that one weight. */
+function weightsInSpec(value) {
+  const raw = String(value || '400').trim().toLowerCase();
+  if (raw === 'normal') return [400];
+  if (raw === 'bold') return [700];
+  const parts = raw.split(/\s+/).map(Number).filter((part) => Number.isFinite(part));
+  if (parts.length === 0) return [400];
+  if (parts.length === 1) return [parts[0]];
+  return [parts[0], parts[parts.length - 1]];
+}
+
+function faceCoversWeight(face, weight) {
+  const spec = weightsInSpec(face?.weight);
+  if (spec.length === 1) return spec[0] === weight;
+  return weight >= spec[0] && weight <= spec[1];
+}
+
+/**
+ * Weights the preview document declares for this family.
+ * null means the styles could not be read. An empty list means no bundled face.
+ */
+function declaredFontWeights(doc, family) {
+  const sheets = doc?.styleSheets;
+  if (!sheets) return null;
+  const found = new Set();
+  let readable = false;
+  for (const sheet of sheets) {
+    let rules;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    if (!rules) continue;
+    readable = true;
+    for (const rule of rules) {
+      if (rule?.type !== 5 || !rule.style?.getPropertyValue) continue;
+      const declared = rule.style.getPropertyValue('font-family').replace(/["']/g, '').trim();
+      if (declared !== family) continue;
+      for (const weight of weightsInSpec(rule.style.getPropertyValue('font-weight'))) {
+        found.add(weight);
+      }
+    }
+  }
+  if (!readable) return null;
+  return [...found].sort((a, b) => a - b);
+}
+
+function facesFor(fonts, family) {
+  const list = [];
+  if (typeof fonts?.forEach !== 'function') return list;
+  fonts.forEach((face) => {
+    const name = String(face?.family || '').replace(/["']/g, '').trim();
+    if (name === family) list.push(face);
+  });
+  return list;
+}
+
+/**
+ * ready: every requested weight can paint.
+ * loading: a requested weight is downloading and has not failed.
+ * unavailable: a requested weight failed, or a loaded face still cannot paint.
+ * An unloaded face has not been requested. check() does not start that
+ * download, so it is not a warning.
+ * A missing Font Loading API cannot support a warning, so it counts as ready.
+ */
+function documentFontState(doc, family) {
+  const fonts = doc?.fonts;
+  if (!fonts || typeof fonts.check !== 'function') return { state: 'ready' };
+  const declared = declaredFontWeights(doc, family);
+  const weights = declared === null ? [400] : declared;
+  if (weights.length === 0) return { state: 'ready' };
+  const loading = [];
+  const missing = [];
+  for (const weight of weights) {
+    let ready = true;
+    try {
+      ready = fonts.check(`${weight} 16px "${family}"`);
+    } catch {
+      return { state: 'ready' };
+    }
+    if (ready) continue;
+    const faces = facesFor(fonts, family).filter((face) => faceCoversWeight(face, weight));
+    if (faces.some((face) => face.status === 'error')) missing.push(weight);
+    else if (faces.some((face) => face.status === 'loading')) loading.push(weight);
+    else if (faces.some((face) => face.status === 'loaded')) missing.push(weight);
+  }
+  if (missing.length > 0) return { state: 'unavailable', weights: missing };
+  if (loading.length > 0) return { state: 'loading', weights: loading };
+  return { state: 'ready' };
+}
+
+function combineFontState(documents, family) {
+  const loading = new Set();
+  const missing = new Set();
+  for (const doc of documents) {
+    const result = documentFontState(doc, family);
+    if (result.state === 'unavailable') result.weights.forEach((weight) => missing.add(weight));
+    else if (result.state === 'loading') result.weights.forEach((weight) => loading.add(weight));
+  }
+  if (missing.size > 0) return { state: 'unavailable', weights: [...missing].sort((a, b) => a - b) };
+  if (loading.size > 0) return { state: 'loading', weights: [...loading].sort((a, b) => a - b) };
+  return { state: 'ready' };
+}
+
 /**
  * What this document asks for that will NOT render as asked, in plain words
  * (owner review, 2026-08-27).
@@ -501,16 +606,15 @@ export function isFontAvailable(family) {
  *   • A COLOUR the resolver cannot read. `config/theme` carries hex strings
  *     as data, and anything that is not `#RGB` or `#RRGGBB` is skipped —
  *     the style's own value renders instead, and nothing on screen says so.
- *   • A FONT the browser does not have. A role resolves to a bundled family;
- *     if that face has not loaded, the reader gets the next family in the
- *     stack. Worth saying, because the preview then shows a page set in a
- *     face the client never chose.
+ *   • A FONT the preview document cannot paint yet. A role resolves to a
+ *     bundled family. While that face is loading, say so. Once it is ready,
+ *     say nothing. If a declared weight fails, say that it did not load.
  *
  * @param {object} themeDoc
- * @param {{ fontAvailable?: (family: string) => boolean }} [options]
+ * @param {{ fontAvailable?: (family: string) => boolean|'loading', documents?: Document[] }} [options]
  * @returns {Array<{ kind: 'color'|'font', field: string, message: string }>}
  */
-export function themeFallbackWarnings(themeDoc, { fontAvailable = isFontAvailable } = {}) {
+export function themeFallbackWarnings(themeDoc, { fontAvailable, documents } = {}) {
   const warnings = [];
   if (!isPlainObject(themeDoc)) return warnings;
 
@@ -550,13 +654,33 @@ export function themeFallbackWarnings(themeDoc, { fontAvailable = isFontAvailabl
     const faces = fontSetFaces(roles[role]);
     if (!faces || seen.has(faces.family)) continue;
     seen.add(faces.family);
-    if (fontAvailable(faces.family)) continue;
+    let result;
+    if (typeof fontAvailable === 'function') {
+      const answer = fontAvailable(faces.family);
+      if (answer === 'loading') result = { state: 'loading' };
+      else if (answer === false) result = { state: 'unavailable' };
+      else result = { state: 'ready' };
+    } else if (Array.isArray(documents)) {
+      result = documents.length === 0 ? { state: 'ready' } : combineFontState(documents, faces.family);
+    } else if (isFontAvailable(faces.family)) {
+      result = { state: 'ready' };
+    } else {
+      result = { state: 'unavailable' };
+    }
+    if (result.state === 'ready') continue;
+    const instead = faces.fallback || 'the browser\u2019s own face';
+    const weights = result.weights ?? [];
+    const weightLabel = weights.length === 0
+      ? ''
+      : ` ${weights.length === 1 ? 'weight' : 'weights'} ${weights.join(' and ')}`;
+    const name = `${faces.family}${weightLabel}`;
+    const loadingVerb = weights.length > 1 ? 'are' : 'is';
     warnings.push({
       kind: 'font',
       field: role,
-      message:
-        `${faces.family} has not loaded, so the ${role} text is showing in ` +
-        `${faces.fallback || 'the browser\u2019s own face'}.`,
+      message: result.state === 'loading'
+        ? `${name} ${loadingVerb} still loading, so the ${role} text is showing in ${instead} for now.`
+        : `${name} did not load, so the ${role} text is showing in ${instead}.`,
     });
   }
   return warnings;

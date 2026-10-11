@@ -3,6 +3,16 @@
 const DEFAULT_SEEDED_THRESHOLD = 0;
 const MIN_ADMINS = 2;
 
+function senderDomainVerified(sender) {
+  const recordedDomain = typeof sender?.domainVerifiedDomain === 'string'
+    ? sender.domainVerifiedDomain.trim().toLowerCase()
+    : '';
+  const senderEmail = typeof sender?.email === 'string' ? sender.email.trim().toLowerCase() : '';
+  const at = senderEmail.lastIndexOf('@');
+  const domain = at > 0 ? senderEmail.slice(at + 1) : '';
+  return sender?.domainVerified === true && recordedDomain !== '' && recordedDomain === domain;
+}
+
 function evaluateReadiness({
   event,
   providers,
@@ -25,7 +35,7 @@ function evaluateReadiness({
     'Have the client review the seeded privacy and terms pages, then clear the flag from admin Settings.',
   );
 
-  const verified = event?.sender?.domainVerified === true;
+  const verified = senderDomainVerified(event?.sender);
   row(
     'sender',
     'Sender domain',
@@ -117,6 +127,7 @@ function formatReadinessTable(rows) {
 module.exports = {
   DEFAULT_SEEDED_THRESHOLD,
   MIN_ADMINS,
+  senderDomainVerified,
   evaluateReadiness,
   allReady,
   formatReadinessTable,

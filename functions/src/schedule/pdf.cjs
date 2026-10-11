@@ -644,7 +644,9 @@ function createBuildMySchedulePdfHandler({ db, auth, getConfig, log = console })
       const ownerName =
         typeof storedName === 'string' && storedName.trim() ? storedName.trim() : null;
 
-      const sessions = sessionsSnap.docs.map((d) => d.data());
+      // Bookmark ids are document ids. A published body often has no id.
+      // The document id wins over a stale id stored in the body.
+      const sessions = sessionsSnap.docs.map((d) => ({ ...d.data(), id: d.id }));
       const speakerNamesById = {};
       for (const d of speakersSnap.docs) {
         const name = deriveApprovedSpeakerName(d.data());

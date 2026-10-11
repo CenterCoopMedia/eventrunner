@@ -144,6 +144,9 @@ jobs:
           EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
           EVENT_ALLOWED_ORIGINS: ${{ vars.EVENT_ALLOWED_ORIGINS }}
           EVENT_EMAIL_PROVIDER: ${{ vars.EVENT_EMAIL_PROVIDER }}
+          # The selected GitHub Environment. Console mail is valid only when
+          # this is exactly "demo". It is not taken from the project id.
+          EVENT_DEPLOY_CLIENT: ${{ inputs.client }}
           EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
           EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
           EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
@@ -192,6 +195,21 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Grant Storage rules access to the account document
+        # storage.rules calls firestore.exists for profile photos (issue 349).
+        # firebase deploy --non-interactive skips the grant, so this step
+        # does it first. The binding is idempotent. The member is the Cloud
+        # Storage for Firebase service agent.
+        env:
+          EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          project_number="$(gcloud projects describe "$EVENT_FIREBASE_PROJECT_ID" --format='value(projectNumber)')"
+          gcloud projects add-iam-policy-binding "$EVENT_FIREBASE_PROJECT_ID" \
+            --member="serviceAccount:service-${project_number}@gcp-sa-firebasestorage.iam.gserviceaccount.com" \
+            --role="roles/firebaserules.firestoreServiceAgent" \
+            --condition=None
       - name: Deploy Firestore rules, Firestore indexes, and Storage rules
         env:
           EVENT_FIREBASE_PROJECT_ID: ${{ vars.EVENT_FIREBASE_PROJECT_ID }}

@@ -22,12 +22,14 @@ import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
+import { useEventClock } from '../hooks/useEventClock.js';
 import { useMyBookmarks } from '../hooks/useMyBookmarks.js';
 import { subscribeScheduleShare } from '../lib/scheduleShareSource.js';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SessionCard from '../components/SessionCard.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
+import { isBackIssue } from '../lib/backIssue.js';
 import { formatDayDate } from '../lib/eventTime.js';
 import { sortSessions } from './Schedule.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
@@ -39,6 +41,9 @@ export default function SharedSchedule() {
   const { scheduleData, loading } = useContent();
   const { attendeeAccess } = useProfile();
   const { bookmarkedIds } = useMyBookmarks();
+  // Same clock as the schedule list, so a shared page left open past the
+  // day end drops bookmark and calendar controls without a reload.
+  const now = useEventClock();
   // undefined = still loading; null = no projection document at all.
   const [share, setShare] = useState(undefined);
   const [denied, setDenied] = useState(false);
@@ -202,6 +207,7 @@ export default function SharedSchedule() {
                   eventConfig={eventConfig}
                   features={features}
                   bookmarked={bookmarkedIds.has(session.id)}
+                  backIssue={isBackIssue(day, eventConfig, now)}
                 />
               ))}
             </ul>

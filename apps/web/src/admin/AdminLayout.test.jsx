@@ -50,6 +50,8 @@ vi.mock('firebase/auth', () => ({
 }));
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(() => ({})),
+  doc: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
   query: vi.fn(() => ({})),
   limit: vi.fn(() => ({})),
   getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
@@ -130,11 +132,25 @@ describe('the admin shell', () => {
   it('uses one compact phone bar and a full-width grouped menu sheet', async () => {
     const original = window.matchMedia;
     const originalBodyOverflow = document.body.style.overflow;
-    window.matchMedia = vi.fn(() => ({
-      matches: false,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
+    let desktop = false;
+    const desktopListeners = new Set();
+    window.matchMedia = vi.fn((query) => ({
+      get matches() {
+        return query === ADMIN_DESKTOP_VIEWPORT ? desktop : false;
+      },
+      addEventListener: (type, listener) => {
+        if (query === ADMIN_DESKTOP_VIEWPORT && type === 'change') desktopListeners.add(listener);
+      },
+      removeEventListener: (type, listener) => {
+        if (type === 'change') desktopListeners.delete(listener);
+      },
     }));
+    const setDesktop = (next) => {
+      desktop = next;
+      act(() => {
+        desktopListeners.forEach((listener) => listener({ matches: next }));
+      });
+    };
     try {
       const { container } = await renderAdmin('/admin/pages');
       const rail = container.querySelector('.admin-rail');
@@ -174,7 +190,8 @@ describe('the admin shell', () => {
       await waitFor(() =>
         expect(container.querySelector('#admin-content')).toHaveAttribute('inert'),
       );
-      expect(document.documentElement.style.overflow).toBe('hidden');
+      // The scroll lock is applied in an effect after the sheet opens.
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe('hidden'));
       // A media dialog owns body overflow. If it closes while this sheet is
       // open, closing the sheet must not restore the dialog's stale lock.
       document.body.style.overflow = '';
@@ -189,6 +206,57 @@ describe('the admin shell', () => {
       fireEvent.click(pagesLink);
       await waitFor(() => expect(docket).not.toHaveAttribute('open'));
       expect(summary).toHaveFocus();
+
+      fireEvent.click(summary);
+      await waitFor(() => expect(docket).toHaveAttribute('open'));
+      await waitFor(() => expect(container.querySelector('#admin-content')).toHaveAttribute('inert'));
+      const sessions = within(nav).getByRole('link', { name: 'Sessions' });
+      sessions.focus();
+      fireEvent.keyDown(sessions, { key: 'Tab' });
+      fireEvent.keyDown(sessions, { key: 'Tab', shiftKey: true });
+      expect(docket).toHaveAttribute('open');
+      const dialog = document.createElement('div');
+      dialog.setAttribute('role', 'dialog');
+      const dialogButton = document.createElement('button');
+      dialogButton.type = 'button';
+      dialogButton.textContent = 'Close detail';
+      dialog.append(dialogButton);
+      document.body.append(dialog);
+      dialogButton.focus();
+      fireEvent.keyDown(dialogButton, { key: 'Escape' });
+      expect(docket).toHaveAttribute('open');
+      dialog.remove();
+      sessions.focus();
+      fireEvent.keyDown(sessions, { key: 'Escape' });
+      await waitFor(() => expect(docket).not.toHaveAttribute('open'));
+      expect(summary).toHaveFocus();
+      expect(container.querySelector('#admin-content')).not.toHaveAttribute('inert');
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe(''));
+      fireEvent.click(summary);
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe('hidden'));
+      fireEvent.keyDown(summary, { key: 'Escape' });
+      await waitFor(() => expect(docket).not.toHaveAttribute('open'));
+      expect(summary).toHaveFocus();
+
+      fireEvent.click(sessions);
+      await waitFor(() => expect(docket).not.toHaveAttribute('open'));
+      expect(summary).toHaveFocus();
+      expect(within(summary).getByText('Sessions')).toBeInTheDocument();
+      fireEvent.click(summary);
+      await waitFor(() => expect(docket).toHaveAttribute('open'));
+      setDesktop(true);
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe(''));
+      expect(container.querySelector('#admin-content')).not.toHaveAttribute('inert');
+      expect(docket).toHaveAttribute('open');
+      fireEvent.keyDown(summary, { key: 'Escape' });
+      expect(docket).toHaveAttribute('open');
+      setDesktop(false);
+      await waitFor(() => expect(document.documentElement.style.overflow).toBe('hidden'));
+      expect(container.querySelector('#admin-content')).toHaveAttribute('inert');
+      fireEvent.keyDown(summary, { key: 'Escape' });
+      await waitFor(() => expect(docket).not.toHaveAttribute('open'));
+      expect(summary).toHaveFocus();
+      expect(document.documentElement.style.overflow).toBe('');
     } finally {
       document.body.style.overflow = originalBodyOverflow;
       if (original) window.matchMedia = original;

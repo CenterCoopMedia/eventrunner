@@ -40,6 +40,22 @@ describe('blockSearchText', () => {
     );
     // An entity outside the small known set is left as text, not guessed at.
     expect(blockSearchText({ blockType: 'richtext', value: '&madeupname;' })).toBe('&madeupname;');
+    // U+10FFFF is the last code point fromCodePoint accepts. One past it throws
+    // and used to take the whole page search down. Both forms stay as text.
+    const maxCodePoint = '&#' + '1114111' + ';';
+    const pastMaxDecimal = '&#' + '1114112' + ';';
+    const pastMaxHex = '&#' + 'x110000' + ';';
+    expect(blockSearchText({ blockType: 'richtext', value: maxCodePoint })).toBe(
+      String.fromCodePoint(0x10ffff),
+    );
+    expect(blockSearchText({ blockType: 'richtext', value: pastMaxDecimal })).toBe(pastMaxDecimal);
+    expect(blockSearchText({ blockType: 'richtext', value: pastMaxHex })).toBe(pastMaxHex);
+    expect(
+      blockMatchesQuery(
+        { blockType: 'richtext', value: `<p>Keep ${pastMaxDecimal} visible</p>` },
+        'Keep',
+      ),
+    ).toBe(true);
   });
 
   it('decodes entities in a FAQ answer, an HTML-backed field, the same way', () => {

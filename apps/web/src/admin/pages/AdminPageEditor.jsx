@@ -26,12 +26,14 @@
 // seeds — each one a (field, blockType) pair whose per-type fields the
 // registry describes.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
 import {
   BLOCK_TYPES,
@@ -39,7 +41,10 @@ import {
   blockTypeFieldSummary,
   blockTypeLabel,
 } from '../blockTypes.js';
-import { blankPage, blankSection, toEditablePage, toPagePayload } from '../pageDoc.js';
+import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
+import { moveItem, nextStoredOrder } from '../reorder.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import {
   PAGE_LAYOUT_DEFAULTS,
   PAGE_LAYOUT_VALUES,
@@ -70,6 +75,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import EditorDisclosure from '../components/EditorDisclosure.jsx';
+import { OrderAnnouncement, ReorderControls, bindReorderDrop } from '../components/ReorderControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -175,21 +181,13 @@ function slotValue(slot) {
   return slot === 'above' ? 'above' : 'main';
 }
 
-/** Move item `from` → `to` in a copy of `list`. */
-function moved(list, from, to) {
-  if (to < 0 || to >= list.length) return list;
-  const next = [...list];
-  const [item] = next.splice(from, 1);
-  next.splice(to, 0, item);
-  return next;
-}
-
 export default function AdminPageEditor({ mode }) {
   const { pageId } = useParams();
   const navigate = useNavigate();
   const call = useAdminApi();
   const { showToast } = useToast();
   const { rows, ready, error: listenerError, findRow } = useAdminPages();
+  const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
   // What the site is set to, so the "follow the site" option can say what
   // following it means instead of sending the operator to another tab to
   // find out.
@@ -197,6 +195,9 @@ export default function AdminPageEditor({ mode }) {
   const siteNavPlacement = resolveNavPlacement(theme) ?? DEFAULT_NAV_PLACEMENT;
 
   const [page, setPage] = useState(() => blankPage());
+  const [savedSnapshot, setSavedSnapshot] = useState(() => (
+    mode === 'create' ? pageSnapshot(blankPage()) : null
+  ));
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null); // null | 'draft' | 'publish' | 'delete'
   const [status, setStatus] = useState('');
@@ -206,13 +207,19 @@ export default function AdminPageEditor({ mode }) {
   // The individual layout variants, behind their own disclosure. Closed by
   // default: the template above is the answer for almost every page.
   const [layoutOpen, setLayoutOpen] = useState(false);
+  const [spoken, setSpoken] = useState('');
   // Set when a publish fails part-way: the queue row the retry must resume.
   const [resumeQueueId, setResumeQueueId] = useState(null);
   const errorRef = useRef(null);
+  const formRef = useRef(null);
+  const unsaved = savedSnapshot !== null && pageSnapshot(page) !== savedSnapshot;
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: busy !== null });
   // Load the stored revision once; later listener updates (e.g. the echo of
   // our own save) must not clobber whatever is being typed.
   const loadedIdRef = useRef(null);
   const nextSectionKey = useRef(0);
+  // Ids the server refused on create. The listener may not have them yet.
+  const rejectedPageIds = useRef(new Set());
 
   const row = mode === 'edit' ? findRow(pageId) : null;
 
@@ -226,11 +233,20 @@ export default function AdminPageEditor({ mode }) {
     const editable = toEditablePage(found.draft ?? found.live);
     editable.sections = editable.sections.map((section) => ({ ...section, [EDITOR_SECTION_KEY]: nextSectionKey.current++ }));
     setPage(editable);
+    setSavedSnapshot(pageSnapshot(editable));
   }, [mode, pageId, ready, rows]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return undefined;
+    if (leaveGuard.pending) form.setAttribute('inert', '');
+    else form.removeAttribute('inert');
+    return () => form.removeAttribute('inert');
+  }, [leaveGuard.pending]);
 
   const fieldErrors = useMemo(() => {
     const map = new Map();
@@ -255,6 +271,18 @@ export default function AdminPageEditor({ mode }) {
     );
   }
 
+  if (mode === 'create' && (!ready || !contentReady)) {
+    if (listenerError || contentError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load pages and content. A new page waits until both have loaded, so its id cannot replace an existing page or reuse a section that still has content."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading page…" />;
+  }
+
   if (mode === 'edit' && loadedIdRef.current !== pageId) {
     if (!ready && listenerError) {
       return (
@@ -275,6 +303,24 @@ export default function AdminPageEditor({ mode }) {
         i === index ? { ...section, ...patch } : section,
       ),
     }));
+  function moveSections(from, to) {
+    const next = moveItem(page.sections, from, to);
+    if (next === page.sections) return false;
+    const label = page.sections[from]?.label || `Section ${from + 1}`;
+    update({ sections: next });
+    setSpoken(`${label} moved to position ${to + 1} of ${page.sections.length}`);
+    return true;
+  }
+
+  function moveBlocks(sectionIndex, from, to) {
+    const blocks = page.sections[sectionIndex]?.defaultBlocks ?? [];
+    const next = moveItem(blocks, from, to);
+    if (next === blocks) return false;
+    updateSection(sectionIndex, { defaultBlocks: next });
+    setSpoken(`Block ${from + 1} in section ${sectionIndex + 1} moved to position ${to + 1} of ${blocks.length}`);
+    return true;
+  }
+
   const updateBlock = (sectionIndex, blockIndex, patch) =>
     setPage((current) => ({
       ...current,
@@ -291,19 +337,50 @@ export default function AdminPageEditor({ mode }) {
     }));
 
   async function save({ publish }) {
-    setBusy(publish ? 'publish' : 'draft');
     setError(null);
     setStatus('');
     setResumeQueueId(null);
-    const payload = toPagePayload(page);
+    if (!String(page.label ?? '').trim()) {
+      setError({
+        message: 'Enter a navigation label.',
+        fieldErrors: [{ field: 'label', message: 'Enter a navigation label.' }],
+      });
+      return;
+    }
+    const creating = mode === 'create' && savedId === null;
+    if (creating && (!ready || !contentReady)) {
+      setError({
+        message: 'Wait until pages and content have loaded before saving a new page.',
+      });
+      return;
+    }
+    const pageIds = new Set(rejectedPageIds.current);
+    const sectionIds = new Set();
+    for (const candidate of rows ?? []) {
+      if (candidate?.id) pageIds.add(candidate.id);
+      for (const section of candidate.current?.sections ?? []) {
+        if (section?.id) sectionIds.add(section.id);
+      }
+    }
+    for (const content of contentRows ?? []) {
+      for (const revision of [content?.current, content?.live, content?.draft]) {
+        if (typeof revision?.section === 'string' && revision.section) sectionIds.add(revision.section);
+      }
+    }
+    let assigned = assignPageIds(page, { pageIds, sectionIds });
+    if (creating) assigned = { ...assigned, order: nextStoredOrder(rows) };
+    if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
+    const payload = toPagePayload(assigned);
+    setBusy(publish ? 'publish' : 'draft');
     try {
-      await call('cmsSavePage', { page: payload });
+      await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt: a failed publish must not leave the id editable,
       // because retrying under a different id would create a second document
       // and orphan the draft that just landed.
       setSavedId(payload.id);
       loadedIdRef.current = payload.id;
+      setSavedSnapshot(pageSnapshot(assigned));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         showToast('Draft saved.');
@@ -317,6 +394,14 @@ export default function AdminPageEditor({ mode }) {
       });
       reportPublish(response, [payload.id]);
     } catch (err) {
+      if (creating && err?.status === 409) {
+        rejectedPageIds.current.add(payload.id);
+        setPage((current) => ({ ...current, id: '' }));
+        setError({
+          message: 'That page id was already taken. Save again to use a new one.',
+        });
+        return;
+      }
       setError(err);
       // A part-way publish failure carries the queue row to resume from.
       if (err?.queueId) setResumeQueueId(err.queueId);
@@ -372,6 +457,7 @@ export default function AdminPageEditor({ mode }) {
 
   return (
     <form
+      ref={formRef}
       className="admin-page-editor flex flex-col gap-md"
       noValidate
       onSubmit={(event) => {
@@ -381,8 +467,13 @@ export default function AdminPageEditor({ mode }) {
     >
       <AdminPageHeader
         title={mode === 'create' ? 'New page' : page.label || page.id}
-        state={row ? <RecordState state={row.state} /> : null}
-        identifiers={isExisting ? page.id : null}
+        state={(
+          <>
+            {row ? <RecordState state={row.state} /> : null}
+            {unsaved ? <UnsavedEditBadge /> : null}
+          </>
+        )}
+        identifiers={page.path || null}
         description="Saving writes a draft. Publishing copies that draft to the live revision the public site reads."
         actions={
           <>
@@ -406,22 +497,18 @@ export default function AdminPageEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
 
       <div className="admin-page-basics">
-      <Panel title="Page" description="How the page is identified, ordered, and linked." className="admin-page-identity">
+      <Panel title="Page" description="How the page is identified and linked." className="admin-page-identity">
         <div className="admin-page-fields">
-          <TextField
-            label="Page id"
-            value={page.id}
-            onChange={(value) => update({ id: value })}
-            error={errorFor('id')}
-            readOnly={isExisting}
-            hint={
-              isExisting
-                ? 'The document id cannot change after creation.'
-                : 'Letters, digits, hyphen, underscore. Used as the document id.'
-            }
-          />
           <TextField
             label="Navigation label"
             value={page.label}
@@ -484,14 +571,17 @@ export default function AdminPageEditor({ mode }) {
             error={errorFor('icon')}
             hint="Optional icon name. Leave blank for none."
           />
-          <TextField
-            label="Order"
-            type="number"
-            value={page.order}
-            onChange={(value) => update({ order: value })}
-            error={errorFor('order')}
-            hint="Lower numbers sort first."
-          />
+          <p className={fieldHintClass}>The pages list sets where this page appears.</p>
+          {isExisting ? (
+            <TextField
+              label="Page id"
+              value={page.id}
+              onChange={() => {}}
+              error={errorFor('id')}
+              readOnly
+              hint="This id stays the same when the label changes."
+            />
+          ) : null}
           <div className="flex flex-col justify-center gap-xs">
             <CheckboxField
               label="Visible"
@@ -626,6 +716,7 @@ export default function AdminPageEditor({ mode }) {
           </button>
         }
       >
+        <OrderAnnouncement message={spoken} />
         {page.sections.length === 0 ? (
           <p className="text-admin-sm text-admin-ink-secondary">
             No sections yet. A page with no sections renders nothing.
@@ -638,6 +729,7 @@ export default function AdminPageEditor({ mode }) {
                 <li
                   key={section[EDITOR_SECTION_KEY]}
                   className="min-w-0"
+                  {...bindReorderDrop('section:', sectionIndex, moveSections)}
                 >
                   <EditorDisclosure
                     title={section.label || section.id || `Section ${sectionIndex + 1}`}
@@ -648,28 +740,13 @@ export default function AdminPageEditor({ mode }) {
                   <div className="mb-md flex flex-wrap items-center justify-between gap-xs">
                     <p className="text-admin-sm text-admin-ink-secondary">Section {sectionIndex + 1} settings</p>
                     <div className="flex flex-wrap gap-2xs">
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        aria-label={`Move section ${sectionIndex + 1} up`}
-                        disabled={sectionIndex === 0}
-                        onClick={() =>
-                          update({ sections: moved(page.sections, sectionIndex, sectionIndex - 1) })
-                        }
-                      >
-                        Up
-                      </button>
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        aria-label={`Move section ${sectionIndex + 1} down`}
-                        disabled={sectionIndex === page.sections.length - 1}
-                        onClick={() =>
-                          update({ sections: moved(page.sections, sectionIndex, sectionIndex + 1) })
-                        }
-                      >
-                        Down
-                      </button>
+                      <ReorderControls
+                        label={`section ${sectionIndex + 1}`}
+                        index={sectionIndex}
+                        count={page.sections.length}
+                        dragToken={`section:${sectionIndex}`}
+                        onMove={moveSections}
+                      />
                       <button
                         type="button"
                         className={dangerButtonClass}
@@ -686,13 +763,16 @@ export default function AdminPageEditor({ mode }) {
                   </div>
 
                   <div className="admin-section-fields">
-                    <TextField
-                      label={`Section ${sectionIndex + 1} id`}
-                      value={section.id}
-                      onChange={(value) => updateSection(sectionIndex, { id: value })}
-                      error={errorFor(`${at}.id`)}
-                      hint="Ties the section to its content blocks."
-                    />
+                    {section.id ? (
+                      <TextField
+                        label={`Section ${sectionIndex + 1} id`}
+                        value={section.id}
+                        onChange={() => {}}
+                        error={errorFor(`${at}.id`)}
+                        readOnly
+                        hint="Content stays attached to this id when the name changes."
+                      />
+                    ) : null}
                     <TextField
                       label={`Section ${sectionIndex + 1} label`}
                       value={section.label}
@@ -823,16 +903,18 @@ export default function AdminPageEditor({ mode }) {
                             <li
                               key={blockIndex}
                               className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-sm"
+                              {...bindReorderDrop(`block:${sectionIndex}:`, blockIndex, (from, to) => moveBlocks(sectionIndex, from, to))}
                             >
                               <div className="grid gap-xs sm:grid-cols-2">
-                                <TextField
-                                  label={`Block ${blockIndex + 1} field — section ${sectionIndex + 1}`}
-                                  value={block.field}
-                                  onChange={(value) =>
-                                    updateBlock(sectionIndex, blockIndex, { field: value })
-                                  }
-                                  error={errorFor(`${bat}.field`)}
-                                />
+                                {block.field ? (
+                                  <TextField
+                                    label={`Block ${blockIndex + 1} field — section ${sectionIndex + 1}`}
+                                    value={block.field}
+                                    onChange={() => {}}
+                                    error={errorFor(`${bat}.field`)}
+                                    readOnly
+                                  />
+                                ) : null}
                                 <SelectField
                                   label={`Block ${blockIndex + 1} type — section ${sectionIndex + 1}`}
                                   value={block.blockType}
@@ -855,40 +937,16 @@ export default function AdminPageEditor({ mode }) {
                                 </div>
                               </div>
                               <div className="mt-xs flex flex-wrap gap-2xs">
-                                <button
-                                  type="button"
-                                  className={secondaryButtonClass}
-                                  aria-label={`Move block ${blockIndex + 1} up in section ${sectionIndex + 1}`}
-                                  disabled={blockIndex === 0}
-                                  onClick={() =>
-                                    updateSection(sectionIndex, {
-                                      defaultBlocks: moved(
-                                        section.defaultBlocks,
-                                        blockIndex,
-                                        blockIndex - 1,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  Up
-                                </button>
-                                <button
-                                  type="button"
-                                  className={secondaryButtonClass}
-                                  aria-label={`Move block ${blockIndex + 1} down in section ${sectionIndex + 1}`}
-                                  disabled={blockIndex === section.defaultBlocks.length - 1}
-                                  onClick={() =>
-                                    updateSection(sectionIndex, {
-                                      defaultBlocks: moved(
-                                        section.defaultBlocks,
-                                        blockIndex,
-                                        blockIndex + 1,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  Down
-                                </button>
+                                <ReorderControls
+                                  label={`block ${blockIndex + 1} in section ${sectionIndex + 1}`}
+                                  index={blockIndex}
+                                  count={section.defaultBlocks.length}
+                                  dragToken={`block:${sectionIndex}:${blockIndex}`}
+                                  upLabel={`Move block ${blockIndex + 1} up in section ${sectionIndex + 1}`}
+                                  downLabel={`Move block ${blockIndex + 1} down in section ${sectionIndex + 1}`}
+                                  dragLabel={`Drag block ${blockIndex + 1} in section ${sectionIndex + 1}`}
+                                  onMove={(from, to) => moveBlocks(sectionIndex, from, to)}
+                                />
                                 <button
                                   type="button"
                                   className={dangerButtonClass}

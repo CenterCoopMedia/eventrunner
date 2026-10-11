@@ -30,6 +30,8 @@
  *   EVENT_ALLOWED_ORIGINS exported for the functions runtime.
  *
  * Usage:
+ *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
+ *   FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
  *   node scripts/dev/invite-smoke.mjs --emulator-log /path/to/emulator.log
  *
  * Exits 0 and prints "SMOKE OK" when every step passes; exits 1 with a
@@ -38,16 +40,41 @@
 
 import fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { pathToFileURL } from 'node:url';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+
+const LOOPBACK_EMULATOR = /^(?:127\.0\.0\.1|localhost|\[::1\]):\d+$/;
+
+/**
+ * The smoke writes `config/bootstrap.adminEmails`. That write is safe only
+ * against a loopback emulator. A missing host lets the Admin SDK use live
+ * credentials for `EVENT_FIREBASE_PROJECT_ID`.
+ *
+ * @param {Record<string, string|undefined>} env
+ * @returns {string|null}
+ */
+export function inviteSmokeEmulatorError(env) {
+  // Do not trim. The Admin SDK reads these variables as they are, and a
+  // padded host that passed a trimmed check would still be rejected later.
+  const firestore = typeof env.FIRESTORE_EMULATOR_HOST === 'string' ? env.FIRESTORE_EMULATOR_HOST : '';
+  const auth = typeof env.FIREBASE_AUTH_EMULATOR_HOST === 'string' ? env.FIREBASE_AUTH_EMULATOR_HOST : '';
+  if (!LOOPBACK_EMULATOR.test(firestore)) {
+    return 'FIRESTORE_EMULATOR_HOST must be a loopback emulator host before invite smoke writes admin config';
+  }
+  if (!LOOPBACK_EMULATOR.test(auth)) {
+    return 'FIREBASE_AUTH_EMULATOR_HOST must be a loopback emulator host before invite smoke writes admin config';
+  }
+  return null;
+}
 
 function parseArgs(argv) {
   const out = {
     projectId: process.env.EVENT_FIREBASE_PROJECT_ID || 'demo-run-of-show',
     region: process.env.EVENT_FIREBASE_REGION || 'us-central1',
     functionsPort: 5001,
-    authHost: process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099',
+    authHost: process.env.FIREBASE_AUTH_EMULATOR_HOST || '',
     emulatorLog: null,
     timeoutMs: 30000,
   };
@@ -62,7 +89,7 @@ const args = parseArgs(process.argv.slice(2));
 const ORIGIN = `http://127.0.0.1:${args.functionsPort}/${args.projectId}/${args.region}`;
 const ADMIN_EMAIL = 'invite-smoke-admin@example.test';
 const SPEAKER_EMAIL = `invite-smoke-speaker-${Date.now()}@example.test`;
-const SPEAKER_ID = `invite-smoke-${Date.now()}`;
+
 // Unique per run: `speaker_slugs` reservations survive between runs against
 // a persisted emulator, and a re-used name would 409 on the slug rather than
 // on anything this script is testing.
@@ -200,6 +227,8 @@ async function signInWithEmailedCode(email, deadline) {
 }
 
 async function main() {
+  const targetError = inviteSmokeEmulatorError(process.env);
+  if (targetError) fail(targetError);
   if (!args.emulatorLog) fail('--emulator-log is required');
   initializeApp({ projectId: args.projectId });
   const db = getFirestore();
@@ -227,23 +256,24 @@ async function main() {
   const created = await call(
     'createSpeaker',
     {
-      speakerId: SPEAKER_ID,
       speaker: { firstName: SPEAKER_FIRST, lastName: SPEAKER_LAST, email: SPEAKER_EMAIL, status: 'draft' },
     },
     adminToken,
   );
   check(created.status === 200, `createSpeaker answered 200 (${created.status})`);
+  const speakerId = created.body && created.body.speakerId;
+  check(typeof speakerId === 'string' && speakerId.length > 0, 'createSpeaker returned a server id');
 
   console.log('admin sends the invitation');
   const logSize = fs.existsSync(args.emulatorLog) ? fs.statSync(args.emulatorLog).size : 0;
-  const sent = await call('sendSpeakerInvite', { speakerId: SPEAKER_ID }, adminToken);
+  const sent = await call('sendSpeakerInvite', { speakerId: speakerId }, adminToken);
   check(sent.status === 200, `sendSpeakerInvite answered 200 (${sent.status}: ${JSON.stringify(sent.body)})`);
   check(sent.body?.status === 'invited', 'the speaker moved draft → invited');
 
   const token = await waitForInviteUrl(logSize, deadline());
   check(Boolean(token), 'the invitation email was captured, carrying the accept URL');
 
-  const stored = (await db.collection('speakers').doc(SPEAKER_ID).get()).data();
+  const stored = (await db.collection('speakers').doc(speakerId).get()).data();
   check(stored.inviteToken && stored.inviteToken !== token, 'the stored token is a digest, not the token');
 
   console.log('the link validates before sign-in');
@@ -276,7 +306,7 @@ async function main() {
       !stranger.body.error.invitedEmailMasked.includes(SPEAKER_EMAIL),
     'the refusal names the invited inbox, masked',
   );
-  const afterStranger = (await db.collection('speakers').doc(SPEAKER_ID).get()).data();
+  const afterStranger = (await db.collection('speakers').doc(speakerId).get()).data();
   check(afterStranger.uid == null, 'the refused attempt linked nothing');
   check(afterStranger.status === 'invited', 'the invitation is still outstanding');
   check(
@@ -313,10 +343,10 @@ async function main() {
   check(accepted.status === 200, `acceptSpeakerInvite answered 200 (${accepted.status}: ${JSON.stringify(accepted.body)})`);
   check(accepted.body?.status === 'accepted', 'the response reports the accepted status');
 
-  const afterAccept = (await db.collection('speakers').doc(SPEAKER_ID).get()).data();
+  const afterAccept = (await db.collection('speakers').doc(speakerId).get()).data();
   const userDoc = (await db.collection('users').doc(speakerUid).get()).data();
   check(afterAccept.uid === speakerUid, 'speakers.uid names the account');
-  check(userDoc.speakerId === SPEAKER_ID, 'users.speakerId names the speaker');
+  check(userDoc.speakerId === speakerId, 'users.speakerId names the speaker');
   check(afterAccept.status === 'accepted', 'the speaker is accepted');
   check(afterAccept.inviteToken === null, 'the token is burned');
 
@@ -335,13 +365,13 @@ async function main() {
   check(reaccepted.status !== 200, `a consumed token gets nobody else in (${reaccepted.status})`);
 
   console.log('admin approves, and the public projection appears');
-  const approved = await call('updateSpeaker', { speakerId: SPEAKER_ID, speaker: { status: 'approved' } }, adminToken);
+  const approved = await call('updateSpeaker', { speakerId: speakerId, speaker: { status: 'approved' } }, adminToken);
   check(approved.status === 200, `updateSpeaker answered 200 (${approved.status})`);
 
   const until = deadline();
   let publicDoc = null;
   while (Date.now() < until) {
-    const snap = await db.collection('speakers_public').doc(SPEAKER_ID).get();
+    const snap = await db.collection('speakers_public').doc(speakerId).get();
     if (snap.exists) {
       publicDoc = snap.data();
       break;
@@ -356,4 +386,16 @@ async function main() {
   console.log('SMOKE OK');
 }
 
-main().catch((err) => fail(err?.stack || String(err)));
+function runAsCli() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === pathToFileURL(fs.realpathSync(entry)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (runAsCli()) {
+  main().catch((err) => fail(err?.stack || String(err)));
+}

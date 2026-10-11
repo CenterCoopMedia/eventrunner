@@ -79,7 +79,7 @@ export default function DirectoriesSection({ folio }) {
         name="Speaker shelf"
         file="pages/Speakers.jsx"
         contract="specimen-label"
-        note="The portrait leads at a size a face survives. A speaker with no picture is an empty frame holding its place, never a hole in the shelf."
+        note="A real portrait leads at a size a face survives. A speaker with no picture is the name and the credit only, with no empty frame."
       >
         <ul className="portrait-shelf grid gap-x-lg sm:grid-cols-2 lg:grid-cols-3">
           {SHELF.map((speaker) => (
@@ -87,11 +87,11 @@ export default function DirectoriesSection({ folio }) {
               key={speaker.id}
               className="portrait-shelf__plate"
             >
-              <div className="portrait-shelf__frame">
-                {speaker.headshotPath ? (
+              {speaker.headshotPath ? (
+                <div className="portrait-shelf__frame">
                   <AssetImage path={speaker.headshotPath} alt="" className="" />
-                ) : null}
-              </div>
+                </div>
+              ) : null}
               <div className="mt-xs">
                 <h3 className="font-heading text-h3 font-semibold text-text-primary">
                   {speaker.displayName}

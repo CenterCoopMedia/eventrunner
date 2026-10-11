@@ -26,11 +26,8 @@ export const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
 /**
  * A block type's EDITABLE value fields — everything the registry declares
  * except `order`. `order` is real registry data for stat/list_item/
- * link_group, but the editor exposes exactly one Order control shared by
- * every block type (it is also how blocks without a registry `order` field
- * get sorted — see SectionBlocks/getSectionBlocks), so folding it into the
- * generic per-type loop would render two divergent "Order" inputs bound to
- * two different pieces of state.
+ * link_group. The section list sets it for every block type, so the value
+ * form does not render a second Order input bound to different state.
  *
  * @param {string} blockTypeId
  */
@@ -156,6 +153,81 @@ export function staleFieldDeletions(priorBlockTypeId, nextBlockTypeId) {
  * @param {{ blockType: string, values: object }} content
  * @returns {Array<{ field: string, message: string }>}
  */
+/** Names an organizer sees. The stored field id stays the registry id. */
+const EDITORIAL_FIELD_LABELS = Object.freeze({
+  text: { value: 'Text' },
+  richtext: { value: 'Text' },
+  image: {
+    url: 'Image',
+    alt: 'Alt text',
+    caption: 'Caption',
+    focalX: 'Horizontal focus',
+    focalY: 'Vertical focus',
+  },
+  cta: { label: 'Button text', url: 'Destination', external: 'Open in a new tab' },
+  stat: {
+    value: 'Figure',
+    label: 'Caption',
+    takeaway: 'Finding',
+    description: 'What it counts',
+    source: 'Source',
+    alt: 'Screen reader text',
+  },
+  fact: { label: 'Term', value: 'Fact', note: 'Note' },
+  quote: { text: 'Quote', attribution: 'Attribution' },
+  list_item: { text: 'Text' },
+  faq_item: { question: 'Question', answer: 'Answer' },
+  link_group: { group: 'Group', label: 'Link text', url: 'Destination' },
+  sponsor_package: { name: 'Name', price: 'Price', limit: 'Limit', benefits: 'Benefits' },
+});
+
+const TITLE_KEYS = ['label', 'name', 'question', 'alt', 'text', 'attribution', 'caption', 'value'];
+
+function plainContentText(value) {
+  return String(value ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** The control's accessible name. Storage keys such as `value` and `url` stay put. */
+export function editorialFieldLabel(blockTypeId, fieldId) {
+  return EDITORIAL_FIELD_LABELS[blockTypeId]?.[fieldId] ?? fieldId;
+}
+
+function titleValues(doc) {
+  if (!doc) return {};
+  return doc.values && typeof doc.values === 'object' ? doc.values : doc;
+}
+
+/** Public text that can name a new block, or the block type when the text is empty. */
+export function contentIdSource(content) {
+  const values = titleValues(content);
+  for (const key of TITLE_KEYS) {
+    const text = plainContentText(values[key]);
+    if (text) return text;
+  }
+  return content?.blockType || 'block';
+}
+
+function humanizeId(id) {
+  const words = String(id ?? '').replace(/[_-]+/g, ' ').trim();
+  if (!words) return 'Content block';
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** What the organizer reads in a list or heading. Not the stored field id. */
+export function contentBlockTitle(doc) {
+  const values = titleValues(doc);
+  for (const key of TITLE_KEYS) {
+    const text = plainContentText(values[key]);
+    if (text) return text.length > 80 ? text.slice(0, 80) : text;
+  }
+  if (doc?.field) return humanizeId(doc.field);
+  return 'Content block';
+}
+
 export function validateRequiredContent(content) {
   if (!content.blockType) {
     return [{ field: 'blockType', message: 'blockType: choose a block type before saving.' }];
@@ -167,7 +239,10 @@ export function validateRequiredContent(content) {
     const isEmpty = field.type === 'richtext'
       ? !hasRichTextContent(raw)
       : raw === undefined || raw === null || String(raw).trim() === '';
-    if (isEmpty) errors.push({ field: field.id, message: `${field.id}: is required.` });
+    if (isEmpty) {
+      const name = editorialFieldLabel(content.blockType, field.id);
+      errors.push({ field: field.id, message: `${name}: is required.` });
+    }
   }
   // The page draws a sponsor package's limit only when it is a whole number
   // of 1 or more (functions/src/cms/content.cjs sponsorPackageErrors), so the

@@ -155,22 +155,37 @@ function extractBearerToken(req) {
 
 /**
  * Verify the request's Firebase ID token. Returns the decoded token, or
- * null for a missing, malformed, expired, or otherwise unverifiable
- * token — it never throws to the caller, so handlers can treat "not
- * signed in" as one condition instead of two.
+ * null for a missing, malformed, expired, revoked, or otherwise
+ * unverifiable token — it never throws to the caller, so handlers can
+ * treat "not signed in" as one condition instead of two.
  *
- * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> } }} deps
+ * `checkRevoked` is required. A deleted or disabled account keeps a valid
+ * ID token until it expires, and Firebase Auth reports that only when the
+ * caller asks. Security rules do not perform this check. That ask is a
+ * remote lookup, so one request object remembers the result and does not
+ * ask again. A copied request is a new object and is checked on its own.
+ *
+ * @param {{ auth: { verifyIdToken: (t: string, checkRevoked?: boolean) => Promise<object> } }} deps
  * @param {object} req
  * @returns {Promise<object|null>} decoded token or null
  */
+const verifiedByRequest = new WeakMap();
+
 async function verifyAuthToken({ auth }, req) {
-  const token = extractBearerToken(req);
-  if (!token) return null;
-  try {
-    return await auth.verifyIdToken(token);
-  } catch {
-    return null;
+  if (req && typeof req === 'object' && verifiedByRequest.has(req)) {
+    return verifiedByRequest.get(req);
   }
+  const token = extractBearerToken(req);
+  let decoded = null;
+  if (token) {
+    try {
+      decoded = await auth.verifyIdToken(token, true);
+    } catch {
+      decoded = null;
+    }
+  }
+  if (req && typeof req === 'object') verifiedByRequest.set(req, decoded);
+  return decoded;
 }
 
 /**

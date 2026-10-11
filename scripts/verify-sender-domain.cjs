@@ -43,22 +43,49 @@ const FLAGS = ['domain', 'no-write', 'attest', 'help'];
  *
  * @param {{ db: object, verified: boolean, method: string, domain: string,
  *           now?: () => number }} args
- * @returns {Promise<string|null>} the ISO stamp written, or null on clear
+ * @returns {Promise<string|null|false>} the ISO stamp written, null on a clear, or false when the sender domain no longer matches
  */
+function senderDomain(email) {
+  if (typeof email !== 'string') return null;
+  const trimmed = email.trim().toLowerCase();
+  const at = trimmed.lastIndexOf('@');
+  if (at < 1) return null;
+  return trimmed.slice(at + 1) || null;
+}
+
+const DOMAIN_NAME = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+function domainName(value) {
+  if (typeof value !== 'string') return null;
+  const name = value.trim().toLowerCase();
+  if (name.length === 0 || name.length > 253 || !DOMAIN_NAME.test(name)) return null;
+  return name;
+}
+
 async function stampVerification({ db, verified, method, domain, now = Date.now }) {
   const at = verified ? new Date(now()).toISOString() : null;
-  await db.collection('config').doc('event').set(
-    {
+  const checked = domainName(domain);
+  const ref = db.collection('config').doc('event');
+  // The DNS check is slow. Read the sender again in the commit and write
+  // only when that address is still on the domain that was checked.
+  const wrote = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const sender = snap.exists && snap.data()?.sender && typeof snap.data().sender === 'object'
+      ? snap.data().sender
+      : {};
+    if (!checked || senderDomain(sender.email) !== checked) return false;
+    tx.set(ref, {
       sender: {
+        ...sender,
         domainVerified: verified,
         domainVerifiedAt: at,
         domainVerifiedBy: verified ? method : null,
-        domainVerifiedDomain: verified ? domain : null,
+        domainVerifiedDomain: verified ? checked : null,
       },
-    },
-    { merge: true },
-  );
-  return at;
+    }, { merge: true });
+    return true;
+  });
+  return wrote ? at : false;
 }
 
 /**
@@ -85,7 +112,7 @@ function usage() {
   return [
     'Usage: node scripts/verify-sender-domain.cjs [--domain <domain>] [--no-write]',
     '',
-    '  --domain <domain>  verify this domain instead of config/event.sender.email',
+    '  --domain <domain>  verify this hostname instead of config/event.sender.email',
     '  --no-write         report only; do not stamp config/event.sender',
     '  --attest           record an operator attestation, for providers with no',
     '                     domain API (webhook, console) — otherwise their',
@@ -141,6 +168,15 @@ function remediation(status) {
 }
 
 async function run({ args, env = process.env, deps = {} }) {
+  let explicitDomain = null;
+  if (typeof args.domain === 'string' && args.domain !== '') {
+    explicitDomain = domainName(args.domain);
+    if (!explicitDomain) {
+      console.error(`--domain must be a hostname, got ${JSON.stringify(args.domain)}.`);
+      return 2;
+    }
+  }
+
   const { getEmailProvider } = deps.getEmailProvider
     ? deps
     : require('../functions/src/email/providers/index.cjs');
@@ -159,14 +195,14 @@ async function run({ args, env = process.env, deps = {} }) {
   let db = null;
   let configuredDomain = null;
   let senderEmail = null;
-  if (!args.domain || !args['no-write']) {
+  if (args.attest || !explicitDomain || !args['no-write']) {
     try {
       ({ db } = initFirebase({ env }));
       const snap = await db.collection('config').doc('event').get();
       senderEmail = snap.exists ? snap.data()?.sender?.email || null : null;
-      configuredDomain = senderEmail ? senderEmail.split('@')[1] || null : null;
+      configuredDomain = senderEmail ? domainName(senderDomain(senderEmail)) : null;
     } catch (err) {
-      if (!args.domain) {
+      if (!explicitDomain || args.attest) {
         console.error(`Cannot read config/event to find the sender domain: ${err.message}`);
         return 2;
       }
@@ -181,7 +217,7 @@ async function run({ args, env = process.env, deps = {} }) {
     // clear teaches operators to ignore the gate. So the same escape the
     // Auth row uses applies: the operator attests, in writing, on the
     // record, after checking the relay's DNS themselves.
-    const domain = (typeof args.domain === 'string' && args.domain) || configuredDomain;
+    const domain = explicitDomain || configuredDomain;
     console.log(`Provider "${provider.name}" exposes no sender-domain API — nothing to check automatically.`);
     if (!args.attest) {
       console.log(
@@ -196,11 +232,21 @@ async function run({ args, env = process.env, deps = {} }) {
       console.error('Cannot attest: config/event.sender.email is unset and --domain was not passed.');
       return 2;
     }
+    if (!configuredDomain || domain !== configuredDomain) {
+      console.error(configuredDomain
+        ? `Cannot attest ${domain}: this deployment sends from ${senderEmail} (${configuredDomain}).`
+        : 'Cannot attest: config/event.sender.email is unset.');
+      return 2;
+    }
     if (args['no-write'] || !db) {
       console.log('--no-write: attestation not recorded.');
       return 0;
     }
     const at = await stampVerification({ db, verified: true, method: 'operator-attested', domain });
+    if (at === false) {
+      console.error('The sender email changed before the attestation was recorded. Nothing was written.');
+      return 2;
+    }
     console.log(`\nRecorded operator attestation for ${domain} at ${at}.`);
     return 0;
   }
@@ -213,7 +259,7 @@ async function run({ args, env = process.env, deps = {} }) {
     return 2;
   }
 
-  const domain = (typeof args.domain === 'string' && args.domain) || configuredDomain;
+  const domain = explicitDomain || configuredDomain;
   if (!domain) {
     console.error('No sender domain: config/event.sender.email is unset and --domain was not passed.');
     return 2;
@@ -246,8 +292,10 @@ async function run({ args, env = process.env, deps = {} }) {
     // "Unknown" is deliberately NOT enough to clear it: a missing account
     // token says nothing about the domain.
     if (!args['no-write'] && db && domain === configuredDomain && isDefinitiveFailure(status)) {
-      await stampVerification({ db, verified: false, method: 'provider-check', domain });
-      console.log('\nCleared the stored sender verification: this domain is failing now.');
+      const cleared = await stampVerification({ db, verified: false, method: 'provider-check', domain });
+      console.log(cleared === false
+        ? '\nThe sender email changed before the clear. The stored record was left as it is.'
+        : '\nCleared the stored sender verification: this domain is failing now.');
     }
     return 1;
   }
@@ -257,6 +305,10 @@ async function run({ args, env = process.env, deps = {} }) {
     return 0;
   }
   const verifiedAt = await stampVerification({ db, verified: true, method: 'provider-check', domain });
+  if (verifiedAt === false) {
+    console.error('\nVerified for the old domain, but the sender email changed before the stamp. Nothing was written.');
+    return 1;
+  }
   console.log(`\nVerified. Stamped config/event.sender.domainVerifiedAt = ${verifiedAt}.`);
   return 0;
 }

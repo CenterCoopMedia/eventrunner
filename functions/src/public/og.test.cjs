@@ -463,6 +463,8 @@ const {
     imageTypeFor,
     zoneOffset,
     ROUTE_CACHE_CONTROL,
+    ROUTE_META_MAX_INSTANCES,
+    routeMetaRuntimeOptions,
     DEFAULT_CARD_IMAGE,
   },
 } = require('./og.cjs');
@@ -894,6 +896,15 @@ test('routeMeta: sets a cache header so the edge, not the function, answers repe
   assert.ok(/must-revalidate/.test(ROUTE_CACHE_CONTROL));
   // And nothing may be served stale while it refreshes, for the same reason.
   assert.ok(!/stale-while-revalidate/.test(ROUTE_CACHE_CONTROL));
+});
+
+test('routeMeta caps instances so scanner traffic stays bounded', () => {
+  const options = routeMetaRuntimeOptions('europe-west1');
+  assert.equal(options.region, 'europe-west1');
+  assert.equal(options.maxInstances, ROUTE_META_MAX_INSTANCES);
+  assert.equal(ROUTE_META_MAX_INSTANCES, 20);
+  const source = require('node:fs').readFileSync(require.resolve('./og.cjs'), 'utf8');
+  assert.match(source, /onRequest\(\s*routeMetaRuntimeOptions\(region\)/);
 });
 
 // -------------------------------------------------------------- resilience
