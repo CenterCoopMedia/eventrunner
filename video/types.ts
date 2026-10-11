@@ -1,0 +1,9 @@
+export type Format = 'landscape' | 'vertical';
+export type Rect = {x:number;y:number;width:number;height:number};
+export type Shot = {file:string;viewport:{width:number;height:number};scale:number;route:string;boxes:Record<string,Rect>;focus:string[]};
+export type Scene = {id:string;start:number;end:number;caption:string;detail?:string;capture:string;after?:string;chapter?:string;word?:string;theme?:'light'|'dark'|'brand';focus?:string[];montage?:string[];action?:{target:string;moveStart:number;moveEnd:number;press:number};typing?:{prefix:string;length:number;start:number;interval:number};endCard?:boolean};
+export type Clock = {id:string;title:string;fps:number;bpm:number;duration:number;settle:number;kind:'tutorial'|'trailer';seed:number;periods:number[];silence:number[];scenes:Scene[];sourceHash?:string;cinematic?:{rule:number;lands:number[];pullback:number;plan:number;shape:number;gather:number;reveal:number;title:number;settle:number;preview:number;fold:number;pageLand:number}};
+export type Experience = {name:string;shortName:string;headline:string;dates:string;venue:string;sessions:{id:string;title:string;time:string;end:string;room:string;speakerIds:string[]}[];speakers:{id:string;name:string;role:string;organization:string}[];before:{name:string;accent:string;font:string};after:{name:string;accent:string;font:string}};
+export type Assembly = {arrivals:number[];join:number;program:number;shape:number;styleFlow:number[];themePublish:number;gather:number;bookmarks:number[];reveal:number;title:number;settle:number};
+export type AssemblyClock = Clock & {assembly?:Assembly};
+export type Project = {clock:AssemblyClock;format:Format;captures:Record<string,Shot>;assetBase:string;experience?:Experience;privateLabel?:string;logo?:string;identityFont?:string;palette?:{paper:string;brand:string;night:string}};

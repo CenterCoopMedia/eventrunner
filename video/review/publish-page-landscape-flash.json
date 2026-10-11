@@ -1,0 +1,29 @@
+{
+  "pass": true,
+  "status": "pass-screen",
+  "certification": false,
+  "frames": 2250,
+  "fps": 30,
+  "maxGeneralPixelTransitionsInOneSecond": 11,
+  "maxRedPixelTransitionsInOneSecond": 0,
+  "maxGeneralEpisodeTransitionsInOneSecond": 2,
+  "maxRedEpisodeTransitionsInOneSecond": 0,
+  "maxRapidPixelAreaFraction": 0.000056,
+  "areaThreshold": 0.02,
+  "luminanceThreshold": 0.1,
+  "redUVComponentThreshold": 0.1414213562373095,
+  "legacyRedThreshold": 20,
+  "resolution": "native",
+  "ambiguousFrames": [
+    295,
+    565,
+    990
+  ],
+  "hazardFrames": [],
+  "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+  "file": "/workspace/eventrunner/video/out/publish-page-landscape.mp4",
+  "width": 1920,
+  "height": 1080,
+  "fileHash": "ea14a57e7158fd60faf53cf4805ed4bec28593ba5879973bbaf7b41502fa0836",
+  "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+}

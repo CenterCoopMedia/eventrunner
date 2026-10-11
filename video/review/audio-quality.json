@@ -1,0 +1,182 @@
+[
+  {
+    "file": "change-style-landscape.wav",
+    "sha256": "816ab68c4f586c565c1de6998ce5642aa8200454d9df590691e7145bf42c9b21",
+    "frames": 4032000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.072650465277249,
+    "dcOffsetDbFS": -134.62156405910247,
+    "stereoCorrelation": 0.9233142893675554,
+    "monoFoldDownLossDb": -0.1699684387711805,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "pass": true
+  },
+  {
+    "file": "change-style-vertical.wav",
+    "sha256": "ab72a4b64e43da4e1a21ea7232c83508f628f8faad01d15456e38a0c3a7b0b5b",
+    "frames": 4032000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.102781100807557,
+    "dcOffsetDbFS": -134.27295101115095,
+    "stereoCorrelation": 0.9232841332974907,
+    "monoFoldDownLossDb": -0.1700313638500212,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "pass": true
+  },
+  {
+    "file": "general-trailer-landscape.wav",
+    "sha256": "1e0ea840e46ef761fa8d7d07f8aca712bf24ce7a23759233248015d14f771d93",
+    "frames": 2160000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.317545364024464,
+    "dcOffsetDbFS": -114.79699198342685,
+    "stereoCorrelation": 0.9379596214877046,
+    "monoFoldDownLossDb": -0.13735218208006283,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "titleSilencePeakDbFS": -240.0,
+    "silenceBoundaryJumpDbFS": -240.0,
+    "pass": true
+  },
+  {
+    "file": "general-trailer-vertical.wav",
+    "sha256": "1e0ea840e46ef761fa8d7d07f8aca712bf24ce7a23759233248015d14f771d93",
+    "frames": 2160000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.317545364024464,
+    "dcOffsetDbFS": -114.79699198342685,
+    "stereoCorrelation": 0.9379596214877046,
+    "monoFoldDownLossDb": -0.13735218208006283,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "titleSilencePeakDbFS": -240.0,
+    "silenceBoundaryJumpDbFS": -240.0,
+    "pass": true
+  },
+  {
+    "file": "publish-page-landscape.wav",
+    "sha256": "422c7a6e07f473ff9a6ab72ac1c839d64975a5adc5c66909e586a4d241d90374",
+    "frames": 3600000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.15266216594575,
+    "dcOffsetDbFS": -133.72900191741377,
+    "stereoCorrelation": 0.9238846364894091,
+    "monoFoldDownLossDb": -0.16867997305185375,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "pass": true
+  },
+  {
+    "file": "publish-page-vertical.wav",
+    "sha256": "422c7a6e07f473ff9a6ab72ac1c839d64975a5adc5c66909e586a4d241d90374",
+    "frames": 3600000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.15266216594575,
+    "dcOffsetDbFS": -133.72900191741377,
+    "stereoCorrelation": 0.9238846364894091,
+    "monoFoldDownLossDb": -0.16867997305185375,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "pass": true
+  },
+  {
+    "file": "save-schedule-landscape.wav",
+    "sha256": "c90ee97a4b8a05032e7dbed55a7c44aa24647d499d49f602bb6bc488f3eeff0a",
+    "frames": 2880000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.572686430462632,
+    "dcOffsetDbFS": -132.7285154894518,
+    "stereoCorrelation": 0.9245146070564002,
+    "monoFoldDownLossDb": -0.16726370480842453,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "pass": true
+  },
+  {
+    "file": "save-schedule-vertical.wav",
+    "sha256": "983cb95230ba2d833d60e08500c51c2c86c821feda4ecfc031b5892c7b7bd1b9",
+    "frames": 2880000,
+    "sampleRate": 48000,
+    "bits": 16,
+    "channels": 2,
+    "samplePeakDbFS": -4.290136137583306,
+    "dcOffsetDbFS": -132.8525243368133,
+    "stereoCorrelation": 0.9244501191121387,
+    "monoFoldDownLossDb": -0.16739912933717713,
+    "firstSample": [
+      0.0,
+      0.0
+    ],
+    "lastSample": [
+      0.0,
+      0.0
+    ],
+    "clippedSamples": 0,
+    "pass": true
+  }
+]

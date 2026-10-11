@@ -1,0 +1,207 @@
+{
+  "sampleRate": 48000,
+  "bits": 16,
+  "channels": 2,
+  "samples": 2160000,
+  "clock": {
+    "id": "general-trailer",
+    "title": "Make room for your event",
+    "fps": 30,
+    "bpm": 112,
+    "duration": 1350,
+    "settle": 1230,
+    "kind": "trailer",
+    "seed": 67041,
+    "periods": [
+      242,
+      578,
+      854
+    ],
+    "silence": [
+      1149,
+      1157
+    ],
+    "assembly": {
+      "arrivals": [
+        26,
+        49,
+        73,
+        97
+      ],
+      "join": 242,
+      "program": 300,
+      "shape": 386,
+      "styleFlow": [
+        462,
+        494,
+        526
+      ],
+      "themePublish": 578,
+      "gather": 643,
+      "bookmarks": [
+        710,
+        807
+      ],
+      "reveal": 964,
+      "title": 1157,
+      "settle": 1230
+    },
+    "scenes": [
+      {
+        "id": "parts",
+        "start": 0,
+        "end": 129,
+        "caption": "Every event starts with people.",
+        "capture": ""
+      },
+      {
+        "id": "plan",
+        "start": 129,
+        "end": 386,
+        "caption": "Bring the pieces together.",
+        "capture": ""
+      },
+      {
+        "id": "shape",
+        "start": 386,
+        "end": 643,
+        "caption": "Make it feel like your event.",
+        "capture": ""
+      },
+      {
+        "id": "gather",
+        "start": 643,
+        "end": 964,
+        "caption": "A whole program. A personal day.",
+        "capture": ""
+      },
+      {
+        "id": "reveal-experience",
+        "start": 964,
+        "end": 1157,
+        "caption": "One connected experience.",
+        "capture": ""
+      },
+      {
+        "id": "end",
+        "start": 1157,
+        "end": 1350,
+        "caption": "Make room for your event.",
+        "capture": "",
+        "endCard": true
+      }
+    ]
+  },
+  "target": -16,
+  "lufs": -15.8,
+  "truePeak": -4.3,
+  "method": "FFmpeg ebur128=peak=true / BS.1770",
+  "summary": "Summary:\n\n  Integrated loudness:\n    I:         -15.8 LUFS\n    Threshold: -25.9 LUFS\n\n  Loudness range:\n    LRA:         4.4 LU\n    Threshold: -35.7 LUFS\n    LRA low:   -18.7 LUFS\n    LRA high:  -14.3 LUFS\n\n  True peak:\n    Peak:       -4.3 dBFS\n[out#0/null @ 0x562a4e2d75c0] video:0KiB audio:8438KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nsize=N/A time=00:00:45.00 bitrate=N/A speed= 237x    \n",
+  "arrangement": {
+    "composer": "Original Event Runner synthesis",
+    "bpm": 112,
+    "bars": 21,
+    "instrumentation": [
+      "modeled tine electric piano",
+      "synthesized acoustic and metallic percussion",
+      "filtered harmonic bass",
+      "detuned harmonic ensemble",
+      "tactile foley",
+      "diffused stereo room"
+    ],
+    "events": [
+      {
+        "kind": "component-arrival",
+        "frame": 26
+      },
+      {
+        "kind": "component-arrival",
+        "frame": 49
+      },
+      {
+        "kind": "component-arrival",
+        "frame": 73
+      },
+      {
+        "kind": "component-arrival",
+        "frame": 97
+      },
+      {
+        "kind": "assembly-action",
+        "frame": 242
+      },
+      {
+        "kind": "spatial-transition",
+        "frame": 300
+      },
+      {
+        "kind": "spatial-transition",
+        "frame": 386
+      },
+      {
+        "kind": "style-arrival",
+        "frame": 462
+      },
+      {
+        "kind": "style-arrival",
+        "frame": 494
+      },
+      {
+        "kind": "style-arrival",
+        "frame": 526
+      },
+      {
+        "kind": "assembly-action",
+        "frame": 578
+      },
+      {
+        "kind": "spatial-transition",
+        "frame": 643
+      },
+      {
+        "kind": "bookmark",
+        "frame": 710
+      },
+      {
+        "kind": "schedule-arrival",
+        "frame": 757
+      },
+      {
+        "kind": "bookmark",
+        "frame": 807
+      },
+      {
+        "kind": "schedule-arrival",
+        "frame": 854
+      },
+      {
+        "kind": "spatial-transition",
+        "frame": 964
+      },
+      {
+        "kind": "spatial-transition",
+        "frame": 1157
+      }
+    ],
+    "rawPeak": 0.4916248888995839,
+    "stemRmsDb": {
+      "keys": -24.092949454625135,
+      "drums": -24.49660116411884,
+      "pad": -27.53237066913225,
+      "bass": -25.197023585910255,
+      "foley": -55.93688739374831,
+      "wet": -35.82119682877786
+    }
+  },
+  "sources": {
+    "synth.mjs": "71791a8a1e69456c92b85ed881b07520add9270639755db7ede2ed4339e0d1d5",
+    "make-score.mjs": "4d83833ff0b6df63340f0117bd2996bf544d089f491e36b64d8858118ccb1395",
+    "audio-plan.mjs": "658f56ed1d7e050cd0db3d211740a84659bef00b401b4fd8860cec62b29e2740",
+    "score-provenance.mjs": "4f898a7f5a3e771157d1c3348fc254a7ca002878063ef6d10b53b49108dd6088",
+    "timeline.ts": "a3ff71d804aa9eac910a674a012195d8f4309e1c26b4161d24047a2fc678234f",
+    "trailer/assembly/make-score.mjs": "c3100f18698e8c85f1c37ff3359af057c6cf0ef9db614e2093b9112f5dbd2373",
+    "trailer/assembly/score.mjs": "31905b2181ddbe1cebf0632fa1ebf4f659848a20ea21f9e2c5e775f4869bb69b",
+    "trailer/assembly/timeline.ts": "954ec40ac91d9555ac00f21a050f41b705ffc6afc9778a90cd109c98d9630f58"
+  },
+  "wavHash": "1e0ea840e46ef761fa8d7d07f8aca712bf24ce7a23759233248015d14f771d93"
+}

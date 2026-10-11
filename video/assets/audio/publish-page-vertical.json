@@ -1,0 +1,156 @@
+{
+  "sampleRate": 48000,
+  "bits": 16,
+  "channels": 2,
+  "samples": 3600000,
+  "clock": {
+    "id": "publish-page",
+    "title": "Publish a page update",
+    "duration": 2250,
+    "seed": 714,
+    "scenes": [
+      {
+        "id": "intro",
+        "start": 0,
+        "end": 150,
+        "caption": "Publish a page update.",
+        "capture": "staff-home",
+        "detail": "Start signed in as event staff.",
+        "chapter": "01"
+      },
+      {
+        "id": "edit",
+        "start": 150,
+        "end": 390,
+        "caption": "Open Edit section.",
+        "capture": "edit-section",
+        "after": "headline-list",
+        "action": {
+          "target": "action",
+          "moveStart": 240,
+          "moveEnd": 279,
+          "press": 285
+        },
+        "chapter": "01"
+      },
+      {
+        "id": "choose",
+        "start": 390,
+        "end": 690,
+        "caption": "Choose the headline block.",
+        "capture": "headline-list",
+        "after": "editor-before",
+        "action": {
+          "target": "action",
+          "moveStart": 510,
+          "moveEnd": 549,
+          "press": 555
+        },
+        "chapter": "02"
+      },
+      {
+        "id": "write",
+        "start": 690,
+        "end": 990,
+        "caption": "Write your new headline.",
+        "capture": "editor-before",
+        "typing": {
+          "prefix": "typing-",
+          "length": 33,
+          "start": 750,
+          "interval": 4
+        },
+        "chapter": "03",
+        "action": {
+          "target": "field",
+          "moveStart": 695,
+          "moveEnd": 729,
+          "press": 735
+        }
+      },
+      {
+        "id": "save",
+        "start": 990,
+        "end": 1110,
+        "caption": "Select Save draft.",
+        "capture": "draft-hover",
+        "after": "draft-saved",
+        "action": {
+          "target": "action",
+          "moveStart": 1030,
+          "moveEnd": 1069,
+          "press": 1075
+        },
+        "chapter": "04"
+      },
+      {
+        "id": "draft",
+        "start": 1110,
+        "end": 1260,
+        "caption": "A saved draft is not public.",
+        "capture": "draft-saved",
+        "chapter": "05"
+      },
+      {
+        "id": "publish",
+        "start": 1260,
+        "end": 1590,
+        "caption": "Select Save and publish.",
+        "capture": "publish-hover",
+        "after": "published",
+        "action": {
+          "target": "action",
+          "moveStart": 1395,
+          "moveEnd": 1434,
+          "press": 1440
+        },
+        "chapter": "06"
+      },
+      {
+        "id": "check",
+        "start": 1590,
+        "end": 1800,
+        "caption": "Check the public page.",
+        "capture": "public-result",
+        "chapter": "07"
+      },
+      {
+        "id": "result",
+        "start": 1800,
+        "end": 2070,
+        "caption": "Your headline is published.",
+        "capture": "public-result",
+        "chapter": "07"
+      },
+      {
+        "id": "end",
+        "start": 2070,
+        "end": 2250,
+        "caption": "Make room for your event.",
+        "capture": "public-result",
+        "endCard": true,
+        "chapter": "07"
+      }
+    ],
+    "fps": 30,
+    "bpm": 120,
+    "periods": [],
+    "silence": [],
+    "kind": "tutorial",
+    "settle": 2190,
+    "sourceHash": "bd51ec2eac423567769aaa46875fec37512e2b68d608d7dd7f7652479447a370"
+  },
+  "target": -19,
+  "lufs": -19.1,
+  "truePeak": -4.2,
+  "method": "FFmpeg ebur128=peak=true / BS.1770",
+  "summary": "Summary:\n\n  Integrated loudness:\n    I:         -19.1 LUFS\n    Threshold: -29.1 LUFS\n\n  Loudness range:\n    LRA:         6.9 LU\n    Threshold: -39.1 LUFS\n    LRA low:   -21.0 LUFS\n    LRA high:  -14.1 LUFS\n\n  True peak:\n    Peak:       -4.2 dBFS\n[out#0/null @ 0x55cdc886b5c0] video:0KiB audio:14062KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nsize=N/A time=00:01:15.00 bitrate=N/A speed= 229x    \n",
+  "sources": {
+    "synth.mjs": "71791a8a1e69456c92b85ed881b07520add9270639755db7ede2ed4339e0d1d5",
+    "make-score.mjs": "4d83833ff0b6df63340f0117bd2996bf544d089f491e36b64d8858118ccb1395",
+    "audio-plan.mjs": "658f56ed1d7e050cd0db3d211740a84659bef00b401b4fd8860cec62b29e2740",
+    "score-provenance.mjs": "4f898a7f5a3e771157d1c3348fc254a7ca002878063ef6d10b53b49108dd6088",
+    "timeline.ts": "57a73c758c60ebfb0175adc3f73c898f2010407a87cd598afe0564cb42ed93f6"
+  },
+  "wavHash": "422c7a6e07f473ff9a6ab72ac1c839d64975a5adc5c66909e586a4d241d90374"
+}

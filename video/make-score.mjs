@@ -1,0 +1,6 @@
+import fs from 'node:fs';import path from 'node:path';
+import {options,readProject} from './project.mjs';import {synth,writeWav,normalize} from './synth.mjs';
+import {assemblyScore} from './trailer/assembly/make-score.mjs';
+import {hash,expectedScoreSources} from './score-provenance.mjs';
+const opt=options();for(const piece of opt.pieces){for(const format of ['landscape','vertical']){const {clock}=await readProject(opt.root,piece,format);const dir=path.join(opt.root,'assets/audio');fs.mkdirSync(dir,{recursive:true});fs.mkdirSync(path.join(opt.root,'.cache'),{recursive:true});const raw=path.join(opt.root,'.cache',piece+'-'+format+'-raw.wav'),out=path.join(dir,piece+'-'+format+'.wav');let arrangement;if(clock.assembly)arrangement=assemblyScore(clock,raw);else writeWav(raw,synth(clock));const target=clock.kind==='trailer'?-16:-19;const loudness=normalize(raw,out,target);fs.writeFileSync(path.join(dir,piece+'-'+format+'.json'),JSON.stringify({sampleRate:48000,bits:16,channels:2,samples:clock.duration/clock.fps*48000,clock,target,...loudness,...(arrangement?{arrangement}:{}),sources:expectedScoreSources(opt.root,piece,clock),wavHash:hash(out)},null,2));console.log(piece,loudness.lufs,loudness.truePeak);}
+}

@@ -1,0 +1,3 @@
+import {captureAt} from './frame-state.ts';
+export {captureAt};
+export function visualKey(clock,frame){if(clock.cinematic||clock.assembly)return frame<clock.settle?`f${frame}`:'settled';const s=clock.scenes.find(s=>frame>=s.start&&frame<s.end)??clock.scenes.at(-1);const wordStart=s.word==='Plan'?120:s.word==='Shape'?420:780;const moving=(clock.kind==='trailer'&&(frame<84||frame<s.start+36||(s.word&&frame<wordStart+46)))||(s.action&&frame>=s.action.moveStart-8&&frame<=s.action.press+18)||(s.endCard&&frame<clock.settle);return moving?`f${frame}`:`${s.id}/${captureAt(s,frame)}/${s.word?(frame>=clock.periods[s.word==='Plan'?0:s.word==='Shape'?1:2]):''}`;}

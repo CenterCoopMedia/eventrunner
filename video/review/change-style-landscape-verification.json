@@ -1,0 +1,54 @@
+{
+  "inputDigest": "82ddc2d001c0ab596275efdfa805bbbd646e25ecb02dbcf91fa8b589a7204db3",
+  "file": "change-style-landscape.mp4",
+  "sha256": "e321319cb28181350b3c8efe74e5a2185fa41ba9dae4428126ae1f6880f1e71d",
+  "format": {
+    "width": 1920,
+    "height": 1080,
+    "fps": "30/1",
+    "pixelFormat": "yuv420p",
+    "codec": "h264",
+    "frames": 2520,
+    "duration": 84
+  },
+  "audio": {
+    "target": -19,
+    "lufs": -19.1,
+    "truePeak": -4.1,
+    "method": "FFmpeg ebur128=peak=true / BS.1770",
+    "summary": "Summary:\n\n  Integrated loudness:\n    I:         -19.1 LUFS\n    Threshold: -29.1 LUFS\n\n  Loudness range:\n    LRA:         6.1 LU\n    Threshold: -39.1 LUFS\n    LRA low:   -20.9 LUFS\n    LRA high:  -14.9 LUFS\n\n  True peak:\n    Peak:       -4.1 dBFS\n[out#0/null @ 0x559c9fd2adc0] video:1083KiB audio:15752KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nframe= 2520 fps=293 q=-0.0 Lsize=N/A time=00:01:24.00 bitrate=N/A speed=9.78x    \n"
+  },
+  "flash": {
+    "pass": true,
+    "status": "pass-screen",
+    "certification": false,
+    "frames": 2520,
+    "fps": 30,
+    "maxGeneralPixelTransitionsInOneSecond": 30,
+    "maxRedPixelTransitionsInOneSecond": 2,
+    "maxGeneralEpisodeTransitionsInOneSecond": 2,
+    "maxRedEpisodeTransitionsInOneSecond": 1,
+    "maxRapidPixelAreaFraction": 0.000058,
+    "areaThreshold": 0.02,
+    "luminanceThreshold": 0.1,
+    "redUVComponentThreshold": 0.1414213562373095,
+    "legacyRedThreshold": 20,
+    "resolution": "native",
+    "ambiguousFrames": [
+      460,
+      840,
+      990,
+      1260,
+      1380,
+      1830,
+      2100
+    ],
+    "hazardFrames": [],
+    "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+    "file": "/workspace/eventrunner/video/out/change-style-landscape.mp4",
+    "width": 1920,
+    "height": 1080,
+    "fileHash": "e321319cb28181350b3c8efe74e5a2185fa41ba9dae4428126ae1f6880f1e71d",
+    "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+  }
+}

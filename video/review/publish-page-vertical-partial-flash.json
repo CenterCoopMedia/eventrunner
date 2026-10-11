@@ -1,0 +1,17 @@
+{
+  "pass": true,
+  "frames": 101,
+  "fps": 30.0,
+  "maxOppositionsInOneSecond": 0,
+  "maxOpposingAreaFraction": 0.000446,
+  "areaThreshold": 0.02,
+  "luminanceThreshold": 0.1,
+  "redThreshold": 20,
+  "resolution": "native",
+  "conservative": true,
+  "method": "Cumulative per-pixel extrema; opposing general or saturated-red transitions; 2% picture area; rolling one-second window. Oppositions count separately.",
+  "qualifyingEvents": [],
+  "file": "video/out/publish-page-vertical-690-790.mp4",
+  "width": 1080,
+  "height": 1920
+}
