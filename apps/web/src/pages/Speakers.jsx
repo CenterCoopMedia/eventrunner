@@ -18,7 +18,6 @@ import SystemPage from '../components/SystemPage.jsx';
 import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
-import { IS_DEMO } from '../lib/demoMode.js';
 
 export default function Speakers() {
   const { features } = useEventConfig();
@@ -57,10 +56,10 @@ export default function Speakers() {
             // which is not a picture of anyone — at that size a face is a
             // bullet. This page's job is recognition: a reader is looking
             // for someone they half remember, or working out who is worth
-            // an hour of their day. So the portrait leads, at a size a face
-            // survives, in a frame on the alternate ground — which also
-            // means a speaker with no headshot is an empty frame holding
-            // its place on the shelf, not a hole in it.
+            // an hour of their day. So a real headshot leads, at a size a
+            // face survives, in a frame on the alternate ground. A speaker
+            // with no headshot is the name and the credit only. The frame
+            // is not drawn, so the row does not reserve a blank square.
             //
             // Still not a card. The frame holds the picture and nothing
             // else: no border boxes the entry, the name and the credit sit
@@ -94,24 +93,26 @@ export default function Speakers() {
                   .filter(Boolean)
                   .join(', ');
                 const href = `/speakers/${typeof speaker.slug === 'string' && speaker.slug ? speaker.slug : speaker.id}`;
+                const hasHeadshot = typeof speaker.headshotPath === 'string' && speaker.headshotPath.length > 0;
+                const besidePortrait = arrangement !== 'grid' && hasHeadshot;
                 return (
                   <li
                     key={speaker.id}
                     className={
-                      arrangement === 'grid'
-                        ? 'portrait-shelf__plate'
-                        : 'portrait-shelf__plate sm:grid sm:grid-cols-[14rem,1fr] sm:gap-lg'
+                      besidePortrait
+                        ? 'portrait-shelf__plate sm:grid sm:grid-cols-[14rem,1fr] sm:gap-lg'
+                        : 'portrait-shelf__plate'
                     }
                   >
                     {/* The portrait is decorative here: the name is right
                         under it and links to the same place, so alt text
                         would be the name said twice to a screen reader. */}
-                    {speaker.headshotPath || !IS_DEMO ? <div className="portrait-shelf__frame">
-                      {speaker.headshotPath ? (
+                    {hasHeadshot ? (
+                      <div className="portrait-shelf__frame">
                         <AssetImage path={speaker.headshotPath} alt="" className="" />
-                      ) : null}
-                    </div> : null}
-                    <div className={arrangement === 'grid' ? 'mt-xs' : 'mt-xs sm:mt-0'}>
+                      </div>
+                    ) : null}
+                    <div className={besidePortrait ? 'mt-xs sm:mt-0' : 'mt-xs'}>
                       <h2 className="font-heading text-h3 font-semibold text-text-primary">
                         <Link to={href} className="hover:underline">
                           {speaker.displayName}

@@ -788,9 +788,8 @@
      ------------------------------------------------------------------
      SPEAKERS — a shelf of portraits. The headshot was a 40px thumbnail
      beside a name, which is not a picture of anyone; at that size it is a
-     bullet. Here the portrait leads at a size a face survives, framed on
-     the alternate ground so a missing headshot is an empty frame rather
-     than a hole in the shelf. */
+     bullet. A real headshot leads at a size a face survives, framed on
+     the alternate ground. A missing headshot does not draw this frame. */
   .portrait-shelf__plate {
     padding-block: var(--page-row-pad-block);
     /* The rule between entries is the directory contract (2026-09-10
