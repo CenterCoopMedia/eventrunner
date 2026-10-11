@@ -74,11 +74,14 @@ Do not infer control from matching names or an empty member response.
 - Review lifecycle scripts and generated build files before approving the final
   release contents. The preview above skips scripts; publishing from a directory
   can run them and produce different contents.
-- After approving the build and lifecycle scripts, create the final tarball with
-  [`npm pack`](https://docs.npmjs.com/cli/v11/commands/npm-pack/). Inspect its
+- After approving the build and lifecycle scripts, create one final tarball
+  per approved package with [`npm pack`](https://docs.npmjs.com/cli/v11/commands/npm-pack/).
+  npm treats a tarball as one package. `@eventrunner` and `@event-runner` need
+  separate tarballs when both organizations are approved. Inspect each tarball's
   actual file contents, including generated files, and check for private data.
-  Record its path and SHA-256 checksum with the release approval. Publish that
-  exact reviewed tarball; rebuilding or changing it requires another review.
+  Record each path and SHA-256 checksum with the release approval. Publish each
+  exact reviewed tarball. An approval for one package does not cover a second
+  name. Rebuilding or changing a tarball requires another review.
 - Confirm the package's behavior with the relevant checks for that release.
 - Keep secrets and private files out of the tarball. Do not publish from the
   repository root or remove a workspace's `private` flag to reserve a name.
@@ -86,9 +89,11 @@ Do not infer control from matching names or an empty member response.
 
 ## 3. Confirm the operator account
 
-Run `npm whoami` against the public registry. Confirm the returned user is the
-approved operator. On the npm website, verify that user's 2FA, recovery details,
-and required organization role. A successful login does not prove those checks.
+Run `npm whoami --registry=https://registry.npmjs.org/`. Confirm the returned
+user is the approved operator. On the npm website, verify that user's 2FA and
+recovery details. If an approved organization already exists, also verify the
+required organization role. A new organization has no role to verify until step
+5 creates it. A successful login does not prove those checks.
 
 If login is needed, the human operator completes `npm login` and 2FA. Do not
 script around 2FA or store a token that bypasses it.
@@ -96,10 +101,12 @@ script around 2FA or store a token that bypasses it.
 ## 4. Recheck and obtain the final go-ahead
 
 Repeat all four registry checks immediately before any public change. Ask the
-maintainer to approve the exact names, reviewed tarball and checksum, and
-organization actions in that execution session. Confirm the tarball checksum
-still matches. Earlier planning approval is insufficient. Stop if the observed
-ownership changed or any prerequisite is unverified.
+maintainer to approve the exact names, every reviewed tarball and checksum, the
+public registry `https://registry.npmjs.org/`, and the organization actions in
+that execution session. Confirm each tarball checksum still matches. Earlier
+planning approval is insufficient. A role on an organization that does not exist
+yet is not a prerequisite. Stop if the observed ownership changed or any other
+prerequisite is unverified.
 
 ## 5. Create only the approved organizations and publish
 
@@ -109,21 +116,32 @@ separately authorized. Add the approved maintainers and verify their roles.
 An organization's name is its scope.
 Create an organization only when the approved release includes its active
 scoped package. A member roster alone does not satisfy the active-use policy.
+After creation, and before publishing that scoped package, verify the operator's
+organization role.
 
 The documented [`npm org` command](https://docs.npmjs.com/cli/v11/commands/npm-org/)
 manages members with `set`, `rm`, and `ls`; it does not provide `npm org create`.
 
-Publish only the exact reviewed tarball, with the agreed name and access level.
-[`npm publish`](https://docs.npmjs.com/cli/v11/commands/npm-publish/) accepts a
-local tarball path. Do not publish from the source directory or repack after
-approval. Complete 2FA interactively. This runbook provides no publish command
-until that release is defined and approved.
+Publish each exact reviewed tarball to the public registry only. The command
+must pass `--registry=https://registry.npmjs.org/`. A saved `.npmrc` registry
+does not replace that flag. [`npm publish`](https://docs.npmjs.com/cli/v11/commands/npm-publish/)
+accepts a local tarball path. Do not publish from the source directory or repack
+after approval. The shape below is not approval to publish. Substitute one
+reviewed tarball path, and repeat it for every approved package. Add the
+approved `--access` value only when the maintainer named it.
+
+```sh
+npm publish <reviewed-tarball> --registry=https://registry.npmjs.org/
+```
+
+Complete 2FA interactively.
 
 ## 6. Verify ownership and record the result
 
-- Run `npm view <approved-package-name>` against the public registry and check
-  the exact version, description, and maintainers against the approved release.
-- Check each approved organization with `npm org ls <org-name>` while signed in
+- Run `npm view <approved-package-name> --registry=https://registry.npmjs.org/`
+  for every approved package and check the exact version, description, and
+  maintainers against that package's approved release.
+- Check each approved organization with `npm org ls <org-name> --registry=https://registry.npmjs.org/` while signed in
   as the operator, and verify owner and maintainer roles on the npm website.
 - For every created organization, verify its approved scoped package exists in
   the registry and is associated with that organization. Record the package URL
