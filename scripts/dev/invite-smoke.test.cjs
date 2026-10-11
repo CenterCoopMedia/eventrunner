@@ -37,12 +37,26 @@ test('invite smoke refuses a missing or remote emulator host', async () => {
 
 test('invite smoke accepts loopback Firestore and Auth hosts', async () => {
   const { inviteSmokeEmulatorError } = await loadGuard();
-  for (const auth of ['127.0.0.1:9099', 'localhost:9099', '[::1]:9099', ' 127.0.0.1:9099 ']) {
+  for (const auth of ['127.0.0.1:9099', 'localhost:9099', '[::1]:9099']) {
     assert.equal(inviteSmokeEmulatorError({
       FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080',
       FIREBASE_AUTH_EMULATOR_HOST: auth,
     }), null);
   }
+  assert.match(
+    inviteSmokeEmulatorError({
+      FIRESTORE_EMULATOR_HOST: ' 127.0.0.1:8080',
+      FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
+    }),
+    /FIRESTORE_EMULATOR_HOST must be a loopback emulator host/,
+  );
+  assert.match(
+    inviteSmokeEmulatorError({
+      FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080',
+      FIREBASE_AUTH_EMULATOR_HOST: ' 127.0.0.1:9099 ',
+    }),
+    /FIREBASE_AUTH_EMULATOR_HOST must be a loopback emulator host/,
+  );
 });
 
 function runScript(env, args) {

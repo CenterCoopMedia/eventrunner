@@ -56,8 +56,10 @@ const LOOPBACK_EMULATOR = /^(?:127\.0\.0\.1|localhost|\[::1\]):\d+$/;
  * @returns {string|null}
  */
 export function inviteSmokeEmulatorError(env) {
-  const firestore = typeof env.FIRESTORE_EMULATOR_HOST === 'string' ? env.FIRESTORE_EMULATOR_HOST.trim() : '';
-  const auth = typeof env.FIREBASE_AUTH_EMULATOR_HOST === 'string' ? env.FIREBASE_AUTH_EMULATOR_HOST.trim() : '';
+  // Do not trim. The Admin SDK reads these variables as they are, and a
+  // padded host that passed a trimmed check would still be rejected later.
+  const firestore = typeof env.FIRESTORE_EMULATOR_HOST === 'string' ? env.FIRESTORE_EMULATOR_HOST : '';
+  const auth = typeof env.FIREBASE_AUTH_EMULATOR_HOST === 'string' ? env.FIREBASE_AUTH_EMULATOR_HOST : '';
   if (!LOOPBACK_EMULATOR.test(firestore)) {
     return 'FIRESTORE_EMULATOR_HOST must be a loopback emulator host before invite smoke writes admin config';
   }
@@ -72,7 +74,7 @@ function parseArgs(argv) {
     projectId: process.env.EVENT_FIREBASE_PROJECT_ID || 'demo-run-of-show',
     region: process.env.EVENT_FIREBASE_REGION || 'us-central1',
     functionsPort: 5001,
-    authHost: (process.env.FIREBASE_AUTH_EMULATOR_HOST || '').trim(),
+    authHost: process.env.FIREBASE_AUTH_EMULATOR_HOST || '',
     emulatorLog: null,
     timeoutMs: 30000,
   };
