@@ -11,6 +11,7 @@ import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import { blockTypeLabel } from '../blockTypes.js';
+import { contentBlockTitle } from '../contentDoc.js';
 import { summarizePublish } from '../publishResult.js';
 import {
   DestructiveConfirm,
@@ -130,7 +131,7 @@ export default function AdminContentSection() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title={section?.label || sectionId}
-        identifiers={`${pageId} · ${sectionId} · ${blocks.length} block${
+        identifiers={`${page?.current?.label || pageId} · ${section?.label || sectionId} · ${blocks.length} block${
           blocks.length === 1 ? '' : 's'
         }`}
         description={`${page?.current?.label ?? pageId} · allows ${
@@ -174,13 +175,11 @@ export default function AdminContentSection() {
                 <div className={rowClass}>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
-                      {/* A block's name is its field id, so the title keeps
-                          the data face the rest of the room sets ids in. */}
                       <Link
                         to={row.current.field}
-                        className={`${rowTitleLinkClass} font-admin-data`}
+                        className={rowTitleLinkClass}
                       >
-                        {row.current.field}
+                        {contentBlockTitle(row.current)}
                       </Link>
                       <RecordState state={row.state} />
                       <StatusBadge tone="info">{blockTypeLabel(row.current.blockType)}</StatusBadge>
@@ -197,7 +196,7 @@ export default function AdminContentSection() {
                         disabled={busyId !== null}
                         onClick={() => publishOne(row)}
                       >
-                        {busyId === row.id ? 'Publishing…' : 'Publish this block'}
+                        {busyId === row.id ? 'Publishing…' : 'Publish'}
                       </button>
                     ) : null}
                     <Link to={row.current.field} className={linkButtonClass}>
@@ -205,12 +204,12 @@ export default function AdminContentSection() {
                     </Link>
                     <DestructiveConfirm
                       trigger="Delete"
-                      title={`Delete ${row.current.field}`}
+                      title={`Delete ${contentBlockTitle(row.current)}`}
                       confirmLabel="Delete this block"
                       busyLabel="Deleting…"
                       busy={busyId === row.id}
                       disabled={busyId !== null}
-                      consequence={`The live revision of ${row.current.field} and its draft both go, and the section renders without it.`}
+                      consequence="The live revision and its draft both go, and the section renders without this block."
                       permanence="This cannot be undone."
                       onConfirm={() => remove(row)}
                     />

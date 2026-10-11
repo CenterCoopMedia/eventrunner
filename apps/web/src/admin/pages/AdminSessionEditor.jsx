@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isSafeUrl } from 'shared/urlSafety';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -6,11 +7,13 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';
 import {
+  lockSessionId,
   publishSetForSession,
   resolveDayLabel,
   sessionFields,
-  sessionIdFromTitle,
 } from '../sessionDoc.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import { useAdminSessions } from '../useAdminSessions.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
@@ -67,11 +70,12 @@ function toForm(row) {
   };
 }
 
-function validateForm(form, mode) {
+function editorSnapshot(form) {
+  return JSON.stringify(form);
+}
+
+function validateForm(form) {
   const errors = new Map();
-  if (mode === 'create' && (!form.id || form.id.includes('/') || form.id === '.' || form.id === '..')) {
-    errors.set('id', 'Enter a session id without a slash.');
-  }
   if (!form.title.trim()) errors.set('title', 'Enter a public title.');
   if (!form.description.trim()) errors.set('description', 'Enter a public description.');
   if (!form.dayId) errors.set('dayId', 'Select an event day.');
@@ -106,25 +110,39 @@ export default function AdminSessionEditor({ mode }) {
   const { rows, ready, error: listenerError, findRow } = useAdminSessions();
   const row = mode === 'edit' ? findRow(sessionId) : null;
   const [form, setForm] = useState(EMPTY);
-  const [idTouched, setIdTouched] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(() => (
+    mode === 'create' ? editorSnapshot(EMPTY) : null
+  ));
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const errorRef = useRef(null);
   const formRef = useRef(null);
   const adoptedRef = useRef(false);
+  const unsaved = savedSnapshot !== null && editorSnapshot(form) !== savedSnapshot;
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving });
 
   useEffect(() => {
     if (mode !== 'edit' || adoptedRef.current || !ready || !row) return;
     adoptedRef.current = true;
-    setForm(toForm(row));
+    const next = toForm(row);
+    setForm(next);
+    setSavedSnapshot(editorSnapshot(next));
   }, [mode, ready, row]);
 
   useEffect(() => {
     if (error) errorRef.current?.focus();
   }, [error]);
 
-  const localErrors = useMemo(() => validateForm(form, mode), [form, mode]);
+  useEffect(() => {
+    const node = formRef.current;
+    if (!node) return undefined;
+    if (leaveGuard.pending) node.setAttribute('inert', '');
+    else node.removeAttribute('inert');
+    return () => node.removeAttribute('inert');
+  }, [leaveGuard.pending]);
+
+  const localErrors = useMemo(() => validateForm(form), [form]);
   const serverErrors = useMemo(() => {
     const map = new Map();
     for (const segment of error?.fieldErrors ?? []) {
@@ -179,18 +197,6 @@ export default function AdminSessionEditor({ mode }) {
       .map((candidate) => ({ value: candidate.id, label: candidate.current.title || candidate.id })),
   ];
 
-  async function saveDraft() {
-    const docId = mode === 'create' ? form.id : sessionId;
-    const endpoint = mode === 'create' ? 'cmsCreateContent' : 'cmsUpdateContent';
-    await call(endpoint, {
-      collection: 'cmsSchedule',
-      docId,
-      fields: sessionFields(form),
-      visible: form.visible,
-    });
-    return docId;
-  }
-
   async function save({ publish = false } = {}) {
     if (saving) return;
     // The submit control stays enabled while a field is invalid (#219). A
@@ -201,15 +207,27 @@ export default function AdminSessionEditor({ mode }) {
       focusFirstError(formRef.current);
       return;
     }
+    const nextForm = mode === 'create'
+      ? lockSessionId(form, rows.map((candidate) => candidate.id))
+      : form;
+    if (nextForm !== form) setForm(nextForm);
+    const docId = mode === 'create' ? nextForm.id : sessionId;
+    const endpoint = mode === 'create' ? 'cmsCreateContent' : 'cmsUpdateContent';
     setSaving(true);
     setError(null);
     setStatus('');
     try {
-      const docId = await saveDraft();
+      await call(endpoint, {
+        collection: 'cmsSchedule',
+        docId,
+        fields: sessionFields(nextForm),
+        visible: nextForm.visible,
+      });
+      setSavedSnapshot(editorSnapshot(nextForm));
       if (publish) {
         // Use the fields just saved. `row` still has the parent from before
         // this edit, so publishing from it can include an unrelated draft.
-        const publishRow = { id: docId, current: sessionFields(form) };
+        const publishRow = { id: docId, current: sessionFields(nextForm) };
         const ids = publishSetForSession(publishRow, rows);
         const response = await call('cmsPublish', { collection: 'cmsSchedule', docIds: ids });
         const verdict = summarizePublish(response, 'cmsSchedule', ids, 'sessions');
@@ -275,9 +293,14 @@ export default function AdminSessionEditor({ mode }) {
       onSubmit={(event) => { event.preventDefault(); save(); }}
     >
       <AdminPageHeader
-        title={mode === 'create' ? 'New session' : form.title || sessionId}
-        state={mode === 'edit' ? <RecordState state={row?.state} /> : null}
-        identifiers={mode === 'edit' ? sessionId : null}
+        title={mode === 'create' ? 'New session' : form.title || 'Session'}
+        state={(
+          <>
+            {mode === 'edit' ? <RecordState state={row?.state} /> : null}
+            {unsaved ? <UnsavedEditBadge /> : null}
+          </>
+        )}
+        identifiers={null}
         description="Save builds a draft. Preview reads that draft, and publish sends it to the public schedule."
         actions={
           <>
@@ -319,6 +342,14 @@ export default function AdminSessionEditor({ mode }) {
 
       <ServerErrorSummary error={error} errorRef={errorRef} />
       {status ? <SaveStatus message={status} /> : null}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
 
       <div className="admin-editor-layout admin-editor-layout--session">
         <Panel
@@ -327,29 +358,10 @@ export default function AdminSessionEditor({ mode }) {
           className="admin-editor-card--primary"
         >
           <div className="flex flex-col gap-sm">
-            {mode === 'create' ? (
-              <TextField
-                label="Session id"
-                hint="A stable identifier. Use lowercase words and hyphens."
-                value={form.id}
-                onChange={(value) => {
-                  setIdTouched(true);
-                  set({ id: value });
-                }}
-                error={errorFor('id')}
-                required
-              />
-            ) : null}
             <TextField
               label="Public title"
               value={form.title}
-              onChange={(value) => {
-                setForm((current) => ({
-                  ...current,
-                  title: value,
-                  id: mode === 'create' && !idTouched ? sessionIdFromTitle(value) : current.id,
-                }));
-              }}
+              onChange={(value) => set({ title: value })}
               error={errorFor('title')}
               required
             />

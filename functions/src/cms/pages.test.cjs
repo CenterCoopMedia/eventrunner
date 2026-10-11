@@ -424,6 +424,31 @@ test('a page save can carry no seed flag: the validator refuses it, and a save w
   assert.ok(!('seeded' in d.store.writes[0].fields));
 });
 
+test('cmsSavePage create asks for a create-only write and maps an existing id to 409', async () => {
+  const created = deps();
+  const createdRes = fakeRes();
+  await createSavePageHandler(created)(adminReq({ create: true, page: validPage() }), createdRes);
+  assert.equal(createdRes.statusCode, 200);
+  assert.equal(created.store.writes[0].createOnly, true);
+  assert.equal(created.store.writes[0].rejectLive, true);
+
+  const taken = deps();
+  taken.store.writeDraft = async () => {
+    throw new Error('ALREADY_EXISTS: cmsPages/scholarships');
+  };
+  const takenRes = fakeRes();
+  await createSavePageHandler(taken)(adminReq({ create: true, page: validPage() }), takenRes);
+  assert.equal(takenRes.statusCode, 409);
+  assert.match(takenRes.body.error.message, /already belongs to a page/);
+
+  const edit = deps();
+  const editRes = fakeRes();
+  await createSavePageHandler(edit)(adminReq({ page: validPage() }), editRes);
+  assert.equal(editRes.statusCode, 200);
+  assert.equal(edit.store.writes[0].createOnly, false);
+  assert.equal(edit.store.writes[0].rejectLive, false);
+});
+
 test('cmsSavePage rejects an invalid page with 400 naming the block', async () => {
   const d = deps();
   const res = fakeRes();

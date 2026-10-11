@@ -11,6 +11,7 @@ const {
   publishDocs,
   logAdminAction,
   contentFieldsOf,
+  isAlreadyExistsError,
   internals,
 } = require('./store.cjs');
 const { makeFakeDb } = require('./firestoreFake.cjs');
@@ -602,6 +603,19 @@ test('writeDraft createOnly refuses an existing draft without writing', async ()
   );
   assert.equal(db.read('cmsContent_drafts', 'hero__title').value, 'first');
   assert.equal(db.writes.length, 0);
+});
+
+test('writeDraft createOnly rejectLive refuses a live doc that has no draft', async () => {
+  const db = makeFakeDb({ 'cmsPages/scholarships': { id: 'scholarships', label: 'Scholarships', visible: true, revision: 2 } });
+  await assert.rejects(
+    () => writeDraft({
+      db, collection: 'cmsPages', docId: 'scholarships', fields: { id: 'scholarships', label: 'Other' },
+      actor: ACTOR, now, createOnly: true, rejectLive: true,
+    }),
+    (err) => isAlreadyExistsError(err),
+  );
+  assert.equal(db.read('cmsPages', 'scholarships').label, 'Scholarships');
+  assert.equal(db.read('cmsPages_drafts', 'scholarships'), undefined);
 });
 
 test('writeDraft createOnly loses the create() race atomically — the first writer wins', async () => {
