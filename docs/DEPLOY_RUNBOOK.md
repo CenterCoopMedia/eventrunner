@@ -176,6 +176,16 @@ is `<CLIENT_ENV>` unless the run's ref is `main`, independent of both the WIF co
 in-workflow check. Combine it with **Required reviewers** on the same screen for any client where a
 human should see a dispatch before it runs.
 
+**Storage rules and the account document.** `storage.rules` calls `firestore.exists` on a profile photo write. Grant this role once per project, before the first deploy in §5. The deploy job does not grant it.
+
+```sh
+PROJECT_NUMBER="$(gcloud projects describe <GCP_PROJECT_ID> --format='value(projectNumber)')"
+gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
+  --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-firebasestorage.iam.gserviceaccount.com" \
+  --role="roles/firebaserules.firestoreServiceAgent" \
+  --condition=None
+```
+
 ## 3. GitHub Environment
 
 Create the environment (repo Settings → Environments → New environment → name it exactly
@@ -310,7 +320,7 @@ Actions tab → Deploy → Run workflow
 
 `deploy-client.yml`'s `provision` job deploys `firestore:rules`, `firestore:indexes`, and `storage`
 on **every** run regardless of the `provision` input (spec §8.1) — that input exists for operator
-intent and log clarity, not as a gate. `storage.rules` calls `firestore.exists` for a profile photo write. An operator grants `roles/firebaserules.firestoreServiceAgent` to the Cloud Storage for Firebase service agent once per project before the first deploy of these rules. The deploy job does not grant it. `bootstrap: true` is the actual gate: it is what skips
+intent and log clarity, not as a gate. The Storage rules role in §2 is required before this dispatch. `bootstrap: true` is the actual gate: it is what skips
 `content` (and, transitively, `build`/`hosting`/`post`/`smoke`) on this run. A dispatch run always deploys
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).
