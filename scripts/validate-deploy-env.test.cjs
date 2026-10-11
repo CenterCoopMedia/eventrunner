@@ -29,6 +29,14 @@ test('exits 0 on a fully populated environment', () => {
   assert.equal(main(VALID_ENV), 0);
 });
 
+test('exits 1 when a real client deployment uses console email', () => {
+  assert.equal(main({ ...VALID_ENV, EVENT_DEPLOY_CLIENT: 'cjs2026' }), 1);
+});
+
+test('exits 0 when the demo deployment uses console email', () => {
+  assert.equal(main({ ...VALID_ENV, EVENT_DEPLOY_CLIENT: 'demo' }), 0);
+});
+
 test('exits 1 when a required GitHub Environment variable was never set', () => {
   const { EVENT_STORAGE_BUCKET, ...missingBucket } = VALID_ENV;
   assert.equal(main(missingBucket), 1);
