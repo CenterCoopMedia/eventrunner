@@ -550,9 +550,11 @@ function facesFor(fonts, family) {
 }
 
 /**
- * ready: every declared weight can paint.
- * loading: a weight is not ready and has not failed.
- * unavailable: a weight failed, or a loaded face still cannot paint.
+ * ready: every requested weight can paint.
+ * loading: a requested weight is downloading and has not failed.
+ * unavailable: a requested weight failed, or a loaded face still cannot paint.
+ * An unloaded face has not been requested. check() does not start that
+ * download, so it is not a warning.
  * A missing Font Loading API cannot support a warning, so it counts as ready.
  */
 function documentFontState(doc, family) {
@@ -573,8 +575,8 @@ function documentFontState(doc, family) {
     if (ready) continue;
     const faces = facesFor(fonts, family).filter((face) => faceCoversWeight(face, weight));
     if (faces.some((face) => face.status === 'error')) missing.push(weight);
+    else if (faces.some((face) => face.status === 'loading')) loading.push(weight);
     else if (faces.some((face) => face.status === 'loaded')) missing.push(weight);
-    else loading.push(weight);
   }
   if (missing.length > 0) return { state: 'unavailable', weights: missing };
   if (loading.length > 0) return { state: 'loading', weights: loading };

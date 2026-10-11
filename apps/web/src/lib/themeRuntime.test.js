@@ -413,6 +413,21 @@ describe('themeFallbackWarnings', () => {
     expect(overpass.message).not.toContain('did not load');
   });
 
+  it('does not call an unused unloaded weight a face that is still loading', () => {
+    const doc = proofDocument({
+      check: (query) => !String(query).startsWith('700 16px "Overpass"'),
+      faces: [
+        { family: 'Overpass', weight: '400', status: 'loaded' },
+        { family: 'Overpass', weight: '700', status: 'unloaded' },
+        { family: 'Overpass Mono', weight: '400', status: 'loaded' },
+        { family: 'Overpass Mono', weight: '700', status: 'loaded' },
+      ],
+      rules: overpassRules,
+    });
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), { documents: [doc] });
+    expect(warnings.filter((warning) => warning.kind === 'font')).toEqual([]);
+  });
+
   it('names a declared weight that failed', () => {
     const doc = proofDocument({
       check: (query) => !String(query).includes('Overpass"') || String(query).includes('Mono'),
