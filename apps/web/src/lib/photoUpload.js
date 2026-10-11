@@ -64,9 +64,10 @@ export async function uploadProfilePhoto({ uid, file }) {
 }
 
 /**
- * Delete an attendee's own photo object. Best-effort: clearing `photoPath`
- * on the profile is what actually removes the photo from the site, and a
- * failed object delete must not block that save.
+ * Delete an attendee's own photo object. The caller is a failed profile
+ * save whose new object is already public. An object that is already gone
+ * is success. Any other failure is thrown so the caller can retry this
+ * same object instead of uploading another public file.
  *
  * @param {string} path
  * @returns {Promise<void>}
@@ -75,8 +76,8 @@ export async function deleteOwnPhoto(path) {
   if (typeof path !== 'string' || !path.startsWith('profile-photos/')) return;
   try {
     await deleteObject(ref(storageClient(), path));
-  } catch {
-    // An object that is already gone, or a rules refusal on somebody else's
-    // path, both end the same way: nothing to clean up here.
+  } catch (error) {
+    if (error && error.code === 'storage/object-not-found') return;
+    throw error;
   }
 }
