@@ -1,13 +1,14 @@
 // The attendee photo field: the one client-side upload in the product.
 //
-// Pinned here: it uploads to the owner's own prefix through the Storage SDK
-// (not the admin endpoints), it refuses a file storage.rules would refuse
-// before spending the upload — including one of EXACTLY the cap, since the
-// rule is a strict `<` — it reports the PATH upward so the profile save
-// writes `photoPath`, and it never deletes an object itself. The public
-// projection deletes a replaced object after users_public names the new path.
+// Pinned here: a cropped photo stays local until commit(), then the upload
+// goes to the owner's own prefix through the Storage SDK (not the admin
+// endpoints). It refuses a file storage.rules would refuse before spending
+// the upload — including one of EXACTLY the cap, since the rule is a strict
+// `<` — commit() reports the PATH upward so the profile save writes
+// `photoPath`, and the field never deletes an object itself.
+import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { chooseAndApplyCrop, installPhotoCropStubs, uninstallPhotoCropStubs } from '../../test/photoCropStubs.js';
 import { BRAND_UTILITY_PREFIX } from '../../test/retiredUtilityNames.js';
 
@@ -94,22 +95,22 @@ describe('ProfilePhotoField', () => {
     expect(label).toHaveClass('file-input-label');
   });
 
-  it('uploads to a fresh object under the signed-in user’s prefix and reports that path', async () => {
+  it('keeps a cropped photo local until the save commits it', async () => {
     const onChange = vi.fn();
-    render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
+    const ref = createRef();
+    render(<ProfilePhotoField ref={ref} uid="attendee-1" value="" onChange={onChange} />);
     await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
 
-    await waitFor(() => expect(onChange).toHaveBeenCalled());
-    const first = uploadBytes.mock.calls[0][0].path;
+    expect(screen.getByAltText('Your new profile photo')).toBeInTheDocument();
+    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(ref.current.hasPending()).toBe(true);
+
+    const first = await ref.current.commit();
     expect(first).toMatch(/^profile-photos\/attendee-1\/[0-9a-f-]{36}\/photo\.png$/);
     expect(first).not.toBe('profile-photos/attendee-1/photo.png');
     expect(onChange).toHaveBeenCalledWith(first);
-
-    await chooseAndApplyCrop(new File(['y'], 'me.png', { type: 'image/png' }), /your profile photo/);
-    await waitFor(() => expect(uploadBytes).toHaveBeenCalledTimes(2));
-    const second = uploadBytes.mock.calls[1][0].path;
-    expect(second).toMatch(/^profile-photos\/attendee-1\/[0-9a-f-]{36}\/photo\.png$/);
-    expect(second).not.toBe(first);
+    expect(ref.current.hasPending()).toBe(false);
   });
 
   it('refuses a type the rules refuse, without uploading', async () => {
@@ -162,11 +163,14 @@ describe('ProfilePhotoField', () => {
   it('reports a failed upload rather than pretending it worked', async () => {
     uploadBytes.mockRejectedValueOnce(new Error('permission denied'));
     const onChange = vi.fn();
-    render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
+    const ref = createRef();
+    render(<ProfilePhotoField ref={ref} uid="attendee-1" value="" onChange={onChange} />);
     await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
 
+    await expect(ref.current.commit()).rejects.toThrow(/permission denied/);
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not be uploaded/);
     expect(onChange).not.toHaveBeenCalled();
+    expect(ref.current.hasPending()).toBe(true);
   });
 
   it('opens the crop step between the picker and the upload, and Cancel uploads nothing', async () => {
@@ -186,9 +190,7 @@ describe('ProfilePhotoField', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('reports pending from the file choice until the upload finishes', async () => {
-    let release;
-    uploadBytes.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+  it('reports pending only while the crop step is open', async () => {
     const onPendingChange = vi.fn();
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={vi.fn()} onPendingChange={onPendingChange} />);
 
@@ -198,20 +200,34 @@ describe('ProfilePhotoField', () => {
     expect(onPendingChange).toHaveBeenLastCalledWith(false);
 
     await chooseAndApplyCrop(new File(['y'], 'me.png', { type: 'image/png' }), /your profile photo/);
-    await waitFor(() => expect(uploadBytes).toHaveBeenCalledTimes(1));
-    expect(onPendingChange).toHaveBeenLastCalledWith(true);
-    release({});
-    await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false));
+    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(onPendingChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('drops an unsaved crop without deleting a stored object', async () => {
+    const onChange = vi.fn();
+    render(
+      <ProfilePhotoField
+        uid="attendee-1"
+        value="profile-photos/attendee-1/photo.png"
+        onChange={onChange}
+      />,
+    );
+    await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+    expect(onChange).toHaveBeenCalledWith('');
+    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(deleteObject).not.toHaveBeenCalled();
   });
 
   it('uploads when randomUUID is missing', async () => {
     const real = globalThis.crypto;
     vi.stubGlobal('crypto', { subtle: real.subtle, getRandomValues: real.getRandomValues?.bind(real) });
     try {
-      const onChange = vi.fn();
-      render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
+      const ref = createRef();
+      render(<ProfilePhotoField ref={ref} uid="attendee-1" value="" onChange={vi.fn()} />);
       await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
-      await waitFor(() => expect(onChange).toHaveBeenCalled());
+      await ref.current.commit();
       const path = uploadBytes.mock.calls.at(-1)[0].path;
       expect(path).toMatch(/^profile-photos\/attendee-1\/[A-Za-z0-9]+\/photo\.png$/);
       expect(path).not.toBe('profile-photos/attendee-1/photo.png');

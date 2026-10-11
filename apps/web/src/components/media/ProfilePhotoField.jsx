@@ -8,21 +8,14 @@
 // through the admin-gated media endpoints would need an admin, which is
 // exactly backwards.
 //
-// The upload lands BEFORE the profile is saved, and the field only reports
-// the new path upward. That ordering is deliberate: a saved path with no
-// object is a broken image on the attendee directory. The new object uses a
-// fresh id, so it does not replace the object the saved profile already
-// names. The directory keeps showing that saved photo until this form is
-// saved. An object nobody's profile names is not the public photo.
-//
-// DELETION FOLLOWS THE SAME RULE, which is why this field never deletes
-// anything. "Remove photo" only clears the path in the form. The old object
-// stays until syncUserPublic has written the new path onto users_public,
-// and that trigger deletes it. Deleting here, or in the save handler before
-// that write, leaves the directory pointing at an object that is gone.
-// The cost is an orphaned object when a save never happens; that is cheap
-// next to a broken avatar.
-import { useRef, useState } from 'react';
+// The cropped file stays in the browser until the profile save commits it.
+// `profile-photos` allows a public read, so an upload before save would
+// publish a photo the attendee has not kept (issues 363 and 372). The save
+// uploads first and then writes the path, so a saved path still has an
+// object. A failed save deletes that new object. The previous object stays
+// until syncUserPublic has published the new path, and that trigger deletes
+// it. This field never deletes a path the saved profile still names.
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   PROFILE_PHOTO_MAX_BYTES,
   PROFILE_PHOTO_TYPES,
@@ -36,36 +29,64 @@ import AssetImage from './AssetImage.jsx';
 import PhotoCrop from './PhotoCrop.jsx';
 import DefaultAvatarPicker from './DefaultAvatarPicker.jsx';
 
-export default function ProfilePhotoField({ uid, value, onChange, onPendingChange }) {
+const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, onChange, onPendingChange }, ref) {
   const inputRef = useRef(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   // The chosen-but-not-yet-cropped picture (issue #175): the crop step sits
-  // between the file picker and the upload.
+  // between the file picker and the local preview.
   const [cropFile, setCropFile] = useState(null);
+  const [pendingFile, setPendingFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   function reportPending(pending) {
     onPendingChange?.(pending);
   }
 
-  async function upload(file) {
-    setBusy(true);
-    reportPending(true);
-    setError(null);
-    try {
-      const { path } = await uploadProfilePhoto({ uid, file });
-      onChange(path);
-    } catch {
-      // A rules refusal and a dropped connection read the same to the person
-      // holding the phone: the photo is not up there, try again.
-      setError('Your photo could not be uploaded. Try again.');
-    } finally {
-      setBusy(false);
-      setCropFile(null);
-      reportPending(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
+  function replacePreview(file) {
+    const next = URL.createObjectURL(file);
+    setPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return next;
+    });
   }
+
+  function hold(file) {
+    setError(null);
+    setCropFile(null);
+    setPendingFile(file);
+    replacePreview(file);
+    reportPending(false);
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  useImperativeHandle(ref, () => ({
+    hasPending() {
+      return pendingFile !== null;
+    },
+    async commit() {
+      if (!pendingFile) return null;
+      setBusy(true);
+      onPendingChange?.(true);
+      setError(null);
+      try {
+        const { path } = await uploadProfilePhoto({ uid, file: pendingFile });
+        onChange(path);
+        setPendingFile(null);
+        return path;
+      } catch (error) {
+        setError('Your photo could not be uploaded. Try again.');
+        throw error;
+      } finally {
+        setBusy(false);
+        onPendingChange?.(false);
+      }
+    },
+  }), [onChange, onPendingChange, pendingFile, uid]);
 
   async function choose(event) {
     const file = event.target.files?.[0] ?? null;
@@ -90,8 +111,11 @@ export default function ProfilePhotoField({ uid, value, onChange, onPendingChang
   }
 
   function remove() {
-    // Clear the form value only. syncUserPublic deletes the object once
-    // users_public no longer names it — see the module header.
+    // Drop the unsaved file and clear the form path. The saved object stays
+    // until the profile save lands and syncUserPublic deletes it.
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPendingFile(null);
     onChange('');
   }
 
@@ -102,7 +126,13 @@ export default function ProfilePhotoField({ uid, value, onChange, onPendingChang
       <span className="block font-semibold text-text-primary">Photo</span>
       {/* Square portrait, brand radius (design brief §2.4) — not a circle. */}
       <div className="flex items-center gap-4">
-        {value && !defaultUrl ? (
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt="Your new profile photo"
+            className="h-20 w-20 rounded-brand bg-surface-alt object-cover"
+          />
+        ) : value && !defaultUrl ? (
           <AssetImage
             path={value}
             alt="Your current profile photo"
@@ -127,7 +157,7 @@ export default function ProfilePhotoField({ uid, value, onChange, onPendingChang
             htmlFor="profile-photo"
             className="file-input-label touch-target inline-flex w-fit cursor-pointer items-center justify-center rounded-brand border border-text-primary/20 bg-surface px-4 py-2 font-semibold text-text-primary hover:bg-surface-alt"
           >
-            {busy ? 'Uploading…' : value ? 'Replace photo' : 'Upload a photo'}
+            {busy ? 'Uploading…' : (value || pendingFile) ? 'Replace photo' : 'Upload a photo'}
           </label>
           <input
             id="profile-photo"
@@ -139,7 +169,7 @@ export default function ProfilePhotoField({ uid, value, onChange, onPendingChang
             onChange={choose}
             aria-describedby="profile-photo-hint"
           />
-          {value ? (
+          {(value || pendingFile) ? (
             <button
               type="button"
               className="touch-target inline-flex w-fit items-center rounded-brand px-3 py-2 text-text-secondary underline hover:bg-surface-alt"
@@ -155,7 +185,7 @@ export default function ProfilePhotoField({ uid, value, onChange, onPendingChang
         <PhotoCrop
           file={cropFile}
           label="your profile photo"
-          onApply={(file) => upload(file)}
+          onApply={(file) => hold(file)}
           onCancel={() => {
             setCropFile(null);
             reportPending(false);
@@ -174,4 +204,6 @@ export default function ProfilePhotoField({ uid, value, onChange, onPendingChang
       ) : null}
     </div>
   );
-}
+});
+
+export default ProfilePhotoField;

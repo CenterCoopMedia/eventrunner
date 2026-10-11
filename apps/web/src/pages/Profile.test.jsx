@@ -378,13 +378,9 @@ describe('the profile photo lifecycle', () => {
     expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
   });
 
-  it('does not save while a replacement photo is still in progress', async () => {
+  it('does not save while the crop step is open', async () => {
     installPhotoCropStubs();
     try {
-      let release;
-      uploadProfilePhotoMock.mockImplementationOnce(
-        () => new Promise((resolve) => { release = resolve; }),
-      );
       profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
       renderPage();
       fireEvent.change(screen.getByLabelText('Replace photo'), {
@@ -394,15 +390,49 @@ describe('the profile photo lifecycle', () => {
       expect(save).toBeDisabled();
       fireEvent.submit(save.closest('form'));
       expect(saveProfileMock).not.toHaveBeenCalled();
+      expect(uploadProfilePhotoMock).not.toHaveBeenCalled();
+    } finally {
+      uninstallPhotoCropStubs();
+    }
+  });
 
-      await screen.findByRole('button', { name: 'Use this crop' });
-      fireEvent.click(screen.getByRole('button', { name: 'Use this crop' }));
-      expect(save).toBeDisabled();
-      fireEvent.submit(save.closest('form'));
-      expect(saveProfileMock).not.toHaveBeenCalled();
+  it('uploads a new photo only when the profile is saved', async () => {
+    installPhotoCropStubs();
+    try {
+      uploadProfilePhotoMock.mockResolvedValueOnce({ path: 'profile-photos/u1/fresh/photo.png' });
+      profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
+      renderPage();
+      fireEvent.change(screen.getByLabelText('Replace photo'), {
+        target: { files: [new File(['x'], 'me.png', { type: 'image/png' })] },
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Use this crop' }));
+      expect(uploadProfilePhotoMock).not.toHaveBeenCalled();
 
-      release({ path: 'profile-photos/u1/fresh/photo.png' });
-      await waitFor(() => expect(save).toBeEnabled());
+      fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+      await waitFor(() => expect(saveProfileMock).toHaveBeenCalled());
+      expect(uploadProfilePhotoMock).toHaveBeenCalledTimes(1);
+      expect(saveProfileMock.mock.calls[0][0].photoPath).toBe('profile-photos/u1/fresh/photo.png');
+      expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
+    } finally {
+      uninstallPhotoCropStubs();
+    }
+  });
+
+  it('deletes a new photo when the save fails and leaves the saved photo', async () => {
+    installPhotoCropStubs();
+    try {
+      uploadProfilePhotoMock.mockResolvedValueOnce({ path: 'profile-photos/u1/fresh/photo.png' });
+      saveProfileMock.mockRejectedValueOnce(new Error('permission denied'));
+      profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
+      renderPage();
+      fireEvent.change(screen.getByLabelText('Replace photo'), {
+        target: { files: [new File(['x'], 'me.png', { type: 'image/png' })] },
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Use this crop' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+
+      await waitFor(() => expect(deleteOwnPhotoMock).toHaveBeenCalledWith('profile-photos/u1/fresh/photo.png'));
+      expect(deleteOwnPhotoMock).not.toHaveBeenCalledWith('profile-photos/u1/old.png');
     } finally {
       uninstallPhotoCropStubs();
     }
