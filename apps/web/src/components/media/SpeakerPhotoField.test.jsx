@@ -131,6 +131,34 @@ describe('SpeakerPhotoField', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('stays busy from the crop until the upload finishes', async () => {
+    let release;
+    uploadSpeakerPhotoMock.mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => resolve({ path: 'speaker-photos/rae/photo.png' });
+    }));
+    const onBusyChange = vi.fn();
+    const onChange = vi.fn();
+    render(
+      <SpeakerPhotoField
+        user={user}
+        speakerId="rae"
+        value=""
+        onChange={onChange}
+        onBusyChange={onBusyChange}
+      />,
+    );
+    pick(new File(['x'], 'me.png', { type: 'image/png' }));
+    expect(await screen.findByRole('application', { name: /position the crop/i })).toBeInTheDocument();
+    expect(onBusyChange).toHaveBeenCalledWith(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use this crop' }));
+    await waitFor(() => expect(uploadSpeakerPhotoMock).toHaveBeenCalled());
+    expect(onChange).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('speaker-photos/rae/photo.png'));
+    expect(onBusyChange).toHaveBeenLastCalledWith(false);
+  });
+
   it('opens the crop step between the picker and the upload, and Cancel uploads nothing', async () => {
     const onChange = vi.fn();
     render(<SpeakerPhotoField user={user} speakerId="rae" value="" onChange={onChange} />);

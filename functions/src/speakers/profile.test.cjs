@@ -1238,3 +1238,55 @@ test('an admin edit that CHANGES a legacy headshotPath to another foreign path i
   });
   assert.equal(own.ok, true);
 });
+
+test('an admin update deletes a superseded speaker photo after the save commits', async () => {
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: 'speaker-photos/rae/old/photo.png' }));
+  const deleted = [];
+  const bucket = { file(path) { return { async delete() { deleted.push(path); } }; } };
+  const result = await applyUpdateSpeaker({
+    db, bucket, speakerId: 'rae',
+    payload: { headshotPath: 'speaker-photos/rae/new/photo.png' },
+    actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').headshotPath, 'speaker-photos/rae/new/photo.png');
+  assert.deepEqual(deleted, ['speaker-photos/rae/old/photo.png']);
+});
+
+test('an admin update leaves the photo object when the path does not change', async () => {
+  const path = 'speaker-photos/rae/keep/photo.png';
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: path }));
+  const deleted = [];
+  const bucket = { file(item) { return { async delete() { deleted.push(item); } }; } };
+  const result = await applyUpdateSpeaker({
+    db, bucket, speakerId: 'rae', payload: { bio: 'edited', headshotPath: path }, actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(deleted, []);
+});
+
+test('an admin update does not delete a legacy path outside speaker-photos', async () => {
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: 'speakers/rae.jpg' }));
+  const deleted = [];
+  const bucket = { file(path) { return { async delete() { deleted.push(path); } }; } };
+  const result = await applyUpdateSpeaker({
+    db, bucket, speakerId: 'rae',
+    payload: { headshotPath: 'default-avatars/avatar-01.svg' },
+    actor: ACTOR, now: NOW,
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(deleted, []);
+});
+
+test('a headshot cleanup failure does not fail the admin update', async () => {
+  const db = makeSpeakersDb(ownedWorld({ headshotPath: 'speaker-photos/rae/old/photo.png' }));
+  const bucket = { file: () => ({ delete: async () => { throw new Error('bucket unavailable'); } }) };
+  const result = await applyUpdateSpeaker({
+    db, bucket, speakerId: 'rae',
+    payload: { headshotPath: null },
+    actor: ACTOR, now: NOW,
+    log: { warn() {} },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(db.read('speakers', 'rae').headshotPath, null);
+});

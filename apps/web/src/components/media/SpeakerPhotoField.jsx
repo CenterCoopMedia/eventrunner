@@ -10,7 +10,7 @@
 // saved, and why this field never deletes the old object itself: the same
 // ordering applies here, and SpeakerProfile.jsx is what removes the
 // replaced object after a save commits.
-import { useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { checkFile, defaultAvatarUrl } from '../../lib/mediaSource.js';
 import {
   SPEAKER_PHOTO_MAX_BYTES,
@@ -23,12 +23,28 @@ import AssetImage from './AssetImage.jsx';
 import PhotoCrop from './PhotoCrop.jsx';
 import DefaultAvatarPicker from './DefaultAvatarPicker.jsx';
 
-export default function SpeakerPhotoField({ user, speakerId, value, onChange }) {
+export default function SpeakerPhotoField({
+  user,
+  speakerId,
+  value,
+  onChange,
+  label = 'Photo',
+  saveNote = 'Save to publish the change; an organizer reviews it before it appears on the public programme.',
+  appearance = 'public',
+  onBusyChange = null,
+}) {
+  const labelId = useId();
   const inputRef = useRef(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   // The chosen-but-not-yet-cropped picture (issue #175).
   const [cropFile, setCropFile] = useState(null);
+  const admin = appearance === 'admin';
+  const pending = busy || cropFile != null;
+
+  useEffect(() => {
+    onBusyChange?.(pending);
+  }, [onBusyChange, pending]);
 
   async function upload(file) {
     setBusy(true);
@@ -71,27 +87,40 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
 
   const defaultUrl = defaultAvatarUrl(value);
 
+  const frameClass = admin
+    ? 'h-20 w-20 rounded-admin bg-admin-ground-input object-cover'
+    : 'h-20 w-20 rounded-brand bg-surface-alt object-cover';
+  const uploadClass = admin
+    ? 'file-input-label inline-flex min-h-admin-control w-fit cursor-pointer items-center justify-center rounded-admin border-admin-hairline border-admin-rule-strong bg-admin-ground-raised px-md py-xs font-admin-ui text-admin-base font-medium text-admin-ink'
+    : 'file-input-label touch-target inline-flex w-fit cursor-pointer items-center justify-center rounded-brand border border-text-primary/20 bg-surface px-4 py-2 font-semibold text-text-primary hover:bg-surface-alt';
+
   return (
-    <div className="flex flex-col gap-2">
-      <span className="block font-semibold text-text-primary">Photo</span>
+    <div
+      className={`speaker-photo-field flex flex-col gap-2${admin ? ' speaker-photo-field--admin' : ''}`}
+      role="group"
+      aria-labelledby={labelId}
+    >
+      <span id={labelId} className={admin ? 'block text-admin-base font-semibold text-admin-ink' : 'block font-semibold text-text-primary'}>{label}</span>
       {/* Square portrait, brand radius (design brief §2.4) — not a circle. */}
       <div className="flex items-center gap-4">
         {value && !defaultUrl ? (
           <AssetImage
             path={value}
             alt="Your current speaker photo"
-            className="h-20 w-20 rounded-brand bg-surface-alt object-cover"
+            className={frameClass}
           />
         ) : defaultUrl ? (
           <img
             src={defaultUrl}
             alt="Your chosen default avatar"
-            className="h-20 w-20 rounded-brand bg-surface-alt object-cover"
+            className={frameClass}
           />
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-20 w-20 items-center justify-center rounded-brand border border-dashed border-text-primary/20 text-xs text-text-secondary"
+            className={admin
+              ? 'flex h-20 w-20 items-center justify-center rounded-admin border border-dashed border-admin-rule-strong text-admin-sm text-admin-ink-secondary'
+              : 'flex h-20 w-20 items-center justify-center rounded-brand border border-dashed border-text-primary/20 text-xs text-text-secondary'}
           >
             None
           </span>
@@ -99,7 +128,7 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
         <div className="flex flex-col gap-2">
           <label
             htmlFor="speaker-photo"
-            className="file-input-label touch-target inline-flex w-fit cursor-pointer items-center justify-center rounded-brand border border-text-primary/20 bg-surface px-4 py-2 font-semibold text-text-primary hover:bg-surface-alt"
+            className={uploadClass}
           >
             {busy ? 'Uploading…' : value ? 'Replace photo' : 'Upload a photo'}
           </label>
@@ -116,7 +145,9 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
           {value ? (
             <button
               type="button"
-              className="touch-target inline-flex w-fit items-center rounded-brand px-3 py-2 text-text-secondary underline hover:bg-surface-alt"
+              className={admin
+                ? 'inline-flex min-h-admin-control w-fit items-center rounded-admin px-sm py-xs font-admin-ui text-admin-sm text-admin-ink-secondary underline'
+                : 'touch-target inline-flex w-fit items-center rounded-brand px-3 py-2 text-text-secondary underline hover:bg-surface-alt'}
               onClick={remove}
               disabled={busy}
             >
@@ -133,14 +164,13 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
           onCancel={() => setCropFile(null)}
         />
       ) : null}
-      <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="speaker" />
-      <p id="speaker-photo-hint" className="text-sm text-text-secondary">
+      <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="speaker" tone={admin ? 'admin' : 'public'} />
+      <p id="speaker-photo-hint" className={admin ? 'text-admin-sm text-admin-ink-secondary' : 'text-sm text-text-secondary'}>
         {SPEAKER_PHOTO_TYPES.map(typeLabel).join(', ')} · up to{' '}
-        {formatBytes(SPEAKER_PHOTO_MAX_BYTES)}. Save to publish the change; an organizer reviews it
-        before it appears on the public programme.
+        {formatBytes(SPEAKER_PHOTO_MAX_BYTES)}. {saveNote}
       </p>
       {error ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className={admin ? 'text-admin-sm text-admin-state-error' : 'text-sm text-danger'}>
           {error}
         </p>
       ) : null}
