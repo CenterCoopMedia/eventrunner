@@ -48,7 +48,9 @@ service firebase.storage {
 
     // A matching uid is not a live account. The delete sweep removes
     // users/{uid}. A still-valid ID token must not upload a new photo
-    // afterwards (issue #349).
+    // afterwards (issue #349). The deploy grants the Storage service
+    // agent roles/firebaserules.firestoreServiceAgent before this check
+    // can run. firebase deploy --non-interactive does not grant it.
     function accountExists(userId) {
       return firestore.exists(/databases/(default)/documents/users/$(userId));
     }
