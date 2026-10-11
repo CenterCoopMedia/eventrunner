@@ -26,11 +26,8 @@ export const DELETE_FIELD_SENTINEL = '__cms_delete_field__';
 /**
  * A block type's EDITABLE value fields — everything the registry declares
  * except `order`. `order` is real registry data for stat/list_item/
- * link_group, but the editor exposes exactly one Order control shared by
- * every block type (it is also how blocks without a registry `order` field
- * get sorted — see SectionBlocks/getSectionBlocks), so folding it into the
- * generic per-type loop would render two divergent "Order" inputs bound to
- * two different pieces of state.
+ * link_group. The section list sets it for every block type, so the value
+ * form does not render a second Order input bound to different state.
  *
  * @param {string} blockTypeId
  */

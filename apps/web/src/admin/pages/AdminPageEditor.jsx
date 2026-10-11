@@ -42,6 +42,7 @@ import {
   blockTypeLabel,
 } from '../blockTypes.js';
 import { assignPageIds, blankPage, blankSection, pageSnapshot, toEditablePage, toPagePayload } from '../pageDoc.js';
+import { moveItem, nextStoredOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
 import {
@@ -74,6 +75,7 @@ import {
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import EditorDisclosure from '../components/EditorDisclosure.jsx';
+import { OrderAnnouncement, ReorderControls, bindReorderDrop } from '../components/ReorderControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -179,15 +181,6 @@ function slotValue(slot) {
   return slot === 'above' ? 'above' : 'main';
 }
 
-/** Move item `from` → `to` in a copy of `list`. */
-function moved(list, from, to) {
-  if (to < 0 || to >= list.length) return list;
-  const next = [...list];
-  const [item] = next.splice(from, 1);
-  next.splice(to, 0, item);
-  return next;
-}
-
 export default function AdminPageEditor({ mode }) {
   const { pageId } = useParams();
   const navigate = useNavigate();
@@ -214,6 +207,7 @@ export default function AdminPageEditor({ mode }) {
   // The individual layout variants, behind their own disclosure. Closed by
   // default: the template above is the answer for almost every page.
   const [layoutOpen, setLayoutOpen] = useState(false);
+  const [spoken, setSpoken] = useState('');
   // Set when a publish fails part-way: the queue row the retry must resume.
   const [resumeQueueId, setResumeQueueId] = useState(null);
   const errorRef = useRef(null);
@@ -309,6 +303,24 @@ export default function AdminPageEditor({ mode }) {
         i === index ? { ...section, ...patch } : section,
       ),
     }));
+  function moveSections(from, to) {
+    const next = moveItem(page.sections, from, to);
+    if (next === page.sections) return false;
+    const label = page.sections[from]?.label || `Section ${from + 1}`;
+    update({ sections: next });
+    setSpoken(`${label} moved to position ${to + 1} of ${page.sections.length}`);
+    return true;
+  }
+
+  function moveBlocks(sectionIndex, from, to) {
+    const blocks = page.sections[sectionIndex]?.defaultBlocks ?? [];
+    const next = moveItem(blocks, from, to);
+    if (next === blocks) return false;
+    updateSection(sectionIndex, { defaultBlocks: next });
+    setSpoken(`Block ${from + 1} in section ${sectionIndex + 1} moved to position ${to + 1} of ${blocks.length}`);
+    return true;
+  }
+
   const updateBlock = (sectionIndex, blockIndex, patch) =>
     setPage((current) => ({
       ...current,
@@ -355,7 +367,8 @@ export default function AdminPageEditor({ mode }) {
         if (typeof revision?.section === 'string' && revision.section) sectionIds.add(revision.section);
       }
     }
-    const assigned = assignPageIds(page, { pageIds, sectionIds });
+    let assigned = assignPageIds(page, { pageIds, sectionIds });
+    if (creating) assigned = { ...assigned, order: nextStoredOrder(rows) };
     if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
     const payload = toPagePayload(assigned);
     setBusy(publish ? 'publish' : 'draft');
@@ -494,7 +507,7 @@ export default function AdminPageEditor({ mode }) {
       ) : null}
 
       <div className="admin-page-basics">
-      <Panel title="Page" description="How the page is identified, ordered, and linked." className="admin-page-identity">
+      <Panel title="Page" description="How the page is identified and linked." className="admin-page-identity">
         <div className="admin-page-fields">
           <TextField
             label="Navigation label"
@@ -558,14 +571,7 @@ export default function AdminPageEditor({ mode }) {
             error={errorFor('icon')}
             hint="Optional icon name. Leave blank for none."
           />
-          <TextField
-            label="Order"
-            type="number"
-            value={page.order}
-            onChange={(value) => update({ order: value })}
-            error={errorFor('order')}
-            hint="Lower numbers sort first."
-          />
+          <p className={fieldHintClass}>The pages list sets where this page appears.</p>
           {isExisting ? (
             <TextField
               label="Page id"
@@ -710,6 +716,7 @@ export default function AdminPageEditor({ mode }) {
           </button>
         }
       >
+        <OrderAnnouncement message={spoken} />
         {page.sections.length === 0 ? (
           <p className="text-admin-sm text-admin-ink-secondary">
             No sections yet. A page with no sections renders nothing.
@@ -722,6 +729,7 @@ export default function AdminPageEditor({ mode }) {
                 <li
                   key={section[EDITOR_SECTION_KEY]}
                   className="min-w-0"
+                  {...bindReorderDrop('section:', sectionIndex, moveSections)}
                 >
                   <EditorDisclosure
                     title={section.label || section.id || `Section ${sectionIndex + 1}`}
@@ -732,28 +740,13 @@ export default function AdminPageEditor({ mode }) {
                   <div className="mb-md flex flex-wrap items-center justify-between gap-xs">
                     <p className="text-admin-sm text-admin-ink-secondary">Section {sectionIndex + 1} settings</p>
                     <div className="flex flex-wrap gap-2xs">
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        aria-label={`Move section ${sectionIndex + 1} up`}
-                        disabled={sectionIndex === 0}
-                        onClick={() =>
-                          update({ sections: moved(page.sections, sectionIndex, sectionIndex - 1) })
-                        }
-                      >
-                        Up
-                      </button>
-                      <button
-                        type="button"
-                        className={secondaryButtonClass}
-                        aria-label={`Move section ${sectionIndex + 1} down`}
-                        disabled={sectionIndex === page.sections.length - 1}
-                        onClick={() =>
-                          update({ sections: moved(page.sections, sectionIndex, sectionIndex + 1) })
-                        }
-                      >
-                        Down
-                      </button>
+                      <ReorderControls
+                        label={`section ${sectionIndex + 1}`}
+                        index={sectionIndex}
+                        count={page.sections.length}
+                        dragToken={`section:${sectionIndex}`}
+                        onMove={moveSections}
+                      />
                       <button
                         type="button"
                         className={dangerButtonClass}
@@ -910,6 +903,7 @@ export default function AdminPageEditor({ mode }) {
                             <li
                               key={blockIndex}
                               className="rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-sm"
+                              {...bindReorderDrop(`block:${sectionIndex}:`, blockIndex, (from, to) => moveBlocks(sectionIndex, from, to))}
                             >
                               <div className="grid gap-xs sm:grid-cols-2">
                                 {block.field ? (
@@ -943,40 +937,16 @@ export default function AdminPageEditor({ mode }) {
                                 </div>
                               </div>
                               <div className="mt-xs flex flex-wrap gap-2xs">
-                                <button
-                                  type="button"
-                                  className={secondaryButtonClass}
-                                  aria-label={`Move block ${blockIndex + 1} up in section ${sectionIndex + 1}`}
-                                  disabled={blockIndex === 0}
-                                  onClick={() =>
-                                    updateSection(sectionIndex, {
-                                      defaultBlocks: moved(
-                                        section.defaultBlocks,
-                                        blockIndex,
-                                        blockIndex - 1,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  Up
-                                </button>
-                                <button
-                                  type="button"
-                                  className={secondaryButtonClass}
-                                  aria-label={`Move block ${blockIndex + 1} down in section ${sectionIndex + 1}`}
-                                  disabled={blockIndex === section.defaultBlocks.length - 1}
-                                  onClick={() =>
-                                    updateSection(sectionIndex, {
-                                      defaultBlocks: moved(
-                                        section.defaultBlocks,
-                                        blockIndex,
-                                        blockIndex + 1,
-                                      ),
-                                    })
-                                  }
-                                >
-                                  Down
-                                </button>
+                                <ReorderControls
+                                  label={`block ${blockIndex + 1} in section ${sectionIndex + 1}`}
+                                  index={blockIndex}
+                                  count={section.defaultBlocks.length}
+                                  dragToken={`block:${sectionIndex}:${blockIndex}`}
+                                  upLabel={`Move block ${blockIndex + 1} up in section ${sectionIndex + 1}`}
+                                  downLabel={`Move block ${blockIndex + 1} down in section ${sectionIndex + 1}`}
+                                  dragLabel={`Drag block ${blockIndex + 1} in section ${sectionIndex + 1}`}
+                                  onMove={(from, to) => moveBlocks(sectionIndex, from, to)}
+                                />
                                 <button
                                   type="button"
                                   className={dangerButtonClass}

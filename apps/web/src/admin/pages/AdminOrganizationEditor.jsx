@@ -337,7 +337,7 @@ export default function AdminOrganizationEditor({ mode }) {
         </Panel>
 
         <div className="admin-editor-stack">
-          <Panel title="Placement" description="Set the group, order, and visibility on the sponsors page.">
+          <Panel title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
             <div className="admin-editor-fields grid gap-sm sm:grid-cols-2">
               <div>
                 <TextField
@@ -354,14 +354,6 @@ export default function AdminOrganizationEditor({ mode }) {
                   </datalist>
                 ) : null}
               </div>
-              <TextField
-                label="Order"
-                hint="Lower numbers come first. The first tier in this order draws the largest logos."
-                inputMode="decimal"
-                value={form.order}
-                onChange={(value) => set('order', value)}
-                error={errorFor('order')}
-              />
               <div className="sm:col-span-2">
                 <CheckboxField
                   label="Show this organization when it is published"

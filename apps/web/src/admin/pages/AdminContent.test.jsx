@@ -308,6 +308,23 @@ describe('content browsing', () => {
   });
 });
 
+describe('content block order', () => {
+  it('saves a moved block order as drafts and does not publish', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT, CTA_BLOCK_DRAFT];
+    fetch.mockResolvedValue(okResponse({ status: 'dirty' }));
+    await renderAt('/admin/content/scholarships/intro');
+    fireEvent.click(await screen.findByRole('button', { name: 'Move Apply now up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // Apply now was order 2 and is now first. The other block already sits at index 1.
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      section: 'intro', field: 'cta1', visible: true, fields: { order: 0 },
+    });
+    expect(fetch.mock.calls.some((call) => String(call[0]).includes('cmsPublish'))).toBe(false);
+  });
+});
+
 describe('creating and editing a block', () => {
   it('creates a block and saves it as a draft only', async () => {
     sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
@@ -326,7 +343,7 @@ describe('creating and editing a block', () => {
       pageId: 'scholarships',
       section: 'intro',
       field: 'hello',
-      fields: { blockType: 'richtext', value: '<p>Hello</p>' },
+      fields: { blockType: 'richtext', value: '<p>Hello</p>', order: 0 },
       visible: true,
     });
     expect(fetch.mock.calls.some((call) => String(call[0]).endsWith('/cmsPublish'))).toBe(false);
@@ -350,10 +367,9 @@ describe('creating and editing a block', () => {
     fireEvent.change(picker, { target: { value: 'stat' } });
     expect(screen.getByLabelText(/^Caption/)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Figure' })).toBeInTheDocument();
-    // stat declares its own registry 'order' field, but the editor renders
-    // exactly one shared Order control (the Block panel's) rather than a
-    // second, divergent one from the per-type value fields.
-    expect(screen.getAllByLabelText('Order')).toHaveLength(1);
+    // stat declares its own registry 'order' field. The section list sets
+    // order, so the value form renders neither that field nor an Order input.
+    expect(screen.queryByLabelText('Order')).toBeNull();
     expect(screen.queryByLabelText(/^order \(optional\)/)).toBeNull();
   });
 

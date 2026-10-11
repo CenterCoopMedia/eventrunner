@@ -198,6 +198,31 @@ describe('the organizations list', () => {
 
 // Review round (c2, finding 3). The notice in place is the record and the
 // announcement; the toast repeats it with no live role.
+describe('organization order', () => {
+  it('saves a moved organization order as drafts and does not publish', async () => {
+    await renderAt('/admin/organizations');
+    await screen.findByRole('heading', { level: 1, name: 'Organizations' });
+    pushOrganizations(LIVE, DRAFTS);
+    fetch.mockResolvedValue(response({ status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move Tide Media Collective up' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(0)).toEqual({
+      collection: 'cmsOrganizations',
+      docId: 'tide-media',
+      visible: true,
+      fields: { order: 0 },
+    });
+    expect(bodyOf(1)).toEqual({
+      collection: 'cmsOrganizations',
+      docId: 'beacon-fund',
+      visible: true,
+      fields: { order: 1 },
+    });
+    expect(fetch.mock.calls.some((call) => String(call[0]).includes('cmsPublish'))).toBe(false);
+  });
+});
+
 describe('the organizations list, announcing a publish', () => {
   /** The live regions (status or alert) whose text holds `message`. */
   const liveRegionsSaying = (message) =>
@@ -294,7 +319,7 @@ describe('the organization editor', () => {
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
       .toEqual(['Public details', 'Placement', 'Logo']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'Name', 'Page address', 'Description', 'Website', 'Tier', 'Order',
+      'Name', 'Page address', 'Description', 'Website', 'Tier',
       'Show this organization when it is published', 'Logo',
     ]);
     const logo = within(layout).getByRole('heading', { name: 'Logo' }).closest('section');
@@ -418,17 +443,16 @@ describe('the organization editor', () => {
     expect(screen.getByText('Another organization already uses this address.')).toBeInTheDocument();
   });
 
-  it('answers a save with an invalid field by moving to it, and sends nothing', async () => {
+  it('answers a save with a blank name by moving to it, and sends nothing', async () => {
     await openNewOrganization();
     // A blank form shows no errors until the operator acts.
     expect(document.querySelectorAll('[aria-invalid="true"]')).toHaveLength(0);
-    fireEvent.change(screen.getByLabelText('Order'), { target: { value: 'first' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     await settle();
     expect(fetch).not.toHaveBeenCalled();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Name')));
-    expect(screen.getByLabelText('Order')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('Enter a number.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Enter the organization’s name.')).toBeInTheDocument();
   });
 
   it('edits a stored organization as an update and keeps its address fixed', async () => {
@@ -441,7 +465,6 @@ describe('the organization editor', () => {
     expect(screen.getByRole('link', { name: /Preview draft/ })).toHaveAttribute('href', '/sponsors/tide-media?preview=1');
 
     fetch.mockResolvedValueOnce(response({ docId: 'tide-media', status: 'dirty' }));
-    fireEvent.change(screen.getByLabelText('Order'), { target: { value: '5' } });
     fireEvent.click(screen.getByLabelText('Show this organization when it is published'));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -450,7 +473,7 @@ describe('the organization editor', () => {
       collection: 'cmsOrganizations',
       docId: 'tide-media',
       visible: false,
-      fields: { name: 'Tide Media Collective', order: 5 },
+      fields: { name: 'Tide Media Collective', order: 1 },
     });
   });
 
