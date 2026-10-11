@@ -11,6 +11,7 @@ import {visualKey} from './visual-key.mjs';
 import {visualBundle,renderProject,inputDigest} from './provenance.mjs';
 const opt=options(),cache=path.join(opt.root,'.cache');fs.mkdirSync(cache,{recursive:true});
 const bundle=await visualBundle();fs.writeFileSync(path.join(cache,'bundle.js'),bundle);
+const escapeRegExp=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const html=`<!doctype html><html><head><link rel="stylesheet" href="/brand/tokens.css"><style>@font-face{font-family:Bricolage;src:url('/fonts/bricolage-grotesque-latin.woff2');font-weight:700 800}@font-face{font-family:Source;src:url('/fonts/source-sans-3-latin.woff2');font-weight:400 700}@font-face{font-family:Mono;src:url('/fonts/ibm-plex-mono-400-latin.woff2')}@font-face{font-family:Merriweather;src:url('/fonts/merriweather-700-latin.woff2');font-weight:700}@font-face{font-family:Fraunces;src:url('/fonts/fraunces-latin.woff2');font-weight:100 900}@font-face{font-family:PublicSans;src:url('/fonts/public-sans-latin.woff2');font-weight:100 900}body{margin:0}canvas{display:block}</style></head><body><canvas></canvas><script src="/bundle.js"></script></body></html>`;
 const server=http.createServer((req,res)=>{
  try{const pathname=decodeURIComponent(new URL(req.url,'http://local').pathname);let file;
@@ -37,7 +38,7 @@ try{for(const piece of opt.pieces){for(const format of opt.format?[opt.format]:[
  const page=await context.newPage();page.on('pageerror',e=>console.error(e.message));await page.goto(origin);await page.waitForFunction(()=>!!window.__VIDEO);await page.evaluate(p=>window.__VIDEO.load(p),project);
  const [start,end]=opt.frames?opt.frames.split('-').map(Number):[0,project.clock.duration-1];
  if(start<0||end>=project.clock.duration||end<start)throw new Error('Invalid frame range');
- if(opt.stills){for(const name of fs.readdirSync(review))if(new RegExp(`^${piece}-${format}-[0-9]+\\.png$`).test(name))fs.unlinkSync(path.join(review,name));const frames=[...new Set([...project.clock.scenes.flatMap(s=>[s.start,Math.min(s.end-1,s.start+75),...(project.clock.cinematic||project.clock.assembly?[Math.floor((s.start+s.end)/2),...(s.action?[s.action.press,s.action.press+11]:[])]:[]),s.end-1]),project.clock.settle,project.clock.duration-1])].sort((a,b)=>a-b);
+ if(opt.stills){const stillPattern=new RegExp(`^${escapeRegExp(piece)}-${escapeRegExp(format)}-[0-9]+\\.png$`);for(const name of fs.readdirSync(review))if(stillPattern.test(name))fs.unlinkSync(path.join(review,name));const frames=[...new Set([...project.clock.scenes.flatMap(s=>[s.start,Math.min(s.end-1,s.start+75),...(project.clock.cinematic||project.clock.assembly?[Math.floor((s.start+s.end)/2),...(s.action?[s.action.press,s.action.press+11]:[])]:[]),s.end-1]),project.clock.settle,project.clock.duration-1])].sort((a,b)=>a-b);
   for(const f of frames){await page.evaluate(f=>window.__VIDEO.seek(f),f);await page.screenshot({path:path.join(review,`${piece}-${format}-${String(f).padStart(4,'0')}.png`)});}
   console.log('Stills',piece,format,frames.length);await context.close();continue;
  }
