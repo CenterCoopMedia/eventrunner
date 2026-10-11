@@ -1,0 +1,50 @@
+{
+  "inputDigest": "6cc1835b6c282186310d38b31c5651516f0d765d3a5a5df6c1644efaca3b6fc5",
+  "file": "publish-page-vertical.mp4",
+  "sha256": "00b50d4648e6089bda0e3fcbd8c0bfa8dbba97655cc559a9d41191bc49b9c8c6",
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "pixelFormat": "yuv420p",
+    "codec": "h264",
+    "frames": 2250,
+    "duration": 75
+  },
+  "audio": {
+    "target": -19,
+    "lufs": -19.1,
+    "truePeak": -4.2,
+    "method": "FFmpeg ebur128=peak=true / BS.1770",
+    "summary": "Summary:\n\n  Integrated loudness:\n    I:         -19.1 LUFS\n    Threshold: -29.1 LUFS\n\n  Loudness range:\n    LRA:         6.9 LU\n    Threshold: -39.1 LUFS\n    LRA low:   -21.0 LUFS\n    LRA high:  -14.1 LUFS\n\n  True peak:\n    Peak:       -4.2 dBFS\n[out#0/null @ 0x55612f43cc40] video:967KiB audio:14064KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nframe= 2250 fps=314 q=-0.0 Lsize=N/A time=00:01:15.00 bitrate=N/A speed=10.5x    \n"
+  },
+  "flash": {
+    "pass": true,
+    "status": "pass-screen",
+    "certification": false,
+    "frames": 2250,
+    "fps": 30,
+    "maxGeneralPixelTransitionsInOneSecond": 11,
+    "maxRedPixelTransitionsInOneSecond": 0,
+    "maxGeneralEpisodeTransitionsInOneSecond": 2,
+    "maxRedEpisodeTransitionsInOneSecond": 0,
+    "maxRapidPixelAreaFraction": 0.000058,
+    "areaThreshold": 0.02,
+    "luminanceThreshold": 0.1,
+    "redUVComponentThreshold": 0.1414213562373095,
+    "legacyRedThreshold": 20,
+    "resolution": "native",
+    "ambiguousFrames": [
+      295,
+      565,
+      990
+    ],
+    "hazardFrames": [],
+    "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+    "file": "/workspace/eventrunner/video/out/publish-page-vertical.mp4",
+    "width": 1080,
+    "height": 1920,
+    "fileHash": "00b50d4648e6089bda0e3fcbd8c0bfa8dbba97655cc559a9d41191bc49b9c8c6",
+    "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+  }
+}

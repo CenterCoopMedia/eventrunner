@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-11",
+  "status": "pass",
+  "formats": {
+    "landscape": {
+      "captures": 83,
+      "missing": [],
+      "geometryMismatches": [],
+      "pixelFilesChanged": [
+        "published",
+        "attendee-home",
+        "schedule-nav",
+        "day-select",
+        "schedule-before",
+        "search-1",
+        "search-2",
+        "search-3",
+        "search-4",
+        "search-5",
+        "search-6",
+        "search-7",
+        "search-8",
+        "search-9",
+        "session-open",
+        "branding-nav",
+        "preview-schedule",
+        "preview-phone-control",
+        "preview-phone-light",
+        "preview-mode-control",
+        "preview-phone-dark",
+        "theme-validation",
+        "theme-publish-hover",
+        "theme-published",
+        "styled-schedule",
+        "my-schedule-nav"
+      ],
+      "blockedRequests": [],
+      "originalManifestHash": "c46679e1e84910021adc25d1ded27d7055ea0287c64d199287d499f3b14e1235",
+      "repeatManifestHash": "f490bcb58a4a1432db188c500075ea6999db88c0466b1a29cf44833c3fb57852",
+      "deliveryCaptures": 79,
+      "missingDeliveryCaptures": [],
+      "deliveryGeometryMismatches": [],
+      "unusedLegacyCaptures": []
+    },
+    "vertical": {
+      "captures": 88,
+      "missing": [
+        "speakers-menu"
+      ],
+      "geometryMismatches": [],
+      "pixelFilesChanged": [
+        "attendee-home",
+        "schedule-nav",
+        "session-open",
+        "operator-overview",
+        "branding-menu",
+        "preview-schedule",
+        "preview-phone-control",
+        "preview-phone-light",
+        "preview-mode-control",
+        "preview-phone-dark",
+        "schedule-menu"
+      ],
+      "blockedRequests": [
+        "https://www.google.com/images/cleardot.gif"
+      ],
+      "originalManifestHash": "a4e1245115e649f5999291fa9552925de95134cc2d3eaf9d0fd2b265e7bcd0ef",
+      "repeatManifestHash": "545811e75ac5accbfdf1db9440da66e6c7aa1c13305d67d3e5e70e316d142844",
+      "deliveryCaptures": 81,
+      "missingDeliveryCaptures": [],
+      "deliveryGeometryMismatches": [],
+      "unusedLegacyCaptures": [
+        "speakers-menu"
+      ]
+    }
+  },
+  "method": "Repeated all three real UI workflows in fresh browser contexts against a task-owned local Firebase emulator, using an unmodified copy of capture tooling in external scratch. Delivered captures were not overwritten. Privacy guard ran before every capture; all external requests were blocked.",
+  "note": "All delivered crop and target geometry matches the fresh run exactly. One unused legacy menu screenshot is absent from the current capture path. Full PNG differences can include focus, hover, carets, and content outside the selected crop; byte-identical screenshots are not claimed."
+}

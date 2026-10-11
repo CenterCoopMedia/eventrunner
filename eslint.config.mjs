@@ -39,6 +39,8 @@ export default [
       // left there by a debugging session is not repository code, and it
       // must not turn `npm run lint` red for whoever runs it next.
       "e2e/.tmp/",
+      "video/.cache/",
+      "video/out/",
       "**/node_modules/",
       "**/dist/",
       "coverage/",

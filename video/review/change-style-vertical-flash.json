@@ -1,0 +1,31 @@
+{
+  "pass": true,
+  "status": "pass-screen",
+  "certification": false,
+  "frames": 2520,
+  "fps": 30,
+  "maxGeneralPixelTransitionsInOneSecond": 11,
+  "maxRedPixelTransitionsInOneSecond": 2,
+  "maxGeneralEpisodeTransitionsInOneSecond": 2,
+  "maxRedEpisodeTransitionsInOneSecond": 1,
+  "maxRapidPixelAreaFraction": 0.000066,
+  "areaThreshold": 0.02,
+  "luminanceThreshold": 0.1,
+  "redUVComponentThreshold": 0.1414213562373095,
+  "legacyRedThreshold": 20,
+  "resolution": "native",
+  "ambiguousFrames": [
+    355,
+    475,
+    840,
+    1830,
+    2100
+  ],
+  "hazardFrames": [],
+  "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+  "file": "/workspace/eventrunner/video/out/change-style-vertical.mp4",
+  "width": 1080,
+  "height": 1920,
+  "fileHash": "c07ce343fcf0a46bbdce7084120d1245da4ee98c25496c5c8d49fdbaa0db1ce1",
+  "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+}

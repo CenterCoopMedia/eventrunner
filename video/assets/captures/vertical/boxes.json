@@ -1,0 +1,3801 @@
+{
+  "staff-home": {
+    "file": "staff-home.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "hero": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 319.640625
+      }
+    },
+    "focus": [
+      "hero"
+    ],
+    "selectors": {
+      "hero": "locator('article section').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "edit-section": {
+    "file": "edit-section.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "hero": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 319.640625
+      },
+      "action": {
+        "x": 45.75,
+        "y": 335.640625,
+        "width": 72.5625,
+        "height": 44
+      }
+    },
+    "focus": [
+      "hero",
+      "action"
+    ],
+    "selectors": {
+      "hero": "locator('article section').first()",
+      "action": "getByRole('link', { name: 'Edit section: Hero', exact: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "headline-list": {
+    "file": "headline-list.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 33,
+        "y": 214.5,
+        "width": 221,
+        "height": 24
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('link', { name: 'Good ideas need a place to meet.', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "editor-before": {
+    "file": "editor-before.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 416.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 149.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 149.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 392.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-00": {
+    "file": "typing-00.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-01": {
+    "file": "typing-01.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-02": {
+    "file": "typing-02.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-03": {
+    "file": "typing-03.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-04": {
+    "file": "typing-04.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-05": {
+    "file": "typing-05.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-06": {
+    "file": "typing-06.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-07": {
+    "file": "typing-07.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-08": {
+    "file": "typing-08.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-09": {
+    "file": "typing-09.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-10": {
+    "file": "typing-10.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-11": {
+    "file": "typing-11.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-12": {
+    "file": "typing-12.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-13": {
+    "file": "typing-13.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-14": {
+    "file": "typing-14.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-15": {
+    "file": "typing-15.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 378.578125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 111.1875,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 111.1875,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 354.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-16": {
+    "file": "typing-16.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-17": {
+    "file": "typing-17.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-18": {
+    "file": "typing-18.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-19": {
+    "file": "typing-19.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-20": {
+    "file": "typing-20.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-21": {
+    "file": "typing-21.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-22": {
+    "file": "typing-22.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-23": {
+    "file": "typing-23.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-24": {
+    "file": "typing-24.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-25": {
+    "file": "typing-25.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-26": {
+    "file": "typing-26.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-27": {
+    "file": "typing-27.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-28": {
+    "file": "typing-28.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-29": {
+    "file": "typing-29.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-30": {
+    "file": "typing-30.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-31": {
+    "file": "typing-31.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-32": {
+    "file": "typing-32.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 402.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 135.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 135.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 378.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "typing-33": {
+    "file": "typing-33.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 416.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 149.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 149.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 392.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "fieldPanel"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "draft-hover": {
+    "file": "draft-hover.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 416.828125,
+        "width": 324,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 149.4375,
+        "width": 133,
+        "height": 44
+      },
+      "action": {
+        "x": 131,
+        "y": 149.4375,
+        "width": 82,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 392.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "action",
+      "publish"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })",
+      "action": "getByRole('button', { name: 'Save draft', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "draft-saved": {
+    "file": "draft-saved.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 515.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 211.4375,
+        "width": 82,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 211.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 491.328125,
+        "width": 324,
+        "height": 68.5
+      },
+      "status": {
+        "x": 16,
+        "y": 365.9375,
+        "width": 266,
+        "height": 20
+      }
+    },
+    "focus": [
+      "status"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "publish-hover": {
+    "file": "publish-hover.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 515.828125,
+        "width": 324,
+        "height": 44
+      },
+      "draft": {
+        "x": 131,
+        "y": 211.4375,
+        "width": 82,
+        "height": 44
+      },
+      "action": {
+        "x": 221,
+        "y": 211.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 491.328125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "draft",
+      "action"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "draft": "getByRole('button', { name: 'Save draft', exact: true })",
+      "action": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "published": {
+    "file": "published.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/content/home/hero/title",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "field": {
+        "x": 33,
+        "y": 453.828125,
+        "width": 324,
+        "height": 44
+      },
+      "publish": {
+        "x": 221,
+        "y": 149.4375,
+        "width": 133,
+        "height": 44
+      },
+      "fieldPanel": {
+        "x": 33,
+        "y": 429.328125,
+        "width": 324,
+        "height": 68.5
+      },
+      "status": {
+        "x": 16,
+        "y": 303.9375,
+        "width": 243,
+        "height": 20
+      }
+    },
+    "focus": [
+      "status"
+    ],
+    "selectors": {
+      "field": "getByLabel('Text', { exact: true })",
+      "publish": "getByRole('button', { name: 'Save and publish', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "staff-result": {
+    "file": "staff-result.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "hero": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 319.640625
+      }
+    },
+    "focus": [
+      "hero"
+    ],
+    "selectors": {
+      "hero": "locator('article section').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "public-result": {
+    "file": "public-result.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "hero": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 263.640625
+      }
+    },
+    "focus": [
+      "hero"
+    ],
+    "selectors": {
+      "hero": "locator('article section').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "attendee-home": {
+    "file": "attendee-home.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "hero": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 263.640625
+      }
+    },
+    "focus": [
+      "hero"
+    ],
+    "selectors": {
+      "hero": "locator('article section').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "schedule-nav": {
+    "file": "schedule-nav.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 98.390625,
+        "y": 76,
+        "width": 80.28125,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('navigation').getByRole('link', { name: 'Schedule', exact: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "day-select": {
+    "file": "day-select.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 33.75,
+        "y": 291.3125,
+        "width": 68,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('button', { name: 'Day one', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "schedule-before": {
+    "file": "schedule-before.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 322.5,
+        "height": 44
+      },
+      "day": {
+        "x": 33.75,
+        "y": 291.3125,
+        "width": 68,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search",
+      "day"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })",
+      "day": "getByRole('button', { name: 'Day one', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-1": {
+    "file": "search-1.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=L",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-2": {
+    "file": "search-2.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Li",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-3": {
+    "file": "search-3.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Lis",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-4": {
+    "file": "search-4.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=List",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-5": {
+    "file": "search-5.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Liste",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-6": {
+    "file": "search-6.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Listen",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-7": {
+    "file": "search-7.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Listeni",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-8": {
+    "file": "search-8.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Listenin",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "search-9": {
+    "file": "search-9.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Listening",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "search": {
+        "x": 33.75,
+        "y": 371.15625,
+        "width": 202.9375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "search"
+    ],
+    "selectors": {
+      "search": "getByRole('searchbox', { name: 'Search this day' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "session-open": {
+    "file": "session-open.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Listening",
+    "scroll": {
+      "x": 0,
+      "y": 520
+    },
+    "boxes": {
+      "action": {
+        "x": 33.75,
+        "y": 409.578125,
+        "width": 288.59375,
+        "height": 25
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('link', { name: 'Listening to your community', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "bookmark-hover": {
+    "file": "bookmark-hover.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule/session-listening?q=Listening",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "session": {
+        "x": 33.75,
+        "y": 125,
+        "width": 322.5,
+        "height": 78.375
+      },
+      "article": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 396.46875
+      },
+      "action": {
+        "x": 33.75,
+        "y": 437.46875,
+        "width": 77.1875,
+        "height": 44
+      }
+    },
+    "focus": [
+      "article"
+    ],
+    "selectors": {
+      "session": "getByRole('heading', { name: 'Listening to your community', exact: true })",
+      "article": "locator('main article').first()",
+      "action": "getByRole('button', { name: 'Bookmark', exact: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "bookmarked": {
+    "file": "bookmarked.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule/session-listening?q=Listening",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "session": {
+        "x": 33.75,
+        "y": 125,
+        "width": 322.5,
+        "height": 78.375
+      },
+      "saved": {
+        "x": 33.75,
+        "y": 437.46875,
+        "width": 95.453125,
+        "height": 44
+      },
+      "article": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 396.46875
+      }
+    },
+    "focus": [
+      "article"
+    ],
+    "selectors": {
+      "session": "getByRole('heading', { name: 'Listening to your community', exact: true })",
+      "saved": "getByRole('button', { name: 'Bookmarked', exact: true }).first()",
+      "article": "locator('main article').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "back-to-schedule": {
+    "file": "back-to-schedule.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule/session-listening?q=Listening",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 33.75,
+        "y": 90,
+        "width": 145.875,
+        "height": 15
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('link', { name: /Back to the (schedule|program)/i })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "my-schedule-nav": {
+    "file": "my-schedule-nav.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule?q=Listening",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 33.75,
+        "y": 520.84375,
+        "width": 113.4375,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('link', { name: 'My schedule', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "my-schedule": {
+    "file": "my-schedule.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule/mine",
+    "scroll": {
+      "x": 0,
+      "y": 85
+    },
+    "boxes": {
+      "header": {
+        "x": 33.75,
+        "y": 0,
+        "width": 322.5,
+        "height": 122.03125
+      },
+      "session": {
+        "x": 33.75,
+        "y": 218.21875,
+        "width": 288.59375,
+        "height": 25
+      }
+    },
+    "focus": [
+      "header",
+      "session"
+    ],
+    "selectors": {
+      "header": "locator('main article').first().locator(':scope > header')",
+      "session": "getByRole('link', { name: 'Listening to your community', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "my-schedule-verified": {
+    "file": "my-schedule-verified.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule/mine",
+    "scroll": {
+      "x": 0,
+      "y": 85
+    },
+    "boxes": {
+      "header": {
+        "x": 33.75,
+        "y": 0,
+        "width": 322.5,
+        "height": 122.03125
+      },
+      "session": {
+        "x": 33.75,
+        "y": 218.21875,
+        "width": 288.59375,
+        "height": 25
+      }
+    },
+    "focus": [
+      "header",
+      "session"
+    ],
+    "selectors": {
+      "header": "locator('main article').first().locator(':scope > header')",
+      "session": "getByRole('link', { name: 'Listening to your community', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "operator-overview": {
+    "file": "operator-overview.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/overview",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "heading": {
+        "x": 38,
+        "y": 68,
+        "width": 104.84375,
+        "height": 31.1875
+      }
+    },
+    "focus": [
+      "heading"
+    ],
+    "selectors": {
+      "heading": "getByRole('heading', { name: 'Overview', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "branding-menu": {
+    "file": "branding-menu.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/overview",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 259,
+        "y": 0,
+        "width": 131,
+        "height": 56
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "locator('summary').filter({ hasText: 'Menu' }).or(getByRole('button', { name: 'Menu', exact: true })).filter({ visible: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "branding-nav": {
+    "file": "branding-nav.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/overview",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 16,
+        "y": 448,
+        "width": 358,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('navigation').getByRole('link', { name: 'Branding', exact: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "page-style-nav": {
+    "file": "page-style-nav.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 199,
+        "y": 286.6875,
+        "width": 175,
+        "height": 98.5
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('button', { name: 'Page style', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "style-before": {
+    "file": "style-before.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "style": {
+        "x": 33,
+        "y": 662.578125,
+        "width": 324,
+        "height": 44
+      },
+      "panel": {
+        "x": 33,
+        "y": 638.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "panel"
+    ],
+    "selectors": {
+      "style": "getByLabel('Site style', { exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "style-chosen": {
+    "file": "style-chosen.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "style": {
+        "x": 33,
+        "y": 662.578125,
+        "width": 324,
+        "height": 44
+      },
+      "panel": {
+        "x": 33,
+        "y": 638.078125,
+        "width": 324,
+        "height": 68.5
+      }
+    },
+    "focus": [
+      "panel"
+    ],
+    "selectors": {
+      "style": "getByLabel('Site style', { exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "preview-home": {
+    "file": "preview-home.png",
+    "viewport": {
+      "width": 358,
+      "height": 143.20001220703125
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 1073
+    },
+    "boxes": {
+      "preview": {
+        "x": 0,
+        "y": 0,
+        "width": 358,
+        "height": 143.20001220703125
+      },
+      "subject": {
+        "x": 14.921875,
+        "y": 26.84375,
+        "width": 328.15625,
+        "height": 77.46875
+      }
+    },
+    "focus": [
+      "subject"
+    ],
+    "selectors": {
+      "preview": "locator('iframe[title=\"Home preview, light mode, 1440px wide\"]')",
+      "subject": "locator('iframe[title=\"Home preview, light mode, 1440px wide\"]').contentFrame().locator('article section').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "preview-page-control": {
+    "file": "preview-page-control.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 1073
+    },
+    "boxes": {
+      "action": {
+        "x": 129,
+        "y": 429.359375,
+        "width": 245,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByLabel('Page', { exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "preview-schedule": {
+    "file": "preview-schedule.png",
+    "viewport": {
+      "width": 358,
+      "height": 143.20001220703125
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 1073
+    },
+    "boxes": {
+      "preview": {
+        "x": 0,
+        "y": 0,
+        "width": 358,
+        "height": 143.20001220703125
+      },
+      "subject": {
+        "x": 42.765625,
+        "y": 60.046875,
+        "width": 150.15625,
+        "height": 23.21875
+      }
+    },
+    "focus": [
+      "subject"
+    ],
+    "selectors": {
+      "preview": "locator('iframe[title=\"Schedule preview, light mode, 1440px wide\"]')",
+      "subject": "locator('iframe[title=\"Schedule preview, light mode, 1440px wide\"]').contentFrame().locator('.session-block__face').first().or(locator('td').filter({ has: getByRole('link', { name: 'Opening the conversation', exact: true }) })).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "preview-phone-control": {
+    "file": "preview-phone-control.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 1073
+    },
+    "boxes": {
+      "action": {
+        "x": 109,
+        "y": 486.359375,
+        "width": 75,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('button', { name: 'Phone', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "preview-phone-light": {
+    "file": "preview-phone-light.png",
+    "viewport": {
+      "width": 358,
+      "height": 774.7487182617188
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 1618
+    },
+    "boxes": {
+      "preview": {
+        "x": 0,
+        "y": 0,
+        "width": 358,
+        "height": 774.7487182617188
+      },
+      "subject": {
+        "x": 30.984375,
+        "y": 253.671875,
+        "width": 296.03125,
+        "height": 267.625
+      }
+    },
+    "focus": [
+      "subject"
+    ],
+    "selectors": {
+      "preview": "locator('iframe[title=\"Schedule preview, light mode, 390px wide\"]')",
+      "subject": "locator('iframe[title=\"Schedule preview, light mode, 390px wide\"]').contentFrame().locator('.session-block__face').first().or(locator('td').filter({ has: getByRole('link', { name: 'Opening the conversation', exact: true }) })).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "preview-mode-control": {
+    "file": "preview-mode-control.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 1618
+    },
+    "boxes": {
+      "action": {
+        "x": 16,
+        "y": 17.859375,
+        "width": 256,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByLabel('Mode', { exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "preview-phone-dark": {
+    "file": "preview-phone-dark.png",
+    "viewport": {
+      "width": 358,
+      "height": 774.7487182617188
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 1618
+    },
+    "boxes": {
+      "preview": {
+        "x": 0,
+        "y": 0,
+        "width": 358,
+        "height": 774.7487182617188
+      },
+      "subject": {
+        "x": 30.984375,
+        "y": 253.671875,
+        "width": 296.03125,
+        "height": 267.625
+      }
+    },
+    "focus": [
+      "subject"
+    ],
+    "selectors": {
+      "preview": "locator('iframe[title=\"Schedule preview, dark mode, 390px wide\"]')",
+      "subject": "locator('iframe[title=\"Schedule preview, dark mode, 390px wide\"]').contentFrame().locator('.session-block__face').first().or(locator('td').filter({ has: getByRole('link', { name: 'Opening the conversation', exact: true }) })).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "theme-validation": {
+    "file": "theme-validation.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "heading": {
+        "x": 38,
+        "y": 68,
+        "width": 100.84375,
+        "height": 31.1875
+      },
+      "tasks": {
+        "x": 16,
+        "y": 286.6875,
+        "width": 358,
+        "height": 205
+      }
+    },
+    "focus": [
+      "heading",
+      "tasks"
+    ],
+    "selectors": {
+      "heading": "getByRole('heading', { name: 'Branding', exact: true })",
+      "tasks": "getByRole('group', { name: 'Branding tasks' })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "theme-publish-hover": {
+    "file": "theme-publish-hover.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 16,
+        "y": 111.1875,
+        "width": 142,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "getByRole('button', { name: 'Publish the theme', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "theme-published": {
+    "file": "theme-published.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/admin/branding",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "publish": {
+        "x": 16,
+        "y": 111.1875,
+        "width": 142,
+        "height": 44
+      }
+    },
+    "focus": [
+      "publish"
+    ],
+    "selectors": {
+      "publish": "getByRole('button', { name: 'Publish the theme', exact: true })"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "styled-home": {
+    "file": "styled-home.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "hero": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 319.640625
+      }
+    },
+    "focus": [
+      "hero"
+    ],
+    "selectors": {
+      "hero": "locator('article section').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "styled-schedule": {
+    "file": "styled-schedule.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule",
+    "scroll": {
+      "x": 0,
+      "y": 31
+    },
+    "boxes": {
+      "entry": {
+        "x": 33.75,
+        "y": 552.34375,
+        "width": 322.5,
+        "height": 291.546875
+      }
+    },
+    "focus": [
+      "entry"
+    ],
+    "selectors": {
+      "entry": "locator('.session-block__face').first().or(locator('td').filter({ has: getByRole('link', { name: 'Opening the conversation', exact: true }) })).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "styled-speakers": {
+    "file": "styled-speakers.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/speakers",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "speaker": {
+        "x": 33.75,
+        "y": 148.1875,
+        "width": 322.5,
+        "height": 148.125
+      }
+    },
+    "focus": [
+      "speaker"
+    ],
+    "selectors": {
+      "speaker": "locator('main li').filter({ has: getByRole('link', { name: 'Avery Lane', exact: true }) }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "schedule-menu": {
+    "file": "schedule-menu.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 270.71875,
+        "y": 16,
+        "width": 85.53125,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "locator('summary').filter({ hasText: 'Menu' }).or(getByRole('button', { name: 'Menu', exact: true })).filter({ visible: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "speakers-menu": {
+    "file": "speakers-menu.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule",
+    "scroll": {
+      "x": 0,
+      "y": 16
+    },
+    "boxes": {
+      "action": {
+        "x": 271.71875,
+        "y": 0,
+        "width": 84.53125,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "locator('summary').filter({ hasText: 'Menu' }).or(getByRole('button', { name: 'Menu', exact: true })).filter({ visible: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "operator-schedule-menu": {
+    "file": "operator-schedule-menu.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "action": {
+        "x": 271.71875,
+        "y": 16,
+        "width": 84.53125,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "locator('summary').filter({ hasText: 'Menu' }).or(getByRole('button', { name: 'Menu', exact: true })).filter({ visible: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "operator-speakers-menu": {
+    "file": "operator-speakers-menu.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/schedule",
+    "scroll": {
+      "x": 0,
+      "y": 16
+    },
+    "boxes": {
+      "action": {
+        "x": 271.71875,
+        "y": 0,
+        "width": 84.53125,
+        "height": 44
+      }
+    },
+    "focus": [
+      "action"
+    ],
+    "selectors": {
+      "action": "locator('summary').filter({ hasText: 'Menu' }).or(getByRole('button', { name: 'Menu', exact: true })).filter({ visible: true }).first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  },
+  "styled-public-home": {
+    "file": "styled-public-home.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "browserViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "scale": 2,
+    "route": "http://127.0.0.1:5173/",
+    "scroll": {
+      "x": 0,
+      "y": 0
+    },
+    "boxes": {
+      "hero": {
+        "x": 33.75,
+        "y": 85,
+        "width": 322.5,
+        "height": 263.640625
+      }
+    },
+    "focus": [
+      "hero"
+    ],
+    "selectors": {
+      "hero": "locator('article section').first()"
+    },
+    "fixtureHash": "38865692494df079f7745c91c92a7e0b763bc64e043c402a1718d78f34169402",
+    "blockedRequests": []
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "inputDigest": "4d9c95b448974a2d320537fef1791a106c6fa59126769192ee58e49723c34e4f",
+  "file": "save-schedule-landscape.mp4",
+  "sha256": "b532416612ad35e098e58aeeda49e6318aa87faa337dbfcc5d7d33f9dc39d642",
+  "format": {
+    "width": 1920,
+    "height": 1080,
+    "fps": "30/1",
+    "pixelFormat": "yuv420p",
+    "codec": "h264",
+    "frames": 1800,
+    "duration": 60
+  },
+  "audio": {
+    "target": -19,
+    "lufs": -19.1,
+    "truePeak": -4.6,
+    "method": "FFmpeg ebur128=peak=true / BS.1770",
+    "summary": "Summary:\n\n  Integrated loudness:\n    I:         -19.1 LUFS\n    Threshold: -29.1 LUFS\n\n  Loudness range:\n    LRA:         7.6 LU\n    Threshold: -39.1 LUFS\n    LRA low:   -21.4 LUFS\n    LRA high:  -13.8 LUFS\n\n  True peak:\n    Peak:       -4.6 dBFS\n[out#0/null @ 0x5583942acb80] video:773KiB audio:11252KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nframe= 1800 fps=413 q=-0.0 Lsize=N/A time=00:01:00.00 bitrate=N/A speed=13.8x    \n"
+  },
+  "flash": {
+    "pass": true,
+    "status": "pass-screen",
+    "certification": false,
+    "frames": 1800,
+    "fps": 30,
+    "maxGeneralPixelTransitionsInOneSecond": 9,
+    "maxRedPixelTransitionsInOneSecond": 0,
+    "maxGeneralEpisodeTransitionsInOneSecond": 2,
+    "maxRedEpisodeTransitionsInOneSecond": 0,
+    "maxRapidPixelAreaFraction": 0.000018,
+    "areaThreshold": 0.02,
+    "luminanceThreshold": 0.1,
+    "redUVComponentThreshold": 0.1414213562373095,
+    "legacyRedThreshold": 20,
+    "resolution": "native",
+    "ambiguousFrames": [
+      150,
+      565,
+      726,
+      870,
+      925,
+      1170
+    ],
+    "hazardFrames": [],
+    "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+    "file": "/workspace/eventrunner/video/out/save-schedule-landscape.mp4",
+    "width": 1920,
+    "height": 1080,
+    "fileHash": "b532416612ad35e098e58aeeda49e6318aa87faa337dbfcc5d7d33f9dc39d642",
+    "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+  }
+}

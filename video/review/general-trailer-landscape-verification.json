@@ -1,0 +1,48 @@
+{
+  "inputDigest": "489dbcba96944fd3f18098a80f9c422e30b1a22956223f7e6dc947a8fdf60766",
+  "file": "general-trailer-landscape.mp4",
+  "sha256": "c94abd921281e9bff525df9740c68989363cb0773c0518de1e0ee189b9d3eb8e",
+  "format": {
+    "width": 1920,
+    "height": 1080,
+    "fps": "30/1",
+    "pixelFormat": "yuv420p",
+    "codec": "h264",
+    "frames": 1350,
+    "duration": 45
+  },
+  "audio": {
+    "target": -16,
+    "lufs": -15.9,
+    "truePeak": -4,
+    "method": "FFmpeg ebur128=peak=true / BS.1770",
+    "summary": "Summary:\n\n  Integrated loudness:\n    I:         -15.9 LUFS\n    Threshold: -25.9 LUFS\n\n  Loudness range:\n    LRA:         4.3 LU\n    Threshold: -35.8 LUFS\n    LRA low:   -18.7 LUFS\n    LRA high:  -14.4 LUFS\n\n  True peak:\n    Peak:       -4.0 dBFS\n[out#0/null @ 0x563d4ea23f40] video:580KiB audio:8440KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nframe= 1350 fps=295 q=-0.0 Lsize=N/A time=00:00:45.00 bitrate=N/A speed=9.82x    \n"
+  },
+  "flash": {
+    "pass": true,
+    "status": "pass-screen",
+    "certification": false,
+    "frames": 1350,
+    "fps": 30,
+    "maxGeneralPixelTransitionsInOneSecond": 11,
+    "maxRedPixelTransitionsInOneSecond": 3,
+    "maxGeneralEpisodeTransitionsInOneSecond": 6,
+    "maxRedEpisodeTransitionsInOneSecond": 0,
+    "maxRapidPixelAreaFraction": 0.000176,
+    "areaThreshold": 0.02,
+    "luminanceThreshold": 0.1,
+    "redUVComponentThreshold": 0.1414213562373095,
+    "legacyRedThreshold": 20,
+    "resolution": "native",
+    "ambiguousFrames": [
+      19
+    ],
+    "hazardFrames": [],
+    "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+    "file": "/workspace/eventrunner/video/out/general-trailer-landscape.mp4",
+    "width": 1920,
+    "height": 1080,
+    "fileHash": "c94abd921281e9bff525df9740c68989363cb0773c0518de1e0ee189b9d3eb8e",
+    "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+  }
+}

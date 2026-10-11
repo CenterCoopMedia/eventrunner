@@ -1,0 +1,288 @@
+{
+  "date": "2026-10-11",
+  "checks": [
+    {
+      "project": "public",
+      "width": 1440,
+      "status": "pass",
+      "title": "Event Runner — videos and guides",
+      "horizontalOverflow": false,
+      "videos": [
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/general-trailer-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/general-trailer-landscape.mp4",
+          "box": {
+            "width": 854,
+            "height": 480.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/general-trailer-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/general-trailer-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/publish-page-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/publish-page-landscape.mp4",
+          "box": {
+            "width": 854,
+            "height": 480.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/publish-page-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/publish-page-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/save-schedule-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/save-schedule-landscape.mp4",
+          "box": {
+            "width": 854,
+            "height": 480.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/save-schedule-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/save-schedule-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/change-style-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/change-style-landscape.mp4",
+          "box": {
+            "width": 854,
+            "height": 480.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/change-style-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/change-style-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        }
+      ],
+      "transcripts": 3,
+      "mp4Decoding": "",
+      "links": [
+        "http://127.0.0.1:9801/",
+        "http://127.0.0.1:9801/videos/general-trailer-landscape.mp4",
+        "http://127.0.0.1:9801/videos/general-trailer-vertical.mp4",
+        "http://127.0.0.1:9801/videos/publish-page-landscape.mp4",
+        "http://127.0.0.1:9801/videos/publish-page-vertical.mp4",
+        "http://127.0.0.1:9801/videos/publish-page-transcript.md",
+        "http://127.0.0.1:9801/videos/save-schedule-landscape.mp4",
+        "http://127.0.0.1:9801/videos/save-schedule-vertical.mp4",
+        "http://127.0.0.1:9801/videos/save-schedule-transcript.md",
+        "http://127.0.0.1:9801/videos/change-style-landscape.mp4",
+        "http://127.0.0.1:9801/videos/change-style-vertical.mp4",
+        "http://127.0.0.1:9801/videos/change-style-transcript.md",
+        "http://127.0.0.1:9801/docs/"
+      ],
+      "resources": [
+        "http://127.0.0.1:9801/favicon.svg",
+        "http://127.0.0.1:9801/tokens.css"
+      ],
+      "keyboardFocus": {
+        "tag": "A",
+        "outline": "auto",
+        "outlineWidth": "1px"
+      },
+      "initialMovieRequests": 0,
+      "errors": []
+    },
+    {
+      "project": "public",
+      "width": 390,
+      "status": "pass",
+      "title": "Event Runner — videos and guides",
+      "horizontalOverflow": false,
+      "videos": [
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/general-trailer-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/general-trailer-landscape.mp4",
+          "box": {
+            "width": 342,
+            "height": 192.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/general-trailer-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/general-trailer-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/publish-page-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/publish-page-landscape.mp4",
+          "box": {
+            "width": 342,
+            "height": 192.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/publish-page-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/publish-page-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/save-schedule-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/save-schedule-landscape.mp4",
+          "box": {
+            "width": 342,
+            "height": 192.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/save-schedule-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/save-schedule-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/change-style-landscape.png",
+          "source": "http://127.0.0.1:9801/videos/change-style-landscape.mp4",
+          "box": {
+            "width": 342,
+            "height": 192.375
+          }
+        },
+        {
+          "controls": true,
+          "autoplay": false,
+          "paused": true,
+          "playsInline": true,
+          "preload": "none",
+          "poster": "http://127.0.0.1:9801/videos/change-style-vertical.png",
+          "source": "http://127.0.0.1:9801/videos/change-style-vertical.mp4",
+          "box": {
+            "width": 270,
+            "height": 480
+          }
+        }
+      ],
+      "transcripts": 3,
+      "mp4Decoding": "",
+      "links": [
+        "http://127.0.0.1:9801/",
+        "http://127.0.0.1:9801/videos/general-trailer-landscape.mp4",
+        "http://127.0.0.1:9801/videos/general-trailer-vertical.mp4",
+        "http://127.0.0.1:9801/videos/publish-page-landscape.mp4",
+        "http://127.0.0.1:9801/videos/publish-page-vertical.mp4",
+        "http://127.0.0.1:9801/videos/publish-page-transcript.md",
+        "http://127.0.0.1:9801/videos/save-schedule-landscape.mp4",
+        "http://127.0.0.1:9801/videos/save-schedule-vertical.mp4",
+        "http://127.0.0.1:9801/videos/save-schedule-transcript.md",
+        "http://127.0.0.1:9801/videos/change-style-landscape.mp4",
+        "http://127.0.0.1:9801/videos/change-style-vertical.mp4",
+        "http://127.0.0.1:9801/videos/change-style-transcript.md",
+        "http://127.0.0.1:9801/docs/"
+      ],
+      "resources": [
+        "http://127.0.0.1:9801/favicon.svg",
+        "http://127.0.0.1:9801/tokens.css"
+      ],
+      "keyboardFocus": {
+        "tag": "A",
+        "outline": "auto",
+        "outlineWidth": "1px"
+      },
+      "initialMovieRequests": 0,
+      "errors": []
+    }
+  ],
+  "playbackLimitation": "This Chromium build has no H.264/AAC decoder. Layout, controls, no-autoplay behavior, keyboard access, and local resources were checked; playback is not claimed. FFmpeg independently decoded and measured every full file."
+}
