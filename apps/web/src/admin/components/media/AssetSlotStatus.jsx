@@ -28,7 +28,7 @@ export default function AssetSlotStatus({ phase, id, onRetry, retrying = false }
   return (
     <div className="flex w-full min-w-0 flex-col items-start gap-2xs">
       {message ? (
-        <p id={id} role="status" aria-live="polite" className="asset-slot-status m-0 w-full text-admin-sm text-admin-ink">
+        <p id={id} aria-live="polite" aria-atomic="true" className="asset-slot-status m-0 w-full text-admin-sm text-admin-ink">
           {message}
         </p>
       ) : null}

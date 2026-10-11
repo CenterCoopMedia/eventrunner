@@ -357,7 +357,7 @@ describe('ImagePicker', () => {
     expect(frame.className).toContain('w-16');
     expect(status.className).not.toMatch(/overflow-hidden|truncate|line-clamp|h-16|w-16/);
     expect(status.className).toContain('w-full');
-    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
     expect(screen.getByLabelText('Primary logo')).toHaveAttribute(
       'aria-describedby',
       expect.stringContaining(status.id),
