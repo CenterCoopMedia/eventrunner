@@ -232,7 +232,7 @@ export function drawAssembly(c:Ctx,project:Project,mark:HTMLImageElement,f:numbe
   opacity(c,entrance,()=>{
    const wide=!vertical&&f>=q.shape&&f<q.gather;
    const y=vertical?369:wide?145:291;label(c,part,left,y,24,P.blue,'Mono',400);
-   lines(c,wide?title.replace('\n',' '):title,{x:left,y:y+53+(1-entrance)*19,width:vertical?910:wide?1740:562,height:vertical?207:327},vertical?83:wide?72:78,P.paper,'Bricolage',700,1.04);
+   lines(c,wide?title.replace(/\n/g,' '):title,{x:left,y:y+53+(1-entrance)*19,width:vertical?910:wide?1740:562,height:vertical?207:327},vertical?83:wide?72:78,P.paper,'Bricolage',700,1.04);
    if(!wide)lines(c,subtitle,{x:left,y:vertical?608:655,width:vertical?910:490,height:115},vertical?31:32,P.muted,'Source',500,1.25);
   });
   const note=project.privateLabel??'Harborlight Forum · Sample event';
