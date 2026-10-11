@@ -187,7 +187,7 @@ describe('speaker editor', () => {
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Rae' } });
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okonkwo' } });
     fireEvent.change(screen.getByLabelText('Job title'), { target: { value: 'Editor' } });
-    expect(screen.queryByLabelText('URL slug')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('URL slug')).toHaveValue('');
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
     });
@@ -203,6 +203,19 @@ describe('speaker editor', () => {
     expect(body.speaker).not.toHaveProperty('approvedAt');
     expect(screen.queryByLabelText('Headshot path')).toBeNull();
     expect(body.speaker.headshotPath).toBeNull();
+  });
+
+  it('sends a slug the operator types when the derived address is already used', async () => {
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'spk-2' }));
+    await renderAt('/admin/speakers/new');
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Rae' } });
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Okonkwo' } });
+    fireEvent.change(screen.getByLabelText('URL slug'), { target: { value: 'rae-okonkwo-2' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create speaker' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker.slug).toBe('rae-okonkwo-2');
   });
 
   it('sends an empty optional field as null rather than an empty string', async () => {

@@ -325,18 +325,20 @@ export default function AdminSpeakerEditor({ mode }) {
               required
             />
           </div>
-          {mode === 'edit' ? (
-            <div className="mt-sm">
-              <TextField
-                label="URL slug"
-                hint="This address stays the same when the name changes."
-                value={form.slug}
-                onChange={() => {}}
-                readOnly
-                error={errorFor('slug')}
-              />
-            </div>
-          ) : null}
+          <div className="mt-sm">
+            <TextField
+              label="URL slug"
+              hint={
+                mode === 'edit'
+                  ? 'This address stays the same when the name changes.'
+                  : 'Leave this blank and the address follows the name. Enter one when that address is already used.'
+              }
+              value={form.slug}
+              onChange={mode === 'edit' ? () => {} : (value) => set({ slug: value })}
+              readOnly={mode === 'edit'}
+              error={errorFor('slug')}
+            />
+          </div>
         </Panel>
 
         <Panel

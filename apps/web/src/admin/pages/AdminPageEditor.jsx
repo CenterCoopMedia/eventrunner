@@ -33,6 +33,7 @@ import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
+import { useAdminContent } from '../useAdminContent.js';
 import { useAdminPages } from '../useAdminPages.js';
 import {
   BLOCK_TYPES,
@@ -193,6 +194,7 @@ export default function AdminPageEditor({ mode }) {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { rows, ready, error: listenerError, findRow } = useAdminPages();
+  const { rows: contentRows, ready: contentReady, error: contentError } = useAdminContent();
   // What the site is set to, so the "follow the site" option can say what
   // following it means instead of sending the operator to another tab to
   // find out.
@@ -222,6 +224,8 @@ export default function AdminPageEditor({ mode }) {
   // our own save) must not clobber whatever is being typed.
   const loadedIdRef = useRef(null);
   const nextSectionKey = useRef(0);
+  // Ids the server refused on create. The listener may not have them yet.
+  const rejectedPageIds = useRef(new Set());
 
   const row = mode === 'edit' ? findRow(pageId) : null;
 
@@ -273,6 +277,18 @@ export default function AdminPageEditor({ mode }) {
     );
   }
 
+  if (mode === 'create' && (!ready || !contentReady)) {
+    if (listenerError || contentError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load pages and content. A new page waits until both have loaded, so its id cannot replace an existing page or reuse a section that still has content."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading page…" />;
+  }
+
   if (mode === 'edit' && loadedIdRef.current !== pageId) {
     if (!ready && listenerError) {
       return (
@@ -319,7 +335,14 @@ export default function AdminPageEditor({ mode }) {
       });
       return;
     }
-    const pageIds = new Set();
+    const creating = mode === 'create' && savedId === null;
+    if (creating && (!ready || !contentReady)) {
+      setError({
+        message: 'Wait until pages and content have loaded before saving a new page.',
+      });
+      return;
+    }
+    const pageIds = new Set(rejectedPageIds.current);
     const sectionIds = new Set();
     for (const candidate of rows ?? []) {
       if (candidate?.id) pageIds.add(candidate.id);
@@ -327,12 +350,17 @@ export default function AdminPageEditor({ mode }) {
         if (section?.id) sectionIds.add(section.id);
       }
     }
+    for (const content of contentRows ?? []) {
+      for (const revision of [content?.current, content?.live, content?.draft]) {
+        if (typeof revision?.section === 'string' && revision.section) sectionIds.add(revision.section);
+      }
+    }
     const assigned = assignPageIds(page, { pageIds, sectionIds });
     if (pageSnapshot(assigned) !== pageSnapshot(page)) setPage(assigned);
     const payload = toPagePayload(assigned);
     setBusy(publish ? 'publish' : 'draft');
     try {
-      await call('cmsSavePage', { page: payload });
+      await call('cmsSavePage', creating ? { page: payload, create: true } : { page: payload });
       // Mark the document existing the moment the DRAFT is written, before
       // any publish attempt: a failed publish must not leave the id editable,
       // because retrying under a different id would create a second document
@@ -353,6 +381,14 @@ export default function AdminPageEditor({ mode }) {
       });
       reportPublish(response, [payload.id]);
     } catch (err) {
+      if (creating && err?.status === 409) {
+        rejectedPageIds.current.add(payload.id);
+        setPage((current) => ({ ...current, id: '' }));
+        setError({
+          message: 'That page id was already taken. Save again to use a new one.',
+        });
+        return;
+      }
       setError(err);
       // A part-way publish failure carries the queue row to resume from.
       if (err?.queueId) setResumeQueueId(err.queueId);

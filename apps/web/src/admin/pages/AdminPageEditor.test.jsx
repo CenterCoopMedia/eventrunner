@@ -274,6 +274,7 @@ describe('page editor', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urlOf(0)).toMatch(/\/cmsSavePage$/);
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe('Bearer id-token');
+    expect(bodyOf(0).create).toBe(true);
     expect(bodyOf(0).page).toMatchObject({
       id: 'scholarships',
       label: 'Scholarships',
@@ -293,6 +294,37 @@ describe('page editor', () => {
     // Saving is explicitly NOT publishing.
     expect(fetch.mock.calls.some((call) => String(call[0]).endsWith('/cmsPublish'))).toBe(false);
     expect(await screen.findByText(/not public until you publish/i)).toBeInTheDocument();
+  });
+
+  it('does not give a new page the id new', async () => {
+    fetch.mockResolvedValueOnce(okResponse({ id: 'new-2', status: 'dirty' }));
+    await renderAt('/admin/pages/new');
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'New' } });
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/welcome' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.id).toBe('new-2');
+    expect(bodyOf(0).page.path).toBe('/welcome');
+  });
+
+  it('does not reuse a section id that content still holds', async () => {
+    draftDocs = [{ id: 'old-faq', section: 'questions' }];
+    fetch.mockResolvedValueOnce(okResponse({ id: 'faq', status: 'dirty' }));
+    await renderAt('/admin/pages/new');
+    fireEvent.change(screen.getByLabelText('Navigation label'), { target: { value: 'FAQ' } });
+    fireEvent.change(screen.getByLabelText('Path'), { target: { value: '/faq' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add section' }));
+    fireEvent.change(screen.getByLabelText('Section 1 label'), { target: { value: 'Questions' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).page.sections[0].id).toBe('questions-2');
+  });
+
+  it('waits to save a new page until content has loaded', async () => {
+    silentCollections = ['cmsContent'];
+    await renderAt('/admin/pages/new', { waitForHeading: false });
+    expect(await screen.findByText('Loading page…')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('asks before leaving a page with unsaved edits', async () => {
@@ -317,6 +349,7 @@ describe('page editor', () => {
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(urlOf(0)).toMatch(/\/cmsSavePage$/);
+    expect(bodyOf(0).create).toBeUndefined();
     expect(urlOf(1)).toMatch(/\/cmsPublish$/);
     expect(bodyOf(1)).toEqual({ collection: 'cmsPages', docIds: ['scholarships'] });
   });

@@ -31,6 +31,7 @@
  */
 
 const { isKnownBlockType } = require('./blockTypes.cjs');
+const { isAlreadyExistsError } = require('./store.cjs');
 const { PAGE_TEMPLATE_IDS, isKnownPageTemplate } = require('./pageTemplates.cjs');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, forbidden, methodNotAllowed, internal } = require('../core/errors.cjs');
@@ -400,6 +401,10 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
       return internal(res, 'The page could not be saved.');
     }
 
+    // `create: true` is a new page. The store then refuses an existing draft
+    // and an existing live doc, so two creators cannot overwrite one id.
+    // An edit omits the flag and keeps the upsert path.
+    const creating = req.body?.create === true;
     try {
       // The store strips reserved publish-model keys (visible/status/
       // revision/...) from `fields` itself; visible rides separately.
@@ -411,8 +416,13 @@ function createSavePageHandler({ db, auth, getConfig, store, now = Date.now, log
         visible: page.visible,
         actor: { uid: gate.uid, email: gate.email },
         now,
+        createOnly: creating,
+        rejectLive: creating,
       });
     } catch (err) {
+      if (creating && isAlreadyExistsError(err)) {
+        return sendError(res, 409, 'already-exists', `id: '${page.id}' already belongs to a page`);
+      }
       log.error('cmsSavePage draft write failed', err);
       return internal(res, 'The page could not be saved.');
     }

@@ -356,4 +356,29 @@ describe('assignPageIds', () => {
     expect(assigned.path).toBe('/scholarships');
     expect(assigned.sections[0].id).toBe('intro-2');
   });
+
+  it('caps a new page id at 64 characters and does not mint the new route', () => {
+    const named = assignPageIds({ id: '', label: 'New', path: '/welcome', sections: [] });
+    expect(named.id).toBe('new-2');
+    expect(named.path).toBe('/welcome');
+    const long = assignPageIds({
+      id: '',
+      label: 'a'.repeat(80),
+      path: '/long',
+      sections: [],
+    });
+    expect(long.id).toBe('a'.repeat(64));
+    const kept = assignPageIds({ id: 'new', label: 'Welcome', path: '/welcome', sections: [] });
+    expect(kept.id).toBe('new');
+  });
+
+  it('skips a section id that content still uses', () => {
+    const assigned = assignPageIds({
+      id: '',
+      label: 'FAQ',
+      path: '/faq',
+      sections: [{ id: '', label: 'Questions', defaultBlocks: [] }],
+    }, { sectionIds: ['questions'] });
+    expect(assigned.sections[0].id).toBe('questions-2');
+  });
 });

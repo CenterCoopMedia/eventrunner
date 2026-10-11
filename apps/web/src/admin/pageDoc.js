@@ -205,6 +205,8 @@ export function pageSnapshot(page) {
  * Block field ids are unique inside their section. The public path is not copied
  * from the page id.
  *
+ * Page ids follow the server contract: 1-64 of letters, digits, hyphen,
+ * and underscore, and never the create route `new`.
  * @param {object} page
  * @param {{ pageIds?: Iterable<string>, sectionIds?: Iterable<string> }} taken
  */
@@ -213,7 +215,10 @@ export function assignPageIds(page, { pageIds = [], sectionIds = [] } = {}) {
   const usedSections = sectionIds instanceof Set ? sectionIds : new Set(sectionIds);
   const next = {
     ...page,
-    id: lockEditorialId(page?.id, page?.label, usedPages, 'page'),
+    id: lockEditorialId(page?.id, page?.label, usedPages, 'page', {
+      maxLength: 64,
+      reserved: ['new'],
+    }),
     sections: (page?.sections ?? []).map((section) => {
       const id = lockEditorialId(section?.id, section?.label, usedSections, 'section');
       usedSections.add(id);

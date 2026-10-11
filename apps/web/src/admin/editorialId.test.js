@@ -23,6 +23,17 @@ describe('editorialId', () => {
     expect(uniqueEditorialId('Intro', new Set(['intro', 'intro-2']))).toBe('intro-3');
   });
 
+  it('caps a page id at 64 characters and skips the reserved new route', () => {
+    expect(editorialId('a'.repeat(80), 'page', 64)).toBe('a'.repeat(64));
+    expect(uniqueEditorialId('New', [], 'page', { maxLength: 64, reserved: ['new'] })).toBe('new-2');
+    const long = 'b'.repeat(80);
+    const base = editorialId(long, 'page', 64);
+    const taken = new Set([base, `${base.slice(0, 62)}-2`]);
+    const next = uniqueEditorialId(long, taken, 'page', { maxLength: 64, reserved: ['new'] });
+    expect(next).toBe(`${'b'.repeat(62)}-3`);
+    expect(next.length).toBeLessThanOrEqual(64);
+  });
+
   it('keeps an existing id when the label changes, and reuses it after a failed save', () => {
     const taken = new Set(['hero']);
     expect(lockEditorialId('hero', 'Welcome', taken, 'section')).toBe('hero');
