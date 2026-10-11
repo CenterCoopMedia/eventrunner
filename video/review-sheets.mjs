@@ -1,0 +1,4 @@
+import path from'node:path';import{spawnSync}from'node:child_process';import{options}from'./project.mjs';
+const opt=options();for(const piece of opt.pieces)for(const format of ['landscape','vertical']){
+ const file=path.join(opt.root,'out',`${piece}-${format}.mp4`),out=path.join(opt.root,'review',`${piece}-${format}-sheet-%02d.jpg`);const width=format==='landscape'?240:150,cols=format==='landscape'?6:8,rows=format==='landscape'?10:8;
+ const r=spawnSync('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',file,'-vf',`select=not(mod(n\\,9)),scale=${width}:-1,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text='%{n}':fontsize=13:fontcolor=black:box=1:boxcolor=white:x=4:y=4,tile=${cols}x${rows}:padding=6:margin=6`,'-fps_mode','vfr','-q:v','3',out],{encoding:'utf8'});if(r.status)throw new Error(r.stderr);console.log('Sheets',piece,format);}

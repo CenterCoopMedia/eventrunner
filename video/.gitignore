@@ -1,0 +1,7 @@
+.cache/
+out/
+node_modules/
+*.log
+__pycache__/
+review/*.png
+review/*-sheet-*.jpg

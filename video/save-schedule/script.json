@@ -1,0 +1,285 @@
+{
+  "id": "save-schedule",
+  "title": "Save your personal schedule",
+  "duration": 1800,
+  "seed": 818,
+  "scenes": [
+    {
+      "id": "intro",
+      "start": 0,
+      "end": 150,
+      "caption": "Save your personal schedule.",
+      "capture": "attendee-home",
+      "detail": "Sign in with an approved registration.",
+      "chapter": "01"
+    },
+    {
+      "id": "schedule",
+      "start": 150,
+      "end": 390,
+      "caption": "Open Schedule.",
+      "capture": "schedule-nav",
+      "after": "day-select",
+      "action": {
+        "target": "action",
+        "moveStart": 240,
+        "moveEnd": 279,
+        "press": 285
+      },
+      "chapter": "01"
+    },
+    {
+      "id": "day",
+      "start": 390,
+      "end": 690,
+      "caption": "Choose your event day.",
+      "capture": "day-select",
+      "after": "schedule-before",
+      "action": {
+        "target": "action",
+        "moveStart": 510,
+        "moveEnd": 549,
+        "press": 555
+      },
+      "chapter": "02"
+    },
+    {
+      "id": "search",
+      "start": 690,
+      "end": 870,
+      "caption": "Search for your session.",
+      "capture": "schedule-before",
+      "typing": {
+        "prefix": "search-",
+        "length": 9,
+        "start": 720,
+        "interval": 6
+      },
+      "chapter": "03"
+    },
+    {
+      "id": "open-session",
+      "start": 870,
+      "end": 960,
+      "caption": "Open the session.",
+      "capture": "session-open",
+      "after": "bookmark-hover",
+      "action": {
+        "target": "action",
+        "moveStart": 880,
+        "moveEnd": 909,
+        "press": 915
+      },
+      "chapter": "03"
+    },
+    {
+      "id": "bookmark",
+      "start": 960,
+      "end": 1170,
+      "caption": "Select Bookmark.",
+      "capture": "bookmark-hover",
+      "after": "bookmarked",
+      "action": {
+        "target": "action",
+        "moveStart": 1005,
+        "moveEnd": 1044,
+        "press": 1050
+      },
+      "chapter": "04"
+    },
+    {
+      "id": "back",
+      "start": 1170,
+      "end": 1260,
+      "caption": "Return to the schedule.",
+      "capture": "back-to-schedule",
+      "after": "my-schedule-nav",
+      "action": {
+        "target": "action",
+        "moveStart": 1180,
+        "moveEnd": 1214,
+        "press": 1220
+      },
+      "chapter": "05"
+    },
+    {
+      "id": "mine",
+      "start": 1260,
+      "end": 1410,
+      "caption": "Open My schedule.",
+      "capture": "my-schedule-nav",
+      "after": "my-schedule",
+      "action": {
+        "target": "action",
+        "moveStart": 1280,
+        "moveEnd": 1314,
+        "press": 1320
+      },
+      "chapter": "05"
+    },
+    {
+      "id": "result",
+      "start": 1410,
+      "end": 1620,
+      "caption": "Your saved session appears here.",
+      "capture": "my-schedule-verified",
+      "chapter": "06"
+    },
+    {
+      "id": "end",
+      "start": 1620,
+      "end": 1800,
+      "caption": "Make room for your event.",
+      "capture": "my-schedule-verified",
+      "endCard": true,
+      "chapter": "07"
+    }
+  ],
+  "verticalScenes": [
+    {
+      "id": "intro",
+      "start": 0,
+      "end": 150,
+      "caption": "Save your personal schedule.",
+      "capture": "attendee-home",
+      "detail": "Sign in with an approved registration.",
+      "chapter": "01"
+    },
+    {
+      "id": "menu",
+      "start": 150,
+      "end": 240,
+      "caption": "Open Menu, then Schedule.",
+      "capture": "schedule-menu",
+      "after": "schedule-nav",
+      "chapter": "01",
+      "action": {
+        "target": "action",
+        "moveStart": 160,
+        "moveEnd": 189,
+        "press": 195
+      }
+    },
+    {
+      "id": "schedule",
+      "start": 240,
+      "end": 390,
+      "caption": "Open Menu, then Schedule.",
+      "capture": "schedule-nav",
+      "after": "day-select",
+      "action": {
+        "target": "action",
+        "moveStart": 240,
+        "moveEnd": 279,
+        "press": 285
+      },
+      "chapter": "01"
+    },
+    {
+      "id": "day",
+      "start": 390,
+      "end": 690,
+      "caption": "Choose your event day.",
+      "capture": "day-select",
+      "after": "schedule-before",
+      "action": {
+        "target": "action",
+        "moveStart": 510,
+        "moveEnd": 549,
+        "press": 555
+      },
+      "chapter": "02"
+    },
+    {
+      "id": "search",
+      "start": 690,
+      "end": 870,
+      "caption": "Search for your session.",
+      "capture": "schedule-before",
+      "typing": {
+        "prefix": "search-",
+        "length": 9,
+        "start": 720,
+        "interval": 6
+      },
+      "chapter": "03"
+    },
+    {
+      "id": "open-session",
+      "start": 870,
+      "end": 960,
+      "caption": "Open the session.",
+      "capture": "session-open",
+      "after": "bookmark-hover",
+      "action": {
+        "target": "action",
+        "moveStart": 880,
+        "moveEnd": 909,
+        "press": 915
+      },
+      "chapter": "03"
+    },
+    {
+      "id": "bookmark",
+      "start": 960,
+      "end": 1170,
+      "caption": "Select Bookmark.",
+      "capture": "bookmark-hover",
+      "after": "bookmarked",
+      "action": {
+        "target": "action",
+        "moveStart": 1005,
+        "moveEnd": 1044,
+        "press": 1050
+      },
+      "chapter": "04"
+    },
+    {
+      "id": "back",
+      "start": 1170,
+      "end": 1260,
+      "caption": "Return to the schedule.",
+      "capture": "back-to-schedule",
+      "after": "my-schedule-nav",
+      "action": {
+        "target": "action",
+        "moveStart": 1180,
+        "moveEnd": 1214,
+        "press": 1220
+      },
+      "chapter": "05"
+    },
+    {
+      "id": "mine",
+      "start": 1260,
+      "end": 1410,
+      "caption": "Open My schedule.",
+      "capture": "my-schedule-nav",
+      "after": "my-schedule",
+      "action": {
+        "target": "action",
+        "moveStart": 1280,
+        "moveEnd": 1314,
+        "press": 1320
+      },
+      "chapter": "05"
+    },
+    {
+      "id": "result",
+      "start": 1410,
+      "end": 1620,
+      "caption": "Your saved session appears here.",
+      "capture": "my-schedule-verified",
+      "chapter": "06"
+    },
+    {
+      "id": "end",
+      "start": 1620,
+      "end": 1800,
+      "caption": "Make room for your event.",
+      "capture": "my-schedule-verified",
+      "endCard": true,
+      "chapter": "07"
+    }
+  ]
+}

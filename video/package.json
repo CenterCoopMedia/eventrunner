@@ -1,0 +1,21 @@
+{
+  "name": "eventrunner-videos",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "node capture/seed.mjs",
+    "capture": "node capture/run.mjs",
+    "score": "node make-score.mjs",
+    "check": "node --test tests/*.test.mjs && tsc --noEmit -p tsconfig.json",
+    "stills": "node render.mjs --stills",
+    "render": "node render.mjs",
+    "verify": "node verify.mjs",
+    "preview-page": "node preview-page.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "@types/node": "26.2.0"
+  }
+}
