@@ -19,7 +19,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ADMIN_SETTABLE_STATUSES } from 'shared/speaker';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import SpeakerPhotoField from '../../components/media/SpeakerPhotoField.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
@@ -27,6 +29,7 @@ import {
   Panel,
   SaveStatus,
   SelectField,
+  FieldError,
   ServerErrorSummary,
   TextAreaField,
   TextField,
@@ -152,6 +155,7 @@ export default function AdminSpeakerEditor({ mode }) {
   const { speakerId } = useParams();
   const navigate = useNavigate();
   const call = useAdminApi();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const { speakers, loading, findSpeaker } = useAdminSpeakers();
 
@@ -369,13 +373,17 @@ export default function AdminSpeakerEditor({ mode }) {
               error={errorFor('bio')}
             />
             {mode === 'edit' ? (
-              <TextField
-                label="Headshot path"
-                hint={`A default avatar, or a path under speaker-photos/${speakerId}/.`}
-                value={form.headshotPath}
-                onChange={(value) => set({ headshotPath: value })}
-                error={errorFor('headshotPath')}
-              />
+              <div className="flex flex-col gap-3xs">
+                <SpeakerPhotoField
+                  user={user}
+                  speakerId={speakerId}
+                  value={form.headshotPath}
+                  onChange={(path) => set({ headshotPath: path })}
+                  label="Headshot"
+                  saveNote="Save speaker to keep this photo. A live speaker shows it on the public directory."
+                />
+                <FieldError message={errorFor('headshotPath')} />
+              </div>
             ) : null}
           </div>
         </Panel>

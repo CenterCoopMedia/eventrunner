@@ -10,7 +10,7 @@
 // saved, and why this field never deletes the old object itself: the same
 // ordering applies here, and SpeakerProfile.jsx is what removes the
 // replaced object after a save commits.
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { checkFile, defaultAvatarUrl } from '../../lib/mediaSource.js';
 import {
   SPEAKER_PHOTO_MAX_BYTES,
@@ -23,7 +23,15 @@ import AssetImage from './AssetImage.jsx';
 import PhotoCrop from './PhotoCrop.jsx';
 import DefaultAvatarPicker from './DefaultAvatarPicker.jsx';
 
-export default function SpeakerPhotoField({ user, speakerId, value, onChange }) {
+export default function SpeakerPhotoField({
+  user,
+  speakerId,
+  value,
+  onChange,
+  label = 'Photo',
+  saveNote = 'Save to publish the change; an organizer reviews it before it appears on the public programme.',
+}) {
+  const labelId = useId();
   const inputRef = useRef(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -72,8 +80,8 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
   const defaultUrl = defaultAvatarUrl(value);
 
   return (
-    <div className="flex flex-col gap-2">
-      <span className="block font-semibold text-text-primary">Photo</span>
+    <div className="flex flex-col gap-2" role="group" aria-labelledby={labelId}>
+      <span id={labelId} className="block font-semibold text-text-primary">{label}</span>
       {/* Square portrait, brand radius (design brief §2.4) — not a circle. */}
       <div className="flex items-center gap-4">
         {value && !defaultUrl ? (
@@ -136,8 +144,7 @@ export default function SpeakerPhotoField({ user, speakerId, value, onChange }) 
       <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="speaker" />
       <p id="speaker-photo-hint" className="text-sm text-text-secondary">
         {SPEAKER_PHOTO_TYPES.map(typeLabel).join(', ')} · up to{' '}
-        {formatBytes(SPEAKER_PHOTO_MAX_BYTES)}. Save to publish the change; an organizer reviews it
-        before it appears on the public programme.
+        {formatBytes(SPEAKER_PHOTO_MAX_BYTES)}. {saveNote}
       </p>
       {error ? (
         <p role="alert" className="text-sm text-danger">
