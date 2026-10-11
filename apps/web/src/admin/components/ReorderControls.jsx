@@ -79,14 +79,14 @@ export function OrderAnnouncement({ message }) {
   );
 }
 
-export function OrderDraftButtons({ dirty, saving, onSave, onCancel }) {
+export function OrderDraftButtons({ dirty, saving, onSave, onCancel, saveDisabled = false }) {
   if (!dirty && !saving) return null;
   return (
     <>
       <button type="button" className={secondaryButtonClass} onClick={onCancel} disabled={saving}>
         Cancel
       </button>
-      <button type="button" className={secondaryButtonClass} onClick={onSave} disabled={saving}>
+      <button type="button" className={secondaryButtonClass} onClick={onSave} disabled={saving || saveDisabled}>
         {saving ? 'Saving…' : 'Save draft'}
       </button>
     </>

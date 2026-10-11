@@ -340,6 +340,17 @@ export default function AdminContentBlockEditor({ mode }) {
       return <AdminLoadingState label="Loading block…" />;
     }
   }
+  if (mode === 'create' && !contentReady) {
+    if (contentListenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load content. A new block waits until both revisions have loaded, so its order cannot tie a block that is still loading."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading block…" />;
+  }
   if (!pagesLoading && (!page || !section)) {
     return (
       <AdminEmptyState
@@ -405,6 +416,10 @@ export default function AdminContentBlockEditor({ mode }) {
       }
       nextFieldId = uniqueEditorialId(contentIdSource(content), taken, content.blockType || 'block');
       setFieldId(nextFieldId);
+    }
+    if (!isExisting && !contentReady) {
+      setError({ message: 'Wait until content has loaded before saving a new block.' });
+      return;
     }
     let savedContent = content;
     if (!isExisting && savedContent.order === '') {

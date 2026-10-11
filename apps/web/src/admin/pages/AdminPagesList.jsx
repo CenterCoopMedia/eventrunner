@@ -79,6 +79,7 @@ export default function AdminPagesList() {
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
 
   function moveRow(from, to) {
+    if (savingOrder || publishing !== null) return false;
     const label = ordered[from]?.current?.label || ordered[from]?.id || 'Page';
     const count = ordered.length;
     const moved = draft.move(from, to);
@@ -92,6 +93,7 @@ export default function AdminPagesList() {
   }
 
   async function saveOrder() {
+    if (publishing !== null) return;
     const writes = ordersToWrite(ordered);
     setSavingOrder(true);
     setNotice(null);
@@ -175,6 +177,7 @@ export default function AdminPagesList() {
             <OrderDraftButtons
               dirty={draft.dirty}
               saving={savingOrder}
+              saveDisabled={publishing !== null}
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
@@ -270,7 +273,7 @@ export default function AdminPagesList() {
                         count={ordered.length}
                         dragToken={`page:${index}`}
                         onMove={moveRow}
-                        disabled={savingOrder}
+                        disabled={savingOrder || publishing !== null}
                       />
                       <Link to={row.id} className={linkButtonClass}>
                         Edit this page

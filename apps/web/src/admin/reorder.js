@@ -2,7 +2,9 @@
 //
 // A list shows a local order until Save draft. The stored order is the
 // displayed index, so ties compact to one sequence. Cancel drops the local
-// order. The server list replaces it only when its id sequence matches.
+// order. The server list replaces it only when every stored order equals
+// its displayed index. An id match alone is not enough: one write in a
+// multi-row save can sort into that sequence before the rest are stored.
 
 import { useEffect, useState } from 'react';
 
@@ -59,12 +61,14 @@ export function ordersToWrite(rows) {
   return writes;
 }
 
-/** One past the highest stored order, or 0 when nothing has an order yet. */
+/**
+ * One past the highest stored order. A missing order counts as 0, so a new
+ * row follows those legacy rows instead of tying them. An empty list is 0.
+ */
 export function nextStoredOrder(rows) {
-  const orders = (rows ?? [])
-    .map((row) => Number(row?.current?.order))
-    .filter((order) => Number.isFinite(order));
-  return orders.length === 0 ? 0 : Math.max(...orders) + 1;
+  const list = rows ?? [];
+  if (list.length === 0) return 0;
+  return Math.max(...list.map((row) => storedOrder(row))) + 1;
 }
 
 /** Index carried by a drag token, or null when the token is a different list. */
@@ -80,6 +84,16 @@ function sameIds(left, right) {
   return left.every((id, index) => id === right[index]);
 }
 
+/** True when the server rows are exactly these ids and each order is its index. */
+function ordersConfirmed(serverRows, localIds) {
+  const rows = serverRows ?? [];
+  if (localIds.length !== rows.length) return false;
+  return localIds.every((id, index) => {
+    const row = rows[index];
+    return row?.id === id && Number(row?.current?.order) === index;
+  });
+}
+
 /**
  * @param {Array<{ id: string, current?: object }>} serverRows
  */
@@ -89,8 +103,7 @@ export function useDraftOrder(serverRows) {
 
   useEffect(() => {
     if (!localIds) return;
-    const serverIds = (serverRows ?? []).map((row) => row.id);
-    if (sameIds(localIds, serverIds)) setLocalIds(null);
+    if (ordersConfirmed(serverRows, localIds)) setLocalIds(null);
   }, [serverRows, localIds]);
 
   function move(from, to) {

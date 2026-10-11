@@ -245,6 +245,26 @@ describe('page list', () => {
     // bump its revision for nothing.
     expect(bodyOf(0)).toEqual({ collection: 'cmsPages', docIds: ['scholarships'] });
   });
+
+  it('disables page moves while publish is running', async () => {
+    liveDocs = [
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [], status: undefined },
+      { ...SCHOLARSHIPS_DRAFT, status: undefined, revision: 2 },
+    ];
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    let release;
+    fetch.mockReturnValueOnce(new Promise((resolve) => {
+      release = () => resolve(okResponse({ queueId: 'q1', status: 'done' }));
+    }));
+    await renderAt('/admin/pages');
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Drag Scholarships' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Drag FAQ' })).toBeDisabled();
+    });
+    release();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+  });
 });
 
 describe('page editor', () => {

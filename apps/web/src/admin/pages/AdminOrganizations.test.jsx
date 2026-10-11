@@ -473,8 +473,9 @@ describe('the organization editor', () => {
       collection: 'cmsOrganizations',
       docId: 'tide-media',
       visible: false,
-      fields: { name: 'Tide Media Collective', order: 1 },
+      fields: { name: 'Tide Media Collective' },
     });
+    expect(bodyOf(0).fields.order).toBeUndefined();
   });
 
   // Codex review on #281: the two listeners report in no fixed order. A

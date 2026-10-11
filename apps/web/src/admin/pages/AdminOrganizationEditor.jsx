@@ -163,7 +163,11 @@ export default function AdminOrganizationEditor({ mode }) {
     setSaving(true);
     setError(null);
     setStatus('');
-    const body = { collection: COLLECTION, fields: organizationFields(form), visible: form.visible };
+    const fields = organizationFields(form);
+    // The sponsors list owns order. An edit must not write the order this
+    // form loaded, or a later save undoes a reorder from another tab.
+    if (!creating) delete fields.order;
+    const body = { collection: COLLECTION, fields, visible: form.visible };
     try {
       let id = docId;
       if (creating) {

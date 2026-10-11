@@ -61,9 +61,10 @@ describe('stored order', () => {
     expect(shown.map((row) => row.id)).toEqual(['b', 'a', 'c']);
   });
 
-  it('gives the next order after the highest, and 0 when none is stored', () => {
+  it('gives the next order after the highest, and 0 only for an empty list', () => {
     expect(nextStoredOrder([])).toBe(0);
     expect(nextStoredOrder([{ current: {} }, { current: { order: 4 } }])).toBe(5);
+    expect(nextStoredOrder([{ current: {} }, { current: {} }])).toBe(1);
   });
 });
 
@@ -109,7 +110,7 @@ describe('useDraftOrder', () => {
     { id: 'b', current: { order: 1 } },
   ];
 
-  it('keeps the local order until the server id sequence matches, and cancel restores it', () => {
+  it('keeps the local order until each stored order matches its index, and cancel restores it', () => {
     const { result, rerender } = renderHook(({ rows }) => useDraftOrder(rows), {
       initialProps: { rows: server },
     });
@@ -137,5 +138,36 @@ describe('useDraftOrder', () => {
     act(() => result.current.cancel());
     expect(result.current.dirty).toBe(false);
     expect(result.current.rows.map((row) => row.id)).toEqual(['b', 'a']);
+  });
+
+  it('stays dirty when a partial save matches the id sequence before every order is stored', () => {
+    const start = [
+      { id: 'b', current: { order: 0 } },
+      { id: 'c', current: { order: 1 } },
+      { id: 'a', current: { order: 2 } },
+    ];
+    const { result, rerender } = renderHook(({ rows }) => useDraftOrder(rows), {
+      initialProps: { rows: start },
+    });
+    act(() => {
+      expect(result.current.move(2, 0)).toBe(true);
+    });
+    expect(result.current.rows.map((row) => row.id)).toEqual(['a', 'b', 'c']);
+    rerender({
+      rows: [
+        { id: 'a', current: { order: 0 } },
+        { id: 'b', current: { order: 0 } },
+        { id: 'c', current: { order: 1 } },
+      ],
+    });
+    expect(result.current.dirty).toBe(true);
+    rerender({
+      rows: [
+        { id: 'a', current: { order: 0 } },
+        { id: 'b', current: { order: 1 } },
+        { id: 'c', current: { order: 2 } },
+      ],
+    });
+    expect(result.current.dirty).toBe(false);
   });
 });

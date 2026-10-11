@@ -323,6 +323,16 @@ describe('content block order', () => {
     });
     expect(fetch.mock.calls.some((call) => String(call[0]).includes('cmsPublish'))).toBe(false);
   });
+
+  it('does not move blocks until both content revisions have loaded', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent_drafts = [BODY_BLOCK_DRAFT, CTA_BLOCK_DRAFT];
+    silentCollections = ['cmsContent'];
+    await renderAt('/admin/content/scholarships/intro');
+    const up = await screen.findByRole('button', { name: 'Move Apply now up' });
+    expect(up).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+  });
 });
 
 describe('creating and editing a block', () => {
@@ -348,6 +358,15 @@ describe('creating and editing a block', () => {
     });
     expect(fetch.mock.calls.some((call) => String(call[0]).endsWith('/cmsPublish'))).toBe(false);
     expect(await screen.findByText(/not public until you publish/i)).toBeInTheDocument();
+  });
+
+  it('waits for both content revisions before a new block can take an order', async () => {
+    sources.cmsPages_drafts = [SCHOLARSHIPS_PAGE];
+    sources.cmsContent = [{ ...BODY_BLOCK_DRAFT, status: undefined }];
+    silentCollections = ['cmsContent_drafts'];
+    await renderAt('/admin/content/scholarships/intro/_new');
+    expect(await screen.findByRole('status', { name: 'Loading block…' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
   });
 
   it('offers only the section’s allowed block types, driven by the registry', async () => {

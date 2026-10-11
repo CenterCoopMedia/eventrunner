@@ -81,6 +81,7 @@ export default function AdminContentSection() {
   }, [leaveGuard.pending]);
 
   function moveRow(from, to) {
+    if (!contentReady || savingOrder || busyId !== null) return false;
     const label = contentBlockTitle(blocks[from]?.current);
     const count = blocks.length;
     const moved = draft.move(from, to);
@@ -94,6 +95,7 @@ export default function AdminContentSection() {
   }
 
   async function saveOrder() {
+    if (!contentReady) return;
     const writes = ordersToWrite(blocks);
     setSavingOrder(true);
     setNotice(null);
@@ -201,6 +203,7 @@ export default function AdminContentSection() {
             <OrderDraftButtons
               dirty={draft.dirty}
               saving={savingOrder}
+              saveDisabled={!contentReady}
               onSave={saveOrder}
               onCancel={cancelOrder}
             />
@@ -239,7 +242,7 @@ export default function AdminContentSection() {
                   row.state.id,
                   resolvedIds.has(row.id),
                 )}`}
-                {...bindReorderDrop('content:', index, moveRow)}
+                {...(contentReady ? bindReorderDrop('content:', index, moveRow) : {})}
               >
                 <div className={rowClass}>
                   <div className="min-w-0">
@@ -264,7 +267,7 @@ export default function AdminContentSection() {
                       count={blocks.length}
                       dragToken={`content:${index}`}
                       onMove={moveRow}
-                      disabled={savingOrder || busyId !== null}
+                      disabled={!contentReady || savingOrder || busyId !== null}
                     />
                     {row.state.id !== 'live' && !draft.dirty ? (
                       <button
