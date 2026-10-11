@@ -19,8 +19,8 @@ export async function renderProject(root,piece,format){
 export function inputDigest(root,project,bundle){
  const files=[...['render.mjs','visual-key.mjs','project.mjs','provenance.mjs','package-lock.json'].map(f=>path.join(ROOT,f)),path.join(REPO,'docs/tokens.css'),path.join(REPO,'docs/favicon.svg'),...fs.readdirSync(path.join(REPO,'docs/fonts')).filter(f=>f.endsWith('.woff2')).sort().map(f=>path.join(REPO,'docs/fonts',f)),...Object.values(project.captures).map(s=>path.join(root,'assets/captures',project.format,s.file)),path.join(root,'assets/audio',`${project.clock.id}-${project.format}.wav`)];
  if(project.logo){if(root===ROOT)throw new Error('Private logo in public project');files.push(path.join(root,project.logo.slice('/private/'.length)));}
- if(project.clock.assembly)for(const f of ['merriweather-700-latin.woff2','fraunces-latin.woff2','public-sans-latin.woff2'])files.push(path.join(REPO,'apps/web/public/fonts',f));
- if(project.identityFont)files.push(path.join(REPO,'apps/web/public/fonts/merriweather-700-latin.woff2'));
+ // Both illustrated scenes and private identity captions can use these render-page faces.
+ if(project.clock.assembly||project.identityFont)for(const f of ['merriweather-700-latin.woff2','fraunces-latin.woff2','public-sans-latin.woff2'])files.push(path.join(REPO,'apps/web/public/fonts',f));
  const hash=crypto.createHash('sha256').update('canvas-png-h264-crf19-v4').update(JSON.stringify(project)).update(bundle);
  for(const file of files)hash.update(fs.readFileSync(file));
  return hash.digest('hex');

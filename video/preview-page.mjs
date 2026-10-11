@@ -7,7 +7,7 @@ const analyzerHash=crypto.createHash('sha256').update(fs.readFileSync(path.join(
 if(process.argv.includes('--private-project'))throw new Error('Public exporter refuses private projects');
 const out=path.join(REPO,'docs/videos');fs.mkdirSync(out,{recursive:true});const escape=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const inline=s=>escape(s).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-const transcriptHtml=s=>s.trim().split('\n\n').map(p=>p.startsWith('## ')?`<h4>${inline(p.slice(3))}</h4>`:p.startsWith('# ')?`<h3>${inline(p.slice(2))}</h3>`:`<p>${inline(p).replaceAll('\n','<br>')}</p>`).join('');
+const transcriptHtml=s=>s.split('\n\n').map(p=>p.trim()).filter(Boolean).map(p=>p.startsWith('## ')?`<h4>${inline(p.slice(3))}</h4>`:p.startsWith('# ')?`<h3>${inline(p.slice(2))}</h3>`:`<p>${inline(p).replaceAll('\n','<br>')}</p>`).join('');
 const titles={'general-trailer':'Plan. Shape. Gather.','publish-page':'Publish a page update','save-schedule':'Save your personal schedule','change-style':'Change your site style'};
 let sections='';for(const piece of PUBLIC){let players='';for(const format of ['landscape','vertical']){
  const project=await renderProject(ROOT,piece,format),{clock}=project,digest=inputDigest(ROOT,project,bundle),name=`${piece}-${format}`,source=path.join(ROOT,'out',name+'.mp4'),report=JSON.parse(fs.readFileSync(path.join(ROOT,'review',name+'-verification.json'),'utf8'));
