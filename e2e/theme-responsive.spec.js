@@ -101,10 +101,7 @@ test('phone proof uses its own viewport and public inheritance for every theme a
   for (const theme of THEMES) {
     await page.getByLabel('Site style').selectOption(theme);
     for (const mode of ['light', 'dark']) {
-      await page.getByRole('button', {
-        name: mode === 'light' ? 'Light' : 'Dark',
-        exact: true,
-      }).click();
+      await page.getByLabel('Mode', { exact: true }).selectOption(mode);
       iframe = page.locator(
         `iframe[title="Home preview, ${mode} mode, 390px wide"]`,
       );
