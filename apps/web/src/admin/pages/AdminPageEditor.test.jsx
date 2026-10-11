@@ -166,6 +166,50 @@ describe('page list', () => {
     });
   });
 
+  it('saves a moved page order as drafts and does not publish', async () => {
+    liveDocs = [
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [] },
+      { id: 'scholarships', label: 'Scholarships', path: '/scholarships', order: 1, visible: true, sections: [] },
+    ];
+    fetch.mockResolvedValue(okResponse({ status: 'dirty' }));
+    await renderAt('/admin/pages');
+    const up = await screen.findByRole('button', { name: 'Move FAQ up' });
+    expect(up).toBeDisabled();
+    expect(up.className).toContain('min-h-11');
+    expect(up.className).toContain('min-w-11');
+    expect(up.parentElement.className).toContain('flex-wrap');
+    expect(screen.getByRole('button', { name: 'Drag Scholarships' })).toHaveAttribute('draggable', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Move Scholarships up' }));
+    expect(screen.getByText('Scholarships moved to position 1 of 2')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect([0, 1].map((index) => [bodyOf(index).page.id, bodyOf(index).page.order, bodyOf(index).create])).toEqual([
+      ['scholarships', 0, undefined],
+      ['faq', 1, undefined],
+    ]);
+    expect(fetch.mock.calls.some((call) => String(call[0]).includes('cmsPublish'))).toBe(false);
+    await waitFor(() => {
+      expect(screen.getAllByText('Draft order saved. It is not public until you publish.').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('asks before leaving a page list with an unsaved move, and cancel restores the order', async () => {
+    liveDocs = [
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [] },
+      { id: 'scholarships', label: 'Scholarships', path: '/scholarships', order: 1, visible: true, sections: [] },
+    ];
+    await renderAt('/admin/pages');
+    fireEvent.click(await screen.findByRole('button', { name: 'Move Scholarships up' }));
+    fireEvent.click(screen.getAllByRole('link', { name: 'Edit this page' })[0]);
+    expect(screen.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stay' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(
+      screen.getAllByRole('link').map((link) => link.textContent).filter((text) => text === 'FAQ' || text === 'Scholarships'),
+    ).toEqual(['FAQ', 'Scholarships']);
+  });
+
   it('fails soft when a listener errors: rows stay, with a non-blocking notice', async () => {
     liveDocs = [{ ...SCHOLARSHIPS_DRAFT, status: undefined }];
     listenerError = new Error('permission denied');
@@ -200,6 +244,26 @@ describe('page list', () => {
     // 'faq' is already published with no dirty draft — republishing it would
     // bump its revision for nothing.
     expect(bodyOf(0)).toEqual({ collection: 'cmsPages', docIds: ['scholarships'] });
+  });
+
+  it('disables page moves while publish is running', async () => {
+    liveDocs = [
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [], status: undefined },
+      { ...SCHOLARSHIPS_DRAFT, status: undefined, revision: 2 },
+    ];
+    draftDocs = [SCHOLARSHIPS_DRAFT];
+    let release;
+    fetch.mockReturnValueOnce(new Promise((resolve) => {
+      release = () => resolve(okResponse({ queueId: 'q1', status: 'done' }));
+    }));
+    await renderAt('/admin/pages');
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish all (1)' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Drag Scholarships' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Drag FAQ' })).toBeDisabled();
+    });
+    release();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -363,6 +427,7 @@ describe('page editor', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
 
     const { page } = bodyOf(0);
+    expect(page.order).toBe(7);
     expect(Object.keys(page).sort()).toEqual(
       [
         'icon',
@@ -584,6 +649,7 @@ describe('page editor', () => {
     await renderAt('/admin/pages/scholarships');
     const intro = await screen.findByRole('button', { name: 'Intro 1 block · 1 allowed type' });
     fireEvent.click(intro);
+    expect(screen.getByRole('button', { name: 'Drag section 1' })).toBeInTheDocument();
     const move = screen.getByRole('button', { name: 'Move section 1 down' });
     move.focus();
     fireEvent.click(move);

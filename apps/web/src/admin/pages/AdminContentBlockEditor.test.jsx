@@ -387,9 +387,9 @@ describe('content editing workspace', () => {
     fireEvent.click(toggle);
     expect(screen.getByRole('combobox', { name: 'Block type' })).toHaveValue('cta');
     expect(screen.getByLabelText('Field id')).toHaveAttribute('readonly');
-    fireEvent.change(screen.getByLabelText('Order'), { target: { value: '3' } });
+    expect(screen.queryByLabelText('Order')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Hide block settings' }));
-    expect(screen.getByText('Call to action · Order 3 · Visible')).toBeVisible();
+    expect(screen.getByText('Call to action · Order 2 · Visible')).toBeVisible();
     expect(screen.getByLabelText('Button text')).toHaveValue('Reserve a place');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
@@ -397,7 +397,7 @@ describe('content editing workspace', () => {
     const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsUpdateContent'));
     expect(JSON.parse(call[1].body)).toMatchObject({
       section: 'hero', field: 'register', visible: true,
-      fields: { blockType: 'cta', label: 'Reserve a place', url: 'https://example.org/register', order: 3 },
+      fields: { blockType: 'cta', label: 'Reserve a place', url: 'https://example.org/register', order: 2 },
     });
   });
 
@@ -451,9 +451,10 @@ describe('content editing workspace', () => {
       ? { ok: false, status: 400, json: async () => ({ error: { code: 'bad-request', message: 'order: must be a non-negative number' } }) }
       : okResponse({})));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
-    expect(await screen.findByRole('alert')).toHaveFocus();
-    await waitFor(() => expect(screen.getByLabelText('Order')).toBeVisible());
-    expect(screen.getByLabelText('Order')).toHaveAttribute('aria-invalid', 'true');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveFocus();
+    expect(alert).toHaveTextContent('order: must be a non-negative number');
+    expect(screen.queryByLabelText('Order')).toBeNull();
     expect(screen.getByRole('button', { name: 'Hide block settings' })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByLabelText('Button text')).toHaveValue('Register now');
   });

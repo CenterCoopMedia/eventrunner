@@ -10,11 +10,19 @@
 // Moment 1: a row with a draft sits on the proof ground, the word is always
 // beside it, and a successful publish resolves the tint away over 160ms on
 // opacity — instantly under reduced motion.
-import { useState } from 'react';
+//
+// Issue #448: the row order is the navigation order. A move stays in this
+// list until Save draft. Publish stays its own action.
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
+import { toEditablePage, toPagePayload } from '../pageDoc.js';
+import { orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import { summarizePublish } from '../publishResult.js';
 import {
   Notice,
@@ -26,6 +34,12 @@ import {
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import {
+  OrderAnnouncement,
+  OrderDraftButtons,
+  ReorderControls,
+  bindReorderDrop,
+} from '../components/ReorderControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -38,8 +52,11 @@ export default function AdminPagesList() {
   const { rows, loading, error } = useAdminPages();
   const call = useAdminApi();
   const { showToast } = useToast();
+  const draft = useDraftOrder(rows);
   const [publishing, setPublishing] = useState(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [spoken, setSpoken] = useState('');
   // A failed run's queue and the ids it asked for. A resume is reported
   // against those ids, never the drafts that are dirty now.
   const [resume, setResume] = useState(null);
@@ -47,8 +64,52 @@ export default function AdminPagesList() {
   // base ground rather than vanishing: the row is the same row, and the
   // operator watched it change (moment 1).
   const [resolvedIds, setResolvedIds] = useState(() => new Set());
+  const frameRef = useRef(null);
+  const leaveGuard = useUnsavedNavigation(draft.dirty, { blocked: savingOrder || publishing !== null });
 
+  useEffect(() => {
+    const node = frameRef.current;
+    if (!node) return undefined;
+    if (leaveGuard.pending) node.setAttribute('inert', '');
+    else node.removeAttribute('inert');
+    return () => node.removeAttribute('inert');
+  }, [leaveGuard.pending]);
+
+  const ordered = draft.rows;
   const pendingIds = rows.filter((row) => row.state.id !== 'live').map((row) => row.id);
+
+  function moveRow(from, to) {
+    if (savingOrder || publishing !== null) return false;
+    const label = ordered[from]?.current?.label || ordered[from]?.id || 'Page';
+    const count = ordered.length;
+    const moved = draft.move(from, to);
+    if (moved) setSpoken(`${label} moved to position ${to + 1} of ${count}`);
+    return moved;
+  }
+
+  function cancelOrder() {
+    draft.cancel();
+    setSpoken('');
+  }
+
+  async function saveOrder() {
+    if (publishing !== null) return;
+    const writes = ordersToWrite(ordered);
+    setSavingOrder(true);
+    setNotice(null);
+    const failed = await saveOrderWrites(
+      writes,
+      async ({ row, order }) => {
+        const page = toEditablePage({ ...row.current, id: row.id, order });
+        await call('cmsSavePage', { page: toPagePayload(page) });
+      },
+      (row) => row.current?.label || row.id,
+    );
+    const verdict = orderSaveMessage(failed);
+    setNotice(verdict);
+    showToast(verdict.message, verdict.tone === 'ok' ? { announce: false } : { tone: 'error', announce: false });
+    setSavingOrder(false);
+  }
 
   async function publishAll() {
     const ids = pendingIds;
@@ -106,29 +167,36 @@ export default function AdminPagesList() {
   const dirtyCount = pendingIds.length;
 
   return (
-    <div className="flex flex-col gap-md">
+    <div ref={frameRef} className="flex flex-col gap-md">
       <AdminPageHeader
         title="Pages"
         description="Every page on the site, and whether its latest edit is live yet."
         identifiers={`${rows.length} page${rows.length === 1 ? '' : 's'}`}
         actions={
           <>
-            {resume ? (
+            <OrderDraftButtons
+              dirty={draft.dirty}
+              saving={savingOrder}
+              saveDisabled={publishing !== null}
+              onSave={saveOrder}
+              onCancel={cancelOrder}
+            />
+            {resume && !draft.dirty ? (
               <button
                 type="button"
                 className={secondaryButtonClass}
                 onClick={resumePublish}
-                disabled={publishing !== null}
+                disabled={publishing !== null || savingOrder}
               >
                 {publishing === 'resume' ? 'Resuming…' : 'Resume publish'}
               </button>
             ) : null}
-            {dirtyCount > 0 ? (
+            {dirtyCount > 0 && !draft.dirty ? (
               <button
                 type="button"
                 className={secondaryButtonClass}
                 onClick={publishAll}
-                disabled={publishing !== null}
+                disabled={publishing !== null || savingOrder}
               >
                 {publishing === 'all' ? 'Publishing…' : `Publish all (${dirtyCount})`}
               </button>
@@ -140,6 +208,7 @@ export default function AdminPagesList() {
         }
       />
 
+      <OrderAnnouncement message={spoken} />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
       {error ? (
@@ -151,7 +220,7 @@ export default function AdminPagesList() {
 
       {loading ? (
         <AdminLoadingState label="Loading pages…" />
-      ) : rows.length === 0 ? (
+      ) : ordered.length === 0 ? (
         <AdminEmptyState
           title="No pages yet"
           description="Create the first page — a title, a path, and the sections its content lives in."
@@ -167,42 +236,64 @@ export default function AdminPagesList() {
               striping and no row cards — the hairline already does that
               work, and striping is the tell of a default table. */}
           <ul>
-            {rows.map((row) => (
-              <li
-                key={row.id}
-                className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
-                  row.state.id,
-                  resolvedIds.has(row.id),
-                )}`}
-              >
-                <div className={rowClass}>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
-                      <Link to={row.id} className={rowTitleLinkClass}>
-                        {row.current?.label || row.id}
-                      </Link>
-                      <RecordState state={row.state} />
-                      {row.current?.systemPage ? (
-                        <StatusBadge tone="neutral">System page</StatusBadge>
-                      ) : null}
-                      {row.current?.visible === false ? (
-                        <StatusBadge tone="neutral">Hidden</StatusBadge>
-                      ) : null}
+            {ordered.map((row, index) => {
+              const label = row.current?.label || row.id;
+              return (
+                <li
+                  key={row.id}
+                  className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
+                    row.state.id,
+                    resolvedIds.has(row.id),
+                  )}`}
+                  {...bindReorderDrop('page:', index, moveRow)}
+                >
+                  <div className={rowClass}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+                        <Link to={row.id} className={rowTitleLinkClass}>
+                          {label}
+                        </Link>
+                        <RecordState state={row.state} />
+                        {row.current?.systemPage ? (
+                          <StatusBadge tone="neutral">System page</StatusBadge>
+                        ) : null}
+                        {row.current?.visible === false ? (
+                          <StatusBadge tone="neutral">Hidden</StatusBadge>
+                        ) : null}
+                      </div>
+                      <p className={`mt-3xs truncate ${rowMetaClass}`}>
+                        {row.current?.path} · {(row.current?.sections ?? []).length} section
+                        {(row.current?.sections ?? []).length === 1 ? '' : 's'}
+                      </p>
                     </div>
-                    <p className={`mt-3xs truncate ${rowMetaClass}`}>
-                      {row.current?.path} · {(row.current?.sections ?? []).length} section
-                      {(row.current?.sections ?? []).length === 1 ? '' : 's'}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-xs">
+                      <ReorderControls
+                        label={label}
+                        index={index}
+                        count={ordered.length}
+                        dragToken={`page:${index}`}
+                        onMove={moveRow}
+                        disabled={savingOrder || publishing !== null}
+                      />
+                      <Link to={row.id} className={linkButtonClass}>
+                        Edit this page
+                      </Link>
+                    </div>
                   </div>
-                  <Link to={row.id} className={linkButtonClass}>
-                    Edit this page
-                  </Link>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </Panel>
       )}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
     </div>
   );
 }

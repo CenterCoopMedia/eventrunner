@@ -9,12 +9,16 @@
 //
 // Each row states its record state as a word, and a record the page will
 // not draw says "Hidden" beside it, so no state is left to the tint.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminOrganizations } from '../useAdminOrganizations.js';
+import { orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
+import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
+import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
 import {
   Notice,
   primaryButtonClass,
@@ -22,6 +26,12 @@ import {
   rowTitleLinkClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import {
+  OrderAnnouncement,
+  OrderDraftButtons,
+  ReorderControls,
+  bindReorderDrop,
+} from '../components/ReorderControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -40,15 +50,64 @@ export default function AdminOrganizationsList() {
   const { rows, loading, error } = useAdminOrganizations();
   const call = useAdminApi();
   const { showToast } = useToast();
+  const draft = useDraftOrder(rows);
   const [publishing, setPublishing] = useState(null);
+  const [savingOrder, setSavingOrder] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [spoken, setSpoken] = useState('');
+  const frameRef = useRef(null);
+  const leaveGuard = useUnsavedNavigation(draft.dirty, { blocked: savingOrder || publishing !== null });
   // A failed run's queue and the ids it asked for. A resume is reported
   // against those ids, never the drafts that are dirty now: a draft saved
   // after the failure was never part of the run.
   const [resume, setResume] = useState(null);
   // A saved draft is dirty until it is published, new or not: the same
   // count the overview's readiness table and the pending changes page read.
+  const ordered = draft.rows;
   const dirtyIds = rows.filter((row) => row.draft?.status === 'dirty').map((row) => row.id);
+
+  useEffect(() => {
+    const node = frameRef.current;
+    if (!node) return undefined;
+    if (leaveGuard.pending) node.setAttribute('inert', '');
+    else node.removeAttribute('inert');
+    return () => node.removeAttribute('inert');
+  }, [leaveGuard.pending]);
+
+  function moveRow(from, to) {
+    const label = text(ordered[from]?.current?.name) ?? ordered[from]?.id ?? 'Organization';
+    const count = ordered.length;
+    const moved = draft.move(from, to);
+    if (moved) setSpoken(`${label} moved to position ${to + 1} of ${count}`);
+    return moved;
+  }
+
+  function cancelOrder() {
+    draft.cancel();
+    setSpoken('');
+  }
+
+  async function saveOrder() {
+    const writes = ordersToWrite(ordered);
+    setSavingOrder(true);
+    setNotice(null);
+    const failed = await saveOrderWrites(
+      writes,
+      async ({ row, order }) => {
+        await call('cmsUpdateContent', {
+          collection: 'cmsOrganizations',
+          docId: row.id,
+          visible: row.current.visible !== false,
+          fields: { order },
+        });
+      },
+      (row) => text(row.current?.name) ?? row.id,
+    );
+    const verdict = orderSaveMessage(failed);
+    setNotice(verdict);
+    showToast(verdict.message, { tone: verdict.tone === 'ok' ? undefined : 'error', announce: false });
+    setSavingOrder(false);
+  }
 
   function reportPublish(response, ids) {
     const verdict = summarizePublish(response, 'cmsOrganizations', ids, 'organizations');
@@ -98,30 +157,36 @@ export default function AdminOrganizationsList() {
   );
 
   return (
-    <div className="flex flex-col gap-md">
+    <div ref={frameRef} className="flex flex-col gap-md">
       <AdminPageHeader
         title="Organizations"
         identifiers={`${rows.length} organization${rows.length === 1 ? '' : 's'}`}
         description="The sponsors page draws these in this order. Organizations with the same tier form one group."
         actions={
           <>
-            {resume ? (
+            <OrderDraftButtons
+              dirty={draft.dirty}
+              saving={savingOrder}
+              onSave={saveOrder}
+              onCancel={cancelOrder}
+            />
+            {resume && !draft.dirty ? (
               <button
                 type="button"
                 className={secondaryButtonClass}
                 onClick={resumePublish}
-                disabled={publishing !== null}
+                disabled={publishing !== null || savingOrder}
                 aria-busy={publishing === 'resume' || undefined}
               >
                 {publishing === 'resume' ? 'Resuming…' : 'Resume publish'}
               </button>
             ) : null}
-            {dirtyIds.length > 0 ? (
+            {dirtyIds.length > 0 && !draft.dirty ? (
               <button
                 type="button"
                 className={secondaryButtonClass}
                 onClick={publishAll}
-                disabled={publishing !== null}
+                disabled={publishing !== null || savingOrder}
                 aria-busy={publishing === 'all' || undefined}
               >
                 {publishing === 'all' ? 'Publishing…' : `Publish all (${dirtyIds.length})`}
@@ -132,6 +197,7 @@ export default function AdminOrganizationsList() {
         }
       />
 
+      <OrderAnnouncement message={spoken} />
       {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
 
       {error ? (
@@ -143,7 +209,7 @@ export default function AdminOrganizationsList() {
 
       {loading ? (
         <AdminLoadingState label="Loading organizations…" />
-      ) : rows.length === 0 ? (
+      ) : ordered.length === 0 ? (
         <AdminEmptyState
           title="No organizations yet"
           description="Add the first organization, then publish it to show it on the sponsors page."
@@ -164,30 +230,44 @@ export default function AdminOrganizationsList() {
               <tr>
                 <th scope="col" className={`${HEAD_CLASS} text-start`}>Organization</th>
                 <th scope="col" className={`${HEAD_CLASS} text-start`}>Tier</th>
-                <th scope="col" aria-sort="ascending" className={`${HEAD_CLASS} text-end`}>Order</th>
+                <th scope="col" aria-sort={draft.dirty ? undefined : 'ascending'} className={`${HEAD_CLASS} text-end`}>Order</th>
                 <th scope="col" className={`${HEAD_CLASS} text-start`}>State</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {ordered.map((row, index) => {
                 const organization = row.current ?? {};
                 const tier = text(organization.tier);
+                const label = text(organization.name) ?? row.id;
                 return (
                   <tr
                     key={row.id}
                     className={`border-b-admin-hairline border-admin-rule-hairline last:border-b-0 ${proofRowClass(row.state.id)}`}
+                    {...bindReorderDrop('organization:', index, moveRow)}
                   >
                     <td className="px-sm py-xs align-top">
                       <Link to={encodeURIComponent(row.id)} className={rowTitleLinkClass}>
-                        {text(organization.name) ?? row.id}
+                        {label}
                       </Link>
                       <p className={`mt-3xs ${rowMetaClass}`}>/sponsors/{row.id}</p>
                     </td>
                     <td className={`px-sm py-xs align-top ${tier ? 'text-admin-ink' : 'text-admin-ink-secondary'}`}>
                       {tier ?? 'None'}
                     </td>
-                    <td className="px-sm py-xs text-end align-top font-admin-data tabular-nums text-admin-ink">
-                      {Number.isFinite(organization.order) ? organization.order : 'None'}
+                    <td className="px-sm py-xs text-end align-top">
+                      <div className="flex flex-wrap items-center justify-end gap-2xs">
+                        <span className="font-admin-data tabular-nums text-admin-ink">
+                          {Number.isFinite(organization.order) ? organization.order : 'None'}
+                        </span>
+                        <ReorderControls
+                          label={label}
+                          index={index}
+                          count={ordered.length}
+                          dragToken={`organization:${index}`}
+                          onMove={moveRow}
+                          disabled={savingOrder || publishing !== null}
+                        />
+                      </div>
                     </td>
                     <td className="px-sm py-xs align-top">
                       <span className="flex flex-wrap items-center gap-2xs">
@@ -202,6 +282,14 @@ export default function AdminOrganizationsList() {
           </table>
         </div>
       )}
+      {leaveGuard.pending ? createPortal(
+        <UnsavedChangesDialog
+          onStay={leaveGuard.stay}
+          onDiscard={leaveGuard.discard}
+          canDiscard={leaveGuard.canDiscard}
+        />,
+        document.body,
+      ) : null}
     </div>
   );
 }

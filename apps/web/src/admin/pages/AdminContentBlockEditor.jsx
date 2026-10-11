@@ -43,6 +43,7 @@ import {
   valueFieldsOf,
 } from '../contentDoc.js';
 import { uniqueEditorialId } from '../editorialId.js';
+import { nextStoredOrder } from '../reorder.js';
 import { contentEditIsDirty, contentEditSnapshot, createFormBaseline } from '../contentEditState.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog, UnsavedEditBadge } from '../components/UnsavedChanges.jsx';
@@ -339,6 +340,17 @@ export default function AdminContentBlockEditor({ mode }) {
       return <AdminLoadingState label="Loading block…" />;
     }
   }
+  if (mode === 'create' && !contentReady) {
+    if (contentListenerError) {
+      return (
+        <Notice
+          tone="caution"
+          message="We could not load content. A new block waits until both revisions have loaded, so its order cannot tie a block that is still loading."
+        />
+      );
+    }
+    return <AdminLoadingState label="Loading block…" />;
+  }
   if (!pagesLoading && (!page || !section)) {
     return (
       <AdminEmptyState
@@ -405,6 +417,16 @@ export default function AdminContentBlockEditor({ mode }) {
       nextFieldId = uniqueEditorialId(contentIdSource(content), taken, content.blockType || 'block');
       setFieldId(nextFieldId);
     }
+    if (!isExisting && !contentReady) {
+      setError({ message: 'Wait until content has loaded before saving a new block.' });
+      return;
+    }
+    let savedContent = content;
+    if (!isExisting && savedContent.order === '') {
+      const siblings = contentRows.filter((row) => row.current?.section === sectionId);
+      savedContent = { ...savedContent, order: nextStoredOrder(siblings) };
+      setContent(savedContent);
+    }
     setBusy(publish ? 'publish' : 'draft');
     const endpoint = isExisting ? 'cmsUpdateContent' : 'cmsCreateContent';
     // cmsUpdateContent merges submitted fields onto the prior draft/live
@@ -413,14 +435,14 @@ export default function AdminContentBlockEditor({ mode }) {
     // (an faq_item's `answer`, a cta's `url`, …) stranded on the doc
     // forever — explicitly mark them for deletion instead.
     const fields = {
-      ...toContentFields(content),
-      ...staleFieldDeletions(savedBlockTypeRef.current, content.blockType),
+      ...toContentFields(savedContent),
+      ...staleFieldDeletions(savedBlockTypeRef.current, savedContent.blockType),
     };
     const request = {
       section: sectionId,
       fields,
       field: nextFieldId,
-      visible: content.visible,
+      visible: savedContent.visible,
     };
     if (!isExisting) request.pageId = pageId;
     try {
@@ -434,8 +456,8 @@ export default function AdminContentBlockEditor({ mode }) {
       // draft that just landed.
       setSavedDocId(docId);
       loadedKeyRef.current = `${sectionId}__${nextFieldId}`;
-      savedBlockTypeRef.current = content.blockType;
-      setSavedEdit(contentEditSnapshot(nextFieldId, content));
+      savedBlockTypeRef.current = savedContent.blockType;
+      setSavedEdit(contentEditSnapshot(nextFieldId, savedContent));
       if (!publish) {
         setStatus('Draft saved. It is not public until you publish.');
         showToast('Draft saved.');
@@ -502,7 +524,7 @@ export default function AdminContentBlockEditor({ mode }) {
     <Panel
       key="settings"
       title={isExisting ? 'Block settings' : 'Set up the block'}
-      description={isExisting ? 'Type, order, and visibility for this block.' : 'Choose the block type, then write the content below.'}
+      description={isExisting ? 'Type and visibility for this block.' : 'Choose the block type, then write the content below.'}
       className="admin-content-settings"
     >
       {isExisting ? (
@@ -544,16 +566,6 @@ export default function AdminContentBlockEditor({ mode }) {
                 ? `This section allows: ${allowed.map(blockTypeLabel).join(', ')}.`
                 : 'This section does not allow any block types yet — add one in Pages.'
             }
-          />
-          <TextField
-            label="Order"
-            type="number"
-            value={content.order}
-            onChange={(value) =>
-              setContent((current) => ({ ...current, order: value === '' ? '' : Number(value) }))
-            }
-            error={errorFor('order')}
-            hint="Lower numbers sort first within the section."
           />
           <div className="flex items-center">
             <CheckboxField
