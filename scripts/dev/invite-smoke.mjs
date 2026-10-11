@@ -30,6 +30,8 @@
  *   EVENT_ALLOWED_ORIGINS exported for the functions runtime.
  *
  * Usage:
+ *   FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 \
+ *   FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 \
  *   node scripts/dev/invite-smoke.mjs --emulator-log /path/to/emulator.log
  *
  * Exits 0 and prints "SMOKE OK" when every step passes; exits 1 with a
@@ -38,16 +40,41 @@
 
 import fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { pathToFileURL } from 'node:url';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+
+const LOOPBACK_EMULATOR = /^(?:127\.0\.0\.1|localhost|\[::1\]):\d+$/;
+
+/**
+ * The smoke writes `config/bootstrap.adminEmails`. That write is safe only
+ * against a loopback emulator. A missing host lets the Admin SDK use live
+ * credentials for `EVENT_FIREBASE_PROJECT_ID`.
+ *
+ * @param {Record<string, string|undefined>} env
+ * @returns {string|null}
+ */
+export function inviteSmokeEmulatorError(env) {
+  // Do not trim. The Admin SDK reads these variables as they are, and a
+  // padded host that passed a trimmed check would still be rejected later.
+  const firestore = typeof env.FIRESTORE_EMULATOR_HOST === 'string' ? env.FIRESTORE_EMULATOR_HOST : '';
+  const auth = typeof env.FIREBASE_AUTH_EMULATOR_HOST === 'string' ? env.FIREBASE_AUTH_EMULATOR_HOST : '';
+  if (!LOOPBACK_EMULATOR.test(firestore)) {
+    return 'FIRESTORE_EMULATOR_HOST must be a loopback emulator host before invite smoke writes admin config';
+  }
+  if (!LOOPBACK_EMULATOR.test(auth)) {
+    return 'FIREBASE_AUTH_EMULATOR_HOST must be a loopback emulator host before invite smoke writes admin config';
+  }
+  return null;
+}
 
 function parseArgs(argv) {
   const out = {
     projectId: process.env.EVENT_FIREBASE_PROJECT_ID || 'demo-run-of-show',
     region: process.env.EVENT_FIREBASE_REGION || 'us-central1',
     functionsPort: 5001,
-    authHost: process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099',
+    authHost: process.env.FIREBASE_AUTH_EMULATOR_HOST || '',
     emulatorLog: null,
     timeoutMs: 30000,
   };
@@ -200,6 +227,8 @@ async function signInWithEmailedCode(email, deadline) {
 }
 
 async function main() {
+  const targetError = inviteSmokeEmulatorError(process.env);
+  if (targetError) fail(targetError);
   if (!args.emulatorLog) fail('--emulator-log is required');
   initializeApp({ projectId: args.projectId });
   const db = getFirestore();
@@ -357,4 +386,16 @@ async function main() {
   console.log('SMOKE OK');
 }
 
-main().catch((err) => fail(err?.stack || String(err)));
+function runAsCli() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === pathToFileURL(fs.realpathSync(entry)).href;
+  } catch {
+    return false;
+  }
+}
+
+if (runAsCli()) {
+  main().catch((err) => fail(err?.stack || String(err)));
+}
