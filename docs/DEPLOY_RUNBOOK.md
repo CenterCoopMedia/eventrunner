@@ -310,7 +310,7 @@ Actions tab → Deploy → Run workflow
 
 `deploy-client.yml`'s `provision` job deploys `firestore:rules`, `firestore:indexes`, and `storage`
 on **every** run regardless of the `provision` input (spec §8.1) — that input exists for operator
-intent and log clarity, not as a gate. Before that deploy, the job grants `roles/firebaserules.firestoreServiceAgent` to `service-<PROJECT_NUMBER>@gcp-sa-firebasestorage.iam.gserviceaccount.com`. `storage.rules` calls `firestore.exists` for a profile photo write, and `firebase deploy --non-interactive` does not grant this role. The binding is idempotent. The deploy service account needs permission to set the project IAM policy. `bootstrap: true` is the actual gate: it is what skips
+intent and log clarity, not as a gate. `storage.rules` calls `firestore.exists` for a profile photo write. An operator grants `roles/firebaserules.firestoreServiceAgent` to the Cloud Storage for Firebase service agent once per project before the first deploy of these rules. The deploy job does not grant it. `bootstrap: true` is the actual gate: it is what skips
 `content` (and, transitively, `build`/`hosting`/`post`/`smoke`) on this run. A dispatch run always deploys
 functions regardless of `bootstrap`, because a fresh project has none yet and gating that on a paths
 filter would provision an empty, broken deployment (spec §8.1).

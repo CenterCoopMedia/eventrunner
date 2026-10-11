@@ -75,16 +75,11 @@ test('deploy validation receives the OTP abuse-control variables', () => {
   );
 });
 
-test('storage rules deploy grants the cross-service Firestore role first', () => {
+test('storage rules deploy does not grant project IAM', () => {
   const provision = job('provision');
-  const grantAt = provision.indexOf('roles/firebaserules.firestoreServiceAgent');
-  const deployAt = provision.indexOf('firestore:rules,firestore:indexes,storage');
-  assert.ok(grantAt > -1);
-  assert.ok(deployAt > grantAt);
-  assert.match(
-    provision,
-    /service-\$\{project_number\}@gcp-sa-firebasestorage\.iam\.gserviceaccount\.com/,
-  );
+  assert.match(provision, /firestore:rules,firestore:indexes,storage/);
+  assert.doesNotMatch(provision, /add-iam-policy-binding/);
+  assert.doesNotMatch(provision, /firestoreServiceAgent/);
 });
 
 test('deploy validation gates every job that consumes the validated environment', () => {
