@@ -16,7 +16,7 @@
 // (`branding/logo.svg`) or served from the bundle have no media_assets row
 // to click, and a picker that could not express them would be a downgrade
 // from the plain field it replaces.
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import {
   FieldError,
   fieldHintClass,
@@ -40,6 +40,12 @@ function slotSrc(folder, value) {
 const frameClass =
   'asset-slot-frame flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-admin border-admin-hairline border-admin-rule-hairline bg-admin-ground-soft';
 
+function initialPhase(value, src) {
+  if (!value) return 'idle';
+  if (!src) return 'unavailable';
+  return 'loading';
+}
+
 export default function ImagePicker({
   label,
   value,
@@ -49,40 +55,63 @@ export default function ImagePicker({
   error = null,
 }) {
   const id = useId();
-  const [browsing, setBrowsing] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  const [phase, setPhase] = useState('idle');
-  const probe = useRef(0);
   const src = slotSrc(folder, value);
+  const identity = `${value ?? ''}\0${src ?? ''}`;
+  const generation = useRef(0);
+  const [browsing, setBrowsing] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  const [phase, setPhase] = useState(() => initialPhase(value, src));
+  const [seenIdentity, setSeenIdentity] = useState(identity);
+  const [seenReload, setSeenReload] = useState(0);
 
-  useEffect(() => {
-    probe.current += 1;
-    if (!value) {
-      setPhase('idle');
-      return;
+  // Reset while rendering. A passive effect runs too late: a cached image can
+  // already have reported load, and the effect would hide it again.
+  let shownPhase = phase;
+  let shownRetrying = retrying;
+  if (seenIdentity !== identity || seenReload !== reload) {
+    generation.current += 1;
+    const identityChanged = seenIdentity !== identity;
+    const nextReload = identityChanged ? 0 : reload;
+    if (identityChanged) {
+      setSeenIdentity(identity);
+      setRetrying(false);
+      shownRetrying = false;
+      if (reload !== 0) setReload(0);
     }
-    if (!src) {
-      setPhase('unavailable');
-      return;
-    }
-    setPhase('loading');
-  }, [value, src, attempt]);
+    if (seenReload !== nextReload) setSeenReload(nextReload);
+    shownPhase = nextReload === 0 ? initialPhase(value, src) : (src ? 'loading' : initialPhase(value, src));
+    if (shownPhase !== phase) setPhase(shownPhase);
+  }
 
-  function onLoad() {
-    probe.current += 1;
+  function accept(ticket) {
+    if (ticket !== generation.current) return;
     setPhase('ready');
   }
 
-  function onError() {
-    const ticket = probe.current;
-    const url = src;
-    fetch(url, { method: 'HEAD' })
+  function bindImage(node) {
+    if (node && node.complete && node.naturalWidth > 0) accept(Number(node.dataset.generation));
+  }
+
+  function onLoad(event) {
+    accept(Number(event.currentTarget.dataset.generation));
+  }
+
+  function onError(event) {
+    const ticket = Number(event.currentTarget.dataset.generation);
+    const url = event.currentTarget.currentSrc || event.currentTarget.src;
+    if (ticket !== generation.current || !url) return;
+    // GET is the method a Storage bucket allows the browser to read. HEAD is
+    // rejected before a 404 or 403 can be seen.
+    fetch(url, { method: 'GET' })
       .then((response) => {
-        if (ticket !== probe.current) return;
+        const cancel = response.body?.cancel?.();
+        if (cancel && typeof cancel.then === 'function') cancel.catch(() => {});
+        if (ticket !== generation.current) return;
         setPhase(assetFailureKind(response.status));
       })
       .catch(() => {
-        if (ticket !== probe.current) return;
+        if (ticket !== generation.current) return;
         setPhase('failed');
       });
   }
@@ -105,10 +134,12 @@ export default function ImagePicker({
           <span className={frameClass}>
             {src ? (
               <img
-                key={`${src}:${attempt}`}
+                key={`${src}:${reload}`}
                 src={src}
                 alt=""
-                className={`h-full w-full object-contain${phase === 'ready' ? '' : ' invisible'}`}
+                data-generation={generation.current}
+                ref={bindImage}
+                className={`h-full w-full object-contain${shownPhase === 'ready' ? '' : ' invisible'}`}
                 onLoad={onLoad}
                 onError={onError}
               />
@@ -130,7 +161,7 @@ export default function ImagePicker({
             onChange={(event) => onChange(event.target.value)}
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={
-              [hint ? `${id}-hint` : null, phase === 'loading' || !ASSET_SLOT_STATUS[phase] ? null : statusId, error ? `${id}-error` : null]
+              [hint ? `${id}-hint` : null, shownPhase === 'loading' || !ASSET_SLOT_STATUS[shownPhase] ? null : statusId, error ? `${id}-error` : null]
                 .filter(Boolean)
                 .join(' ') || undefined
             }
@@ -148,7 +179,15 @@ export default function ImagePicker({
           </div>
         </div>
       </div>
-      <AssetSlotStatus phase={phase} id={statusId} onRetry={() => setAttempt((n) => n + 1)} />
+      <AssetSlotStatus
+        phase={shownPhase}
+        id={statusId}
+        retrying={shownRetrying}
+        onRetry={() => {
+          setRetrying(true);
+          setReload((n) => n + 1);
+        }}
+      />
 
       <FieldError id={`${id}-error`} message={error} />
 

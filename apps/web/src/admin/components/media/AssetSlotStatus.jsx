@@ -18,20 +18,23 @@ export function assetFailureKind(status) {
 }
 
 /**
- * @param {{ phase: string, id: string, onRetry: () => void }} props
+ * @param {{ phase: string, id: string, onRetry: () => void, retrying?: boolean }} props
  */
-export default function AssetSlotStatus({ phase, id, onRetry }) {
+export default function AssetSlotStatus({ phase, id, onRetry, retrying = false }) {
   const message = ASSET_SLOT_STATUS[phase];
-  if (!message) return null;
-  const retry = phase === 'missing' || phase === 'denied' || phase === 'failed';
+  const busy = Boolean(retrying && phase === 'loading');
+  const showRetry = busy || retrying || phase === 'missing' || phase === 'denied' || phase === 'failed';
+  if (!message && !showRetry) return null;
   return (
     <div className="flex w-full min-w-0 flex-col items-start gap-2xs">
-      <p id={id} className="asset-slot-status m-0 w-full text-admin-sm text-admin-ink">
-        {message}
-      </p>
-      {retry ? (
-        <button type="button" className={secondaryButtonClass} onClick={onRetry}>
-          Try again
+      {message ? (
+        <p id={id} role="status" aria-live="polite" className="asset-slot-status m-0 w-full text-admin-sm text-admin-ink">
+          {message}
+        </p>
+      ) : null}
+      {showRetry ? (
+        <button type="button" className={secondaryButtonClass} onClick={onRetry} disabled={busy}>
+          {busy ? 'Trying again' : 'Try again'}
         </button>
       ) : null}
     </div>

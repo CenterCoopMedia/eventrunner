@@ -294,6 +294,25 @@ describe('ImagePicker', () => {
     expect(screen.queryByText(/missing from storage/)).toBeNull();
   });
 
+  it('keeps a cached thumbnail visible after it has already loaded', () => {
+    const complete = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
+    const width = vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(8);
+    try {
+      const { rerender } = render(
+        <ImagePicker label="Primary logo" folder="branding" value="branding/logo.svg" onChange={vi.fn()} />,
+      );
+      expect(screen.queryByText('Loading this file.')).toBeNull();
+      expect(document.querySelector('img').className).not.toContain('invisible');
+      rerender(
+        <ImagePicker label="Primary logo" folder="branding" value="branding/logo.svg" onChange={vi.fn()} />,
+      );
+      expect(screen.queryByText('Loading this file.')).toBeNull();
+    } finally {
+      complete.mockRestore();
+      width.mockRestore();
+    }
+  });
+
   it('keeps a page image on the storage url', () => {
     render(
       <ImagePicker label="Hero" folder="cms-images" value="cms-images/asset-1/hero.png" onChange={vi.fn()} />,
@@ -338,12 +357,19 @@ describe('ImagePicker', () => {
     expect(frame.className).toContain('w-16');
     expect(status.className).not.toMatch(/overflow-hidden|truncate|line-clamp|h-16|w-16/);
     expect(status.className).toContain('w-full');
+    expect(status).toHaveAttribute('role', 'status');
     expect(screen.getByLabelText('Primary logo')).toHaveAttribute(
       'aria-describedby',
       expect.stringContaining(status.id),
     );
     expect(screen.getByRole('button', { name: 'Choose or upload…' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    const busy = screen.getByRole('button', { name: 'Trying again' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveFocus();
     fireEvent.error(document.querySelector('img'));
     await screen.findByText(
       'This file is missing from storage. Choose or upload a replacement, or try again.',
