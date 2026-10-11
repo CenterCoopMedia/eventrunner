@@ -39,6 +39,7 @@ import {
   OrderDraftButtons,
   ReorderControls,
   bindReorderDrop,
+  useRowDrag,
 } from '../components/ReorderControls.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
@@ -47,6 +48,69 @@ import AdminPageHeader, {
   StatusBadge,
   proofRowClass,
 } from '../components/adminChrome.jsx';
+
+function PageRow({ row, index, count, moveRow, disabled, resolved }) {
+  const label = row.current?.label || row.id;
+  const drag = useRowDrag(`page:${index}`, disabled);
+  const drop = bindReorderDrop('page:', index, moveRow);
+  const [over, setOver] = useState(false);
+  const sections = row.current?.sections ?? [];
+  return (
+    <li
+      className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
+        row.state.id,
+        resolved,
+      )}${over ? ' border-t-admin-strong border-admin-action bg-admin-action-soft' : ''}`}
+      {...drag}
+      onDragOver={(event) => {
+        drop.onDragOver(event);
+        setOver(true);
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget)) return;
+        setOver(false);
+      }}
+      onDrop={(event) => {
+        drop.onDrop(event);
+        setOver(false);
+      }}
+    >
+      <div className={rowClass}>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
+            <Link to={row.id} className={rowTitleLinkClass} data-reorder-block="">
+              {label}
+            </Link>
+            <RecordState state={row.state} />
+            {row.current?.systemPage ? (
+              <StatusBadge tone="neutral">System page</StatusBadge>
+            ) : null}
+            {row.current?.visible === false ? (
+              <StatusBadge tone="neutral">Hidden</StatusBadge>
+            ) : null}
+          </div>
+          <p className={`mt-3xs truncate ${rowMetaClass}`} data-reorder-block="">
+            {row.current?.path} · {sections.length} section
+            {sections.length === 1 ? '' : 's'}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-xs">
+          <ReorderControls
+            label={label}
+            index={index}
+            count={count}
+            dragToken={`page:${index}`}
+            onMove={moveRow}
+            disabled={disabled}
+          />
+          <Link to={row.id} className={linkButtonClass} data-reorder-block="">
+            Edit this page
+          </Link>
+        </div>
+      </div>
+    </li>
+  );
+}
 
 export default function AdminPagesList() {
   const { rows, loading, error } = useAdminPages();
@@ -236,53 +300,17 @@ export default function AdminPagesList() {
               striping and no row cards — the hairline already does that
               work, and striping is the tell of a default table. */}
           <ul>
-            {ordered.map((row, index) => {
-              const label = row.current?.label || row.id;
-              return (
-                <li
-                  key={row.id}
-                  className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
-                    row.state.id,
-                    resolvedIds.has(row.id),
-                  )}`}
-                  {...bindReorderDrop('page:', index, moveRow)}
-                >
-                  <div className={rowClass}>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
-                        <Link to={row.id} className={rowTitleLinkClass}>
-                          {label}
-                        </Link>
-                        <RecordState state={row.state} />
-                        {row.current?.systemPage ? (
-                          <StatusBadge tone="neutral">System page</StatusBadge>
-                        ) : null}
-                        {row.current?.visible === false ? (
-                          <StatusBadge tone="neutral">Hidden</StatusBadge>
-                        ) : null}
-                      </div>
-                      <p className={`mt-3xs truncate ${rowMetaClass}`}>
-                        {row.current?.path} · {(row.current?.sections ?? []).length} section
-                        {(row.current?.sections ?? []).length === 1 ? '' : 's'}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-xs">
-                      <ReorderControls
-                        label={label}
-                        index={index}
-                        count={ordered.length}
-                        dragToken={`page:${index}`}
-                        onMove={moveRow}
-                        disabled={savingOrder || publishing !== null}
-                      />
-                      <Link to={row.id} className={linkButtonClass}>
-                        Edit this page
-                      </Link>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
+            {ordered.map((row, index) => (
+              <PageRow
+                key={row.id}
+                row={row}
+                index={index}
+                count={ordered.length}
+                moveRow={moveRow}
+                disabled={savingOrder || publishing !== null}
+                resolved={resolvedIds.has(row.id)}
+              />
+            ))}
           </ul>
         </Panel>
       )}

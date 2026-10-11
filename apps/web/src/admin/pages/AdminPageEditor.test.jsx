@@ -179,6 +179,12 @@ describe('page list', () => {
     expect(up.className).toContain('min-w-11');
     expect(up.parentElement.className).toContain('flex-wrap');
     expect(screen.getByRole('button', { name: 'Drag Scholarships' })).toHaveAttribute('draggable', 'true');
+    const row = screen.getByRole('link', { name: 'Scholarships' }).closest('li');
+    expect(row).toHaveAttribute('draggable', 'true');
+    expect(screen.getByRole('link', { name: 'Scholarships' })).toHaveAttribute('data-reorder-block');
+    fireEvent.dragOver(row);
+    expect(row.className).toContain('border-admin-action');
+    expect(row.className).toContain('bg-admin-action-soft');
     fireEvent.click(screen.getByRole('button', { name: 'Move Scholarships up' }));
     expect(screen.getByText('Scholarships moved to position 1 of 2')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
