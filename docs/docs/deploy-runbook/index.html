@@ -273,6 +273,13 @@
           is <code>&lt;CLIENT_ENV&gt;</code> unless the run&#39;s ref is <code>main</code>, independent of both the WIF condition and the
           in-workflow check. Combine it with <strong>Required reviewers</strong> on the same screen for any client where a
           human should see a dispatch before it runs.</p>
+          <p><strong>Storage rules and the account document.</strong> <code>storage.rules</code> calls <code>firestore.exists</code> on a profile photo write. Grant this role once per project, before the first deploy in §5. The deploy job does not grant it.</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PROJECT_NUMBER=&quot;$(gcloud projects describe &lt;GCP_PROJECT_ID&gt; --format=&#39;value(projectNumber)&#39;)&quot;
+          gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
+            --member=&quot;serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-firebasestorage.iam.gserviceaccount.com&quot; \
+            --role=&quot;roles/firebaserules.firestoreServiceAgent&quot; \
+            --condition=None
+          </code></pre>
           <h2 id="3-github-environment">3. GitHub Environment<a class="heading-anchor" href="#3-github-environment" aria-label="Link to this section">#</a></h2>
           <p>Create the environment (repo Settings → Environments → New environment → name it exactly
           <code>&lt;CLIENT_ENV&gt;</code>), then set its variables and secrets. <strong>Every value below is a GitHub Environment
@@ -394,7 +401,7 @@
           </code></pre>
           <p><code>deploy-client.yml</code>&#39;s <code>provision</code> job deploys <code>firestore:rules</code>, <code>firestore:indexes</code>, and <code>storage</code>
           on <strong>every</strong> run regardless of the <code>provision</code> input (spec §8.1) — that input exists for operator
-          intent and log clarity, not as a gate. Before that deploy, the job grants <code>roles/firebaserules.firestoreServiceAgent</code> to <code>service-&lt;PROJECT_NUMBER&gt;@gcp-sa-firebasestorage.iam.gserviceaccount.com</code>. <code>storage.rules</code> calls <code>firestore.exists</code> for a profile photo write, and <code>firebase deploy --non-interactive</code> does not grant this role. The binding is idempotent. The deploy service account needs permission to set the project IAM policy. <code>bootstrap: true</code> is the actual gate: it is what skips
+          intent and log clarity, not as a gate. The Storage rules role in §2 is required before this dispatch. <code>bootstrap: true</code> is the actual gate: it is what skips
           <code>content</code> (and, transitively, <code>build</code>/<code>hosting</code>/<code>post</code>/<code>smoke</code>) on this run. A dispatch run always deploys
           functions regardless of <code>bootstrap</code>, because a fresh project has none yet and gating that on a paths
           filter would provision an empty, broken deployment (spec §8.1).</p>
