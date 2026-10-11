@@ -104,6 +104,25 @@ describe('Speakers', () => {
     expect(container.querySelector('ul').className).toContain('measure');
   });
 
+  it('keeps a speaker with no headshot as text and does not reserve a portrait frame', () => {
+    // Non-demo render: vitest does not set VITE_DEMO_MODE, so this is the
+    // hosted directory. A missing path must not draw the square frame.
+    speakers = [
+      { ...PROJECTED, headshotPath: null },
+      { ...PROJECTED, id: 'with-photo', slug: 'with-photo', displayName: 'With Photo', headshotPath: 'speakers/with.jpg' },
+    ];
+    const { container } = renderSpeakers();
+    const rows = [...container.querySelectorAll('li')];
+    const missing = rows.find((row) => row.textContent.includes('Rae Okonkwo'));
+    const present = rows.find((row) => row.textContent.includes('With Photo'));
+    expect(missing.querySelector('.portrait-shelf__frame')).toBeNull();
+    expect(missing.querySelector('img')).toBeNull();
+    expect(missing.className).not.toContain('sm:grid-cols-');
+    expect(screen.getByRole('link', { name: 'Rae Okonkwo' })).toHaveAttribute('href', '/speakers/rae-okonkwo');
+    expect(present.querySelector('.portrait-shelf__frame')).not.toBeNull();
+    expect(present.className).toContain('sm:grid-cols-[14rem,1fr]');
+  });
+
   it('frames a portrait square, never a circle', () => {
     // interface guidelines, User interface: a portrait is square on the
     // brand radius. The size comes from the stylesheet, so that is where
