@@ -60,7 +60,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved }) {
       className={`border-admin-rule-hairline border-b-admin-hairline last:border-b-0 ${proofRowClass(
         row.state.id,
         resolved,
-      )}${over ? ' reorder-target' : ''}`}
+      )}${over ? ' border-t-admin-strong border-admin-action bg-admin-action-soft' : ''}`}
       {...drag}
       onDragOver={(event) => {
         drop.onDragOver(event);
