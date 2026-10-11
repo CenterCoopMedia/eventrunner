@@ -37,13 +37,22 @@ service firebase.storage {
   match /b/{bucket}/o {
 
     // --- helpers -----------------------------------------------------------
-    // Storage rules cannot read Firestore, so "is this caller an admin?"
-    // cannot be asked here at all. That is not a gap being papered over: it
-    // is why every admin-authored path below is `write: if false` and goes
+    // Admin is not decided here. The admin list lives in Firestore, and a
+    // client write is not granted because a token is on that list. That is
+    // why every admin-authored path below is `write: if false` and goes
     // through the server instead.
 
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
+    }
+
+    // A matching uid is not a live account. The delete sweep removes
+    // users/{uid}. A still-valid ID token must not upload a new photo
+    // afterwards (issue #349). The deploy grants the Storage service
+    // agent roles/firebaserules.firestoreServiceAgent before this check
+    // can run. firebase deploy --non-interactive does not grant it.
+    function accountExists(userId) {
+      return firestore.exists(/databases/(default)/documents/users/$(userId));
     }
 
     // Image types the product accepts everywhere a client may upload.
@@ -76,9 +85,10 @@ service firebase.storage {
       allow get: if true;
       allow list: if false;
       allow write: if isOwner(userId)
+        && accountExists(userId)
         && underSizeLimit(2 * 1024 * 1024)
         && isAllowedImage();
-      allow delete: if isOwner(userId);
+      allow delete: if isOwner(userId) && accountExists(userId);
     }
 
     // --- server-authorized uploads -----------------------------------------

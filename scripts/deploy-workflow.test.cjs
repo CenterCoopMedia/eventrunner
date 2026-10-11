@@ -75,6 +75,18 @@ test('deploy validation receives the OTP abuse-control variables', () => {
   );
 });
 
+test('storage rules deploy grants the cross-service Firestore role first', () => {
+  const provision = job('provision');
+  const grantAt = provision.indexOf('roles/firebaserules.firestoreServiceAgent');
+  const deployAt = provision.indexOf('firestore:rules,firestore:indexes,storage');
+  assert.ok(grantAt > -1);
+  assert.ok(deployAt > grantAt);
+  assert.match(
+    provision,
+    /service-\$\{project_number\}@gcp-sa-firebasestorage\.iam\.gserviceaccount\.com/,
+  );
+});
+
 test('deploy validation gates every job that consumes the validated environment', () => {
   for (const name of ['provision', 'functions', 'content']) {
     assert.match(job(name), /needs: \[[^\]\n]*validate-env[^\]\n]*\]/);
