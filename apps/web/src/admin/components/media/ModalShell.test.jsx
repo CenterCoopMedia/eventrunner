@@ -7,6 +7,7 @@
 // moves in on open, Escape closes, focus returns to the opener on close) so
 // a future restyle cannot silently drop either.
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ModalShell from './ModalShell.jsx';
 
@@ -73,5 +74,36 @@ describe('ModalShell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('names the icon-only close control and returns focus after dismissal', () => {
+    function Example() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>Choose image</button>
+          {open ? (
+            <ModalShell title="Choose an image — Primary logo" onClose={() => setOpen(false)}>
+              Images
+            </ModalShell>
+          ) : null}
+        </>
+      );
+    }
+    render(<Example />);
+    const opener = screen.getByRole('button', { name: 'Choose image' });
+    opener.focus();
+    fireEvent.click(opener);
+    const close = screen.getByRole('button', { name: 'Close' });
+    expect(close).toHaveTextContent('');
+    expect(close).toHaveAttribute('title', 'Close dialog');
+    expect(close.className).toContain('shrink-0');
+    expect(close.className).toContain('min-w-[var(--admin-control-height)]');
+    expect(close.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    close.focus();
+    expect(close).toHaveFocus();
+    fireEvent.click(close);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
   });
 });
