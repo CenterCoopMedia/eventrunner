@@ -352,8 +352,122 @@ describe('themeFallbackWarnings', () => {
     // family, not per role.
     expect(warnings).toHaveLength(3);
     expect(warnings.every((warning) => warning.kind === 'font')).toBe(true);
-    expect(warnings[0].message).toContain('Overpass has not loaded');
+    expect(warnings[0].message).toContain('Overpass did not load');
     expect(warnings[0].message).toMatch(/showing in .+/);
+  });
+
+  it('says a face is still loading, which is not a failed face', () => {
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), {
+      fontAvailable: () => 'loading',
+    });
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings.every((warning) => warning.message.includes('still loading'))).toBe(true);
+    expect(warnings.some((warning) => warning.message.includes('did not load'))).toBe(false);
+  });
+
+  function proofDocument({ check, faces = [], rules }) {
+    return {
+      fonts: {
+        status: 'loading',
+        check,
+        forEach(visit) {
+          for (const face of faces) visit(face);
+        },
+      },
+      styleSheets: [
+        {
+          cssRules: rules.map((rule) => ({
+            type: 5,
+            style: {
+              getPropertyValue(prop) {
+                if (prop === 'font-family') return rule.family;
+                if (prop === 'font-weight') return rule.weight;
+                return '';
+              },
+            },
+          })),
+        },
+      ],
+    };
+  }
+
+  const overpassRules = [
+    { family: 'Overpass', weight: '400 700' },
+    { family: 'Overpass Mono', weight: '400' },
+    { family: 'Overpass Mono', weight: '700' },
+  ];
+
+  it('names the declared weights that are still loading in the preview document', () => {
+    const doc = proofDocument({
+      check: () => false,
+      faces: [
+        { family: 'Overpass', weight: '400 700', status: 'loading' },
+        { family: 'Overpass Mono', weight: '400', status: 'loading' },
+        { family: 'Overpass Mono', weight: '700', status: 'loading' },
+      ],
+      rules: overpassRules,
+    });
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), { documents: [doc] });
+    const overpass = warnings.find((warning) => warning.message.startsWith('Overpass weights'));
+    expect(overpass.message).toContain('weights 400 and 700 are still loading');
+    expect(overpass.message).not.toContain('did not load');
+  });
+
+  it('does not call an unused unloaded weight a face that is still loading', () => {
+    const doc = proofDocument({
+      check: (query) => !String(query).startsWith('700 16px "Overpass"'),
+      faces: [
+        { family: 'Overpass', weight: '400', status: 'loaded' },
+        { family: 'Overpass', weight: '700', status: 'unloaded' },
+        { family: 'Overpass Mono', weight: '400', status: 'loaded' },
+        { family: 'Overpass Mono', weight: '700', status: 'loaded' },
+      ],
+      rules: overpassRules,
+    });
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), { documents: [doc] });
+    expect(warnings.filter((warning) => warning.kind === 'font')).toEqual([]);
+  });
+
+  it('names a declared weight that failed', () => {
+    const doc = proofDocument({
+      check: (query) => !String(query).includes('Overpass"') || String(query).includes('Mono'),
+      faces: [{ family: 'Overpass', weight: '400 700', status: 'error' }],
+      rules: overpassRules,
+    });
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), { documents: [doc] });
+    expect(warnings.some((warning) => warning.message.includes('Overpass weights 400 and 700 did not load'))).toBe(true);
+  });
+
+  it('clears the font warning for the same theme once the preview face is ready', () => {
+    const loading = proofDocument({
+      check: () => false,
+      faces: [{ family: 'Overpass', weight: '400 700', status: 'loading' }],
+      rules: overpassRules,
+    });
+    const ready = proofDocument({
+      check: () => true,
+      faces: [{ family: 'Overpass', weight: '400 700', status: 'loaded' }],
+      rules: overpassRules,
+    });
+    const theme = recommendedConfiguration('atlas');
+    expect(themeFallbackWarnings(theme, { documents: [loading] }).some((warning) => warning.kind === 'font')).toBe(true);
+    expect(themeFallbackWarnings(theme, { documents: [ready] }).filter((warning) => warning.kind === 'font')).toEqual([]);
+  });
+
+  it('keeps a loading warning while either compare frame is still loading', () => {
+    const ready = proofDocument({
+      check: () => true,
+      rules: overpassRules,
+    });
+    const loading = proofDocument({
+      check: () => false,
+      faces: [{ family: 'Overpass', weight: '400 700', status: 'loading' }],
+      rules: overpassRules,
+    });
+    const warnings = themeFallbackWarnings(recommendedConfiguration('atlas'), {
+      documents: [ready, loading],
+    });
+    expect(warnings.some((warning) => warning.message.includes('still loading'))).toBe(true);
   });
 
   it('reads the bundled face and its fallbacks out of the one stack table', () => {

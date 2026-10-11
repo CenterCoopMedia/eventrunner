@@ -379,6 +379,7 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   const [stress, setStress] = useState(false);
   const [compare, setCompare] = useState(false);
   const [columnWidth, setColumnWidth] = useState(0);
+  const [fontEpoch, setFontEpoch] = useState(0);
 
   const viewport =
     PREVIEW_VIEWPORTS.find((entry) => entry.id === viewportId) ?? PREVIEW_VIEWPORTS[0];
@@ -476,7 +477,45 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
     [realConfig, stress, stressConfig, themeDoc],
   );
 
-  const warnings = useMemo(() => themeFallbackWarnings(themeDoc), [themeDoc]);
+  // The warning reads the preview document, not the admin page. Fonts in
+  // that document finish after the first paint, so the same theme is judged
+  // again when a frame loads, swaps, or reports loading, loadingdone, or
+  // loadingerror. Compare mode has two documents; both have to be ready.
+  const previewDocuments = useMemo(
+    () => [
+      frameRoot?.ownerDocument,
+      compare ? compareRoot?.ownerDocument : null,
+    ].filter(Boolean),
+    [frameRoot, compareRoot, compare],
+  );
+  useEffect(() => {
+    const bump = () => setFontEpoch((value) => value + 1);
+    const stops = [];
+    for (const doc of previewDocuments) {
+      const fonts = doc.fonts;
+      if (!fonts?.addEventListener) continue;
+      for (const type of ['loading', 'loadingdone', 'loadingerror']) {
+        fonts.addEventListener(type, bump);
+        stops.push(() => fonts.removeEventListener(type, bump));
+      }
+      let current = true;
+      fonts.ready?.then?.(() => {
+        if (current) bump();
+      });
+      stops.push(() => {
+        current = false;
+      });
+    }
+    return () => {
+      for (const stop of stops) stop();
+    };
+  }, [previewDocuments]);
+  const warnings = useMemo(() => {
+    // The document object stays the same when a face finishes loading.
+    // fontEpoch is the signal that its font set changed.
+    void fontEpoch;
+    return themeFallbackWarnings(themeDoc, { documents: previewDocuments });
+  }, [themeDoc, previewDocuments, fontEpoch]);
 
   // Which pages can be offered depends on what the frame is showing: session
   // detail needs a session to open. The frame follows the same content, so
