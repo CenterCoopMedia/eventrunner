@@ -1,0 +1,23 @@
+{
+  "pass": true,
+  "status": "pass-screen",
+  "certification": false,
+  "frames": 185,
+  "fps": 30.0,
+  "maxGeneralPixelTransitionsInOneSecond": 5,
+  "maxRedPixelTransitionsInOneSecond": 0,
+  "maxGeneralEpisodeTransitionsInOneSecond": 1,
+  "maxRedEpisodeTransitionsInOneSecond": 0,
+  "maxRapidPixelAreaFraction": 0,
+  "areaThreshold": 0.02,
+  "luminanceThreshold": 0.1,
+  "redUVComponentThreshold": 0.1414213562373095,
+  "legacyRedThreshold": 20,
+  "resolution": "native",
+  "ambiguousFrames": [],
+  "hazardFrames": [],
+  "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+  "file": "video/out/general-trailer-landscape-75-259.mp4",
+  "width": 1920,
+  "height": 1080
+}

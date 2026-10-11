@@ -1,0 +1,50 @@
+{
+  "inputDigest": "e08cc443fb93729cc02f1d249298f64ac4b749d6bc0b776321841ac17d34a636",
+  "file": "save-schedule-vertical.mp4",
+  "sha256": "59ff13c7b871b5ac14a0dd0464854a2293a134388b9071dad080b2989fd1bd7a",
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "pixelFormat": "yuv420p",
+    "codec": "h264",
+    "frames": 1800,
+    "duration": 60
+  },
+  "audio": {
+    "target": -19,
+    "lufs": -19.1,
+    "truePeak": -4.1,
+    "method": "FFmpeg ebur128=peak=true / BS.1770",
+    "summary": "Summary:\n\n  Integrated loudness:\n    I:         -19.1 LUFS\n    Threshold: -29.1 LUFS\n\n  Loudness range:\n    LRA:         7.6 LU\n    Threshold: -39.1 LUFS\n    LRA low:   -21.4 LUFS\n    LRA high:  -13.8 LUFS\n\n  True peak:\n    Peak:       -4.1 dBFS\n[out#0/null @ 0x55ab7821dc00] video:773KiB audio:11252KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nframe= 1800 fps=655 q=-0.0 Lsize=N/A time=00:01:00.00 bitrate=N/A speed=21.8x    \n"
+  },
+  "flash": {
+    "pass": true,
+    "status": "pass-screen",
+    "certification": false,
+    "frames": 1800,
+    "fps": 30,
+    "maxGeneralPixelTransitionsInOneSecond": 9,
+    "maxRedPixelTransitionsInOneSecond": 0,
+    "maxGeneralEpisodeTransitionsInOneSecond": 2,
+    "maxRedEpisodeTransitionsInOneSecond": 0,
+    "maxRapidPixelAreaFraction": 0.000014,
+    "areaThreshold": 0.02,
+    "luminanceThreshold": 0.1,
+    "redUVComponentThreshold": 0.1414213562373095,
+    "legacyRedThreshold": 20,
+    "resolution": "native",
+    "ambiguousFrames": [
+      726,
+      1170,
+      1330
+    ],
+    "hazardFrames": [],
+    "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+    "file": "/workspace/eventrunner/video/out/save-schedule-vertical.mp4",
+    "width": 1080,
+    "height": 1920,
+    "fileHash": "59ff13c7b871b5ac14a0dd0464854a2293a134388b9071dad080b2989fd1bd7a",
+    "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+  }
+}

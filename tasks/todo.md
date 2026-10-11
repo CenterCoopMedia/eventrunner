@@ -1,5 +1,32 @@
 # Session task list
 
+## 2026-10-11: product trailer and task tutorials
+
+Goal: make a 45-second customer-facing trailer and three single-task tutorials,
+each in landscape and vertical. Follow `docs/video-production.md` and the four
+linked piece specs. Keep private production inputs and outputs outside the checkout.
+Preserve all earlier task records below.
+
+- [x] Read product, contributor, design, and workflow documentation.
+- [x] Find brand assets, fonts, local emulator setup, and capture helpers.
+- [x] Complete the creative interview and record dated decisions in the specs.
+- [x] Draft acts, frame ranges, two-cut layouts, source claims, and review gates.
+- [x] Receive approval of the proposed acts and timing before build or render.
+- [x] Create the isolated `video/` kit and a fully fictional local fixture.
+- [x] Verify capture privacy, blocked external traffic, and repeatable boxes (79 landscape and 81 vertical delivery captures).
+- [x] Implement shared clock, scenes, tutorial planner, synth, and meaningful tests.
+- [x] Prove defect tests fail on controlled bad inputs, then restore them.
+- [x] Inspect the exact Boardwalk PR #24 reference and retire the rejected trailer treatment.
+- [x] Review the 20-second study; record Joe’s request for original constituent-part animation and richer music.
+- [x] Build a new 45-second illustrated trailer and a separate original 112 BPM arrangement.
+- [x] Independently review semantic relationships and source freshness; fix the camera-boundary findings.
+- [x] Review both cuts as stills and check fast-act partial renders for flashes.
+- [x] Render all eight public MP4s; measure every final file and inspect contact sheets.
+- [x] Produce tutorial transcripts and the public preview page without autoplay.
+- [x] Complete independent source review; fix camera, title overlap, and export-freshness findings.
+- [ ] Commit with the configured identity and DCO; open a PR with public evidence.
+- [ ] Deliver outputs and measured results; identify the remaining human watch/listen.
+
 ## 2026-09-23: burn down the open issues with stacked pull requests
 
 Goal: close as many open issues as the sandbox allows, milestone by milestone,

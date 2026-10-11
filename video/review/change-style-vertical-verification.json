@@ -1,0 +1,52 @@
+{
+  "inputDigest": "58c2cd51f5c0ccc18e88030dd275ae96df17a02fbd60f6f14f17c24ac29e7ef6",
+  "file": "change-style-vertical.mp4",
+  "sha256": "c07ce343fcf0a46bbdce7084120d1245da4ee98c25496c5c8d49fdbaa0db1ce1",
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "pixelFormat": "yuv420p",
+    "codec": "h264",
+    "frames": 2520,
+    "duration": 84
+  },
+  "audio": {
+    "target": -19,
+    "lufs": -19.1,
+    "truePeak": -4.1,
+    "method": "FFmpeg ebur128=peak=true / BS.1770",
+    "summary": "Summary:\n\n  Integrated loudness:\n    I:         -19.1 LUFS\n    Threshold: -29.1 LUFS\n\n  Loudness range:\n    LRA:         6.1 LU\n    Threshold: -39.1 LUFS\n    LRA low:   -21.0 LUFS\n    LRA high:  -14.9 LUFS\n\n  True peak:\n    Peak:       -4.1 dBFS\n[out#0/null @ 0x560550b02dc0] video:1083KiB audio:15752KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nframe= 2520 fps=510 q=-0.0 Lsize=N/A time=00:01:24.00 bitrate=N/A speed=  17x    \n"
+  },
+  "flash": {
+    "pass": true,
+    "status": "pass-screen",
+    "certification": false,
+    "frames": 2520,
+    "fps": 30,
+    "maxGeneralPixelTransitionsInOneSecond": 11,
+    "maxRedPixelTransitionsInOneSecond": 2,
+    "maxGeneralEpisodeTransitionsInOneSecond": 2,
+    "maxRedEpisodeTransitionsInOneSecond": 1,
+    "maxRapidPixelAreaFraction": 0.000066,
+    "areaThreshold": 0.02,
+    "luminanceThreshold": 0.1,
+    "redUVComponentThreshold": 0.1414213562373095,
+    "legacyRedThreshold": 20,
+    "resolution": "native",
+    "ambiguousFrames": [
+      355,
+      475,
+      840,
+      1830,
+      2100
+    ],
+    "hazardFrames": [],
+    "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+    "file": "/workspace/eventrunner/video/out/change-style-vertical.mp4",
+    "width": 1080,
+    "height": 1920,
+    "fileHash": "c07ce343fcf0a46bbdce7084120d1245da4ee98c25496c5c8d49fdbaa0db1ce1",
+    "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+  }
+}

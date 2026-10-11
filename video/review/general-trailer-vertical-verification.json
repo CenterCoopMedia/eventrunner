@@ -1,0 +1,46 @@
+{
+  "inputDigest": "a5891166800e3a18c3a922c5fd1dc08e27a0335cb72cd1b0b802e41f9c64f6e5",
+  "file": "general-trailer-vertical.mp4",
+  "sha256": "12261e93c672b97b1244eaee8f5f7187253b8207e6e478aa39b11af691ef5609",
+  "format": {
+    "width": 1080,
+    "height": 1920,
+    "fps": "30/1",
+    "pixelFormat": "yuv420p",
+    "codec": "h264",
+    "frames": 1350,
+    "duration": 45
+  },
+  "audio": {
+    "target": -16,
+    "lufs": -15.9,
+    "truePeak": -4,
+    "method": "FFmpeg ebur128=peak=true / BS.1770",
+    "summary": "Summary:\n\n  Integrated loudness:\n    I:         -15.9 LUFS\n    Threshold: -25.9 LUFS\n\n  Loudness range:\n    LRA:         4.3 LU\n    Threshold: -35.8 LUFS\n    LRA low:   -18.7 LUFS\n    LRA high:  -14.4 LUFS\n\n  True peak:\n    Peak:       -4.0 dBFS\n[out#0/null @ 0x55c5fcd21200] video:580KiB audio:8440KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown\nframe= 1350 fps=328 q=-0.0 Lsize=N/A time=00:00:45.00 bitrate=N/A speed=10.9x    \n"
+  },
+  "flash": {
+    "pass": true,
+    "status": "pass-screen",
+    "certification": false,
+    "frames": 1350,
+    "fps": 30,
+    "maxGeneralPixelTransitionsInOneSecond": 10,
+    "maxRedPixelTransitionsInOneSecond": 3,
+    "maxGeneralEpisodeTransitionsInOneSecond": 2,
+    "maxRedEpisodeTransitionsInOneSecond": 0,
+    "maxRapidPixelAreaFraction": 0.000069,
+    "areaThreshold": 0.02,
+    "luminanceThreshold": 0.1,
+    "redUVComponentThreshold": 0.1414213562373095,
+    "legacyRedThreshold": 20,
+    "resolution": "native",
+    "ambiguousFrames": [],
+    "hazardFrames": [],
+    "method": "Cumulative native-pixel transitions plus paired spatial transition cohorts; >6 transitions per rolling second; rising/falling spatial cohorts accumulate independently before pairing. Conservative u/v and legacy red screens retain all saturation history (a deliberate overestimate). Not a conformance certificate.",
+    "file": "/workspace/eventrunner/video/out/general-trailer-vertical.mp4",
+    "width": 1080,
+    "height": 1920,
+    "fileHash": "12261e93c672b97b1244eaee8f5f7187253b8207e6e478aa39b11af691ef5609",
+    "analyzerHash": "6e2df0a2ea8139369e3284ae421e4ef6b0a8e547e1e20e3ca92cc50061e5fa5b"
+  }
+}
