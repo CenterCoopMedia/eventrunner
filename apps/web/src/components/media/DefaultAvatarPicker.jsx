@@ -18,13 +18,17 @@ import { Radio } from '../forms/Choice.jsx';
  *   value: string,             // the current photoPath, whatever kind it is
  *   onChange: (path: string) => void,
  *   namePrefix: string,        // unique per field: 'profile' | 'speaker'
+ *   tone?: 'public' | 'admin',
  * }} props
  */
-export default function DefaultAvatarPicker({ value, onChange, namePrefix }) {
+export default function DefaultAvatarPicker({ value, onChange, namePrefix, tone = 'public' }) {
   const selected = DEFAULT_AVATARS.some((avatar) => avatar.path === value) ? value : 'none';
+  const legendClass = tone === 'admin'
+    ? 'font-admin-ui text-admin-sm font-semibold text-admin-ink'
+    : 'font-data text-caption font-semibold text-text-primary';
   return (
     <fieldset className="mt-sm">
-      <legend className="font-data text-caption font-semibold text-text-primary">
+      <legend className={legendClass}>
         Or pick a neutral avatar
       </legend>
       <div className="mt-xs grid grid-cols-2 gap-xs sm:grid-cols-4">
@@ -32,6 +36,7 @@ export default function DefaultAvatarPicker({ value, onChange, namePrefix }) {
           name={`${namePrefix}-default-avatar`}
           value="none"
           label="None"
+          tone={tone}
           checked={selected === 'none'}
           onChange={() => onChange('')}
         />
@@ -41,6 +46,7 @@ export default function DefaultAvatarPicker({ value, onChange, namePrefix }) {
             name={`${namePrefix}-default-avatar`}
             value={avatar.path}
             label={avatar.label}
+            tone={tone}
             checked={selected === avatar.path}
             onChange={() => onChange(avatar.path)}
           />

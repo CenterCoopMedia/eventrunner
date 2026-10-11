@@ -172,13 +172,14 @@ export default function AdminSpeakerEditor({ mode }) {
   // sends one — a new record needs a starting state, and the form's default
   // is the one the server would apply anyway.
   const [statusPicked, setStatusPicked] = useState(mode === 'create');
+  const [photoBusy, setPhotoBusy] = useState(false);
   const errorRef = useRef(null);
   const formRef = useRef(null);
   // Adopt the live record exactly once, so a listener update does not
   // overwrite what the admin is typing.
   const adoptedRef = useRef(false);
-  const unsaved = savedSnapshot !== null && editorSnapshot(form) !== savedSnapshot;
-  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving });
+  const unsaved = savedSnapshot !== null && (editorSnapshot(form) !== savedSnapshot || photoBusy);
+  const leaveGuard = useUnsavedNavigation(unsaved, { blocked: saving || photoBusy });
 
   useEffect(() => {
     if (mode !== 'edit' || adoptedRef.current || !speaker) return;
@@ -290,7 +291,7 @@ export default function AdminSpeakerEditor({ mode }) {
         identifiers={null}
         description="This is the one record for this person. Sessions point at it by id, and the public directory shows a published copy of the safe fields."
         actions={
-          <button type="submit" className={primaryButtonClass} disabled={saving}>
+          <button type="submit" className={primaryButtonClass} disabled={saving || photoBusy}>
             {saving ? 'Saving…' : mode === 'create' ? 'Create speaker' : 'Save speaker'}
           </button>
         }
@@ -381,6 +382,8 @@ export default function AdminSpeakerEditor({ mode }) {
                   onChange={(path) => set({ headshotPath: path })}
                   label="Headshot"
                   saveNote="Save speaker to keep this photo. A live speaker shows it on the public directory."
+                  appearance="admin"
+                  onBusyChange={setPhotoBusy}
                 />
                 <FieldError message={errorFor('headshotPath')} />
               </div>

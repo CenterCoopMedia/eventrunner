@@ -178,6 +178,11 @@ describe('speaker editor', () => {
     expect(screen.queryByLabelText('Headshot path')).toBeNull();
     expect(screen.getByRole('group', { name: 'Headshot' })).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: /path/i })).toBeNull();
+    const upload = screen.getByText('Replace photo');
+    expect(upload).toHaveClass('border-admin-rule-strong');
+    expect(upload).toHaveClass('text-admin-ink');
+    expect(upload.className).not.toMatch(/text-text-primary/);
+    expect(screen.getByRole('radio', { name: 'None' }).closest('label')).toHaveClass('text-admin-ink');
     const account = within(layout).getByRole('heading', { name: 'Linked attendee account' })
       .closest('.admin-object-row');
     expect(account).toHaveTextContent('cannot be edited here');
