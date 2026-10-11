@@ -79,6 +79,7 @@ import {
   SelectField,
   ServerErrorSummary,
   TextField,
+  choiceButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
@@ -937,7 +938,7 @@ export default function AdminBranding() {
                       key={mode}
                       type="button"
                       aria-pressed={overrideMode === mode}
-                      className={overrideMode === mode ? primaryButtonClass : secondaryButtonClass}
+                      className={overrideMode === mode ? choiceButtonClass : secondaryButtonClass}
                       onClick={() => setOverrideMode(mode)}
                     >
                       {mode === 'light' ? 'Light mode' : 'Dark mode'}

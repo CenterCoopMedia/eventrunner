@@ -54,7 +54,7 @@ test('compare mode clears the loading warning after both frames load', async ({ 
   });
   try {
     await openPageStyle(page);
-    await page.getByRole('button', { name: 'Compare light and dark', exact: true }).click();
+    await page.getByLabel('Mode', { exact: true }).selectOption('compare');
     await expect(page.locator('iframe[data-theme-proof]')).toHaveCount(2);
     await expect(page.getByText(/still loading, so the/).first()).toBeVisible();
     release();
