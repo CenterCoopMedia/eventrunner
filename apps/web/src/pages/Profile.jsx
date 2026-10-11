@@ -37,7 +37,7 @@ import { useProfile } from '../contexts/ProfileContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import ProfilePhotoField from '../components/media/ProfilePhotoField.jsx';
-import { deleteOwnPhoto } from '../lib/photoUpload.js';
+
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 import { Checkbox, Radio } from '../components/forms/Choice.jsx';
@@ -292,6 +292,7 @@ export default function Profile() {
         // projection coerces either to nothing rendered.
         photoPath,
       });
+      photoRef.current?.release();
       if (features.customBadges === true && customBadgesChanged) savedCustomBadgesRef.current = customBadges;
       // The old photo object stays until syncUserPublic has published the
       // new path. Deleting it here would race that write and break the
@@ -299,14 +300,26 @@ export default function Profile() {
       showToast('Profile saved.');
     } catch {
       // The new object is public and no profile names it. Delete it. The
-      // previous object stays for the directory.
+      // previous object stays for the directory. A failed delete keeps the
+      // same object so the next save does not upload a second public file.
+      let stillPublic = false;
       if (uploadedPath && uploadedPath !== profile?.photoPath) {
-        await deleteOwnPhoto(uploadedPath);
+        try {
+          await photoRef.current?.discard();
+          setField('photoPath', profile?.photoPath ? profile.photoPath : '');
+        } catch {
+          stillPublic = true;
+        }
       }
       // The rules reject anything outside the self-editable allowlist, and
       // an offline write never lands: say so plainly rather than pretending
       // the save worked.
-      showToast('Your profile could not be saved. Try again.', { tone: 'error' });
+      showToast(
+        stillPublic
+          ? 'Your profile could not be saved. The new photo is still public. Try again.'
+          : 'Your profile could not be saved. Try again.',
+        { tone: 'error' },
+      );
     } finally {
       setSaving(false);
     }

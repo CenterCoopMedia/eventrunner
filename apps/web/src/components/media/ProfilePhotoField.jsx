@@ -8,14 +8,15 @@
 // through the admin-gated media endpoints would need an admin, which is
 // exactly backwards.
 //
-// The cropped file stays in the browser until the profile save commits it.
+// The cropped file stays in the browser until the profile save succeeds.
 // `profile-photos` allows a public read, so an upload before save would
 // publish a photo the attendee has not kept (issues 363 and 372). The save
-// uploads first and then writes the path, so a saved path still has an
-// object. A failed save deletes that new object. The previous object stays
-// until syncUserPublic has published the new path, and that trigger deletes
-// it. This field never deletes a path the saved profile still names.
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+// uploads first and then writes the path. The local file stays until that
+// write succeeds, so a failed save can delete the new object and try the
+// same file again. If that delete fails, the next save retries the same
+// object. A neutral avatar or Remove drops the local file first. This
+// field never deletes a path the saved profile still names.
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   PROFILE_PHOTO_MAX_BYTES,
   PROFILE_PHOTO_TYPES,
@@ -24,7 +25,7 @@ import {
   typeLabel,
   defaultAvatarUrl,
 } from '../../lib/mediaSource.js';
-import { uploadProfilePhoto } from '../../lib/photoUpload.js';
+import { deleteOwnPhoto, uploadProfilePhoto } from '../../lib/photoUpload.js';
 import AssetImage from './AssetImage.jsx';
 import PhotoCrop from './PhotoCrop.jsx';
 import DefaultAvatarPicker from './DefaultAvatarPicker.jsx';
@@ -38,6 +39,10 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
   const [cropFile, setCropFile] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  // Refs, not state: commit() stores the uploaded path and the parent
+  // discards it in the same turn, before a re-render can publish state.
+  const pendingFileRef = useRef(null);
+  const stagedPathRef = useRef(null);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -55,28 +60,79 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
     });
   }
 
-  function hold(file) {
+  function rememberFile(file) {
+    pendingFileRef.current = file;
+    setPendingFile(file);
+  }
+
+  function rememberStaged(path) {
+    stagedPathRef.current = path;
+  }
+
+  const dropLocal = useCallback(() => {
+    setPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    rememberFile(null);
+    setCropFile(null);
+    onPendingChange?.(false);
+  }, [onPendingChange]);
+
+  async function hold(file) {
+    if (busy) return;
+    const staged = stagedPathRef.current;
+    if (staged) {
+      try {
+        await deleteOwnPhoto(staged);
+      } catch {
+        setError('Your new photo is still public. Try again.');
+        return;
+      }
+      rememberStaged(null);
+    }
     setError(null);
     setCropFile(null);
-    setPendingFile(file);
+    rememberFile(file);
     replacePreview(file);
     reportPending(false);
     if (inputRef.current) inputRef.current.value = '';
   }
 
+  async function clearLocal(nextPath) {
+    if (busy) return;
+    const staged = stagedPathRef.current;
+    if (staged) {
+      try {
+        await deleteOwnPhoto(staged);
+      } catch {
+        setError('Your new photo is still public. Try again.');
+        return;
+      }
+      rememberStaged(null);
+    }
+    dropLocal();
+    onChange(nextPath);
+  }
+
   useImperativeHandle(ref, () => ({
     hasPending() {
-      return pendingFile !== null;
+      return pendingFileRef.current !== null;
     },
     async commit() {
-      if (!pendingFile) return null;
+      const file = pendingFileRef.current;
+      if (!file) return null;
+      if (stagedPathRef.current) {
+        onChange(stagedPathRef.current);
+        return stagedPathRef.current;
+      }
       setBusy(true);
       onPendingChange?.(true);
       setError(null);
       try {
-        const { path } = await uploadProfilePhoto({ uid, file: pendingFile });
+        const { path } = await uploadProfilePhoto({ uid, file });
+        rememberStaged(path);
         onChange(path);
-        setPendingFile(null);
         return path;
       } catch (error) {
         setError('Your photo could not be uploaded. Try again.');
@@ -86,7 +142,17 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
         onPendingChange?.(false);
       }
     },
-  }), [onChange, onPendingChange, pendingFile, uid]);
+    release() {
+      dropLocal();
+      rememberStaged(null);
+    },
+    async discard() {
+      const staged = stagedPathRef.current;
+      if (!staged) return;
+      await deleteOwnPhoto(staged);
+      rememberStaged(null);
+    },
+  }), [dropLocal, onChange, onPendingChange, uid]);
 
   async function choose(event) {
     const file = event.target.files?.[0] ?? null;
@@ -113,10 +179,7 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
   function remove() {
     // Drop the unsaved file and clear the form path. The saved object stays
     // until the profile save lands and syncUserPublic deletes it.
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-    setPendingFile(null);
-    onChange('');
+    clearLocal('');
   }
 
   const defaultUrl = defaultAvatarUrl(value);
@@ -192,7 +255,7 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
           }}
         />
       ) : null}
-      <DefaultAvatarPicker value={value} onChange={onChange} namePrefix="profile" />
+      <DefaultAvatarPicker value={value} onChange={clearLocal} namePrefix="profile" />
       <p id="profile-photo-hint" className="text-sm text-text-secondary">
         {PROFILE_PHOTO_TYPES.map(typeLabel).join(', ')} · up to{' '}
         {formatBytes(PROFILE_PHOTO_MAX_BYTES)}. Save your profile to publish the change.
