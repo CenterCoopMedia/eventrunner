@@ -245,7 +245,7 @@ describe('the proof', () => {
     await renderBranding();
     expect(screen.getByText('Home · light · 1440px · published theme')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
+    fireEvent.change(screen.getByLabelText('Page'), { target: { value: 'schedule' } });
     expect(screen.getByText('Schedule · light · 1440px · published theme')).toBeInTheDocument();
     // And the FRAME really moved. `initialEntries` is read once, so the
     // router has to remount or the line and the picture disagree.
@@ -254,7 +254,7 @@ describe('the proof', () => {
 
   it('switches light and dark instantly, as two proofs of one forme', async () => {
     await renderBranding();
-    fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
+    fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'dark' } });
 
     expect(frame().dataset.mode).toBe('dark');
     expect(screen.getByText('Home · dark · 1440px · published theme')).toBeInTheDocument();
@@ -265,7 +265,12 @@ describe('the proof', () => {
 
   it('renders a phone at a phone’s real width, so its own breakpoints fire', async () => {
     await renderBranding();
-    fireEvent.click(screen.getByRole('button', { name: 'Phone (390px)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Phone', exact: true }));
+    const phone = screen.getByRole('button', { name: 'Phone', exact: true });
+    expect(phone).toHaveAttribute('aria-pressed', 'true');
+    expect(phone.className).toContain('bg-admin-action-soft');
+    expect(phone.className).not.toContain('bg-admin-action ');
+    expect(screen.getByRole('button', { name: 'Publish the theme' }).className).toContain('bg-admin-action ');
     const preview = screen.getByTitle('Home preview, light mode, 390px wide');
     expect(preview).toHaveAttribute('width', '390');
     expect(frame().ownerDocument).toBe(preview.contentDocument);
@@ -278,7 +283,7 @@ describe('the proof', () => {
     // Dark mode is its own palette, and it is where a brand colour usually
     // fails. Flipping a toggle and remembering is not the same as looking.
     await renderBranding(PRESET_THEME);
-    fireEvent.click(screen.getByRole('button', { name: 'Compare light and dark' }));
+    fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'compare' } });
 
     const compared = frame(PREVIEW_COMPARE_SCOPE_ID);
     expect(frame().dataset.mode).toBe('light');
@@ -289,15 +294,15 @@ describe('the proof', () => {
     expect(screen.getAllByText(/Home · dark · 1440px/).length).toBeGreaterThan(0);
 
     const comparedDocument = compared.ownerDocument;
-    fireEvent.click(screen.getByRole('button', { name: 'Light' }));
+    fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'light' } });
     expect(previewIframe(PREVIEW_COMPARE_SCOPE_ID)).toBeNull();
     expect(comparedDocument.getElementById(PREVIEW_STYLE_ID)).toBeNull();
   });
 
   it('swaps in a long title and a dense day on request, and says it is doing it', async () => {
     await renderBranding(PRESET_THEME);
-    fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Stress test' }));
+    fireEvent.change(screen.getByLabelText('Page'), { target: { value: 'schedule' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Stress test' }));
 
     expect(screen.getByText(/Nothing here is saved or published/)).toBeInTheDocument();
     expect(screen.getAllByText(/Schedule · light · 1440px · stress test/).length)
@@ -315,7 +320,7 @@ describe('the proof', () => {
     // first — the page where a theme meets one session's own type, room,
     // and speakers.
     await renderBranding(PRESET_THEME);
-    fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+    fireEvent.change(screen.getByLabelText('Page'), { target: { value: 'session' } });
     await waitFor(() =>
       expect(
         within(frame()).getByRole('heading', { level: 1, name: scheduleData.find((session) => session.visible !== false).title }),
