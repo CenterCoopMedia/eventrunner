@@ -53,6 +53,12 @@ test('workflow lookups tolerate a CRLF checkout', () => {
   assert.equal(crlfWorkflow.indexOf(marker), -1);
 });
 
+test('deploy validation receives the selected client, not a project id', () => {
+  const validation = step('Validate Tier A environment (spec §2.1) before touching GCP');
+  assert.match(validation, /EVENT_DEPLOY_CLIENT: \$\{\{ inputs\.client \}\}/);
+  assert.equal(validation.includes('vars.EVENT_DEPLOY_CLIENT'), false);
+});
+
 test('deploy validation receives the OTP abuse-control variables', () => {
   const validation = step('Validate Tier A environment (spec §2.1) before touching GCP');
   assert.match(

@@ -144,6 +144,9 @@ jobs:
           EVENT_STORAGE_BUCKET: ${{ vars.EVENT_STORAGE_BUCKET }}
           EVENT_ALLOWED_ORIGINS: ${{ vars.EVENT_ALLOWED_ORIGINS }}
           EVENT_EMAIL_PROVIDER: ${{ vars.EVENT_EMAIL_PROVIDER }}
+          # The selected GitHub Environment. Console mail is valid only when
+          # this is exactly "demo". It is not taken from the project id.
+          EVENT_DEPLOY_CLIENT: ${{ inputs.client }}
           EVENT_TICKETING_PROVIDER: ${{ vars.EVENT_TICKETING_PROVIDER }}
           EVENT_TICKETING_EVENT_ID: ${{ vars.EVENT_TICKETING_EVENT_ID }}
           EVENT_OPERATOR_NOTIFIER: ${{ vars.EVENT_OPERATOR_NOTIFIER }}
