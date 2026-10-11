@@ -24,8 +24,8 @@ Preserve all earlier task records below.
 - [x] Render all eight public MP4s; measure every final file and inspect contact sheets.
 - [x] Produce tutorial transcripts and the public preview page without autoplay.
 - [x] Complete independent source review; fix camera, title overlap, and export-freshness findings.
-- [ ] Commit with the configured identity and DCO; open a PR with public evidence.
-- [ ] Deliver outputs and measured results; identify the remaining human watch/listen.
+- [x] Commit with the repository’s GitHub noreply identity and DCO; open [draft PR #480](https://github.com/CenterCoopMedia/eventrunner/pull/480) with public evidence.
+- [x] Deliver all ten cuts and measured results; identify the remaining full headphone and laptop-speaker watch/listen before release.
 
 ## 2026-09-23: burn down the open issues with stacked pull requests
 
