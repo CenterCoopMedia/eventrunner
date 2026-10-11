@@ -170,8 +170,19 @@ describe('speaker editor', () => {
       .toEqual(['Name', 'Profile', 'Contact and status']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
       'First name', 'Last name', 'URL slug', 'Job title', 'Organization',
-      'Bio', 'Headshot path', 'Email', 'Status',
+      'Bio', 'Replace photo', 'None',
+      'Default avatar 01', 'Default avatar 02', 'Default avatar 03',
+      'Default avatar 04', 'Default avatar 05', 'Default avatar 06',
+      'Email', 'Status',
     ]);
+    expect(screen.queryByLabelText('Headshot path')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Headshot' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: /path/i })).toBeNull();
+    const upload = screen.getByText('Replace photo');
+    expect(upload).toHaveClass('border-admin-rule-strong');
+    expect(upload).toHaveClass('text-admin-ink');
+    expect(upload.className).not.toMatch(/text-text-primary/);
+    expect(screen.getByRole('radio', { name: 'None' }).closest('label')).toHaveClass('text-admin-ink');
     const account = within(layout).getByRole('heading', { name: 'Linked attendee account' })
       .closest('.admin-object-row');
     expect(account).toHaveTextContent('cannot be edited here');
@@ -201,7 +212,7 @@ describe('speaker editor', () => {
     expect(body.speaker).not.toHaveProperty('uid');
     expect(body.speaker).not.toHaveProperty('inviteToken');
     expect(body.speaker).not.toHaveProperty('approvedAt');
-    expect(screen.queryByLabelText('Headshot path')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Headshot' })).toBeNull();
     expect(body.speaker.headshotPath).toBeNull();
   });
 
@@ -248,6 +259,42 @@ describe('speaker editor', () => {
     expect(urlOf(0)).toMatch(/updateSpeaker$/);
     expect(bodyOf(0).speakerId).toBe('rae-okonkwo');
     expect(bodyOf(0).speaker.bio).toBe('Updated bio.');
+    expect(bodyOf(0).speaker.headshotPath).toBe('speakers/rae.jpg');
+  });
+
+  it('saves a chosen default avatar and keeps that choice when the save fails', async () => {
+    speakerDocs = [RAE];
+    fetch.mockResolvedValueOnce(
+      errorResponse(400, 'bad-request', 'bio: must be a string'),
+    );
+    await renderAt('/admin/speakers/rae-okonkwo');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Default avatar 01' }));
+    expect(screen.getByAltText('Your chosen default avatar')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+    });
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker.headshotPath).toBe('default-avatars/avatar-01.svg');
+    expect(screen.getByRole('radio', { name: 'Default avatar 01' })).toBeChecked();
+    expect(screen.getByAltText('Your chosen default avatar')).toBeInTheDocument();
+  });
+
+  it('clears the headshot on save when staff remove the photo', async () => {
+    speakerDocs = [RAE];
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
+    await renderAt('/admin/speakers/rae-okonkwo');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.getByText('Upload a photo')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+    });
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker.headshotPath).toBeNull();
   });
 
   it('shows a server rejection verbatim, field by field', async () => {

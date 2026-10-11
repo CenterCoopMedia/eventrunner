@@ -2072,6 +2072,21 @@
     outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
     outline-offset: var(--admin-focus-offset);
   }
+  /* The shared photo control keeps the public ring on its visible label.
+     Inside the desk, that label uses the admin ring, and the radios use
+     the admin rule and action instead of the public theme accent. */
+  .admin-room .speaker-photo-field--admin .file-input-label:has(+ input:focus-visible) {
+    outline: var(--admin-focus-width) solid rgb(var(--admin-focus-ring-rgb));
+    outline-offset: var(--admin-focus-offset);
+  }
+  .admin-room .speaker-photo-field--admin .control-choice {
+    border-color: rgb(var(--admin-rule-control-rgb));
+    background-color: rgb(var(--admin-ground-input-rgb));
+  }
+  .admin-room .speaker-photo-field--admin .control-choice:checked {
+    border-color: rgb(var(--admin-action-rgb));
+    background-color: rgb(var(--admin-action-rgb));
+  }
 
   /* The Quill core editor carries only the CMS rich-text allowlist. These
      rules replace Quill's broad theme CSS with the admin room's tokens and

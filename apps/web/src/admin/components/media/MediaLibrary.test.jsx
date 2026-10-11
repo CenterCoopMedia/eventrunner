@@ -5,7 +5,7 @@
 // storage.rules deny for cms-images/ and branding/); the delete flow shows
 // the usage list before it destroys anything and only force-deletes after a
 // second, explicit press; and ImagePicker hands its caller the object PATH.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const call = vi.fn();
@@ -253,6 +253,10 @@ describe('nested dialogs', () => {
 });
 
 describe('ImagePicker', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('hands its caller the object path, not a download URL', async () => {
     const onChange = vi.fn();
     render(<ImagePicker label="Primary logo" folder="branding" value="" onChange={onChange} />);
@@ -277,6 +281,137 @@ describe('ImagePicker', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
     expect(onChange).toHaveBeenCalledWith('');
+  });
+
+  it('resolves a seeded branding file the same way the page preview does', () => {
+    render(
+      <ImagePicker label="Primary logo" folder="branding" value="branding/logo.svg" onChange={vi.fn()} />,
+    );
+    const img = document.querySelector('img');
+    expect(img).toHaveAttribute('src', '/branding/logo.svg');
+    expect(img.getAttribute('src')).not.toContain('firebasestorage.googleapis.com');
+    fireEvent.load(img);
+    expect(screen.queryByText(/missing from storage/)).toBeNull();
+  });
+
+  it('keeps a cached thumbnail visible after it has already loaded', () => {
+    const complete = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
+    const width = vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(8);
+    try {
+      const { rerender } = render(
+        <ImagePicker label="Primary logo" folder="branding" value="branding/logo.svg" onChange={vi.fn()} />,
+      );
+      expect(screen.queryByText('Loading this file.')).toBeNull();
+      expect(document.querySelector('img').className).not.toContain('invisible');
+      rerender(
+        <ImagePicker label="Primary logo" folder="branding" value="branding/logo.svg" onChange={vi.fn()} />,
+      );
+      expect(screen.queryByText('Loading this file.')).toBeNull();
+    } finally {
+      complete.mockRestore();
+      width.mockRestore();
+    }
+  });
+
+  it('keeps a page image on the storage url', () => {
+    render(
+      <ImagePicker label="Hero" folder="cms-images" value="cms-images/asset-1/hero.png" onChange={vi.fn()} />,
+    );
+    expect(document.querySelector('img').getAttribute('src')).toContain('firebasestorage.googleapis.com');
+  });
+
+  it('resolves an uploaded branding file from storage', () => {
+    render(
+      <ImagePicker
+        label="Primary logo"
+        folder="branding"
+        value="branding/abc123/logo.png"
+        onChange={vi.fn()}
+      />,
+    );
+    const src = document.querySelector('img').getAttribute('src');
+    expect(src).toContain('firebasestorage.googleapis.com');
+    expect(src).toContain(encodeURIComponent('branding/abc123/logo.png'));
+  });
+
+  it('keeps a missing-file sentence outside the thumbnail and offers retry', async () => {
+    const fetchMock = vi.fn(async () => ({ status: 404, ok: false }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <ImagePicker
+        label="Primary logo"
+        folder="branding"
+        value="branding/abc123/logo.png"
+        onChange={vi.fn()}
+      />,
+    );
+    const img = document.querySelector('img');
+    expect(await screen.findByText('Loading this file.')).toBeInTheDocument();
+    fireEvent.error(img);
+    const status = await screen.findByText(
+      'This file is missing from storage. Choose or upload a replacement, or try again.',
+    );
+    const frame = img.closest('.asset-slot-frame');
+    expect(frame).not.toContain(status);
+    expect(frame.className).toContain('h-16');
+    expect(frame.className).toContain('w-16');
+    expect(status.className).not.toMatch(/overflow-hidden|truncate|line-clamp|h-16|w-16/);
+    expect(status.className).toContain('w-full');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByLabelText('Primary logo')).toHaveAttribute(
+      'aria-describedby',
+      expect.stringContaining(status.id),
+    );
+    expect(screen.getByRole('button', { name: 'Choose or upload…' })).toBeInTheDocument();
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET' });
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    retry.focus();
+    fireEvent.click(retry);
+    const busy = screen.getByRole('button', { name: 'Trying again' });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveFocus();
+    fireEvent.error(document.querySelector('img'));
+    await screen.findByText(
+      'This file is missing from storage. Choose or upload a replacement, or try again.',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it('says when the file is refused', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ status: 403, ok: false })));
+    render(
+      <ImagePicker label="Footer logo" folder="branding" value="branding/abc/footer.png" onChange={vi.fn()} />,
+    );
+    fireEvent.error(document.querySelector('img'));
+    const status = await screen.findByText(
+      'You do not have permission to view this file. Try again, or choose another file.',
+    );
+    expect(status.closest('.asset-slot-frame')).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it('says when the load fails without a readable status', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    }));
+    render(
+      <ImagePicker label="Favicon" folder="branding" value="branding/abc/favicon.png" onChange={vi.fn()} />,
+    );
+    fireEvent.error(document.querySelector('img'));
+    expect(
+      await screen.findByText('This file could not be loaded. Try again, or choose another file.'),
+    ).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('says when the path cannot be shown', async () => {
+    render(
+      <ImagePicker label="Primary logo" folder="branding" value="https://evil.example/x.png" onChange={vi.fn()} />,
+    );
+    expect(await screen.findByText('This path cannot be shown.')).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Choose or upload…' })).toBeInTheDocument();
   });
 });
 

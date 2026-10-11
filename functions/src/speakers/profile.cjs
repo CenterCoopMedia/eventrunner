@@ -256,7 +256,7 @@ async function applyCreateSpeaker({
  * @returns {Promise<{ ok: true, speakerId: string, docPath: string } |
  *                    { ok: false, status: number, code: string, message: string }>}
  */
-async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.now }) {
+async function applyUpdateSpeaker({ db, bucket = null, speakerId, payload, actor, now = Date.now, log = console }) {
   if (!isValidDocId(speakerId)) {
     return { ok: false, status: 400, code: 'bad-request', message: 'speakerId: required' };
   }
@@ -269,9 +269,14 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
   }
   const at = new Date(now());
   const ref = db.collection(SPEAKERS).doc(speakerId);
+  let oldHeadshotPath = null;
+  let newHeadshotPath;
 
   try {
     await db.runTransaction(async (tx) => {
+      // A retry runs this function again. Keep only the attempt that commits.
+      oldHeadshotPath = null;
+      newHeadshotPath = undefined;
       const snap = await tx.get(ref);
       if (!snap.exists) {
         const err = new Error('NOT_FOUND');
@@ -377,11 +382,30 @@ async function applyUpdateSpeaker({ db, speakerId, payload, actor, now = Date.no
         }
       }
       if (linked) tx.set(linked.ref, { speakerId: null, updatedAt: at }, { merge: true });
+      if ('headshotPath' in patch) {
+        oldHeadshotPath = typeof stored.headshotPath === 'string' ? stored.headshotPath : null;
+        newHeadshotPath = patch.headshotPath;
+      }
       tx.set(ref, { ...patch, updatedAt: at, updatedBy: actor.email }, { merge: true });
     });
   } catch (err) {
     if (err?.conflict) return { ok: false, ...err.conflict };
     throw err;
+  }
+
+  // speaker-photos allows public get. A replaced object would stay readable
+  // after this save. Delete only this speaker's own object, and only after
+  // the write commits. A legacy path outside that prefix is left alone.
+  // speakerPhotoDelete would refuse while speakers_public still names the
+  // old path, so this uses the Admin SDK, the same as applying a queued edit.
+  const ownOldPhoto = typeof oldHeadshotPath === 'string'
+    && oldHeadshotPath.startsWith(`speaker-photos/${speakerId}/`);
+  if (bucket && ownOldPhoto && newHeadshotPath !== undefined && newHeadshotPath !== oldHeadshotPath) {
+    try {
+      await bucket.file(oldHeadshotPath).delete({ ignoreNotFound: true });
+    } catch (err) {
+      log.warn('applyUpdateSpeaker: old headshot cleanup failed', err);
+    }
   }
 
   return { ok: true, speakerId, docPath: `${SPEAKERS}/${speakerId}` };
@@ -905,7 +929,7 @@ function createCreateSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
 /**
  * @param {{ db, auth, getConfig, now?: () => number, log?: Console }} deps
  */
-function createUpdateSpeakerHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+function createUpdateSpeakerHandler({ db, bucket = null, auth, getConfig, now = Date.now, log = console }) {
   return async function updateSpeaker(req, res) {
     const actor = await gateAdminPost({ auth, db, getConfig }, req, res);
     if (!actor) return;
@@ -913,10 +937,12 @@ function createUpdateSpeakerHandler({ db, auth, getConfig, now = Date.now, log =
     try {
       result = await applyUpdateSpeaker({
         db,
+        bucket,
         speakerId: req.body?.speakerId,
         payload: req.body?.speaker,
         actor,
         now,
+        log,
       });
     } catch (err) {
       log.error('updateSpeaker failed', err);

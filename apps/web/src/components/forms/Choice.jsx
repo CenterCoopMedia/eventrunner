@@ -59,17 +59,21 @@ function DotMark() {
  * @param {string} [props.description] a second line under the word
  * @param {string} [props.error] the message under the control
  */
-function Choice({ type, label, description, error, className = '', ...rest }) {
+function Choice({ type, label, description, error, className = '', tone = 'public', ...rest }) {
   const id = useId();
   const errorId = `${id}-error`;
   const Mark = type === 'radio' ? DotMark : CheckMark;
+  const textClass = tone === 'admin'
+    ? 'font-admin-ui text-admin-base text-admin-ink'
+    : 'font-body text-body text-text-primary';
+  const markClass = tone === 'admin' ? 'text-admin-ink-inverse' : 'text-surface';
   return (
     <div className="flex flex-col gap-3xs">
       <label
         htmlFor={id}
-        className={`touch-target flex items-start gap-sm py-2xs font-body text-body text-text-primary ${className}`}
+        className={`touch-target flex items-start gap-sm py-2xs ${textClass} ${className}`}
       >
-        <span className="relative mt-3xs inline-flex text-surface">
+        <span className={`relative mt-3xs inline-flex ${markClass}`}>
           <input
             id={id}
             type={type}
