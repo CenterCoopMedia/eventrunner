@@ -195,7 +195,7 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_PUBLIC_URL` | canonical origin, e.g. `https://summit.example.org` |
 | `EVENT_STORAGE_BUCKET` | the project's default Storage bucket |
 | `EVENT_ALLOWED_ORIGINS` | comma-separated CORS origins |
-| `EVENT_EMAIL_PROVIDER` | `postmark` \| `webhook` \| `console` |
+| `EVENT_EMAIL_PROVIDER` | `postmark` \| `webhook`. `console` is valid only when the GitHub Environment name is exactly `demo` |
 | `EVENT_TICKETING_PROVIDER` | `eventbrite` \| `manual` \| `none` |
 | `EVENT_TICKETING_EVENT_ID` | required only when the ticketing provider is `eventbrite` |
 | `EVENT_OPERATOR_NOTIFIER` | `webhook` \| `email` \| `none` |
