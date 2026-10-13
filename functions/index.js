@@ -57,6 +57,8 @@ const ticketingCsvImport = require('./src/ticketing/csvImport.cjs');
 const ticketingEntitlement = require('./src/ticketing/entitlement.cjs');
 const ticketingRegistrationPrompt = require('./src/ticketing/registrationPrompt.cjs');
 const ticketingCommerceHttp = require('./src/ticketing/commerceHttp.cjs');
+const ticketingCommerceAdmin = require('./src/ticketing/commerceAdmin.cjs');
+const ticketingCommerceEmail = require('./src/ticketing/commerceEmail.cjs');
 const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
 
 module.exports = {
@@ -114,5 +116,7 @@ module.exports = {
   ...ticketingEntitlement.handlers,
   ...ticketingRegistrationPrompt.handlers,
   ...ticketingCommerceHttp.handlers,
+  ...ticketingCommerceAdmin.handlers,
+  ...ticketingCommerceEmail.handlers,
   ...maintenanceCleanup.handlers,
 };

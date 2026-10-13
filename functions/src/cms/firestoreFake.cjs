@@ -230,6 +230,11 @@ function makeFakeDb(seed = {}) {
     collection(name) {
       return {
         _kind: 'query',
+        async add(data) {
+          const ref = docRef(name, randomBytes(10).toString('hex'));
+          await ref.create(data);
+          return ref;
+        },
         doc(id) {
           return docRef(name, id === undefined ? randomBytes(10).toString('hex') : id);
         },

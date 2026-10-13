@@ -25,6 +25,8 @@ const DEFAULTS = {
   'speaker.confirmation': require('./templates/speaker.confirmation.cjs'),
   'ticket.get_ticket': require('./templates/ticket.get_ticket.cjs'),
   'ticket.claim_prompt': require('./templates/ticket.claim_prompt.cjs'),
+  'ticket.order_confirmation': require('./templates/ticket.order_confirmation.cjs'),
+  'ticket.attendee_confirmation': require('./templates/ticket.attendee_confirmation.cjs'),
 };
 
 const OVERRIDE_KEYS = ['subject', 'html', 'text'];
