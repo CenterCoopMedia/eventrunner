@@ -43,7 +43,10 @@ export function useRegistrationLink() {
   }, [enabled, key]);
 
   if (enabled && resolved?.key !== key) return null;
-  if (enabled && resolved?.provider === 'stripe') {
+  // Only a confirmed legacy provider may use its external destination.
+  // An outage must not send a Stripe purchaser to an older checkout source;
+  // the native page presents the catalog error and its retry control.
+  if (enabled && !['eventbrite', 'manual', 'none'].includes(resolved?.provider)) {
     return { label: 'Get tickets', url: '/tickets', native: true };
   }
   return resolveRegistrationLink(eventConfig);

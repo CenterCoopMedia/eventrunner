@@ -48,10 +48,12 @@ describe('registration provider destination', () => {
     expect(screen.queryByRole('link', { name: 'Get tickets' })).not.toBeInTheDocument();
   });
 
-  it('falls back to the configured external action when the provider endpoint is unavailable', async () => {
+  it('keeps an unknown provider on the native ticket page instead of switching checkout sources during an outage', async () => {
     ticketingRequest.mockRejectedValue(new Error('Unavailable'));
     render(surface());
-    await waitFor(() => expect(screen.getAllByRole('link', { name: /Register externally/ })).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
+    for (const link of screen.getAllByRole('link')) expect(link).toHaveAttribute('href', '/tickets');
+    expect(screen.queryByRole('link', { name: /Register externally/ })).not.toBeInTheDocument();
   });
 
   it('waits for the provider decision before presenting a competing external destination', async () => {

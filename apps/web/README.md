@@ -256,7 +256,9 @@ claimed tickets through its private API, with cursor pagination.
 
 The shared `useRegistrationLink` hook makes one credential-free provider lookup for the
 home and header registration actions. Stripe selects the internal `/tickets` destination.
-Other providers or a failed lookup preserve the configured external action. Historical
+Confirmed Eventbrite, manual, and none providers preserve the configured external action.
+If provider lookup fails, the native ticket page shows its error and retry control; an
+outage never selects a possibly stale external checkout source. Historical
 and static demos skip the lookup. The rest of the shell still renders from its snapshot;
 commerce availability and financial state require current server responses.
 
