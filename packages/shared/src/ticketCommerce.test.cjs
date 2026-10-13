@@ -76,6 +76,19 @@ test('checkout accepts selections and normalized per-seat assignments only', () 
   ]) assert.equal(validateCheckoutRequest(bad).ok, false, JSON.stringify(bad));
 });
 
+test('checkout normalizes an accepted catalog revision and leaves revision-free internal requests intact', () => {
+  for (const revision of [0, 1, Number.MAX_SAFE_INTEGER]) {
+    const checked = validateCheckoutRequest(request({ catalogRevision: revision }));
+    assert.equal(checked.ok, true);
+    assert.equal(checked.value.catalogRevision, revision);
+  }
+  assert.equal(Object.hasOwn(validateCheckoutRequest(request()).value, 'catalogRevision'), false);
+  for (const catalogRevision of [null, -1, 1.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(validateCheckoutRequest(request({ catalogRevision })).ok, false);
+  }
+  assert.equal(validateCheckoutRequest({ requestId: request().requestId, resume: true, catalogRevision: 1 }).ok, false);
+});
+
 test('group purchases have a global seat ceiling, not one ceiling per type', () => {
   assert.equal(validateCheckoutRequest(request({ lines: [
     { ticketTypeId: 'general', quantity: 11, attendees: Array(11).fill(attendee) },
