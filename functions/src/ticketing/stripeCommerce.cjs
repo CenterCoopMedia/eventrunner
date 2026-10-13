@@ -36,7 +36,7 @@ function attemptIdFor(orderId) {
 }
 
 function requestFingerprint(request, source = 'checkout', reason = '') {
-  return digest(JSON.stringify({ lines: request.lines, source, reason }));
+  return digest(JSON.stringify({ lines: request.lines, source, reason, catalogRevision: request.catalogRevision }));
 }
 
 function providerScope(provider) {

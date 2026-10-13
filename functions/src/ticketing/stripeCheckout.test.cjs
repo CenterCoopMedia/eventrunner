@@ -33,6 +33,7 @@ function catalog(patch = {}) {
 function request(patch = {}) {
   return {
     requestId: 'checkout-request-0001',
+    catalogRevision: 1,
     lines: [{ ticketTypeId: 'general', quantity: 1, attendees: [PERSON] }],
     ...patch,
   };
@@ -148,6 +149,83 @@ test('missing or unverified authentication and client-supplied pricing cannot re
     assert.equal(db.ids('ticket_payment_attempts').length, 0);
     assert.equal(calls.length, 0);
   }
+});
+
+test('new paid and free purchases require a valid accepted catalog revision before any mutation', async () => {
+  for (const unitAmount of [2500, 0]) {
+    for (const catalogRevision of [undefined, null, -1, 0.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
+      const { deps, db, calls } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount }] } });
+      const body = request({ catalogRevision });
+      if (catalogRevision === undefined) delete body.catalogRevision;
+      const res = await checkout(deps, body);
+      assert.equal(res.statusCode, 400, `${unitAmount}:${catalogRevision}`);
+      assert.equal(res.body.error.code, 'invalid-checkout');
+      for (const collection of ['ticket_orders', 'ticket_payment_attempts', 'ticket_inventory', 'tickets', 'ticket_sync_queue', 'admin_logs']) {
+        assert.equal(db.ids(collection).length, 0, collection);
+      }
+      assert.equal(calls.length, 0);
+    }
+  }
+});
+
+test('changed prices or refund terms require renewed acceptance for paid and free purchases', async () => {
+  for (const unitAmount of [2500, 0]) {
+    for (const change of ['price', 'policy']) {
+      const { deps, db, calls } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount }] } });
+      const shown = await readTicketingCatalog(deps);
+      const nextAmount = change === 'price' ? unitAmount + 500 : unitAmount;
+      const nextPolicy = change === 'policy' ? 'Refunds require organizer approval.' : catalog().refundPolicy;
+      await db.collection('ticket_catalog').doc('current').update({
+        revision: 2, refundPolicy: nextPolicy,
+        ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: nextAmount }],
+      });
+      const refused = await checkout(deps, request({ catalogRevision: shown.catalogRevision }));
+      assert.equal(refused.statusCode, 409, `${unitAmount}:${change}`);
+      assert.equal(refused.body.error.code, 'catalog-changed');
+      for (const collection of ['ticket_orders', 'ticket_payment_attempts', 'ticket_inventory', 'tickets', 'ticket_sync_queue', 'admin_logs']) {
+        assert.equal(db.ids(collection).length, 0, collection);
+      }
+      assert.equal(calls.length, 0);
+      const refreshed = await readTicketingCatalog(deps);
+      const accepted = await checkout(deps, request({ catalogRevision: refreshed.catalogRevision }));
+      assert.equal(accepted.statusCode, 200);
+      const order = db.read('ticket_orders', accepted.body.orderId);
+      assert.equal(order.catalogRevision, 2);
+      assert.equal(order.totalAmount, nextAmount);
+      assert.equal(order.refundPolicy, nextPolicy);
+      const pointer = db.ids('ticket_inventory').find((id) => id.startsWith('purchaser_'));
+      assert.equal(db.read('ticket_inventory', pointer).ordersInWindow, 1, 'the rejected request did not spend quota');
+    }
+  }
+});
+
+test('a catalog price or policy change racing reservation commit aborts paid and free orders', async () => {
+  for (const unitAmount of [2500, 0]) {
+    for (const patch of [
+      { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: 9900 }] },
+      { refundPolicy: 'Refunds require organizer approval.' },
+    ]) {
+      const { deps, db, calls } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount }] } });
+      db.beforeCommit = async () => db.collection('ticket_catalog').doc('current').update({ ...patch, revision: 2 });
+      const res = await checkout(deps);
+      assert.equal(res.statusCode, 409);
+      assert.equal(res.body.error.code, 'catalog-changed');
+      for (const collection of ['ticket_orders', 'ticket_payment_attempts', 'ticket_inventory', 'tickets', 'ticket_sync_queue', 'admin_logs']) {
+        assert.equal(db.ids(collection).length, 0, collection);
+      }
+      assert.equal(calls.length, 0);
+    }
+  }
+});
+
+test('reservation cannot bypass revision acceptance by calling the internal public-order helper', async () => {
+  const { deps, db, calls } = setup();
+  const body = request();
+  delete body.catalogRevision;
+  await assert.rejects(reserveCommerceOrder({ ...deps, actor: ADA, request: body }), { code: 'invalid-checkout', status: 400 });
+  assert.equal(db.ids('ticket_orders').length, 0);
+  assert.equal(db.ids('ticket_inventory').length, 0);
+  assert.equal(calls.length, 0);
 });
 
 test('missing provider identity and a non-HTTPS return origin refuse creation', async () => {
@@ -442,14 +520,24 @@ test('an unknown create result retains the reservation and replays the exact sto
   assert.equal(first.statusCode, 202);
   assert.equal(first.body.checkoutUrl, null);
   assert.equal(first.body.status, 'pending');
-  await db.collection('ticket_catalog').doc('current').set({ ticketTypes: [{ id: 'general', name: 'New price', capacity: 100, unitAmount: 9900 }] }, { merge: true });
+  await db.collection('ticket_catalog').doc('current').set({ revision: 2, refundPolicy: 'New refund terms.', ticketTypes: [{ id: 'general', name: 'New price', capacity: 100, unitAmount: 9900 }] }, { merge: true });
   advance(6000);
   const retry = await checkout(deps, { requestId: request().requestId, resume: true });
   assert.equal(retry.body.orderId, first.body.orderId);
   assert.equal(retry.statusCode, 200);
   assert.deepEqual(calls[0], calls[1]);
   assert.equal(db.read('ticket_orders', first.body.orderId).totalAmount, 2500);
+  assert.equal(db.read('ticket_orders', first.body.orderId).catalogRevision, 1);
+  assert.equal(db.read('ticket_orders', first.body.orderId).refundPolicy, catalog().refundPolicy);
   assert.equal(db.read('ticket_inventory', 'current').held, 1);
+  const originalBodyRetry = await checkout(deps, request());
+  assert.equal(originalBodyRetry.statusCode, 200);
+  assert.equal(originalBodyRetry.body.orderId, first.body.orderId);
+  assert.equal(calls.length, 2, 'a saved Session does not create another payment');
+  const changedAcceptance = await checkout(deps, request({ catalogRevision: 2 }));
+  assert.equal(changedAcceptance.statusCode, 409);
+  assert.equal(changedAcceptance.body.error.code, 'idempotency-conflict');
+  assert.equal(calls.length, 2);
 });
 
 test('a process crash after the reservation is recovered without another order or cart', async () => {
@@ -662,12 +750,15 @@ test('public catalog omits unpublished, inactive, hidden, and organizer-only dat
   await createTicketingCatalogHandler(deps)({ method: 'GET' }, res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.mode, 'test');
+  assert.equal(res.body.catalogRevision, 1);
   assert.deepEqual(res.body.ticketTypes.map((type) => type.id), ['general']);
   assert.equal(JSON.stringify(res.body).includes('acct_example'), false);
   assert.equal(res.body.ticketTypes[0].remaining, 5);
   assert.equal(res.body.taxAmount, 0);
   const unpublished = setup({ catalogPatch: { published: false } });
-  assert.deepEqual((await readTicketingCatalog(unpublished.deps)).ticketTypes, []);
+  const closed = await readTicketingCatalog(unpublished.deps);
+  assert.deepEqual(closed.ticketTypes, []);
+  assert.equal(closed.catalogRevision, null);
 });
 
 test('order status is owner and verified-email scoped before any provider work', async () => {
