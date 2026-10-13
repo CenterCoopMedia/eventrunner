@@ -1,0 +1,75 @@
+name: 404 review workspace
+on:
+  pull_request:
+    paths:
+      - .github/workflows/404-review-workspace.yml
+permissions:
+  contents: read
+concurrency:
+  group: 404-review-workspace-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    if: github.event.pull_request.number == 489 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/404-ticket-recovery'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare the shared workspace
+        run: npm run prepare:functions
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Capture isolated verification inputs
+        run: |
+          mkdir -p /tmp/404-review
+          git rev-parse HEAD > /tmp/404-review/source-sha.txt
+          git archive --format=tar.gz HEAD > /tmp/404-review/source.tar.gz
+          find . -type d -name node_modules -prune -print0 | tar --null -T - -czf /tmp/404-review/dependencies.tar.gz
+      - name: Check recovery and CMS routing regressions
+        run: npm run test -w apps/web -- src/pages/NotFound.test.jsx src/pages/ContentPage.test.jsx
+      - name: Regenerate and independently compare the demo
+        run: |
+          npm run build:demo
+          node scripts/build-demo.cjs --check
+          git add -- docs/demo
+      - name: Store generated Git objects without changing any branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const { execFileSync } = require('node:child_process');
+            const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+            const sourceSha = git('rev-parse', 'HEAD');
+            if (sourceSha !== context.payload.pull_request.head.sha) throw new Error('Source changed');
+            const names = git('diff', '--cached', '--name-only', '--no-renames', '--', 'docs/demo').split('\n').filter(Boolean);
+            const entries = [];
+            for (const path of names) {
+              if (!path.startsWith('docs/demo/')) throw new Error('Unexpected generated path');
+              if (!fs.existsSync(path)) {
+                entries.push({ path, mode: '100644', type: 'blob', sha: null });
+                continue;
+              }
+              if (!fs.lstatSync(path).isFile()) throw new Error('Generated path is not a regular file');
+              const { data } = await github.rest.git.createBlob({ ...context.repo, encoding: 'base64', content: fs.readFileSync(path).toString('base64') });
+              entries.push({ path, mode: '100644', type: 'blob', sha: data.sha });
+            }
+            const { data: source } = await github.rest.git.getCommit({ ...context.repo, commit_sha: sourceSha });
+            const { data: tree } = await github.rest.git.createTree({ ...context.repo, base_tree: source.tree.sha, tree: entries });
+            const result = { sourceSha, treeSha: tree.sha, changedFiles: names };
+            fs.writeFileSync('/tmp/404-review/generated-tree.json', JSON.stringify(result, null, 2));
+            core.info(JSON.stringify(result));
+            // Deliberately no createCommit, updateRef, push or deployment here.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 404-review-workspace
+          path: /tmp/404-review/
+          retention-days: 1
