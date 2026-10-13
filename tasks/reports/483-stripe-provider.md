@@ -164,6 +164,22 @@ to the integrating agent for the final clean check.
 - No merchant account, webhook endpoint, charge, or refund was created in
   Stripe. No production cutover or merge occurred in this branch.
 
+## PR #484 registration prompt follow-up
+
+Connector comment `4253696452` identified that Stripe omitted the universal
+speaker and claimed-ticket skips from the registration prompt contract. The
+provider now checks both flags before reading configuration or preparing a
+message. The provider test covers every prompt trigger; the registration-email
+matrix includes Stripe and verifies that no email is sent for either entitled
+user. A new attendee still receives the catalog prompt without payment keys.
+
+The focused tests reproduced three failures before the fix. After the fix, all
+36 provider and registration-prompt tests pass. Scoped ESLint and
+`git diff --check` pass. The generic deploy runbook now lists Stripe's required
+account/mode variables and accurately limits ticketing secrets to Eventbrite
+and Stripe. This follow-up has not run the remote checks for the final PR head;
+the parent builder owns publication and thread resolution.
+
 ## Primary references checked
 
 Checked on October 13, 2026, together with the installed SDK's type definitions.

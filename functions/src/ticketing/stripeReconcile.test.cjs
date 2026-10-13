@@ -44,7 +44,7 @@ function refund({ id = 're_fixture', amount = 3000, status = 'succeeded' } = {})
 }
 
 function fixture({ order = ORDER } = {}) {
-  const db = makeFakeDb({ 'ticket_orders/ord_fixture': order,
+  const db = makeFakeDb({ 'config/event': { historicalDemo: false }, 'ticket_orders/ord_fixture': order,
     'ticket_inventory/current': { eventId: ORDER.eventId, held: 2, sold: 0, types: { general: { held: 2, sold: 0 } } } });
   const provider = { ...SCOPE, readFinancialState: async () => state() };
   const reconcile = () => reconcileStripeOrder({ db, provider, orderId: ORDER.id, now: () => T0 });
@@ -91,6 +91,72 @@ test('successful full refund invalidates every seat, keeps sold capacity, and pr
   await recomputeEntitlement({ db, uid: 'press' });
   assert.equal(db.read('users', 'attendee').registrationStatus, 'revoked');
   assert.equal(db.read('users', 'press').registrationStatus, 'approved');
+});
+
+test('a successful full refund supersedes old failed refund attention but retains history and disputes', async () => {
+  const { db, provider, reconcile } = fixture();
+  const refunds = [refund({ id: 're_old', status: 'failed' }), refund({ id: 're_retry' })];
+  provider.readFinancialState = async () => ({ ...state(), refunds });
+  await reconcile();
+  const order = db.read('ticket_orders', ORDER.id);
+  assert.equal(order.refundStatus, 'full');
+  assert.equal(order.refundedAmount, order.totalAmount);
+  assert.equal(order.refunds.find((item) => item.id === 're_old').status, 'failed');
+  assert.equal(order.reconciliationException, null);
+  provider.readFinancialState = async () => ({ ...state(), refunds, disputes: [{ id: 'du_active', status: 'needs_response',
+    payment_intent: 'pi_fixture', amount: 3000, currency: 'usd', livemode: false }] });
+  assert.equal((await reconcile()).exception.code, 'payment-disputed');
+});
+
+test('partial successful refunds retain conservative attention for another failed refund', async () => {
+  const { provider, reconcile } = fixture();
+  provider.readFinancialState = async () => ({ ...state(), refunds: [
+    refund({ id: 're_old', status: 'failed' }), refund({ id: 're_retry', amount: 500 }),
+  ] });
+  assert.equal((await reconcile()).exception.code, 'refund-needs-attention');
+});
+
+test('a known PaymentIntent cannot disappear or change before an expired hold is released', async () => {
+  for (const paymentIntent of [null, 'pi_other']) {
+    const { db, provider, reconcile } = fixture({ order: { ...ORDER, stripePaymentIntentId: 'pi_fixture', paymentStatus: 'pending',
+      refunds: [{ id: 're_known', amount: 500, currency: 'usd', status: 'pending' }] } });
+    provider.readFinancialState = async () => {
+      const data = state();
+      return { ...data, session: { ...data.session, status: 'expired', payment_status: 'unpaid', payment_intent: paymentIntent },
+        paymentIntent: paymentIntent ? { ...data.paymentIntent, id: paymentIntent, status: 'canceled', amount_received: 0 } : null };
+    };
+    const result = await reconcile();
+    assert.ok(result.exception);
+    const order = db.read('ticket_orders', ORDER.id);
+    assert.equal(order.stripePaymentIntentId, 'pi_fixture');
+    assert.equal(order.refunds[0].id, 're_known');
+    assert.equal(order.inventoryState, 'held');
+    assert.equal(db.read('ticket_inventory', 'current').held, 2);
+  }
+});
+
+test('historical demos refuse reconciliation before Stripe reads or order writes', async () => {
+  const { db, provider, reconcile } = fixture();
+  await db.collection('config').doc('event').set({ historicalDemo: true });
+  let reads = 0;
+  provider.readFinancialState = async () => { reads += 1; return state(); };
+  const before = db.read('ticket_orders', ORDER.id);
+  assert.equal((await reconcile()).writeBlocked, true);
+  assert.equal(reads, 0);
+  assert.deepEqual(db.read('ticket_orders', ORDER.id), before);
+  assert.equal(db.ids('tickets').length, 0);
+});
+
+test('a demo freeze during the financial commit aborts ticket and inventory writes', async () => {
+  const { db, provider, reconcile } = fixture();
+  provider.readFinancialState = async () => {
+    db.beforeCommit = async () => db.collection('config').doc('event').set({ historicalDemo: true });
+    return state();
+  };
+  assert.equal((await reconcile()).writeBlocked, true);
+  assert.equal(db.ids('tickets').length, 0);
+  assert.equal(db.read('ticket_orders', ORDER.id).status, 'pending');
+  assert.equal(db.read('ticket_inventory', 'current').held, 2);
 });
 
 test('amount-only partial refund requires an allocation and never guesses an attendee', async () => {

@@ -91,6 +91,11 @@ transaction. Explicit admin grants and revocations keep their existing precedenc
    unknown response retains the hold. Recovery sends the identical saved request
    and key, only within 23 hours of the first attempt. After that safe boundary,
    operator review is required. The durable order uniqueness guard never expires.
+   The first queue wake-up follows the short creation lease, so a process crash
+   before the Stripe request can recover while the frozen expiry remains valid.
+   Once a Session exists, the next payment check can follow its expiry. The
+   23-hour idempotency boundary does not extend Stripe's Session-creation window;
+   an outage that makes the saved request unusable needs operator review.
 4. A signed webhook can attach a missing Session ID through verified server metadata
    after a lost create response. A redirect, browser cancellation, declined card,
    local clock, or expired creation lease cannot release inventory or grant access.
@@ -196,6 +201,9 @@ Rollback starts with pausing sales. Keep the Stripe provider, webhook, existing
 queue drain, order records, and compatible reconciliation deployed until every
 accepted payment and hold is resolved. Reverting to a build without the adapter or
 switching provider while orders are outstanding is not a safe payment rollback.
+Historical-demo mode freezes ticketing writes, including signed webhook intake
+and reconciliation. Enable it only after accepted payment, refund, dispute, and
+support obligations are settled. It is not a substitute for the sales-pause switch.
 
 Credential-free tests cover tampering, oversell, replay, refunds, roles, claims,
 demo policy, and worker races. A separately authorized Stripe sandbox rehearsal must
