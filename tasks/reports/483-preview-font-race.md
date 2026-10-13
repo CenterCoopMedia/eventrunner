@@ -47,3 +47,13 @@ font-loading redesign.
   sandbox remain unchanged. The parent will verify them on the new hosted
   head. No browser rerun was requested against the known failing head, and
   no generated output was changed in this commit.
+
+## Foundation propagation
+
+The same unchanged font-warning test was flaky on foundation PR #484 head
+`fb15a78a8702f761e232a39ea34dd3c34ef3c233`, run `38338417373`, E2E job
+`115103753964`: the initial warning assertion failed and retry 1 passed
+(**73 passed, 1 flaky, 0 final failures, 0 skipped**). The bounded source repair
+is therefore also propagated to the foundation, so every PR in the stack can
+pass this assertion directly. No assertion, timeout, retry or sandbox change
+is involved. The next hosted head must supply fresh browser evidence.
