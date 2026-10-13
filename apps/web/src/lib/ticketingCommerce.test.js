@@ -41,10 +41,11 @@ describe('ticketing commerce transport and credentials', () => {
     expect(formatTicketMoney(25, 'JPY')).toMatch(/25/);
     expect(formatTicketMoney(1234, 'KWD')).toMatch(/1\.234/);
   });
-  it('only follows hosted Stripe checkout and dashboard links without URL credentials', () => {
+  it('accepts trusted account-custom Checkout URLs and rejects unsafe transports or credentials', () => {
     expect(safeCheckoutUrl('https://checkout.stripe.com/c/pay/cs_test_synthetic')).toBe('https://checkout.stripe.com/c/pay/cs_test_synthetic');
+    expect(safeCheckoutUrl('https://checkout.events.example.org/c/pay/cs_test_synthetic')).toBe('https://checkout.events.example.org/c/pay/cs_test_synthetic');
     expect(safeStripeDashboardUrl('https://dashboard.stripe.com/acct_test/test/payments/pi_synthetic')).toContain('dashboard.stripe.com');
-    for (const url of ['javascript:alert(1)', 'https://checkout.stripe.com.evil.test/pay', 'https://someone@checkout.stripe.com/pay', 'https://checkout.stripe.com:8443/pay', 'http://checkout.stripe.com/pay']) expect(safeCheckoutUrl(url)).toBeNull();
+    for (const url of ['javascript:alert(1)', '/pay/cs_test_synthetic', 'https://someone@checkout.stripe.com/pay', 'https://checkout.stripe.com:8443/pay', 'http://checkout.stripe.com/pay']) expect(safeCheckoutUrl(url)).toBeNull();
     expect(safeStripeDashboardUrl('https://dashboard.stripe.com.evil.test')).toBeNull();
   });
 });

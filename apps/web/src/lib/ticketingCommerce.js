@@ -74,12 +74,16 @@ export function formatTicketTime(value, timezone = 'UTC') {
   } catch { return parsed.toISOString(); }
 }
 
-/** Hosted Checkout only. A returned arbitrary URL must not become a payment handoff. */
+/**
+ * This value comes only from the verified server Checkout response. Stripe
+ * may return the merchant's custom domain; the browser validates transport,
+ * while the server establishes that the URL belongs to the saved Session.
+ */
 export function safeCheckoutUrl(value) {
   if (typeof value !== 'string' || !value.startsWith('https://')) return null;
   try {
     const url = new URL(value);
-    return url.hostname === 'checkout.stripe.com' && !url.username && !url.password && !url.port
+    return !url.username && !url.password && !url.port
       ? url.href : null;
   } catch { return null; }
 }
