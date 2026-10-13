@@ -93,6 +93,12 @@ const SECTIONS = Object.freeze([
         summary: 'Create, edit, preview, and publish sessions without breaking schedule references.',
       },
       {
+        source: 'docs/operator/stripe-ticketing.md',
+        route: 'stripe-ticketing/',
+        title: 'Stripe ticketing launch and support',
+        summary: 'Configure organizer-owned payments, verify readiness, and support orders and admission.',
+      },
+      {
         source: 'docs/operator/webmcp-diagnostics.md',
         route: 'webmcp-diagnostics/',
         title: 'Use read-only browser diagnostics',
