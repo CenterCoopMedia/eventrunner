@@ -20,10 +20,11 @@
 // sit in a hairline-ruled block tinted by --color-surface-alt, the same
 // device SignInPanel and the speaker-invite page use — never a shadowed,
 // rounded card.
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
-import EmptyState from '../components/EmptyState.jsx';
+import { useProfile } from '../contexts/ProfileContext.jsx';
+import SignInPanel from '../components/SignInPanel.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
 import { inputClass, primaryActionClass } from '../components/controlClasses.js';
 
@@ -33,35 +34,112 @@ const Panel = ({ children }) => (
   </div>
 );
 
+// Keep listening through the existing ProfileContext retry path. A bounded
+// wait also gives the attendee a recovery action without losing the reference.
+function PreparingAccount({ retryPath }) {
+  const [takingLonger, setTakingLonger] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setTakingLonger(true), 15_000);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <Panel>
+      <p role={takingLonger ? 'alert' : 'status'} className="text-text-primary">
+        {takingLonger
+          ? 'Your account is taking longer to load. Check your connection and reload this page, or contact the organizers if this continues.'
+          : 'Setting up your account. The claim form will appear when your account is ready.'}
+      </p>
+      {takingLonger ? <a href={retryPath} className={primaryActionClass}>Reload claim page</a> : null}
+    </Panel>
+  );
+}
+
 export default function TicketClaim() {
   const { user, loading: authLoading } = useAuth();
+  const { profile, status } = useProfile();
   const [searchParams] = useSearchParams();
 
-  // A confirmation link may suggest the reference; only the explicit submit
-  // below asks the server to claim anything for the verified account.
+  // Authentication stays on this page, preserving both the emailed reference
+  // and any edit. Only the explicit verified-account submit below claims it.
   const [orderNumber, setOrderNumber] = useState(() => (searchParams.get('order') || '').slice(0, 160));
+  const [reauthenticate, setReauthenticate] = useState(null);
+  const identity = user ? `${user.uid}:${user.email || ''}` : null;
+  if (authLoading) return null;
+
+  const needsSignIn = !user || !user.emailVerified || reauthenticate === identity;
+  if (needsSignIn) {
+    return (
+      <article className="mx-auto max-w-md">
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
+        <p className="my-md text-text-secondary" role={reauthenticate === identity && user ? 'alert' : undefined}>
+          {!user
+            ? 'Sign in to claim your ticket'
+            : reauthenticate === identity
+              ? 'Your sign-in could not be verified. Sign in again before claiming your ticket.'
+              : 'Verify your email before claiming your ticket. Sign in with Google or an emailed code below.'}
+        </p>
+        <SignInPanel key={identity || 'signed-out'} initialEmail={user?.email || ''} onSignedIn={() => setReauthenticate(null)} />
+      </article>
+    );
+  }
+
+  // A fresh sign-in can precede the auth trigger that creates users/{uid}.
+  // Also reject a prior account's profile during the subscription transition.
+  if (status !== 'ready' || profile?.id !== user.uid) {
+    const retryParams = new URLSearchParams(searchParams);
+    if (orderNumber || retryParams.has('order')) retryParams.set('order', orderNumber);
+    return (
+      <article className="mx-auto max-w-md">
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
+        <PreparingAccount key={identity} retryPath={`/ticket/claim?${retryParams.toString()}`} />
+      </article>
+    );
+  }
+
+  // Mount submission state per verified account. Signing out, switching
+  // accounts or losing the account document discards any old result.
+  return <ClaimForm key={identity} user={user} orderNumber={orderNumber} setOrderNumber={setOrderNumber} onRequireSignIn={() => setReauthenticate(identity)} />;
+}
+
+function ClaimForm({ user, orderNumber, setOrderNumber, onRequireSignIn }) {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null); // the server's success payload
   const [error, setError] = useState(null); // { message } — one shape, every cause
   const inputRef = useRef(null);
   const errorRef = useRef(null);
+  const active = useRef(true);
+  const inFlight = useRef(false);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
+  useEffect(() => {
+    if (error) errorRef.current?.focus();
+  }, [error]);
 
   const submit = useCallback(
     async (event) => {
       event.preventDefault();
+      if (inFlight.current || !active.current) return;
       const trimmed = orderNumber.trim();
       if (!trimmed) {
         setError({ message: 'Enter the order number from your confirmation email.' });
-        errorRef.current?.focus();
         return;
       }
       setError(null);
+      inFlight.current = true;
       setSubmitting(true);
       try {
         const idToken = await user.getIdToken();
+        if (!active.current) return;
         const claimed = await verifyTicketOrder({ orderNumber: trimmed, idToken });
-        setResult(claimed);
+        if (active.current) setResult(claimed);
       } catch (err) {
+        if (!active.current) return;
+        if ((err instanceof TicketClaimError && [401, 403].includes(err.status)) || (typeof err?.code === 'string' && err.code.startsWith('auth/'))) {
+          onRequireSignIn();
+          return;
+        }
         // Every server-side refusal (unknown order, wrong event, address
         // mismatch, already claimed) reaches here as the identical 404 —
         // see the module doc. A network failure gets its own honest
@@ -73,32 +151,13 @@ export default function TicketClaim() {
               ? 'We could not reach the server. Check your connection and try again.'
               : 'No ticket matches that order number. Check it against your confirmation email, or contact the organizers.',
         });
-        errorRef.current?.focus();
       } finally {
-        setSubmitting(false);
+        inFlight.current = false;
+        if (active.current) setSubmitting(false);
       }
     },
-    [orderNumber, user],
+    [orderNumber, user, onRequireSignIn],
   );
-
-  if (authLoading) return null;
-
-  if (!user) {
-    return (
-      <article className="mx-auto max-w-md">
-        <h1 className="font-heading text-h1 font-semibold text-text-primary">Claim your ticket</h1>
-        <EmptyState
-          title="Sign in to claim your ticket"
-          description="Claiming a ticket links it to your account, so it lives behind sign-in."
-          action={
-            <Link to="/signin" className={primaryActionClass}>
-              Sign in
-            </Link>
-          }
-        />
-      </article>
-    );
-  }
 
   if (result) {
     return (

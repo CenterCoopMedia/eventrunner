@@ -35,10 +35,15 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
   });
 
   test('an attendee claims a manual ticket, is approved, and bookmarks a session', async ({ page }) => {
-    // Sign in as the ticket-holder through the real OTP flow — the account
-    // this order's email address has to match to claim it.
+    // A confirmation deep link must survive real OTP authentication in place.
+    // Authentication and profile readiness must never submit the claim.
+    const claimRequests = [];
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.endsWith('/ticketingVerifyOrder')) claimRequests.push(request);
+    });
+    const claimPath = `/ticket/claim?order=${encodeURIComponent(orderId)}`;
     const since = mailFileSize();
-    await page.goto('/signin');
+    await page.goto(claimPath);
     const emailInput = page.locator('#signin-email');
     await emailInput.waitFor({ state: 'visible' });
     await emailInput.fill(email);
@@ -49,21 +54,16 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     expect(code, 'the OTP code was captured from the mail file').toBeTruthy();
     await codeInput.fill(code);
     await page.getByRole('button', { name: /^sign in$/i }).click();
-    // A successful verify lands on "/", but ProfileSetupRedirect
-    // (components/ProfileSetupRedirect.jsx) can immediately bounce a
-    // brand-new account on to "/profile" — waiting for "/" alone races
-    // that redirect and can time out even though sign-in succeeded.
-    // Either destination proves sign-in stuck; the explicit goto below
-    // moves on regardless of which one the SPA settled on.
-    await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/profile');
+    const orderInput = page.locator('#order-number');
+    await expect(orderInput).toBeVisible({ timeout: 15000 });
 
     // The claim endpoint requires users/{uid} to already exist —
     // applyTicketClaimToUser (functions/src/ticketing/registration.cjs)
     // no-ops on a missing account doc, silently burning the ticket's claim
     // without ever reaching "approved". That doc is seeded by the
     // onUserCreated auth trigger (functions/src/users/lifecycle.cjs)
-    // moments after sign-in, so without this wait the claim click can beat
-    // it. Poll for it directly rather than trusting a fixed delay.
+    // moments after sign-in. The claim page now gates on ProfileContext
+    // readiness; also prove that record exists before the explicit claim.
     const uid = await ensureUser(email);
     await expect
       .poll(async () => (await adminDb().collection('users').doc(uid).get()).exists, { timeout: 15000 })
@@ -72,12 +72,13 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     // Claim the ticket by order number (issue #33): every failure mode
     // answers the same 404 (module doc, apps/web/src/pages/TicketClaim.jsx),
     // so the one observable success path is the order being accepted.
-    await page.goto('/ticket/claim');
-    const orderInput = page.locator('#order-number');
-    await orderInput.waitFor({ state: 'visible' });
-    await orderInput.fill(orderId);
+    await expect(orderInput).toHaveValue(orderId);
+    await expect(page).toHaveURL((url) => `${url.pathname}${url.search}` === claimPath);
+    expect(claimRequests).toHaveLength(0);
+    expect((await adminDb().collection('tickets').doc(externalId).get()).data()?.claimedByUid).toBeNull();
     await page.getByRole('button', { name: /^claim ticket$/i }).click();
     await expect(page.getByRole('heading', { name: /ticket claimed/i })).toBeVisible();
+    expect(claimRequests).toHaveLength(1);
 
     // Server-side: the ticket is claimed, and — with autoApproveTicketHolders
     // seeded on — the account went straight to approved (functions/src/
