@@ -51,6 +51,23 @@ test('a ticketed deployment discloses the ticketing processor and refund policy'
   assert.match(registration.value, /refund/);
 });
 
+test('Stripe legal templates distinguish organizer registration from hosted payment processing', () => {
+  const legal = build({ ticketing: { provider: 'stripe' }, email: { provider: 'postmark' } });
+  const privacy = legal.privacy.find((block) => block.field === 'ticketing');
+  const terms = legal.terms.find((block) => block.section === 'terms_registration');
+  assert.ok(privacy && terms);
+  assert.match(privacy.value, /purchaser and attendee details on this event site/);
+  assert.match(privacy.value, /page hosted by Stripe/);
+  assert.match(privacy.value, /https:\/\/stripe.com\/privacy/);
+  assert.match(privacy.value, /does not receive or store full card numbers/);
+  assert.match(terms.value, /Test Operator sells the tickets/);
+  assert.match(terms.value, /refund/);
+  assert.match(terms.value, /Ticket transfer is unavailable/);
+  assert.doesNotMatch(privacy.value + terms.value, /Registration is handled through|PCI.compliant/i);
+  assert.ok(privacy.value.includes(REVIEW_MARKER) && terms.value.includes(REVIEW_MARKER));
+  assert.equal(legal.reviewRequired, true);
+});
+
 test('sign-in is described as emailed one-time codes — never a magic link', () => {
   const legal = build({ ticketing: { provider: 'none' }, email: { provider: 'console' } });
   const signin = legal.privacy.find((b) => b.field === 'signin');

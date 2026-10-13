@@ -206,6 +206,17 @@ test('Tier A wins on provider selection, and an answers-file override warns', ()
   assert.match(warnings.join(' '), /EVENT_EMAIL_PROVIDER/);
 });
 
+test('Stripe initialization mirrors deployment scope and refuses answers-file account or mode overrides', () => {
+  const { providers, warnings } = buildProviders({
+    tierA: { ...TIER_A, ticketingProvider: 'stripe', stripeAccountId: 'acct_fixture', stripeMode: 'test' },
+    overrides: { ticketing: { provider: 'eventbrite', stripeAccountId: 'acct_other', livemode: true } },
+  });
+  assert.deepEqual(providers.ticketing, { provider: 'stripe', externalEventId: 'ext-123',
+    stripeAccountId: 'acct_fixture', livemode: false, webhookRegisteredAt: null, webhookId: null });
+  assert.match(warnings.join(' '), /stripeAccountId/);
+  assert.match(warnings.join(' '), /livemode/);
+});
+
 test('admin emails are required and normalized', () => {
   const none = buildConfigDocs({ answers: { ...MINIMAL, adminEmails: [] }, tierA: TIER_A, now: () => 0 });
   assert.equal(none.ok, false);

@@ -279,6 +279,11 @@ function buildProviders({ tierA, overrides = {} }) {
       );
     }
   }
+  for (const key of ['externalEventId', 'stripeAccountId', 'livemode']) {
+    if (isPlainObject(over.ticketing) && over.ticketing[key] !== undefined) {
+      warnings.push(`providers.ticketing.${key}: ignored — event, Stripe account, and mode come from Tier A.`);
+    }
+  }
   return {
     providers: {
       email: {
@@ -288,6 +293,9 @@ function buildProviders({ tierA, overrides = {} }) {
       ticketing: {
         provider: tierA.ticketingProvider || 'none',
         externalEventId: tierA.ticketingEventId || null,
+        ...(tierA.ticketingProvider === 'stripe'
+          ? { stripeAccountId: tierA.stripeAccountId || null, livemode: tierA.stripeMode === 'live' }
+          : {}),
         webhookRegisteredAt: null,
         webhookId: null,
       },

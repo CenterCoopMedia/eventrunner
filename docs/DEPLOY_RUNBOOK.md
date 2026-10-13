@@ -206,8 +206,10 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_STORAGE_BUCKET` | the project's default Storage bucket |
 | `EVENT_ALLOWED_ORIGINS` | comma-separated CORS origins |
 | `EVENT_EMAIL_PROVIDER` | `postmark` \| `webhook`. `console` is valid only when the GitHub Environment name is exactly `demo` |
-| `EVENT_TICKETING_PROVIDER` | `eventbrite` \| `manual` \| `none` |
-| `EVENT_TICKETING_EVENT_ID` | required only when the ticketing provider is `eventbrite` |
+| `EVENT_TICKETING_PROVIDER` | `eventbrite` \| `stripe` \| `manual` \| `none` |
+| `EVENT_TICKETING_EVENT_ID` | Eventbrite event ID or stable internal event ID for Stripe; required for either provider |
+| `EVENT_STRIPE_ACCOUNT_ID` | organizer-owned `acct_…` account; required when the ticketing provider is `stripe` |
+| `EVENT_STRIPE_MODE` | explicit `test` or `live` when using Stripe; begin onboarding in `test` |
 | `EVENT_OPERATOR_NOTIFIER` | `webhook` \| `email` \| `none` |
 | `EVENT_APP_CHECK_ENFORCED` | `false` by default; set the App Check site key before changing this to `true` |
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | positive integer; defaults to `500` |
@@ -234,8 +236,8 @@ only the rows that apply to the providers selected above:
 | `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` (server token) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | `EVENT_EMAIL_PROVIDER = postmark` and delivery-event ingest is enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | `EVENT_EMAIL_PROVIDER = webhook` |
-| `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER != none` |
-| `TICKETING_WEBHOOK_SECRET` | ticketing provider implements `registerWebhook` (`eventbrite` — never `manual`) |
+| `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER = eventbrite` or `stripe`; Stripe requires a secret or restricted key matching `EVENT_STRIPE_MODE`. `manual` and `none` use no ticketing API token |
+| `TICKETING_WEBHOOK_SECRET` | `eventbrite` or `stripe`; for Stripe, use the signing secret generated for this deployed endpoint in the configured mode. `manual` and `none` use no webhook secret |
 | `OPERATOR_WEBHOOK_URL`, `OPERATOR_WEBHOOK_SECRET` | `EVENT_OPERATOR_NOTIFIER = webhook` |
 
 There is deliberately no `FIREBASE_SERVICE_ACCOUNT` secret in this list — WIF (§1–2) replaces the
@@ -601,6 +603,25 @@ client already past step 3 never needs it again.
   (dispatched from `main`), the attribute condition (§1) or the repository+ref binding (§2) is the
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
   run's log against what the binding names.
+
+### Archiving an event with ticket sales
+
+Pause new sales with the catalog's `salesPaused` setting while payment, held-capacity,
+refund, dispute, or reconciliation work remains. Keep the event writable until those
+obligations are settled and the existing `ticket_sync_queue` has no unresolved work.
+Then enable `config/event.historicalDemo` to freeze the archive.
+
+The archive flag stops native payment reconciliation, webhook queuing, and ticket
+synchronization. These paths read the persisted policy before provider work and include
+it in transactions that update orders, payment attempts, inventory, tickets, delivery
+claims, and queued work. Freezing with an open payment or hold can therefore leave its
+last local state unchanged even when Stripe later reports a payment or refund.
+
+If an event was frozen before its obligations were settled, an authorized operator must
+restore its writable policy and reconcile the existing orders before freezing it again.
+Keep the original provider, account, payment attempts, and inventory records throughout
+recovery; deleting a hold or making a replacement order does not establish the original
+payment's outcome.
 
 ## 7. Rotating access
 

@@ -216,6 +216,63 @@ beforeEach(() => {
 });
 
 describe('the proof', () => {
+  it('reports fonts that began loading between the preview render and event subscription', async () => {
+    await renderBranding({ ...PRESET_THEME, preset: 'civic', optionPicks: {} });
+    const chosen = screen.getByLabelText('Site style').value;
+    const originalDocument = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentDocument').get;
+    const face = { family: 'Merriweather', weight: '400', status: 'unloaded' };
+    const listeners = new Map();
+    let resolveReady;
+    const fontChecks = [];
+    const fonts = {
+      ready: new Promise((resolve) => { resolveReady = resolve; }),
+      check: (spec) => {
+        if (!spec.includes('Merriweather')) return true;
+        fontChecks.push(face.status);
+        return face.status === 'loaded';
+      },
+      forEach: (visit) => visit(face),
+      addEventListener: (type, listener) => {
+        // Layout requested the face after render read "unloaded", but its
+        // loading event was delivered before this effect could subscribe.
+        if (type === 'loading' && face.status === 'unloaded') face.status = 'loading';
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type).add(listener);
+      },
+      removeEventListener: (type, listener) => listeners.get(type)?.delete(listener),
+    };
+    const documentGetter = vi.spyOn(HTMLIFrameElement.prototype, 'contentDocument', 'get')
+      .mockImplementation(function () {
+        const doc = originalDocument.call(this);
+        if (doc && this.dataset.themeProof === PREVIEW_COMPARE_SCOPE_ID && !Object.hasOwn(doc, 'fonts')) {
+          Object.defineProperty(doc, 'fonts', { configurable: true, value: fonts });
+          const style = doc.createElement('style');
+          style.textContent = '@font-face { font-family: "Merriweather"; font-weight: 400; src: url("/fonts/merriweather-400-latin.woff2"); }';
+          doc.head.appendChild(style);
+        }
+        return doc;
+      });
+    try {
+      fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'compare' } });
+      expect(frame(PREVIEW_COMPARE_SCOPE_ID)).not.toBeNull();
+      expect(fontChecks).toContain('unloaded');
+      expect(face.status).toBe('loading');
+      expect(screen.getByText(/Merriweather weight 400 is still loading, so the/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Site style')).toHaveValue(chosen);
+
+      await act(async () => {
+        face.status = 'loaded';
+        for (const listener of listeners.get('loadingdone') || []) listener();
+        resolveReady();
+      });
+      expect(screen.queryByText(/still loading, so the/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/did not load, so the/)).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Site style')).toHaveValue(chosen);
+    } finally {
+      documentGetter.mockRestore();
+    }
+  });
+
   it('renders the client’s real page inside the frame, not swatches', async () => {
     await renderBranding();
     // The public shell, rendered by the app's own routes and components.

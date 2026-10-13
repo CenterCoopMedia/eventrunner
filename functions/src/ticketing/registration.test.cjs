@@ -15,6 +15,7 @@ const {
   createCreateUserFromTicketHandler,
   claimTicket,
   claimTicketsForUser,
+  applyTicketClaimToUser,
 } = require('./registration.cjs');
 const { createFakeTicketingProvider, fakeTicket } = require('./ticketingFake.cjs');
 
@@ -332,6 +333,35 @@ test('two concurrent claims on one ticket cannot both win', async () => {
 
   assert.deepEqual(ada, { claimed: false, reason: 'claimed_by_other' });
   assert.equal(db.read('tickets', 'tkt-1').claimedByUid, 'uid-bob');
+});
+
+test('a refund between the ticket claim and account update cannot grant admission', async () => {
+  const db = seededDb({ 'tickets/tkt-1': fakeTicket() });
+  const result = await claimTicketsForUser({
+    db, uid: 'uid-ada', email: 'attendee@example.com', externalIds: ['tkt-1'], now: () => T0,
+    getConfig: async () => {
+      await db.collection('tickets').doc('tkt-1').set({ status: 'refunded' }, { merge: true });
+      return { features: { autoApproveTicketHolders: true } };
+    },
+  });
+  assert.deepEqual(result.claimed, ['tkt-1']);
+  assert.equal(result.registrationStatus, 'pending');
+  assert.equal(result.changed, false);
+  assert.equal(db.read('users', 'uid-ada').approvalSource, null);
+});
+
+test('a refund concurrent with the account update forces a fresh valid-ticket check', async () => {
+  const db = seededDb({ 'tickets/tkt-1': { ...fakeTicket(), claimedByUid: 'uid-ada' } });
+  db.beforeCommit = async () => {
+    await db.collection('tickets').doc('tkt-1').set({ status: 'refunded' }, { merge: true });
+  };
+  const result = await applyTicketClaimToUser({
+    db, uid: 'uid-ada', now: () => T0,
+    getConfig: async () => ({ features: { autoApproveTicketHolders: true } }),
+  });
+  assert.deepEqual(result, { registrationStatus: 'pending', changed: false });
+  assert.equal(db.read('users', 'uid-ada').registrationStatus, 'pending');
+  assert.equal(db.read('users', 'uid-ada').approvalSource, null);
 });
 
 test('the account state is advanced once for a multi-ticket claim', async () => {

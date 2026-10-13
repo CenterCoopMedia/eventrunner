@@ -10,6 +10,7 @@
     "./pitch": { "require": "./src/pitch.cjs", "import": "./src/pitch.mjs" },
     "./time": { "require": "./src/time.cjs", "import": "./src/time.mjs" },
     "./registration": { "require": "./src/registration.cjs", "import": "./src/registration.mjs" },
+    "./ticketCommerce": { "require": "./src/ticketCommerce.cjs", "import": "./src/ticketCommerce.mjs" },
     "./badges": { "require": "./src/badges.cjs", "import": "./src/badges.mjs" },
     "./profile": { "require": "./src/profile.cjs", "import": "./src/profile.mjs" },
     "./slug": { "require": "./src/slug.cjs", "import": "./src/slug.mjs" },

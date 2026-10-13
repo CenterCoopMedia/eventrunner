@@ -8,6 +8,7 @@ const makeFakeDb = (seed = {}) => makeStoreDb({ 'config/event': {}, ...seed });
 const { createEventbriteProvider } = require('./providers/eventbrite.cjs');
 const { createManualProvider } = require('./providers/manual.cjs');
 const { createNoneProvider } = require('./providers/none.cjs');
+const { createStripeProvider } = require('./providers/stripe.cjs');
 const {
   sendRegistrationPrompt,
   createOnUserRegistrationPromptCreated,
@@ -16,6 +17,29 @@ const {
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const T0 = new Date('2026-08-20T10:00:00.000Z');
+
+test('registration prompt binds send-only email secrets and only eager provider credentials', () => {
+  const keys = ['EVENT_EMAIL_PROVIDER', 'EVENT_TICKETING_PROVIDER'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const secrets = () => Object.getOwnPropertyDescriptor(
+    require('./registrationPrompt.cjs').handlers.onUserRegistrationPromptCreated, '__endpoint',
+  ).value.secretEnvironmentVariables.map((entry) => entry.key).sort();
+  try {
+    process.env.EVENT_EMAIL_PROVIDER = 'postmark';
+    process.env.EVENT_TICKETING_PROVIDER = 'stripe';
+    assert.deepEqual(secrets(), ['EMAIL_PROVIDER_API_KEY']);
+    process.env.EVENT_TICKETING_PROVIDER = 'eventbrite';
+    assert.deepEqual(secrets(), ['EMAIL_PROVIDER_API_KEY', 'TICKETING_API_TOKEN', 'TICKETING_WEBHOOK_SECRET']);
+    process.env.EVENT_EMAIL_PROVIDER = 'webhook';
+    process.env.EVENT_TICKETING_PROVIDER = 'none';
+    assert.deepEqual(secrets(), ['EMAIL_WEBHOOK_SECRET', 'EMAIL_WEBHOOK_URL']);
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+});
 
 function user(overrides = {}) {
   return {
@@ -77,6 +101,16 @@ function manual(db, getConfig) {
 
 function none() {
   return createNoneProvider({});
+}
+
+function stripe(db, getConfig) {
+  return createStripeProvider({
+    db, getConfig,
+    env: {
+      EVENT_TICKETING_EVENT_ID: 'conference-1', EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture',
+      EVENT_STRIPE_MODE: 'test', EVENT_PUBLIC_URL: 'https://summit.example.org',
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -163,9 +197,27 @@ test('none: a brand-new signup gets nothing at all — send: false suppresses th
   assert.equal(calls.length, 0);
 });
 
+test('stripe: a signup without admission gets the catalog prompt without payment credentials', async () => {
+  const db = makeFakeDb({ 'users/uid-ada': user() });
+  const getConfig = async () => baseConfig();
+  const calls = [];
+  const result = await sendRegistrationPrompt({
+    db, provider: stripe(db, getConfig), sendEmail: makeSendEmail(calls), getConfig,
+    uid: 'uid-ada', now: () => T0, log: QUIET,
+  });
+  assert.equal(result.sent, true);
+  assert.equal(result.templateId, 'ticket.get_ticket');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].onceKey, 'get-ticket:uid-ada');
+  const catalogAnchor = calls[0].html.match(/<a href="([^"]+)"[^>]*>Choose tickets<\/a>/);
+  assert.ok(catalogAnchor, 'the catalog CTA is rendered');
+  assert.equal(catalogAnchor[1], 'https://summit.example.org/tickets');
+});
+
 for (const [label, makeProvider] of [
   ['eventbrite', (db, getConfig) => eventbrite(getConfig)],
   ['manual', (db, getConfig) => manual(db, getConfig)],
+  ['stripe', (db, getConfig) => stripe(db, getConfig)],
   ['none', () => none()],
 ]) {
   test(`${label}: a speaker never gets a registration prompt, whatever the provider (§3.5 universal skip)`, async () => {

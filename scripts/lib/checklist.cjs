@@ -57,6 +57,18 @@ function manualChecklist(ctx = {}) {
           title: 'Ticketing → upload the first attendee CSV',
           detail: 'The manual provider has no webhook to register; the CSV import is the equivalent step.',
         }
+        : ticketing === 'stripe'
+          ? {
+            title: 'Ticketing → configure the organizer Stripe account and hosted checkout',
+            detail:
+              'Start with EVENT_STRIPE_MODE=test and the organizer-owned EVENT_STRIPE_ACCOUNT_ID. ' +
+              'Bind the matching TICKETING_API_TOKEN in Secret Manager. Create the snapshot webhook endpoint ' +
+              'in Stripe Dashboard with the documented events. Bind its generated signing secret as ' +
+              'TICKETING_WEBHOOK_SECRET. Run scripts/register-ticketing-webhook.cjs and confirm a delivery ' +
+              'in getTicketingStatus. Configure the catalog currency, prices, capacity, sales windows, and refund terms. ' +
+              'Confirm tax and fee treatment. Keep sales paused until the sandbox purchase, refund, and recovery ' +
+              'checks in docs/DEPLOY_RUNBOOK.md pass.',
+          }
         : {
           title: 'Ticketing → create the API token, then register the webhook',
           detail:

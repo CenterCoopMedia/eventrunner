@@ -23,8 +23,8 @@
 
 const { createNoneProvider } = require('./none.cjs');
 
-/** The three valid EVENT_TICKETING_PROVIDER values (shared/config/deploy.cjs). */
-const PROVIDER_NAMES = ['eventbrite', 'manual', 'none'];
+/** Valid EVENT_TICKETING_PROVIDER values (shared/config/deploy.cjs). */
+const PROVIDER_NAMES = ['eventbrite', 'manual', 'none', 'stripe'];
 
 /**
  * Providers that implement `registerWebhook` (§3.3). This is a static
@@ -35,7 +35,7 @@ const PROVIDER_NAMES = ['eventbrite', 'manual', 'none'];
  * the same change; the registry contract test pins the two against each
  * other for every adapter present in the build.
  */
-const WEBHOOK_CAPABLE_PROVIDERS = new Set(['eventbrite']);
+const WEBHOOK_CAPABLE_PROVIDERS = new Set(['eventbrite', 'stripe']);
 
 /** Methods every TicketingProvider must implement (§3.3). */
 const REQUIRED_METHODS = ['verifyWebhook', 'fetchOrder', 'listTickets', 'getRegistrationPrompt'];

@@ -40,6 +40,8 @@ function getTierA(env = process.env) {
     emailProvider: get('EVENT_EMAIL_PROVIDER'),
     ticketingProvider: get('EVENT_TICKETING_PROVIDER'),
     ticketingEventId: get('EVENT_TICKETING_EVENT_ID'),
+    stripeAccountId: get('EVENT_STRIPE_ACCOUNT_ID'),
+    stripeMode: get('EVENT_STRIPE_MODE'),
     operatorNotifier: get('EVENT_OPERATOR_NOTIFIER'),
   };
 }
