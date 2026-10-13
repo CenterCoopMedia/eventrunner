@@ -316,8 +316,9 @@ function createSendOtpHandler({
 }
 
 /**
- * @param {{ db, auth: { getUserByEmail: (email: string) => Promise<{uid: string}>,
- *           createUser: (props: object) => Promise<{uid: string}>,
+ * @param {{ db, auth: { getUserByEmail: (email: string) => Promise<{uid: string, email: string, emailVerified: boolean}>,
+ *           createUser: (props: object) => Promise<{uid: string, email: string, emailVerified: boolean}>,
+ *           updateUser: (uid: string, props: object) => Promise<{uid: string, email: string, emailVerified: boolean}>,
  *           createCustomToken: (uid: string) => Promise<string> },
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
@@ -352,12 +353,25 @@ function createVerifyOtpHandler({ db, auth, now = Date.now, log = console }) {
     // can retry the same code instead of burning another rate slot.
     let token;
     try {
-      let uid;
+      let user;
       try {
-        uid = (await auth.getUserByEmail(verdict.email)).uid;
+        user = await auth.getUserByEmail(verdict.email);
       } catch (err) {
         if (err?.code !== 'auth/user-not-found') throw err;
-        uid = (await auth.createUser({ email: verdict.email, emailVerified: true })).uid;
+        user = await auth.createUser({ email: verdict.email, emailVerified: true });
+      }
+      const uid = user?.uid;
+      if (typeof uid !== 'string' || !uid || normalizeEmail(user.email) !== verdict.email) {
+        throw new Error('Auth account does not match verified challenge');
+      }
+      if (user.emailVerified !== true) {
+        // Ticket imports can create an unverified Auth account. The OTP proves
+        // this address, so bind the address and its verified flag in one write
+        // before minting a token. An update failure must not create a new UID.
+        user = await auth.updateUser(uid, { email: verdict.email, emailVerified: true });
+      }
+      if (user?.uid !== uid || normalizeEmail(user.email) !== verdict.email || user.emailVerified !== true) {
+        throw new Error('Auth account verification was not confirmed');
       }
       token = await auth.createCustomToken(uid);
     } catch (err) {
