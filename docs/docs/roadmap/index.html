@@ -81,6 +81,7 @@
         <ul>
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
           <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
+          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
           <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
@@ -170,6 +171,24 @@
           <li class="task-item"><input type="checkbox" disabled checked> Manual/CSV adapter</li>
           <li class="task-item"><input type="checkbox" disabled checked> Registration state machine</li>
           <li class="task-item"><input type="checkbox" disabled checked> Provider-owned registration prompts and ticket templates</li>
+          </ul>
+          <h3 id="native-stripe-ticket-commerce-implementation-in-review">Native Stripe ticket commerce — implementation in review<a class="heading-anchor" href="#native-stripe-ticket-commerce-implementation-in-review" aria-label="Link to this section">#</a></h3>
+          <p><a href="https://github.com/CenterCoopMedia/eventrunner/issues/483">Epic #483</a> extends the provider
+          layer with one organizer-owned Stripe account per deployment, a server-owned catalog,
+          capacity-safe hosted Checkout, authoritative reconciliation, purchaser/attendee separation,
+          and organizer admission/support controls. Existing Eventbrite, manual/CSV, none, and
+          external registration remain supported. The decision is recorded in
+          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0004-stripe-ticket-commerce.md">ADR 0004</a>; the
+          <a href="/eventrunner/docs/stripe-ticketing/">Stripe launch and support runbook</a> covers readiness,
+          credential rotation, retention, and incident handling.</p>
+          <p>Implementation review and synthetic CI are separate from a merchant&#39;s launch decision.
+          An authorized Stripe sandbox rehearsal, final live configuration, and written commercial
+          and retention approvals remain deployment requirements. No client credentials, real
+          payment rehearsal, or live sales are supplied by the epic&#39;s repository tests.</p>
+          <ul>
+          <li class="task-item"><input type="checkbox" disabled> Complete review and CI for native Stripe ticket commerce (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/483">#483</a>).</li>
+          <li class="task-item"><input type="checkbox" disabled> Embedded payment collection (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/325">#325</a>); the current implementation uses Stripe-hosted Checkout.</li>
+          <li class="task-item"><input type="checkbox" disabled> Day/session/material-specific ticket entitlements (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/326">#326</a>); MVP ticket types grant full-event admission.</li>
           </ul>
           <h2 id="m5-packaging-and-transfer-in-progress">M5: Packaging and transfer — in progress<a class="heading-anchor" href="#m5-packaging-and-transfer-in-progress" aria-label="Link to this section">#</a></h2>
           <p>Issues #92 and #79 moved to a new milestone, M5.1: Operator follow-ups, because they wait on a third party.</p>
