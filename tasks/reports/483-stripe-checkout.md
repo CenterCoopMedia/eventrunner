@@ -14,11 +14,14 @@ This branch alone does not meet the full epic. It does not claim browser, emulat
 - A paid reservation commits the exact Stripe request and idempotency key before calling Stripe. A lost response keeps the inventory held. Recovery sends the same request only within 23 hours. Later ambiguity requires operator review.
 - The existing `ticket_sync_queue` receives the order in the reservation transaction. Its scheduled reconciliation can recover an abandoned creation attempt. This branch adds no queue.
 - `ticket_inventory/purchaser_<hash>` holds the current order pointer and purchase window. It permits one active hold and five new orders per purchaser per hour. Retrying a saved order uses no quota. Operator comps are exempt and audited.
-- The tests cover request validation, scope and verified identity, integer prices, concurrent last-seat purchases, duplicate requests, uncertain responses, stale idempotency, free group claims, comps, rate limits, and inventory transitions.
+- Public checkout reads `users/{uid}` in the reservation transaction. Account deletion makes the transaction retry and refuse the reservation. A first sign-in waits for profile creation. Operator comps are exempt from this purchaser profile requirement.
+- The tests cover request validation, scope and verified identity, integer prices, concurrent last-seat purchases, duplicate requests, uncertain responses, stale idempotency, free group claims, comps, rate limits, account deletion, recovery on another device, and inventory transitions.
 
 ## API contracts
 
-`ticketingCheckout` accepts `{ requestId, lines: [{ ticketTypeId, quantity, attendees: [{ firstName, lastName, email }] }] }`. A purchaser can resume the saved order with `{ requestId, resume: true }`.
+`ticketingCheckout` accepts `{ requestId, lines: [{ ticketTypeId, quantity, attendees: [{ firstName, lastName, email }] }] }`. A purchaser can resume the saved order with `{ requestId, resume: true }` or `{ orderId, resume: true }`. A resume request must use one ID and no cart. Order IDs are checked for ownership before any provider work. A missing order and another purchaser’s order both return the same HTTP 404 response.
+
+An existing hold returns HTTP 409 with `error.code: purchase-in-progress` and the purchaser’s `error.existingOrderId`. The interface can use that ID to recover the same order on another device. A missing purchaser profile returns HTTP 503 with `error.code: account-not-ready`. Retrying after profile creation is safe.
 
 `ticketingOrderStatus` accepts `orderId` or the same purchaser’s `requestId`. An order redirect does not mark the order paid. Completed purchases use `status: paid` or `status: free` with `paymentStatus: succeeded`.
 
@@ -35,9 +38,9 @@ Rate exhaustion returns HTTP 429 with `error.code: rate-limited`, `error.retryAf
 
 ## Verification
 
-The final focused run after the rate-limit change passed 33 tests. The shared and ticketing unit run passed 504 tests. Targeted ESLint and `git diff --check` passed. These tests use Node 22 and repository Firestore fakes. No production credentials or payment calls were used.
+The final focused run passed 40 tests. The shared and ticketing unit run passed 511 tests. Targeted ESLint and `git diff --check` passed. The account-deletion and device-recovery regressions failed before the fixes. These tests use Node 22 and repository Firestore fakes. No production credentials or payment calls were used.
 
-The director must run the complete integrated checks after packing the shared package and regenerating required output. The initial implementation commit used the runtime git identity before the repository’s identity instruction was found. The director will correct that unpublished commit to the required Joe Amditis GitHub noreply identity. Later commits use the configured repository identity and a DCO sign-off.
+The director must run the complete integrated checks after packing the shared package and regenerating required output. The initial implementation commit used the runtime git identity before the repository’s identity instruction was found. The director corrected that unpublished commit to the required Joe Amditis GitHub noreply identity during integration. Later commits use the configured repository identity and a DCO sign-off.
 
 ## Integration review
 

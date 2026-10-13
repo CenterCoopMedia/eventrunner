@@ -2,7 +2,7 @@
 
 /** Server-authoritative catalog, reservations, Checkout, and purchaser recovery. */
 const {
-  CURRENCY_EXPONENTS, validateTicketCatalog, validateCheckoutRequest, isCommerceRequestId, isSalesWindowOpen,
+  CURRENCY_EXPONENTS, validateTicketCatalog, validateCheckoutRequest, isCommerceRequestId, isCommerceOrderId, isSalesWindowOpen,
 } = require('shared/ticketCommerce');
 const { verifyAuthToken } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
@@ -18,7 +18,6 @@ const ATTEMPT_LEASE_MS = 30 * 1000;
 const RETRY_BACKOFF_MS = 5 * 1000;
 const PURCHASER_WINDOW_MS = 60 * 60 * 1000;
 const MAX_PURCHASER_ORDERS = 5;
-const ORDER_ID = /^ord_[a-f0-9]{40}$/;
 
 function assertWritableEvent(event) {
   if (!event || typeof event !== 'object' || Array.isArray(event)
@@ -49,6 +48,10 @@ function handleError(res, err, log = console) {
     if (err.status === 429 && Number.isInteger(err.retryAfterSeconds)) {
       res.set('Retry-After', String(err.retryAfterSeconds));
       res.status(429).json({ error: { code: err.code, message: err.message, retryAfterSeconds: err.retryAfterSeconds } });
+      return;
+    }
+    if (err.code === 'purchase-in-progress' && isCommerceOrderId(err.existingOrderId)) {
+      res.status(err.status).json({ error: { code: err.code, message: err.message, existingOrderId: err.existingOrderId } });
       return;
     }
     sendError(res, err.status, err.code, err.message);
@@ -138,7 +141,7 @@ async function reserveCommerceOrder({
   db, provider, getConfig, actor, request, source = 'checkout', reason = '', now = () => new Date(), env = process.env,
 }) {
   const scope = providerScope(provider);
-  const id = orderIdFor(actor.uid, request.requestId);
+  const id = request.orderId || orderIdFor(actor.uid, request.requestId);
   const attemptId = attemptIdFor(id);
   const fingerprint = request.resume ? null : requestFingerprint(request, source, reason);
   const config = typeof getConfig === 'function' ? await getConfig() : {};
@@ -149,12 +152,22 @@ async function reserveCommerceOrder({
     const orderRef = db.collection(ORDERS).doc(id);
     const attemptRef = db.collection(ATTEMPTS).doc(attemptId);
     const eventRef = db.collection('config').doc('event');
-    const [existing, eventSnap] = await tx.getAll(orderRef, eventRef);
+    // Reading the profile in this transaction makes account deletion conflict
+    // with a new reservation. First sign-in can retry after profile creation.
+    const [existing, eventSnap, accountSnap] = await tx.getAll(
+      orderRef, eventRef, ...(comp ? [] : [db.collection('users').doc(actor.uid)]),
+    );
     assertWritableEvent(eventSnap.exists ? eventSnap.data() : null);
+    if (!comp && !accountSnap.exists) {
+      throw new CommerceError('account-not-ready', 'Your account is still being set up. Wait a moment and try again.', 503);
+    }
     if (existing.exists) {
       const order = existing.data();
+      if (order.purchaserUid !== actor.uid || order.source !== source) {
+        throw new CommerceError('not-found', 'Order not found.', 404);
+      }
       assertOrderScope(order, provider);
-      if (order.purchaserUid !== actor.uid || order.source !== source || (fingerprint && order.requestFingerprint !== fingerprint)) {
+      if (fingerprint && order.requestFingerprint !== fingerprint) {
         throw new CommerceError('idempotency-conflict', 'This request ID already belongs to a different order. Resume the original order.');
       }
       return { order, created: false };
@@ -172,10 +185,17 @@ async function reserveCommerceOrder({
     ]);
     if (purchaserSnap?.exists) {
       const previousId = purchaserSnap.data()?.orderId;
-      if (!ORDER_ID.test(previousId || '')) throw new CommerceError('inventory-invalid', 'This checkout needs organizer review.', 503);
+      if (!isCommerceOrderId(previousId)) throw new CommerceError('inventory-invalid', 'This checkout needs organizer review.', 503);
       const previous = await tx.get(db.collection(ORDERS).doc(previousId));
-      if (previous.exists && previous.data()?.inventoryState === 'held') {
-        throw new CommerceError('purchase-in-progress', 'Finish or expire your current checkout before starting another order.');
+      if (previous.exists) {
+        const order = previous.data();
+        if (order.purchaserUid !== actor.uid) throw new CommerceError('inventory-invalid', 'This checkout needs organizer review.', 503);
+        assertOrderScope(order, provider);
+        if (order.inventoryState === 'held') {
+          const error = new CommerceError('purchase-in-progress', 'Resume your current checkout before starting another order.');
+          error.existingOrderId = previousId;
+          throw error;
+        }
       }
     }
     const catalog = catalogValue(catalogSnap);
@@ -392,7 +412,7 @@ function createTicketingCheckoutHandler(deps) {
 
 async function readPurchaserOrder({ db, provider, actor, orderId, requestId, now = () => new Date() }) {
   const id = orderId || (isCommerceRequestId(requestId) ? orderIdFor(actor.uid, requestId) : null);
-  if (typeof id !== 'string' || !ORDER_ID.test(id)) throw new CommerceError('not-found', 'Order not found.', 404);
+  if (!isCommerceOrderId(id)) throw new CommerceError('not-found', 'Order not found.', 404);
   const ref = db.collection(ORDERS).doc(id);
   let snap = await ref.get();
   if (!snap.exists || snap.data()?.purchaserUid !== actor.uid) throw new CommerceError('not-found', 'Order not found.', 404);

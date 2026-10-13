@@ -12,6 +12,7 @@ const CURRENCY_MINIMUMS = Object.freeze({ usd: 50, cad: 50, eur: 50, gbp: 30, au
 const TAX_TREATMENTS = Object.freeze(['inclusive', 'not_collected']);
 const TYPE_ID = /^[a-z][a-z0-9_-]{0,47}$/;
 const REQUEST_ID = /^[a-zA-Z0-9_-]{16,100}$/;
+const ORDER_ID = /^ord_[a-f0-9]{40}$/;
 const RESERVED_IDS = new Set(['constructor', 'prototype', '__proto__']);
 
 function isTicketTypeId(value) {
@@ -20,6 +21,10 @@ function isTicketTypeId(value) {
 
 function isCommerceRequestId(value) {
   return typeof value === 'string' && REQUEST_ID.test(value);
+}
+
+function isCommerceOrderId(value) {
+  return typeof value === 'string' && ORDER_ID.test(value);
 }
 
 function integer(value, min, max) {
@@ -137,13 +142,20 @@ function normalizeAttendee(input) {
 function validateCheckoutRequest(input) {
   const issue = (message) => ({ ok: false, value: null, issues: [{ path: 'checkout', message }] });
   if (!input || typeof input !== 'object' || Array.isArray(input)) return issue('A checkout request is required.');
-  if (Object.keys(input).some((key) => !['requestId', 'lines', 'resume'].includes(key))) return issue('Checkout accepts ticket selections and attendee assignments only.');
-  if (!isCommerceRequestId(input.requestId)) return issue('A valid request ID is required.');
+  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume'].includes(key))) return issue('Checkout accepts ticket selections and attendee assignments only.');
   if (input.resume === true) {
     if (input.lines !== undefined) return issue('Resume uses the saved ticket selections.');
-    return { ok: true, value: { requestId: input.requestId, resume: true }, issues: [] };
+    if (!Object.hasOwn(input, 'requestId') && isCommerceOrderId(input.orderId)) {
+      return { ok: true, value: { orderId: input.orderId, resume: true }, issues: [] };
+    }
+    if (!Object.hasOwn(input, 'orderId') && isCommerceRequestId(input.requestId)) {
+      return { ok: true, value: { requestId: input.requestId, resume: true }, issues: [] };
+    }
+    return issue('Resume requires one valid order ID or request ID.');
   }
   if (input.resume !== undefined && input.resume !== false) return issue('Invalid resume value.');
+  if (Object.hasOwn(input, 'orderId')) return issue('An order ID can only resume a saved order.');
+  if (!isCommerceRequestId(input.requestId)) return issue('A valid request ID is required.');
   if (!Array.isArray(input.lines) || input.lines.length < 1 || input.lines.length > MAX_TICKET_TYPES) return issue('Choose at least one ticket type.');
   const seen = new Set();
   const lines = [];
@@ -175,6 +187,6 @@ function isSalesWindowOpen(object, at = new Date()) {
 module.exports = {
   MAX_TICKET_TYPES, MAX_ORDER_SEATS, MAX_CAPACITY, MAX_AMOUNT,
   CURRENCY_EXPONENTS, CURRENCY_MINIMUMS, TAX_TREATMENTS,
-  isTicketTypeId, isCommerceRequestId, normalizeAttendee,
+  isTicketTypeId, isCommerceRequestId, isCommerceOrderId, normalizeAttendee,
   validateTicketCatalog, validateCheckoutRequest, isSalesWindowOpen,
 };

@@ -90,6 +90,16 @@ test('resume accepts the original request ID without resending private attendee 
   assert.equal(validateCheckoutRequest(request({ resume: true })).ok, false);
 });
 
+test('cross-device resume accepts one opaque order ID but never mixes it with a new cart', () => {
+  const orderId = `ord_${'a'.repeat(40)}`;
+  assert.deepEqual(validateCheckoutRequest({ orderId, resume: true }), {
+    ok: true, value: { orderId, resume: true }, issues: [],
+  });
+  assert.equal(validateCheckoutRequest({ orderId: '../tickets', resume: true }).ok, false);
+  assert.equal(validateCheckoutRequest(request({ orderId })).ok, false);
+  assert.equal(validateCheckoutRequest({ orderId, requestId: request().requestId, resume: true }).ok, false);
+});
+
 test('ES module shim exposes the same commerce validator', async () => {
   const esm = await import('./ticketCommerce.mjs');
   assert.equal(esm.validateTicketCatalog, validateTicketCatalog);

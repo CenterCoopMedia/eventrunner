@@ -167,6 +167,51 @@ test('historical demo policy is read live even when the cached configuration des
   assert.equal(calls.length, 0);
 });
 
+test('a verified account waits for its profile before creating a checkout', async () => {
+  const { deps, db, calls } = setup();
+  await db.collection('users').doc(ADA.uid).delete();
+  const pending = await checkout(deps);
+  assert.equal(pending.statusCode, 503);
+  assert.equal(pending.body.error.code, 'account-not-ready');
+  assert.equal(db.ids('ticket_orders').length, 0);
+  assert.equal(db.ids('ticket_payment_attempts').length, 0);
+  assert.equal(db.ids('ticket_inventory').length, 0);
+  assert.equal(db.ids('admin_logs').length, 0);
+  assert.equal(calls.length, 0);
+  await db.collection('users').doc(ADA.uid).set({ registrationStatus: 'pending', approvalSource: null });
+  assert.equal((await checkout(deps)).statusCode, 200);
+  assert.equal(calls.length, 1);
+});
+
+test('profile deletion races abort new reservations before any payment or order data can be written', async () => {
+  const { deps, db, calls } = setup();
+  db.beforeCommit = async () => db.collection('users').doc(ADA.uid).delete();
+  const res = await checkout(deps);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.error.code, 'account-not-ready');
+  assert.equal(db.ids('ticket_orders').length, 0);
+  assert.equal(db.ids('ticket_payment_attempts').length, 0);
+  assert.equal(db.ids('ticket_inventory').length, 0);
+  assert.equal(db.ids('ticket_sync_queue').length, 0);
+  assert.equal(db.ids('admin_logs').length, 0);
+  assert.equal(calls.length, 0);
+});
+
+test('a missing purchaser profile blocks resume while operator comps need no purchaser profile', async () => {
+  const { deps, db, calls, advance } = setup({ create() { throw new Error('Unknown provider outcome'); } });
+  await checkout(deps);
+  await db.collection('users').doc(ADA.uid).delete();
+  advance(6000);
+  const resume = await checkout(deps, { requestId: request().requestId, resume: true });
+  assert.equal(resume.statusCode, 503);
+  assert.equal(resume.body.error.code, 'account-not-ready');
+  assert.equal(calls.length, 1);
+  assert.equal(db.read('ticket_inventory', 'current').held, 1);
+  const comp = await createCompOrder({ ...deps, actorUid: 'organizer-with-no-profile', ticketTypeId: 'general', attendees: [PERSON], requestId: 'organizer-comp-0001', reason: 'Approved press access' });
+  assert.equal(comp.status, 'free');
+  assert.equal(calls.length, 1);
+});
+
 test('concurrent purchasers racing the last seat cannot oversell event capacity', async () => {
   const { deps, db, calls } = setup({ catalogPatch: { capacity: 1 } });
   const results = await Promise.all([
@@ -197,6 +242,49 @@ test('a second distinct held checkout is blocked for the same purchaser', async 
   assert.equal(second.statusCode, 409);
   assert.equal(second.body.error.code, 'purchase-in-progress');
   assert.equal(db.ids('ticket_orders').length, 1);
+});
+
+test('a purchaser on another device can locate the held order and resume its existing Session', async () => {
+  const { deps, db, calls } = setup();
+  const first = await checkout(deps);
+  const blocked = await checkout(deps, request({ requestId: 'different-device-0002' }));
+  assert.equal(blocked.statusCode, 409);
+  assert.equal(blocked.body.error.existingOrderId, first.body.orderId);
+  const recovered = await checkout(deps, { orderId: first.body.orderId, resume: true });
+  assert.equal(recovered.statusCode, 200);
+  assert.equal(recovered.body.checkoutUrl, first.body.checkoutUrl);
+  assert.equal(calls.length, 1);
+  assert.equal(db.ids('ticket_orders').length, 1);
+});
+
+test('cross-device resume replays unknown creation and hides another purchaser’s order', async () => {
+  const { deps, db, calls, advance } = setup({ create({ params, options, calls: seen, sessions }) {
+    if (!sessions.has(options.idempotencyKey)) sessions.set(options.idempotencyKey, makeSession(params));
+    if (seen.length === 1) throw new Error('Connection lost after Session creation.');
+    return sessions.get(options.idempotencyKey);
+  } });
+  const initial = await checkout(deps);
+  advance(6000);
+  const foreign = await checkout(deps, { orderId: initial.body.orderId, resume: true }, 'bob');
+  const missing = await checkout(deps, { orderId: `ord_${'f'.repeat(40)}`, resume: true }, 'bob');
+  assert.equal(foreign.statusCode, 404);
+  assert.deepEqual(foreign.body, missing.body);
+  assert.equal(calls.length, 1);
+  const recovered = await checkout(deps, { orderId: initial.body.orderId, resume: true });
+  assert.equal(recovered.statusCode, 200);
+  assert.equal(recovered.body.orderId, initial.body.orderId);
+  assert.deepEqual(calls[0], calls[1]);
+  assert.equal(db.ids('ticket_orders').length, 1);
+});
+
+test('a corrupt purchaser pointer never discloses the other owner’s order reference', async () => {
+  const { deps, db } = setup();
+  const first = await checkout(deps);
+  await db.collection('ticket_orders').doc(first.body.orderId).set({ purchaserUid: BOB.uid }, { merge: true });
+  const response = await checkout(deps, request({ requestId: 'different-device-0002' }));
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.error.existingOrderId, undefined);
+  assert.equal(JSON.stringify(response.body).includes(first.body.orderId), false);
 });
 
 test('free orders have a per-purchaser hourly ceiling and old retries spend no quota', async () => {
