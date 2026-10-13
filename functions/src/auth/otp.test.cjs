@@ -544,22 +544,37 @@ test('sendOtpCode maps a failed provider send to 502', async () => {
 
 function fakeAuth() {
   const users = new Map(); // email -> uid
+  const records = new Map(); // uid -> Auth properties
+  const updates = [];
+  const minted = [];
   return {
-    users,
+    users, records, updates, minted,
     async getUserByEmail(email) {
       if (!users.has(email)) {
         const err = new Error('no user');
         err.code = 'auth/user-not-found';
         throw err;
       }
-      return { uid: users.get(email) };
+      return { email, emailVerified: false, ...records.get(users.get(email)), uid: users.get(email) };
     },
-    async createUser({ email }) {
+    async createUser(props) {
       const uid = `uid-${users.size + 1}`;
-      users.set(email, uid);
-      return { uid };
+      users.set(props.email, uid);
+      records.set(uid, { ...props, uid });
+      return { ...props, uid };
+    },
+    async updateUser(uid, props) {
+      updates.push({ uid, ...props });
+      const email = [...users].find(([, value]) => value === uid)?.[0];
+      assert.ok(email, 'only an existing account can be updated');
+      users.delete(email);
+      users.set(props.email || email, uid);
+      const updated = { ...records.get(uid), email: props.email || email, ...props, uid };
+      records.set(uid, updated);
+      return updated;
     },
     async createCustomToken(uid) {
+      minted.push(uid);
       return `custom-token-for-${uid}`;
     },
   };
@@ -575,6 +590,8 @@ test('verifyOtpCode: full round trip creates the user and returns a custom token
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.token, 'custom-token-for-uid-1');
   assert.equal(auth.users.get('a@example.org'), 'uid-1');
+  assert.equal(auth.records.get('uid-1').emailVerified, true);
+  assert.deepEqual(auth.updates, []);
 });
 
 test('verifyOtpCode: existing user is reused, not recreated', async () => {
@@ -586,6 +603,161 @@ test('verifyOtpCode: existing user is reused, not recreated', async () => {
   const res = fakeRes();
   await handler({ method: 'POST', body: { challengeId: token, email: 'A@Example.org', code: '123456' } }, res);
   assert.equal(res.body.token, 'custom-token-for-uid-existing');
+  assert.deepEqual(auth.updates, [{ uid: 'uid-existing', email: 'a@example.org', emailVerified: true }]);
+  assert.equal(auth.records.get('uid-existing').emailVerified, true);
+  assert.equal(auth.users.size, 1);
+});
+
+test('verifyOtpCode: a precreated unverified account is verified before its token is minted', async () => {
+  const db = fakeDb();
+  const auth = fakeAuth();
+  auth.users.set('a@example.org', 'uid-ticket-attendee');
+  auth.records.set('uid-ticket-attendee', { email: 'a@example.org', emailVerified: false });
+  let finishUpdate;
+  let started;
+  const updating = new Promise((resolve) => { started = resolve; });
+  const update = auth.updateUser;
+  auth.updateUser = async (uid, props) => {
+    started();
+    await new Promise((resolve) => { finishUpdate = resolve; });
+    return update(uid, props);
+  };
+  const mint = auth.createCustomToken;
+  auth.createCustomToken = async (uid) => {
+    assert.equal(auth.records.get(uid).emailVerified, true);
+    return mint(uid);
+  };
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  const handler = createVerifyOtpHandler({ db, auth });
+  const req = { method: 'POST', body: { challengeId: token, email: ' A@Example.org ', code: '123456' } };
+  const res = fakeRes();
+  const first = handler(req, res);
+  await Promise.race([updating, first]);
+  assert.equal(typeof finishUpdate, 'function', 'verified proof must reach the Auth verification update');
+  assert.deepEqual(auth.minted, []);
+  const replay = fakeRes();
+  await handler(req, replay);
+  assert.equal(replay.statusCode, 401, 'the in-flight verification keeps its challenge consumed');
+  finishUpdate();
+  await first;
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(auth.updates, [{ uid: 'uid-ticket-attendee', email: 'a@example.org', emailVerified: true }]);
+  assert.deepEqual(auth.minted, ['uid-ticket-attendee']);
+  assert.equal(db.store.has(`auth_challenges/${token}`), false);
+});
+
+test('verifyOtpCode: an already verified account needs no verification write', async () => {
+  const db = fakeDb();
+  const auth = fakeAuth();
+  auth.users.set('a@example.org', 'uid-existing');
+  auth.records.set('uid-existing', { email: 'a@example.org', emailVerified: true });
+  auth.updateUser = async () => assert.fail('already verified email must not be rewritten');
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  const res = fakeRes();
+  await createVerifyOtpHandler({ db, auth })({ method: 'POST', body: { challengeId: token, email: 'a@example.org', code: '123456' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.token, 'custom-token-for-uid-existing');
+});
+
+test('verifyOtpCode: wrong code or a different email cannot verify an existing account', async () => {
+  const db = fakeDb();
+  const auth = new Proxy({}, { get() { assert.fail('unproven OTP must never reach Auth'); } });
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  const handler = createVerifyOtpHandler({ db, auth });
+  for (const body of [{ email: 'a@example.org', code: '654321' }, { email: 'b@example.org', code: '123456' }]) {
+    const res = fakeRes();
+    await handler({ method: 'POST', body: { challengeId: token, ...body } }, res);
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.body.error.code, 'invalid-code');
+  }
+});
+
+test('verifyOtpCode: a lookup identity mismatch cannot verify or sign in an account', async () => {
+  for (const record of [
+    { uid: 'uid-existing', email: 'other@example.org', emailVerified: false },
+    { uid: '', email: 'a@example.org', emailVerified: false },
+  ]) {
+    const db = fakeDb();
+    const auth = fakeAuth();
+    auth.getUserByEmail = async () => record;
+    const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+    const res = fakeRes();
+    await createVerifyOtpHandler({ db, auth, log: { error() {} } })(
+      { method: 'POST', body: { challengeId: token, email: 'a@example.org', code: '123456' } }, res,
+    );
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(auth.updates, []);
+    assert.deepEqual(auth.minted, []);
+    assert.equal(db.store.get(`auth_challenges/${token}`).consumedAt, null);
+  }
+});
+
+test('verifyOtpCode: verification must confirm the same UID and proven email before token issuance', async () => {
+  for (const mismatch of [
+    { uid: 'uid-other' },
+    { email: 'other@example.org' },
+    { emailVerified: false },
+  ]) {
+    const db = fakeDb();
+    const auth = fakeAuth();
+    auth.users.set('a@example.org', 'uid-existing');
+    auth.updateUser = async () => ({ uid: 'uid-existing', email: 'a@example.org', emailVerified: true, ...mismatch });
+    const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+    const res = fakeRes();
+    await createVerifyOtpHandler({ db, auth, log: { error() {} } })(
+      { method: 'POST', body: { challengeId: token, email: 'a@example.org', code: '123456' } }, res,
+    );
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(auth.minted, []);
+    assert.equal(db.store.get(`auth_challenges/${token}`).consumedAt, null);
+  }
+});
+
+test('verifyOtpCode: verification update failures mint no token or replacement account and release the challenge', async () => {
+  for (const code of ['auth/internal-error', 'auth/user-not-found', 'auth/email-already-exists']) {
+    const db = fakeDb();
+    const auth = fakeAuth();
+    auth.users.set('a@example.org', 'uid-existing');
+    auth.createUser = async () => assert.fail('an update failure must not create a replacement account');
+    const update = auth.updateUser;
+    auth.updateUser = async () => { throw Object.assign(new Error('Synthetic Auth update failure'), { code }); };
+    const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+    const handler = createVerifyOtpHandler({ db, auth, log: { error() {} } });
+    const req = { method: 'POST', body: { challengeId: token, email: 'a@example.org', code: '123456' } };
+    const refused = fakeRes();
+    await handler(req, refused);
+    assert.equal(refused.statusCode, 500, code);
+    assert.deepEqual(refused.body, { error: { code: 'internal', message: 'Sign-in failed. Try again.' } });
+    assert.deepEqual(auth.minted, []);
+    assert.equal(db.store.get(`auth_challenges/${token}`).consumedAt, null);
+    auth.updateUser = update;
+    const retried = fakeRes();
+    await handler(req, retried);
+    assert.equal(retried.statusCode, 200);
+    assert.equal(retried.body.token, 'custom-token-for-uid-existing');
+  }
+});
+
+test('verifyOtpCode: a failed token mint retries the proven account without repeating verification', async () => {
+  const db = fakeDb();
+  const auth = fakeAuth();
+  auth.users.set('a@example.org', 'uid-existing');
+  const mint = auth.createCustomToken;
+  auth.createCustomToken = async () => { throw new Error('Synthetic token signing failure'); };
+  const { token } = await createChallenge({ db, email: 'a@example.org', code: '123456' });
+  const handler = createVerifyOtpHandler({ db, auth, log: { error() {} } });
+  const req = { method: 'POST', body: { challengeId: token, email: 'a@example.org', code: '123456' } };
+  const refused = fakeRes();
+  await handler(req, refused);
+  assert.equal(refused.statusCode, 500);
+  assert.equal(auth.records.get('uid-existing')?.emailVerified, true);
+  assert.equal(db.store.get(`auth_challenges/${token}`).consumedAt, null);
+  auth.createCustomToken = mint;
+  const retried = fakeRes();
+  await handler(req, retried);
+  assert.equal(retried.statusCode, 200);
+  assert.equal(auth.updates.length, 1);
+  assert.deepEqual(auth.minted, ['uid-existing']);
 });
 
 test('verifyOtpCode: wrong code, bad shapes, and replay all fail with one shape', async () => {
