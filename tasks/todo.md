@@ -1,5 +1,26 @@
 # Session task list
 
+## 2026-10-13: Stripe ticket commerce epic #483
+
+Goal: open the complete MVP implementation as a reviewable stack, address connector
+review threads, and finish with green required CI. Merchant configuration and live
+cutover are separate, as the epic states. Preserve existing providers and one queue.
+
+| Slice | Owner | State |
+| --- | --- | --- |
+| Catalog, checkout, holds, purchaser recovery | Checkout builder | Implemented; integration review |
+| Provider, webhook, reconciliation, claim races | Provider builder | Implemented; deployment wiring review |
+| Attendee and organizer UI, browser evidence | UI builder | Implemented; integration review |
+| Organizer APIs, email, rules, ADR/runbook, PR stack | Director | Integrating and validating |
+
+- [x] Read epic, related issues, contributor instructions, and ticketing architecture.
+- [x] Implement isolated slices with synthetic regression coverage and signed commits.
+- [x] Review payment/expiry, claim/refund, demo-write, and repeated-checkout races.
+- [ ] Verify complete integrated Node/web/rules/build/generated outputs.
+- [ ] Open foundation, organizer operations, and UI/runbook PRs in dependency order.
+- [ ] Resolve supported connector findings and verify CI on every final PR head.
+- [ ] Record hosted browser evidence and the separately unrun Stripe sandbox rehearsal.
+
 ## 2026-10-11: product trailer and task tutorials
 
 Goal: make a 45-second customer-facing trailer and three single-task tutorials,

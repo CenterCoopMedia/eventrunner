@@ -565,6 +565,10 @@ describe("server-only collections stay deny-all", () => {
     "tickets",
     "ticket_webhook_deliveries",
     "ticket_sync_queue",
+    "ticket_catalog",
+    "ticket_inventory",
+    "ticket_orders",
+    "ticket_payment_attempts",
   ]) {
     it(`denies all access to ${c}, admin included`, async () => {
       await assertFails(getDoc(doc(anon(), `${c}/d1`)));

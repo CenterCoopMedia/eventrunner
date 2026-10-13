@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Native Stripe ticket commerce, default closed until an operator publishes a
+  reviewed catalog. Verified purchasers receive server-priced, atomic reservations
+  with recoverable hosted Checkout; free and comp orders create one admission per
+  attendee. The existing webhook/sync queue reconciles merchant-scoped payments,
+  refunds, expiry, and disputes without duplicating seats or restoring cancelled
+  admission. ADR 0004 records the merchant, capacity, access, retention, and separate
+  launch decisions (#483, #325).
+
 - Account view switching for users with multiple attendee, speaker or admin roles. The selected
   view stays in the browser session, and multi-role admins can open Manage event from their
   attendee or speaker dashboard. Phone controls support browsers without native dialogs (#340).

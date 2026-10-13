@@ -621,6 +621,14 @@ service cloud.firestore {
     match /ticket_webhook_deliveries/{deliveryId} { allow read, write: if false; }
     match /ticket_sync_queue/{orderId} { allow read, write: if false; }
 
+    // Native checkout keeps financial records, immutable price snapshots,
+    // purchaser reservation pointers, and catalog authority behind handlers.
+    // Even an organizer browser must use the live role-checked HTTP API.
+    match /ticket_catalog/{catalogId} { allow read, write: if false; }
+    match /ticket_inventory/{inventoryId} { allow read, write: if false; }
+    match /ticket_orders/{orderId} { allow read, write: if false; }
+    match /ticket_payment_attempts/{attemptId} { allow read, write: if false; }
+
     // Everything not matched above stays deny-all.
     match /{document=**} {
       allow read, write: if false;

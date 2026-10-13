@@ -51,3 +51,24 @@ Event settings admit staff because dates, venue, places, tracks, the register li
 The shared package is packed into `vendor/shared.tgz` by `npm run prepare:functions` (also the `firebase.json` predeploy hook), because Firebase uploads only this directory — a workspace symlink does not survive the upload. The tarball is gitignored; `package-lock.json` pins its integrity hash, so a stale tarball is a loud lockfile mismatch. See spec §1.1.
 
 Tests live beside each module (`*.test.cjs`, `node --test`) and run with fakes — no emulator, no network. Modules take injected dependencies (`db`, `fetchImpl`, clocks); only `src/core/firestore.cjs` imports firebase-admin.
+
+## Stripe commerce
+
+`ticketingCatalog` is a public, redacted GET. `ticketingCheckout` accepts POST from
+a verified purchaser and computes prices/capacity on the server.
+`ticketingOrderStatus` accepts GET/POST for the owning verified purchaser only.
+Each is a domain factory in `src/ticketing/stripeCheckout.cjs`, with deploy wiring
+in `commerceHttp.cjs`. The SDK is pinned to Stripe 23.0.0; changing it requires
+checking the Checkout request and response contract again.
+
+Stripe uses the existing webhook and sync queue. Exact raw bytes, account/mode/event
+scope, persistent request keys, authoritative payment snapshots, refund records,
+and atomic inventory/ticket updates are required before admission. `eventbrite`,
+`manual`, and `none` remain supported. Provider construction does not eagerly load
+unrelated email secrets on purchaser reads; only send-capable handlers bind them.
+
+The private stores and launch decisions are documented in
+[ADR 0004](../docs/adr/0004-stripe-ticket-commerce.md). There is no catalog seed, new
+queue, Connect routing, or automatic migration. A missing/unpublished catalog keeps
+sales closed. Merchant setup, retention terms, a real Stripe test rehearsal, and
+live cutover remain operator responsibilities.
