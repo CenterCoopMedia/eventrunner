@@ -112,6 +112,27 @@ test('init seeds config, pages, and content, and exits 0 despite unmet readiness
   assert.match(output, /Legal review/);
 });
 
+test('a fresh Stripe deployment seeds its processor disclosure and prints its exact setup path', async () => {
+  const db = makeFakeDb();
+  const env = { ...ENV, EVENT_TICKETING_PROVIDER: 'stripe', EVENT_TICKETING_EVENT_ID: 'conference-1',
+    EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture', EVENT_STRIPE_MODE: 'test' };
+  const { getTierA } = require('../functions/src/core/config.cjs');
+  const { value, output } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs(), tierA: getTierA(env), env, now: () => 0,
+  }));
+  assert.equal(value, 0);
+  assert.equal(db.read('config', 'providers').ticketing.stripeAccountId, 'acct_fixture');
+  assert.equal(db.read('config', 'providers').ticketing.livemode, false);
+  const content = db.ids('cmsContent').map((id) => db.read('cmsContent', id).value).join('\n');
+  assert.match(content, /page hosted by Stripe/);
+  assert.match(content, /Test Operator sells the tickets/);
+  assert.match(output, /Stripe Dashboard/);
+  assert.match(output, /generated signing secret/);
+  assert.match(output, /EVENT_STRIPE_MODE=test/);
+  assert.equal(db.read('config', 'event').legal.reviewRequired, true);
+  assert.equal(db.ids('ticket_catalog').length, 0, 'initialization cannot invent commercial terms or open sales');
+});
+
 test('init seeds the two client-visible email_templates overrides (§5.1 step f)', async () => {
   const db = makeFakeDb();
   await quietly(() =>

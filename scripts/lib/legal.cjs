@@ -35,6 +35,7 @@ const REVIEW_MARKER = '[Client legal review required]';
 /** How each ticketing provider is described, or null for "do not mention". */
 const TICKETING_DISCLOSURE = Object.freeze({
   eventbrite: 'a third-party ticketing platform',
+  stripe: 'Stripe for payment processing',
   manual: null,
   none: null,
 });
@@ -152,10 +153,14 @@ function buildPrivacyBlocks(ctx) {
       section: 'privacy_sharing',
       field: 'ticketing',
       blockType: 'richtext',
-      value: clause(
-        `Registration is handled through ${ticketing}. Information you give that platform is covered ` +
-        'by its own privacy policy, and we receive the attendee details it passes back to us.',
-      ),
+      value: clause(ctx.ticketingProvider === 'stripe'
+        ? 'We collect purchaser and attendee details on this event site. We share the purchaser email address ' +
+          'and order details with Stripe to request payment. You enter payment details on a page hosted by Stripe. ' +
+          'This site keeps order references, amounts, payment, refund, and dispute status, and attendee assignments. ' +
+          'It does not receive or store full card numbers or card security codes. ' +
+          'Stripe describes its data handling at https://stripe.com/privacy.'
+        : `Registration is handled through ${ticketing}. Information you give that platform is covered ` +
+          'by its own privacy policy, and we receive the attendee details it passes back to us.'),
     });
   }
   return blocks;
@@ -224,10 +229,13 @@ function buildTermsBlocks(ctx) {
       section: 'terms_registration',
       field: 'tickets',
       blockType: 'richtext',
-      value: clause(
-        `Registration and any payment are handled through ${ticketing} under its own terms. ` +
-        '[Replace] State the refund and transfer policy for this event.',
-      ),
+      value: clause(ctx.ticketingProvider === 'stripe'
+        ? `${operator} sells the tickets and manages admission, support, and refund decisions. ` +
+          'Stripe processes card payments for the organizer. A payment receipt does not replace this site\'s ticket confirmation. ' +
+          'Ticket transfer is unavailable through this site. ' +
+          '[Replace] State refund eligibility, sales cutoffs, tax treatment, and any charges before opening sales.'
+        : `Registration and any payment are handled through ${ticketing} under its own terms. ` +
+          '[Replace] State the refund and transfer policy for this event.'),
     });
   }
   return blocks;

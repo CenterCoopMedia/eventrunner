@@ -43,6 +43,15 @@ test('getTierA parses and defaults', () => {
   assert.equal(tierA.ticketingEventId, null);
 });
 
+test('Stripe scope enters Tier A without reading any payment secret', () => {
+  const tierA = getTierA({ ...ENV, EVENT_TICKETING_PROVIDER: 'stripe',
+    EVENT_TICKETING_EVENT_ID: 'conference-1', EVENT_STRIPE_ACCOUNT_ID: ' acct_fixture ', EVENT_STRIPE_MODE: ' test ',
+    TICKETING_API_TOKEN: 'private-api-fixture', TICKETING_WEBHOOK_SECRET: 'private-webhook-fixture' });
+  assert.equal(tierA.stripeAccountId, 'acct_fixture');
+  assert.equal(tierA.stripeMode, 'test');
+  assert.doesNotMatch(JSON.stringify(tierA), /private-/);
+});
+
 test('loads all six config docs, missing docs become null (features {})', async () => {
   const db = fakeDb({ event: { name: 'E' }, providers: { email: { provider: 'console' } } });
   const config = await getEventConfig({ db, env: ENV });
