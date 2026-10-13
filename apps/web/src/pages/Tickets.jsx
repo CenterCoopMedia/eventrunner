@@ -97,6 +97,7 @@ export default function Tickets() {
   async function sendCheckout(body) {
     if (submittingRef.current || !user) return;
     const uid = user.uid;
+    const startingNewCheckout = !attempt && body.resume !== true;
     submittingRef.current = true;
     setBusy(true);
     setRequestError('');
@@ -123,13 +124,19 @@ export default function Tickets() {
           navigate(`/tickets/status?orderId=${encodeURIComponent(err.existingOrderId)}`);
           return;
         }
-        if (['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited'].includes(err.code)) {
+        const missingSavedCheckout = body.resume === true && err.status === 404 && err.code === 'not-found';
+        // A missing profile rejects a first submission before reservation. A
+        // retry can already hold seats from an earlier uncertain response.
+        const profileRejectedBeforeCreation = startingNewCheckout && err.code === 'account-not-ready';
+        if (missingSavedCheckout || profileRejectedBeforeCreation || ['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited'].includes(err.code)) {
           forgetCheckoutAttempt(uid);
           requestRef.current = null;
           setSaved({ uid, attempt: null });
           setLoadVersion((value) => value + 1);
         }
-        setRequestError(err.message || 'Checkout could not be opened. Retry the saved request.');
+        setRequestError(missingSavedCheckout
+          ? 'The saved checkout is not available to this account. Choose your tickets again.'
+          : err.message || 'Checkout could not be opened. Retry the saved request.');
       }
     } finally {
       if (activeUid.current === uid) {
