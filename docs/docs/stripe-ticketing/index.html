@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stripe ticketing launch and support — Event Runner documentation</title>
+  <meta name="description" content="Configure organizer-owned payments, verify readiness, and support orders and admission.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/stripe-ticketing/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Stripe ticketing launch and support — Event Runner documentation">
+  <meta property="og:description" content="Configure organizer-owned payments, verify readiness, and support orders and admission.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/stripe-ticketing/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Stripe ticketing launch and support — Event Runner documentation">
+  <meta name="twitter:description" content="Configure organizer-owned payments, verify readiness, and support orders and admission.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
+          <strong>Event Runner</strong>
+          <span class="brand-line">Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Stripe ticketing launch and support</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
+          <li><a href="/eventrunner/docs/stripe-ticketing/" aria-current="page" class="is-current">Stripe ticketing launch and support</a></li>
+          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Stripe ticketing: launch and support</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#1-name-the-owners-and-approve-the-offer">1. Name the owners and approve the offer</a></li>
+              <li><a href="#2-provision-an-isolated-test-deployment">2. Provision an isolated test deployment</a></li>
+              <li><a href="#3-generate-store-and-grant-access-to-secrets">3. Generate, store, and grant access to secrets</a></li>
+              <li><a href="#4-create-and-verify-the-snapshot-webhook">4. Create and verify the snapshot webhook</a></li>
+              <li><a href="#5-configure-and-open-the-catalog">5. Configure and open the catalog</a></li>
+              <li><a href="#6-support-the-payment-and-the-attendee-separately">6. Support the payment and the attendee separately</a></li>
+              <li><a href="#7-pause-rotate-credentials-and-recover-safely">7. Pause, rotate credentials, and recover safely</a></li>
+              <li><a href="#8-complete-a-retention-schedule-before-live-sales">8. Complete a retention schedule before live sales</a></li>
+              <li><a href="#9-keep-ci-evidence-and-stripe-rehearsal-evidence-separate">9. Keep CI evidence and Stripe rehearsal evidence separate</a></li>
+              <li><a href="#source-of-truth">Source of truth</a></li>
+            </ul>
+          </nav>
+          <p>Use this runbook for an event that explicitly selects the organizer-owned Stripe provider. <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0004-stripe-ticket-commerce.md">ADR 0004</a> defines the payment, admission, and recovery boundaries for <a href="https://github.com/CenterCoopMedia/eventrunner/issues/483">epic #483</a>. The <a href="/eventrunner/docs/deploy-runbook/">deploy runbook</a> remains the source for Firebase provisioning, runtime identity, Workload Identity Federation, and client deployment commands.</p>
+          <p>Merging the implementation does not authorize a Stripe account connection, a payment rehearsal, or live sales. Record the organizer&#39;s launch decision and complete the readiness evidence below before opening the catalog. The public demo and credential-free CI do not take real payments.</p>
+          <h2 id="1-name-the-owners-and-approve-the-offer">1. Name the owners and approve the offer<a class="heading-anchor" href="#1-name-the-owners-and-approve-the-offer" aria-label="Link to this section">#</a></h2>
+          <p>One deployment serves one event, one organizer-owned Stripe account, one explicit test/live mode, and one currency. There are no Connect transfers, platform fees, subscriptions, or invoice payments in this ticket flow. The purchaser pays through Stripe-hosted Checkout; Event Runner never collects card details.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Responsibility</th><th>Owner and access</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Merchant account, receipts, payout destination, refunds, disputes, and payment support</td><td>The organizer&#39;s authorized Stripe account administrator and finance contact. Record named primary and backup contacts.</td></tr>
+          <tr><td>Event deployment, Stripe credentials, webhook health, and reconciliation</td><td>The deployment operator with approved access to the client project and secret-management system.</td></tr>
+          <tr><td>Catalog publication, sales pause/reopen, complimentary admission, partial-refund admission allocation, and check-in correction</td><td>An Event Runner operator. A staff account cannot perform these actions.</td></tr>
+          <tr><td>Order/ticket support, attendee correction, confirmation resend, resync, ordinary cancellation, and check-in</td><td>Event Runner staff or operators. Cancelling already checked-in tickets requires an operator.</td></tr>
+          <tr><td>Retention, account-deletion requests, and event policy</td><td>The organizer&#39;s designated data/records owner, with the operator carrying out the approved procedure.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Before configuration, record the event&#39;s refund policy and deadline, support contact, currency, every advertised price, total capacity, per-type limits, sale windows, tax treatment, fee allocation, and who can approve complimentary admission. MVP currencies are USD, CAD, EUR, GBP, AUD, and NZD. Prices use two decimal places; the displayed total includes everything the attendee pays. The organizer absorbs processing fees. Choose <strong>Tax included in ticket prices</strong> or <strong>No tax collected for this event</strong> only after the organizer establishes the correct treatment; the application does not infer an exemption.</p>
+          <p>All ticket types grant the existing full-event entitlement. Describe early-bird and complimentary types accordingly. Embedded payment collection remains follow-on work in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/325">#325</a>; day/session/material-specific access remains in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/326">#326</a>.</p>
+          <h2 id="2-provision-an-isolated-test-deployment">2. Provision an isolated test deployment<a class="heading-anchor" href="#2-provision-an-isolated-test-deployment" aria-label="Link to this section">#</a></h2>
+          <p>Use a separate Firebase event/project and the organizer&#39;s Stripe sandbox for the authorized rehearsal. Keep its identities and data synthetic. Provision the final live event separately; copying test orders, inventory, attempts, or tickets into a live project is unsupported. After accepting orders, changing the merchant, event identity, currency, or provider requires a separately reviewed migration; a fresh event/project is the supported starting point.</p>
+          <p>Set the following non-secret values in the correct client GitHub Environment and operator process configuration. The deployment workflow passes the server values to functions. The catalog and private commerce records are never generated into the public site snapshot.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Variable</th><th>Required value</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>EVENT_TICKETING_PROVIDER</code></td><td><code>stripe</code></td></tr>
+          <tr><td><code>EVENT_TICKETING_EVENT_ID</code></td><td>A stable identifier for this event, using letters, digits, underscores, or hyphens. Keep it unchanged after orders exist.</td></tr>
+          <tr><td><code>EVENT_STRIPE_ACCOUNT_ID</code></td><td>The organizer account&#39;s <code>acct_…</code> identifier. The provider verifies it against the account owning the configured key.</td></tr>
+          <tr><td><code>EVENT_STRIPE_MODE</code></td><td>Explicitly <code>test</code> for rehearsal or <code>live</code> for the separately approved final deployment. Live mode is refused in emulators and demo deployments.</td></tr>
+          <tr><td><code>EVENT_PUBLIC_URL</code></td><td>The canonical HTTPS event origin used to build Checkout return links.</td></tr>
+          <tr><td><code>EVENT_ALLOWED_ORIGINS</code></td><td>The approved site origins for CORS.</td></tr>
+          <tr><td><code>EVENT_FIREBASE_PROJECT_ID</code>, <code>EVENT_FIREBASE_REGION</code></td><td>The intended event project and functions region; the region defaults to <code>us-central1</code>.</td></tr>
+          <tr><td>Email and operator-notifier settings</td><td>A working managed email provider and an operator notification destination, configured through the existing deploy runbook.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Verify that Google or emailed-code sign-in produces a verified account, that the public origin is authorized in Firebase Auth, and that sender-domain verification passes. Public purchasing requires an existing verified account. A newly created account whose profile has not finished initializing can retry the same saved attempt.</p>
+          <h2 id="3-generate-store-and-grant-access-to-secrets">3. Generate, store, and grant access to secrets<a class="heading-anchor" href="#3-generate-store-and-grant-access-to-secrets" aria-label="Link to this section">#</a></h2>
+          <p>Only the organizer&#39;s authorized Stripe administrator creates account credentials. In the intended sandbox/account, create a named restricted API key for this event integration. Start with no permissions and grant the capabilities below; use Stripe&#39;s request logs during the separately authorized rehearsal to confirm that each operation succeeds. The permission table is derived from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/functions/src/ticketing/providers/stripe.cjs">the provider&#39;s SDK calls</a>, not a claim that an untested restricted key is ready for launch. Stripe documents resource-level <strong>None</strong>, <strong>Read</strong>, and <strong>Write</strong> permissions in its <a href="https://docs.stripe.com/keys/restricted-api-keys">restricted-key guide</a>.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Stripe capability</th><th>Why the integration needs it</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Read the owning account</td><td><code>accounts.retrieve()</code> proves that the key belongs to <code>EVENT_STRIPE_ACCOUNT_ID</code>.</td></tr>
+          <tr><td>Write Checkout Sessions; read Sessions and line items</td><td>Creates/recovers hosted Checkout, can expire a Session, and verifies the saved purchase against provider state.</td></tr>
+          <tr><td>Read Prices and Products as required for expanded line items</td><td>Reconciliation compares the provider&#39;s line-item products and amounts with the immutable order snapshot. Confirm the permission requirements of inline <code>price_data</code> during rehearsal.</td></tr>
+          <tr><td>Read PaymentIntents and Charges</td><td>Verifies payment state and links relevant webhook events to the saved order.</td></tr>
+          <tr><td>Read Refunds and Disputes</td><td>Records individual refund/dispute outcomes and their admission implications.</td></tr>
+          <tr><td>Read Events</td><td>Retrieves the signed event through the configured merchant account before accepting its association.</td></tr>
+          <tr><td>Read Webhook Endpoints for the operator verification command</td><td>Confirms an enabled snapshot endpoint with the expected URL, account/mode, and event selection.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>The runtime has no reason to receive permissions for money refunds, payouts, account changes, or Connect transfers. Creating a webhook endpoint is a separate organizer Dashboard action. If a restricted key fails, inspect the denied operation and adjust only the reviewed scope. Do not quietly replace it with an unrestricted live key. The implementation accepts mode-matching <code>rk_…</code> or <code>sk_…</code> keys; any use of an unrestricted key needs the organizer&#39;s explicit access decision.</p>
+          <p>Store the API key as <strong><code>TICKETING_API_TOKEN</code></strong> in managed Secret Manager. Create the webhook endpoint described below and store its Stripe-generated signing secret as <strong><code>TICKETING_WEBHOOK_SECRET</code></strong>. A signing secret is distinct from an API key and belongs to that endpoint and mode; do not generate an arbitrary replacement string. No publishable Stripe key is needed in this hosted flow. See Stripe&#39;s <a href="https://docs.stripe.com/keys">key types</a> and <a href="https://docs.stripe.com/keys-best-practices">key-handling guidance</a>.</p>
+          <p>Use the approved secret-management interface or an approved secure input file to create/add a version. Do not put a secret value in a shell command, committed environment file, screenshot, issue, browser setting, or support message. The deploy workflow does not serialize Stripe secrets into public build variables or its functions environment file. Secret names and non-secret account identifiers may appear in the deployment record; values may not.</p>
+          <p>The secret writer needs permission to create/add the intended secret versions. Grant <code>roles/secretmanager.secretAccessor</code> on each payment secret to the <strong>function runtime service account</strong>, and retain the deploy identity&#39;s separate reference/access permissions from the deploy runbook. The repository uses the default compute runtime identity unless explicitly overridden. A successful deployment does not prove that runtime secret access works. Verify cold-start execution after the grant. Event Runner operator access alone does not grant Stripe or Google Cloud credential administration.</p>
+          <h2 id="4-create-and-verify-the-snapshot-webhook">4. Create and verify the snapshot webhook<a class="heading-anchor" href="#4-create-and-verify-the-snapshot-webhook" aria-label="Link to this section">#</a></h2>
+          <p>In the correct Stripe account and mode, create an enabled <strong>snapshot</strong> webhook endpoint for:</p>
+          <pre data-scroll-region data-scroll-label="Code example (text)"><code class="language-text">https://&lt;region&gt;-&lt;project&gt;.cloudfunctions.net/ticketingWebhook
+          </code></pre>
+          <p>Use the actual deployed URL if the event has an approved alternative front door. Preserve the exact raw request body and <code>Stripe-Signature</code> header. Do not substitute a thin-event destination or a proxy that parses and reserializes the body. Record the endpoint&#39;s API version with the release; change it only with a compatible SDK/code review and rehearsal.</p>
+          <p>Enable the provider&#39;s current <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/functions/src/ticketing/providers/stripe.cjs">required event list</a>:</p>
+          <pre data-scroll-region data-scroll-label="Code example (text)"><code class="language-text">checkout.session.completed
+          checkout.session.expired
+          checkout.session.async_payment_succeeded
+          checkout.session.async_payment_failed
+          payment_intent.succeeded
+          payment_intent.payment_failed
+          payment_intent.canceled
+          refund.created
+          refund.updated
+          refund.failed
+          charge.refunded
+          charge.dispute.created
+          charge.dispute.updated
+          charge.dispute.closed
+          charge.dispute.funds_withdrawn
+          charge.dispute.funds_reinstated
+          </code></pre>
+          <p>Bind the generated signing secret, deploy the compatible functions, and run the existing operator command with the event&#39;s non-secret environment and secrets supplied by the approved secret manager:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/register-ticketing-webhook.cjs
+          </code></pre>
+          <p><code>--callback-url</code> accepts an explicit HTTPS callback; <code>--no-write</code> performs verification without stamping Firestore. For Stripe, this command <strong>verifies an existing endpoint</strong>. It does not create the endpoint or reveal, generate, or rotate its signing secret. Success records <code>config/providers.ticketing.webhookRegisteredAt</code> and <code>webhookId</code>. It verifies configuration and the presence of a secret, not that the secret matches a delivered signature.</p>
+          <p>During the authorized rehearsal, create a test order through Event Runner and observe its actual signed delivery, accepted queue work, and final ticket state. A generic CLI fixture has no scoped Event Runner order metadata and cannot prove fulfillment. Use Stripe&#39;s resend facility on a matching test order to check replay. Confirm <strong>Provider status</strong>, recent delivery, pending work, and exhausted work in <strong>Ticketing</strong>. Registration timestamps and a green HTTP smoke check are insufficient by themselves. Stripe&#39;s <a href="https://docs.stripe.com/webhooks">webhook documentation</a> explains signatures, duplicate delivery, and ordering; Event Runner reconciles authoritative state instead of trusting delivery order.</p>
+          <h2 id="5-configure-and-open-the-catalog">5. Configure and open the catalog<a class="heading-anchor" href="#5-configure-and-open-the-catalog" aria-label="Link to this section">#</a></h2>
+          <p>Open <strong>Ticketing → Configure ticket catalog</strong> as an operator. Set <strong>Currency</strong>, <strong>Event capacity</strong>, <strong>Maximum tickets per order</strong>, <strong>Tax treatment</strong>, event sale windows, and <strong>Refund policy</strong>. Currency becomes fixed when the first catalog is saved. Times are entered in UTC with a preview in the event&#39;s timezone.</p>
+          <p>For each ticket type, set <strong>Ticket name</strong>, <strong>Price</strong>, <strong>Ticket-type capacity</strong>, <strong>Availability</strong>, quantity bounds, and any narrower sale window. Use a separate ticket type for an early-bird price; all types still share the event capacity. A <strong>Hidden — staff-issued only</strong> type stays out of public purchase selection and may be used for authorized comps. Retire a saved type by clearing <strong>Ticket type is active</strong>; historical orders keep its identity and price.</p>
+          <p>Keep <strong>Pause new sales</strong> checked while setting up. Confirm the written commercial decision before checking <strong>Commercial terms are approved for this event</strong>. Use <strong>Save catalog</strong>. If another operator changed the catalog, or the save response could not be confirmed, preserve or record your intended edits, then use <strong>Discard unsaved edits and reload catalog</strong> before submitting against the current revision. The reload reads the saved version; a failed reload preserves the draft.</p>
+          <p>New purchases are tied to the catalog version the attendee reviewed. If prices or terms change before reservation, the page reloads the offer and requires the attendee to accept the updated refund policy before submitting again. Existing saved orders keep their original prices and terms when resumed.</p>
+          <p>Before live sales, the launch record must contain:</p>
+          <ul>
+          <li>The named owners, approved offer, refund policy, tax/fee decision, and completed retention schedule in section 8.</li>
+          <li>Passing CI at the exact release commit, deployed rules/indexes/functions, runtime secret access, sender delivery, and a functioning operator notification route.</li>
+          <li>Passing evidence from every applicable authorized Stripe rehearsal scenario in section 9, with untested or unavailable cases explicitly identified and resolved before approval.</li>
+          <li>The correct final merchant, live mode, live credentials, endpoint, HTTPS origin, live-ready Stripe account, catalog revision, event capacity, and no copied test commerce records.</li>
+          <li>An incident contact, pause/rollback procedure, and the organizer&#39;s explicit approval to accept real payments.</li>
+          </ul>
+          <p>After approval, check <strong>Publish the catalog</strong>, save while paused, and use <strong>Review reopening sales → Reopen new sales</strong> with the release reason. Verify that <strong>Get tickets</strong> in the site header/home leads to <code>/tickets</code>, that the published offer and totals are correct, and that the workspace identifies <strong>Live payments</strong>. A test deployment identifies <strong>Test mode</strong>. Missing/unpublished catalogs, paused sales, closed windows, and exhausted capacity prevent new eligible purchases. These indicators do not replace the merchant&#39;s readiness decision.</p>
+          <h2 id="6-support-the-payment-and-the-attendee-separately">6. Support the payment and the attendee separately<a class="heading-anchor" href="#6-support-the-payment-and-the-attendee-separately" aria-label="Link to this section">#</a></h2>
+          <p>In <strong>Orders</strong>, use <strong>Find a purchaser or order</strong>, <strong>Payment state</strong>, <strong>Refund state</strong>, and <strong>Search orders</strong>. Open an order reference for <strong>Order details</strong>. In <strong>Admission tickets</strong>, use <strong>Find an attendee or ticket</strong> and the ticket/claim/check-in filters. <strong>Load more orders</strong> and <strong>Load more tickets</strong> continue the submitted filters; edit and submit a search to start a different result set.</p>
+          <p>Collect the order reference, ticket code where relevant, time, event/mode, and displayed error. Verify the requester through the normal account/support process. Never request card numbers, CVC, a secret key, a raw webhook body, or an authentication token. Purchaser financial details belong to the purchaser; an attendee&#39;s ticket assignment does not authorize disclosure of the rest of the order.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Situation</th><th>Attendee or purchaser guidance</th><th>Staff/operator response</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Checkout response lost or no payment URL</td><td>Use <strong>Resume existing checkout</strong> on <code>/tickets</code>, or <strong>Recover existing checkout</strong> on the order-status page. Keep the same saved purchase.</td><td>Find the order and use <strong>Resync this order</strong>. A creation timeout retains capacity. Recovery uses the exact saved provider request/key; after the 23-hour safe recovery boundary, escalate the exception for reviewed resolution. Do not create a replacement payment or delete the hold to clear the screen.</td></tr>
+          <tr><td>A different device finds a purchase already in progress</td><td>Sign in as the same verified purchaser; the site opens that purchaser&#39;s existing order.</td><td>Confirm ownership and the existing reference. Possession of an order ID or Checkout Session ID is not authorization.</td></tr>
+          <tr><td>Card declined while the order is still pending</td><td>Use <strong>Continue your existing Stripe checkout</strong> to try again within that Session.</td><td>A failed payment attempt does not close an open Session or free its reserved seats. Do not tell the purchaser to start another order.</td></tr>
+          <tr><td>Returned from Stripe, closed the window, or status is pending</td><td>Use <strong>Check payment status</strong> and allow confirmation to finish. A return link is not a receipt or admission.</td><td>Compare the order with <strong>Open this payment in Stripe Dashboard</strong>, then <strong>Resync this order</strong>. Check delivery and queue health. Processing/conflicting evidence retains capacity and may require operator review.</td></tr>
+          <tr><td>Order is expired</td><td>After server-confirmed closure, <strong>Choose tickets for a new order</strong> starts a new selection.</td><td>Reconciliation releases a held seat once only after authoritative expiry with no payment still able to complete. Browser time, a cancel redirect, or an expired worker lease cannot release it.</td></tr>
+          <tr><td>Paid/free order but recipient cannot claim</td><td>The recipient uses <code>/ticket/claim</code> with the order reference and the verified email assigned to that seat; then <strong>View and print your tickets</strong> opens <code>/tickets/mine</code>.</td><td>Check each seat&#39;s assignment and current validity. Use <strong>Correct attendee</strong> for a spelling/address correction on an unused, unclaimed ticket. Claimed or checked-in tickets allow name correction only. There is no in-app transfer workflow.</td></tr>
+          <tr><td>Confirmation did not arrive or the send outcome is uncertain</td><td>The purchaser can still open their order status; a claimed attendee can open <strong>Your tickets</strong>.</td><td>Check <strong>Email log</strong>, provider delivery/suppression, and recipient spelling before <strong>Resend ticket confirmation</strong>. A retry of the same resend request uses the same key. Investigate an uncertain send before intentionally issuing another resend. Payment receipts are managed by Stripe; Event Runner sends ticket/claim messages.</td></tr>
+          <tr><td>Attendee cannot attend; no money action approved</td><td>Explain the event&#39;s refund policy before changing admission.</td><td>Select the exact tickets, use <strong>Review ticket cancellation</strong>, read the order/amount/admission warning, add a reason, and confirm. Cancellation removes admission without sending money or restocking. Used tickets require an operator.</td></tr>
+          <tr><td>Full money refund approved or observed</td><td>Refer payment timing/questions to the organizer&#39;s finance contact.</td><td>The authorized organizer issues the refund in Stripe Dashboard. Use <strong>Resync this order</strong> and inspect <strong>Refund history</strong>. A succeeded full refund invalidates all seats; pending/failed refunds do not prove that money was returned.</td></tr>
+          <tr><td>Partial money refund succeeded</td><td>Explain which admission, if any, changes under the organizer&#39;s decision.</td><td>An operator selects <strong>Refund to allocate</strong> and affected tickets, or explicitly checks <strong>Keep every ticket valid</strong> for a price adjustment. Use <strong>Review refund allocation</strong>, provide a reason, and confirm. No refund money is created here, and no admission is guessed from an amount alone.</td></tr>
+          <tr><td>Refund pending, requires action, failed, or canceled</td><td>Avoid promising completion until the provider confirms it.</td><td>Inspect the individual refund state in Stripe Dashboard and the order, resync after correction, and resolve any exception. These states do not automatically remove valid tickets.</td></tr>
+          <tr><td>Payment disputed</td><td>Direct payment-case correspondence to the authorized merchant contact.</td><td>Review <strong>Payment disputes</strong>, respond in Stripe Dashboard, and record an explicit admission decision under event policy. A dispute does not silently cancel admission or authorize an in-app payout action.</td></tr>
+          <tr><td>Duplicate, invalid, or mistaken check-in</td><td>Present the human-readable ticket code; online validation remains authoritative.</td><td>Use <strong>Ticket code for check-in → Check in attendee</strong>. An already-used result does not create another check-in. An operator can use <strong>Review check-in correction → Undo recorded check-in</strong>, with a reason. Investigate an invalid ticket before admission.</td></tr>
+          <tr><td>Complimentary admission approved</td><td>Each named recipient still needs to claim with their verified email.</td><td>An operator opens <strong>Issue complimentary admission</strong>, supplies attendee details/reason, then <strong>Review complimentary tickets</strong> and the final issue confirmation. Comps consume real capacity. Retry a failed confirmation with its saved request; after a lost response or reload, inspect orders before intentionally issuing another comp.</td></tr>
+          <tr><td>Queue exhausted, conflicting amount/currency/account, or unresolved exception</td><td>Ask the purchaser to wait for the named support contact rather than paying again.</td><td>Pause new sales if the fault is systemic. Inspect the redacted exception, provider state, and audit trail; preserve the business records and alert evidence. Resync only after correcting the cause. Do not set paid/valid flags or inventory counters by hand.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Public purchasers can have one unresolved reserved order and create at most five new orders per hour; retries are exempt. A rate-limit refusal creates no new order. Explain the cooldown and preserve an already-known order rather than using another account to bypass the limit.</p>
+          <p>Original order amounts remain historical financial facts after cancellation, refund allocation, or attendee correction. A cancelled/refunded seat remains sold for capacity purposes in this MVP. Locally removed admission is not revived by later provider delivery. Account approval granted or revoked explicitly by an admin retains its existing precedence over ticket-derived approval.</p>
+          <h2 id="7-pause-rotate-credentials-and-recover-safely">7. Pause, rotate credentials, and recover safely<a class="heading-anchor" href="#7-pause-rotate-credentials-and-recover-safely" aria-label="Link to this section">#</a></h2>
+          <p>For an incident or planned maintenance, use <strong>Review pausing sales → Pause new sales</strong>, enter the reason, and confirm. This stops new purchases. Existing Checkout Sessions may still complete; signed webhooks, the existing queue worker, reconciliation, email, order status, and check-in must remain available.</p>
+          <p>Rollback to a compatible build that still understands the saved Stripe order/attempt schema. Keep <code>EVENT_TICKETING_PROVIDER=stripe</code>, the same merchant/event/mode, secrets, endpoint, and durable records while obligations remain. Reverting to a build without the adapter, switching to <code>none</code> or Eventbrite, deleting the queue, clearing inventory, or changing event identity does not cancel payments. Before reopening, resolve every affected hold/payment, confirm queue health and notifications, reconcile a known order, and record the recovery decision.</p>
+          <p>Historical-demo mode freezes ticketing writes, including webhook intake and reconciliation. Do not use it to pause sales. Enable it only after accepted payment, refund, dispute, and support obligations are settled. Use the sales-pause control while existing payments still need to converge.</p>
+          <p>For a routine API-key rotation, create a replacement with the same reviewed account/mode/scope, save a new <code>TICKETING_API_TOKEN</code> version, redeploy every function that binds it, and verify successful account/Session/financial reads before retiring the previous key. Coordinate overlapping function revisions with the organizer&#39;s key-expiry schedule. Stripe&#39;s <a href="https://docs.stripe.com/keys#rolling-keys">API-key rotation procedure</a> describes the current Dashboard options. If compromise is suspected, revoke the exposed key through the organizer&#39;s incident procedure immediately and accept a paused-sales outage while replacement access is restored.</p>
+          <p>For a webhook-secret rotation, the organizer uses the endpoint&#39;s <strong>Roll secret</strong> action. Stripe supports an overlap in which it signs with both active secrets. Bind the new value to <code>TICKETING_WEBHOOK_SECRET</code>, redeploy every consumer, verify a real matching signed delivery, and retire the old secret after all consumers have moved within the chosen overlap. The application validates one configured secret per instance; old and new instances can coexist only while Stripe supplies valid signatures for each. Keep reconciliation running and request provider redelivery for any missed events after recovery. See <a href="https://docs.stripe.com/webhooks#roll-endpoint-secrets">Stripe&#39;s signing-secret rotation guidance</a>.</p>
+          <p>Record the credential owner, secret version identifiers, scope review, deployment commit, verification time/result, and old-key retirement time. Never record the values. Test keys, live keys, and endpoint secrets are separate; rotating one is not evidence that the others changed.</p>
+          <h2 id="8-complete-a-retention-schedule-before-live-sales">8. Complete a retention schedule before live sales<a class="heading-anchor" href="#8-complete-a-retention-schedule-before-live-sales" aria-label="Link to this section">#</a></h2>
+          <p>The organizer must supply a written <strong>duration, unit, start trigger, owner, exception/legal-hold process, and deletion or minimization method for each category</strong> below. Blank entries, “keep as needed,” or one blanket order TTL do not satisfy launch readiness. Agree the durations with the organizer&#39;s records/privacy advisers; this repository does not select an accounting or legal retention period for them.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Category</th><th>Required duration decision</th><th>Current behavior and constraints</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Financial order facts and minimal provider/uniqueness IDs</td><td><code>___ years after ___</code>; finance/records owner</td><td>No automatic commerce purge. Preserve unresolved payment/refund/dispute obligations and required history. Never remove the durable order uniqueness guard merely because a short-lived webhook record expired.</td></tr>
+          <tr><td>Attendee names/emails, seat assignments, and claim/check-in history</td><td><code>___ days/months after ___</code>; event/data owner</td><td>Private operational records remain after account deletion. Approve a scoped correction/minimization procedure that respects business obligations and access/audit consistency.</td></tr>
+          <tr><td>Payment-attempt parameters, return/Checkout URLs, and creation evidence</td><td><code>___ hours/days after resolution</code>; operator with records owner</td><td>Preserve unresolved recovery evidence. The 23-hour safe creation-retry boundary is not permission to delete an unresolved attempt. After the approved interval, review minimization of expired URLs/PII while retaining replay-safe identifiers.</td></tr>
+          <tr><td>Webhook deduplication receipts</td><td><code>___ days after receipt</code>; operator</td><td>Confirm the actual deployed TTL/maintenance policy. This feature adds no blanket receipt purge. Receipt removal must not make an old payment create a new ticket or erase order uniqueness.</td></tr>
+          <tr><td>Pending/exhausted reconciliation and incident evidence</td><td><code>___ days after reviewed resolution</code>; operator</td><td>Active queue work must remain until resolved; exhausted work remains for diagnosis. Preserve incident evidence while an obligation or hold is open.</td></tr>
+          <tr><td>Organizer audit history</td><td><code>___ years/months after action or event closure</code>; records owner</td><td>Actor, time, affected IDs, and reason remain private. No new audit purge is supplied. Avoid attendee details in free-text reasons unless necessary.</td></tr>
+          <tr><td>Sent-email delivery log</td><td>Confirm the existing <strong>90 days after sending</strong>, or commission a reviewed policy change; email/records owner</td><td>Existing scheduled maintenance removes old sent-email rows. Ticket email bodies are not retained. This does not erase the order, ticket, provider receipt, or organizer audit.</td></tr>
+          <tr><td>Stripe-side payment/receipt records and support exports</td><td>Written merchant policy for each system/copy; finance/data owner</td><td>The organizer controls Stripe and any approved export. Event Runner account deletion does not delete those records.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Account deletion releases ticket claims and removes the account&#39;s documented profile/access data; it is not represented as erasure of a purchase. Before any maintenance deletion, inventory unresolved obligations, identify holds/exceptions, verify backup and audit implications, define scope, and obtain the records owner&#39;s approved procedure. No generic retention job is added by this feature. Record when the schedule will next be reviewed.</p>
+          <h2 id="9-keep-ci-evidence-and-stripe-rehearsal-evidence-separate">9. Keep CI evidence and Stripe rehearsal evidence separate<a class="heading-anchor" href="#9-keep-ci-evidence-and-stripe-rehearsal-evidence-separate" aria-label="Link to this section">#</a></h2>
+          <p>Credential-free tests use synthetic identities, fake provider responses, and emulator sign-in. They cover catalog validation, forged prices/ownership, capacity races, stable recovery IDs, signed-payload/replay handling, reconciliation/refund invariants, role gates, verified claims, demo restrictions, and UI behavior. The browser suite <code>e2e/stripe-ticketing-ui.spec.js</code> captures ticket selection, confirmation/print, and organizer dialogs at desktop, phone, and narrow widths under <code>test-results/admin-visual-evidence</code>. These tests make no real Stripe call and do not establish merchant readiness.</p>
+          <p>A separately authorized rehearsal against the organizer&#39;s Stripe sandbox must record the release commit, test account/mode, catalog revision, synthetic order references, each scenario&#39;s result, responsible reviewer, and redacted evidence:</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Rehearsal</th><th>Evidence to collect</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Ordinary purchase, free order, and comp</td><td>Correct amounts/currency; one ticket per seat; no Stripe payment for free/comp; accurate inventory and recipient assignment.</td></tr>
+          <tr><td>Authentication/3DS and decline</td><td>Actual hosted provider behavior; a failed attempt resumes the same open Session without duplicate holds or charges.</td></tr>
+          <tr><td>Lost create response, reload, and another device</td><td>One durable attempt/order, exact saved-request recovery, and preserved capacity; purchaser ownership remains enforced.</td></tr>
+          <tr><td>Redirect before webhook, duplicate/reordered delivery, and replay</td><td>No admission from the return URL; authoritative final state; stable ticket IDs; no repeated capacity transition or claim.</td></tr>
+          <tr><td>Expiry and unresolved payment</td><td>Provider-confirmed expiry releases once; processing/unknown/conflicting state retains a hold and produces the expected support exception.</td></tr>
+          <tr><td>Full/partial refunds and pending/failed/requires-action states</td><td>Individual provider refund facts; full refund invalidation; explicit partial-refund admission choice; no false invalidation or restocking. Mark any provider state that cannot be induced as unrun and resolve that evidence gap before launch approval.</td></tr>
+          <tr><td>Disputes and operator notification</td><td>Merchant-case handoff, visible redacted exception, notification receipt, and no automatic admission cancellation.</td></tr>
+          <tr><td>Claim, group recipients, corrections, and email</td><td>Verified attendee isolation, purchaser-only financial details, one-person print view, protected claimed/used email, actual managed-email delivery, and a distinct Stripe payment receipt.</td></tr>
+          <tr><td>Sales pause, compatible rollback, and rotation</td><td>Existing Sessions still reconcile while intake is closed; new credentials verify correctly; missed delivery can be recovered without duplicate admission.</td></tr>
+          <tr><td>Check-in and correction</td><td>Online duplicate detection, invalid-ticket handling, operator-only undo, and audit evidence.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p><strong>No real Stripe rehearsal is supplied by this implementation&#39;s synthetic test results.</strong> Do not mark an unrun scenario passed or infer live readiness from a screenshot, a webhook registration stamp, or a successful build. Keep card data, secrets, raw provider payloads, and identifiable purchaser details out of PR artifacts. Live charges or refunds require their own organizer authorization; test-mode rehearsal permission does not authorize them.</p>
+          <h2 id="source-of-truth">Source of truth<a class="heading-anchor" href="#source-of-truth" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0004-stripe-ticket-commerce.md">ADR 0004</a>: decision, invariants, commercial boundaries, and follow-on scope.</li>
+          <li><a href="/eventrunner/docs/admin-guide/#ticketing">Admin guide: Ticketing</a>: day-to-day controls and roles.</li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deployment runbook</a>: project provisioning, IAM, secret bindings, release workflow, and rollout.</li>
+          <li><a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/functions/src/ticketing/providers/stripe.cjs">Stripe adapter</a>, <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/functions/src/ticketing/stripeCheckout.cjs">checkout</a>, and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/functions/src/ticketing/stripeReconcile.cjs">reconciliation</a>: required provider operations and recovery behavior.</li>
+          <li><a href="https://docs.stripe.com/keys">Stripe API keys</a>, <a href="https://docs.stripe.com/keys/restricted-api-keys">restricted keys</a>, <a href="https://docs.stripe.com/keys-best-practices">key handling</a>, and <a href="https://docs.stripe.com/webhooks">webhooks</a>: provider-owned credential and delivery procedures.</li>
+          </ul>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/stripe-ticketing.md"><code>docs/operator/stripe-ticketing.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/admin-sessions/"><span>Previous</span>Work with sessions in the admin</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/webmcp-diagnostics/"><span>Next</span>Use read-only browser diagnostics</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

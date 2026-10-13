@@ -88,7 +88,7 @@ The admin opens here, for staff and operators alike. The page states how the eve
 |---|---|
 | Accounts | Every account, then the accounts at each registration status: Pending, ticketed, approved, and revoked. |
 | Profiles complete | The accounts with a complete profile, out of all accounts. |
-| Tickets | Every ticket record, then valid, refunded, cancelled, and waiting for details. A ticket is one ticket record, not one seat. |
+| Tickets | Every stored ticket record, then valid, refunded, cancelled, and waiting for details. Native Stripe issues one record per seat; other providers retain their source ticket model. |
 | Speakers | Every speaker record, by stage: Draft, invited, accepted, approved, and removed. |
 | Sessions | The sessions on the site, and the sessions with unpublished changes. A new session that was never published counts as one with unpublished changes. |
 | Unresolved errors | The count only. Operators read the errors themselves on the System errors page. |
@@ -319,13 +319,34 @@ The server refuses a delete in four cases, and says why:
 
 ## Ticketing
 
-Provider status, CSV import, and a searchable ticket list. What is here depends on the client's provider choice ([`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md) §3 item 5):
+The workspace follows the deployment's configured provider ([`CLIENT_ONBOARDING.md`](CLIENT_ONBOARDING.md) §3 item 5):
 
+- **Stripe**: Native event-site selection, Stripe-hosted payment, and the organizer controls below. Merchant setup and opening live sales require the [Stripe launch and support runbook](operator/stripe-ticketing.md).
 - **Eventbrite**: Provider status shows webhook registration state and recent sync activity.
-- **Manual / CSV import**: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it. That is the whole ticketing story for a manual deployment.
+- **Manual / CSV import**: Upload a spreadsheet, map its columns to attendee fields, preview the import as a dry run, then commit it.
 - **None**: Nothing to configure.
 
-Ticket records are server-only in Firestore. Every list, search, and import here goes through an admin-gated endpoint.
+Ticket records are server-only in Firestore. Every list, search, import, and commerce action goes through an authenticated endpoint; even an admin browser cannot read the commerce collections directly.
+
+### Stripe sales and catalog
+
+The **Stripe sales** panel identifies **Test mode** or **Live payments**, the publication/pause state, and held/issued seats. An operator opens **Configure ticket catalog** to set currency, capacity, prices, quantity limits, UTC sale windows, tax treatment, and refund policy. Currency becomes fixed after the first save. Every type grants full-event access; an early-bird type changes its offer and sale window, not its access rights. Hidden types stay out of public purchase selection.
+
+Keep **Pause new sales** checked while configuring. Check **Commercial terms are approved for this event** only after the organizer approves the merchant, refund/support policy, tax treatment, and absorbed processing fees. Use **Publish the catalog** and **Save catalog** after readiness is complete. **Review reopening sales** and **Review pausing sales** show a confirmation and require a reason. Pausing stops new purchases while existing payments and tickets continue to reconcile.
+
+### Orders, admission, and support
+
+**Orders** searches purchaser email or order reference and filters by **Payment state** and **Refund state**. Open the order reference for **Order details**. **Admission tickets** searches attendee email or ticket code and filters by ticket type, admission, claim, and check-in state. **Load more orders** and **Load more tickets** continue the current submitted search.
+
+In an order, staff can **Resync this order**, **Resend ticket confirmation**, or **Correct attendee**. Claimed or checked-in tickets permit name corrections but keep their email locked. There is no in-app ticket transfer. The purchaser owns payment details; each attendee claims their assigned seat using the existing verified-email form. The confirmation link prefills the order reference without claiming automatically. Claimed attendees can open `/tickets/mine` to **Print tickets**, which includes an opaque code staff can look up.
+
+Select the exact tickets before **Review ticket cancellation**. The confirmation names the order, original amount, selected attendees/codes, and admission consequences; add a reason before confirming. Cancellation removes admission without refunding money or returning sold seats to capacity. An operator must cancel a ticket that has already been checked in.
+
+Money refunds happen through **Open this payment in Stripe Dashboard**, using the organizer's authorized Stripe account. **Refund history** records provider results. A succeeded full refund invalidates all tickets. For a succeeded partial refund, an operator chooses **Refund to allocate**, then selects affected tickets or explicitly chooses **Keep every ticket valid** for a price adjustment. **Review refund allocation** confirms that decision without creating a money refund. A dispute appears under **Payment disputes** for merchant review; it does not automatically cancel admission. Reasons and actions appear in **Audit trail**.
+
+For complimentary seats, an operator opens **Issue complimentary admission**, enters each attendee and a reason, and uses **Review complimentary tickets** before the final issue confirmation. Comps consume real event/type capacity. At the door, staff enter or scan a human-readable code in **Ticket code for check-in**, then select **Check in attendee**. A repeat reports already checked in. Only an operator can use **Review check-in correction → Undo recorded check-in**, with a reason.
+
+If a payment response is lost, the purchaser uses **Resume existing checkout** or **Recover existing checkout**. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the [support matrix](operator/stripe-ticketing.md#6-support-the-payment-and-the-attendee-separately) before suggesting another payment, refund, resend, or admission change.
 
 ## Announcements
 
@@ -401,11 +422,9 @@ The event's own identity fields: Name, dates, timezone, venue, sender address, s
 
 **What the track list changes on the public site.** Once you list tracks, the schedule draws as a grid on a wide screen: Time down the left, one column per track, in the order you listed them. On a phone — and for anyone reading with a screen reader — the same day is a time-ordered list. It contains the same sessions in the same order as the wide-screen grid. A session with no track runs across the whole width, which is what a plenary is. A session that names a parent is listed under it as a stop on the way through it rather than as a separate entry, in both views.
 
-**The register control.** Two fields under Registration draw the one control that sends a reader to wherever you actually take registrations: the **external registration URL** and the **register button label**. Set the URL and the control appears twice — as the filled action at the top of the home page, and as a quiet control in the site header on every page. It opens in a new tab, because the form belongs to your ticket provider rather than to this site. The label is what the control says; leave it empty and it says "Register".
+**The register control.** For external registration providers, the **external registration URL** and **register button label** configure the action in the home lead and site header. It opens the provider's HTTPS page in a new tab; the default label is "Register". Leave the URL empty when there is no external destination. These providers read the same field for their registration emails.
 
-**Leave the URL empty and no control is drawn anywhere.** That is the right answer for an event that takes no registrations yet, or one whose provider has not given you a link. The site would rather say nothing than show a button that goes nowhere. The URL must start with `https://` — a save with anything else is refused and the field says why, because a registration form is where a reader types their name and their email.
-
-**It is the same URL your registration email uses.** Your ticket provider reads this same field when it builds the email a new account gets, so the link on the page and the link in that email can never drift apart. Change it here and both change.
+When the deployment's public catalog identifies **Stripe**, both controls say **Get tickets** and open `/tickets` on this site, including when no external URL is configured. The native page shows the current offer or explains why sales are closed. A manual, Eventbrite, or none provider, or an unavailable provider lookup, retains the configured external action. Historical demos keep their existing external behavior and do not probe live ticketing. Set the deployment provider through the operator workflow; editing an external URL does not switch the payment provider.
 
 **Past days become back issues.** When a day ends, its page keeps every word and quietens: The colour drops out, the day head says "Back issue", and the controls that act on a live event — bookmarking, reactions, adding to a calendar — go away. Nothing is hidden, and every link still works. Setting an **archive date** for the whole event does the same thing to every day at once.
 

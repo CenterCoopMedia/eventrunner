@@ -7,8 +7,10 @@
 //     functions/src/auth/otp.cjs:
 //       sendOtpCode    { email } → { challengeId, expiresInMinutes }
 //       verifyOtpCode  { challengeId, email, code } → { token }
-//     verifyOtpCode() finishes with signInWithCustomToken, so a successful
-//     call lands in the same onAuthStateChanged stream as Google.
+//     verifyOtpCode() finishes with signInWithCustomToken. UID changes use
+//     the same onAuthStateChanged stream as Google; a refreshed same-UID
+//     credential also updates the context because Firebase suppresses that
+//     auth-state event.
 //
 // Function URL convention (spec §2.4 / §8.1 — no hardcoded probe URLs):
 //   https://<region>-<project>.cloudfunctions.net/<name>
@@ -232,12 +234,30 @@ export function AuthProvider({ children }) {
   // Step 2: one failure shape for every miss (no oracle), then the custom
   // token signs the browser in.
   const verifyOtpCode = useCallback(async ({ challengeId, email, code }) => {
+    const requestUser = auth.currentUser;
     const { token } = await postJson('verifyOtpCode', {
       challengeId,
       email,
       code,
     });
-    return signInWithCustomToken(auth, token);
+    if (auth.currentUser !== requestUser) {
+      throw new OtpRequestError({
+        code: 'auth-changed',
+        status: 0,
+        message: 'Your signed-in account changed. Request a new code to continue.',
+      });
+    }
+    const credential = await signInWithCustomToken(auth, token);
+    const refreshedUser = credential?.user;
+    if (refreshedUser?.uid) {
+      // Same-UID sign-in replaces Firebase's user without an auth-state
+      // event. Ignore a returned object once Firebase has moved on to a
+      // different user, sign-out, or newer credential.
+      setUser((currentUser) => currentUser?.uid === refreshedUser.uid && auth.currentUser === refreshedUser
+        ? refreshedUser
+        : currentUser);
+    }
+    return credential;
   }, []);
 
   const signOut = useCallback(() => firebaseSignOut(auth), []);

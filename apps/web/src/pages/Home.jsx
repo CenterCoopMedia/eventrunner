@@ -11,8 +11,8 @@ import EventHero from '../components/EventHero.jsx';
 import { demoHero } from '../lib/demoHero.js';
 import { buildNameplate } from '../components/editorial/Nameplate.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
-import RegistrationAction, {
-  resolveRegistrationLink,
+import {
+  RegistrationLink, useRegistrationLink,
 } from '../components/RegistrationAction.jsx';
 import SectionHead from '../components/editorial/SectionHead.jsx';
 import SectionEditLink from '../components/SectionEditLink.jsx';
@@ -130,6 +130,7 @@ export function withLiveDates(block, eventConfig) {
 export default function Home() {
   const { eventConfig, features, theme } = useEventConfig();
   const { getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
+  const registrationAction = useRegistrationLink();
 
   const page = getPage('home') ?? getPage('/');
   const title = getBlock('hero', 'title');
@@ -158,10 +159,6 @@ export default function Home() {
     typeof eventConfig.tagline === 'string' && eventConfig.tagline.trim()
       ? eventConfig.tagline
       : null;
-  // The event's own registration action (M7 issue 8), or null where no
-  // destination is configured. Resolved here as well as inside the control
-  // because the action row around it is drawn only when it holds something.
-  const registrationAction = resolveRegistrationLink(eventConfig);
   const heroBlocks = getSectionBlocks('hero');
   const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
   // config/event is runtime data, so `days` may arrive as anything.
@@ -288,7 +285,7 @@ export default function Home() {
           {subtitle?.value ? <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{subtitle.value}</p> : null}
           {registrationAction || heroCtas.length ? (
             <div className="no-print mt-lg flex flex-wrap gap-sm">
-              <RegistrationAction placement="lead" />
+              <RegistrationLink action={registrationAction} placement="lead" />
               {heroCtas.map((block) => <CtaBlock key={`${block.section}__${block.field}`} block={block} />)}
             </div>
           ) : null}

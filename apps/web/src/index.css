@@ -2671,7 +2671,23 @@
   display: none;
 }
 
+.ticketing-confirmation {
+  max-block-size: calc(100dvh - var(--space-lg));
+  overflow: auto;
+}
+.ticketing-confirmation::backdrop {
+  background: rgb(var(--admin-ink-rgb) / 0.4);
+}
+
 @media print {
+  .ticket-document {
+    break-inside: avoid;
+    overflow-wrap: anywhere;
+  }
+  .ticket-print-page {
+    overflow: visible;
+    color: rgb(var(--color-text-primary-rgb));
+  }
   /* Keep the page heading and authored copy; omit decorative artwork. */
   .event-hero__figure,
   .event-hero__veil,

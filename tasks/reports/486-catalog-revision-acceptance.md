@@ -32,8 +32,12 @@ their original fingerprint when the field is omitted. Shared parsing permits omi
 for those durable requests and trusted comps; the reservation transaction enforces it
 for every new public paid or free order. Staff comps keep their explicit-authority path.
 
-The director owns the frontend acceptance and refresh behavior. This server change alone
-does not complete the display and renewed-acceptance part of the review comment.
+The attendee screen submits the displayed revision with a new purchase. A confirmed
+`catalog-changed` refusal clears that attempt, hides the stale form while refetching,
+and requires renewed acceptance before a deliberate new submission. Attendee fields
+are retained. Every changed displayed revision clears the checkbox, including a
+refresh after a capacity, rate-limit, or account-readiness refusal. An uncertain
+request retains its frozen body; a reload resumes by reference without a new revision.
 
 ## Verification and packaging
 
@@ -47,6 +51,13 @@ saved Stripe parameters and rejection of a replacement accepted revision.
 The final focused Node 22 run passes 60 tests across Checkout, native HTTP wrappers, and
 the shared catalog/checkout contract. Scoped ESLint passes with `--max-warnings=0`.
 `git diff --check` passes.
+
+The final foundation Node suite passes 3,068 tests. The integrated organizer Node
+suite passes 3,090 tests. The attendee selection suite passes 32 tests, including
+changed price/policy display, pending refresh, retained attendee input, renewed
+acceptance, a new request ID, and frozen uncertain retries. Three additional refresh
+regressions failed before resetting acceptance on every changed revision and pass
+with that reset. Hosted browser evidence is recorded on the PR's final head.
 
 The existing ESM shim re-exports the updated validator; no new export was introduced.
 `npm run prepare:functions` rebuilt the shared tarball and both lockfile integrity values.

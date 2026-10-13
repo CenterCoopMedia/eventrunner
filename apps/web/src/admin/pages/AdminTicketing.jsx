@@ -19,7 +19,7 @@
 // in a tinted badge at the smallest radius, never a pill (admin story part 5
 // refuses that device by name): the word carries the meaning and the tint
 // agrees with it.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
 import {
@@ -37,6 +37,8 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+
+const StripeTicketingWorkspace = lazy(() => import('../components/StripeTicketingWorkspace.jsx'));
 
 const MAPPING_FIELDS = [
   { id: 'email', label: 'Email address', required: true },
@@ -86,7 +88,7 @@ function StatusCard({ status, error, onRefresh, busy }) {
   return (
     <Panel
       title="Provider status"
-      description="What the ticketing core (§3.3) currently reports."
+      description="Current provider connection and reconciliation activity."
       actions={
         <button type="button" className={secondaryButtonClass} onClick={onRefresh} disabled={busy}>
           {busy ? 'Checking…' : 'Refresh'}
@@ -118,6 +120,8 @@ function StatusCard({ status, error, onRefresh, busy }) {
                     Registered {status.webhookRegisteredAt}
                     {status.webhookId ? ` (id ${status.webhookId})` : ''}
                   </span>
+                ) : status.provider === 'stripe' ? (
+                  'Verify the configured endpoint and recent deliveries in Stripe Dashboard.'
                 ) : (
                   <>
                     Not registered —{' '}
@@ -479,17 +483,22 @@ export default function AdminTicketing() {
   }, [refreshStatus]);
 
   const onImported = useMemo(() => () => setRefreshToken((n) => n + 1), []);
+  const confirmedProvider = !statusBusy && statusError === null ? status?.provider : null;
 
   return (
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Ticketing"
-        description="Provider status, CSV import for the manual/no-vendor path (spec §3.3), and the ticket list."
+        description="Manage ticket sales, registration records, and attendee admission."
       />
 
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} />
-      <ImportPanel call={call} onImported={onImported} />
-      <TicketList call={call} refreshToken={refreshToken} />
+      {confirmedProvider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
+        <StripeTicketingWorkspace call={call} />
+      </Suspense> : ['eventbrite', 'manual', 'none'].includes(confirmedProvider) ? <>
+        <ImportPanel call={call} onImported={onImported} />
+        <TicketList call={call} refreshToken={refreshToken} />
+      </> : null}
     </div>
   );
 }

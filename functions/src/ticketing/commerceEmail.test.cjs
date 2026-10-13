@@ -31,8 +31,7 @@ test('confirmation replay sends one purchaser confirmation and one distinct atte
   assert.equal((await run()).alreadySent, true);
   assert.equal(sent.length, 2);
   assert.match(sent[0].text, /\$100\.00/);
-  assert.match(sent[0].text, /Open your event profile: https:\/\/event\.example\.org\/profile/);
-  assert.doesNotMatch(sent[0].text, /tickets\/status/);
+  assert.match(sent[0].text, /View your order and ticket information: https:\/\/event\.example\.org\/tickets\/status\?orderId=order-1/);
   assert.doesNotMatch(sent[1].text, /100\.00|buyer@example/);
   assert.match(sent[1].text, /ticket\/claim\?order=order-1/);
   const logs = await db.collection('sent_emails').get();

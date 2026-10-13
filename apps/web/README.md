@@ -1,6 +1,6 @@
 # apps/web
 
-Vite 5 + React 18 + Tailwind 3 attendee-facing site, plus the sign-in flow.
+Vite + React 18 + Tailwind 3 attendee-facing site and organizer workspace.
 Tracked under milestone M2 (pages-as-data, CMS, auth, schedule, theming) —
 spec: [docs/adr/0001-event-platform-v1.md](../../docs/adr/0001-event-platform-v1.md).
 
@@ -244,6 +244,55 @@ order:
    `mark.svg`. If the shapes change, update `renderPlaceholderIcon` too.
 2. Run `node scripts/dev/build-app-icons.mjs`.
 3. Commit both PNGs with the change.
+
+## Native Stripe ticketing (#483)
+
+The lazy routes `/tickets`, `/tickets/status`, and `/tickets/mine` add attendee selection,
+authoritative purchaser confirmation, and claimed-attendee print views. `TicketClaim`
+accepts an `?order=` prefill through the normal verified-email claim flow; a query parameter
+never claims a ticket automatically. The purchase page uses public catalog data, then a
+verified purchaser token for checkout/status. The recipient page reads only that account's
+claimed tickets through its private API, with cursor pagination.
+
+The shared `useRegistrationLink` hook makes one credential-free provider lookup for the
+home and header registration actions. Stripe selects the internal `/tickets` destination.
+Confirmed Eventbrite, manual, and none providers preserve the configured external action.
+If provider lookup fails, the native ticket page shows its error and retry control; an
+outage never selects a possibly stale external checkout source. Historical
+and static demos skip the lookup. The rest of the shell still renders from its snapshot;
+commerce availability and financial state require current server responses.
+
+`ticketingCommerce.js` sends App Check and bearer credentials where appropriate, requests
+private responses with `no-store`, restricts payment handoffs to hosted Stripe Checkout,
+and stores only account-scoped request/order identifiers for recovery. The browser never
+submits a price, currency, Stripe Price ID, entitlement, or claimed user ID as purchase
+authority. Unknown responses retry a saved attempt; owner-scoped order recovery also works
+from another device. A declined card on an open Session is recoverable. Return URL flags
+never fulfill tickets, and switching accounts immediately hides the previous purchaser's
+private response. Only confirmed paid/free orders represent completed purchase fulfillment.
+
+`AdminTicketing` keeps the other providers' workspace and mounts `StripeTicketingWorkspace`
+for Stripe. Its catalog, order/ticket lists, corrections, comp/cancel, check-in, refund
+allocation, resend, reconciliation, and audit controls call server-gated APIs. Sensitive
+actions use native modal review with affected records, reasons, and admission consequences.
+Money refunds stay in the organizer's Stripe Dashboard; the UI never collects card data.
+Opaque text codes provide an accessible printable fallback without encoding personal data.
+Public and admin surfaces use their respective design tokens.
+
+The unit files `Tickets.test.jsx`, `TicketStatus.test.jsx`,
+`StripeTicketingWorkspace.test.jsx`, `RegistrationActionStripe.test.jsx`, and
+`ticketingCommerce.test.js` cover ownership, identity assignment, retry/reload and cross-device
+recovery, financial/admission state, precision, review, role visibility, pagination, and
+provider fallbacks. `e2e/stripe-ticketing-ui.spec.js` uses emulator sign-in and synthetic HTTP
+responses for purchase/status/print, cancellation focus containment/restoration, and
+1440/390/320px screenshots in `test-results/admin-visual-evidence`. It does not call Stripe.
+
+See [ADR 0004](../../docs/adr/0004-stripe-ticket-commerce.md) and the
+[Stripe launch/support runbook](../../docs/operator/stripe-ticketing.md) for merchant
+ownership, required secrets, test/live readiness, retention, and the separately authorized
+real Stripe rehearsal. Embedded payment UI remains in
+[#325](https://github.com/CenterCoopMedia/eventrunner/issues/325); limited-access pass
+entitlements remain in [#326](https://github.com/CenterCoopMedia/eventrunner/issues/326).
 
 ## Testing
 

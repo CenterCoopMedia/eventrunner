@@ -40,8 +40,9 @@
  *
  * `ticket` is the self-service ticket claim area (issue #33): /ticket/claim
  * is statically mounted, and it is the address `ticket.claim_prompt`'s CTA
- * links to for every provider that resolves one (manual.cjs, eventbrite.cjs
- * getRegistrationPrompt). Same reasoning as `speaker`: mail already sent
+ * links to for every provider that resolves one. The plural `tickets`
+ * contains native selection, purchaser status, and printable claimed admission.
+ * Same reasoning as `speaker`: mail already sent
  * with this link must keep working.
  *
  * `specimen` is the specimen book (apps/web/src/pages/specimen/): the
@@ -65,7 +66,7 @@
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
   'schedule', 'speakers', 'speaker', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
-  'ticket', 'specimen', 'dashboard', 'pitch',
+  'ticket', 'tickets', 'specimen', 'dashboard', 'pitch',
 ]);
 
 /**

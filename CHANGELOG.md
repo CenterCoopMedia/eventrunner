@@ -17,6 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admission. ADR 0004 records the merchant, capacity, access, retention, and separate
   launch decisions (#483, #325).
 
+- Native Stripe ticket selection, verified purchaser checkout recovery/status, and claimed-attendee
+  printable tickets. Header and home registration actions select `/tickets` from the public Stripe
+  catalog while preserving other providers' configured external registration. Unknown responses,
+  reloads, cross-device recovery, and declined cards reuse the existing purchase; return redirects
+  never grant admission (#483).
+- Organizer Stripe catalog, sales pause/reopen, paginated order and admission filters, attendee
+  correction, complimentary admission, cancellation, check-in/correction, confirmation resend,
+  reconciliation, refund admission allocation, disputes, and audit views. Review dialogs state the
+  affected tickets, reason, money, and admission consequences. Money refunds remain in the
+  organizer's Stripe Dashboard, and cancelled/refunded seats are not restocked (#483).
+- A Stripe launch and support runbook covering merchant ownership, scoped credentials and rotation,
+  snapshot webhook verification, test/live readiness, incident rollback, support, and separate
+  retention decisions. Synthetic unit/browser evidence is distinguished from the separately
+  authorized, unrun real Stripe rehearsal. Embedded payment collection (#325) and limited-access
+  pass entitlements (#326) remain follow-on work.
 - Account view switching for users with multiple attendee, speaker or admin roles. The selected
   view stays in the browser session, and multi-role admins can open Manage event from their
   attendee or speaker dashboard. Phone controls support browsers without native dialogs (#340).
