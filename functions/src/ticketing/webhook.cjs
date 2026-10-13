@@ -44,6 +44,7 @@
 const {
   internals: { WEBHOOK_DELIVERIES, SYNC_QUEUE, QUEUE_PENDING, QUEUE_EXHAUSTED, safeDocId },
 } = require('./index.cjs');
+const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 
 /**
  * Generous for a webhook envelope (a full order payload with attendees),
@@ -115,7 +116,10 @@ async function claimAndEnqueue({ db, deliveryId, orderId, eventType, providerNam
   const claimRef = db.collection(WEBHOOK_DELIVERIES).doc(deliveryId);
   const queueRef = db.collection(SYNC_QUEUE).doc(orderId);
   try {
-    await db.runTransaction(async (tx) => {
+    const enqueued = await db.runTransaction(async (tx) => {
+      const policy = await checkDemoWrites({ db, transaction: tx });
+      throwIfDemoPolicyUnavailable(policy);
+      if (!policy.ok) return false;
       const existing = await tx.get(queueRef);
       const prior = existing.exists ? existing.data() : null;
       const at = now();
@@ -148,10 +152,11 @@ async function claimAndEnqueue({ db, deliveryId, orderId, eventType, providerNam
         updatedAt: at,
         // A re-armed row is no longer exhausted; clear the forensics of
         // the previous give-up so the drain does not read a stale error.
-        ...(prior?.status === QUEUE_EXHAUSTED ? { exhaustedAt: null, lastError: null } : {}),
+        ...(prior?.status === QUEUE_EXHAUSTED ? { exhaustedAt: null, lastError: null, paymentChecks: 0 } : {}),
       }, { merge: true });
+      return true;
     });
-    return { enqueued: true, duplicate: false };
+    return enqueued ? { enqueued: true, duplicate: false } : { enqueued: false, duplicate: false, ignored: true };
   } catch (err) {
     if (isDuplicateClaim(err)) return { enqueued: false, duplicate: true };
     throw err;
@@ -178,6 +183,12 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
     }
     if (rawBody.length > MAX_BODY_BYTES) {
       res.status(413).json({ error: { code: 'payload-too-large', message: 'Delivery is too large.' } });
+      return;
+    }
+    const policy = await checkDemoWrites({ db });
+    if (!policy.ok) {
+      if (policy.code === 'read-only-demo') res.status(200).json({ ok: true, ignored: true });
+      else res.status(policy.status).json({ error: { code: policy.code, message: policy.message } });
       return;
     }
 

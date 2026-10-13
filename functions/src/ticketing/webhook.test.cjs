@@ -3,7 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/event': { historicalDemo: false }, ...seed });
 const { createTicketingWebhookHandler, claimAndEnqueue, internals } = require('./webhook.cjs');
 const { createFakeTicketingProvider, buildDelivery, SIGNATURE_HEADER } = require('./ticketingFake.cjs');
 
@@ -57,6 +58,29 @@ test('a verified delivery claims and enqueues in ONE transaction (§3.3 step 2)'
   assert.equal(row.attempts, 0);
   assert.equal(row.lastDeliveryId, 'del-1');
   assert.ok(row.readyAt instanceof Date);
+});
+
+test('historical demos acknowledge without verifying externally or adding queued work', async () => {
+  const db = makeFakeDb({ 'config/event': { historicalDemo: true } });
+  const provider = createFakeTicketingProvider();
+  let verified = 0;
+  provider.verifyWebhook = async () => { verified += 1; throw new Error('No provider read in a frozen archive.'); };
+  const res = makeRes();
+  await makeHandler({ db, provider })(makeReq(buildDelivery({ deliveryId: 'del-archive', orderId: 'ord-1', eventId: 'evt-1' })), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ignored, true);
+  assert.equal(verified, 0);
+  assert.equal(db.ids('ticket_sync_queue').length, 0);
+  assert.equal(db.ids('ticket_webhook_deliveries').length, 0);
+});
+
+test('a demo freeze racing enqueue aborts both the delivery claim and queued work', async () => {
+  const db = makeFakeDb();
+  db.beforeCommit = async () => db.collection('config').doc('event').set({ historicalDemo: true });
+  const result = await claimAndEnqueue({ db, deliveryId: 'del-race', orderId: 'ord-1', eventType: 'order.updated', providerName: 'stripe' });
+  assert.equal(result.ignored, true);
+  assert.equal(db.ids('ticket_sync_queue').length, 0);
+  assert.equal(db.ids('ticket_webhook_deliveries').length, 0);
 });
 
 test('a replayed delivery is a no-op 200 and writes nothing', async () => {
@@ -138,7 +162,7 @@ test('a fresh delivery never resets the attempts of a pending row', async () => 
 test('a delivery re-arms an exhausted row and clears its give-up forensics', async () => {
   const db = makeFakeDb({
     'ticket_sync_queue/ord-1': {
-      orderId: 'ord-1', status: 'exhausted', attempts: 6,
+      orderId: 'ord-1', status: 'exhausted', attempts: 6, paymentChecks: 48,
       exhaustedAt: new Date(0), lastError: 'order never became complete',
     },
   });
@@ -147,6 +171,7 @@ test('a delivery re-arms an exhausted row and clears its give-up forensics', asy
   const row = db.read('ticket_sync_queue', 'ord-1');
   assert.equal(row.status, 'pending');
   assert.equal(row.attempts, 0);
+  assert.equal(row.paymentChecks, 0);
   assert.equal(row.exhaustedAt, null);
   assert.equal(row.lastError, null);
 });

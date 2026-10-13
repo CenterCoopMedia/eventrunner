@@ -604,6 +604,25 @@ client already past step 3 never needs it again.
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed
   run's log against what the binding names.
 
+### Archiving an event with ticket sales
+
+Pause new sales with the catalog's `salesPaused` setting while payment, held-capacity,
+refund, dispute, or reconciliation work remains. Keep the event writable until those
+obligations are settled and the existing `ticket_sync_queue` has no unresolved work.
+Then enable `config/event.historicalDemo` to freeze the archive.
+
+The archive flag stops native payment reconciliation, webhook queuing, and ticket
+synchronization. These paths read the persisted policy before provider work and include
+it in transactions that update orders, payment attempts, inventory, tickets, delivery
+claims, and queued work. Freezing with an open payment or hold can therefore leave its
+last local state unchanged even when Stripe later reports a payment or refund.
+
+If an event was frozen before its obligations were settled, an authorized operator must
+restore its writable policy and reconcile the existing orders before freezing it again.
+Keep the original provider, account, payment attempts, and inventory records throughout
+recovery; deleting a hold or making a replacement order does not establish the original
+payment's outcome.
+
 ## 7. Rotating access
 
 There is no key to rotate. To revoke a client's deploy access, remove the IAM policy binding from

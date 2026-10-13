@@ -29,7 +29,7 @@ function signed(event = EVENT) {
 }
 
 function fixture({ order = ORDER, event = EVENT, accountId = ENV.EVENT_STRIPE_ACCOUNT_ID, env = ENV } = {}) {
-  const db = makeFakeDb({ [`ticket_orders/${ORDER.id}`]: order,
+  const db = makeFakeDb({ 'config/event': { historicalDemo: false }, [`ticket_orders/${ORDER.id}`]: order,
     [`ticket_payment_attempts/${ORDER.attemptId}`]: { id: ORDER.attemptId, orderId: ORDER.id } });
   const calls = { events: [], create: [] };
   const stripeClient = {
@@ -137,6 +137,25 @@ test('verified Session delivery recovers a lost creation response only for the d
   assert.equal((await provider.verifyWebhook(delivery.rawBody, delivery.headers)).valid, true);
   assert.equal(db.read('ticket_orders', ORDER.id).stripeSessionId, EVENT.data.object.id);
   assert.equal(db.read('ticket_payment_attempts', ORDER.attemptId).stripeSessionId, EVENT.data.object.id);
+});
+
+test('a frozen archive cannot read Stripe or recover a Session from a signed webhook', async () => {
+  const { db, provider, calls } = fixture({ order: { ...ORDER, stripeSessionId: null } });
+  await db.collection('config').doc('event').set({ historicalDemo: true });
+  const delivery = signed();
+  assert.equal((await provider.verifyWebhook(delivery.rawBody, delivery.headers)).eventType, 'ignored');
+  assert.deepEqual(calls.events, []);
+  assert.equal(db.read('ticket_orders', ORDER.id).stripeSessionId, null);
+});
+
+test('a freeze racing webhook Session recovery leaves the saved attempt unchanged', async () => {
+  const { db, provider } = fixture({ order: { ...ORDER, stripeSessionId: null } });
+  const attempt = db.read('ticket_payment_attempts', ORDER.attemptId);
+  db.beforeCommit = async () => db.collection('config').doc('event').set({ historicalDemo: true });
+  const delivery = signed();
+  await provider.verifyWebhook(delivery.rawBody, delivery.headers);
+  assert.equal(db.read('ticket_orders', ORDER.id).stripeSessionId, null);
+  assert.deepEqual(db.read('ticket_payment_attempts', ORDER.attemptId), attempt);
 });
 
 test('refund deliveries follow their PaymentIntent metadata, not an arbitrary caller address', async () => {

@@ -2,6 +2,7 @@
 
 /** Organizer-owned Stripe account, hosted Checkout, and authoritative reconciliation. */
 const { createHash } = require('node:crypto');
+const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../../core/demoWrites.cjs');
 
 const WEBHOOK_EVENTS = [
   'checkout.session.completed', 'checkout.session.expired',
@@ -179,6 +180,9 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
       if (event.livemode !== scope.livemode || (event.account && event.account !== scope.stripeAccountId)) {
         return { valid: false, reason: 'wrong_event' };
       }
+      const policy = await checkDemoWrites({ db });
+      throwIfDemoPolicyUnavailable(policy);
+      if (!policy.ok) return { valid: true, eventType: 'ignored', deliveryId: safeId(event.id) };
       await assertAccount();
       // Standalone account events omit event.account. Retrieve the event
       // using this account's key before trusting its order association.
@@ -211,6 +215,9 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
         // durable attempt without treating a caller's Session ID as proof.
         if (!order.stripeSessionId) {
           await db.runTransaction(async (tx) => {
+            const policy = await checkDemoWrites({ db, transaction: tx });
+            throwIfDemoPolicyUnavailable(policy);
+            if (!policy.ok) return;
             const ref = db.collection('ticket_orders').doc(orderId);
             const attemptRef = db.collection('ticket_payment_attempts').doc(order.attemptId);
             const snap = await tx.get(ref);

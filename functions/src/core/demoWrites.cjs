@@ -8,7 +8,7 @@
  * after an operator enables historicalDemo. A request body, Auth claim, or
  * build-time demo flag must never override this durable setting.
  */
-async function checkDemoWrites({ db }) {
+async function checkDemoWrites({ db, transaction }) {
   const unavailable = {
     ok: false,
     status: 503,
@@ -17,7 +17,10 @@ async function checkDemoWrites({ db }) {
   };
   let event;
   try {
-    const snap = await db.collection('config').doc('event').get();
+    const ref = db.collection('config').doc('event');
+    // Transactional callers include the policy in their read set so a demo
+    // switch between validation and commit retries under the current policy.
+    const snap = transaction ? await transaction.get(ref) : await ref.get();
     event = snap.exists ? snap.data() : null;
   } catch {
     return unavailable;
