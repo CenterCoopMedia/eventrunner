@@ -33,6 +33,12 @@ function catalogValue(snap) {
   return result.value;
 }
 
+function requirePaymentCredentials(provider) {
+  if (provider.hasPaymentCredentials !== true) {
+    throw new CommerceError('ticketing-unavailable', 'Paid ticket sales are not configured. Try again later.', 503);
+  }
+}
+
 async function verifiedPurchaser(auth, req) {
   const decoded = await verifyAuthToken({ auth }, req);
   if (!decoded?.uid) throw new CommerceError('unauthorized', 'Sign in to buy or view your tickets.', 401);
@@ -111,12 +117,14 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
   const at = now();
   const windowOpen = isSalesWindowOpen(catalog, at);
   const salesEnabled = !catalog.salesPaused && catalog.commercialTermsConfirmed && windowOpen && eventRemaining > 0;
+  const paidConfigured = provider.hasPaymentCredentials === true;
   const ticketTypes = catalog.ticketTypes.filter((type) => type.visibility === 'public' && type.active).map((type) => {
     const counts = inventory.types[type.id] || { held: 0, sold: 0 };
     const remaining = Math.min(eventRemaining, Math.max(0, type.capacity - counts.held - counts.sold));
     return {
       id: type.id, name: type.name, description: type.description, unitAmount: type.unitAmount,
-      remaining, available: salesEnabled && isSalesWindowOpen(type, at) && remaining >= type.minPerOrder,
+      remaining, available: salesEnabled && (type.unitAmount === 0 || paidConfigured) &&
+        isSalesWindowOpen(type, at) && remaining >= type.minPerOrder,
       minPerOrder: type.minPerOrder, maxPerOrder: type.maxPerOrder,
       salesStartAt: type.salesStartAt, salesEndAt: type.salesEndAt,
     };
@@ -203,6 +211,7 @@ async function reserveCommerceOrder({
     const rate = comp ? null : purchaserWindow(purchaserSnap?.data(), at);
     const priced = priceSelections({ catalog, request, at, comp });
     const paid = priced.totalAmount > 0;
+    if (paid) requirePaymentCredentials(provider);
     const publicUrl = paid ? configuredPublicUrl(config, env) : null;
     const seats = makeSeats(id, priced.lines, request);
     const order = {
@@ -308,6 +317,7 @@ async function recoverCheckoutAttempt({ db, provider, orderId, now = () => new D
       tx.set(attemptRef, { state: 'exception', leaseUntil: null, updatedAt: at }, { merge: true });
       return { order: { ...order, ...patch } };
     }
+    requirePaymentCredentials(provider);
     if (millis(attempt.leaseUntil) > at.getTime() || millis(attempt.retryNotBefore) > at.getTime()) return { order };
     const leaseToken = `${at.getTime()}:${require('node:crypto').randomBytes(12).toString('hex')}`;
     tx.set(attemptRef, {

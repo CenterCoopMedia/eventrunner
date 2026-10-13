@@ -40,14 +40,19 @@ function stripeScope(env = process.env) {
   return { externalEventId, stripeAccountId, livemode };
 }
 
+function hasPaymentCredentials(env, livemode) {
+  const token = typeof env.TICKETING_API_TOKEN === 'string' ? env.TICKETING_API_TOKEN.trim() : '';
+  return new RegExp(`^(sk|rk)_${livemode ? 'live' : 'test'}_[A-Za-z0-9]+$`).test(token);
+}
+
 /** The installed SDK is locked by package-lock; no browser sees either secret. */
 function createStripeClient({ env = process.env, stripeClient } = {}) {
   if (stripeClient) return stripeClient;
   const scope = stripeScope(env);
-  const token = env.TICKETING_API_TOKEN?.trim();
-  if (!new RegExp(`^(sk|rk)_${scope.livemode ? 'live' : 'test'}_`).test(token || '')) {
+  if (!hasPaymentCredentials(env, scope.livemode)) {
     throw new Error('TICKETING_API_TOKEN must match EVENT_STRIPE_MODE.');
   }
+  const token = env.TICKETING_API_TOKEN.trim();
   const Stripe = require('stripe');
   return new Stripe(token, { timeout: 10_000, maxNetworkRetries: 1 });
 }
@@ -99,6 +104,9 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
   const provider = {
     name: 'stripe',
     ...scope,
+    // This is a local configuration check, not a Stripe request or a claim
+    // that the merchant account has passed its separate launch checks.
+    hasPaymentCredentials: Boolean(stripeClient) || hasPaymentCredentials(env, scope.livemode),
     ownsTicketPersistence: true,
     requiresRawBody: true,
     webhookEventTypes: WEBHOOK_EVENTS,

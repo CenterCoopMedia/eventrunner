@@ -7,10 +7,25 @@ function buildCommerceDeps() {
   const { getDb } = require('../core/firestore.cjs');
   const { getEventConfig } = require('../core/config.cjs');
   const { getAuth } = require('firebase-admin/auth');
-  const { getTicketingProvider } = require('./providers/index.cjs');
+  const { getTicketingProvider, PROVIDER_NAMES } = require('./providers/index.cjs');
   const db = getDb();
   const getConfig = () => getEventConfig({ db });
-  return { db, getConfig, auth: getAuth(), provider: getTicketingProvider({ db, getConfig, env: process.env }), env: process.env };
+  const name = process.env.EVENT_TICKETING_PROVIDER?.trim();
+  if (!PROVIDER_NAMES.includes(name)) throw new Error('Ticketing provider configuration is unavailable.');
+  // These endpoints serve native commerce only. A legacy deployment can
+  // report a closed catalog without constructing its unrelated adapter.
+  const provider = name === 'stripe' ? getTicketingProvider({ db, getConfig, env: process.env }) : { name };
+  return { db, getConfig, auth: getAuth(), provider, env: process.env };
+}
+
+async function invokeCommerceHandler(factory, req, res) {
+  try {
+    await factory(buildCommerceDeps())(req, res);
+  } catch (err) {
+    console.error('Ticket commerce request is unavailable.', { name: err?.name || 'Error' });
+    res.set('Cache-Control', 'no-store');
+    res.status(503).json({ error: { code: 'ticketing-unavailable', message: 'Ticketing is temporarily unavailable. Try again later.' } });
+  }
 }
 
 function buildHandlers() {
@@ -23,7 +38,7 @@ function buildHandlers() {
   const secrets = ticketingSecretNames(process.env).map(defineSecret);
   const wrap = (factory, methods) => onRequest({ region, secrets }, async (req, res) => {
     if (applyCors(req, res, { allowedOrigins: parseAllowedOrigins(process.env.EVENT_ALLOWED_ORIGINS), methods })) return;
-    await factory(buildCommerceDeps())(req, res);
+    await invokeCommerceHandler(factory, req, res);
   });
   return {
     ticketingCatalog: wrap(checkout.createTicketingCatalogHandler, ['GET']),
@@ -32,4 +47,4 @@ function buildHandlers() {
   };
 }
 
-module.exports = { buildCommerceDeps, get handlers() { return buildHandlers(); } };
+module.exports = { buildCommerceDeps, invokeCommerceHandler, get handlers() { return buildHandlers(); } };

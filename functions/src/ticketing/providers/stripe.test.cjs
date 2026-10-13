@@ -54,6 +54,19 @@ test('Stripe registry and deploy secret capability preserve legacy providers', (
   assert.deepEqual(ticketingSecretNames({ EVENT_TICKETING_PROVIDER: 'none' }), []);
 });
 
+test('local payment readiness requires a nonempty secret key in the configured mode', () => {
+  for (const [mode, token, expected] of [
+    ['test', undefined, false], ['test', 'sk_test_', false],
+    ['test', 'pk_test_fixture', false], ['test', 'sk_live_fixture', false],
+    ['test', 'sk_test_fixture', true], ['test', 'rk_test_fixture', true],
+    ['live', 'sk_test_fixture', false], ['live', 'sk_live_fixture', true],
+    ['live', 'rk_live_fixture', true],
+  ]) {
+    const provider = createStripeProvider({ env: { ...ENV, EVENT_STRIPE_MODE: mode, TICKETING_API_TOKEN: token } });
+    assert.equal(provider.hasPaymentCredentials, expected);
+  }
+});
+
 test('Stripe account, event and explicit test/live mode are required; live is barred from demo/emulators', () => {
   for (const field of ['EVENT_STRIPE_ACCOUNT_ID', 'EVENT_TICKETING_EVENT_ID', 'EVENT_STRIPE_MODE']) {
     assert.throws(() => stripeScope({ ...ENV, [field]: '' }));

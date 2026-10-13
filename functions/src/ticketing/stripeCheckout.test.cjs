@@ -9,6 +9,7 @@ const {
 } = require('./stripeCheckout.cjs');
 const { inventoryTransitionPatch, transitionOrderInventory, SAFE_RETRY_MS } = require('./stripeCommerce.cjs');
 const { claimTicketsForUser } = require('./registration.cjs');
+const { createStripeProvider } = require('./providers/stripe.cjs');
 
 const START = new Date('2026-10-12T16:00:00.000Z');
 const ADA = { uid: 'uid-ada', email: 'ada@example.com', email_verified: true };
@@ -58,6 +59,7 @@ function setup({ catalogPatch = {}, seed = {}, create } = {}) {
   const sessions = new Map();
   const provider = {
     name: 'stripe', externalEventId: 'example-event', stripeAccountId: 'acct_example', livemode: false,
+    hasPaymentCredentials: true,
     async createCheckoutSession(params, options) {
       calls.push({ params: structuredClone(params), options: structuredClone(options) });
       if (create) return create({ db, params, options, calls, sessions });
@@ -156,6 +158,81 @@ test('missing provider identity and a non-HTTPS return origin refuse creation', 
   b.deps.env.EVENT_PUBLIC_URL = 'https://event.example.com@evil.example/path?redirect=anything';
   assert.equal((await checkout(b.deps)).statusCode, 503);
   assert.equal(b.calls.length, 0);
+});
+
+test('missing or mismatched Stripe keys close paid sales before reserving any inventory', async () => {
+  for (const token of [undefined, 'sk_live_fixture', 'sk_test_']) {
+    const { deps, db } = setup();
+    const env = {
+      ...deps.env, EVENT_TICKETING_EVENT_ID: 'example-event', EVENT_STRIPE_ACCOUNT_ID: 'acct_example',
+      EVENT_STRIPE_MODE: 'test', TICKETING_API_TOKEN: token,
+    };
+    deps.provider = createStripeProvider({ env, db });
+    const catalog = await readTicketingCatalog(deps);
+    const res = await checkout(deps);
+    assert.equal(catalog.salesEnabled, false);
+    assert.ok(catalog.ticketTypes.every((type) => !type.available));
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.error.code, 'ticketing-unavailable');
+    for (const collection of ['ticket_orders', 'ticket_payment_attempts', 'ticket_inventory', 'ticket_sync_queue', 'admin_logs']) {
+      assert.equal(db.ids(collection).length, 0, collection);
+    }
+  }
+});
+
+test('missing payment keys leave free sales and comps usable while paid types remain closed', async () => {
+  const { deps, db } = setup({ catalogPatch: { ticketTypes: [
+    { id: 'general', name: 'Free event pass', unitAmount: 0, capacity: 100 },
+    { id: 'student', name: 'Paid event pass', unitAmount: 1000, capacity: 100 },
+  ] } });
+  const env = { ...deps.env, EVENT_TICKETING_EVENT_ID: 'example-event', EVENT_STRIPE_ACCOUNT_ID: 'acct_example', EVENT_STRIPE_MODE: 'test' };
+  deps.provider = createStripeProvider({ env, db });
+  const catalog = await readTicketingCatalog(deps);
+  assert.equal(catalog.salesEnabled, true);
+  assert.equal(catalog.ticketTypes.find((type) => type.id === 'general').available, true);
+  assert.equal(catalog.ticketTypes.find((type) => type.id === 'student').available, false);
+  const free = await checkout(deps);
+  assert.equal(free.statusCode, 200);
+  assert.equal(free.body.status, 'free');
+  const comp = await createCompOrder({ ...deps, actorUid: 'organizer', ticketTypeId: 'student', attendees: [PERSON], requestId: 'organizer-comp-0001', reason: 'Approved press access' });
+  assert.equal(comp.status, 'free');
+  assert.equal(db.read('ticket_inventory', 'current').sold, 2);
+});
+
+test('an absent catalog remains closed without requiring a Stripe client or payment key', async () => {
+  const { deps, db } = setup();
+  await db.collection('ticket_catalog').doc('current').delete();
+  const env = { ...deps.env, EVENT_TICKETING_EVENT_ID: 'example-event', EVENT_STRIPE_ACCOUNT_ID: 'acct_example', EVENT_STRIPE_MODE: 'test' };
+  deps.provider = createStripeProvider({ env, db });
+  const catalog = await readTicketingCatalog(deps);
+  assert.equal(catalog.salesEnabled, false);
+  assert.deepEqual(catalog.ticketTypes, []);
+  assert.equal(db.ids('ticket_orders').length, 0);
+});
+
+test('public catalog availability never requests Stripe account or financial data', async () => {
+  const { deps, db } = setup();
+  const stripeClient = {};
+  Object.defineProperty(stripeClient, 'accounts', { get() { throw new Error('Catalog must not call Stripe.'); } });
+  const env = { ...deps.env, EVENT_TICKETING_EVENT_ID: 'example-event', EVENT_STRIPE_ACCOUNT_ID: 'acct_example', EVENT_STRIPE_MODE: 'test' };
+  deps.provider = createStripeProvider({ env, db, stripeClient });
+  const catalog = await readTicketingCatalog(deps);
+  assert.equal(catalog.salesEnabled, true);
+  assert.ok(catalog.ticketTypes.every((type) => type.available));
+});
+
+test('an existing unknown attempt with unavailable credentials remains unchanged until safe retry', async () => {
+  const { deps, db, advance } = setup({ create() { throw new Error('Lost creation response'); } });
+  const initial = await checkout(deps);
+  const attemptId = db.ids('ticket_payment_attempts')[0];
+  const attempt = db.read('ticket_payment_attempts', attemptId);
+  advance(6000);
+  const env = { ...deps.env, EVENT_TICKETING_EVENT_ID: 'example-event', EVENT_STRIPE_ACCOUNT_ID: 'acct_example', EVENT_STRIPE_MODE: 'test' };
+  deps.provider = createStripeProvider({ env, db });
+  const resumed = await checkout(deps, { orderId: initial.body.orderId, resume: true });
+  assert.equal(resumed.statusCode, 503);
+  assert.deepEqual(db.read('ticket_payment_attempts', attemptId), attempt);
+  assert.equal(db.read('ticket_inventory', 'current').held, 1);
 });
 
 test('historical demo policy is read live even when the cached configuration describes a live event', async () => {
