@@ -10,6 +10,7 @@ const {
 const { inventoryTransitionPatch, transitionOrderInventory, SAFE_RETRY_MS } = require('./stripeCommerce.cjs');
 const { claimTicketsForUser } = require('./registration.cjs');
 const { createStripeProvider } = require('./providers/stripe.cjs');
+const { drainTicketSyncQueue } = require('./sync.cjs');
 
 const START = new Date('2026-10-12T16:00:00.000Z');
 const ADA = { uid: 'uid-ada', email: 'ada@example.com', email_verified: true };
@@ -244,6 +245,27 @@ test('historical demo policy is read live even when the cached configuration des
   assert.equal(calls.length, 0);
 });
 
+test('a demo freeze racing the Stripe creation response prevents local payment writes', async () => {
+  let beforeFreeze;
+  const { deps, db, calls } = setup({ create({ db: current, params }) {
+    beforeFreeze = {
+      order: current.read('ticket_orders', params.metadata.eventRunnerOrderId),
+      attempt: current.read('ticket_payment_attempts', params.metadata.eventRunnerAttemptId),
+      inventory: current.read('ticket_inventory', 'current'),
+    };
+    current.beforeCommit = async () => current.collection('config').doc('event').set({ historicalDemo: true });
+    return makeSession(params);
+  } });
+  const res = await checkout(deps);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'read-only-demo');
+  assert.equal(calls.length, 1);
+  assert.deepEqual(db.read('ticket_orders', beforeFreeze.order.id), beforeFreeze.order);
+  assert.deepEqual(db.read('ticket_payment_attempts', beforeFreeze.order.attemptId), beforeFreeze.attempt);
+  assert.deepEqual(db.read('ticket_inventory', 'current'), beforeFreeze.inventory);
+  assert.equal(db.ids('tickets').length, 0);
+});
+
 test('a verified account waits for its profile before creating a checkout', async () => {
   const { deps, db, calls } = setup();
   await db.collection('users').doc(ADA.uid).delete();
@@ -438,6 +460,39 @@ test('a process crash after the reservation is recovered without another order o
   assert.ok(recovered.stripeSessionId);
   assert.equal(calls.length, 1);
   assert.equal(db.ids('ticket_orders').length, 1);
+});
+
+test('the existing queue recovers a crash before Stripe creation while the frozen expiry is still valid', async () => {
+  const { deps, db, provider, calls, advance } = setup({ create({ params }) {
+    if (params.expires_at * 1000 - deps.now().getTime() < 30 * 60_000) throw new Error('Stripe requires at least 30 minutes before expiry.');
+    return makeSession(params);
+  } });
+  const reserved = await reserveCommerceOrder({ ...deps, actor: ADA, request: request() });
+  const row = db.read('ticket_sync_queue', reserved.order.id);
+  advance(row.readyAt.getTime() - deps.now().getTime());
+  provider.fetchOrder = async (id) => {
+    const recovered = await recoverCheckoutAttempt({ ...deps, orderId: id });
+    return { complete: Boolean(recovered.stripeSessionId), tickets: [], paymentPending: Boolean(recovered.stripeSessionId),
+      nextReconciliationAt: new Date(recovered.expiresAt) };
+  };
+  await drainTicketSyncQueue({ ...deps, log: QUIET });
+  assert.equal(calls.length, 1);
+  assert.ok(db.read('ticket_orders', reserved.order.id).stripeSessionId);
+  assert.deepEqual(db.read('ticket_sync_queue', reserved.order.id).readyAt, new Date(reserved.order.expiresAt));
+  assert.equal(db.ids('ticket_orders').length, 1);
+});
+
+test('verified Stripe Session URLs may use organizer custom domains but never insecure or credential URLs', async () => {
+  for (const [url, accepted] of [
+    ['https://payments.event.example/c/pay/session', true],
+    ['http://payments.event.example/c/pay/session', false],
+    ['https://user:secret@payments.event.example/c/pay/session', false],
+    ['javascript:alert(1)', false],
+  ]) {
+    const { deps } = setup({ create({ params }) { return makeSession(params, { url }); } });
+    const result = await checkout(deps);
+    assert.equal(result.body.checkoutUrl, accepted ? url : null);
+  }
 });
 
 test('a changed cart cannot reuse an old payment request ID', async () => {

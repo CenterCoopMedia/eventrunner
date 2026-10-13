@@ -15,7 +15,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/event': { historicalDemo: false }, ...seed });
 const { createTicketingWebhookHandler } = require('./webhook.cjs');
 const { drainTicketSyncQueue } = require('./sync.cjs');
 const { claimTicketsForUser } = require('./registration.cjs');

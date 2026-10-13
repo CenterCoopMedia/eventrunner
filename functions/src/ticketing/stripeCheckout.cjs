@@ -249,7 +249,9 @@ async function reserveCommerceOrder({
       // dies after Stripe receives creation, the frozen attempt is recoverable.
       tx.create(db.collection('ticket_sync_queue').doc(id), {
         orderId: id, provider: 'stripe', status: 'pending', attempts: 0,
-        readyAt: new Date(at.getTime() + HOLD_MS + 5000), createdAt: at, updatedAt: at,
+        // Recover a crash before Stripe creation while the frozen Session
+        // still meets Stripe's minimum of 30 minutes until expiry.
+        readyAt: new Date(at.getTime() + ATTEMPT_LEASE_MS + 5000), createdAt: at, updatedAt: at,
         lastEventType: 'checkout.reserved',
       });
     } else {
@@ -267,7 +269,9 @@ async function reserveCommerceOrder({
 function safeCheckoutUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname === 'checkout.stripe.com' && !url.username && !url.password ? url.href : null;
+    // This value comes only from an account-verified Stripe Session. Stripe
+    // may return the merchant's custom Checkout domain.
+    return url.protocol === 'https:' && !url.username && !url.password ? url.href : null;
   } catch { return null; }
 }
 
@@ -338,7 +342,8 @@ async function recoverCheckoutAttempt({ db, provider, orderId, now = () => new D
   }
   return db.runTransaction(async (tx) => {
     const attemptRef = db.collection(ATTEMPTS).doc(lease.order.attemptId);
-    const [orderSnap, attemptSnap] = await tx.getAll(orderRef, attemptRef);
+    const [orderSnap, attemptSnap, eventSnap] = await tx.getAll(orderRef, attemptRef, db.collection('config').doc('event'));
+    assertWritableEvent(eventSnap.data());
     const order = orderSnap.data();
     if (!order) throw new CommerceError('not-found', 'Order not found.', 404);
     const at = now();

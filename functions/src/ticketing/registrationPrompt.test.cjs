@@ -8,6 +8,7 @@ const makeFakeDb = (seed = {}) => makeStoreDb({ 'config/event': {}, ...seed });
 const { createEventbriteProvider } = require('./providers/eventbrite.cjs');
 const { createManualProvider } = require('./providers/manual.cjs');
 const { createNoneProvider } = require('./providers/none.cjs');
+const { createStripeProvider } = require('./providers/stripe.cjs');
 const {
   sendRegistrationPrompt,
   createOnUserRegistrationPromptCreated,
@@ -102,6 +103,16 @@ function none() {
   return createNoneProvider({});
 }
 
+function stripe(db, getConfig) {
+  return createStripeProvider({
+    db, getConfig,
+    env: {
+      EVENT_TICKETING_EVENT_ID: 'conference-1', EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture',
+      EVENT_STRIPE_MODE: 'test', EVENT_PUBLIC_URL: 'https://summit.example.org',
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // buildContext / hasClaimedTicket
 // ---------------------------------------------------------------------------
@@ -186,9 +197,26 @@ test('none: a brand-new signup gets nothing at all — send: false suppresses th
   assert.equal(calls.length, 0);
 });
 
+test('stripe: a signup without admission gets the catalog prompt without payment credentials', async () => {
+  const db = makeFakeDb({ 'users/uid-ada': user() });
+  const getConfig = async () => baseConfig();
+  const calls = [];
+  const result = await sendRegistrationPrompt({
+    db, provider: stripe(db, getConfig), sendEmail: makeSendEmail(calls), getConfig,
+    uid: 'uid-ada', now: () => T0, log: QUIET,
+  });
+  assert.equal(result.sent, true);
+  assert.equal(result.templateId, 'ticket.get_ticket');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].onceKey, 'get-ticket:uid-ada');
+  assert.ok(calls[0].html.includes('https://summit.example.org/tickets'));
+  assert.ok(calls[0].html.includes('Choose tickets'));
+});
+
 for (const [label, makeProvider] of [
   ['eventbrite', (db, getConfig) => eventbrite(getConfig)],
   ['manual', (db, getConfig) => manual(db, getConfig)],
+  ['stripe', (db, getConfig) => stripe(db, getConfig)],
   ['none', () => none()],
 ]) {
   test(`${label}: a speaker never gets a registration prompt, whatever the provider (§3.5 universal skip)`, async () => {

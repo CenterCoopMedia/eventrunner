@@ -6,6 +6,7 @@
  * fences concurrent provider reads; its token is checked again on commit.
  */
 const { randomUUID } = require('node:crypto');
+const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { internals: { scopeMatches, metadataMatches, objectId, safeId } } = require('./providers/stripe.cjs');
 
 const LEASE_MS = 5 * 60_000;
@@ -24,6 +25,12 @@ function millis(value) {
 
 function requireMatch(condition, code = 'stripe-order-mismatch', message = 'Payment details do not match the saved order.') {
   if (!condition) throw new ReconciliationMismatch(code, message);
+}
+
+async function writesAllowed(db, transaction) {
+  const policy = await checkDemoWrites({ db, transaction });
+  throwIfDemoPolicyUnavailable(policy);
+  return policy.ok;
 }
 
 function validateFinancialState(order, state, provider) {
@@ -58,6 +65,8 @@ function validateFinancialState(order, state, provider) {
     order.seats.length === order.ticketIds.length && new Set(order.ticketIds).size === order.ticketIds.length &&
     order.seats.every((seat) => safeId(seat.externalId) && order.ticketIds.includes(seat.externalId)));
   const paymentIntentId = objectId(session.payment_intent);
+  requireMatch(!order.stripePaymentIntentId || order.stripePaymentIntentId === paymentIntentId,
+    'stripe-payment-identity-mismatch', 'The saved payment identity changed. Capacity and financial history remain unchanged for organizer review.');
   if (paymentIntentId) {
     requireMatch(paymentIntent?.id === paymentIntentId && metadataMatches(paymentIntent.metadata, order) &&
       paymentIntent.livemode === provider.livemode && paymentIntent.currency === order.currency &&
@@ -105,11 +114,13 @@ function financialPatch(order, state, at) {
   requireMatch(refundedAmount <= order.totalAmount);
   let refundStatus = 'none';
   if (refundedAmount > 0) refundStatus = refundedAmount === order.totalAmount ? 'full' : 'partial';
-  if (refunds.some((refund) => refund.status === 'pending')) refundStatus = 'pending';
-  if (refunds.some((refund) => refund.status === 'requires_action')) refundStatus = 'requires_action';
-  if (refunds.some((refund) => refund.status === 'failed')) refundStatus = 'failed';
   let reconciliationException = null;
   const fullRefund = order.totalAmount > 0 && refundedAmount === order.totalAmount;
+  if (!fullRefund) {
+    if (refunds.some((refund) => refund.status === 'pending')) refundStatus = 'pending';
+    if (refunds.some((refund) => refund.status === 'requires_action')) refundStatus = 'requires_action';
+    if (refunds.some((refund) => refund.status === 'failed')) refundStatus = 'failed';
+  }
   if (!fullRefund && refunds.some((refund) => refund.status === 'succeeded' &&
       (!Array.isArray(order.refundAllocations?.[refund.id]) ||
        !order.refundAllocations[refund.id].every((id) => order.ticketIds.includes(id)) ||
@@ -117,7 +128,7 @@ function financialPatch(order, state, at) {
         order.refundAllocationDecisions?.[refund.id]?.preserveAdmission !== true)))) {
     reconciliationException = { code: 'refund-allocation-required', message: 'A partial refund needs ticket allocation.' };
   }
-  if (refunds.some((refund) => refund.status === 'failed' || refund.status === 'requires_action')) {
+  if (!fullRefund && refunds.some((refund) => refund.status === 'failed' || refund.status === 'requires_action')) {
     reconciliationException = { code: 'refund-needs-attention', message: 'A refund needs an organizer to review its current Stripe status.' };
   }
   if (disputes.some((dispute) => !['won', 'warning_closed'].includes(dispute.status))) {
@@ -164,6 +175,7 @@ async function readTickets(db, order) {
 async function finishException({ db, orderId, leaseId, exception, now }) {
   const ref = db.collection('ticket_orders').doc(orderId);
   await db.runTransaction(async (tx) => {
+    if (!await writesAllowed(db, tx)) return;
     const snap = await tx.get(ref);
     if (!snap.exists || snap.data().reconciliationLease?.id !== leaseId) return;
     tx.set(ref, {
@@ -178,7 +190,10 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
   if (!db || !safeId(orderId)) throw new Error('An internal order identifier and database are required.');
   const ref = db.collection('ticket_orders').doc(orderId);
   const leaseId = randomUUID();
+  const blocked = { orderId, externalEventId: provider.externalEventId, complete: false,
+    retryWithoutAttempt: true, writeBlocked: true, tickets: [], ticketsPersisted: true };
   const acquired = await db.runTransaction(async (tx) => {
+    if (!await writesAllowed(db, tx)) return { blocked: true };
     const snap = await tx.get(ref);
     if (!snap.exists || !scopeMatches(snap.data(), provider)) return { missing: true };
     const order = snap.data();
@@ -186,6 +201,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
     tx.set(ref, { reconciliationLease: { id: leaseId, expiresAt: new Date(now().getTime() + LEASE_MS) } }, { merge: true });
     return { order };
   });
+  if (acquired.blocked) return blocked;
   if (acquired.missing) return { orderId, externalEventId: provider.externalEventId, complete: true, tickets: [], ticketsPersisted: true };
   if (acquired.busy) return { orderId, externalEventId: provider.externalEventId, complete: false, retryWithoutAttempt: true, tickets: [], ticketsPersisted: true };
   let order = acquired.order;
@@ -208,9 +224,11 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
         return { orderId, externalEventId: provider.externalEventId, complete: Boolean(exception), tickets: [], ticketsPersisted: true, exception };
       }
     }
+    if (!await writesAllowed(db)) return blocked;
     const state = validateFinancialState(order, await provider.readFinancialState(order), provider);
     const at = now();
     const result = await db.runTransaction(async (tx) => {
+      if (!await writesAllowed(db, tx)) return blocked;
       const snap = await tx.get(ref);
       const current = snap.data();
       if (!scopeMatches(current, provider) || current.reconciliationLease?.id !== leaseId ||
@@ -283,6 +301,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
         tickets: await readTickets(db, order), ticketsPersisted: true, exception };
     }
     await db.runTransaction(async (tx) => {
+      if (!await writesAllowed(db, tx)) return;
       const snap = await tx.get(ref);
       if (snap.data()?.reconciliationLease?.id === leaseId) tx.set(ref, { reconciliationLease: null }, { merge: true });
     });

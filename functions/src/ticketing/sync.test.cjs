@@ -38,7 +38,7 @@ const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
 // #186 review: it fails closed on an absent document), so every fake this
 // file builds carries the document the file's getConfig describes.
 const BOOTSTRAP_DOC = { adminEmails: ['admin@example.com'] };
-const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
+const makeFakeDb = (seed = {}) => makeBareFakeDb({ 'config/event': { historicalDemo: false }, 'config/bootstrap': BOOTSTRAP_DOC, ...seed });
 const {
   drainTicketSyncQueue,
   runFullSync,
@@ -133,6 +133,62 @@ test('a delivery accepted during a provider read survives completion of the prev
   await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
   assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
   assert.equal(db.read('ticket_sync_queue', 'ord-1'), undefined);
+});
+
+test('a fresh delivery during the final failed attempt gets its own reconciliation budget', async () => {
+  const db = makeFakeDb({ 'ticket_sync_queue/ord-1': pendingRow('ord-1', { generation: 1, attempts: 5 }) });
+  const provider = createFakeTicketingProvider();
+  let calls = 0;
+  provider.fetchOrder = async () => {
+    calls += 1;
+    if (calls === 1) {
+      await claimAndEnqueue({ db, deliveryId: 'fresh-paid', orderId: 'ord-1', eventType: 'order.updated', providerName: provider.name, now: () => T0 });
+      return { complete: false };
+    }
+    return { complete: true, tickets: [fakeTicket()] };
+  };
+  await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(calls, 2);
+  assert.equal(db.read('tickets', 'tkt-1').status, 'valid');
+  assert.equal(db.read('ticket_sync_queue', 'ord-1'), undefined);
+});
+
+test('historical demos freeze queued work and full sync before any provider or database mutation', async () => {
+  const row = pendingRow('ord-1');
+  const db = makeFakeDb({ 'config/event': { historicalDemo: true }, 'ticket_sync_queue/ord-1': row });
+  const provider = createFakeTicketingProvider({ orders: { 'ord-1': { tickets: [fakeTicket()] } } });
+  await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  await runFullSync({ db, provider, now: () => T0, log: QUIET });
+  assert.deepEqual(provider.calls.fetchOrder, []);
+  assert.deepEqual(provider.calls.listTickets, []);
+  assert.deepEqual(db.read('ticket_sync_queue', 'ord-1'), row);
+  assert.equal(db.ids('tickets').length, 0);
+});
+
+test('a demo freeze while fetching leaves the queue and admission unchanged', async () => {
+  const db = makeFakeDb({ 'ticket_sync_queue/ord-1': pendingRow('ord-1') });
+  const provider = createFakeTicketingProvider();
+  let leased;
+  provider.fetchOrder = async () => {
+    leased = db.read('ticket_sync_queue', 'ord-1');
+    await db.collection('config').doc('event').set({ historicalDemo: true });
+    return { complete: true, tickets: [fakeTicket()] };
+  };
+  await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  assert.deepEqual(db.read('ticket_sync_queue', 'ord-1'), leased);
+  assert.equal(db.ids('tickets').length, 0);
+});
+
+test('a demo freeze racing a full-sync ticket commit aborts the ticket write', async () => {
+  const db = makeFakeDb();
+  const provider = createFakeTicketingProvider();
+  provider.listTickets = async () => {
+    db.beforeCommit = async () => db.collection('config').doc('event').set({ historicalDemo: true });
+    return { tickets: [fakeTicket()] };
+  };
+  await runFullSync({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(db.ids('tickets').length, 0);
 });
 
 test('payment waiting does not spend the six provider-unreadability attempts and remains bounded', async () => {

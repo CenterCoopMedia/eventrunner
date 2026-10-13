@@ -1,6 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 
 /**
  * The sync queue and the ticket upsert (spec §3.3 steps 3–4, §4.2).
@@ -44,6 +45,12 @@ const PAYMENT_RECHECK_LIMIT = 48;
 
 /** Pages one manual full sync will walk before it reports itself truncated. */
 const MAX_SYNC_PAGES = 50;
+
+async function writesAllowed(db, transaction) {
+  const policy = await checkDemoWrites({ db, transaction });
+  throwIfDemoPolicyUnavailable(policy);
+  return policy.ok;
+}
 
 /** @param {number} attempts 1-based @returns {number} ms */
 function backoffMsFor(attempts) {
@@ -111,9 +118,10 @@ function normalizeTicket(record, providerName) {
  * @param {{ db: object, ticket: object, now?: () => Date }} deps
  * @returns {Promise<{ action: 'created'|'updated' }>}
  */
-async function upsertTicket({ db, ticket, now = () => new Date() }) {
+async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPolicy = false }) {
   const ref = db.collection(TICKETS).doc(ticket.externalId);
   return db.runTransaction(async (tx) => {
+    if (respectDemoPolicy && !await writesAllowed(db, tx)) return { action: 'blocked' };
     const snap = await tx.get(ref);
     const at = now();
     if (!snap.exists) {
@@ -140,7 +148,7 @@ async function upsertTicket({ db, ticket, now = () => new Date() }) {
  *           now?: () => Date, log?: Pick<Console,'warn'> }} deps
  * @returns {Promise<{ created: number, updated: number, skipped: number }>}
  */
-async function upsertTickets({ db, tickets, providerName, now = () => new Date(), log = console }) {
+async function upsertTickets({ db, tickets, providerName, now = () => new Date(), log = console, respectDemoPolicy = false }) {
   let created = 0;
   let updated = 0;
   let skipped = 0;
@@ -151,7 +159,8 @@ async function upsertTickets({ db, tickets, providerName, now = () => new Date()
       log.warn('ticketing: skipped a ticket with no usable externalId');
       continue;
     }
-    const { action } = await upsertTicket({ db, ticket: normalized, now });
+    const { action } = await upsertTicket({ db, ticket: normalized, now, respectDemoPolicy });
+    if (action === 'blocked') return { created, updated, skipped, blocked: true };
     if (action === 'created') created += 1;
     else updated += 1;
   }
@@ -196,6 +205,7 @@ async function exhaustRow({ db, orderId, attempts, reason, notifyOperator, now, 
 async function leaseQueueRow({ db, ref, providerName, now }) {
   const token = randomUUID();
   return db.runTransaction(async (tx) => {
+    if (!await writesAllowed(db, tx)) return null;
     const snap = await tx.get(ref);
     const row = snap.data();
     const at = now();
@@ -213,12 +223,13 @@ async function leaseQueueRow({ db, ref, providerName, now }) {
 
 async function finishQueueRow({ db, ref, lease, remove = false, patch = {}, now }) {
   return db.runTransaction(async (tx) => {
+    if (!await writesAllowed(db, tx)) return false;
     const snap = await tx.get(ref);
     const row = snap.data();
     if (!snap.exists || row.leaseId !== lease.leaseId) return false;
     if ((row.generation || 0) !== lease.generation) {
       // A delivery accepted while we were reading is still durable work.
-      const attemptsPatch = remove ? { attempts: 0 }
+      const attemptsPatch = remove || patch.status === QUEUE_EXHAUSTED ? { attempts: 0, paymentChecks: 0 }
         : Number.isInteger(patch.attempts) && patch.attempts < row.attempts ? { attempts: patch.attempts } : {};
       tx.set(ref, { leaseId: null, leaseExpiresAt: null, readyAt: now(), ...attemptsPatch }, { merge: true });
       return false;
@@ -254,6 +265,8 @@ async function drainTicketSyncQueue({
   limit = DRAIN_LIMIT,
   log = console,
 }) {
+  const summary = { scanned: 0, completed: 0, retried: 0, exhausted: 0, skipped: 0 };
+  if (!await writesAllowed(db)) return summary;
   const nowMs = now().getTime();
   // `status == pending` ordered by readyAt: the ready rows are a prefix of
   // that ordering, so an over-read plus an in-memory cutoff is exact, and
@@ -263,8 +276,6 @@ async function drainTicketSyncQueue({
     .orderBy('readyAt')
     .limit(limit)
     .get();
-
-  const summary = { scanned: 0, completed: 0, retried: 0, exhausted: 0, skipped: 0 };
 
   for (const doc of snap.docs) {
     const row = doc.data() || {};
@@ -296,7 +307,7 @@ async function drainTicketSyncQueue({
             fields: { orderId, attempts: String(cappedAttempts), reason }, dedupeKey: `ticket-sync-exhausted:${orderId}` });
         } catch { log.warn('ticketing: operator notification unavailable'); }
       }
-      summary.exhausted += 1;
+      if (marked) summary.exhausted += 1;
     };
     if (attempts > MAX_ATTEMPTS) {
       await exhaust('previous attempt ended before completion', MAX_ATTEMPTS);
@@ -317,6 +328,7 @@ async function drainTicketSyncQueue({
       }
       continue;
     }
+    if (!await writesAllowed(db)) return summary;
 
     // Wrong-event orders are not our work and must not occupy the queue.
     // Same rule as the webhook's wrong-event branch (§3.3): one configured
@@ -356,11 +368,13 @@ async function drainTicketSyncQueue({
     }
 
     if (!provider.ownsTicketPersistence) {
-      await upsertTickets({ db, tickets: order.tickets, providerName: provider.name, now, log });
+      const upserted = await upsertTickets({ db, tickets: order.tickets, providerName: provider.name, now, log, respectDemoPolicy: true });
+      if (upserted.blocked) return summary;
     }
     // Only now: the row is the only durable record that this order still
     // needs work.
     await finishQueueRow({ db, ref: doc.ref, lease, now, remove: true });
+    if (!await writesAllowed(db)) return summary;
     if (order.exception) await notifySyncException({ notifyOperator, orderId,
       code: order.exception.code, message: order.exception.message, log });
     summary.completed += 1;
@@ -385,14 +399,17 @@ async function runFullSync({ db, provider, since, now = () => new Date(), log = 
   const totals = { created: 0, updated: 0, skipped: 0, pages: 0, truncated: false };
   let pageToken;
   for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
+    if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
     const result = await provider.listTickets({ since, pageToken });
+    if (!await writesAllowed(db)) return { ...totals, skippedReason: 'read-only-demo' };
     totals.pages += 1;
     const counts = provider.ownsTicketPersistence
       ? { created: 0, updated: result?.tickets?.length || 0, skipped: 0 }
-      : await upsertTickets({ db, tickets: result?.tickets, providerName: provider.name, now, log });
+      : await upsertTickets({ db, tickets: result?.tickets, providerName: provider.name, now, log, respectDemoPolicy: true });
     totals.created += counts.created;
     totals.updated += counts.updated;
     totals.skipped += counts.skipped;
+    if (counts.blocked) return { ...totals, skippedReason: 'read-only-demo' };
     pageToken = result?.nextPageToken || null;
     if (!pageToken) return totals;
   }
