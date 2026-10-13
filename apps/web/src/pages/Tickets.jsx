@@ -28,7 +28,8 @@ export default function Tickets() {
   const [loadVersion, setLoadVersion] = useState(0);
   const [quantities, setQuantities] = useState({});
   const [attendees, setAttendees] = useState({});
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [acceptedCatalogRevision, setAcceptedCatalogRevision] = useState(null);
+  const [acceptedByUid, setAcceptedByUid] = useState(null);
   const [errors, setErrors] = useState({});
   const [requestError, setRequestError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,12 +58,11 @@ export default function Tickets() {
     setBusy(false);
     setQuantities({});
     setAttendees({});
-    setTermsAccepted(false);
+    setAcceptedCatalogRevision(null);
+    setAcceptedByUid(null);
     setErrors({});
     setRequestError('');
   }, [user?.uid]);
-
-  useEffect(() => { setTermsAccepted(false); }, [catalog?.catalogRevision]);
 
   useEffect(() => {
     if (Object.keys(errors).length) {
@@ -70,6 +70,11 @@ export default function Tickets() {
       else errorRef.current?.focus();
     } else if (requestError) errorRef.current?.focus();
   }, [errors, requestError, catalog]);
+
+  // Consent belongs to the displayed offer and purchaser in this render.
+  // A passive reset would briefly commit new terms with the old box checked.
+  const validCatalogRevision = Number.isSafeInteger(catalog?.catalogRevision) && catalog.catalogRevision >= 0;
+  const termsAccepted = validCatalogRevision && acceptedCatalogRevision === catalog.catalogRevision && acceptedByUid === user?.uid;
 
   const types = catalog?.ticketTypes || [];
   const lines = types.filter((type) => Number(quantities[type.id]) > 0).map((type) => ({
@@ -128,7 +133,8 @@ export default function Tickets() {
           requestRef.current = null;
           setSaved({ uid, attempt: null });
           if (catalogChanged) {
-            setTermsAccepted(false);
+            setAcceptedCatalogRevision(null);
+            setAcceptedByUid(null);
             setErrors({});
             setCatalog(null);
           }
@@ -167,7 +173,7 @@ export default function Tickets() {
     if (Object.keys(nextErrors).length) return;
     const body = {
       requestId: newTicketingRequestId(),
-      catalogRevision: catalog.catalogRevision,
+      catalogRevision: acceptedCatalogRevision,
       lines: lines.map((line) => ({ ...line, attendees: line.attendees.map((attendee) => ({
         firstName: attendee.firstName.trim(), lastName: (attendee.lastName || '').trim(), email: attendee.email.trim(),
       })) })),
@@ -306,7 +312,10 @@ export default function Tickets() {
             <p className="text-caption text-text-secondary">{catalog.taxTreatment === 'inclusive' ? 'Any applicable tax is included in these prices.' : 'The organizer has configured this event not to collect tax.'} The organizer pays processing fees; no additional fees are added to your total.</p>
             <h3 className="font-heading text-h3 font-semibold">Refund policy</h3>
             <p className="whitespace-pre-wrap wrap-anywhere">{catalog.refundPolicy}</p>
-            <Checkbox label="I have read and accept the refund policy" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} error={errors.terms} />
+            <Checkbox label="I have read and accept the refund policy" checked={termsAccepted} onChange={(event) => {
+              setAcceptedCatalogRevision(event.target.checked && validCatalogRevision ? catalog.catalogRevision : null);
+              setAcceptedByUid(event.target.checked ? user.uid : null);
+            }} error={errors.terms} />
             {total > 0 ? <p>Stripe securely collects your payment on the next page. Your tickets are issued only after payment is confirmed. Returning to this site does not confirm a purchase.</p> : <p>No payment is required. The server will confirm available seats before issuing your tickets.</p>}
             <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Preparing your order…' : total > 0 ? `Continue to Stripe — ${formatTicketMoney(total, catalog.currency)}` : 'Reserve tickets'}</button>
           </section>

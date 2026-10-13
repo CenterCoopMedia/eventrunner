@@ -2,10 +2,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
-const state = vi.hoisted(() => ({ auth: { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false }, event: { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} } }));
+const state = vi.hoisted(() => ({ consentCommits: [], auth: { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false }, event: { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} } }));
 vi.mock('../contexts/AuthContext.jsx', () => ({ useAuth: () => state.auth, functionsOrigin: () => 'https://functions.example.test' }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: state.event }) }));
 vi.mock('../components/SignInPanel.jsx', () => ({ default: () => <p>Inline verified sign-in</p> }));
+vi.mock('../components/forms/Choice.jsx', async (original) => {
+  const actual = await original();
+  const { useLayoutEffect, useRef } = await import('react');
+  function ObservedCheckbox(props) {
+    const wrapper = useRef(null);
+    useLayoutEffect(() => {
+      const article = wrapper.current.closest('article');
+      const heading = [...article.querySelectorAll('h3')].find((node) => node.textContent === 'Refund policy');
+      // Observe the actual committed control and policy before any parent
+      // passive effect can reset an old consent value.
+      state.consentCommits.push({
+        policy: heading?.nextElementSibling?.textContent,
+        checked: wrapper.current.querySelector('input').checked,
+        buyer: article.querySelector('span.font-semibold')?.textContent,
+      });
+    });
+    return <div ref={wrapper}><actual.Checkbox {...props} /></div>;
+  }
+  return { ...actual, Checkbox: ObservedCheckbox };
+});
+
 vi.mock('../lib/ticketingCommerce.js', async (original) => ({ ...await original(), ticketingRequest: vi.fn() }));
 import { ticketingRequest, TicketingRequestError } from '../lib/ticketingCommerce.js';
 import Tickets from './Tickets.jsx';
@@ -33,6 +54,7 @@ async function fill(quantity = 1) {
 describe('attendee ticket selection', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    state.consentCommits = [];
     state.auth = { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false };
     state.event = { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} };
     ticketingRequest.mockReset();
@@ -42,18 +64,60 @@ describe('attendee ticket selection', () => {
     const changed = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Updated refund policy requires organizer approval.',
       ticketTypes: CATALOG.ticketTypes.map((type) => ({ ...type, unitAmount: 3500 })) };
     let catalogCalls = 0;
+    let checkoutCalls = 0;
     ticketingRequest.mockImplementation(async (name) => {
       if (name === 'ticketingCatalog') return ++catalogCalls === 1 ? CATALOG : changed;
-      throw new TicketingRequestError(code, 'Review the available tickets and try again.', code === 'account-not-ready' ? 503 : code === 'rate-limited' ? 429 : 409);
+      if (++checkoutCalls === 1) throw new TicketingRequestError(code, 'Review the available tickets and try again.', code === 'account-not-ready' ? 503 : code === 'rate-limited' ? 429 : 409);
+      return { orderId: 'order-synthetic', checkoutUrl: null };
     });
     mount(); await fill();
     expect(screen.getByRole('checkbox')).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
     await screen.findByText(changed.refundPolicy);
     expect(screen.getByRole('checkbox')).not.toBeChecked();
+    const updatedCommits = state.consentCommits.filter(({ policy }) => policy === changed.refundPolicy);
+    expect(updatedCommits.length).toBeGreaterThan(0);
+    expect(updatedCommits.every(({ checked }) => checked === false)).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $35.00' }));
     expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
     expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $35.00' }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    const calls = ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout');
+    expect(calls).toHaveLength(2);
+    expect(calls[0][1].body.catalogRevision).toBe(1);
+    expect(calls[1][1].body.catalogRevision).toBe(2);
+    expect(calls[1][1].body.requestId).not.toBe(calls[0][1].body.requestId);
+  });
+  it.each([undefined, null, -1, 1.5, '1', Number.MAX_SAFE_INTEGER + 1])('does not accept or submit an invalid displayed revision: %s', async (catalogRevision) => {
+    ticketingRequest.mockResolvedValue({ ...CATALOG, catalogRevision });
+    mount(); await fill();
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
+    expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(0);
+  });
+  it('accepts revision zero as a valid displayed catalog revision', async () => {
+    ticketingRequest.mockImplementation(async (name) => name === 'ticketingCatalog'
+      ? { ...CATALOG, catalogRevision: 0 }
+      : { orderId: 'order-synthetic', checkoutUrl: null });
+    mount(); await fill();
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    expect(ticketingRequest.mock.calls.find(([name]) => name === 'ticketingCheckout')[1].body.catalogRevision).toBe(0);
+  });
+  it('requires the new purchaser to accept even when the displayed revision is unchanged', async () => {
+    const view = mount(); await fill();
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    state.auth.user = { ...state.auth.user, uid: 'purchaser-b', email: 'next-purchaser@example.test' };
+    view.rerender(<MemoryRouter initialEntries={['/tickets']}><Routes><Route path="/tickets" element={<Tickets />} /><Route path="*" element={<Location />} /></Routes></MemoryRouter>);
+    const nextBuyerCommits = state.consentCommits.filter(({ buyer }) => buyer === 'next-purchaser@example.test');
+    expect(nextBuyerCommits.length).toBeGreaterThan(0);
+    expect(nextBuyerCommits.every(({ checked }) => checked === false)).toBe(true);
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(0);
   });
   it('requires verified sign-in before revealing purchase controls', async () => {
     state.auth.user = null;
