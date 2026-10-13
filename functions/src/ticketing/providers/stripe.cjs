@@ -268,7 +268,12 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
       return { tickets, ticketsPersisted: true, nextPageToken: page.size === ORDER_PAGE_SIZE ? page.docs.at(-1).id : null };
     },
 
-    async getRegistrationPrompt() {
+    async getRegistrationPrompt(ctx = {}) {
+      // Registration prompt entitlement skips apply to every provider and
+      // trigger, before configuration reads or any delivery onceKey is used.
+      if (ctx?.isSpeaker === true || ctx?.hasClaimedTicket === true) {
+        return { send: false, templateId: null, ctaLabel: null, ctaUrl: null, action: null, bodyNote: null };
+      }
       const config = typeof getConfig === 'function' ? await getConfig() : null;
       const publicUrl = env.EVENT_PUBLIC_URL?.trim();
       let origin;

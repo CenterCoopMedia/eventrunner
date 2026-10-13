@@ -75,6 +75,22 @@ test('Stripe account, event and explicit test/live mode are required; live is ba
   assert.throws(() => stripeScope({ ...ENV, EVENT_STRIPE_MODE: 'live', EVENT_FIREBASE_PROJECT_ID: 'demo-stripe' }), /live mode/);
 });
 
+test('registration prompts suppress entitled users for every trigger before reading configuration', async () => {
+  const provider = createStripeProvider({
+    env: ENV,
+    getConfig: async () => assert.fail('An entitled user must not require configuration or Stripe credentials.'),
+  });
+  for (const context of [{ isSpeaker: true }, { hasClaimedTicket: true }]) {
+    for (const trigger of ['account_created', 'ticket_unclaimed', 'admin_resend']) {
+      const prompt = await provider.getRegistrationPrompt({ ...context, trigger });
+      assert.equal(prompt.send, false);
+      assert.equal(prompt.templateId, null);
+      assert.equal(prompt.ctaUrl, null);
+      assert.equal(prompt.action, null);
+    }
+  }
+});
+
 test('official SDK verifies exact bytes, and independent account-scoped retrieval binds the order', async () => {
   const { provider, calls } = fixture();
   const delivery = signed();

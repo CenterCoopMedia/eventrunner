@@ -206,8 +206,10 @@ bearer token, and none of the Tier A values are confidential either.
 | `EVENT_STORAGE_BUCKET` | the project's default Storage bucket |
 | `EVENT_ALLOWED_ORIGINS` | comma-separated CORS origins |
 | `EVENT_EMAIL_PROVIDER` | `postmark` \| `webhook`. `console` is valid only when the GitHub Environment name is exactly `demo` |
-| `EVENT_TICKETING_PROVIDER` | `eventbrite` \| `manual` \| `none` |
-| `EVENT_TICKETING_EVENT_ID` | required only when the ticketing provider is `eventbrite` |
+| `EVENT_TICKETING_PROVIDER` | `eventbrite` \| `stripe` \| `manual` \| `none` |
+| `EVENT_TICKETING_EVENT_ID` | Eventbrite event ID or stable internal event ID for Stripe; required for either provider |
+| `EVENT_STRIPE_ACCOUNT_ID` | organizer-owned `acct_…` account; required when the ticketing provider is `stripe` |
+| `EVENT_STRIPE_MODE` | explicit `test` or `live` when using Stripe; begin onboarding in `test` |
 | `EVENT_OPERATOR_NOTIFIER` | `webhook` \| `email` \| `none` |
 | `EVENT_APP_CHECK_ENFORCED` | `false` by default; set the App Check site key before changing this to `true` |
 | `EVENT_OTP_SEND_CEILING_PER_HOUR` | positive integer; defaults to `500` |
@@ -234,8 +236,8 @@ only the rows that apply to the providers selected above:
 | `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` (server token) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | `EVENT_EMAIL_PROVIDER = postmark` and delivery-event ingest is enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | `EVENT_EMAIL_PROVIDER = webhook` |
-| `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER != none` |
-| `TICKETING_WEBHOOK_SECRET` | ticketing provider implements `registerWebhook` (`eventbrite` — never `manual`) |
+| `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER = eventbrite` or `stripe`; Stripe requires a secret or restricted key matching `EVENT_STRIPE_MODE`. `manual` and `none` use no ticketing API token |
+| `TICKETING_WEBHOOK_SECRET` | `eventbrite` or `stripe`; for Stripe, use the signing secret generated for this deployed endpoint in the configured mode. `manual` and `none` use no webhook secret |
 | `OPERATOR_WEBHOOK_URL`, `OPERATOR_WEBHOOK_SECRET` | `EVENT_OPERATOR_NOTIFIER = webhook` |
 
 There is deliberately no `FIREBASE_SERVICE_ACCOUNT` secret in this list — WIF (§1–2) replaces the
