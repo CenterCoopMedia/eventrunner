@@ -63,7 +63,7 @@ test.beforeEach(() => resetTemplateCacheForTest());
 
 // --- registry -------------------------------------------------------------
 
-test('listTemplateIds returns the phase-2 defaults, the phase-3 speaker trio, and the phase-4 ticket pair', () => {
+test('listTemplateIds includes account, speaker, claim, and native ticket confirmations', () => {
   assert.deepEqual(listTemplateIds().sort(), [
     'account.welcome',
     'auth.otp',
@@ -76,8 +76,10 @@ test('listTemplateIds returns the phase-2 defaults, the phase-3 speaker trio, an
     'speaker.invite',
     // §6.3 phase 4: could not be finished before the provider that
     // parameterizes them existed (issue #33).
+    'ticket.attendee_confirmation',
     'ticket.claim_prompt',
     'ticket.get_ticket',
+    'ticket.order_confirmation',
   ]);
 });
 

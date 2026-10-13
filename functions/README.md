@@ -72,3 +72,33 @@ The private stores and launch decisions are documented in
 queue, Connect routing, or automatic migration. A missing/unpublished catalog keeps
 sales closed. Merchant setup, retention terms, a real Stripe test rehearsal, and
 live cutover remain operator responsibilities.
+
+### Organizer operations and confirmations
+
+`ticketingCommerceAdmin` is a POST action API. Staff can list scoped orders/tickets,
+read their audit trail, correct an attendee, cancel selected admission, reconcile an
+order, and resend transactional confirmations. Operators alone can save the
+revisioned catalog, pause/resume sales, issue a confirmed comp, and allocate a
+succeeded partial refund. A claimed or checked-in ticket cannot change its email.
+An operator must cancel an already used ticket. All admission changes retain the
+historical paid amount and sold capacity. There is no API that sends a money refund.
+
+`ticketingCheckIn` admits staff for atomic online check-in. Undo requires an operator,
+confirmation, and reason. Invalid/refunded/cancelled tickets and explicit account
+revocations fail closed; duplicate scans make only one audit entry.
+`ticketingMyTickets` lists only the verified caller's claimed tickets, with a cursor,
+for Stripe, Eventbrite, and manual deployments. It exposes no purchaser finances.
+
+The `onTicketOrderConfirmation` order-written trigger rereads current settled order
+and admission state, then uses the existing email adapter with per-recipient,
+per-template send-once keys. It sends the purchaser's order receipt separately from
+each attendee's claim invitation. These messages are Event Runner confirmations;
+the merchant's Stripe payment receipt is separate. Neither rendered body is retained
+in the email log. Duplicate triggers do not duplicate sends. Failed or uncertain
+delivery creates a redacted attention audit; staff inspect the email log and choose
+an explicit resend with a new request key. Resends include the actor in the audit.
+
+Transactional mutations include `config/event` in their read set, so enabling
+`historicalDemo` during a request prevents the commit. Managed email secrets are
+bound only to the organizer endpoint that can resend and the confirmation trigger;
+the native attendee read/checkout handlers do not need them.
