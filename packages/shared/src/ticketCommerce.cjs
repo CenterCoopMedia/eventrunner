@@ -138,13 +138,13 @@ function normalizeAttendee(input) {
   return { firstName, lastName, email };
 }
 
-/** Client input contains intent and assignments only. Prices and grants are rejected. */
+/** Client input contains catalog acceptance, intent, and assignments. Prices and grants are rejected. */
 function validateCheckoutRequest(input) {
   const issue = (message) => ({ ok: false, value: null, issues: [{ path: 'checkout', message }] });
   if (!input || typeof input !== 'object' || Array.isArray(input)) return issue('A checkout request is required.');
-  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume'].includes(key))) return issue('Checkout accepts ticket selections and attendee assignments only.');
+  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume', 'catalogRevision'].includes(key))) return issue('Checkout accepts catalog acceptance, ticket selections, and attendee assignments only.');
   if (input.resume === true) {
-    if (input.lines !== undefined) return issue('Resume uses the saved ticket selections.');
+    if (input.lines !== undefined || Object.hasOwn(input, 'catalogRevision')) return issue('Resume uses the saved ticket selections and accepted terms.');
     if (!Object.hasOwn(input, 'requestId') && isCommerceOrderId(input.orderId)) {
       return { ok: true, value: { orderId: input.orderId, resume: true }, issues: [] };
     }
@@ -156,6 +156,10 @@ function validateCheckoutRequest(input) {
   if (input.resume !== undefined && input.resume !== false) return issue('Invalid resume value.');
   if (Object.hasOwn(input, 'orderId')) return issue('An order ID can only resume a saved order.');
   if (!isCommerceRequestId(input.requestId)) return issue('A valid request ID is required.');
+  // Trusted comp creation and old durable requests have no accepted revision.
+  // The reservation transaction requires it only for a new public order.
+  const hasRevision = Object.hasOwn(input, 'catalogRevision');
+  if (hasRevision && !integer(input.catalogRevision, 0, Number.MAX_SAFE_INTEGER)) return issue('Review the current ticket prices and terms before starting this order.');
   if (!Array.isArray(input.lines) || input.lines.length < 1 || input.lines.length > MAX_TICKET_TYPES) return issue('Choose at least one ticket type.');
   const seen = new Set();
   const lines = [];
@@ -174,7 +178,7 @@ function validateCheckoutRequest(input) {
   }
   if (seatCount > MAX_ORDER_SEATS) return issue(`An order can contain at most ${MAX_ORDER_SEATS} tickets.`);
   lines.sort((a, b) => a.ticketTypeId.localeCompare(b.ticketTypeId));
-  return { ok: true, value: { requestId: input.requestId, lines }, issues: [] };
+  return { ok: true, value: { requestId: input.requestId, lines, ...(hasRevision ? { catalogRevision: input.catalogRevision } : {}) }, issues: [] };
 }
 
 function isSalesWindowOpen(object, at = new Date()) {

@@ -97,7 +97,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
   const config = typeof getConfig === 'function' ? await getConfig() : {};
   const closed = {
     provider: provider?.name || 'none', mode: provider?.livemode === true ? 'live' : 'test',
-    salesEnabled: false, currency: null, currencyExponent: 2,
+    salesEnabled: false, catalogRevision: null, currency: null, currencyExponent: 2,
     eventName: typeof config?.event?.name === 'string' ? config.event.name : '',
     refundPolicy: '', taxTreatment: null, taxAmount: 0, feeAmount: 0,
     salesStartAt: null, salesEndAt: null,
@@ -132,7 +132,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
   });
   const anyAvailable = salesEnabled && ticketTypes.some((type) => type.available);
   return {
-    ...closed, salesEnabled: anyAvailable, currency: catalog.currency,
+    ...closed, salesEnabled: anyAvailable, catalogRevision: catalog.revision, currency: catalog.currency,
     currencyExponent: CURRENCY_EXPONENTS[catalog.currency],
     eventName: typeof event.name === 'string' ? event.name : closed.eventName,
     refundPolicy: catalog.refundPolicy, taxTreatment: catalog.taxTreatment,
@@ -183,6 +183,9 @@ async function reserveCommerceOrder({
       return { order, created: false };
     }
     if (request.resume) throw new CommerceError('not-found', 'Order not found.', 404);
+    if (!comp && (!Number.isSafeInteger(request.catalogRevision) || request.catalogRevision < 0)) {
+      throw new CommerceError('invalid-checkout', 'Review the current ticket prices and terms before starting this order.', 400);
+    }
     const inventoryRef = db.collection(INVENTORY).doc(CURRENT);
     // One private pointer per purchaser is a transaction lock, not pending
     // work: nobody drains it. Reading the referenced order means a completed
@@ -193,6 +196,13 @@ async function reserveCommerceOrder({
       tx.get(inventoryRef),
       comp ? Promise.resolve(null) : tx.get(purchaserRef),
     ]);
+    const catalog = catalogValue(catalogSnap);
+    // The catalog is in this transaction's read set. A concurrent price or
+    // policy save retries here before capacity, quota, or payment is written.
+    // Existing orders returned above retain their original accepted terms.
+    if (!comp && request.catalogRevision !== catalog.revision) {
+      throw new CommerceError('catalog-changed', 'Ticket prices or terms have changed. Review the updated catalog before continuing.');
+    }
     if (purchaserSnap?.exists) {
       const previousId = purchaserSnap.data()?.orderId;
       if (!isCommerceOrderId(previousId)) throw new CommerceError('inventory-invalid', 'This checkout needs organizer review.', 503);
@@ -208,7 +218,6 @@ async function reserveCommerceOrder({
         }
       }
     }
-    const catalog = catalogValue(catalogSnap);
     const at = now();
     const rate = comp ? null : purchaserWindow(purchaserSnap?.data(), at);
     const priced = priceSelections({ catalog, request, at, comp });
