@@ -108,7 +108,9 @@ Open **Ticketing → Configure ticket catalog** as an operator. Set **Currency**
 
 For each ticket type, set **Ticket name**, **Price**, **Ticket-type capacity**, **Availability**, quantity bounds, and any narrower sale window. Use a separate ticket type for an early-bird price; all types still share the event capacity. A **Hidden — staff-issued only** type stays out of public purchase selection and may be used for authorized comps. Retire a saved type by clearing **Ticket type is active**; historical orders keep its identity and price.
 
-Keep **Pause new sales** checked while setting up. Confirm the written commercial decision before checking **Commercial terms are approved for this event**. Use **Save catalog**. If another operator changed the catalog, preserve or record your intended edits, then use **Discard unsaved edits and reload catalog** before submitting against the current revision.
+Keep **Pause new sales** checked while setting up. Confirm the written commercial decision before checking **Commercial terms are approved for this event**. Use **Save catalog**. If another operator changed the catalog, or the save response could not be confirmed, preserve or record your intended edits, then use **Discard unsaved edits and reload catalog** before submitting against the current revision. The reload reads the saved version; a failed reload preserves the draft.
+
+New purchases are tied to the catalog version the attendee reviewed. If prices or terms change before reservation, the page reloads the offer and requires the attendee to accept the updated refund policy before submitting again. Existing saved orders keep their original prices and terms when resumed.
 
 Before live sales, the launch record must contain:
 

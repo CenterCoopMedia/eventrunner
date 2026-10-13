@@ -62,6 +62,8 @@ export default function Tickets() {
     setRequestError('');
   }, [user?.uid]);
 
+  useEffect(() => { setTermsAccepted(false); }, [catalog?.catalogRevision]);
+
   useEffect(() => {
     if (Object.keys(errors).length) {
       if (formRef.current?.querySelector('[aria-invalid="true"]')) focusFirstError(formRef.current);

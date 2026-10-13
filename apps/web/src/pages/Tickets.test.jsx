@@ -38,6 +38,23 @@ describe('attendee ticket selection', () => {
     ticketingRequest.mockReset();
     ticketingRequest.mockImplementation(async (name) => name === 'ticketingCatalog' ? CATALOG : { orderId: 'order-synthetic', status: 'pending', paymentStatus: 'pending', checkoutUrl: null });
   });
+  it.each(['sold-out', 'rate-limited', 'account-not-ready'])('requires renewed terms acceptance when a %s refresh returns another revision', async (code) => {
+    const changed = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Updated refund policy requires organizer approval.',
+      ticketTypes: CATALOG.ticketTypes.map((type) => ({ ...type, unitAmount: 3500 })) };
+    let catalogCalls = 0;
+    ticketingRequest.mockImplementation(async (name) => {
+      if (name === 'ticketingCatalog') return ++catalogCalls === 1 ? CATALOG : changed;
+      throw new TicketingRequestError(code, 'Review the available tickets and try again.', code === 'account-not-ready' ? 503 : code === 'rate-limited' ? 429 : 409);
+    });
+    mount(); await fill();
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    await screen.findByText(changed.refundPolicy);
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $35.00' }));
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
+    expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(1);
+  });
   it('requires verified sign-in before revealing purchase controls', async () => {
     state.auth.user = null;
     mount();
