@@ -75,6 +75,29 @@ test('deploy validation receives the OTP abuse-control variables', () => {
   );
 });
 
+test('Stripe account and mode reach validation, both runtime env writers, and the publisher', () => {
+  const names = ['EVENT_STRIPE_ACCOUNT_ID', 'EVENT_STRIPE_MODE'];
+  const validation = step('Validate Tier A environment (spec §2.1) before touching GCP');
+  const publisher = step('Write the Cloud Run job environment');
+  const writers = workflow.split('- name: Write the functions runtime env for this project').slice(1)
+    .map((block) => block.split(/\n {6}- (?:name:|uses:|run:)/)[0]);
+  assert.equal(writers.length, 2, 'normal and post-deploy recovery must preserve the same scope');
+  for (const name of names) {
+    for (const block of [validation, publisher, ...writers]) {
+      assert.ok(block.includes(name + ': ${{ vars.' + name + ' }}'), `${name} must come from this client Environment`);
+    }
+    for (const writer of writers) {
+      assert.ok(writer.includes(`echo "${name}=$${name}"`), `${name} must survive functions dotenv generation`);
+    }
+    assert.ok(publisher.includes(`--arg ${name} "$${name}"`));
+    assert.ok(publisher.includes(`${name}: $${name},`), `${name} must survive publisher JSON generation`);
+  }
+  for (const secret of ['TICKETING_API_TOKEN', 'TICKETING_WEBHOOK_SECRET']) {
+    assert.ok(writers.every((writer) => !writer.includes(`echo "${secret}=`)), 'payment secrets stay in Secret Manager');
+    assert.ok(!publisher.includes(`--arg ${secret} `));
+  }
+});
+
 test('storage rules deploy does not grant project IAM', () => {
   const provision = job('provision');
   assert.match(provision, /firestore:rules,firestore:indexes,storage/);
