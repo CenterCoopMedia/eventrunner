@@ -57,6 +57,100 @@ describe('AdminTicketing', () => {
     expect(callMock).toHaveBeenCalledWith('getTicketingStatus', {});
   });
 
+  it('mounts no provider workspace or ticket reads while provider status is pending', async () => {
+    let resolveStatus;
+    callMock.mockImplementation((name, body) => {
+      if (name === 'getTicketingStatus') return new Promise((resolve) => { resolveStatus = resolve; });
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      if (body.action === 'catalog') return Promise.resolve({ mode: 'test', catalog: { published: false, currency: 'usd', ticketTypes: [] } });
+      if (body.action === 'orders') return Promise.resolve({ orders: [], nextCursor: null });
+      if (body.action === 'tickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    expect(screen.getByRole('status', { name: 'Loading ticketing status…' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ticket code for check-in')).not.toBeInTheDocument();
+    expect(callMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => resolveStatus({ ...STATUS, provider: 'stripe' }));
+    expect(await screen.findByRole('heading', { name: 'Stripe sales' })).toBeInTheDocument();
+    expect(callMock).not.toHaveBeenCalledWith('ticketingListTickets', expect.anything());
+  });
+
+  it('keeps provider workspaces closed after a status failure and recovers through Refresh', async () => {
+    let statusCalls = 0;
+    callMock.mockImplementation((name) => {
+      if (name === 'getTicketingStatus') {
+        statusCalls += 1;
+        return statusCalls === 1 ? Promise.reject(new Error('The provider could not be confirmed.')) : Promise.resolve(STATUS);
+      }
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    await screen.findByText('The provider could not be confirmed.');
+    expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ticket code for check-in')).not.toBeInTheDocument();
+    expect(callMock).not.toHaveBeenCalledWith('ticketingListTickets', expect.anything());
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    expect(refresh).toBeEnabled();
+
+    fireEvent.click(refresh);
+    expect(await screen.findByRole('heading', { name: 'Import tickets from a CSV' })).toBeInTheDocument();
+    expect(statusCalls).toBe(2);
+    expect(callMock.mock.calls.filter(([name]) => name === 'ticketingListTickets')).toHaveLength(1);
+  });
+
+  it('does not treat an unrecognized provider as permission to import manual tickets', async () => {
+    callMock.mockImplementation((name) => {
+      if (name === 'getTicketingStatus') return Promise.resolve({ ...STATUS, provider: 'unrecognized-provider' });
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    await screen.findByText('unrecognized-provider');
+    expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Ticket code for check-in')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(callMock).not.toHaveBeenCalledWith('ticketingListTickets', expect.anything());
+  });
+
+  it.each(['manual', 'eventbrite', 'none'])('preserves the existing import and ticket list for a confirmed %s provider', async (provider) => {
+    callMock.mockImplementation((name) => {
+      if (name === 'getTicketingStatus') return Promise.resolve({ ...STATUS, provider });
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    expect(await screen.findByRole('heading', { name: 'Import tickets from a CSV' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tickets', exact: true })).toBeInTheDocument();
+    expect(callMock.mock.calls.filter(([name]) => name === 'ticketingListTickets')).toHaveLength(1);
+    expect(callMock).not.toHaveBeenCalledWith('ticketingCommerceAdmin', expect.anything());
+  });
+
+  it('does not keep an earlier manual workspace open while refreshing or after refresh fails', async () => {
+    let rejectStatus;
+    let statusCalls = 0;
+    callMock.mockImplementation((name) => {
+      if (name === 'getTicketingStatus') {
+        statusCalls += 1;
+        return statusCalls === 1 ? Promise.resolve(STATUS) : new Promise((_resolve, reject) => { rejectStatus = reject; });
+      }
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    await screen.findByRole('heading', { name: 'Import tickets from a CSV' });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
+
+    await act(async () => rejectStatus(new Error('Provider refresh failed.')));
+    expect(await screen.findByText('Provider refresh failed.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+  });
+
   it('loads the Stripe workspace without replacing the provider controls or moving keyboard focus', async () => {
     let resolveCatalog;
     callMock.mockImplementation((name, body) => {
@@ -81,11 +175,18 @@ describe('AdminTicketing', () => {
     expect(screen.queryByRole('status', { name: 'Loading Stripe ticketing…' })).not.toBeInTheDocument();
   });
 
-  it('keeps a Stripe workspace load error beside the available provider controls', async () => {
+  it('retries an initial Stripe catalog failure in place and clears the stale error', async () => {
+    let catalogCalls = 0;
+    let resolveCatalog;
     callMock.mockImplementation((name, body) => {
       if (name === 'getTicketingStatus') return Promise.resolve({ ...STATUS, provider: 'stripe' });
       if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
-      if (body.action === 'catalog') return Promise.reject(new Error('The Stripe catalog is temporarily unavailable.'));
+      if (body.action === 'catalog') {
+        catalogCalls += 1;
+        return catalogCalls === 1 ? Promise.reject(new Error('The Stripe catalog is temporarily unavailable.')) : new Promise((resolve) => { resolveCatalog = resolve; });
+      }
+      if (body.action === 'orders') return Promise.resolve({ orders: [], nextCursor: null });
+      if (body.action === 'tickets') return Promise.resolve({ tickets: [], nextCursor: null });
       return Promise.reject(new Error(`unexpected call: ${name}`));
     });
     render(<AdminTicketing />);
@@ -93,6 +194,16 @@ describe('AdminTicketing', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
     expect(screen.getByRole('heading', { name: 'Ticketing' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Stripe ticketing' }));
+    expect(screen.queryByText('The Stripe catalog is temporarily unavailable.')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading Stripe ticketing…' })).toBeInTheDocument();
+    await waitFor(() => expect(catalogCalls).toBe(2));
+    await act(async () => resolveCatalog({ mode: 'test', catalog: { published: false, currency: 'usd', ticketTypes: [] } }));
+    expect(await screen.findByRole('heading', { name: 'Stripe sales' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Ticket code for check-in')).toBeInTheDocument();
+    expect(screen.queryByText('The Stripe catalog is temporarily unavailable.')).not.toBeInTheDocument();
+    expect(callMock.mock.calls.filter(([name]) => name === 'getTicketingStatus')).toHaveLength(1);
   });
 
   it('does not show a webhook registration row when the provider does not support webhooks', async () => {

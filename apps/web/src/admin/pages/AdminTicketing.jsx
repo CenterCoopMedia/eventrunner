@@ -483,6 +483,7 @@ export default function AdminTicketing() {
   }, [refreshStatus]);
 
   const onImported = useMemo(() => () => setRefreshToken((n) => n + 1), []);
+  const confirmedProvider = !statusBusy && statusError === null ? status?.provider : null;
 
   return (
     <div className="flex flex-col gap-md">
@@ -492,12 +493,12 @@ export default function AdminTicketing() {
       />
 
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} />
-      {status?.provider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
+      {confirmedProvider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
         <StripeTicketingWorkspace call={call} />
-      </Suspense> : <>
+      </Suspense> : ['eventbrite', 'manual', 'none'].includes(confirmedProvider) ? <>
         <ImportPanel call={call} onImported={onImported} />
         <TicketList call={call} refreshToken={refreshToken} />
-      </>}
+      </> : null}
     </div>
   );
 }

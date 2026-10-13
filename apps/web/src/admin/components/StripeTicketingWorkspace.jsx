@@ -50,7 +50,10 @@ export default function StripeTicketingWorkspace({ call }) {
   }
 
   if (demo) return <Notice message="This event demo does not sell tickets, take payments, or issue admission." />;
-  if (!data) return <>{error ? <Notice tone="error" message={error} /> : <AdminLoadingState label="Loading Stripe ticketing…" />}</>;
+  if (!data) return error ? <div className="space-y-sm">
+    <Notice tone="error" message={error} />
+    <button type="button" className={secondaryButtonClass} onClick={() => { setError(''); bump(); }}>Retry Stripe ticketing</button>
+  </div> : <AdminLoadingState label="Loading Stripe ticketing…" />;
   return <div className="min-w-0 space-y-md" key={user?.uid}>
     <Panel title="Stripe sales" description="Payment and ticket ownership are separate. Existing Checkout sessions continue to reconcile while new sales are paused.">
       <div className="flex flex-wrap items-center gap-sm">
