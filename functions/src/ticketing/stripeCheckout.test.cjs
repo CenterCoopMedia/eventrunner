@@ -1,0 +1,427 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { makeFakeDb } = require('../cms/firestoreFake.cjs');
+const {
+  createTicketingCatalogHandler, createTicketingCheckoutHandler, createTicketingOrderStatusHandler,
+  reserveCommerceOrder, recoverCheckoutAttempt, createCompOrder, readTicketingCatalog,
+} = require('./stripeCheckout.cjs');
+const { inventoryTransitionPatch, transitionOrderInventory, SAFE_RETRY_MS } = require('./stripeCommerce.cjs');
+const { claimTicketsForUser } = require('./registration.cjs');
+
+const START = new Date('2026-10-12T16:00:00.000Z');
+const ADA = { uid: 'uid-ada', email: 'ada@example.com', email_verified: true };
+const BOB = { uid: 'uid-bob', email: 'bob@example.com', email_verified: true };
+const PERSON = { firstName: 'Ada', lastName: 'Example', email: 'ada@example.com' };
+const QUIET = { error() {}, warn() {} };
+
+function catalog(patch = {}) {
+  return {
+    schemaVersion: 1, revision: 1, published: true, salesPaused: false,
+    commercialTermsConfirmed: true, currency: 'usd', capacity: 100, maxPerOrder: 20,
+    taxTreatment: 'not_collected', refundPolicy: 'Contact the organizer before the event for a refund.',
+    ticketTypes: [
+      { id: 'general', name: 'Full event pass', unitAmount: 2500, capacity: 100, active: true, visibility: 'public' },
+      { id: 'student', name: 'Student full event pass', unitAmount: 1000, capacity: 50, active: true, visibility: 'public' },
+    ], ...patch,
+  };
+}
+
+function request(patch = {}) {
+  return {
+    requestId: 'checkout-request-0001',
+    lines: [{ ticketTypeId: 'general', quantity: 1, attendees: [PERSON] }],
+    ...patch,
+  };
+}
+
+function response() {
+  return {
+    statusCode: null, body: null, headers: {},
+    set(key, value) { this.headers[key] = value; return this; },
+    status(code) { this.statusCode = code; return this; },
+    json(value) { this.body = value; return this; },
+  };
+}
+
+function setup({ catalogPatch = {}, seed = {}, create } = {}) {
+  const db = makeFakeDb({
+    'config/event': { name: 'Example event', historicalDemo: false },
+    'ticket_catalog/current': catalog(catalogPatch),
+    'users/uid-ada': { registrationStatus: 'pending', approvalSource: null },
+    'users/uid-bob': { registrationStatus: 'pending', approvalSource: null },
+    ...seed,
+  });
+  let clock = new Date(START);
+  const calls = [];
+  const sessions = new Map();
+  const provider = {
+    name: 'stripe', externalEventId: 'example-event', stripeAccountId: 'acct_example', livemode: false,
+    async createCheckoutSession(params, options) {
+      calls.push({ params: structuredClone(params), options: structuredClone(options) });
+      if (create) return create({ db, params, options, calls, sessions });
+      if (!sessions.has(options.idempotencyKey)) sessions.set(options.idempotencyKey, makeSession(params));
+      return sessions.get(options.idempotencyKey);
+    },
+  };
+  const deps = {
+    db, provider, log: QUIET, env: { EVENT_PUBLIC_URL: 'https://event.example.com' },
+    now: () => new Date(clock),
+    getConfig: async () => ({ event: { name: 'Example event' }, features: { autoApproveTicketHolders: true } }),
+    auth: {
+      async verifyIdToken(token, revoked) {
+        assert.equal(revoked, true);
+        if (token === 'ada') return ADA;
+        if (token === 'bob') return BOB;
+        if (token === 'unverified') return { ...ADA, email_verified: false };
+        throw new Error('Invalid token');
+      },
+    },
+  };
+  return { deps, db, provider, calls, advance(ms) { clock = new Date(clock.getTime() + ms); } };
+}
+
+function makeSession(params, patch = {}) {
+  const total = params.line_items.reduce((sum, line) => sum + line.quantity * line.price_data.unit_amount, 0);
+  return {
+    id: `cs_test_${params.metadata.eventRunnerOrderId}`, mode: 'payment', status: 'open', payment_status: 'unpaid',
+    livemode: false, metadata: params.metadata, currency: params.line_items[0].price_data.currency,
+    amount_total: total, amount_subtotal: total, payment_intent: null,
+    url: 'https://checkout.stripe.com/c/pay/example', expires_at: params.expires_at,
+    ...patch,
+  };
+}
+
+async function checkout(deps, body = request(), token = 'ada') {
+  const res = response();
+  await createTicketingCheckoutHandler(deps)({ method: 'POST', headers: { authorization: `Bearer ${token}` }, body }, res);
+  return res;
+}
+
+async function status(deps, query, token = 'ada') {
+  const res = response();
+  await createTicketingOrderStatusHandler(deps)({ method: 'GET', headers: { authorization: `Bearer ${token}` }, query }, res);
+  return res;
+}
+
+test('paid checkout reserves inventory before external creation and freezes exact card-only prices', async () => {
+  const { deps, db, calls } = setup({ create({ db: current, params }) {
+    assert.equal(current.read('ticket_inventory', 'current').held, 2);
+    assert.equal(current.ids('tickets').length, 0);
+    assert.equal(current.ids('ticket_payment_attempts').length, 1);
+    return makeSession(params);
+  } });
+  const res = await checkout(deps, request({ lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [PERSON, { ...PERSON, email: BOB.email }] }] }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.status, 'pending');
+  assert.equal(res.body.paymentStatus, 'pending');
+  assert.equal(res.body.checkoutUrl, 'https://checkout.stripe.com/c/pay/example');
+  assert.deepEqual(res.body.ticketIds, []);
+  const order = db.read('ticket_orders', res.body.orderId);
+  assert.equal(order.totalAmount, 5000);
+  assert.equal(order.taxAmount, 0);
+  assert.equal(order.feeAmount, 0);
+  assert.equal(order.discountAmount, 0);
+  assert.deepEqual(order.seats.map((seat) => seat.email), [ADA.email, BOB.email]);
+  assert.deepEqual(calls[0].params.allowed_payment_method_types, ['card']);
+  assert.equal(calls[0].params.ui_mode, 'hosted_page');
+  assert.deepEqual(calls[0].params.adaptive_pricing, { enabled: false });
+  assert.deepEqual(calls[0].params.automatic_tax, { enabled: false });
+  assert.equal(calls[0].params.allow_promotion_codes, false);
+  assert.deepEqual(calls[0].params.payment_intent_data.metadata, calls[0].params.metadata);
+  assert.equal(calls[0].params.line_items[0].price_data.product_data.metadata.eventRunnerTicketTypeId, 'general');
+  assert.equal(calls[0].params.success_url, `https://event.example.com/tickets/status?orderId=${order.id}`);
+  assert.equal(db.read('ticket_sync_queue', order.id).status, 'pending');
+  assert.equal(db.ids('admin_logs').length, 1);
+});
+
+test('missing or unverified authentication and client-supplied pricing cannot reserve or pay', async () => {
+  for (const [body, token, expected] of [[request(), 'invalid', 401], [request(), 'unverified', 403], [request({ totalAmount: 1 }), 'ada', 400]]) {
+    const { deps, db, calls } = setup();
+    const res = await checkout(deps, body, token);
+    assert.equal(res.statusCode, expected);
+    assert.equal(db.ids('ticket_orders').length, 0);
+    assert.equal(db.ids('ticket_payment_attempts').length, 0);
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('missing provider identity and a non-HTTPS return origin refuse creation', async () => {
+  const a = setup();
+  a.provider.stripeAccountId = '';
+  assert.equal((await checkout(a.deps)).statusCode, 503);
+  assert.equal(a.db.ids('ticket_orders').length, 0);
+  const b = setup();
+  b.deps.env.EVENT_PUBLIC_URL = 'https://event.example.com@evil.example/path?redirect=anything';
+  assert.equal((await checkout(b.deps)).statusCode, 503);
+  assert.equal(b.calls.length, 0);
+});
+
+test('historical demo policy is read live even when the cached configuration describes a live event', async () => {
+  const { deps, db, calls } = setup({ seed: { 'config/event': { historicalDemo: true } } });
+  const res = await checkout(deps);
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'read-only-demo');
+  assert.equal(db.ids('ticket_orders').length, 0);
+  assert.equal(calls.length, 0);
+});
+
+test('concurrent purchasers racing the last seat cannot oversell event capacity', async () => {
+  const { deps, db, calls } = setup({ catalogPatch: { capacity: 1 } });
+  const results = await Promise.all([
+    checkout(deps),
+    checkout(deps, request({ requestId: 'checkout-request-0002' }), 'bob'),
+  ]);
+  assert.deepEqual(results.map((res) => res.statusCode).sort(), [200, 409]);
+  assert.equal(results.find((res) => res.statusCode === 409).body.error.code, 'sold-out');
+  assert.equal(db.read('ticket_inventory', 'current').held, 1);
+  assert.equal(db.ids('ticket_orders').length, 1);
+  assert.equal(calls.length, 1);
+});
+
+test('concurrent retries of one request reserve one order and call Stripe once', async () => {
+  const { deps, db, calls } = setup();
+  const results = await Promise.all([checkout(deps), checkout(deps), checkout(deps)]);
+  assert.equal(new Set(results.map((res) => res.body.orderId)).size, 1);
+  assert.equal(db.ids('ticket_orders').length, 1);
+  assert.equal(db.ids('ticket_payment_attempts').length, 1);
+  assert.equal(db.read('ticket_inventory', 'current').held, 1);
+  assert.equal(calls.length, 1);
+});
+
+test('a second distinct held checkout is blocked for the same purchaser', async () => {
+  const { deps, db } = setup();
+  assert.equal((await checkout(deps)).statusCode, 200);
+  const second = await checkout(deps, request({ requestId: 'checkout-request-0002' }));
+  assert.equal(second.statusCode, 409);
+  assert.equal(second.body.error.code, 'purchase-in-progress');
+  assert.equal(db.ids('ticket_orders').length, 1);
+});
+
+test('an unknown create result retains the reservation and replays the exact stored request', async () => {
+  const { deps, db, calls, advance } = setup({ create({ params, options, calls: seen, sessions }) {
+    if (!sessions.has(options.idempotencyKey)) sessions.set(options.idempotencyKey, makeSession(params));
+    if (seen.length === 1) throw new Error('The connection closed after Stripe created the Session.');
+    return sessions.get(options.idempotencyKey);
+  } });
+  const first = await checkout(deps);
+  assert.equal(first.statusCode, 202);
+  assert.equal(first.body.checkoutUrl, null);
+  assert.equal(first.body.status, 'pending');
+  await db.collection('ticket_catalog').doc('current').set({ ticketTypes: [{ id: 'general', name: 'New price', capacity: 100, unitAmount: 9900 }] }, { merge: true });
+  advance(6000);
+  const retry = await checkout(deps, { requestId: request().requestId, resume: true });
+  assert.equal(retry.body.orderId, first.body.orderId);
+  assert.equal(retry.statusCode, 200);
+  assert.deepEqual(calls[0], calls[1]);
+  assert.equal(db.read('ticket_orders', first.body.orderId).totalAmount, 2500);
+  assert.equal(db.read('ticket_inventory', 'current').held, 1);
+});
+
+test('a process crash after the reservation is recovered without another order or cart', async () => {
+  const { deps, db, calls } = setup();
+  const reserved = await reserveCommerceOrder({ ...deps, actor: ADA, request: request() });
+  assert.equal(calls.length, 0);
+  const recovered = await recoverCheckoutAttempt({ ...deps, orderId: reserved.order.id });
+  assert.ok(recovered.stripeSessionId);
+  assert.equal(calls.length, 1);
+  assert.equal(db.ids('ticket_orders').length, 1);
+});
+
+test('a changed cart cannot reuse an old payment request ID', async () => {
+  const { deps, calls } = setup();
+  await checkout(deps);
+  const res = await checkout(deps, request({ lines: [{ ticketTypeId: 'student', quantity: 1, attendees: [PERSON] }] }));
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'idempotency-conflict');
+  assert.equal(calls.length, 1);
+});
+
+test('never recreate an ambiguous payment after the idempotency retention safety window', async () => {
+  const { deps, db, calls, advance } = setup({ create() { throw new Error('Unknown network outcome.'); } });
+  const initial = await checkout(deps);
+  advance(SAFE_RETRY_MS);
+  const retried = await checkout(deps, { requestId: request().requestId, resume: true });
+  assert.equal(retried.body.status, 'exception');
+  assert.equal(calls.length, 1);
+  assert.equal(db.read('ticket_inventory', 'current').held, 1);
+  assert.equal(db.read('ticket_orders', initial.body.orderId).inventoryState, 'held');
+  assert.equal(db.ids('tickets').length, 0);
+});
+
+test('a mismatched Stripe amount, account mode, or metadata never delivers tickets or a redirect', async () => {
+  for (const patch of [{ amount_total: 1 }, { livemode: true }, { metadata: { eventRunnerOrderId: 'another-order' } }]) {
+    const { deps, db } = setup({ create({ params }) { return makeSession(params, patch); } });
+    const res = await checkout(deps);
+    assert.equal(res.body.status, 'exception');
+    assert.equal(res.body.checkoutUrl, null);
+    assert.equal(db.ids('tickets').length, 0);
+    assert.equal(db.read('ticket_inventory', 'current').held, 1);
+  }
+});
+
+test('free multi-seat orders deliver one stable email-bound ticket per attendee without Stripe', async () => {
+  const { deps, db, calls } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Full event pass', unitAmount: 0, capacity: 100 }] } });
+  const body = request({ lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [PERSON, { ...PERSON, email: BOB.email }] }] });
+  const res = await checkout(deps, body);
+  assert.equal(res.body.status, 'free');
+  assert.equal(res.body.paymentStatus, 'succeeded');
+  assert.equal(calls.length, 0);
+  assert.equal(db.ids('tickets').length, 2);
+  assert.equal(db.read('ticket_inventory', 'current').sold, 2);
+  assert.equal(db.read('ticket_inventory', 'current').held, 0);
+  const retry = await checkout(deps, body);
+  assert.deepEqual(retry.body.ticketIds, res.body.ticketIds);
+  assert.equal(db.ids('tickets').length, 2);
+  const claim = await claimTicketsForUser({ ...deps, uid: ADA.uid, email: ADA.email, externalIds: res.body.ticketIds });
+  assert.equal(claim.claimed.length, 1);
+  assert.equal(claim.refused[0].reason, 'email_mismatch');
+  assert.equal(db.read('users', ADA.uid).registrationStatus, 'approved');
+  assert.equal(db.read('users', BOB.uid).registrationStatus, 'pending');
+});
+
+test('comps may use hidden tickets while sales are paused but still consume capacity with an audit reason', async () => {
+  const { deps, db, calls } = setup({ catalogPatch: {
+    published: false, salesPaused: true,
+    ticketTypes: [{ id: 'press', name: 'Press full event pass', unitAmount: 2500, capacity: 2, visibility: 'hidden' }],
+  } });
+  const result = await createCompOrder({ ...deps, actorUid: 'organizer-uid', ticketTypeId: 'press', attendees: [PERSON], requestId: 'organizer-comp-0001', reason: 'Approved press access' });
+  assert.equal(result.status, 'free');
+  assert.equal(result.order.source, 'comp');
+  assert.equal(result.order.totalAmount, 0);
+  assert.equal(result.order.lines[0].originalUnitAmount, 2500);
+  assert.equal(db.read('ticket_inventory', 'current').sold, 1);
+  assert.equal(calls.length, 0);
+  const log = db.read('admin_logs', db.ids('admin_logs')[0]);
+  assert.equal(log.action, 'ticketing.comp');
+  assert.equal(log.reason, 'Approved press access');
+  assert.equal(JSON.stringify(log).includes(PERSON.email), false);
+  const same = await createCompOrder({ ...deps, actorUid: 'organizer-uid', ticketTypeId: 'press', attendees: [PERSON], requestId: 'organizer-comp-0001', reason: 'Approved press access' });
+  assert.equal(same.orderId, result.orderId);
+  assert.equal(db.ids('tickets').length, 1);
+});
+
+test('sales windows, unpublished catalogs, hidden types, and per-type quantities are server enforced', async () => {
+  const cases = [
+    { published: false }, { salesPaused: true },
+    { salesStartAt: '2026-10-13T16:00:00Z' }, { salesEndAt: START.toISOString() },
+    { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: 2500, visibility: 'hidden' }] },
+    { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: 2500, active: false }] },
+    { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: 2500, minPerOrder: 2 }] },
+    { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: 2500, salesEndAt: START.toISOString() }] },
+  ];
+  for (const catalogPatch of cases) {
+    const { deps, db, calls } = setup({ catalogPatch });
+    const res = await checkout(deps);
+    assert.ok(res.statusCode === 400 || res.statusCode === 409, JSON.stringify(catalogPatch));
+    assert.equal(db.ids('ticket_orders').length, 0);
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('two ticket types share the event ceiling while retaining individual type capacities', async () => {
+  const { deps, db } = setup({ catalogPatch: { capacity: 3 } });
+  const res = await checkout(deps, request({ lines: [
+    { ticketTypeId: 'student', quantity: 2, attendees: [PERSON, PERSON] },
+    { ticketTypeId: 'general', quantity: 2, attendees: [PERSON, PERSON] },
+  ] }));
+  assert.equal(res.statusCode, 409);
+  assert.equal(db.ids('ticket_orders').length, 0);
+  const limited = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 1, unitAmount: 2500 }] } });
+  assert.equal((await checkout(limited.deps, request({ lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [PERSON, PERSON] }] }))).body.error.code, 'sold-out');
+});
+
+test('integer totals include free and paid types and enforce the supported charge minimum', async () => {
+  const tooSmall = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Pass', capacity: 100, unitAmount: 1 }] } });
+  assert.equal((await checkout(tooSmall.deps)).body.error.code, 'amount-too-small');
+  assert.equal(tooSmall.calls.length, 0);
+  const mixed = setup({ catalogPatch: { ticketTypes: [
+    { id: 'general', name: 'Pass', capacity: 100, unitAmount: 333 },
+    { id: 'student', name: 'Free pass', capacity: 100, unitAmount: 0 },
+  ] } });
+  const res = await checkout(mixed.deps, request({ lines: [
+    { ticketTypeId: 'general', quantity: 3, attendees: [PERSON, PERSON, PERSON] },
+    { ticketTypeId: 'student', quantity: 1, attendees: [PERSON] },
+  ] }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(mixed.db.read('ticket_orders', res.body.orderId).totalAmount, 999);
+  assert.equal(mixed.db.ids('tickets').length, 0, 'free seats in a paid order also wait for payment');
+});
+
+test('public catalog omits unpublished, inactive, hidden, and organizer-only data', async () => {
+  const { deps } = setup({ catalogPatch: { ticketTypes: [
+    { id: 'general', name: 'Pass', capacity: 5, unitAmount: 2500 },
+    { id: 'press', name: 'Private comp', capacity: 5, unitAmount: 0, visibility: 'hidden' },
+    { id: 'old', name: 'Retired pass', capacity: 5, unitAmount: 2500, active: false },
+  ] } });
+  const res = response();
+  await createTicketingCatalogHandler(deps)({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.mode, 'test');
+  assert.deepEqual(res.body.ticketTypes.map((type) => type.id), ['general']);
+  assert.equal(JSON.stringify(res.body).includes('acct_example'), false);
+  assert.equal(res.body.ticketTypes[0].remaining, 5);
+  assert.equal(res.body.taxAmount, 0);
+  const unpublished = setup({ catalogPatch: { published: false } });
+  assert.deepEqual((await readTicketingCatalog(unpublished.deps)).ticketTypes, []);
+});
+
+test('order status is owner and verified-email scoped before any provider work', async () => {
+  const { deps, provider } = setup();
+  const created = await checkout(deps);
+  let reconciles = 0;
+  provider.reconcileOrder = async () => { reconciles += 1; };
+  const denied = await status(deps, { orderId: created.body.orderId }, 'bob');
+  assert.equal(denied.statusCode, 404);
+  assert.equal(reconciles, 0);
+  assert.equal((await status(deps, { orderId: created.body.orderId }, 'unverified')).statusCode, 403);
+  const owned = await status(deps, { orderId: created.body.orderId });
+  assert.equal(owned.statusCode, 200);
+  assert.equal(owned.body.totalAmount, 2500);
+  assert.equal(owned.body.status, 'pending');
+  assert.equal(owned.body.tickets.length, 0);
+  assert.equal(reconciles, 1);
+  assert.equal((await status(deps, { orderId: '../config/bootstrap' })).statusCode, 404);
+});
+
+test('recover by request ID requires the same purchaser without exposing attempt payloads', async () => {
+  const { deps } = setup();
+  const created = await checkout(deps);
+  const own = await status(deps, { requestId: request().requestId });
+  assert.equal(own.body.orderId, created.body.orderId);
+  assert.equal(own.body.stripeRequest, undefined);
+  assert.equal(own.body.purchaserUid, undefined);
+  assert.equal((await status(deps, { requestId: request().requestId }, 'bob')).statusCode, 404);
+});
+
+test('only provider-confirmed hold transitions change inventory; paid refunds do not restock', async () => {
+  const { deps, db } = setup();
+  const created = await checkout(deps);
+  const orderId = created.body.orderId;
+  await transitionOrderInventory({ ...deps, orderId, to: 'sold', patch: { status: 'paid', paymentStatus: 'succeeded' } });
+  await transitionOrderInventory({ ...deps, orderId, to: 'sold' });
+  assert.equal(db.read('ticket_inventory', 'current').held, 0);
+  assert.equal(db.read('ticket_inventory', 'current').sold, 1);
+  assert.throws(() => inventoryTransitionPatch({ order: db.read('ticket_orders', orderId), inventory: db.read('ticket_inventory', 'current'), to: 'released' }), /organizer review/);
+  const other = setup();
+  const pending = await checkout(other.deps);
+  await transitionOrderInventory({ ...other.deps, orderId: pending.body.orderId, to: 'released', patch: { status: 'expired', paymentStatus: 'expired' } });
+  await transitionOrderInventory({ ...other.deps, orderId: pending.body.orderId, to: 'released' });
+  assert.equal(other.db.read('ticket_inventory', 'current').held, 0);
+  assert.equal(other.db.read('ticket_inventory', 'current').sold, 0);
+  await assert.rejects(transitionOrderInventory({ ...other.deps, orderId: pending.body.orderId, to: 'sold' }), /organizer review/);
+});
+
+test('an in-flight API response cannot regress a webhook-confirmed paid order', async () => {
+  const { deps, db } = setup({ async create({ db: current, params }) {
+    await transitionOrderInventory({ db: current, orderId: params.metadata.eventRunnerOrderId, to: 'sold', patch: {
+      status: 'paid', paymentStatus: 'succeeded', stripeSessionId: 'cs_test_confirmed',
+    } });
+    return makeSession(params);
+  } });
+  const result = await checkout(deps);
+  assert.equal(result.body.status, 'paid');
+  assert.equal(db.read('ticket_orders', result.body.orderId).stripeSessionId, 'cs_test_confirmed');
+  assert.equal(db.read('ticket_inventory', 'current').sold, 1);
+});
