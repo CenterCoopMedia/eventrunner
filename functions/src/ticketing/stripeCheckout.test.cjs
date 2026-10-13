@@ -615,6 +615,43 @@ test('integer totals include free and paid types and enforce the supported charg
   assert.equal(mixed.db.ids('tickets').length, 0, 'free seats in a paid order also wait for payment');
 });
 
+test('public catalog exposes normalized overall windows without organizer-only data', async () => {
+  const { deps } = setup({ catalogPatch: {
+    salesStartAt: '2026-10-12T10:00:00-04:00', salesEndAt: '2026-10-13T18:00:00+02:00',
+    updatedByUid: 'organizer-uid',
+    ticketTypes: [{ id: 'general', name: 'Pass', capacity: 5, unitAmount: 2500,
+      salesStartAt: '2026-10-12T15:00:00Z', salesEndAt: '2026-10-13T20:00:00Z' }],
+  } });
+  const res = response();
+  await createTicketingCatalogHandler(deps)({ method: 'GET' }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.salesStartAt, '2026-10-12T14:00:00.000Z');
+  assert.equal(res.body.salesEndAt, '2026-10-13T16:00:00.000Z');
+  assert.equal(res.body.ticketTypes[0].salesStartAt, '2026-10-12T15:00:00.000Z');
+  assert.equal(res.body.ticketTypes[0].salesEndAt, '2026-10-13T20:00:00.000Z');
+  assert.equal(res.body.salesEnabled, true);
+  for (const field of ['capacity', 'revision', 'updatedByUid', 'commercialTermsConfirmed', 'stripeAccountId']) {
+    assert.equal(Object.hasOwn(res.body, field), false, field);
+  }
+  assert.equal(Object.hasOwn(res.body.ticketTypes[0], 'capacity'), false);
+});
+
+test('public catalog uses null overall windows when unset and never exposes unpublished deadlines', async () => {
+  for (const catalogPatch of [
+    {},
+    { published: false, salesStartAt: '2026-10-12T14:00:00Z', salesEndAt: '2026-10-13T16:00:00Z' },
+    { salesStartAt: 'not-a-date' },
+  ]) {
+    const { deps } = setup({ catalogPatch });
+    const res = response();
+    await createTicketingCatalogHandler(deps)({ method: 'GET' }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.salesStartAt, null);
+    assert.equal(res.body.salesEndAt, null);
+    if (Object.keys(catalogPatch).length) assert.deepEqual(res.body.ticketTypes, []);
+  }
+});
+
 test('public catalog omits unpublished, inactive, hidden, and organizer-only data', async () => {
   const { deps } = setup({ catalogPatch: { ticketTypes: [
     { id: 'general', name: 'Pass', capacity: 5, unitAmount: 2500 },
