@@ -134,10 +134,16 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     expect(actions.filter((action) => action.action === 'cancelTickets')).toHaveLength(0);
     await expect(dialog.getByText(/No refund payment is created/)).toBeVisible();
     await expect(dialog.getByText(/Sold seats will not be returned/)).toBeVisible();
-    // Native showModal supplies the trap. Every Tab stays inside the dialog.
-    for (let index = 0; index < 8; index += 1) {
-      await page.keyboard.press('Tab');
-      expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    // Opening focuses the heading; reverse navigation starts at the final
+    // control, and repeated Tab navigation stays inside in both directions.
+    await page.keyboard.press('Shift+Tab');
+    await expect(dialog.getByRole('button', { name: 'Go back' })).toBeFocused();
+    for (const key of ['Tab', 'Shift+Tab']) {
+      for (let index = 0; index < 8; index += 1) {
+        await page.keyboard.press(key);
+        const focus = await dialog.evaluate((element) => ({ inside: element.contains(document.activeElement), tag: document.activeElement?.tagName }));
+        expect(focus.inside, `${key} stays inside the review dialog (active element: ${focus.tag})`).toBe(true);
+      }
     }
     await screenshot(page, 'stripe-cancel-review-mobile', dialog);
     await page.keyboard.press('Escape');
