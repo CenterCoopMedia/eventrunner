@@ -19,7 +19,7 @@
 // in a tinted badge at the smallest radius, never a pill (admin story part 5
 // refuses that device by name): the word carries the meaning and the tint
 // agrees with it.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
 import {
@@ -37,7 +37,8 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
-import StripeTicketingWorkspace from '../components/StripeTicketingWorkspace.jsx';
+
+const StripeTicketingWorkspace = lazy(() => import('../components/StripeTicketingWorkspace.jsx'));
 
 const MAPPING_FIELDS = [
   { id: 'email', label: 'Email address', required: true },
@@ -491,7 +492,9 @@ export default function AdminTicketing() {
       />
 
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} />
-      {status?.provider === 'stripe' ? <StripeTicketingWorkspace call={call} /> : <>
+      {status?.provider === 'stripe' ? <Suspense fallback={<AdminLoadingState label="Loading Stripe ticketing…" />}>
+        <StripeTicketingWorkspace call={call} />
+      </Suspense> : <>
         <ImportPanel call={call} onImported={onImported} />
         <TicketList call={call} refreshToken={refreshToken} />
       </>}

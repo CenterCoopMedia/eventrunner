@@ -7,6 +7,13 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
+vi.mock('../../contexts/AuthContext.jsx', () => ({
+  useAuth: () => ({ isOperator: false, user: { uid: 'staff-synthetic' } }),
+  functionsOrigin: () => 'https://functions.example.test',
+}));
+vi.mock('../../contexts/EventConfigContext.jsx', () => ({
+  useEventConfig: () => ({ eventConfig: { name: 'Synthetic event', timezone: 'UTC' } }),
+}));
 
 import AdminTicketing from './AdminTicketing.jsx';
 
@@ -48,6 +55,44 @@ describe('AdminTicketing', () => {
     render(<AdminTicketing />);
     await waitFor(() => expect(screen.getByText('manual')).toBeInTheDocument());
     expect(callMock).toHaveBeenCalledWith('getTicketingStatus', {});
+  });
+
+  it('loads the Stripe workspace without replacing the provider controls or moving keyboard focus', async () => {
+    let resolveCatalog;
+    callMock.mockImplementation((name, body) => {
+      if (name === 'getTicketingStatus') return Promise.resolve({ ...STATUS, provider: 'stripe' });
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      if (body.action === 'catalog') return new Promise((resolve) => { resolveCatalog = resolve; });
+      if (body.action === 'orders') return Promise.resolve({ orders: [], nextCursor: null });
+      if (body.action === 'tickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    expect(await screen.findByRole('status', { name: 'Loading Stripe ticketing…' })).toBeInTheDocument();
+    await waitFor(() => expect(callMock).toHaveBeenCalledWith('ticketingCommerceAdmin', { action: 'catalog' }));
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    refresh.focus();
+    expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
+
+    await act(async () => resolveCatalog({ mode: 'test', catalog: { published: false, currency: 'usd', ticketTypes: [] } }));
+    expect(await screen.findByRole('heading', { name: 'Stripe sales' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Ticket code for check-in')).toBeInTheDocument();
+    expect(refresh).toHaveFocus();
+    expect(screen.queryByRole('status', { name: 'Loading Stripe ticketing…' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a Stripe workspace load error beside the available provider controls', async () => {
+    callMock.mockImplementation((name, body) => {
+      if (name === 'getTicketingStatus') return Promise.resolve({ ...STATUS, provider: 'stripe' });
+      if (name === 'ticketingListTickets') return Promise.resolve({ tickets: [], nextCursor: null });
+      if (body.action === 'catalog') return Promise.reject(new Error('The Stripe catalog is temporarily unavailable.'));
+      return Promise.reject(new Error(`unexpected call: ${name}`));
+    });
+    render(<AdminTicketing />);
+    expect(await screen.findByText('The Stripe catalog is temporarily unavailable.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: 'Ticketing' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Import tickets from a CSV' })).not.toBeInTheDocument();
   });
 
   it('does not show a webhook registration row when the provider does not support webhooks', async () => {
