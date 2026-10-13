@@ -209,8 +209,9 @@ test('stripe: a signup without admission gets the catalog prompt without payment
   assert.equal(result.templateId, 'ticket.get_ticket');
   assert.equal(calls.length, 1);
   assert.equal(calls[0].onceKey, 'get-ticket:uid-ada');
-  assert.ok(calls[0].html.includes('https://summit.example.org/tickets'));
-  assert.ok(calls[0].html.includes('Choose tickets'));
+  const catalogAnchor = calls[0].html.match(/<a href="([^"]+)"[^>]*>Choose tickets<\/a>/);
+  assert.ok(catalogAnchor, 'the catalog CTA is rendered');
+  assert.equal(catalogAnchor[1], 'https://summit.example.org/tickets');
 });
 
 for (const [label, makeProvider] of [
