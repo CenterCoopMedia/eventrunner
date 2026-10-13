@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import StripeOrderDetail from './StripeOrderDetail.jsx';
 
 const DETAIL = {
@@ -25,6 +25,108 @@ async function setup(outcomes) {
 
 function clickResend() { fireEvent.click(screen.getByRole('button', { name: 'Resend ticket confirmation' })); }
 function requestIds(resend) { return resend.mock.calls.map(([body]) => body.requestId); }
+
+const UNUSED_TICKET = { externalId: 'seat-unused', firstName: 'Unused', lastName: 'Attendee', email: 'unused@example.test', status: 'valid', checkedInAt: null };
+const USED_TICKET = { ...UNUSED_TICKET, externalId: 'seat-used', firstName: 'Used', email: 'used@example.test', checkedInAt: '2026-01-02T10:00:00Z' };
+
+async function cancellationSetup({ isOperator = false, initialTickets = [UNUSED_TICKET, USED_TICKET], latestTickets = initialTickets, lookupError } = {}) {
+  let reads = 0;
+  const call = vi.fn(async (_name, body) => {
+    if (body.action === 'order') {
+      reads += 1;
+      if (reads > 1 && lookupError) throw lookupError;
+      return { ...DETAIL, tickets: reads === 1 ? initialTickets : latestTickets };
+    }
+    if (body.action === 'cancelTickets') return { ...DETAIL, tickets: latestTickets };
+    throw new Error(`Unexpected action: ${body.action}`);
+  });
+  const props = { call, orderId: 'order-1', isOperator, timezone: 'UTC', onChanged: vi.fn(), onClose: vi.fn() };
+  const view = render(<StripeOrderDetail {...props} />);
+  await screen.findByRole('checkbox', { name: /Select Unused Attendee/ });
+  return { call, props, ...view };
+}
+
+function reviewCancellation() { fireEvent.click(screen.getByRole('button', { name: 'Review ticket cancellation' })); }
+function confirmCancellation() {
+  const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText('Reason for this action'), { target: { value: 'Attendee cannot attend.' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: /Cancel \d+ admission tickets/ }));
+}
+
+describe('staff cancellation authority', () => {
+  it('disables checked-in ticket selection for staff while allowing unused tickets from the same order', async () => {
+    const { call } = await cancellationSetup();
+    const used = screen.getByRole('checkbox', { name: /Select Used Attendee/ });
+    expect(used).toBeDisabled();
+    expect(used).toHaveAccessibleDescription('An operator must cancel a checked-in ticket.');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Unused Attendee/ }));
+    reviewCancellation();
+    await screen.findByRole('dialog');
+    confirmCancellation();
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({ action: 'cancelTickets', ticketIds: ['seat-unused'], confirmed: true })));
+  });
+
+  it('refreshes a mixed staff selection before review and excludes a newly checked-in ticket', async () => {
+    const { call } = await cancellationSetup({ initialTickets: [UNUSED_TICKET, { ...USED_TICKET, checkedInAt: null }] });
+    // The latest lookup must differ from the originally displayed snapshot.
+    call.mockImplementationOnce(async () => ({ ...DETAIL, tickets: [UNUSED_TICKET, USED_TICKET] }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Unused Attendee/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Used Attendee/ }));
+    reviewCancellation();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Unused Attendee')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Used Attendee')).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/Checked-in or unavailable tickets were removed from the selection/)).toBeInTheDocument();
+    confirmCancellation();
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({ action: 'cancelTickets', ticketIds: ['seat-unused'] })));
+  });
+
+  it('blocks staff review when the entire stale selection is now checked in', async () => {
+    const { call } = await cancellationSetup({ initialTickets: [UNUSED_TICKET], latestTickets: [{ ...UNUSED_TICKET, checkedInAt: USED_TICKET.checkedInAt }] });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Unused Attendee/ }));
+    reviewCancellation();
+    await screen.findByText(/An operator must review their cancellation/);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Select Unused Attendee/ })).toBeDisabled();
+    expect(call.mock.calls.some(([, body]) => body.action === 'cancelTickets')).toBe(false);
+  });
+
+  it('keeps staff selection available to retry when the current order cannot be checked', async () => {
+    const { call } = await cancellationSetup({ lookupError: new Error('Current ticket state is unavailable.') });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Unused Attendee/ }));
+    reviewCancellation();
+    await screen.findByText('Current ticket state is unavailable.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Select Unused Attendee/ })).toBeChecked();
+    expect(call.mock.calls.some(([, body]) => body.action === 'cancelTickets')).toBe(false);
+  });
+
+  it('lets operators explicitly confirm cancellation of checked-in tickets in a mixed selection', async () => {
+    const { call } = await cancellationSetup({ isOperator: true });
+    const used = screen.getByRole('checkbox', { name: /Select Used Attendee/ });
+    expect(used).toBeEnabled();
+    fireEvent.click(used);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Unused Attendee/ }));
+    reviewCancellation();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/already checked in/)).toBeInTheDocument();
+    expect(call.mock.calls.some(([, body]) => body.action === 'cancelTickets')).toBe(false);
+    confirmCancellation();
+    await waitFor(() => expect(call).toHaveBeenCalledWith('ticketingCommerceAdmin', expect.objectContaining({ action: 'cancelTickets', ticketIds: ['seat-used', 'seat-unused'], confirmed: true })));
+  });
+
+  it('rechecks operator authority at confirmation if the role changes during review', async () => {
+    const { call, props, rerender } = await cancellationSetup({ isOperator: true });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Select Used Attendee/ }));
+    reviewCancellation();
+    await screen.findByRole('dialog');
+    rerender(<StripeOrderDetail {...props} isOperator={false} />);
+    confirmCancellation();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText(/Review the current tickets before cancelling/)).toBeInTheDocument();
+    expect(call.mock.calls.some(([, body]) => body.action === 'cancelTickets')).toBe(false);
+  });
+});
 
 describe('order confirmation resend outcomes', () => {
   it('reports the sent count and uses a new request for a later deliberate resend after completion', async () => {

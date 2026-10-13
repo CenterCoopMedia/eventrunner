@@ -17,6 +17,8 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   const [draft, setDraft] = useState(() => structuredClone(data.catalog || emptyCatalog()));
   const [priceInputs, setPriceInputs] = useState(() => Object.fromEntries((data.catalog || emptyCatalog()).ticketTypes.map((type) => [type.id, String(type.unitAmount / (10 ** currencyDigits((data.catalog || emptyCatalog()).currency)))])));
   const [busy, setBusy] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [recoveryRequired, setRecoveryRequired] = useState(false);
   const [baseRevision, setBaseRevision] = useState(data.catalog?.revision || 0);
   const busyRef = useRef(false);
   const [notice, setNotice] = useState(null);
@@ -26,11 +28,38 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   const changed = (key, value) => setDraft((previous) => ({ ...previous, [key]: value }));
   const updateType = (index, key, value) => setDraft((previous) => ({ ...previous, ticketTypes: previous.ticketTypes.map((type, current) => current === index ? { ...type, [key]: value } : type) }));
   const quantity = (value) => value === '' ? '' : Number(value);
+  const revisionChanged = baseRevision !== (data.catalog?.revision || 0);
+
+  async function reloadCatalog() {
+    if (busyRef.current || !isOperator) return;
+    busyRef.current = true;
+    setBusy(true);
+    setReloading(true);
+    setNotice(null);
+    try {
+      const result = await call('ticketingCommerceAdmin', { action: 'catalog' });
+      const current = structuredClone(result.catalog || emptyCatalog());
+      setDraft(current);
+      setBaseRevision(current.revision);
+      setPriceInputs(Object.fromEntries(current.ticketTypes.map((type) => [type.id, String(type.unitAmount / (10 ** currencyDigits(current.currency)))])));
+      setPriceErrors({});
+      setRecoveryRequired(false);
+      setNotice({ tone: 'ok', message: 'The current saved catalog is loaded. Review it before making more changes.' });
+      onSaved(result);
+    } catch (err) {
+      setRecoveryRequired(true);
+      setNotice({ tone: 'error', message: err.message });
+    } finally { busyRef.current = false; setBusy(false); setReloading(false); }
+  }
 
   async function save(event) {
     event.preventDefault();
     if (busyRef.current || !isOperator) return;
-    if (baseRevision !== (data.catalog?.revision || 0)) {
+    if (recoveryRequired) {
+      setNotice({ tone: 'error', message: 'Reload the saved catalog before saving again. Your unsaved edits are still here.' });
+      return;
+    }
+    if (revisionChanged) {
       setNotice({ tone: 'error', message: 'The catalog changed since you opened this form. Reload the saved catalog before making more changes.' });
       return;
     }
@@ -51,7 +80,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
       setBaseRevision(result.catalog.revision);
       setNotice({ tone: 'ok', message: 'Catalog saved. Existing orders keep the prices they were issued with.' });
       onSaved(result);
-    } catch (err) { setNotice({ tone: 'error', message: err.message }); }
+    } catch (err) { setRecoveryRequired(true); setNotice({ tone: 'error', message: err.message }); }
     finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -59,13 +88,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   return (
     <Panel title="Ticket catalog" description="One currency, full-event admission, and prices that include every amount the attendee will pay. Early-bird types share the event’s total capacity.">
       <form className="space-y-md" onSubmit={save} noValidate>
-        {baseRevision !== (data.catalog?.revision || 0) ? <div className="space-y-sm"><Notice tone="caution" message="The saved catalog has changed. Your unsaved edits are still here; reload to use the current saved version." /><button type="button" className={secondaryButtonClass} onClick={() => {
-          const current = structuredClone(data.catalog || emptyCatalog());
-          setDraft(current);
-          setBaseRevision(current.revision);
-          setPriceInputs(Object.fromEntries(current.ticketTypes.map((type) => [type.id, String(type.unitAmount / (10 ** currencyDigits(current.currency)))])));
-          setNotice(null);
-        }}>Discard unsaved edits and reload catalog</button></div> : null}
+        {recoveryRequired || revisionChanged ? <div className="space-y-sm"><Notice tone="caution" message={recoveryRequired ? 'The save could not be confirmed. Your unsaved edits are still here. Reload the saved catalog to check the current version before saving again.' : 'The saved catalog has changed. Your unsaved edits are still here; reload to use the current saved version.'} /><button type="button" className={secondaryButtonClass} aria-busy={reloading} aria-disabled={busy} onClick={reloadCatalog}>{reloading ? 'Reloading saved catalog…' : 'Discard unsaved edits and reload catalog'}</button></div> : null}
         <div className="grid gap-md sm:grid-cols-2">
           {data.catalog ? <TextField label="Currency" value={draft.currency.toUpperCase()} readOnly hint="Currency is fixed after the first catalog is saved." /> : <SelectField label="Currency" value={draft.currency.toLowerCase()} onChange={(value) => changed('currency', value)} options={['usd', 'cad', 'eur', 'gbp', 'aud', 'nzd'].map((currency) => ({ value: currency, label: currency.toUpperCase() }))} />}
           <TextField label="Event capacity" type="number" inputMode="numeric" min="1" max="1000000" step="1" value={draft.capacity} onChange={(value) => changed('capacity', quantity(value))} />
@@ -107,7 +130,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
           }}>{draft.ticketTypes.length >= 20 ? 'Limit reached — 20 ticket types' : 'Add ticket type'}</button>
         </div>
         {notice ? <div ref={errorRef} tabIndex={-1}><Notice tone={notice.tone} message={notice.message} /></div> : null}
-        <button type="submit" className={primaryButtonClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Saving catalog…' : 'Save catalog'}</button>
+        <button type="submit" className={primaryButtonClass} aria-busy={busy && !reloading} aria-disabled={busy || recoveryRequired || revisionChanged}>{busy && !reloading ? 'Saving catalog…' : 'Save catalog'}</button>
       </form>
     </Panel>
   );

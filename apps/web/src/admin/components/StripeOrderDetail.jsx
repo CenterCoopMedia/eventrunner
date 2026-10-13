@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import ExternalLink from '../../components/ExternalLink.jsx';
 import { Checkbox } from '../../components/forms/Choice.jsx';
 import { formatTicketMoney, formatTicketTime, newTicketingRequestId, safeStripeDashboardUrl, ticketStatusLabel } from '../../lib/ticketingCommerce.js';
@@ -56,6 +56,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   const busyRef = useRef(false);
   const resendRef = useRef(null);
   const headingRef = useRef(null);
+  const cancellationHelpId = useId();
   useEffect(() => { headingRef.current?.focus(); }, []);
   useEffect(() => {
     let active = true;
@@ -103,9 +104,35 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
   }
 
   function closeConfirmation() { setConfirm(null); setEdit(null); setReason(''); setError(''); }
+  async function reviewCancellation() {
+    if (busyRef.current) return;
+    if (!selected.length) { setError('Select the tickets you want to cancel.'); return; }
+    setReason(''); setError(''); setNotice(null);
+    if (isOperator) { setConfirm('cancel'); return; }
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      const current = await call('ticketingCommerceAdmin', { action: 'order', orderId });
+      const eligibleIds = selected.filter((id) => current.tickets?.some((ticket) => (ticket.externalId || ticket.id) === id && !ticket.checkedInAt));
+      setData(current);
+      setSelected(eligibleIds);
+      if (!eligibleIds.length) {
+        setError('The selected tickets are already checked in or no longer available. An operator must review their cancellation.');
+        return;
+      }
+      if (eligibleIds.length !== selected.length) setNotice({ tone: 'caution', message: 'Checked-in or unavailable tickets were removed from the selection. An operator must cancel checked-in tickets.' });
+      setConfirm('cancel');
+    } catch (err) { setError(err.message); }
+    finally { busyRef.current = false; setBusy(false); }
+  }
   function performConfirmed() {
     if (!reason.trim()) { setError('Enter a reason for the audit trail.'); return; }
     if (confirm === 'cancel') {
+      if (!selected.length || selectedTickets.length !== selected.length || (!isOperator && selectedTickets.some((ticket) => ticket.checkedInAt))) {
+        setConfirm(null);
+        setError('The ticket selection changed. Review the current tickets before cancelling.');
+        return;
+      }
       run({ action: 'cancelTickets', orderId, ticketIds: selected, reason: reason.trim(), confirmed: true }, 'Selected tickets cancelled. No money was refunded and no seats were restocked.');
     } else if (confirm === 'refund') {
       if (!selectedRefund) { setError('Choose the refund being allocated.'); return; }
@@ -122,7 +149,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
     <h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{orderId}</h3>
     {!order && !error ? <AdminLoadingState label="Loading order details…" /> : null}
     {error && !confirm ? <Notice tone="error" message={error} /> : null}
-    {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
+    {notice && confirm !== 'cancel' ? <Notice tone={notice.tone} message={notice.message} /> : null}
     {order ? <div className="space-y-md">
       <dl className="grid min-w-0 gap-md sm:grid-cols-2 lg:grid-cols-3">
         <div><dt className="text-admin-base font-semibold">Purchaser</dt><dd className="wrap-anywhere font-admin-data text-admin-sm">{order.purchaserEmail || order.purchaser?.email}</dd></div>
@@ -149,18 +176,19 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         <h3 className="text-admin-lg font-bold">Individual tickets</h3>
         <div className="flex flex-wrap items-center gap-sm">
           <p role="status" className="text-admin-sm">{selected.length ? `${selected.length} tickets selected` : 'No tickets selected'}</p>
-          <button type="button" className={secondaryButtonClass} onClick={() => setSelected([])}>Clear selection</button>
-          <button type="button" className={dangerButtonClass} aria-disabled={!selected.length || busy} onClick={() => {
-            if (!selected.length) { setError('Select the tickets you want to cancel.'); return; }
-            if (busy) return;
-            setReason(''); setError(''); setConfirm('cancel');
-          }}>Review ticket cancellation</button>
+          <button type="button" className={secondaryButtonClass} disabled={busy} onClick={() => setSelected([])}>Clear selection</button>
+          <button type="button" className={dangerButtonClass} aria-busy={busy} aria-disabled={!selected.length || busy} onClick={reviewCancellation}>Review ticket cancellation</button>
         </div>
+        {!isOperator && tickets.some((ticket) => ticket.checkedInAt) ? <p id={cancellationHelpId} className="text-admin-sm text-admin-ink-secondary">An operator must cancel a checked-in ticket.</p> : null}
         {tickets.length ? <TicketingTable label="Individual tickets on this order"><thead><tr>{['Select', 'Ticket code', 'Attendee', 'Email', 'Admission', 'Claim', 'Check-in', 'Correction'].map((column) => <TicketingHead key={column}>{column}</TicketingHead>)}</tr></thead>
           <tbody>{tickets.map((ticket) => {
             const id = ticket.externalId || ticket.id;
+            const requiresOperator = !isOperator && Boolean(ticket.checkedInAt);
             return <tr key={id} className="border-b-admin-hairline border-admin-rule-hairline last:border-b-0">
-              <td className={cellClass}><Checkbox tone="admin" label={<span className="sr-only">Select {ticket.firstName} {ticket.lastName}, {id}</span>} checked={selected.includes(id)} onChange={(event) => setSelected((previous) => event.target.checked ? [...previous, id] : previous.filter((selectedId) => selectedId !== id))} /></td>
+              <td className={cellClass}><Checkbox tone="admin" label={<span className="sr-only">Select {ticket.firstName} {ticket.lastName}, {id}</span>} disabled={busy || requiresOperator} aria-describedby={requiresOperator ? cancellationHelpId : undefined} checked={selected.includes(id)} onChange={(event) => {
+                if (busyRef.current || requiresOperator) return;
+                setSelected((previous) => event.target.checked ? [...previous, id] : previous.filter((selectedId) => selectedId !== id));
+              }} /></td>
               <td className={dataCellClass}>{id}</td>
               <td className={cellClass}>{ticket.firstName} {ticket.lastName}</td>
               <td className={dataCellClass}>{ticket.email}</td>
@@ -197,6 +225,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         <TextField label="Corrected last name" hint="Optional for attendees who use one name." value={edit.lastName} maxLength={100} onChange={(value) => setEdit((previous) => ({ ...previous, lastName: value }))} />
         <TextField label="Corrected attendee email" type="email" value={edit.email} maxLength={254} readOnly={edit.claimed || edit.checkedIn} hint={edit.claimed ? 'A claimed ticket cannot change email here. Ticket transfers require a separate verified workflow.' : edit.checkedIn ? 'A checked-in ticket cannot change email here.' : 'Use a correction only. This does not transfer payment ownership.'} onChange={(value) => setEdit((previous) => ({ ...previous, email: value }))} />
       </> : <>
+        {confirm === 'cancel' && notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
         <p className="wrap-anywhere">Order: <span className="font-admin-data">{orderId}</span>. Original payment: {formatTicketMoney(order?.totalAmount, order?.currency)}.</p>
         {confirm === 'refund' ? <p>Refund {selectedRefund?.id}: {formatTicketMoney(selectedRefund?.amount, selectedRefund?.currency || order?.currency)} — {selectedRefund?.status === 'succeeded' ? 'Succeeded' : ticketStatusLabel(selectedRefund?.status)}.</p> : null}
         {preserveAdmission && confirm === 'refund' ? <p>All ticket admission stays as it is. This records an amount-only payment adjustment.</p> : <>{selectedSummary}<p>These tickets will lose admission, including any that have already been checked in. Sold seats will not be returned to capacity.</p></>}
