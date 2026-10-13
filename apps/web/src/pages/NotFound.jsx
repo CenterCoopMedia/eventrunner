@@ -1,14 +1,14 @@
 // Public recovery stays inside the event's existing theme and navigation gates.
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { usePages } from '../contexts/ContentContext.jsx';
+import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { buildNavItems, SYSTEM_PAGES } from '../lib/siteNavigation.js';
 import { primaryActionClass } from '../components/controlClasses.js';
 import './NotFound.css';
 
 export default function NotFound() {
-  const { pages } = usePages();
+  const { pages } = useContent();
   const { eventConfig, features } = useEventConfig();
   const nav = buildNavItems(pages, features);
   const destinations = [SYSTEM_PAGES.schedule.to, SYSTEM_PAGES.speakers.to]
@@ -32,8 +32,8 @@ export default function NotFound() {
   return (
     <section className="not-found" aria-labelledby="not-found-title">
       <div className="not-found__intro">
-        <h1 id="not-found-title">This page missed its cue.</h1>
-        <p className="not-found__code">404 / Page not found</p>
+        <h1 id="not-found-title">Page not found</h1>
+        <p className="not-found__code">404 / This page missed its cue.</p>
         <p className="not-found__description">
           The address may be mistyped, or the page may have moved.
           Your next stop is still here.

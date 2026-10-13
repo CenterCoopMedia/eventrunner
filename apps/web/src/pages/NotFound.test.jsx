@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import NotFound from './NotFound.jsx';
 
 const state = vi.hoisted(() => ({ pages: [], features: {}, name: 'Example conference' }));
-vi.mock('../contexts/ContentContext.jsx', () => ({ usePages: () => ({ pages: state.pages }) }));
+vi.mock('../contexts/ContentContext.jsx', () => ({ useContent: () => ({ pages: state.pages }) }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig: { name: state.name }, features: state.features }),
 }));
@@ -21,7 +21,7 @@ beforeEach(() => {
 describe('the missing-ticket recovery page', () => {
   it('offers the home page and the event’s published program and speakers', () => {
     view();
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('This page missed its cue.');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Page not found');
     expect(screen.getByRole('link', { name: 'Go to the home page' }).getAttribute('href')).toBe('/');
     expect(screen.getByRole('link', { name: /Program/ }).getAttribute('href')).toBe('/schedule');
     expect(screen.getByRole('link', { name: /Speakers/ }).getAttribute('href')).toBe('/speakers');
