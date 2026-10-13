@@ -37,6 +37,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import StripeTicketingWorkspace from '../components/StripeTicketingWorkspace.jsx';
 
 const MAPPING_FIELDS = [
   { id: 'email', label: 'Email address', required: true },
@@ -86,7 +87,7 @@ function StatusCard({ status, error, onRefresh, busy }) {
   return (
     <Panel
       title="Provider status"
-      description="What the ticketing core (§3.3) currently reports."
+      description="Current provider connection and reconciliation activity."
       actions={
         <button type="button" className={secondaryButtonClass} onClick={onRefresh} disabled={busy}>
           {busy ? 'Checking…' : 'Refresh'}
@@ -118,6 +119,8 @@ function StatusCard({ status, error, onRefresh, busy }) {
                     Registered {status.webhookRegisteredAt}
                     {status.webhookId ? ` (id ${status.webhookId})` : ''}
                   </span>
+                ) : status.provider === 'stripe' ? (
+                  'Verify the configured endpoint and recent deliveries in Stripe Dashboard.'
                 ) : (
                   <>
                     Not registered —{' '}
@@ -484,12 +487,14 @@ export default function AdminTicketing() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Ticketing"
-        description="Provider status, CSV import for the manual/no-vendor path (spec §3.3), and the ticket list."
+        description="Manage ticket sales, registration records, and attendee admission."
       />
 
       <StatusCard status={status} error={statusError} onRefresh={refreshStatus} busy={statusBusy} />
-      <ImportPanel call={call} onImported={onImported} />
-      <TicketList call={call} refreshToken={refreshToken} />
+      {status?.provider === 'stripe' ? <StripeTicketingWorkspace call={call} /> : <>
+        <ImportPanel call={call} onImported={onImported} />
+        <TicketList call={call} refreshToken={refreshToken} />
+      </>}
     </div>
   );
 }

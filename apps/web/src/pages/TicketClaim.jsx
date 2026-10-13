@@ -21,7 +21,7 @@
 // device SignInPanel and the speaker-invite page use — never a shadowed,
 // rounded card.
 import { useCallback, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { TicketClaimError, verifyTicketOrder } from '../lib/ticketClaim.js';
@@ -35,8 +35,11 @@ const Panel = ({ children }) => (
 
 export default function TicketClaim() {
   const { user, loading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
 
-  const [orderNumber, setOrderNumber] = useState('');
+  // A confirmation link may suggest the reference; only the explicit submit
+  // below asks the server to claim anything for the verified account.
+  const [orderNumber, setOrderNumber] = useState(() => (searchParams.get('order') || '').slice(0, 160));
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null); // the server's success payload
   const [error, setError] = useState(null); // { message } — one shape, every cause
@@ -107,8 +110,8 @@ export default function TicketClaim() {
               ? `${result.claimed} tickets on that order are now linked to your account.`
               : 'Your ticket is now linked to your account.'}
           </p>
-          <Link to="/" className={primaryActionClass}>
-            Go to the event site
+          <Link to="/tickets/mine" className={primaryActionClass}>
+            View and print your tickets
           </Link>
         </Panel>
       </article>

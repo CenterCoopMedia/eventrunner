@@ -34,6 +34,7 @@ export default function AccountMenu({ account }) {
   useEffect(() => {
     if (!phone || !open) return undefined;
     const sheet = dialog.current;
+    const opener = trigger.current;
     const previousOverflow = document.documentElement.style.overflow;
     // Older WebViews need the focus behavior that showModal normally supplies.
     const containFocus = (event) => {
@@ -63,7 +64,7 @@ export default function AccountMenu({ account }) {
       sheet.removeEventListener('keydown', wrapFocus);
       closeSheet(sheet);
       document.documentElement.style.overflow = previousOverflow;
-      trigger.current?.focus();
+      opener?.focus();
     };
   }, [phone, open]);
 

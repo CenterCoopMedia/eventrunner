@@ -65,6 +65,9 @@ const ContentPage = lazyPage(() => import('./pages/ContentPage.jsx'));
 const SpeakerAccept = lazyPage(() => import('./pages/SpeakerAccept.jsx'));
 const SpeakerProfile = lazyPage(() => import('./pages/SpeakerProfile.jsx'));
 const TicketClaim = lazyPage(() => import('./pages/TicketClaim.jsx'));
+const Tickets = lazyPage(() => import('./pages/Tickets.jsx'));
+const TicketStatus = lazyPage(() => import('./pages/TicketStatus.jsx'));
+const MyTickets = lazyPage(() => import('./pages/MyTickets.jsx'));
 const Profile = lazyPage(() => import('./pages/Profile.jsx'));
 const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
 const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
@@ -137,6 +140,9 @@ export function AppRoutes() {
             for the same reason — mail already sent with this link must
             keep working. */}
         <Route path="ticket/claim" element={<DeferredPage component={TicketClaim} label="ticket claim" />} />
+        <Route path="tickets" element={<DeferredPage component={Tickets} label="tickets" />} />
+        <Route path="tickets/status" element={<DeferredPage component={TicketStatus} label="order status" />} />
+        <Route path="tickets/mine" element={<DeferredPage component={MyTickets} label="your tickets" />} />
         <Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />
         {/* The signed-in attendee's home (issue #168): one place that shows
             their status, their sessions, and the event's resources. `dashboard`
