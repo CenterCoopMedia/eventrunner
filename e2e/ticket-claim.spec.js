@@ -9,16 +9,20 @@
 // turned on by e2e/fixtures/answers.json), and bookmarking a session — runs
 // through the real pages a signed-in attendee uses.
 import { test, expect } from '@playwright/test';
-import { adminDb, ensureUser, mailFileSize, waitForOtpCode } from './helpers.mjs';
+import { adminAuth, adminDb, mailFileSize, waitForOtpCode } from './helpers.mjs';
 
 test.describe.serial('Ticket claim -> approved -> bookmark', () => {
   const stamp = Date.now();
   const email = `ticket-e2e-${stamp}@example.test`;
+  const uid = `ticket-e2e-user-${stamp}`;
   const orderId = `E2E-ORDER-${stamp}`;
   const externalId = `e2e-ticket-${stamp}`;
   const sessionId = 'session-keynote';
 
   test.beforeAll(async () => {
+    // An admin-issued account can exist before its address is verified.
+    // The real OTP exchange must verify this account, not replace it.
+    await adminAuth().createUser({ uid, email, emailVerified: false });
     await adminDb().collection('tickets').doc(externalId).set({
       provider: 'manual',
       orderId,
@@ -34,7 +38,11 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     });
   });
 
-  test('an attendee claims a manual ticket, is approved, and bookmarks a session', async ({ page }) => {
+  test('an existing unverified attendee completes OTP, claims a manual ticket, and bookmarks a session', async ({ page }) => {
+    const initialAccount = await adminAuth().getUserByEmail(email);
+    expect(initialAccount.uid).toBe(uid);
+    expect(initialAccount.emailVerified).toBe(false);
+
     // A confirmation deep link must survive real OTP authentication in place.
     // Authentication and profile readiness must never submit the claim.
     const claimRequests = [];
@@ -54,6 +62,10 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     expect(code, 'the OTP code was captured from the mail file').toBeTruthy();
     await codeInput.fill(code);
     await page.getByRole('button', { name: /^sign in$/i }).click();
+    await expect.poll(async () => {
+      const verifiedAccount = await adminAuth().getUserByEmail(email);
+      return { uid: verifiedAccount.uid, emailVerified: verifiedAccount.emailVerified };
+    }, { timeout: 15000 }).toEqual({ uid, emailVerified: true });
     const orderInput = page.locator('#order-number');
     await expect(orderInput).toBeVisible({ timeout: 15000 });
 
@@ -61,10 +73,11 @@ test.describe.serial('Ticket claim -> approved -> bookmark', () => {
     // applyTicketClaimToUser (functions/src/ticketing/registration.cjs)
     // no-ops on a missing account doc, silently burning the ticket's claim
     // without ever reaching "approved". That doc is seeded by the
-    // onUserCreated auth trigger (functions/src/users/lifecycle.cjs)
-    // moments after sign-in. The claim page now gates on ProfileContext
-    // readiness; also prove that record exists before the explicit claim.
-    const uid = await ensureUser(email);
+    // onUserCreated auth trigger (functions/src/users/lifecycle.cjs) after
+    // account creation. The claim page gates on ProfileContext readiness;
+    // also prove that record exists before the explicit claim. Do not use
+    // ensureUser here: a helper-created verified account would mask the
+    // existing-account OTP regression this journey must prove.
     await expect
       .poll(async () => (await adminDb().collection('users').doc(uid).get()).exists, { timeout: 15000 })
       .toBe(true);
