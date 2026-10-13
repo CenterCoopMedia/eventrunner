@@ -12,13 +12,13 @@ module.exports = {
   html: wrap([
     '<p>Your order for {{event_name}} is confirmed.</p>',
     '<p>Order: {{order_reference}}<br>Tickets: {{ticket_count}}<br>Total: {{total_amount}}</p>',
-    '<p><a href="{{cta_url}}">Open your event profile</a></p>',
+    '<p><a href="{{cta_url}}">View your order and ticket information</a></p>',
     '<p>Each attendee needs to sign in with the email assigned to their ticket and claim it. Your payment receipt, when applicable, comes separately from Stripe.</p>',
   ].join('\n')),
   text: [
     'Your order for {{event_name}} is confirmed.', '',
     'Order: {{order_reference}}', 'Tickets: {{ticket_count}}', 'Total: {{total_amount}}', '',
-    'Open your event profile: {{cta_url}}', '',
+    'View your order and ticket information: {{cta_url}}', '',
     'Each attendee needs to sign in with the email assigned to their ticket and claim it. Your payment receipt, when applicable, comes separately from Stripe.',
     '', TEXT_FOOTER,
   ].join('\n'),

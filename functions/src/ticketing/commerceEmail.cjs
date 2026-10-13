@@ -55,7 +55,7 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (order.purchaserEmail) {
     recipients.push({
       to: order.purchaserEmail, templateId: 'ticket.order_confirmation',
-      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order), cta_url: `${origin}/profile` },
+      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order), cta_url: `${origin}/tickets/status?orderId=${encodeURIComponent(orderId)}` },
     });
   }
   const attendees = new Map();
