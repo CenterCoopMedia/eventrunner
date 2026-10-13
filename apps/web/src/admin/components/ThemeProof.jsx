@@ -508,6 +508,11 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
         current = false;
       });
     }
+    // Rendering can see an unloaded face just before layout requests it.
+    // Its loading event may then fire before this effect attaches. Resample
+    // after subscribing so a held download is visible without waiting for
+    // loadingdone / fonts.ready (which cannot arrive until it finishes).
+    if (stops.length > 0) bump();
     return () => {
       for (const stop of stops) stop();
     };
