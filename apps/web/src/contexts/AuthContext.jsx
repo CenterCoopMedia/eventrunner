@@ -234,17 +234,25 @@ export function AuthProvider({ children }) {
   // Step 2: one failure shape for every miss (no oracle), then the custom
   // token signs the browser in.
   const verifyOtpCode = useCallback(async ({ challengeId, email, code }) => {
+    const requestUser = auth.currentUser;
     const { token } = await postJson('verifyOtpCode', {
       challengeId,
       email,
       code,
     });
+    if (auth.currentUser !== requestUser) {
+      throw new OtpRequestError({
+        code: 'auth-changed',
+        status: 0,
+        message: 'Your signed-in account changed. Request a new code to continue.',
+      });
+    }
     const credential = await signInWithCustomToken(auth, token);
     const refreshedUser = credential?.user;
     if (refreshedUser?.uid) {
       // Same-UID sign-in replaces Firebase's user without an auth-state
-      // event. Accept only its still-current object for the current account;
-      // a later sign-out, account switch, or credential must win.
+      // event. Ignore a returned object once Firebase has moved on to a
+      // different user, sign-out, or newer credential.
       setUser((currentUser) => currentUser?.uid === refreshedUser.uid && auth.currentUser === refreshedUser
         ? refreshedUser
         : currentUser);

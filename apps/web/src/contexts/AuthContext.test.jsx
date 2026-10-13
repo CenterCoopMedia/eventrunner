@@ -41,7 +41,7 @@ function AuthConsumer() {
       try {
         const credential = await verifyOtpCode({ challengeId: 'challenge', email: UNVERIFIED.email, code: '123456' });
         setResult(`complete: ${credential.user.uid}`);
-      } catch (error) { setResult(error.message); }
+      } catch (error) { setResult(`${error.code}: ${error.message}`); }
     }}>Verify emailed code</button>
     <button type="button" onClick={signOut}>Sign out</button>
   </>;
@@ -103,7 +103,31 @@ describe('same-account OTP credential refresh', () => {
     expect(getDocs).toHaveBeenCalledTimes(4);
   });
 
-  it('does not restore a credential after sign-out completes while the SDK result is pending', async () => {
+  it.each([
+    ['sign-out', null],
+    ['account switch', { uid: 'other-attendee', emailVerified: false }],
+  ])('does not exchange an old OTP token after %s during the HTTP request', async (_action, nextUser) => {
+    const pendingHttp = deferred();
+    const verified = { ...UNVERIFIED, emailVerified: true };
+    vi.mocked(fetch).mockReturnValue(pendingHttp.promise);
+    // If called, this mock really replaces the SDK user and emits the
+    // UID-changing event. A returned credential alone would miss the race.
+    vi.mocked(signInWithCustomToken).mockImplementation(async () => customTokenResult(verified));
+    renderAuth();
+    verify();
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await act(async () => publishAuth(nextUser));
+    await act(async () => pendingHttp.resolve({ ok: true, status: 200, json: async () => ({ token: 'old-custom-token' }) }));
+    await waitFor(() => expect(screen.getByLabelText('OTP result')).not.toHaveTextContent('waiting'));
+    expect(signInWithCustomToken).not.toHaveBeenCalled();
+    expect(auth.currentUser).toBe(nextUser);
+    expect(screen.getByLabelText('Account')).toHaveTextContent(nextUser ? 'other-attendee: unverified' : 'signed out');
+    expect(screen.getByLabelText('OTP result')).toHaveTextContent('auth-changed: Your signed-in account changed. Request a new code to continue.');
+  });
+
+  // These cases guard the React update after Firebase has already changed
+  // accounts. They do not simulate cancelling an in-flight SDK exchange.
+  it('ignores a stale returned credential after Firebase has already signed out', async () => {
     const pending = deferred();
     const verified = { ...UNVERIFIED, emailVerified: true };
     vi.mocked(signInWithCustomToken).mockReturnValue(pending.promise);
@@ -118,7 +142,7 @@ describe('same-account OTP credential refresh', () => {
     expect(auth.currentUser).toBeNull();
   });
 
-  it('does not overwrite an account switch with an older OTP credential', async () => {
+  it('ignores a stale returned credential after Firebase has already switched accounts', async () => {
     const pending = deferred();
     const replacement = { uid: 'other-attendee', emailVerified: false };
     vi.mocked(signInWithCustomToken).mockReturnValue(pending.promise);
