@@ -31,12 +31,68 @@ test('confirmation replay sends one purchaser confirmation and one distinct atte
   assert.equal((await run()).alreadySent, true);
   assert.equal(sent.length, 2);
   assert.match(sent[0].text, /\$100\.00/);
-  assert.match(sent[0].text, /tickets\/status\?orderId=order-1/);
+  assert.match(sent[0].text, /Open your event profile: https:\/\/event\.example\.org\/profile/);
+  assert.doesNotMatch(sent[0].text, /tickets\/status/);
   assert.doesNotMatch(sent[1].text, /100\.00|buyer@example/);
   assert.match(sent[1].text, /ticket\/claim\?order=order-1/);
   const logs = await db.collection('sent_emails').get();
   assert.equal(logs.size, 2);
   assert.ok(logs.docs.every((snap) => snap.data().bodyStored === false));
+});
+
+test('an explicit resend keeps the purchaser receipt but excludes tickets already claimed by an attendee', async () => {
+  const db = fixture();
+  const sent = [];
+  const provider = { name: 'test', async send(message) { sent.push(message); return { status: 'sent', providerMessageId: `synthetic-${sent.length}` }; } };
+  const sendEmail = createEmailCore({ db, provider, getConfig }).send;
+  const run = (resendKey = null) => sendOrderConfirmations({ db, getConfig, orderId: 'order-1', env, sendEmail, resendKey });
+  assert.equal((await run()).sent, 2);
+  for (const id of order.ticketIds) await db.collection('tickets').doc(id).update({ claimedByUid: 'uid-attendee' });
+  sent.length = 0;
+  assert.equal((await run('organizer-resend')).sent, 1);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, 'buyer@example.org');
+  assert.match(sent[0].text, /\$100\.00/);
+  assert.doesNotMatch(sent[0].text, /ticket\/claim\?/);
+  assert.equal((await run('organizer-resend')).alreadySent, true);
+  assert.equal(sent.length, 1);
+});
+
+test('an invitation counts only unclaimed seats and never exposes payment details to the attendee', async () => {
+  const db = fixture({
+    'tickets/ticket-1': { externalId: 'ticket-1', orderId: 'order-1', status: 'valid',
+      email: 'attendee@example.org', firstName: 'Synthetic', claimedByUid: 'uid-attendee' },
+  });
+  const sent = [];
+  const result = await sendOrderConfirmations({
+    db, getConfig, orderId: 'order-1', env,
+    sendEmail: async (message) => { sent.push(message); return { status: 'sent' }; },
+  });
+  assert.equal(result.sent, 2);
+  const attendee = sent.find((message) => message.to === 'attendee@example.org');
+  assert.match(attendee.text, /^1 ticket\(s\) for Synthetic conference are assigned to this email address\.$/m);
+  assert.doesNotMatch(attendee.text, /^2 ticket\(s\)|100\.00|buyer@example/m);
+  assert.match(attendee.text, /ticket\/claim\?order=order-1/);
+});
+
+test('confirmation scope uses the same normalized event, account, and mode as the Stripe provider', async () => {
+  for (const changes of [
+    { EVENT_TICKETING_EVENT_ID: ` ${env.EVENT_TICKETING_EVENT_ID} ` },
+    { EVENT_STRIPE_ACCOUNT_ID: ` ${env.EVENT_STRIPE_ACCOUNT_ID} ` },
+    { EVENT_STRIPE_MODE: ' test ' },
+    { EVENT_TICKETING_EVENT_ID: ` ${env.EVENT_TICKETING_EVENT_ID} `,
+      EVENT_STRIPE_ACCOUNT_ID: ` ${env.EVENT_STRIPE_ACCOUNT_ID} `, EVENT_STRIPE_MODE: ' live ' },
+  ]) {
+    const selectedEnv = { ...env, ...changes };
+    const db = fixture({ 'ticket_orders/order-1': { ...order, livemode: selectedEnv.EVENT_STRIPE_MODE.trim() === 'live' } });
+    const sent = [];
+    const result = await sendOrderConfirmations({
+      db, getConfig, orderId: 'order-1', env: selectedEnv,
+      sendEmail: async (message) => { sent.push(message); return { status: 'sent' }; },
+    });
+    assert.equal(result.sent, 2);
+    assert.deepEqual(sent.map((message) => message.to), ['buyer@example.org', 'attendee@example.org']);
+  }
 });
 
 test('unpaid, wrong-scope, refunded-only, and demo orders send no messages', async () => {
