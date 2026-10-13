@@ -11,7 +11,7 @@ import { ticketingRequest, TicketingRequestError } from '../lib/ticketingCommerc
 import Tickets from './Tickets.jsx';
 
 const CATALOG = {
-  provider: 'stripe', mode: 'test', salesEnabled: true, currency: 'usd', eventName: 'Synthetic event', maxPerOrder: 3,
+  provider: 'stripe', mode: 'test', salesEnabled: true, catalogRevision: 1, currency: 'usd', eventName: 'Synthetic event', maxPerOrder: 3,
   refundPolicy: 'Contact the organizer before the event for a refund.', taxTreatment: 'inclusive',
   ticketTypes: [{ id: 'general', name: 'General admission', description: 'Full event', unitAmount: 2500, available: true, remaining: 3, minPerOrder: 1, maxPerOrder: 3 }],
 };
@@ -106,27 +106,65 @@ describe('attendee ticket selection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' }));
     await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
     const body = ticketingRequest.mock.calls.find(([name]) => name === 'ticketingCheckout')[1].body;
-    expect(body).toEqual({ requestId: expect.any(String), lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
+    expect(body).toEqual({ requestId: expect.any(String), catalogRevision: 1, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
       { firstName: 'Synthetic', lastName: 'Attendee 1', email: 'attendee-1@example.test' },
       { firstName: 'Synthetic', lastName: 'Attendee 2', email: 'attendee-2@example.test' },
     ] }] });
     expect(JSON.stringify(body)).not.toMatch(/unitAmount|currency|priceId|entitlement/);
   });
-  it('retries an uncertain request with the same frozen id and selections', async () => {
+  it('retries an uncertain request with the same frozen id, accepted revision, and selections', async () => {
+    let liveCatalog = CATALOG;
     ticketingRequest.mockImplementation(async (name) => {
-      if (name === 'ticketingCatalog') return CATALOG;
+      if (name === 'ticketingCatalog') return liveCatalog;
       throw new TicketingRequestError('network', 'Connection interrupted');
     });
     mount();
     await fill();
     fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
     await screen.findByText('Connection interrupted');
+    liveCatalog = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Updated refund policy.' };
     expect(screen.queryByLabelText('Quantity — General admission')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Resume existing checkout' }));
     await waitFor(() => expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(2));
     const calls = ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout');
     expect(calls[0][1].body).toEqual(calls[1][1].body);
+    expect(calls[1][1].body.catalogRevision).toBe(1);
     expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).not.toContain('attendee-1@example.test');
+  });
+  it('requires renewed acceptance after changed prices or terms and waits for the refreshed catalog', async () => {
+    const changed = { ...CATALOG, catalogRevision: 2, refundPolicy: 'Refunds are available until May 1.',
+      ticketTypes: CATALOG.ticketTypes.map((type) => ({ ...type, unitAmount: 3500 })) };
+    let catalogCalls = 0;
+    let refresh;
+    ticketingRequest.mockImplementation((name, { body } = {}) => {
+      if (name === 'ticketingCatalog') {
+        catalogCalls += 1;
+        return catalogCalls === 1 ? Promise.resolve(CATALOG) : new Promise((resolve) => { refresh = resolve; });
+      }
+      if (body.catalogRevision === 1) return Promise.reject(new TicketingRequestError('catalog-changed', 'Ticket prices or terms have changed. Review the updated catalog before continuing.', 409));
+      return Promise.resolve({ orderId: 'order-synthetic', checkoutUrl: null });
+    });
+    mount(); await fill();
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    await screen.findByText('Loading ticket information…');
+    expect(screen.queryByRole('button', { name: /Continue to Stripe/ })).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
+    await act(async () => refresh(changed));
+    expect(screen.getByText(changed.refundPolicy)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Ticket prices or terms have changed.');
+    expect(screen.getByRole('alert')).toHaveFocus();
+    expect(screen.getByLabelText('Attendee email')).toHaveValue('attendee-1@example.test');
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $35.00' }));
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
+    expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $35.00' }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    const calls = ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout');
+    expect(calls).toHaveLength(2);
+    expect(calls[1][1].body.catalogRevision).toBe(2);
+    expect(calls[1][1].body.requestId).not.toBe(calls[0][1].body.requestId);
   });
   it('restores a pending request after reload without retaining attendee details', async () => {
     sessionStorage.setItem('eventrunner.ticket-checkout.purchaser-a', JSON.stringify({ requestId: 'saved-request-123456789' }));

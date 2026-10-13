@@ -67,7 +67,7 @@ export default function Tickets() {
       if (formRef.current?.querySelector('[aria-invalid="true"]')) focusFirstError(formRef.current);
       else errorRef.current?.focus();
     } else if (requestError) errorRef.current?.focus();
-  }, [errors, requestError]);
+  }, [errors, requestError, catalog]);
 
   const types = catalog?.ticketTypes || [];
   const lines = types.filter((type) => Number(quantities[type.id]) > 0).map((type) => ({
@@ -120,10 +120,16 @@ export default function Tickets() {
         // A missing profile rejects a first submission before reservation. A
         // retry can already hold seats from an earlier uncertain response.
         const profileRejectedBeforeCreation = startingNewCheckout && err.code === 'account-not-ready';
-        if (missingSavedCheckout || profileRejectedBeforeCreation || ['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited'].includes(err.code)) {
+        const catalogChanged = err.code === 'catalog-changed';
+        if (missingSavedCheckout || profileRejectedBeforeCreation || catalogChanged || ['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited'].includes(err.code)) {
           forgetCheckoutAttempt(uid);
           requestRef.current = null;
           setSaved({ uid, attempt: null });
+          if (catalogChanged) {
+            setTermsAccepted(false);
+            setErrors({});
+            setCatalog(null);
+          }
           setLoadVersion((value) => value + 1);
         }
         setRequestError(missingSavedCheckout
@@ -159,6 +165,7 @@ export default function Tickets() {
     if (Object.keys(nextErrors).length) return;
     const body = {
       requestId: newTicketingRequestId(),
+      catalogRevision: catalog.catalogRevision,
       lines: lines.map((line) => ({ ...line, attendees: line.attendees.map((attendee) => ({
         firstName: attendee.firstName.trim(), lastName: (attendee.lastName || '').trim(), email: attendee.email.trim(),
       })) })),

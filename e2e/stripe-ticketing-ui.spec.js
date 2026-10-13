@@ -8,7 +8,7 @@ import { ADMIN_EMAIL, APP_BASE_URL, adminDb, signIn } from './helpers.mjs';
 
 const TYPE = { id: 'general', name: 'General admission', description: 'Full-event admission.', unitAmount: 2500, capacity: 20, active: true, available: true, visibility: 'public', remaining: 20, minPerOrder: 1, maxPerOrder: 4, salesStartAt: null, salesEndAt: null };
 const CATALOG = { schemaVersion: 1, revision: 1, published: true, salesPaused: false, currency: 'usd', capacity: 20, maxPerOrder: 4, refundPolicy: 'Contact the organizer before the event to request a refund.', taxTreatment: 'inclusive', commercialTermsConfirmed: true, salesStartAt: null, salesEndAt: null, ticketTypes: [TYPE] };
-const PUBLIC = { provider: 'stripe', mode: 'test', salesEnabled: true, currency: 'usd', maxPerOrder: 4, refundPolicy: CATALOG.refundPolicy, taxTreatment: 'inclusive', ticketTypes: [TYPE] };
+const PUBLIC = { provider: 'stripe', mode: 'test', salesEnabled: true, catalogRevision: CATALOG.revision, currency: 'usd', maxPerOrder: 4, refundPolicy: CATALOG.refundPolicy, taxTreatment: 'inclusive', ticketTypes: [TYPE] };
 const TICKET = { externalId: 'opaque-browser-seat-1', id: 'opaque-browser-seat-1', orderId: 'browser-order-1', ticketTypeId: 'general', ticketClass: 'General admission', firstName: 'Synthetic', lastName: 'Attendee', email: 'browser-attendee@example.test', status: 'valid', claimedByUid: null, claimedByMe: false, checkedInAt: null };
 const ORDER = { id: 'browser-order-1', orderId: 'browser-order-1', purchaserEmail: ADMIN_EMAIL, status: 'paid', paymentStatus: 'succeeded', currency: 'usd', subtotalAmount: 2500, totalAmount: 2500, createdAt: '2026-01-01T12:00:00Z', refundStatus: 'none', refundedAmount: 0, lines: [{ ticketTypeId: 'general', name: TYPE.name, quantity: 1, unitAmount: 2500, lineAmount: 2500 }] };
 const EVIDENCE = path.resolve('test-results/admin-visual-evidence');
@@ -81,6 +81,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await page.waitForURL(`**/tickets/status?orderId=${ORDER.orderId}`);
     await expect(page.getByRole('heading', { name: 'We are confirming your order' })).toBeVisible();
     expect(checkoutBodies).toHaveLength(2);
+    expect(checkoutBodies[0].catalogRevision).toBe(CATALOG.revision);
     expect(checkoutBodies[1]).toEqual({ requestId: checkoutBodies[0].requestId, resume: true });
     expect(checkoutBodies[0]).not.toHaveProperty('unitAmount');
     expect(checkoutBodies[0].lines[0]).not.toHaveProperty('unitAmount');
