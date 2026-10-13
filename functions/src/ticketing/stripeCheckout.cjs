@@ -100,6 +100,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
     salesEnabled: false, currency: null, currencyExponent: 2,
     eventName: typeof config?.event?.name === 'string' ? config.event.name : '',
     refundPolicy: '', taxTreatment: null, taxAmount: 0, feeAmount: 0,
+    salesStartAt: null, salesEndAt: null,
     maxPerOrder: 0, ticketTypes: [], closedReason: 'Ticket sales are not configured.',
   };
   let scope;
@@ -135,6 +136,7 @@ async function readTicketingCatalog({ db, provider, getConfig, now = () => new D
     currencyExponent: CURRENCY_EXPONENTS[catalog.currency],
     eventName: typeof event.name === 'string' ? event.name : closed.eventName,
     refundPolicy: catalog.refundPolicy, taxTreatment: catalog.taxTreatment,
+    salesStartAt: catalog.salesStartAt, salesEndAt: catalog.salesEndAt,
     maxPerOrder: catalog.maxPerOrder, ticketTypes,
     closedReason: anyAvailable ? null : (catalog.salesPaused ? 'Ticket sales are paused.' : eventRemaining === 0 ? 'This event is sold out.' : 'Ticket sales are currently closed.'),
   };

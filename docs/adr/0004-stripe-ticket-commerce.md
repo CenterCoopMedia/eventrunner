@@ -63,8 +63,9 @@ pricing authority. Completed orders retain their captured descriptions and amoun
 | `ticket_sync_queue/{orderId}` | The existing and only work queue: durable wake-ups and bounded reconciliation. |
 | `admin_logs/{id}` | Actor, timestamp, affected IDs, reason, and action; no raw provider body. |
 
-All commerce collections deny every direct browser read and write, including admin
-clients. APIs enforce verified purchaser ownership or live staff/operator roles and
+The new catalog, inventory, order, and payment-attempt collections deny every direct
+browser read and write, including admin clients. Existing operator reads of
+`admin_logs` remain available. APIs enforce verified purchaser ownership or live staff/operator roles and
 scope every order to provider, account, test/live mode, and event. Public catalog
 responses contain eligible offers and availability, never buyer data or secrets.
 Financial data never enters the public attendee projection.
