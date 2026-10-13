@@ -60,6 +60,13 @@ async function applyTicketClaimToUser({ db, uid, getConfig, now = () => new Date
     if (!snap.exists) return { registrationStatus: null, changed: false };
     const current = snap.data()?.registrationStatus ?? null;
 
+    // A refund can commit after claimTicket but before this transaction.
+    // Read the live entitlement in the same transaction as the user write
+    // so a concurrent refund also invalidates this transaction's read set.
+    const validTickets = await tx.get(db.collection(TICKETS)
+      .where('claimedByUid', '==', uid).where('status', '==', 'valid').limit(1));
+    if (validTickets.empty) return { registrationStatus: current, changed: false };
+
     let next = current;
     const patch = { updatedAt: now() };
     if (isValidTransition(current, 'ticketed', 'ticket_claimed')) {
@@ -230,7 +237,7 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, getConfig, now 
     // claim writes `tickets/{externalId}`, so the document has to exist.
     // A manual lookup already read that document. Writing the snapshot
     // back can restore a refund that a CSV import stored after the read.
-    if (provider.name !== 'manual') {
+    if (provider.name !== 'manual' && !provider.ownsTicketPersistence) {
       await upsertTickets({ db, tickets: found.tickets, providerName: provider.name, now, log });
     }
 

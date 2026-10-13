@@ -81,8 +81,9 @@ function isDuplicateClaim(err) {
 }
 
 /** @param {object} req @returns {Buffer} the exact bytes the signature covers */
-function rawBodyOf(req) {
+function rawBodyOf(req, requireExact = false) {
   if (Buffer.isBuffer(req?.rawBody)) return req.rawBody;
+  if (requireExact) return Buffer.alloc(0);
   if (typeof req?.rawBody === 'string') return Buffer.from(req.rawBody, 'utf8');
   try {
     return Buffer.from(JSON.stringify(req?.body ?? {}), 'utf8');
@@ -140,6 +141,7 @@ async function claimAndEnqueue({ db, deliveryId, orderId, eventType, providerNam
         attempts: keepAttempts,
         readyAt: at,
         provider: providerName,
+        generation: (Number.isSafeInteger(prior?.generation) ? prior.generation : 0) + 1,
         firstEnqueuedAt: prior?.firstEnqueuedAt || at,
         lastDeliveryId: deliveryId,
         lastEventType: eventType,
@@ -169,7 +171,11 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
       return;
     }
 
-    const rawBody = rawBodyOf(req);
+    const rawBody = rawBodyOf(req, provider.requiresRawBody === true);
+    if (provider.requiresRawBody === true && rawBody.length === 0) {
+      res.status(401).json({ error: { code: 'unauthorized', message: 'Verification failed.' } });
+      return;
+    }
     if (rawBody.length > MAX_BODY_BYTES) {
       res.status(413).json({ error: { code: 'payload-too-large', message: 'Delivery is too large.' } });
       return;
@@ -182,7 +188,7 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
       // A throw is ambiguous — a malformed body and an unreachable key
       // store look the same from here. 500 so the provider retries; the
       // dedup claim makes that retry free.
-      log.error('ticketing: verifyWebhook threw', err);
+      log.error('ticketing: verifyWebhook threw', provider.name === 'stripe' ? { code: 'stripe-verification-unavailable' } : err);
       res.status(500).json({ error: { code: 'internal', message: 'Delivery could not be processed.' } });
       return;
     }

@@ -235,11 +235,22 @@ function createOnUserRegistrationPromptCreated({ db, provider, sendEmail, getCon
 /** Deployable exports (spec §1.3 ticketing/): onUserRegistrationPromptCreated. */
 function buildHandlers() {
   const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+  const { defineSecret } = require('firebase-functions/params');
+  const { internals: { SEND_SECRETS_BY_PROVIDER } } = require('../email/send.cjs');
+  const { ticketingSecretNames } = require('./providers/index.cjs');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
+  const emailProvider = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
+  const secretNames = new Set(SEND_SECRETS_BY_PROVIDER[emailProvider] || []);
+  // Eventbrite currently validates both credentials in its constructor.
+  // Stripe/manual/none registration prompts perform no provider API call.
+  if ((process.env.EVENT_TICKETING_PROVIDER || '').trim() === 'eventbrite') {
+    for (const name of ticketingSecretNames(process.env)) secretNames.add(name);
+  }
 
   return {
     onUserRegistrationPromptCreated: onDocumentCreated({
       region,
+      secrets: [...secretNames].map(defineSecret),
       document: 'users/{uid}',
       // At-least-once, like every other cross-module users/{uid} trigger
       // (users/projection.cjs syncUserPublic, ticketing/entitlement.cjs

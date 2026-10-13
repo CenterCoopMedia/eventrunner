@@ -18,7 +18,7 @@ const SLUG_RE = /^[a-z0-9-]+$/;
 const SERVICE_ACCOUNT_RE = /^[a-z0-9-]+@[a-z0-9.-]+\.(iam\.)?gserviceaccount\.com$/;
 
 const EMAIL_PROVIDERS = ['postmark', 'webhook', 'console'];
-const TICKETING_PROVIDERS = ['eventbrite', 'manual', 'none'];
+const TICKETING_PROVIDERS = ['eventbrite', 'manual', 'none', 'stripe'];
 const OPERATOR_NOTIFIERS = ['webhook', 'email', 'none'];
 
 const REQUIRED_ALWAYS = [
@@ -178,9 +178,26 @@ function validateDeployEnv(env = process.env) {
   // Conditionally required: the external event id only exists for a
   // provider that filters against one (spec §2.1, §3.3).
   if (present(source.EVENT_TICKETING_PROVIDER) &&
-      source.EVENT_TICKETING_PROVIDER.trim() === 'eventbrite' &&
+      ['eventbrite', 'stripe'].includes(source.EVENT_TICKETING_PROVIDER.trim()) &&
       !present(source.EVENT_TICKETING_EVENT_ID)) {
     missing.push('EVENT_TICKETING_EVENT_ID');
+  }
+
+  if (present(source.EVENT_TICKETING_PROVIDER) && source.EVENT_TICKETING_PROVIDER.trim() === 'stripe') {
+    for (const key of ['EVENT_STRIPE_ACCOUNT_ID', 'EVENT_STRIPE_MODE']) {
+      if (!present(source[key])) missing.push(key);
+    }
+    if (present(source.EVENT_STRIPE_ACCOUNT_ID) && !/^acct_[A-Za-z0-9]+$/.test(source.EVENT_STRIPE_ACCOUNT_ID.trim())) {
+      errors.push('EVENT_STRIPE_ACCOUNT_ID: must identify an organizer-owned Stripe account (acct_...)');
+    }
+    if (present(source.EVENT_STRIPE_MODE) && !['test', 'live'].includes(source.EVENT_STRIPE_MODE.trim())) {
+      errors.push('EVENT_STRIPE_MODE: must be test or live');
+    }
+    if (present(source.EVENT_STRIPE_MODE) && source.EVENT_STRIPE_MODE.trim() === 'live' &&
+        ((present(source.EVENT_DEPLOY_CLIENT) && source.EVENT_DEPLOY_CLIENT.trim() === 'demo') || source.FUNCTIONS_EMULATOR === 'true' ||
+         present(source.FIRESTORE_EMULATOR_HOST) || /^demo-/.test(source.EVENT_FIREBASE_PROJECT_ID || ''))) {
+      errors.push('EVENT_STRIPE_MODE: live payments are not allowed in a demo or emulator');
+    }
   }
 
   // Apply defaults: copy string-valued env entries, then fill any absent

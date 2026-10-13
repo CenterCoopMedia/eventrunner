@@ -1,5 +1,7 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
+
 /**
  * The sync queue and the ticket upsert (spec §3.3 steps 3–4, §4.2).
  *
@@ -37,6 +39,8 @@ const MAX_BACKOFF_MS = 60 * 60 * 1000;
 
 /** Rows one drain touches. Bounded so a backlog cannot exceed the run's timeout. */
 const DRAIN_LIMIT = 25;
+const QUEUE_LEASE_MS = 5 * 60 * 1000;
+const PAYMENT_RECHECK_LIMIT = 48;
 
 /** Pages one manual full sync will walk before it reports itself truncated. */
 const MAX_SYNC_PAGES = 50;
@@ -188,6 +192,51 @@ async function exhaustRow({ db, orderId, attempts, reason, notifyOperator, now, 
   }
 }
 
+/** Take the lease transactionally, then fence every completion by token and generation. */
+async function leaseQueueRow({ db, ref, providerName, now }) {
+  const token = randomUUID();
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const row = snap.data();
+    const at = now();
+    if (!snap.exists || row.status !== QUEUE_PENDING ||
+        (row.provider && row.provider !== providerName) ||
+        toMillis(row.readyAt) > at.getTime() || toMillis(row.leaseExpiresAt) > at.getTime()) return null;
+    const attempts = (Number.isInteger(row.attempts) ? row.attempts : 0) + 1;
+    tx.set(ref, {
+      leaseId: token, leaseExpiresAt: new Date(at.getTime() + QUEUE_LEASE_MS),
+      attempts, readyAt: new Date(at.getTime() + backoffMsFor(attempts)), lastAttemptAt: at, updatedAt: at,
+    }, { merge: true });
+    return { ...row, attempts, leaseId: token, generation: row.generation || 0 };
+  });
+}
+
+async function finishQueueRow({ db, ref, lease, remove = false, patch = {}, now }) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const row = snap.data();
+    if (!snap.exists || row.leaseId !== lease.leaseId) return false;
+    if ((row.generation || 0) !== lease.generation) {
+      // A delivery accepted while we were reading is still durable work.
+      const attemptsPatch = remove ? { attempts: 0 }
+        : Number.isInteger(patch.attempts) && patch.attempts < row.attempts ? { attempts: patch.attempts } : {};
+      tx.set(ref, { leaseId: null, leaseExpiresAt: null, readyAt: now(), ...attemptsPatch }, { merge: true });
+      return false;
+    }
+    if (remove) tx.delete(ref);
+    else tx.set(ref, { ...patch, leaseId: null, leaseExpiresAt: null }, { merge: true });
+    return true;
+  });
+}
+
+async function notifySyncException({ notifyOperator, orderId, code, message, log }) {
+  if (typeof notifyOperator !== 'function') return;
+  try {
+    await notifyOperator({ kind: 'error', title: `Ticket order ${orderId} needs attention`, summary: message,
+      fields: { orderId, code }, dedupeKey: `ticketing-exception:${orderId}:${code}` });
+  } catch { log.warn('ticketing: operator notification unavailable'); }
+}
+
 /**
  * Drain the sync queue once. Scheduled every 2 minutes (§3.3 step 3).
  *
@@ -229,18 +278,30 @@ async function drainTicketSyncQueue({
       summary.skipped += 1;
       continue;
     }
+    const lease = await leaseQueueRow({ db, ref: doc.ref, providerName: provider.name, now });
+    if (!lease) continue;
     summary.scanned += 1;
+    const { attempts } = lease;
 
-    const attempts = (Number.isInteger(row.attempts) ? row.attempts : 0) + 1;
-    const at = now();
-    // Lease first (see the module doc): the attempt is spent before the
-    // provider is called, so a crash cannot buy an unbounded retry.
-    await doc.ref.set({
-      attempts,
-      readyAt: new Date(at.getTime() + backoffMsFor(attempts)),
-      lastAttemptAt: at,
-      updatedAt: at,
-    }, { merge: true });
+    const exhaust = async (reason, cappedAttempts = attempts) => {
+      const at = now();
+      const marked = await finishQueueRow({ db, ref: doc.ref, lease, now, patch: {
+        status: QUEUE_EXHAUSTED, attempts: cappedAttempts, exhaustedAt: at, lastError: reason, updatedAt: at,
+      } });
+      if (marked && typeof notifyOperator === 'function') {
+        // The fenced write owns exhaustion. Alerting never mutates the row.
+        try {
+          await notifyOperator({ kind: 'error', title: `ticket sync gave up on order ${orderId}`,
+            summary: `${cappedAttempts} attempts failed to reconcile this order (${reason}). Review ${SYNC_QUEUE}/${orderId}.`,
+            fields: { orderId, attempts: String(cappedAttempts), reason }, dedupeKey: `ticket-sync-exhausted:${orderId}` });
+        } catch { log.warn('ticketing: operator notification unavailable'); }
+      }
+      summary.exhausted += 1;
+    };
+    if (attempts > MAX_ATTEMPTS) {
+      await exhaust('previous attempt ended before completion', MAX_ATTEMPTS);
+      continue;
+    }
 
     let order = null;
     try {
@@ -249,9 +310,9 @@ async function drainTicketSyncQueue({
       const reason = `fetchOrder failed: ${String(err?.message || err)}`;
       log.warn(`ticketing: ${reason}`);
       if (attempts >= MAX_ATTEMPTS) {
-        await exhaustRow({ db, orderId, attempts, reason, notifyOperator, now, log });
-        summary.exhausted += 1;
+        await exhaust(reason);
       } else {
+        await finishQueueRow({ db, ref: doc.ref, lease, now });
         summary.retried += 1;
       }
       continue;
@@ -263,29 +324,45 @@ async function drainTicketSyncQueue({
     if (provider.externalEventId && order?.externalEventId &&
         order.externalEventId !== provider.externalEventId) {
       log.warn(`ticketing: dropped order ${orderId} for a different event`);
-      await doc.ref.delete();
+      await finishQueueRow({ db, ref: doc.ref, lease, now, remove: true });
       summary.skipped += 1;
       continue;
     }
 
+    if (order?.retryWithoutAttempt === true || order?.paymentPending === true) {
+      const paymentChecks = (Number.isInteger(lease.paymentChecks) ? lease.paymentChecks : 0) +
+        (order.paymentPending === true ? 1 : 0);
+      if (paymentChecks > PAYMENT_RECHECK_LIMIT) {
+        await exhaust('payment remained unconfirmed; inventory is still reserved', Math.max(0, attempts - 1));
+      } else {
+        await finishQueueRow({ db, ref: doc.ref, lease, now, patch: {
+          attempts: Math.max(0, attempts - 1), paymentChecks,
+          readyAt: order.nextReconciliationAt || new Date(now().getTime() + BASE_BACKOFF_MS),
+        } });
+        summary.retried += 1;
+      }
+      continue;
+    }
     if (order?.complete !== true) {
       // The provider says the attendee data is not populated yet — the
       // exact case the queue exists for. The backoff is already written.
       if (attempts >= MAX_ATTEMPTS) {
-        await exhaustRow({
-          db, orderId, attempts, reason: 'order never became complete', notifyOperator, now, log,
-        });
-        summary.exhausted += 1;
+        await exhaust('order never became complete');
       } else {
+        await finishQueueRow({ db, ref: doc.ref, lease, now });
         summary.retried += 1;
       }
       continue;
     }
 
-    await upsertTickets({ db, tickets: order.tickets, providerName: provider.name, now, log });
+    if (!provider.ownsTicketPersistence) {
+      await upsertTickets({ db, tickets: order.tickets, providerName: provider.name, now, log });
+    }
     // Only now: the row is the only durable record that this order still
     // needs work.
-    await doc.ref.delete();
+    await finishQueueRow({ db, ref: doc.ref, lease, now, remove: true });
+    if (order.exception) await notifySyncException({ notifyOperator, orderId,
+      code: order.exception.code, message: order.exception.message, log });
     summary.completed += 1;
   }
 
@@ -310,9 +387,9 @@ async function runFullSync({ db, provider, since, now = () => new Date(), log = 
   for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
     const result = await provider.listTickets({ since, pageToken });
     totals.pages += 1;
-    const counts = await upsertTickets({
-      db, tickets: result?.tickets, providerName: provider.name, now, log,
-    });
+    const counts = provider.ownsTicketPersistence
+      ? { created: 0, updated: result?.tickets?.length || 0, skipped: 0 }
+      : await upsertTickets({ db, tickets: result?.tickets, providerName: provider.name, now, log });
     totals.created += counts.created;
     totals.updated += counts.updated;
     totals.skipped += counts.skipped;
@@ -374,12 +451,16 @@ function buildHandlers() {
 
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
   const secretNames = new Set(ticketingSecretNames(process.env));
-  // The drain fires an OperatorEvent on exhaustion, so the webhook sink's
-  // secrets have to be readable from inside it (same reasoning as
-  // auth/otp.cjs's send path).
-  if ((process.env.EVENT_OPERATOR_NOTIFIER || '').trim() === 'webhook') {
+  // Queue exceptions can alert through either configured sink. Send-only
+  // email credentials belong here; delivery-ingest secrets do not.
+  const notifierName = (process.env.EVENT_OPERATOR_NOTIFIER || '').trim();
+  if (notifierName === 'webhook') {
     secretNames.add('OPERATOR_WEBHOOK_URL');
     secretNames.add('OPERATOR_WEBHOOK_SECRET');
+  } else if (notifierName === 'email') {
+    const { internals: { SEND_SECRETS_BY_PROVIDER } } = require('../email/send.cjs');
+    const emailProvider = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
+    for (const name of SEND_SECRETS_BY_PROVIDER[emailProvider] || []) secretNames.add(name);
   }
   const secrets = [...secretNames].map(defineSecret);
 
@@ -426,6 +507,8 @@ module.exports = {
     BASE_BACKOFF_MS,
     MAX_BACKOFF_MS,
     DRAIN_LIMIT,
+    QUEUE_LEASE_MS,
+    PAYMENT_RECHECK_LIMIT,
     MAX_SYNC_PAGES,
   },
 };

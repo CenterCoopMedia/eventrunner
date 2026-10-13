@@ -22,7 +22,7 @@ const {
   PROVIDER_NAMES,
 } = require('./providers/index.cjs');
 
-/** The three ticketing collections (spec §4.1). No others exist. */
+/** Shared admission, webhook receipt, and single sync queue collections. */
 const TICKETS = 'tickets';
 const WEBHOOK_DELIVERIES = 'ticket_webhook_deliveries';
 const SYNC_QUEUE = 'ticket_sync_queue';
@@ -153,37 +153,52 @@ function createGetTicketingStatusHandler({ db, provider, auth, getConfig, now })
   };
 }
 
+/** Resolve notification and email credentials only on an actual alert. */
+function createLazyTicketingNotifier({ db, getConfig, env = process.env }) {
+  let notifier;
+  let emailCore;
+  return async (event) => {
+    if (!notifier) {
+      const { createOperatorNotifier } = require('../notify/operator.cjs');
+      notifier = createOperatorNotifier({
+        env,
+        getConfig,
+        sendEmail: async (message) => {
+          if (!emailCore) {
+            const { createEmailCore } = require('../email/send.cjs');
+            const { getEmailProvider } = require('../email/providers/index.cjs');
+            emailCore = createEmailCore({ db, provider: getEmailProvider({ env }), getConfig });
+          }
+          return emailCore.send(message);
+        },
+      });
+    }
+    return notifier.notify(event);
+  };
+}
+
 /**
- * Shared runtime wiring for every ticketing function. Required lazily so
- * that requiring this module (in tests, or at deploy analysis time) never
- * touches firebase-admin.
- *
+ * Shared runtime wiring for ticketing functions. Required lazily so
+ * importing the module never initializes firebase-admin.
  * @returns {{ db: object, provider: object, getConfig: () => Promise<object>,
  *             notifyOperator: (e: object) => Promise<object>, auth: object }}
  */
 function buildTicketingDeps() {
   const { getDb } = require('../core/firestore.cjs');
   const { getEventConfig } = require('../core/config.cjs');
-  const { createOperatorNotifier } = require('../notify/operator.cjs');
-  const { createEmailCore } = require('../email/send.cjs');
-  const { getEmailProvider } = require('../email/providers/index.cjs');
   const { getAuth } = require('firebase-admin/auth');
 
   const db = getDb();
   const getConfig = () => getEventConfig({ db });
-  const emailCore = createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
-  const notifier = createOperatorNotifier({
-    env: process.env,
-    getConfig,
-    sendEmail: emailCore.send,
-  });
   return {
     db,
     // db/getConfig forwarded: the manual adapter reads tickets/{externalId}
     // itself and needs config/event.registration.externalUrl for §3.5.
     provider: getTicketingProvider({ env: process.env, db, getConfig }),
     getConfig,
-    notifyOperator: notifier.notify,
+    // Read/status/claim calls never need an email credential. Alerting
+    // resolves its configured sink only if an operation actually alerts.
+    notifyOperator: createLazyTicketingNotifier({ db, getConfig }),
     auth: getAuth(),
   };
 }
@@ -228,6 +243,7 @@ module.exports = {
     return buildHandlers();
   },
   internals: {
+    createLazyTicketingNotifier,
     isSafeDocId,
     safeDocId,
     TICKETS,

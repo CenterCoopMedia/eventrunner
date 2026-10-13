@@ -8,11 +8,13 @@
  * operator command, the same shape `verify-sender-domain.cjs` (§5.6 item 4)
  * uses for its own provisioning step: a checklist item that has to be run
  * once per deployment, from a terminal with real credentials, well before
- * the first Eventbrite order ever needs to reach this project.
+ * the first paid order ever needs to reach this project.
  *
  * CAPABILITY, NOT ENABLEMENT (§3.3). Webhook registration applies only to
- * providers that implement `registerWebhook` — today that is `eventbrite`
- * alone. `manual` has no webhook to register and `none` has no provider at
+ * providers that implement `registerWebhook` — `eventbrite` and `stripe`.
+ * Stripe verifies an existing Dashboard endpoint because its generated
+ * signing secret must be bound before verification. `manual` has no webhook
+ * to register and `none` has no provider at
  * all, so this script exits 0 with an explanatory message for either,
  * rather than failing a checklist item a CSV deployment could never
  * satisfy. The gate is `typeof provider.registerWebhook !== 'function'`,
@@ -49,7 +51,7 @@ const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 
 const FLAGS = ['callback-url', 'no-write', 'help'];
 
-/** Webhook events every registration asks for — mirrors webhook.cjs's ACTIONABLE_EVENT_TYPES (§3.3). */
+/** Default Eventbrite events; adapters may supply their own required list. */
 const WEBHOOK_EVENTS = ['order.placed', 'order.updated', 'attendee.updated'];
 
 /**
@@ -89,10 +91,13 @@ function usage() {
     '  --no-write             report only; do not stamp config/providers.ticketing',
     '',
     'Environment (Tier A, .env.example):',
-    '  EVENT_TICKETING_PROVIDER    eventbrite | manual | none',
-    '  EVENT_TICKETING_EVENT_ID    required when provider is eventbrite',
+    '  EVENT_TICKETING_PROVIDER    eventbrite | stripe | manual | none',
+    '  EVENT_TICKETING_EVENT_ID    required when provider is eventbrite or stripe',
+    '  EVENT_STRIPE_ACCOUNT_ID     required for stripe; organizer-owned acct_ identifier',
+    '  EVENT_STRIPE_MODE           required for stripe; test | live',
     '  TICKETING_API_TOKEN         required when provider is not none',
-    '  TICKETING_WEBHOOK_SECRET    required for a registerWebhook-capable provider (eventbrite today)',
+    '  TICKETING_WEBHOOK_SECRET    required for eventbrite or stripe',
+    '  Stripe: create the Dashboard endpoint and bind its generated signing secret first.',
     '  EVENT_FIREBASE_PROJECT_ID   the project whose config/providers is read and stamped',
     '  EVENT_FIREBASE_REGION       default us-central1',
   ].join('\n');
@@ -136,11 +141,12 @@ async function run({ args, env = process.env, deps = {} }) {
 
   console.log(`\nRegistering the ${provider.name} webhook (spec §3.3)\n`);
   console.log(`  Callback URL: ${callbackUrl}`);
-  console.log(`  Events:       ${WEBHOOK_EVENTS.join(', ')}`);
+  const webhookEvents = provider.webhookEventTypes || WEBHOOK_EVENTS;
+  console.log(`  Events:       ${webhookEvents.join(', ')}`);
 
   let result;
   try {
-    result = await provider.registerWebhook({ callbackUrl, events: WEBHOOK_EVENTS });
+    result = await provider.registerWebhook({ callbackUrl, events: webhookEvents });
   } catch (err) {
     console.error(`\nRegistration failed: ${err.message}`);
     return 1;

@@ -22,6 +22,16 @@ const { evaluateReadiness } = require('../../../scripts/lib/readiness.cjs');
 const T0 = new Date('2026-08-20T10:00:00.000Z');
 const ADMIN = 'admin@example.com';
 
+test('ticketing dependency construction and disabled alerts never read email credentials', async () => {
+  const env = { EVENT_OPERATOR_NOTIFIER: 'none', EVENT_EMAIL_PROVIDER: 'postmark' };
+  Object.defineProperty(env, 'EMAIL_PROVIDER_API_KEY', {
+    get() { throw new Error('This endpoint has no email secret binding.'); },
+  });
+  const notify = internals.createLazyTicketingNotifier({ db: makeFakeDb(), env,
+    getConfig: async () => { throw new Error('A disabled notifier should not load config.'); } });
+  assert.deepEqual(await notify({ kind: 'error', title: 'fixture' }), { delivered: false, sink: 'none' });
+});
+
 function makeRes() {
   const res = {
     statusCode: null, body: null, headers: {},

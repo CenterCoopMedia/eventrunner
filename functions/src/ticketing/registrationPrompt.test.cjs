@@ -17,6 +17,29 @@ const {
 const QUIET = { warn() {}, error() {}, info() {} };
 const T0 = new Date('2026-08-20T10:00:00.000Z');
 
+test('registration prompt binds send-only email secrets and only eager provider credentials', () => {
+  const keys = ['EVENT_EMAIL_PROVIDER', 'EVENT_TICKETING_PROVIDER'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const secrets = () => Object.getOwnPropertyDescriptor(
+    require('./registrationPrompt.cjs').handlers.onUserRegistrationPromptCreated, '__endpoint',
+  ).value.secretEnvironmentVariables.map((entry) => entry.key).sort();
+  try {
+    process.env.EVENT_EMAIL_PROVIDER = 'postmark';
+    process.env.EVENT_TICKETING_PROVIDER = 'stripe';
+    assert.deepEqual(secrets(), ['EMAIL_PROVIDER_API_KEY']);
+    process.env.EVENT_TICKETING_PROVIDER = 'eventbrite';
+    assert.deepEqual(secrets(), ['EMAIL_PROVIDER_API_KEY', 'TICKETING_API_TOKEN', 'TICKETING_WEBHOOK_SECRET']);
+    process.env.EVENT_EMAIL_PROVIDER = 'webhook';
+    process.env.EVENT_TICKETING_PROVIDER = 'none';
+    assert.deepEqual(secrets(), ['EMAIL_WEBHOOK_SECRET', 'EMAIL_WEBHOOK_URL']);
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+});
+
 function user(overrides = {}) {
   return {
     uid: 'uid-ada',

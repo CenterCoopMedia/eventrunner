@@ -3,6 +3,35 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+test('sync alerts bind the selected notifier send secrets without requiring them on status or claims', () => {
+  const keys = ['EVENT_EMAIL_PROVIDER', 'EVENT_TICKETING_PROVIDER', 'EVENT_OPERATOR_NOTIFIER'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const secretsOf = (handler) => Object.getOwnPropertyDescriptor(handler, '__endpoint').value
+    .secretEnvironmentVariables.map((entry) => entry.key).sort();
+  try {
+    process.env.EVENT_EMAIL_PROVIDER = 'postmark';
+    process.env.EVENT_TICKETING_PROVIDER = 'stripe';
+    const ticketSecrets = ['TICKETING_API_TOKEN', 'TICKETING_WEBHOOK_SECRET'];
+    for (const [notifier, extra] of [
+      ['email', ['EMAIL_PROVIDER_API_KEY']],
+      ['webhook', ['OPERATOR_WEBHOOK_SECRET', 'OPERATOR_WEBHOOK_URL']],
+      ['none', []],
+    ]) {
+      process.env.EVENT_OPERATOR_NOTIFIER = notifier;
+      const handlers = require('./sync.cjs').handlers;
+      assert.deepEqual(secretsOf(handlers.processTicketSyncQueue), [...ticketSecrets, ...extra].sort());
+      assert.deepEqual(secretsOf(handlers.ticketingSync), [...ticketSecrets, ...extra].sort());
+      assert.deepEqual(secretsOf(require('./index.cjs').handlers.getTicketingStatus), ticketSecrets);
+      assert.deepEqual(secretsOf(require('./registration.cjs').handlers.ticketingVerifyOrder), ticketSecrets);
+    }
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+});
+
 const { makeFakeDb: makeBareFakeDb } = require('../cms/firestoreFake.cjs');
 
 // requireAdmin reads config/bootstrap LIVE from the db it is handed (issue
@@ -18,6 +47,7 @@ const {
   internals,
 } = require('./sync.cjs');
 const { createFakeTicketingProvider, fakeTicket } = require('./ticketingFake.cjs');
+const { claimAndEnqueue } = require('./webhook.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const T0 = new Date('2026-08-20T10:00:00.000Z');
@@ -67,6 +97,69 @@ test('a row that is not ready yet is left alone', async () => {
 
   assert.equal(summary.scanned, 0);
   assert.deepEqual(provider.calls.fetchOrder, []);
+});
+
+test('concurrent drains acquire one transactional lease and call the provider once', async () => {
+  const db = makeFakeDb({ 'ticket_sync_queue/ord-1': pendingRow('ord-1') });
+  let entered;
+  let release;
+  const reading = new Promise((resolve) => { entered = resolve; });
+  const providerResult = new Promise((resolve) => { release = resolve; });
+  let calls = 0;
+  const provider = createFakeTicketingProvider();
+  provider.fetchOrder = async () => { calls += 1; entered(); return providerResult; };
+  const first = drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  await reading;
+  const second = await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(second.scanned, 0);
+  assert.equal(calls, 1);
+  release({ complete: true, tickets: [fakeTicket()] });
+  await first;
+  assert.equal(db.read('ticket_sync_queue', 'ord-1'), undefined);
+});
+
+test('a delivery accepted during a provider read survives completion of the previous generation', async () => {
+  const db = makeFakeDb({ 'ticket_sync_queue/ord-1': pendingRow('ord-1', { generation: 1 }) });
+  const provider = createFakeTicketingProvider();
+  let call = 0;
+  provider.fetchOrder = async () => {
+    call += 1;
+    if (call === 1) await claimAndEnqueue({ db, deliveryId: 'new-refund', orderId: 'ord-1',
+      eventType: 'order.updated', providerName: 'eventbrite', now: () => T0 });
+    return { complete: true, tickets: [fakeTicket({ status: call === 1 ? 'valid' : 'refunded' })] };
+  };
+  await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(db.read('ticket_sync_queue', 'ord-1').generation, 2);
+  await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
+  assert.equal(db.read('ticket_sync_queue', 'ord-1'), undefined);
+});
+
+test('payment waiting does not spend the six provider-unreadability attempts and remains bounded', async () => {
+  const db = makeFakeDb({ 'ticket_sync_queue/ord-1': pendingRow('ord-1', { provider: 'stripe' }) });
+  let clock = T0;
+  const provider = createFakeTicketingProvider({ name: 'stripe' });
+  provider.fetchOrder = async () => ({ complete: true, paymentPending: true, tickets: [],
+    nextReconciliationAt: new Date(clock.getTime() + 15 * 60_000) });
+  for (let i = 0; i < internals.PAYMENT_RECHECK_LIMIT; i += 1) {
+    await drainTicketSyncQueue({ db, provider, now: () => clock, log: QUIET });
+    const row = db.read('ticket_sync_queue', 'ord-1');
+    assert.equal(row.attempts, 0);
+    assert.equal(row.status, 'pending');
+    clock = row.readyAt;
+  }
+  const result = await drainTicketSyncQueue({ db, provider, now: () => clock, log: QUIET });
+  assert.equal(result.exhausted, 1);
+  assert.match(db.read('ticket_sync_queue', 'ord-1').lastError, /inventory is still reserved/);
+});
+
+test('a provider that owns atomic ticket persistence cannot have a stale snapshot upsert undo cancellation', async () => {
+  const db = makeFakeDb({ 'ticket_sync_queue/ord-1': pendingRow('ord-1', { provider: 'stripe' }),
+    'tickets/tkt-1': fakeTicket({ status: 'cancelled' }) });
+  const provider = createFakeTicketingProvider({ name: 'stripe', orders: { 'ord-1': { tickets: [fakeTicket()] } } });
+  provider.ownsTicketPersistence = true;
+  await drainTicketSyncQueue({ db, provider, now: () => T0, log: QUIET });
+  assert.equal(db.read('tickets', 'tkt-1').status, 'cancelled');
 });
 
 test('an incomplete order backs off exponentially instead of being dropped', async () => {

@@ -97,7 +97,7 @@ test('provider enums are enforced', () => {
   }
 });
 
-test('EVENT_TICKETING_EVENT_ID required only for eventbrite', () => {
+test('EVENT_TICKETING_EVENT_ID is required for Eventbrite but not manual', () => {
   const eb = validateDeployEnv({ ...VALID_ENV, EVENT_TICKETING_PROVIDER: 'eventbrite' });
   assert.equal(eb.ok, false);
   assert.ok(eb.missing.includes('EVENT_TICKETING_EVENT_ID'));
@@ -111,6 +111,17 @@ test('EVENT_TICKETING_EVENT_ID required only for eventbrite', () => {
 
   const manual = validateDeployEnv({ ...VALID_ENV, EVENT_TICKETING_PROVIDER: 'manual' });
   assert.equal(manual.ok, true);
+});
+
+test('Stripe deployment requires an explicit account, event and mode without enabling live demo payments', () => {
+  const base = { ...VALID_ENV, EVENT_TICKETING_PROVIDER: 'stripe' };
+  assert.deepEqual(validateDeployEnv(base).missing, ['EVENT_TICKETING_EVENT_ID', 'EVENT_STRIPE_ACCOUNT_ID', 'EVENT_STRIPE_MODE']);
+  const configured = { ...base, EVENT_TICKETING_EVENT_ID: 'conference-1', EVENT_STRIPE_ACCOUNT_ID: 'acct_fixture', EVENT_STRIPE_MODE: 'test' };
+  assert.equal(validateDeployEnv(configured).ok, true);
+  assert.equal(validateDeployEnv({ ...configured, EVENT_STRIPE_MODE: 'live' }).ok, false);
+  assert.equal(validateDeployEnv({ ...configured, EVENT_STRIPE_ACCOUNT_ID: 'not-account' }).ok, false);
+  assert.equal(validateDeployEnv({ ...configured, EVENT_STRIPE_MODE: 4 }).ok, false);
+  assert.doesNotThrow(() => validateDeployEnv({ EVENT_TICKETING_PROVIDER: 4 }));
 });
 
 test('EVENT_FIREBASE_REGION has a default and is never required', () => {
