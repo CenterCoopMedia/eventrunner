@@ -7,10 +7,44 @@ import { Notice, Panel, secondaryButtonClass, dangerButtonClass, linkButtonClass
 import TicketingConfirmation from './TicketingConfirmation.jsx';
 import { TicketingTable, TicketingHead, cellClass, dataCellClass } from './StripeTicketList.jsx';
 
+function confirmationOutcome(result, unconfirmed) {
+  const review = 'Retrying keeps this request. Review the email log before another send.';
+  if (result?.skipped) {
+    const reason = {
+      'not-confirmed': 'The order’s payment is not confirmed.',
+      'no-valid-tickets': 'This order has no valid admission tickets.',
+      'read-only-demo': 'This historical demo is read-only.',
+    }[result.skipped] || 'The server skipped this request. Review the order and email log before trying again.';
+    return { tone: 'caution', message: `No confirmation messages were sent. ${reason} Retrying keeps this request.`, unconfirmed };
+  }
+  const sent = result?.sent;
+  const failed = result?.failed;
+  if (!Number.isSafeInteger(sent) || sent < 0 || !Number.isSafeInteger(failed) || failed < 0) {
+    return { tone: 'caution', message: `The confirmation response did not confirm delivery. ${review}`, unconfirmed: true };
+  }
+  const sentMessage = `${sent} confirmation ${sent === 1 ? 'message' : 'messages'} sent.`;
+  if (failed > 0) {
+    return { tone: 'caution', message: `${sentMessage} ${failed} ${failed === 1 ? 'message' : 'messages'} failed or could not be confirmed. ${review}`, unconfirmed: true };
+  }
+  // The backend claims each recipient before delivery. Replayed claims also
+  // cover failed or uncertain sends, so neither alreadySent nor a positive
+  // retry count proves that every earlier recipient was sent its message.
+  if (result.alreadySent) {
+    return { tone: 'caution', message: `This request is already recorded. No messages were sent again. Delivery is still unconfirmed. ${review}`, unconfirmed: true };
+  }
+  if (sent === 0) {
+    return { tone: 'caution', message: 'No confirmation messages were sent. Review the order’s recipients and email log before trying again. Retrying keeps this request.', unconfirmed };
+  }
+  if (unconfirmed) {
+    return { tone: 'caution', message: `${sentMessage} Earlier delivery results are still unconfirmed. ${review}`, unconfirmed: true };
+  }
+  return { tone: 'ok', message: `${sentMessage} Stripe’s payment receipt is separate.`, complete: true };
+}
+
 export default function StripeOrderDetail({ call, orderId, isOperator, timezone, onChanged, onClose }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [selected, setSelected] = useState([]);
@@ -41,18 +75,30 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
     busyRef.current = true;
     setBusy(true);
     setError('');
-    setNotice('');
+    setNotice(null);
+    const resend = body.action === 'resend' ? resendRef.current : null;
     try {
       const result = await call('ticketingCommerceAdmin', body);
       if (result.order && result.tickets) setData(result);
       else setRefresh((value) => value + 1);
-      setNotice(result.alreadySent ? 'This confirmation request was already sent; it was not sent again.' : message);
+      if (resend) {
+        const outcome = confirmationOutcome(result, resend.unconfirmed);
+        resend.unconfirmed = outcome.unconfirmed === true;
+        if (outcome.complete && resendRef.current === resend) resendRef.current = null;
+        setNotice(outcome);
+      } else setNotice({ tone: 'ok', message });
       setConfirm(null);
       setEdit(null);
       setReason('');
       setSelected([]);
       onChanged();
-    } catch (err) { setError(err.message); }
+    } catch (err) {
+      if (resend) {
+        resend.unconfirmed = true;
+        setNotice({ tone: 'caution', message: 'Delivery is unconfirmed. Retrying keeps this request. Review the email log before another send.' });
+      }
+      setError(err.message);
+    }
     finally { busyRef.current = false; setBusy(false); }
   }
 
@@ -76,7 +122,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
     <h3 ref={headingRef} tabIndex={-1} className="mb-sm wrap-anywhere font-admin-data text-admin-base font-bold">{orderId}</h3>
     {!order && !error ? <AdminLoadingState label="Loading order details…" /> : null}
     {error && !confirm ? <Notice tone="error" message={error} /> : null}
-    {notice ? <Notice tone="ok" message={notice} /> : null}
+    {notice ? <Notice tone={notice.tone} message={notice.message} /> : null}
     {order ? <div className="space-y-md">
       <dl className="grid min-w-0 gap-md sm:grid-cols-2 lg:grid-cols-3">
         <div><dt className="text-admin-base font-semibold">Purchaser</dt><dd className="wrap-anywhere font-admin-data text-admin-sm">{order.purchaserEmail || order.purchaser?.email}</dd></div>
@@ -90,8 +136,11 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
       <div className="flex flex-wrap gap-sm">
         <button type="button" className={secondaryButtonClass} aria-busy={busy} aria-disabled={busy} onClick={() => run({ action: 'reconcile', orderId }, 'Latest payment and ticket state requested from Stripe.')}>Resync this order</button>
         <button type="button" className={secondaryButtonClass} aria-busy={busy} aria-disabled={busy} onClick={() => {
-          if (!resendRef.current) resendRef.current = newTicketingRequestId();
-          run({ action: 'resend', orderId, requestId: resendRef.current }, 'Transactional ticket confirmation sent. Stripe’s payment receipt is separate.');
+          if (busyRef.current) return;
+          if (!resendRef.current || resendRef.current.orderId !== orderId) {
+            resendRef.current = { orderId, requestId: newTicketingRequestId(), unconfirmed: false };
+          }
+          run({ action: 'resend', orderId, requestId: resendRef.current.requestId });
         }}>Resend ticket confirmation</button>
         {dashboardUrl ? <ExternalLink href={dashboardUrl} className={secondaryButtonClass}>Open this payment in Stripe Dashboard</ExternalLink> : null}
       </div>
