@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  SOURCE_SHA: 197672ef4da60d9b4378d85385699616e5986bb4
+
 jobs:
   build:
     if: github.repository == 'CenterCoopMedia/eventrunner'
@@ -16,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 8132b909604f51de952ead4d6107c632045abf2a
+          ref: ${{ env.SOURCE_SHA }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -38,12 +41,12 @@ jobs:
       - name: Package a generated-output-only commit
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 8132b909604f51de952ead4d6107c632045abf2a
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           git add -- docs/demo
           git -c user.name='Joe Amditis' -c user.email='6799804+jamditis@users.noreply.github.com' commit -s -m 'build: regenerate the 404 demo with the locked CI toolchain'
-          test "$(git rev-parse HEAD^)" = 8132b909604f51de952ead4d6107c632045abf2a
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
           mkdir -p "$RUNNER_TEMP/489-demo-repair"
-          git bundle create "$RUNNER_TEMP/489-demo-repair/generated.bundle" HEAD ^8132b909604f51de952ead4d6107c632045abf2a
+          git bundle create "$RUNNER_TEMP/489-demo-repair/generated.bundle" HEAD "^$SOURCE_SHA"
           git rev-parse HEAD > "$RUNNER_TEMP/489-demo-repair/head.sha"
           git rev-parse HEAD^{tree} > "$RUNNER_TEMP/489-demo-repair/tree.sha"
       - uses: actions/upload-artifact@v4
@@ -62,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 8132b909604f51de952ead4d6107c632045abf2a
+          ref: ${{ env.SOURCE_SHA }}
       - uses: actions/download-artifact@v4
         with:
           name: pr-489-generated-commit
@@ -74,12 +77,12 @@ jobs:
           git -c core.hooksPath=/dev/null fetch --no-tags "$RUNNER_TEMP/489-demo-repair/generated.bundle" HEAD
           candidate="$(git rev-parse FETCH_HEAD)"
           test "$candidate" = "$(cat "$RUNNER_TEMP/489-demo-repair/head.sha")"
-          test "$(git rev-parse "$candidate^")" = 8132b909604f51de952ead4d6107c632045abf2a
+          test "$(git rev-parse "$candidate^")" = "$SOURCE_SHA"
           test "$(git rev-parse "$candidate^{tree}")" = "$(cat "$RUNNER_TEMP/489-demo-repair/tree.sha")"
-          test "$(git rev-list --count 8132b909604f51de952ead4d6107c632045abf2a.."$candidate")" = 1
+          test "$(git rev-list --count "$SOURCE_SHA..$candidate")" = 1
           CANDIDATE="$candidate" python3 - <<'PY'
           import os, subprocess
-          base = '8132b909604f51de952ead4d6107c632045abf2a'
+          base = os.environ['SOURCE_SHA']
           head = os.environ['CANDIDATE']
           paths = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', '-z', base, head]).split(b'\0')
           paths = [p for p in paths if p]
@@ -88,7 +91,7 @@ jobs:
           assert all(not e or e.startswith(b'100644 blob ') for e in entries), 'Only regular demo files may be published'
           print(f'Verified {len(paths)} generated paths; no application or workflow edits.')
           PY
-          # Publish only a candidate branch. The connected review workflow
-          # verifies it and advances the PR with a compare-and-swap lease.
-          git -c core.hooksPath=/dev/null push origin "$candidate:refs/heads/codex/489-generated-demo-8132b90"
+          # No repository scripts run in this write-capable job. Publish
+          # only a candidate; the connected tool leases the PR update.
+          git -c core.hooksPath=/dev/null push origin "$candidate:refs/heads/codex/489-generated-demo-197672e"
           printf 'Candidate commit: `%s`\n\nGenerated tree: `%s`\n' "$candidate" "$(git rev-parse "$candidate^{tree}")" >> "$GITHUB_STEP_SUMMARY"
