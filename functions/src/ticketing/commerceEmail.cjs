@@ -7,6 +7,7 @@ const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoW
 const { render } = require('../email/render.cjs');
 const { loadTemplate } = require('../email/templates.cjs');
 const { createEmailCore, internals: { SEND_SECRETS_BY_PROVIDER } } = require('../email/send.cjs');
+const { stripeScope, internals: { scopeMatches } } = require('./providers/stripe.cjs');
 
 function receiptAmount(order) {
   const format = new Intl.NumberFormat('en', { style: 'currency', currency: order.currency.toUpperCase() });
@@ -29,9 +30,13 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (!policy.ok) return { sent: 0, alreadySent: false, skipped: 'read-only-demo' };
   const snap = await db.collection('ticket_orders').doc(orderId).get();
   const order = snap.exists ? snap.data() : null;
-  if (!order || order.provider !== 'stripe' || order.eventId !== env.EVENT_TICKETING_EVENT_ID ||
-      order.stripeAccountId !== env.EVENT_STRIPE_ACCOUNT_ID || order.livemode !== (env.EVENT_STRIPE_MODE === 'live') ||
+  if (!order || order.provider !== 'stripe' ||
       order.inventoryState !== 'sold' || order.paymentStatus !== 'succeeded') {
+    return { sent: 0, alreadySent: false, skipped: 'not-confirmed' };
+  }
+  // Use the provider's normalized deployment identity without creating its
+  // SDK client or requiring payment secrets in this email-only trigger.
+  if (!scopeMatches(order, stripeScope(env))) {
     return { sent: 0, alreadySent: false, skipped: 'not-confirmed' };
   }
   const refs = (order.ticketIds || []).slice(0, 20).map((id) => db.collection('tickets').doc(id));
@@ -50,11 +55,14 @@ async function sendOrderConfirmations({ db, getConfig, orderId, resendKey = null
   if (order.purchaserEmail) {
     recipients.push({
       to: order.purchaserEmail, templateId: 'ticket.order_confirmation',
-      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order), cta_url: `${origin}/tickets/status?orderId=${encodeURIComponent(orderId)}` },
+      tokens: { order_reference: orderId, ticket_count: String(order.ticketIds.length), total_amount: receiptAmount(order), cta_url: `${origin}/profile` },
     });
   }
   const attendees = new Map();
   for (const ticket of tickets) {
+    // Claim invitations are only for outstanding claims. The purchaser's
+    // separate confirmation remains available after attendees have claimed.
+    if (ticket.claimedByUid) continue;
     const email = ticket.email?.trim().toLowerCase();
     if (!email) continue;
     const existing = attendees.get(email) || { firstName: ticket.firstName || 'there', count: 0 };
