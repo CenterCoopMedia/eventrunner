@@ -6,8 +6,10 @@
 .not-found__scene { min-width: 0; position: relative; padding-inline: var(--space-lg); }
 .not-found__ticket-control { display: block; width: 100%; min-height: 25rem; padding: 0 1rem 2rem; color: inherit; background: transparent; border: 0; cursor: grab; touch-action: pan-y; }
 .not-found__ticket-control:active { cursor: grabbing; }
+.not-found__ticket-control[data-static='true'] { cursor: default; touch-action: auto; }
 .not-found__hanging { display: flex; flex-direction: column; align-items: center; transform-origin: 50% 0; transform: rotate(-6deg); animation: ticket-arrival 1.8s ease-out both; }
 .not-found__hanging[data-dragging='true'] { animation: none; transform: rotate(var(--ticket-angle)); }
+.not-found__ticket-control[data-static='true'] .not-found__hanging { animation: none; transform: none; }
 .not-found__cord { width: 2px; height: 4rem; background: currentColor; opacity: .65; }
 .not-found__ticket { position: relative; display: flex; flex-direction: column; align-items: center; width: min(100%, 23rem); border: 1px solid currentColor; border-radius: var(--radius-large); box-shadow: .5rem 1rem 0 color-mix(in srgb, currentColor 9%, transparent); padding: 2rem 1.25rem 0; }
 .not-found__eyelet { position: absolute; top: .6rem; width: .6rem; height: .6rem; border: 2px solid currentColor; border-radius: 50%; }
