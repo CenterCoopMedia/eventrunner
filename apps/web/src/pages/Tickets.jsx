@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { resolveRegistrationAction } from 'shared/registration';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
@@ -15,15 +16,6 @@ import {
 } from '../lib/ticketingCommerce.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function externalRegistrationUrl(eventConfig) {
-  const value = eventConfig?.registration?.externalUrl;
-  if (typeof value !== 'string' || !value.startsWith('https://')) return null;
-  try {
-    const url = new URL(value);
-    return !url.username && !url.password ? url.href : null;
-  } catch { return null; }
-}
 
 export default function Tickets() {
   useDocumentTitle('Get tickets');
@@ -191,12 +183,12 @@ export default function Tickets() {
   );
   if (!catalog) return <article className="space-y-md">{heading}<p role="status">Loading ticket information…</p></article>;
   if (catalog.provider !== 'stripe') {
-    const externalUrl = externalRegistrationUrl(eventConfig);
+    const registrationAction = resolveRegistrationAction(eventConfig);
     return (
       <article className="space-y-md">
         {heading}
-        <p>{externalUrl ? 'Registration is managed by the event’s registration provider.' : 'Contact the organizers for registration information.'}</p>
-        {externalUrl ? <a href={externalUrl} className={primaryActionClass}>{eventConfig.registration.actionLabel || 'Open registration'}</a> : null}
+        <p>{registrationAction ? 'Registration is managed by the event’s registration provider.' : 'Contact the organizers for registration information.'}</p>
+        {registrationAction ? <a href={registrationAction.url} className={primaryActionClass}>{registrationAction.label || 'Open registration'}</a> : null}
         <p><Link to="/ticket/claim" className="underline">Claim a ticket you already have</Link></p>
       </article>
     );

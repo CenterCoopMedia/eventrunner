@@ -51,12 +51,26 @@ describe('attendee ticket selection', () => {
     expect(screen.getByText(/Ticket sales and payments are unavailable/)).toBeInTheDocument();
     expect(ticketingRequest).not.toHaveBeenCalled();
   });
-  it('preserves the configured external registration path for other providers', async () => {
-    state.event.registration = { externalUrl: 'https://register.example.test/event', actionLabel: 'Register with the organizer' };
+  it.each(['manual', 'eventbrite', 'none'])('uses the shared canonical external registration action for %s', async (provider) => {
+    state.event.registration = { externalUrl: '  HTTPS://Register.Example.TEST/event tickets  ', actionLabel: '  Register with the organizer  ' };
+    ticketingRequest.mockResolvedValue({ provider });
+    mount();
+    expect(await screen.findByRole('link', { name: 'Register with the organizer' })).toHaveAttribute('href', 'https://register.example.test/event%20tickets');
+    expect(screen.queryByRole('button', { name: /Continue to Stripe/ })).not.toBeInTheDocument();
+  });
+  it('supplies a readable default when the canonical registration action has no label', async () => {
+    state.event.registration = { externalUrl: 'https://register.example.test', actionLabel: '   ' };
     ticketingRequest.mockResolvedValue({ provider: 'manual' });
     mount();
-    expect(await screen.findByRole('link', { name: 'Register with the organizer' })).toHaveAttribute('href', 'https://register.example.test/event');
-    expect(screen.queryByRole('button', { name: /Continue to Stripe/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Open registration' })).toHaveAttribute('href', 'https://register.example.test/');
+  });
+  it.each(['javascript:alert(1)', 'https:register.example.test'])('does not render a rejected external registration destination: %s', async (externalUrl) => {
+    state.event.registration = { externalUrl, actionLabel: 'Register with the organizer' };
+    ticketingRequest.mockResolvedValue({ provider: 'manual' });
+    mount();
+    expect(await screen.findByText('Contact the organizers for registration information.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Register with the organizer' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Claim a ticket you already have' })).toHaveAttribute('href', '/ticket/claim');
   });
   it.each([
     ['global-only deadlines', NARROW_SALES_WINDOW, {}],
