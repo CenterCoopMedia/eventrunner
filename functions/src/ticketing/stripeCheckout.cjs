@@ -16,6 +16,8 @@ const {
 
 const ATTEMPT_LEASE_MS = 30 * 1000;
 const RETRY_BACKOFF_MS = 5 * 1000;
+const PURCHASER_WINDOW_MS = 60 * 60 * 1000;
+const MAX_PURCHASER_ORDERS = 5;
 const ORDER_ID = /^ord_[a-f0-9]{40}$/;
 
 function assertWritableEvent(event) {
@@ -44,12 +46,42 @@ async function verifiedPurchaser(auth, req) {
 
 function handleError(res, err, log = console) {
   if (err instanceof CommerceError) {
+    if (err.status === 429 && Number.isInteger(err.retryAfterSeconds)) {
+      res.set('Retry-After', String(err.retryAfterSeconds));
+      res.status(429).json({ error: { code: err.code, message: err.message, retryAfterSeconds: err.retryAfterSeconds } });
+      return;
+    }
     sendError(res, err.status, err.code, err.message);
     return;
   }
   // Never serialize Stripe payloads, attendee assignments, or provider error text.
   log.error('Ticket commerce request failed.', { name: err?.name || 'Error' });
   sendError(res, 503, 'ticketing-unavailable', 'Ticketing is temporarily unavailable. Retry your existing order.');
+}
+
+function purchaserWindow(pointer, at) {
+  let windowStart = millis(pointer?.windowStart);
+  let ordersInWindow = pointer?.ordersInWindow;
+  // A pointer from before the rate ceiling has no window fields. Start its
+  // first window once; malformed partial counters do not reset the budget.
+  if (pointer?.windowStart === undefined && ordersInWindow === undefined) {
+    windowStart = at.getTime();
+    ordersInWindow = 0;
+  } else if (!Number.isFinite(windowStart) || !Number.isSafeInteger(ordersInWindow) || ordersInWindow < 0) {
+    throw new CommerceError('inventory-invalid', 'This checkout needs organizer review.', 503);
+  }
+  if (at.getTime() - windowStart >= PURCHASER_WINDOW_MS) {
+    windowStart = at.getTime();
+    ordersInWindow = 0;
+  }
+  if (ordersInWindow >= MAX_PURCHASER_ORDERS) {
+    const retryAfterSeconds = Math.max(1, Math.ceil((windowStart + PURCHASER_WINDOW_MS - at.getTime()) / 1000));
+    const minutes = Math.ceil(retryAfterSeconds / 60);
+    const error = new CommerceError('rate-limited', `You have reached the ticket order limit. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`, 429);
+    error.retryAfterSeconds = retryAfterSeconds;
+    throw error;
+  }
+  return { windowStart: new Date(windowStart), ordersInWindow: ordersInWindow + 1 };
 }
 
 async function readTicketingCatalog({ db, provider, getConfig, now = () => new Date() }) {
@@ -148,6 +180,7 @@ async function reserveCommerceOrder({
     }
     const catalog = catalogValue(catalogSnap);
     const at = now();
+    const rate = comp ? null : purchaserWindow(purchaserSnap?.data(), at);
     const priced = priceSelections({ catalog, request, at, comp });
     const paid = priced.totalAmount > 0;
     const publicUrl = paid ? configuredPublicUrl(config, env) : null;
@@ -181,7 +214,7 @@ async function reserveCommerceOrder({
     tx.create(orderRef, order);
     tx.create(attemptRef, attempt);
     tx.set(inventoryRef, { ...inventory, updatedAt: at });
-    if (!comp) tx.set(purchaserRef, { orderId: id, updatedAt: at });
+    if (!comp) tx.set(purchaserRef, { orderId: id, ...rate, updatedAt: at });
     if (paid) {
       // This uses the existing provider-consistency queue. If the function
       // dies after Stripe receives creation, the frozen attempt is recoverable.
@@ -409,5 +442,6 @@ function createTicketingOrderStatusHandler(deps) {
 module.exports = {
   readTicketingCatalog, reserveCommerceOrder, recoverCheckoutAttempt, readPurchaserOrder, createCompOrder,
   createTicketingCatalogHandler, createTicketingCheckoutHandler, createTicketingOrderStatusHandler,
-  internals: { verifiedPurchaser, checkoutResponse, safeCheckoutUrl, verifyCreatedSession, ATTEMPT_LEASE_MS, RETRY_BACKOFF_MS },
+  internals: { verifiedPurchaser, checkoutResponse, safeCheckoutUrl, verifyCreatedSession, purchaserWindow,
+    ATTEMPT_LEASE_MS, RETRY_BACKOFF_MS, PURCHASER_WINDOW_MS, MAX_PURCHASER_ORDERS },
 };

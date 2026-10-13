@@ -199,6 +199,52 @@ test('a second distinct held checkout is blocked for the same purchaser', async 
   assert.equal(db.ids('ticket_orders').length, 1);
 });
 
+test('free orders have a per-purchaser hourly ceiling and old retries spend no quota', async () => {
+  const { deps, db, advance } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Full event pass', unitAmount: 0, capacity: 100 }] } });
+  const first = await checkout(deps);
+  for (let i = 2; i <= 5; i += 1) {
+    assert.equal((await checkout(deps, request({ requestId: `checkout-request-000${i}` }))).statusCode, 200);
+  }
+  const retry = await checkout(deps);
+  assert.equal(retry.statusCode, 200);
+  assert.equal(retry.body.orderId, first.body.orderId);
+  const denied = await checkout(deps, request({ requestId: 'checkout-request-0006' }));
+  assert.equal(denied.statusCode, 429);
+  assert.equal(denied.body.error.code, 'rate-limited');
+  assert.equal(denied.body.error.retryAfterSeconds, 3600);
+  assert.equal(denied.headers['Retry-After'], '3600');
+  assert.equal(db.ids('ticket_orders').length, 5);
+  assert.equal(db.read('ticket_inventory', 'current').sold, 5);
+  assert.equal((await checkout(deps, request({ requestId: 'checkout-request-0006' }), 'bob')).statusCode, 200);
+  advance(3600000);
+  assert.equal((await checkout(deps, request({ requestId: 'checkout-request-0006' }))).statusCode, 200);
+});
+
+test('concurrent last-quota free orders consume one slot and failed selections do not spend it', async () => {
+  const { deps, db } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Full event pass', unitAmount: 0, capacity: 100 }] } });
+  for (let i = 1; i <= 4; i += 1) await checkout(deps, request({ requestId: `checkout-request-000${i}` }));
+  const invalid = await checkout(deps, request({ requestId: 'checkout-request-bad0', lines: [{ ticketTypeId: 'unknown', quantity: 1, attendees: [PERSON] }] }));
+  assert.equal(invalid.statusCode, 409);
+  const results = await Promise.all([
+    checkout(deps, request({ requestId: 'checkout-request-0005' })),
+    checkout(deps, request({ requestId: 'checkout-request-0006' })),
+  ]);
+  assert.deepEqual(results.map((result) => result.statusCode).sort(), [200, 429]);
+  assert.equal(db.ids('ticket_orders').length, 5);
+  assert.equal(db.read('ticket_inventory', 'current').sold, 5);
+});
+
+test('staff comps are exempt from the public purchaser rate ceiling', async () => {
+  const { deps, db } = setup();
+  for (let i = 1; i <= 6; i += 1) {
+    const result = await createCompOrder({ ...deps, actorUid: 'organizer-uid', ticketTypeId: 'general', attendees: [PERSON], requestId: `organizer-comp-000${i}`, reason: 'Approved press access' });
+    assert.equal(result.status, 'free');
+  }
+  assert.equal(db.ids('ticket_orders').length, 6);
+  assert.equal(db.read('ticket_inventory', 'current').sold, 6);
+  assert.equal(db.ids('admin_logs').length, 6);
+});
+
 test('an unknown create result retains the reservation and replays the exact stored request', async () => {
   const { deps, db, calls, advance } = setup({ create({ params, options, calls: seen, sessions }) {
     if (!sessions.has(options.idempotencyKey)) sessions.set(options.idempotencyKey, makeSession(params));
