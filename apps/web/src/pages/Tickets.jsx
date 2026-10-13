@@ -251,6 +251,8 @@ export default function Tickets() {
             {types.length === 0 ? <p>No ticket types are currently available.</p> : null}
             {types.map((type) => {
               const maximum = Math.max(0, Math.min(type.maxPerOrder || 20, catalog.maxPerOrder || 20, 20, Number.isInteger(type.remaining) ? type.remaining : 20));
+              const salesStartAt = [catalog.salesStartAt, type.salesStartAt].filter(Boolean).sort((left, right) => Date.parse(right) - Date.parse(left))[0];
+              const salesEndAt = [catalog.salesEndAt, type.salesEndAt].filter(Boolean).sort((left, right) => Date.parse(left) - Date.parse(right))[0];
               return (
                 <fieldset key={type.id} className="min-w-0 space-y-sm border-b-hairline border-rule-hairline pb-md">
                   <legend className="font-heading text-h3 font-semibold">{type.name}</legend>
@@ -259,8 +261,8 @@ export default function Tickets() {
                       <p className="font-data tabular-nums">{formatTicketMoney(type.unitAmount, catalog.currency)} per ticket</p>
                       {type.description ? <p className="wrap-anywhere text-text-secondary">{type.description}</p> : null}
                       {!type.available ? <p>Unavailable</p> : Number.isInteger(type.remaining) ? <p>{type.remaining} seats available</p> : null}
-                      {type.salesStartAt ? <p className="text-caption">Sales open {formatTicketTime(type.salesStartAt, eventConfig.timezone)}.</p> : null}
-                      {type.salesEndAt ? <p className="text-caption">Sales close {formatTicketTime(type.salesEndAt, eventConfig.timezone)}.</p> : null}
+                      {salesStartAt ? <p className="text-caption">Sales open {formatTicketTime(salesStartAt, eventConfig.timezone)}.</p> : null}
+                      {salesEndAt ? <p className="text-caption">Sales close {formatTicketTime(salesEndAt, eventConfig.timezone)}.</p> : null}
                     </div>
                     <SelectField label={`Quantity — ${type.name}`} value={quantities[type.id] || '0'} error={errors[`${type.id}.quantity`]}
                       onChange={(value) => setQuantities((previous) => ({ ...previous, [type.id]: value }))}

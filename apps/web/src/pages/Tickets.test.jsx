@@ -15,6 +15,8 @@ const CATALOG = {
   refundPolicy: 'Contact the organizer before the event for a refund.', taxTreatment: 'inclusive',
   ticketTypes: [{ id: 'general', name: 'General admission', description: 'Full event', unitAmount: 2500, available: true, remaining: 3, minPerOrder: 1, maxPerOrder: 3 }],
 };
+const WIDE_SALES_WINDOW = { salesStartAt: '2030-05-01T14:00:00.000Z', salesEndAt: '2030-06-03T20:00:00.000Z' };
+const NARROW_SALES_WINDOW = { salesStartAt: '2030-05-02T15:00:00.000Z', salesEndAt: '2030-06-01T18:00:00.000Z' };
 function Location() { const location = useLocation(); return <p>Location: {location.pathname}{location.search}</p>; }
 function mount() { return render(<MemoryRouter initialEntries={['/tickets']}><Routes><Route path="/tickets" element={<Tickets />} /><Route path="*" element={<Location />} /></Routes></MemoryRouter>); }
 async function fill(quantity = 1) {
@@ -55,6 +57,22 @@ describe('attendee ticket selection', () => {
     mount();
     expect(await screen.findByRole('link', { name: 'Register with the organizer' })).toHaveAttribute('href', 'https://register.example.test/event');
     expect(screen.queryByRole('button', { name: /Continue to Stripe/ })).not.toBeInTheDocument();
+  });
+  it.each([
+    ['global-only deadlines', NARROW_SALES_WINDOW, {}],
+    ['a tighter global window', NARROW_SALES_WINDOW, WIDE_SALES_WINDOW],
+    ['a tighter ticket-type window', WIDE_SALES_WINDOW, NARROW_SALES_WINDOW],
+    ['ticket-type-only deadlines', {}, NARROW_SALES_WINDOW],
+  ])('shows the effective sales window in the event timezone for %s', async (_label, globalWindow, typeWindow) => {
+    state.event.timezone = 'Etc/GMT+5';
+    ticketingRequest.mockResolvedValue({
+      ...CATALOG, ...globalWindow,
+      ticketTypes: CATALOG.ticketTypes.map((type) => ({ ...type, ...typeWindow })),
+    });
+    mount();
+    expect(await screen.findByText('Sales open May 2, 2030, 10:00:00 AM GMT-5.')).toBeInTheDocument();
+    expect(screen.getByText('Sales close Jun 1, 2030, 1:00:00 PM GMT-5.')).toBeInTheDocument();
+    expect(screen.getAllByText(/^Sales (open|close) /)).toHaveLength(2);
   });
   it('validates attendee identity and refund terms, focusing the field that needs correction', async () => {
     mount();
