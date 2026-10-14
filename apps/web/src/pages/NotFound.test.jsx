@@ -141,4 +141,51 @@ describe('the missing-ticket recovery page', () => {
     unmount();
     expect(listeners.size).toBe(0);
   });
+  it.each([false, true])('subscribes and cleans up with the legacy media-query API, initially reduced=%s', (matches) => {
+    media = {
+      matches,
+      addListener: vi.fn((listener) => listeners.add(listener)),
+      removeListener: vi.fn((listener) => listeners.delete(listener)),
+    };
+    const { unmount } = view();
+    expect(media.addListener).toHaveBeenCalledTimes(1);
+    expect(Boolean(screen.queryByRole('button', { name: 'Swing the decorative ticket' }))).toBe(!matches);
+    preferReducedMotion(false);
+    pointer(ticketButton(), 'pointerdown');
+    pointer(ticketButton(), 'pointermove', { clientX: 180 });
+    preferReducedMotion(true);
+    expect(screen.queryByRole('button', { name: 'Swing the decorative ticket' })).toBeNull();
+    expect(document.querySelector('[data-static="true"]').getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('[data-static="true"]').hasAttribute('tabindex')).toBe(false);
+    expect(screen.queryByText('Drag the ticket, or select it to give it a swing.')).toBeNull();
+    expect(screen.getAllByRole('link')).toHaveLength(3);
+    preferReducedMotion(false);
+    expect(ticketButton().firstElementChild.dataset.dragging).toBe('false');
+    expect(ticketButton().firstElementChild.style.getPropertyValue('--ticket-angle')).toBe('0deg');
+    const listener = media.addListener.mock.calls[0][0];
+    unmount();
+    expect(media.removeListener).toHaveBeenCalledWith(listener);
+    expect(listeners.size).toBe(0);
+  });
+  it('prefers the modern subscription when both listener APIs exist', () => {
+    media.addListener = vi.fn();
+    media.removeListener = vi.fn();
+    const { unmount } = view();
+    preferReducedMotion(true);
+    expect(screen.queryByRole('button', { name: 'Swing the decorative ticket' })).toBeNull();
+    expect(media.addEventListener).toHaveBeenCalledTimes(1);
+    expect(media.addListener).not.toHaveBeenCalled();
+    const listener = media.addEventListener.mock.calls[0][1];
+    unmount();
+    expect(media.removeEventListener).toHaveBeenCalledWith('change', listener);
+    expect(media.removeListener).not.toHaveBeenCalled();
+    expect(listeners.size).toBe(0);
+  });
+  it('keeps recovery available when matchMedia is unavailable', () => {
+    vi.stubGlobal('matchMedia', undefined);
+    const { unmount } = view();
+    expect(screen.getByRole('link', { name: 'Go to the home page' }).getAttribute('href')).toBe('/');
+    expect(screen.getAllByRole('link')).toHaveLength(3);
+    expect(() => unmount()).not.toThrow();
+  });
 });

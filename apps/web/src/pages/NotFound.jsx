@@ -12,8 +12,13 @@ const getReducedMotion = () => window.matchMedia?.(MOTION_QUERY)?.matches === tr
 const getServerReducedMotion = () => true;
 function subscribeMotion(onChange) {
   const query = window.matchMedia?.(MOTION_QUERY);
-  query?.addEventListener?.('change', onChange);
-  return () => query?.removeEventListener?.('change', onChange);
+  if (typeof query?.addEventListener === 'function') {
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener?.('change', onChange);
+  }
+  // Match the legacy MediaQueryList support used by viewport.js.
+  query?.addListener?.(onChange);
+  return () => query?.removeListener?.(onChange);
 }
 
 function TicketArtwork({ name, angle = 0, dragging = false }) {
