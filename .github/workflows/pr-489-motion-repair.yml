@@ -1,0 +1,109 @@
+name: PR 489 isolated motion fallback repair
+
+on:
+  push:
+    branches: [codex/489-motion-fallback-build]
+    paths: [.github/workflows/pr-489-motion-repair.yml]
+
+permissions:
+  contents: read
+
+env:
+  SOURCE_SHA: 5612c487382b0dd2a1e2938314b4fd0125f1c178
+
+jobs:
+  build:
+    if: github.repository == 'CenterCoopMedia/eventrunner'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm run prepare:functions
+      - run: npm ci
+      - name: Prove the legacy regression fails before the repair
+        run: |
+          set -euo pipefail
+          git show 4b8d071a70b1d4ad94d1979b284825bdf2281570:apps/web/src/pages/NotFound.jsx > apps/web/src/pages/NotFound.jsx
+          set +e
+          npm run test -w apps/web -- src/pages/NotFound.test.jsx > "$RUNNER_TEMP/legacy-before.log" 2>&1
+          code=$?
+          set -e
+          git restore --source "$SOURCE_SHA" -- apps/web/src/pages/NotFound.jsx
+          cat "$RUNNER_TEMP/legacy-before.log"
+          test "$code" -ne 0
+          grep -F 'legacy media-query API' "$RUNNER_TEMP/legacy-before.log"
+      - name: Verify the repaired source regressions
+        run: npm run test -w apps/web -- src/pages/NotFound.test.jsx src/pages/ContentPage.test.jsx
+      - name: Generate and verify the exact demo
+        run: |
+          set -euo pipefail
+          node scripts/generate-content.cjs --demo
+          node scripts/generate-content.cjs --demo --check
+          git diff --exit-code -- apps/web/src/generated
+          node scripts/build-demo.cjs
+          node scripts/build-demo.cjs --check
+          node scripts/ci/bundle-budget.cjs --dist docs/demo
+      - name: Package a generated-output-only commit
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git add -- docs/demo
+          git -c user.name='Joe Amditis' -c user.email='6799804+jamditis@users.noreply.github.com' commit -s -m 'build(404): regenerate the demo after legacy motion repair'
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          mkdir -p "$RUNNER_TEMP/489-motion-repair"
+          git bundle create "$RUNNER_TEMP/489-motion-repair/generated.bundle" HEAD "^$SOURCE_SHA"
+          git rev-parse HEAD > "$RUNNER_TEMP/489-motion-repair/head.sha"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/489-motion-repair/tree.sha"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr-489-motion-generated-commit
+          path: ${{ runner.temp }}/489-motion-repair/
+          if-no-files-found: error
+          retention-days: 2
+
+  publish-candidate:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr-489-motion-generated-commit
+          path: ${{ runner.temp }}/489-motion-repair
+      - name: Verify and publish the isolated candidate
+        run: |
+          set -euo pipefail
+          git bundle verify "$RUNNER_TEMP/489-motion-repair/generated.bundle"
+          git -c core.hooksPath=/dev/null fetch --no-tags "$RUNNER_TEMP/489-motion-repair/generated.bundle" HEAD
+          candidate="$(git rev-parse FETCH_HEAD)"
+          test "$candidate" = "$(cat "$RUNNER_TEMP/489-motion-repair/head.sha")"
+          test "$(git rev-parse "$candidate^")" = "$SOURCE_SHA"
+          test "$(git rev-parse "$candidate^{tree}")" = "$(cat "$RUNNER_TEMP/489-motion-repair/tree.sha")"
+          test "$(git rev-list --count "$SOURCE_SHA..$candidate")" = 1
+          CANDIDATE="$candidate" python3 - <<'PY'
+          import os, subprocess
+          base = os.environ['SOURCE_SHA']
+          head = os.environ['CANDIDATE']
+          paths = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', '-z', base, head]).split(b'\0')
+          paths = [p for p in paths if p]
+          assert paths and all(p.startswith(b'docs/demo/') for p in paths), 'Refusing non-demo changes'
+          entries = subprocess.check_output(['git', 'ls-tree', '-r', '-z', head, '--', 'docs/demo']).split(b'\0')
+          assert all(not e or e.startswith(b'100644 blob ') for e in entries), 'Only regular demo files may be published'
+          print(f'Verified {len(paths)} generated paths; no application or workflow edits.')
+          PY
+          # This fresh job never executes repository scripts. It publishes
+          # only a candidate, leaving the PR advance to a leased tool write.
+          git -c core.hooksPath=/dev/null push origin "$candidate:refs/heads/codex/489-motion-fallback-generated"
+          printf 'Candidate commit: `%s`\n\nGenerated tree: `%s`\n' "$candidate" "$(git rev-parse "$candidate^{tree}")" >> "$GITHUB_STEP_SUMMARY"
