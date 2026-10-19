@@ -358,7 +358,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (schedule, speakers, sponsors, attendees, updates) is no longer shown on the public site. It led
   to a "doesn't have a public schedule" page. The Content editor warns under the destination when
   a link leads to a section that is off; the save still succeeds, and the link returns when the
-  feature is switched on.
+  feature is switched on. The warning is announced to screen readers as it appears.
+- A hero button or link group item that leads to a hidden page, or to an address no page has, is no
+  longer shown on the public site. It led to the 404 page, and a fresh site now seeds three pages
+  hidden. The Content editor warns the same way.
 - The home page body no longer draws the seeded **Footer links** section under its own heading.
   The site footer now shows those links on every page, one list per group.
 - Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
@@ -394,7 +397,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A fresh site seeds the **Recap**, **Guidelines** and **City guide** pages hidden, so a new
   site's navigation offers no empty page. A re-run of init keeps each page's stored visibility,
   so an existing deployment does not change. The admin Pages list now says **Visible** or
-  **Hidden** on every row, and names the feature that hides a built-in page.
+  **Hidden** on every row for the published page, names the feature that hides a built-in page,
+  and says when a visibility change waits for a publish.
 - The admin guide's early launch steps now say how to take a home section off the site (hide or
   delete its blocks, or remove the section in Pages), that "[Replace]" text and seeded statistics
   show until edited, and that **Pitch a session** appears in the home page lead only.
