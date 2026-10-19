@@ -152,15 +152,71 @@ test('the shared session validator refuses a bad row, and its message reaches th
   assert.deepEqual(db.ids('cmsSchedule_drafts'), []);
 });
 
-test('a title whose id is taken gets the next free suffix; a taken mapped ID is an error', async () => {
+test('a title whose id is taken by another session gets the next free suffix, with a note', async () => {
   const db = makeDb({ 'cmsSchedule/verification-at-speed': { title: 'Older', visible: true, revision: 1 } });
-  const { commit } = await previewAndCommit(db, body([ROW, { ...ROW, Ref: 'SES-2' }]));
+  const { preview, commit } = await previewAndCommit(db, body([ROW, { ...ROW, Ref: 'SES-2' }]));
   assert.deepEqual(commit.body.rows.map((r) => r.docId), ['verification-at-speed-2', 'verification-at-speed-3']);
+  assert.match(preview.body.rows[0].notes[0], /^A session with the ID "verification-at-speed" already exists/);
+});
 
+test('a session typed in the editor is matched, not made twice: by its title and day, or by a mapped ID', async () => {
+  const typed = {
+    title: 'Verification at speed', description: 'Typed by staff.', dayId: 'day-1', visible: true, revision: 1,
+  };
+  const db = makeDb({ 'cmsSchedule/verification-at-speed': typed });
+  const { preview, commit } = await previewAndCommit(db, body([ROW]));
+  for (const res of [preview, commit]) {
+    assert.equal(res.body.rows[0].verdict, 'update');
+    assert.equal(res.body.rows[0].matched, true);
+    assert.equal(res.body.rows[0].docId, 'verification-at-speed');
+  }
+  assert.match(commit.body.rows[0].notes[0], /^Matches the existing session "verification-at-speed" by its session ID/);
+  assert.equal(sessionKey(db, 'SES-1').docId, 'verification-at-speed');
+  const draft = db.read('cmsSchedule_drafts', 'verification-at-speed');
+  assert.equal(draft.description, 'Typed by staff.', 'a value the record has is kept');
+  assert.equal(draft.startTime, '09:30', 'an empty field is filled');
+  assert.deepEqual(db.ids('cmsSchedule_drafts'), ['verification-at-speed'], 'no second session');
+
+  // The same title on another day is another session.
+  const otherDay = makeDb({ 'cmsSchedule/verification-at-speed': { ...typed, dayId: 'day-2' } });
+  const second = await previewAndCommit(otherDay, body([ROW]));
+  assert.equal(second.commit.body.rows[0].verdict, 'create');
+  assert.equal(second.commit.body.rows[0].docId, 'verification-at-speed-2');
+
+  // A mapped session ID matches whatever the title.
   const mapped = makeDb({ 'cmsSchedule_drafts/keynote': { title: 'Keynote' } });
-  const result = await previewAndCommit(mapped, body([{ ...ROW, Slug: 'keynote' }], { ...MAPPING, slug: 'Slug' }));
-  assert.equal(result.commit.body.rows[0].verdict, 'error');
-  assert.match(result.commit.body.rows[0].reasons[0], /^slug: another session already uses "keynote"/);
+  const byId = await previewAndCommit(mapped, body([{ ...ROW, Slug: 'keynote' }], { ...MAPPING, slug: 'Slug' }));
+  assert.equal(byId.commit.body.rows[0].verdict, 'update');
+  assert.equal(byId.commit.body.rows[0].docId, 'keynote');
+  assert.equal(mapped.read('cmsSchedule_drafts', 'keynote').title, 'Keynote');
+});
+
+test('a mapped ID that another external ID imported, or an earlier row uses, is a row error', async () => {
+  const db = makeDb();
+  const withId = { ...MAPPING, slug: 'Slug' };
+  await previewAndCommit(db, body([{ ...ROW, Slug: 'keynote' }], withId));
+  const { commit } = await previewAndCommit(db, body([{ ...ROW, Ref: 'SES-9', Slug: 'keynote' }], withId));
+  assert.equal(commit.body.rows[0].verdict, 'error');
+  assert.match(commit.body.rows[0].reasons[0], /^slug: the session "keynote" belongs to another external ID/);
+
+  const twin = makeDb();
+  const rows = [{ ...ROW, Slug: 'keynote' }, { ...ROW, Ref: 'SES-2', Slug: 'keynote' }];
+  const second = await previewAndCommit(twin, body(rows, withId));
+  assert.deepEqual(second.commit.body.rows.map((r) => r.verdict), ['create', 'error']);
+  assert.match(second.commit.body.rows[1].reasons[0], /^slug: an earlier row of this file uses "keynote"/);
+});
+
+test('a removed speaker is a row error, by external ID or by slug', async () => {
+  const db = makeDb({
+    ...speakerSeed(),
+    'speakers/spk-a': { firstName: 'Ada', lastName: 'Lovelace', slug: 'ada-lovelace', status: 'removed' },
+  });
+  for (const token of ['SPK-1', 'ada-lovelace']) {
+    const { commit } = await previewAndCommit(db, body([{ ...ROW, Speakers: token }]));
+    assert.equal(commit.body.rows[0].verdict, 'error');
+    assert.match(commit.body.rows[0].reasons[0], new RegExp(`^speakers: "${token}" is a removed speaker`));
+  }
+  assert.deepEqual(db.ids('cmsSchedule_drafts'), []);
 });
 
 /* ---------------------------------------------------------------- */
@@ -205,7 +261,7 @@ test('a staff edit to a mapped field is kept when the file changes it too', asyn
 
   const { commit } = await previewAndCommit(db, body([{ ...ROW, Title: 'Verification, fast' }]));
   assert.equal(commit.body.rows[0].verdict, 'unchanged');
-  assert.match(commit.body.rows[0].notes[0], /^title: kept the edit/);
+  assert.match(commit.body.rows[0].notes[0], /^title: kept the value in the admin panel/);
   assert.equal(db.read('cmsSchedule_drafts', id).title, 'Verification on deadline');
 });
 

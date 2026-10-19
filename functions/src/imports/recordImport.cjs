@@ -22,8 +22,20 @@
  *
  * THE EXTERNAL ID IS THE KEY. Each row carries a stable id from the source
  * system. `record_imports/{type}__{sha256(id)}` maps it to the document it
- * created and keeps the values the last import wrote. The key document is
- * read inside each row's transaction, so two imports of one row serialize.
+ * created and keeps a digest of each value the last import wrote. It keeps
+ * digests, not values: the merge below only needs to know whether two
+ * values are equal, and a key must not keep a copy of a person's email or
+ * bio after staff delete the record. The external ID itself is not stored
+ * either, only its hash in the key's id. The key document is read inside
+ * each row's transaction, so two imports of one row serialize.
+ *
+ * A RECORD THAT ALREADY EXISTS. A row with no key whose slug or session ID
+ * belongs to a record no import has linked (typed in an editor, seeded, or
+ * made before the import existed) is matched to that record instead of
+ * making a second one. The row previews as an update with a note that
+ * names the record, and the commit writes the key. The match has no "last
+ * import" values, so the merge fills only the record's empty fields and
+ * keeps every value it already has.
  *
  * RECONCILIATION IS THREE-WAY, per mapped field (reconcileFields):
  *
@@ -37,6 +49,11 @@
  *
  * An unmapped field is never read from the file and never written, so a
  * staff edit to it always survives.
+ *
+ * After a conflict the file's value becomes the "last import" value, so the
+ * same file is quiet the next time. If staff later undo their edit, the
+ * import does not bring the file's value back until the file changes it
+ * again. The admin guide says so.
  *
  * A record staff deleted after an import is not created again. The row
  * reports it as unchanged, with a note.
@@ -54,8 +71,9 @@
 const { createHash } = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
-const { logAdminAction } = require('../cms/store.cjs');
 
+/** The audit collection (cms/store.cjs logAdminAction writes the same shape). */
+const ADMIN_LOGS = 'admin_logs';
 /** Server-only: firestore.rules denies every client read and write. */
 const RECORD_IMPORTS = 'record_imports';
 
@@ -77,8 +95,9 @@ function isPlainObject(v) {
 
 /**
  * One cell as trimmed text. Numbers and booleans become text; anything else
- * is empty. Over-long cells are cut, and the validators then name the
- * field that is too long.
+ * is empty. runImport refuses a row with a mapped cell over the limit
+ * before any importer reads it (overLongCells), so the cut here only bounds
+ * what the digest reads.
  *
  * @param {unknown} v
  * @returns {string}
@@ -139,24 +158,73 @@ function sameValue(a, b) {
 }
 
 /**
+ * The digest a key keeps for one field value. Equal values (blank, null and
+ * absent among them) give equal digests.
+ *
+ * @param {unknown} v
+ * @returns {string}
+ */
+function valueDigest(v) {
+  return createHash('sha256').update(JSON.stringify(comparable(v))).digest('hex').slice(0, 32);
+}
+
+/** Each field's value as its digest, for the key document. */
+function digestValues(values) {
+  return Object.fromEntries(Object.entries(values ?? {}).map(([field, v]) => [field, valueDigest(v)]));
+}
+
+/**
+ * The mapped columns of a row whose cell is longer than the import reads,
+ * as row errors that name the field.
+ *
+ * @param {object} row
+ * @param {Record<string,string>} mapping
+ * @returns {string[]}
+ */
+function overLongCells(row, mapping) {
+  return Object.entries(mapping)
+    .filter(([, column]) => typeof row[column] === 'string' && row[column].trim().length > MAX_CELL_LENGTH)
+    .map(([field, column]) => `${field}: the "${column}" cell is longer than ${MAX_CELL_LENGTH} characters`);
+}
+
+/**
+ * True when an import key other than this row's already points at the
+ * record. A record linked that way belongs to another external ID, so a
+ * row with no key must not be matched to it.
+ *
+ * @param {{ db, tx, type: string, docId: string }} args
+ * @returns {Promise<boolean>}
+ */
+async function linkedByImport({ db, tx, type, docId }) {
+  const snap = await tx.get(db.collection(RECORD_IMPORTS).where('docId', '==', docId));
+  return snap.docs.some((doc) => doc.data()?.type === type);
+}
+
+/** The note on a row matched to a record that already exists. */
+function matchNote(noun, id, by) {
+  return `Matches the existing ${noun} "${id}" by its ${by}. The import links this row to it, fills its empty fields and keeps the values it has.`;
+}
+
+/**
  * The three-way merge of one row's mapped fields (module doc).
  *
  * @param {{ incoming: object, last: object|null, current: object }} args
  *   incoming: the file's normalized value for each MAPPED field;
- *   last: the values the last import wrote (the key document), or null;
+ *   last: the digest of each value the last import wrote (the key
+ *     document), or null;
  *   current: the record as it is stored now.
  * @returns {{ patch: object, conflicts: string[] }}
  */
 function reconcileFields({ incoming, last, current }) {
   const patch = {};
   const conflicts = [];
-  const lastValues = isPlainObject(last) ? last : {};
+  const lastDigests = isPlainObject(last) ? last : {};
   for (const [field, next] of Object.entries(incoming)) {
     const stored = current?.[field];
-    const hasLast = Object.prototype.hasOwnProperty.call(lastValues, field);
-    if (hasLast && sameValue(next, lastValues[field])) continue; // the file did not change it
+    const hasLast = Object.prototype.hasOwnProperty.call(lastDigests, field);
+    if (hasLast && valueDigest(next) === lastDigests[field]) continue; // the file did not change it
     if (sameValue(stored, next)) continue; // already what the file says
-    if (hasLast ? sameValue(stored, lastValues[field]) : comparable(stored) === null) {
+    if (hasLast ? valueDigest(stored) === lastDigests[field] : comparable(stored) === null) {
       patch[field] = next;
     } else {
       conflicts.push(field);
@@ -165,9 +233,9 @@ function reconcileFields({ incoming, last, current }) {
   return { patch, conflicts };
 }
 
-/** The note a row carries for each field where a staff edit was kept. */
+/** The note a row carries for each field where the stored value was kept. */
 function conflictNote(field) {
-  return `${field}: kept the edit made in the admin panel. The file has a different value.`;
+  return `${field}: kept the value in the admin panel. The file has a different value.`;
 }
 
 const DELETED_NOTE = 'The record from this row was deleted in the admin panel. The import does not create it again.';
@@ -256,6 +324,12 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
   const results = [];
 
   for (let index = 0; index < rows.length; index += 1) {
+    const tooLong = overLongCells(rows[index], mapping);
+    if (tooLong.length > 0) {
+      const externalId = mapping.externalId ? cell(rows[index][mapping.externalId]) || null : null;
+      results.push({ index, verdict: 'error', externalId, reasons: tooLong });
+      continue;
+    }
     const mapped = importer.mapRow({ row: rows[index], mapping, context });
     if (!mapped.ok) {
       results.push({ index, verdict: 'error', externalId: mapped.externalId ?? null, reasons: mapped.reasons });
@@ -285,12 +359,12 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
         if (dryRun || planned.verdict === 'error') return planned;
         if (planned.write) await planned.write(tx);
         const at = new Date(now());
-        if (planned.verdict === 'create') {
+        if (planned.verdict === 'create' || planned.matched) {
+          // A new record, or one that existed before and is linked now.
           tx.set(keyRef, {
             type,
-            externalId,
             docId: planned.docId,
-            values: planned.values,
+            values: digestValues(planned.values),
             createdAt: at,
             importedAt: at,
             importedBy: actor.email,
@@ -300,7 +374,7 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
           // included: the next run of the same file then leaves the kept
           // staff edit alone instead of reporting it again. Written only
           // when something moved, so a repeat run writes nothing at all.
-          const values = { ...(key?.values ?? {}), ...planned.values };
+          const values = { ...(key?.values ?? {}), ...digestValues(planned.values) };
           if (!sameValue(key?.values ?? {}, values)) {
             tx.set(keyRef, { values, importedAt: at, importedBy: actor.email }, { merge: true });
           }
@@ -320,6 +394,7 @@ async function runImport({ db, importer, type, mapping, rows, dryRun, actor, now
       label: plan.label ?? null,
       docId: plan.docId ?? null,
       changedFields: plan.changedFields ?? [],
+      matched: Boolean(plan.matched),
       reasons: plan.reasons ?? [],
       notes: plan.notes ?? [],
     });
@@ -366,6 +441,27 @@ function createImportRecordsCsvHandler({ db, auth, getConfig, importers, now = D
       );
     }
 
+    // The audit row is written, and awaited, BEFORE the first record write
+    // (the exportAttendees rule): a commit that dies part way still leaves
+    // a row that names who started it. The counts are added at the end.
+    let auditRef = null;
+    if (!dryRun) {
+      auditRef = db.collection(ADMIN_LOGS).doc();
+      try {
+        await auditRef.set({
+          action: 'records-import',
+          docPath: importer.docPath,
+          uid: actor.uid,
+          email: actor.email,
+          at: new Date(now()),
+          details: { type, rows: rows.length, finished: false },
+        });
+      } catch (err) {
+        log.error('importRecordsCsv: the admin_logs row could not be written; nothing was imported', err);
+        return internal(res, 'The import could not be recorded in the audit log, so nothing was imported. Try again.');
+      }
+    }
+
     let outcome;
     try {
       outcome = await runImport({ db, importer, type, mapping, rows, dryRun, actor, now, log, newId });
@@ -374,16 +470,12 @@ function createImportRecordsCsvHandler({ db, auth, getConfig, importers, now = D
       return internal(res, dryRun ? 'The import could not be checked.' : 'The import could not be completed.');
     }
 
-    if (!dryRun) {
-      await logAdminAction({
-        db,
-        action: 'records-import',
-        docPath: importer.docPath,
-        actor,
-        now,
-        log,
-        details: { type, rows: rows.length, ...outcome.summary },
-      });
+    if (auditRef) {
+      try {
+        await auditRef.set({ details: { type, rows: rows.length, finished: true, ...outcome.summary } }, { merge: true });
+      } catch (err) {
+        log.warn('importRecordsCsv: the admin_logs counts could not be written', err);
+      }
     }
 
     res.status(200).json({
@@ -454,6 +546,11 @@ module.exports = {
     MAX_EXTERNAL_ID_LENGTH,
     DELETED_NOTE,
     cell,
+    valueDigest,
+    digestValues,
+    overLongCells,
+    linkedByImport,
+    matchNote,
     cellOrNull,
     externalIdError,
     importKeyId,

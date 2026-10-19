@@ -13,6 +13,10 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
     label: 'Speakers',
     noun: 'speaker',
     plural: 'speakers',
+    // Speakers have no draft revision: a change to a published speaker is
+    // queued for review (functions/src/imports/speakerImport.cjs).
+    previewNote: 'New speakers are saved as drafts. A change to a published speaker waits for review on the Speakers page. Nothing is published and no email is sent.',
+    doneNote: 'New speakers are drafts. Invite or approve them on the Speakers page. A change to a published speaker waits there for review.',
     fields: [
       { id: 'externalId', label: 'External ID', required: true, header: 'external_id', example: 'SPK-001' },
       { id: 'firstName', label: 'First name', header: 'first_name', example: 'Ada' },
@@ -30,6 +34,8 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
     label: 'Sessions',
     noun: 'session',
     plural: 'sessions',
+    previewNote: 'New sessions are saved as hidden drafts. Changed sessions get a new draft. Nothing is published and no email is sent.',
+    doneNote: 'The new and changed sessions are drafts. Publish them from the Sessions page.',
     fields: [
       { id: 'externalId', label: 'External ID', required: true, header: 'external_id', example: 'SES-001' },
       { id: 'title', label: 'Title', required: true, header: 'title', example: 'Opening keynote' },
@@ -50,6 +56,8 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
     label: 'Organizations',
     noun: 'organization',
     plural: 'organizations',
+    previewNote: 'New organizations are saved as hidden drafts. Changed organizations get a new draft. Nothing is published and no email is sent.',
+    doneNote: 'The new and changed organizations are drafts. Publish them from the Organizations page.',
     fields: [
       { id: 'externalId', label: 'External ID', required: true, header: 'external_id', example: 'ORG-001' },
       { id: 'name', label: 'Name', required: true, header: 'name', example: 'Example Foundation' },
@@ -73,6 +81,9 @@ export const VERDICT_WORDS = Object.freeze({
   unchanged: 'No change',
   error: 'Error',
 });
+/** The word for an update that links a row to a record made before the import. */
+export const MATCHED_WORD = 'Matches existing';
+
 export const VERDICT_TONES = Object.freeze({
   create: 'ok',
   update: 'info',

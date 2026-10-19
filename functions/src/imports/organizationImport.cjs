@@ -15,7 +15,10 @@
  *
  * The slug is the document id and the page address (#193). It is chosen
  * once, on create: a mapped slug column, or the name the way the editor
- * suggests it. A taken address is a row error, as it is in the editor.
+ * suggests it. A row with no key whose address belongs to an organization
+ * no import has linked is matched to it (recordImport.cjs). An address
+ * another import's external ID holds, or an earlier row of the file, is a
+ * row error.
  * Logos are not importable: a logo is a media library image, chosen in the
  * organization editor.
  */
@@ -32,7 +35,7 @@ const {
 } = require('../cms/organizations.cjs');
 const {
   reconcileFields,
-  internals: { cell, cellOrNull, externalIdError, conflictNote, DELETED_NOTE },
+  internals: { cell, cellOrNull, externalIdError, conflictNote, linkedByImport, matchNote, DELETED_NOTE },
 } = require('./recordImport.cjs');
 
 const TYPE = 'organizations';
@@ -82,9 +85,8 @@ function mapRow({ row, mapping }) {
   return { ok: true, externalId, input: { values, slug } };
 }
 
-/** True when the address is used live, as a draft, or earlier in this file. */
-async function slugTaken({ db, tx, slug, claimed }) {
-  if (claimed.has(`organization:${slug}`)) return true;
+/** True when the address is used live or as a draft. */
+async function slugStored({ db, tx, slug }) {
   const [live, draft] = await Promise.all([
     tx.get(db.collection(ORGANIZATIONS_COLLECTION).doc(slug)),
     tx.get(db.collection(DRAFTS).doc(slug)),
@@ -112,8 +114,20 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
     const docId = input.slug || slugFromName(incoming.fields.name);
     const slugError = organizationSlugError(docId);
     if (slugError) return { verdict: 'error', label, reasons: [slugError] };
-    if (await slugTaken({ db, tx, slug: docId, claimed })) {
-      return { verdict: 'error', label, reasons: [`${slugTakenMessage(docId)}. Map a slug column with a different address.`] };
+    if (claimed.has(`organization:${docId}`)) {
+      return { verdict: 'error', label, reasons: [`slug: an earlier row of this file uses "${docId}". Give one of the rows a different address.`] };
+    }
+    if (await slugStored({ db, tx, slug: docId })) {
+      if (await linkedByImport({ db, tx, type: TYPE, docId })) {
+        return {
+          verdict: 'error',
+          label,
+          reasons: [`${slugTakenMessage(docId)}. An earlier import made it from another external ID. Check the external ID, or map a slug column with a different address.`],
+        };
+      }
+      return planUpdate({
+        db, tx, incoming, label, key: { docId, values: null }, actor, now, matched: true,
+      });
     }
     return {
       verdict: 'create',
@@ -137,7 +151,10 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
       },
     };
   }
+  return planUpdate({ db, tx, incoming, label, key, actor, now });
+}
 
+async function planUpdate({ db, tx, incoming, label, key, actor, now, matched = false }) {
   const docId = key.docId;
   const [draftSnap, liveSnap] = await Promise.all([
     tx.get(db.collection(DRAFTS).doc(docId)),
@@ -149,15 +166,22 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
 
   const { patch, conflicts } = reconcileFields({ incoming: incoming.fields, last: key.values, current });
   const notes = conflicts.map(conflictNote);
+  if (matched) notes.unshift(matchNote('organization', docId, 'address'));
   const changedFields = Object.keys(patch);
   const merged = { ...current, ...patch };
+  const claims = matched ? [`organization:${docId}`] : [];
   if (changedFields.length === 0) {
-    return { verdict: 'unchanged', docId, label: current.name ?? label, notes, values: incoming.fields };
+    // A matched row still links the record, so it is an update.
+    return {
+      verdict: matched ? 'update' : 'unchanged', matched, docId, label: current.name ?? label, notes, values: incoming.fields, claims,
+    };
   }
   const verdict = validateOrganizationFields(merged, patch);
   if (!verdict.ok) return { verdict: 'error', docId, label, reasons: verdict.errors };
   return {
     verdict: 'update',
+    matched,
+    claims,
     docId,
     label: verdict.fields.name ?? label,
     changedFields,

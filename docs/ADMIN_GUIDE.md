@@ -371,14 +371,16 @@ Add speakers, sessions and organizations (sponsors and partners) from a CSV file
 
 - A new speaker has the status **Not invited** (draft). It is not in the public speaker directory. Approve or invite the speaker on the **Speakers** page.
 - A new session or organization is a draft, and it is hidden: **Show this session when it is published** and **Show this organization when it is published** are cleared. Turn the option on in the editor, then publish.
-- A changed record gets a new draft. The published version does not change until you publish. The import does not change a speaker's status or a record's **Show** option.
+- A changed session or organization gets a new draft. The published version does not change until you publish.
+- A speaker has no draft. A change to a speaker who is not yet approved is saved on the speaker. A change to an approved speaker is not shown on the site: it waits on the **Speakers** page as **Changes pending review**, the same as a change the speaker makes. Apply or discard it there. The import does not change an approved speaker's slug. Change it in the speaker editor.
+- The import does not change a speaker's status or a record's **Show** option.
 
 **Steps.**
 
 1. Select the **Record type**: Speakers, Sessions or Organizations. Import speakers before sessions, so that the sessions can name their speakers.
-2. Choose the CSV file. The first row names the columns. A file can have up to 500 rows. Split a larger file.
+2. Choose the CSV file. The first row names the columns. A file can have up to 500 rows and 5 MB. A cell can have up to 5000 characters. Split a larger file.
 3. Under **Columns**, point each field at a column of the file. A column with the template's header, or with the field's name, is selected for you. A field set to **Not in this file** is never read or changed. Only the columns you map leave your browser.
-4. Select **Preview import**. The preview lists each row with its result: **New**, **Update**, **No change** or **Error**, and the reason for each error. Nothing is saved yet.
+4. Select **Preview import**. The preview lists each row with its result: **New**, **Update**, **Matches existing**, **No change** or **Error**, and the reason for each error. Nothing is saved yet.
 5. Select **Import N speakers as drafts** (the words name the type and count). Rows with an error are skipped. The result lists what happened to each row, and the import writes one row to the audit log.
 
 If the file or the mapping changes after the preview, the import is refused. Preview again.
@@ -390,6 +392,14 @@ If the file or the mapping changes after the preview, the import is refused. Pre
 - If you edited a field in the admin panel and the file also changes that field, the import keeps your edit. The row shows a note that names the field.
 - A field you map for the first time fills only an empty field. A value already in the record is kept, with a note.
 - If you deleted a record that an import made, the import does not make it again. To make it again, give the row a new external ID.
+- After the import keeps your edit, the file's value counts as imported. If you later undo your edit, importing the same file does not bring the file's value back. Type it in the editor, or change it in the file. The same is true if you discard a speaker change that an import queued.
+
+**Records you made before the import.** A row that no import has seen before is matched to a record that already exists, so the import does not make a second copy. The row shows **Matches existing** and names the record. The import links the row's external ID to that record. It fills the record's empty fields and keeps every value the record has, with a note for each field where the file differs.
+
+- A speaker matches by slug: the `slug` cell, or the slug the name makes. If the row has an email address and the speaker has a different one, they are different people, and the row is an error. Give one of them another slug.
+- A session matches by `session_id`. With no `session_id` cell, it matches the session whose ID the title makes, if that session has the same title and is on the same day. A session with the same title on another day is a different session: the row makes a new one, with a note.
+- An organization matches by its address (`slug`, or the address the name makes).
+- A record that an import already linked to another external ID is not matched. The row is an error. Check the external ID.
 
 **Checks.** Each row goes through the same checks as the editor: a speaker's names, email and slug; a session's title, description, day and times; an organization's name, website and order. A row that fails shows the editor's own message.
 
@@ -401,7 +411,7 @@ If the file or the mapping changes after the preview, the import is refused. Pre
 | Sessions | `external_id,title,description,day,start_time,end_time,track,place,location,recording_url,speakers,session_id` |
 | Organizations | `external_id,name,slug,tier,website,description,order` |
 
-**Speaker columns.** `first_name` and `last_name` are required. If the file has one name column, map it to **Full name** instead. The first word becomes the first name. `slug` is the speaker's page address. Leave it empty and the import makes it from the name. A name change does not change the slug; change the `slug` cell to change it. A slug that another speaker uses is an error. The import does not change the email address of a speaker who has an open invitation. Change it in the speaker editor.
+**Speaker columns.** `first_name` and `last_name` are required. If the file has one name column, map it to **Full name** instead. The first word becomes the first name. `slug` is the speaker's page address. Leave it empty and the import makes it from the name. A name change does not change the slug; change the `slug` cell to change it. A new slug that another speaker uses is an error. The import does not change the email address of a speaker who has an open invitation. Change it in the speaker editor.
 
 **Session columns.** `title` is required, and a session also needs a description, a day, a start time and an end time before it can be saved. Write each value the way your event settings name it:
 
@@ -409,14 +419,14 @@ If the file or the mapping changes after the preview, the import is refused. Pre
 - `start_time`, `end_time`: 24-hour (`13:30`) or 12-hour (`1:30 PM`).
 - `track`: the track letter or the track name.
 - `place`: the place ID or the place name.
-- `speakers`: speaker external IDs from a speaker import, or speaker slugs, separated by `;`. A speaker that does not exist is an error.
-- `session_id`: the session's address on the site, for new sessions only. Leave it empty and the import makes it from the title.
+- `speakers`: speaker external IDs from a speaker import, or speaker slugs, separated by `;`. A speaker that does not exist, or that was removed, is an error.
+- `session_id`: the session's address on the site, for new sessions only. Leave it empty and the import makes it from the title. A `session_id` that an existing session uses matches that session.
 
 The import does not set a parent session. Set it in the session editor.
 
-**Organization columns.** `name` is required. `slug` is the page address, for new organizations only. Leave it empty and the import makes it from the name. An address that another organization uses is an error. `website` must start with `http://` or `https://`. `order` is a number. The import does not set a logo. Choose it in the organization editor.
+**Organization columns.** `name` is required. `slug` is the page address, for new organizations only. Leave it empty and the import makes it from the name. An address that another organization uses matches that organization (see **Records you made before the import**). `website` must start with `http://` or `https://`. `order` is a number. The import does not set a logo. Choose it in the organization editor.
 
-**Remove an imported record** the same way as any other record: **Delete** in its editor or list. The import keeps no copy of the file.
+**Remove an imported record** the same way as any other record: **Delete** in its editor or list. The import keeps no copy of the file. For each external ID it keeps only the record it links to and a fingerprint (a digest) of each value it imported, not the values, so a deleted speaker's email address or bio does not stay behind.
 
 ## Announcements
 

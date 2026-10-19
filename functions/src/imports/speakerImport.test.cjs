@@ -95,20 +95,52 @@ test('a field the shared validator refuses is a row error that names it', async 
   assert.deepEqual(db.ids('speakers'), []);
 });
 
-test('a slug another speaker holds is a row error; two rows deriving one slug fail on the second', async () => {
+test('a speaker typed in the editor before the import is matched by slug, not made twice', async () => {
   const db = makeDb({
-    'speakers/existing': { firstName: 'Ada', lastName: 'Lovelace', slug: 'ada-lovelace', status: 'approved' },
+    'speakers/existing': { firstName: 'Ada', lastName: 'Lovelace', slug: 'ada-lovelace', status: 'draft', bio: 'Typed by staff.' },
     'speaker_slugs/ada-lovelace': { speakerId: 'existing' },
   });
-  const { commit } = await previewAndCommit(db, body([ROW]));
+  const { preview, commit } = await previewAndCommit(db, body([ROW]));
+  for (const res of [preview, commit]) {
+    assert.equal(res.body.rows[0].verdict, 'update');
+    assert.equal(res.body.rows[0].matched, true);
+    assert.equal(res.body.rows[0].docId, 'existing');
+  }
+  const notes = commit.body.rows[0].notes;
+  assert.match(notes[0], /^Matches the existing speaker "ada-lovelace" by its slug/);
+  assert.match(notes[1], /^bio: kept the value in the admin panel/);
+  assert.deepEqual(db.ids('speakers'), ['existing'], 'no second speaker');
+  const speaker = speakerByExternalId(db, 'SPK-1');
+  assert.equal(speaker.id, 'existing', 'the external ID now points at the record');
+  assert.equal(speaker.bio, 'Typed by staff.', 'a value the record has is kept');
+  assert.equal(speaker.jobTitle, 'Editor', 'an empty field is filled');
+
+  const again = await previewAndCommit(db, body([ROW]));
+  assert.equal(again.commit.body.rows[0].verdict, 'unchanged', 'the link holds');
+});
+
+test('a slug held by another person, by another external ID, or by an earlier row is a row error', async () => {
+  const other = makeDb({
+    'speakers/existing': { firstName: 'Ada', lastName: 'Lovelace', slug: 'ada-lovelace', email: 'other@example.com', status: 'draft' },
+    'speaker_slugs/ada-lovelace': { speakerId: 'existing' },
+  });
+  const { commit } = await previewAndCommit(other, body([ROW]));
   assert.equal(commit.body.rows[0].verdict, 'error');
-  assert.match(commit.body.rows[0].reasons[0], /^slug: "ada-lovelace" is already used by another speaker/);
+  assert.match(commit.body.rows[0].reasons[0], /^slug: "ada-lovelace" belongs to an existing speaker with a different email address/);
+
+  const linked = makeDb();
+  await previewAndCommit(linked, body([ROW]));
+  const { commit: second } = await previewAndCommit(linked, body([{ ...ROW, 'Speaker ID': 'SPK-9' }]));
+  assert.equal(second.body.rows[0].verdict, 'error');
+  assert.match(second.body.rows[0].reasons[0], /an earlier import made from another external ID/);
+  assert.equal(linked.ids('speakers').length, 1);
 
   const twin = makeDb();
   const rows = [ROW, { ...ROW, 'Speaker ID': 'SPK-2' }];
-  const { preview, commit: second } = await previewAndCommit(twin, body(rows));
+  const { preview, commit: third } = await previewAndCommit(twin, body(rows));
   assert.deepEqual(preview.body.rows.map((r) => r.verdict), ['create', 'error'], 'the preview says what the commit does');
-  assert.deepEqual(second.body.rows.map((r) => r.verdict), ['create', 'error']);
+  assert.deepEqual(third.body.rows.map((r) => r.verdict), ['create', 'error']);
+  assert.match(third.body.rows[1].reasons[0], /^slug: an earlier row of this file uses "ada-lovelace"/);
 });
 
 /* ---------------------------------------------------------------- */
@@ -130,15 +162,16 @@ test('a changed row updates only the mapped field it changed, and keeps the stat
   const db = makeDb();
   await previewAndCommit(db, body([ROW]));
   const id = speakerByExternalId(db, 'SPK-1').id;
-  // Staff approve the speaker and add a headshot, which the file does not map.
-  await db.collection('speakers').doc(id).set({ status: 'approved', headshotPath: 'default-avatars/a.svg' }, { merge: true });
+  // The speaker accepts an invitation (not yet public) and staff add a
+  // headshot, which the file does not map.
+  await db.collection('speakers').doc(id).set({ status: 'accepted', headshotPath: 'default-avatars/a.svg' }, { merge: true });
 
   const { commit } = await previewAndCommit(db, body([{ ...ROW, Title: 'Managing editor' }]));
   assert.equal(commit.body.rows[0].verdict, 'update');
   assert.deepEqual(commit.body.rows[0].changedFields, ['jobTitle']);
   const speaker = speakerByExternalId(db, 'SPK-1');
   assert.equal(speaker.jobTitle, 'Managing editor');
-  assert.equal(speaker.status, 'approved', 'an import never moves the status');
+  assert.equal(speaker.status, 'accepted', 'an import never moves the status');
   assert.equal(speaker.headshotPath, 'default-avatars/a.svg', 'an unmapped staff edit survives');
 });
 
@@ -154,7 +187,7 @@ test('a staff edit to a mapped field survives a re-import, and a changed file va
 
   const changed = await previewAndCommit(db, body([{ ...ROW, Bio: 'A new bio from the source.' }]));
   assert.equal(changed.commit.body.rows[0].verdict, 'unchanged');
-  assert.match(changed.commit.body.rows[0].notes[0], /^bio: kept the edit made in the admin panel/);
+  assert.match(changed.commit.body.rows[0].notes[0], /^bio: kept the value in the admin panel/);
   assert.equal(speakerByExternalId(db, 'SPK-1').bio, 'Edited by staff.');
 
   // The conflict is reported once: the next run of that file is quiet.
@@ -202,4 +235,77 @@ test('a speaker staff deleted after the import is not created again', async () =
   assert.equal(commit.body.rows[0].verdict, 'unchanged');
   assert.match(commit.body.rows[0].notes[0], /deleted in the admin panel/);
   assert.deepEqual(db.ids('speakers'), []);
+});
+
+/* ---------------------------------------------------------------- */
+/* A published speaker                                              */
+/* ---------------------------------------------------------------- */
+
+/**
+ * The onSpeakerWritten trigger, run the way Firestore runs it: after every
+ * write to a speaker. The fake runs no triggers, so the test calls the
+ * projection core itself for each speaker.
+ */
+async function runProjection(db) {
+  const { createSyncSpeakerPublic } = require('../speakers/projection.cjs');
+  const sync = createSyncSpeakerPublic({ db, now: () => new Date(0), log: { error() {} } });
+  for (const speakerId of db.ids('speakers')) await sync({ speakerId });
+}
+
+test('a re-import never changes what a published speaker shows: the change waits for review', async () => {
+  const db = makeDb();
+  await previewAndCommit(db, body([ROW]));
+  const id = speakerByExternalId(db, 'SPK-1').id;
+  await db.collection('speakers').doc(id).set({ status: 'approved' }, { merge: true });
+  await runProjection(db);
+  const published = db.read('speakers_public', id);
+  assert.equal(published.jobTitle, 'Editor');
+
+  const changed = { ...ROW, Title: 'Managing editor', Bio: 'A placeholder bio.' };
+  const { preview, commit } = await previewAndCommit(db, body([changed]));
+  assert.equal(preview.body.rows[0].verdict, 'update');
+  assert.match(preview.body.rows[0].notes.join(' '), /pending review/);
+  assert.deepEqual(commit.body.rows[0].changedFields, ['jobTitle', 'bio']);
+  await runProjection(db);
+
+  assert.deepEqual(db.read('speakers_public', id), published, 'the public speaker is unchanged');
+  const speaker = speakerByExternalId(db, 'SPK-1');
+  assert.equal(speaker.jobTitle, 'Editor', 'the live field is unchanged');
+  assert.deepEqual(speaker.pendingEdits, { jobTitle: 'Managing editor', bio: 'A placeholder bio.' });
+  assert.equal(speaker.status, 'approved');
+
+  // The same file again stages nothing new and reports no change.
+  const again = await previewAndCommit(db, body([changed]));
+  assert.equal(again.commit.body.rows[0].verdict, 'unchanged');
+
+  // Staff accept the change on the Speakers page; only then is it public.
+  const { applyApplySpeakerPendingEdits } = require('../speakers/profile.cjs');
+  const applied = await applyApplySpeakerPendingEdits({ db, speakerId: id, actor: { uid: 'u', email: 'staff@example.com' } });
+  assert.equal(applied.ok, true);
+  await runProjection(db);
+  assert.equal(db.read('speakers_public', id).jobTitle, 'Managing editor');
+});
+
+test('a re-import keeps the slug of a published speaker, and a pending edit by the speaker', async () => {
+  const db = makeDb();
+  const withSlug = { ...MAPPING, slug: 'Slug' };
+  await previewAndCommit(db, body([{ ...ROW, Slug: 'ada-lovelace' }], withSlug));
+  const id = speakerByExternalId(db, 'SPK-1').id;
+  await db.collection('speakers').doc(id).set({
+    status: 'approved',
+    pendingEdits: { bio: 'The speaker wrote this.' },
+  }, { merge: true });
+  await runProjection(db);
+  const published = db.read('speakers_public', id);
+
+  const { commit } = await previewAndCommit(db, body([{ ...ROW, Slug: 'ada-king', Bio: 'From the file.' }], withSlug));
+  await runProjection(db);
+  assert.deepEqual(db.read('speakers_public', id), published);
+  const speaker = speakerByExternalId(db, 'SPK-1');
+  assert.equal(speaker.slug, 'ada-lovelace');
+  assert.deepEqual(db.ids('speaker_slugs'), ['ada-lovelace']);
+  assert.deepEqual(speaker.pendingEdits, { bio: 'The speaker wrote this.' }, "the speaker's own pending edit is kept");
+  const notes = commit.body.rows[0].notes.join(' ');
+  assert.match(notes, /^bio: kept the value in the admin panel/);
+  assert.match(notes, /slug: kept the page address/);
 });

@@ -113,7 +113,7 @@ describe('AdminRecordImport', () => {
     expect(callMock.mock.calls[1][1]).toMatchObject({ type: 'speakers', dryRun: false, confirmDigest: 'a'.repeat(64) });
     expect(callMock.mock.calls[1][1].rows).toEqual(callMock.mock.calls[0][1].rows);
 
-    expect(await screen.findByText(/Imported: 1 new, 0 updates, 0 no change, 1 error\. The new and changed speakers are drafts\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Imported: 1 new, 0 updates, 0 no change, 1 error\. New speakers are drafts\. Invite or approve them on the Speakers page\./)).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /Result: speakers/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open speakers' })).toHaveAttribute('href', '/admin/speakers');
     expect(screen.queryByRole('button', { name: /as drafts/ })).not.toBeInTheDocument();
@@ -156,6 +156,42 @@ describe('AdminRecordImport', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
     expect(await screen.findByText('Nothing to import. Every row is unchanged or has an error.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /as drafts/ })).not.toBeInTheDocument();
+  });
+
+  it('says a change to a published speaker waits for review, and names a matched record', async () => {
+    callMock.mockResolvedValueOnce({
+      ...PREVIEW,
+      summary: { create: 0, update: 1, unchanged: 0, error: 0 },
+      rows: [{
+        index: 0,
+        verdict: 'update',
+        matched: true,
+        externalId: 'SPK-1',
+        label: 'Ada Lovelace',
+        changedFields: ['bio'],
+        reasons: [],
+        notes: ['Matches the existing speaker "ada-lovelace" by its slug.'],
+      }],
+    });
+    renderPage();
+    await chooseFile(SPEAKER_CSV);
+    fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
+    const preview = await screen.findByRole('region', { name: /Preview: speakers/ });
+    expect(within(preview).getByText('Matches existing')).toBeInTheDocument();
+    expect(within(preview).getByText(/Matches the existing speaker "ada-lovelace"/)).toBeInTheDocument();
+    expect(screen.getByText(/A change to a published speaker waits for review on the Speakers page\./)).toBeInTheDocument();
+  });
+
+  it('refuses a file over the size limit without reading it', async () => {
+    renderPage();
+    const text = vi.fn(async () => '');
+    const input = screen.getByLabelText('CSV file');
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [{ name: 'huge.csv', size: 6 * 1024 * 1024, text }] } });
+      await Promise.resolve();
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('That file is larger than 5 MB. Split the file.');
+    expect(text).not.toHaveBeenCalled();
   });
 
   it('refuses a file over the row limit before sending it', async () => {

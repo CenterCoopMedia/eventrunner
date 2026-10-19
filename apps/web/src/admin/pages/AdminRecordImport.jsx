@@ -12,6 +12,9 @@
 // list. The page says so before and after the import, and it never sends
 // mail.
 //
+// A speaker has no draft revision, so a change to a published speaker is
+// queued for review on the Speakers page instead; the page says so.
+//
 // The preview is a ruled table (RuledTable): each verdict a word in a badge
 // whose tint agrees with it, never colour alone and never a pill.
 import { useMemo, useState } from 'react';
@@ -20,6 +23,7 @@ import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
 import { saveTextFile } from '../downloadFile.js';
 import {
+  MATCHED_WORD,
   RECORD_IMPORT_TYPES,
   VERDICT_TONES,
   VERDICT_WORDS,
@@ -47,6 +51,8 @@ import RuledTable from '../components/RuledTable.jsx';
 
 /** The most rows the server takes in one import (MAX_IMPORT_ROWS). */
 const MAX_ROWS = 500;
+/** The largest file the page reads. A file this size is far past MAX_ROWS of real data. */
+const MAX_FILE_MB = 5;
 
 const LIST_PAGES = {
   speakers: '/admin/speakers',
@@ -95,7 +101,7 @@ function PreviewTable({ result, type }) {
       row: row.index + 1,
       result: (
         <StatusBadge tone={VERDICT_TONES[row.verdict] ?? 'neutral'}>
-          {VERDICT_WORDS[row.verdict] ?? row.verdict}
+          {row.matched ? MATCHED_WORD : VERDICT_WORDS[row.verdict] ?? row.verdict}
         </StatusBadge>
       ),
       externalId: <span className="font-admin-data text-admin-ink-data wrap-anywhere">{row.externalId ?? '—'}</span>,
@@ -147,6 +153,11 @@ export default function AdminRecordImport() {
     setNotice(null);
     setResult(null);
     setParsed(null);
+    // Refused before the file is read, so a huge file never fills memory.
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      setNotice({ tone: 'error', message: `That file is larger than ${MAX_FILE_MB} MB. Split the file.` });
+      return;
+    }
     try {
       const { headers, rows } = parseCsvFile(await file.text());
       if (rows.length === 0) {
@@ -200,7 +211,7 @@ export default function AdminRecordImport() {
       setResult(response);
       setNotice({
         tone: response.summary.error > 0 ? 'caution' : 'ok',
-        message: `Imported: ${summaryWords(response.summary)}. The new and changed ${type.plural} are drafts. Publish them from the ${type.label} page.`,
+        message: `Imported: ${summaryWords(response.summary)}. ${type.doneNote}`,
       });
     } catch (err) {
       setNotice({ tone: 'error', message: err?.message ?? 'The import could not be completed.' });
@@ -308,7 +319,7 @@ export default function AdminRecordImport() {
               writes > 0 ? (
                 <div className="flex flex-col gap-xs">
                   <p className="text-admin-sm text-admin-ink-secondary">
-                    New {type.plural} are saved as drafts. Changed {type.plural} get a new draft. Nothing is published and no email is sent.
+                    {type.previewNote}
                   </p>
                   <div>
                     <button

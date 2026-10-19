@@ -21,6 +21,8 @@ const {
 } = require('./importTestKit.cjs');
 
 const IMPORTERS = defaultImporters();
+// A key keeps a digest of each value the last import wrote, not the value.
+const { digestValues } = internals;
 const SPEAKER_BODY = {
   type: 'speakers',
   mapping: { externalId: 'ID', name: 'Name', email: 'Email' },
@@ -92,7 +94,7 @@ test('requestDigest: the same file and mapping give one digest; a changed cell o
 test('reconcileFields: the file unchanged since the last import leaves even a staff-edited field alone', () => {
   const out = reconcileFields({
     incoming: { bio: 'From the file' },
-    last: { bio: 'From the file' },
+    last: digestValues({ bio: 'From the file' }),
     current: { bio: 'Edited by staff' },
   });
   assert.deepEqual(out, { patch: {}, conflicts: [] });
@@ -101,7 +103,7 @@ test('reconcileFields: the file unchanged since the last import leaves even a st
 test('reconcileFields: a new file value replaces a field staff did not touch', () => {
   const out = reconcileFields({
     incoming: { bio: 'New bio', jobTitle: 'Editor' },
-    last: { bio: 'Old bio', jobTitle: 'Editor' },
+    last: digestValues({ bio: 'Old bio', jobTitle: 'Editor' }),
     current: { bio: 'Old bio', jobTitle: 'Editor' },
   });
   assert.deepEqual(out, { patch: { bio: 'New bio' }, conflicts: [] });
@@ -110,7 +112,7 @@ test('reconcileFields: a new file value replaces a field staff did not touch', (
 test('reconcileFields: a new file value never replaces a field staff changed; it is a conflict', () => {
   const out = reconcileFields({
     incoming: { bio: 'New bio' },
-    last: { bio: 'Old bio' },
+    last: digestValues({ bio: 'Old bio' }),
     current: { bio: 'Edited by staff' },
   });
   assert.deepEqual(out, { patch: {}, conflicts: ['bio'] });
@@ -128,9 +130,9 @@ test('reconcileFields: a newly mapped field fills a blank, and is a conflict ove
 });
 
 test('reconcileFields: blank, null and absent are one value; arrays compare by content', () => {
-  assert.deepEqual(reconcileFields({ incoming: { tier: null }, last: { tier: '' }, current: {} }), { patch: {}, conflicts: [] });
+  assert.deepEqual(reconcileFields({ incoming: { tier: null }, last: digestValues({ tier: '' }), current: {} }), { patch: {}, conflicts: [] });
   assert.deepEqual(
-    reconcileFields({ incoming: { speakerIds: ['a', 'b'] }, last: { speakerIds: ['a'] }, current: { speakerIds: ['a'] } }),
+    reconcileFields({ incoming: { speakerIds: ['a', 'b'] }, last: digestValues({ speakerIds: ['a'] }), current: { speakerIds: ['a'] } }),
     { patch: { speakerIds: ['a', 'b'] }, conflicts: [] },
   );
 });
@@ -211,7 +213,10 @@ test('importRecordsCsv: a commit writes one admin_logs row with the counts, and 
   assert.equal(logs[0].action, 'records-import');
   assert.equal(logs[0].docPath, 'speakers');
   assert.equal(logs[0].email, STAFF_EMAIL);
-  assert.deepEqual(logs[0].details, { type: 'speakers', rows: 2, create: 2, update: 0, unchanged: 0, error: 0 });
+  assert.deepEqual(logs[0].details, {
+    type: 'speakers', rows: 2, finished: true, create: 2, update: 0, unchanged: 0, error: 0,
+  });
+  assert.equal(db.writes[0].path.split('/')[0], 'admin_logs', 'the audit row is written before any record');
 
   const written = writtenCollections(db);
   assert.deepEqual(written, ['admin_logs', 'record_imports', 'speaker_slugs', 'speakers']);
@@ -233,4 +238,51 @@ test('importRecordsCsv: a row that fails does not stop the rows after it', async
   const { commit } = await previewAndCommit(db, body);
   assert.deepEqual(commit.body.summary, { create: 2, update: 0, unchanged: 0, error: 1 });
   assert.match(commit.body.rows[0].reasons[0], /^externalId:/);
+});
+
+test('importRecordsCsv: a commit whose audit row cannot be written imports nothing', async () => {
+  const db = makeDb();
+  const preview = await callImport(db, SPEAKER_BODY);
+  const realCollection = db.collection.bind(db);
+  db.collection = (name) => {
+    const ref = realCollection(name);
+    if (name !== 'admin_logs') return ref;
+    return { doc: () => ({ set: async () => { throw new Error('audit down'); } }) };
+  };
+  const res = await callImport(db, { ...SPEAKER_BODY, dryRun: false, confirmDigest: preview.body.digest });
+  assert.equal(res.statusCode, 500);
+  assert.match(res.body.error.message, /audit log/);
+  assert.deepEqual(db.ids('speakers'), []);
+  assert.equal(db.writes.length, 0);
+});
+
+test('importRecordsCsv: a mapped cell over the limit is a row error that names it, not a cut value', async () => {
+  const db = makeDb();
+  const long = 'x'.repeat(internals.MAX_CELL_LENGTH + 1);
+  const body = {
+    type: 'speakers',
+    mapping: { externalId: 'ID', name: 'Name', bio: 'Bio' },
+    rows: [{ ID: 'S-1', Name: 'Ada Lovelace', Bio: long, Unmapped: long }, { ID: 'S-2', Name: 'Grace Hopper', Unmapped: long }],
+  };
+  const { commit } = await previewAndCommit(db, body);
+  assert.equal(commit.body.rows[0].verdict, 'error');
+  assert.deepEqual(commit.body.rows[0].reasons, [`bio: the "Bio" cell is longer than ${internals.MAX_CELL_LENGTH} characters`]);
+  assert.equal(commit.body.rows[0].externalId, 'S-1');
+  assert.equal(commit.body.rows[1].verdict, 'create', 'an unmapped long cell is never read');
+});
+
+test('importRecordsCsv: an import key keeps no personal data: no email, name, bio or external ID', async () => {
+  const db = makeDb();
+  const body = {
+    type: 'speakers',
+    mapping: { externalId: 'ID', name: 'Name', email: 'Email', bio: 'Bio' },
+    rows: [{ ID: 'S-ada@example.com', Name: 'Ada Lovelace', Email: 'ada@example.com', Bio: 'Writes about engines.' }],
+  };
+  await previewAndCommit(db, body);
+  const keys = db.ids('record_imports').map((id) => db.read('record_imports', id));
+  assert.equal(keys.length, 1);
+  const stored = JSON.stringify(keys[0]);
+  for (const text of ['ada@example.com', 'Ada', 'Lovelace', 'engines']) assert.ok(!stored.includes(text), text);
+  assert.deepEqual(Object.keys(keys[0].values).sort(), ['bio', 'email', 'firstName', 'lastName']);
+  for (const digest of Object.values(keys[0].values)) assert.match(digest, /^[0-9a-f]{32}$/);
 });

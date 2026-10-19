@@ -80,11 +80,35 @@ test('the organization validator refuses a bad row; its message reaches the prev
   ]);
 });
 
-test('a taken page address, or a bad mapped one, is a row error', async () => {
-  const db = makeDb({ 'cmsOrganizations/northwind-press': { name: 'Northwind Press', visible: true, revision: 1 } });
-  const { commit } = await previewAndCommit(db, body([ROW]));
+test('an organization typed in the editor is matched by its address, not made twice', async () => {
+  const db = makeDb({
+    'cmsOrganizations/northwind-press': { name: 'Northwind Press', tier: 'Silver', visible: true, revision: 1 },
+  });
+  const { preview, commit } = await previewAndCommit(db, body([ROW]));
+  for (const res of [preview, commit]) {
+    assert.equal(res.body.rows[0].verdict, 'update');
+    assert.equal(res.body.rows[0].matched, true);
+  }
+  assert.match(commit.body.rows[0].notes[0], /^Matches the existing organization "northwind-press" by its address/);
+  assert.match(commit.body.rows[0].notes[1], /^tier: kept the value in the admin panel/);
+  assert.equal(db.read('record_imports', importKeyId('organizations', 'ORG-1')).docId, 'northwind-press');
+  const draft = db.read('cmsOrganizations_drafts', 'northwind-press');
+  assert.equal(draft.tier, 'Silver', 'a value the record has is kept');
+  assert.equal(draft.description, 'A press that funds fellowships.', 'an empty field is filled');
+  assert.equal(draft.visible, true, 'the match keeps the visibility');
+  assert.deepEqual(db.ids('cmsOrganizations_drafts'), ['northwind-press']);
+});
+
+test('an address another external ID imported, an earlier row, or a bad mapped one is a row error', async () => {
+  const db = makeDb();
+  await previewAndCommit(db, body([ROW]));
+  const { commit } = await previewAndCommit(db, body([{ ...ROW, 'Sponsor ID': 'ORG-9' }]));
   assert.equal(commit.body.rows[0].verdict, 'error');
-  assert.match(commit.body.rows[0].reasons[0], /^slug: another organization already uses "northwind-press"/);
+  assert.match(commit.body.rows[0].reasons[0], /^slug: another organization already uses "northwind-press"\. An earlier import made it/);
+
+  const twin = await previewAndCommit(makeDb(), body([ROW, { ...ROW, 'Sponsor ID': 'ORG-2' }]));
+  assert.deepEqual(twin.commit.body.rows.map((r) => r.verdict), ['create', 'error']);
+  assert.match(twin.commit.body.rows[1].reasons[0], /^slug: an earlier row of this file uses "northwind-press"/);
 
   const bad = await previewAndCommit(makeDb(), body([{ ...ROW, Slug: 'Not A Slug' }], { ...MAPPING, slug: 'Slug' }));
   assert.match(bad.commit.body.rows[0].reasons[0], /^slug: use lowercase letters/);
@@ -115,7 +139,8 @@ test('a changed tier updates the draft only; a logo staff chose survives', async
   assert.equal(draft.tier, 'Silver');
   assert.equal(draft.logoPath, 'media/logo.png');
   assert.equal(draft.visible, true);
-  assert.equal(db.read('record_imports', importKeyId('organizations', 'ORG-1')).values.tier, 'Silver');
+  const { internals: { valueDigest } } = require('./recordImport.cjs');
+  assert.equal(db.read('record_imports', importKeyId('organizations', 'ORG-1')).values.tier, valueDigest('Silver'));
 });
 
 test('a staff edit to a mapped field is kept when the file changes it too', async () => {
@@ -125,6 +150,6 @@ test('a staff edit to a mapped field is kept when the file changes it too', asyn
 
   const { commit } = await previewAndCommit(db, body([{ ...ROW, Blurb: 'New blurb from the source.' }]));
   assert.equal(commit.body.rows[0].verdict, 'unchanged');
-  assert.match(commit.body.rows[0].notes[0], /^description: kept the edit/);
+  assert.match(commit.body.rows[0].notes[0], /^description: kept the value in the admin panel/);
   assert.equal(db.read('cmsOrganizations_drafts', 'northwind-press').description, 'Edited by staff.');
 });

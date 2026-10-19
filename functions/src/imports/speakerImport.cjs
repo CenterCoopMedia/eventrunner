@@ -16,16 +16,32 @@
  * and it does not change the address of a speaker with an open invitation,
  * because the invitation went to the stored address. Staff change that in
  * the speaker editor, which handles the invitation.
+ *
+ * A PUBLISHED SPEAKER IS NEVER CHANGED IN PLACE. Speakers have no draft
+ * revision: onSpeakerWritten (speakers/projection.cjs) republishes an
+ * approved speaker on every write. So an update to a speaker the public
+ * site shows goes into `pendingEdits`, the queue a speaker's own edits use
+ * (profile.cjs applyUpdateOwnSpeakerProfile), and the live fields do not
+ * move. Staff apply or discard the queue on the Speakers page. The merge
+ * reads a queued value as the current one, so a change the speaker queued
+ * is kept, not replaced. The slug of a published speaker is not changed at
+ * all: applying the queue does not move the slug reservation, so the row
+ * keeps the slug and says to change it in the speaker editor.
+ *
+ * A row with no key whose slug belongs to a speaker no import has linked
+ * is matched to that speaker (recordImport.cjs), unless the row maps an
+ * email address and the speaker has a different one: that is another
+ * person with the same name, and the row is an error.
  */
 
-const { validateSpeaker } = require('shared/speaker');
+const { validateSpeaker, isPubliclyVisibleSpeaker } = require('shared/speaker');
 const { isValidDocId } = require('../cms/store.cjs');
 const {
   internals: { SPEAKERS, SPEAKER_SLUGS, newSpeakerDefaults, findSlugOwner },
 } = require('../speakers/profile.cjs');
 const {
   reconcileFields,
-  internals: { cell, externalIdError, conflictNote, DELETED_NOTE },
+  internals: { cell, externalIdError, conflictNote, isPlainObject, linkedByImport, matchNote, DELETED_NOTE },
 } = require('./recordImport.cjs');
 
 const TYPE = 'speakers';
@@ -111,16 +127,47 @@ function slugTakenReason(slug) {
   return `slug: "${slug}" is already used by another speaker. Map a slug column with a different value.`;
 }
 
+const PUBLISHED_NOTE = 'The changes are pending review, because this speaker is published. Apply or discard them on the Speakers page.';
+const PUBLISHED_SLUG_NOTE = 'slug: kept the page address, because this speaker is published. Change it in the speaker editor.';
+
 async function planCreate({ db, tx, payload, claimed, actor, now, newId }) {
   const verdict = validateSpeaker(payload);
   if (!verdict.ok) return { verdict: 'error', label: labelOf(payload), reasons: verdict.errors };
   const fields = { ...newSpeakerDefaults(), ...verdict.fields, status: 'draft' };
 
   if (claimed.has(slugClaim(fields.slug))) {
-    return { verdict: 'error', label: labelOf(fields), reasons: [slugTakenReason(fields.slug)] };
+    return {
+      verdict: 'error',
+      label: labelOf(fields),
+      reasons: [`slug: an earlier row of this file uses "${fields.slug}". Give one of the rows a different slug.`],
+    };
   }
   const owner = await findSlugOwner({ tx, db, slug: fields.slug });
-  if (owner) return { verdict: 'error', label: labelOf(fields), reasons: [slugTakenReason(fields.slug)] };
+  if (owner) {
+    const ownerSnap = await tx.get(db.collection(SPEAKERS).doc(owner));
+    const ownerEmail = ownerSnap.exists ? ownerSnap.data()?.email : null;
+    if (!ownerSnap.exists) {
+      return { verdict: 'error', label: labelOf(fields), reasons: [slugTakenReason(fields.slug)] };
+    }
+    if (await linkedByImport({ db, tx, type: TYPE, docId: owner })) {
+      return {
+        verdict: 'error',
+        label: labelOf(fields),
+        reasons: [`slug: "${fields.slug}" belongs to a speaker that an earlier import made from another external ID. Check the external ID. For a different person with the same name, map a slug column with a different value.`],
+      };
+    }
+    if (fields.email && ownerEmail && fields.email !== ownerEmail) {
+      return {
+        verdict: 'error',
+        label: labelOf(fields),
+        reasons: [`slug: "${fields.slug}" belongs to an existing speaker with a different email address. If this is a different person, map a slug column with a different value.`],
+      };
+    }
+    // The same person, typed in the editor before the import: link it.
+    return planUpdate({
+      db, tx, payload, key: { docId: owner, values: null }, claimed, actor, now, matched: true,
+    });
+  }
 
   const docId = (newId ?? (() => require('node:crypto').randomBytes(12).toString('hex')))();
   if (!isValidDocId(docId)) throw new Error('The speaker id could not be assigned.');
@@ -153,7 +200,7 @@ async function planCreate({ db, tx, payload, claimed, actor, now, newId }) {
   };
 }
 
-async function planUpdate({ db, tx, payload, key, claimed, actor, now }) {
+async function planUpdate({ db, tx, payload, key, claimed, actor, now, matched = false }) {
   const docId = key.docId;
   const ref = db.collection(SPEAKERS).doc(docId);
   const snap = await tx.get(ref);
@@ -161,6 +208,8 @@ async function planUpdate({ db, tx, payload, key, claimed, actor, now }) {
     return { verdict: 'unchanged', docId, label: labelOf(payload), notes: [DELETED_NOTE] };
   }
   const stored = snap.data();
+  const published = isPubliclyVisibleSpeaker(stored);
+  const queued = published && isPlainObject(stored.pendingEdits) ? stored.pendingEdits : {};
 
   // A blank slug is "derive it" on create, and "leave it" on an update.
   const sent = { ...payload };
@@ -172,11 +221,17 @@ async function planUpdate({ db, tx, payload, key, claimed, actor, now }) {
   // nor replaces the slug the last import recorded.
   if (incoming.slug === null) delete incoming.slug;
 
-  const { patch, conflicts } = reconcileFields({ incoming, last: key.values, current: stored });
+  // A queued value is the one staff will see next, so it is the current one.
+  const { patch, conflicts } = reconcileFields({ incoming, last: key.values, current: { ...stored, ...queued } });
   const notes = conflicts.map(conflictNote);
+  if (matched) notes.unshift(matchNote('speaker', stored.slug, 'slug'));
   if (Object.prototype.hasOwnProperty.call(patch, 'email') && stored.status === 'invited') {
     delete patch.email;
     notes.push('email: kept the stored address. This speaker has an open invitation. Change the address in the speaker editor.');
+  }
+  if (published && patch.slug !== undefined) {
+    delete patch.slug;
+    notes.push(PUBLISHED_SLUG_NOTE);
   }
 
   if (patch.slug !== undefined) {
@@ -188,19 +243,32 @@ async function planUpdate({ db, tx, payload, key, claimed, actor, now }) {
 
   const changedFields = Object.keys(patch);
   const label = labelOf({ ...stored, ...patch });
+  const claims = [patch.slug, matched ? stored.slug : null].filter(Boolean).map(slugClaim);
   if (changedFields.length === 0) {
-    return { verdict: 'unchanged', docId, label, notes, values: incoming };
+    // A matched row still links the record, so it is an update.
+    return { verdict: matched ? 'update' : 'unchanged', matched, docId, label, notes, values: incoming, claims };
   }
+  if (published) notes.push(PUBLISHED_NOTE);
   const at = new Date(now());
   return {
     verdict: 'update',
+    matched,
     docId,
     label,
     changedFields,
     notes,
     values: incoming,
-    claims: patch.slug ? [slugClaim(patch.slug)] : [],
+    claims,
     write(writeTx) {
+      if (published) {
+        // The whole map is written, so a queued edit of another field stays.
+        writeTx.set(ref, {
+          pendingEdits: { ...queued, ...patch },
+          pendingEditsAt: at,
+          pendingEditsBy: actor.email,
+        }, { merge: true });
+        return;
+      }
       if (patch.slug !== undefined && patch.slug !== stored.slug) {
         writeTx.set(db.collection(SPEAKER_SLUGS).doc(patch.slug), { speakerId: docId, updatedAt: at });
         if (typeof stored.slug === 'string' && stored.slug) {

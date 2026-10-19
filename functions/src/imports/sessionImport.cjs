@@ -27,7 +27,16 @@
  *
  * A value that resolves to nothing is a row error that names it. The parent
  * session is not importable: a parent must be a published top-level
- * session on the same day and track, and staff set it in the editor.
+ * session on the same day and track, and staff set it in the editor. A
+ * speaker that was removed is a row error too: the session would link a
+ * speaker the site never shows.
+ *
+ * A SESSION THAT ALREADY EXISTS. A row with no key is matched to an
+ * existing session no import has linked (recordImport.cjs) when the row's
+ * mapped session ID names it, or when the ID its title suggests names a
+ * session with the same title on the same day. Titles such as "Lunch"
+ * repeat across days, so a title alone does not match: the row then makes
+ * a new session with a "-2" suffix and a note that names the other one.
  */
 
 const { generateSlug } = require('shared/slug');
@@ -41,7 +50,9 @@ const {
 } = require('../schedule/sessions.cjs');
 const {
   reconcileFields,
-  internals: { cell, cellOrNull, externalIdError, importKeyId, conflictNote, DELETED_NOTE, RECORD_IMPORTS },
+  internals: {
+    cell, cellOrNull, externalIdError, importKeyId, conflictNote, linkedByImport, matchNote, DELETED_NOTE, RECORD_IMPORTS,
+  },
 } = require('./recordImport.cjs');
 
 const TYPE = 'sessions';
@@ -224,44 +235,71 @@ async function resolveSpeakers({ db, tx, tokens }) {
   const reasons = [];
   for (const token of tokens) {
     const keySnap = await tx.get(db.collection(RECORD_IMPORTS).doc(importKeyId('speakers', token)));
-    let speakerId = keySnap.exists ? keySnap.data()?.docId : null;
-    if (speakerId && !(await tx.get(db.collection('speakers').doc(speakerId))).exists) speakerId = null;
-    if (!speakerId) {
+    const keyed = keySnap.exists ? keySnap.data()?.docId : null;
+    let speaker = keyed ? await tx.get(db.collection('speakers').doc(keyed)) : null;
+    if (!speaker?.exists) {
       const bySlug = await tx.get(db.collection('speakers').where('slug', '==', token).limit(1));
-      speakerId = bySlug.docs[0]?.id ?? null;
+      speaker = bySlug.docs[0] ?? null;
     }
-    if (speakerId) {
-      if (!ids.includes(speakerId)) ids.push(speakerId);
-    } else {
+    if (!speaker?.exists) {
       reasons.push(`speakers: "${token}" matches no speaker external ID or slug. Import the speakers first.`);
+    } else if (speaker.data()?.status === 'removed') {
+      reasons.push(`speakers: "${token}" is a removed speaker. Restore the speaker on the Speakers page, or take them off this row.`);
+    } else if (!ids.includes(speaker.id)) {
+      ids.push(speaker.id);
     }
   }
   return { ids, reasons };
 }
 
-/** True when a session id is used live, as a draft, or earlier in this file. */
-async function idTaken({ db, tx, id, claimed }) {
-  if (claimed.has(`session:${id}`)) return true;
-  const [live, draft] = await Promise.all([
-    tx.get(db.collection(SESSIONS).doc(id)),
+/** The stored session at an id (draft first, then live), or null. */
+async function storedSession({ db, tx, id }) {
+  const [draft, live] = await Promise.all([
     tx.get(db.collection(SESSIONS_DRAFTS).doc(id)),
+    tx.get(db.collection(SESSIONS).doc(id)),
   ]);
-  return live.exists || draft.exists;
+  if (draft.exists) return draft.data();
+  return live.exists ? live.data() : null;
 }
 
+/**
+ * The id a new row's session gets, or the existing session it matches
+ * (module doc). `note` names an existing session the row did not match.
+ *
+ * @returns {Promise<{ ok: true, id: string, matched: boolean, note?: string } |
+ *                   { ok: false, reason: string }>}
+ */
 async function allocateId({ db, tx, input, claimed }) {
+  const linked = (id) => linkedByImport({ db, tx, type: TYPE, docId: id });
   if (input.slug) {
-    if (await idTaken({ db, tx, id: input.slug, claimed })) {
-      return { ok: false, reason: `slug: another session already uses "${input.slug}". Map a different session ID.` };
+    if (claimed.has(`session:${input.slug}`)) {
+      return { ok: false, reason: `slug: an earlier row of this file uses "${input.slug}". Map a different session ID.` };
     }
-    return { ok: true, id: input.slug };
+    if (!(await storedSession({ db, tx, id: input.slug }))) return { ok: true, id: input.slug, matched: false };
+    if (await linked(input.slug)) {
+      return {
+        ok: false,
+        reason: `slug: the session "${input.slug}" belongs to another external ID from an earlier import. Check the external ID, or map a different session ID.`,
+      };
+    }
+    return { ok: true, id: input.slug, matched: true };
   }
   const base = sessionIdFromTitle(input.values.title) || 'session';
+  let note;
   for (let n = 1; n <= MAX_ID_SUFFIX; n += 1) {
     const suffix = n === 1 ? '' : `-${n}`;
     const id = `${base.slice(0, MAX_SESSION_ID_LENGTH - suffix.length).replace(/-+$/, '')}${suffix}`;
     if (RESERVED_SESSION_IDS.has(id) || !isValidDocId(id)) continue;
-    if (!(await idTaken({ db, tx, id, claimed }))) return { ok: true, id };
+    if (claimed.has(`session:${id}`)) continue;
+    const existing = await storedSession({ db, tx, id });
+    if (!existing) return { ok: true, id, matched: false, note };
+    if (n === 1) {
+      const sameTitle = lower(existing.title) === lower(input.values.title);
+      const dayMapped = Object.prototype.hasOwnProperty.call(input.values, 'dayId');
+      const sameDay = !dayMapped || input.values.dayId === existing.dayId;
+      if (sameTitle && sameDay && !(await linked(id))) return { ok: true, id, matched: true };
+      note = `A session with the ID "${id}" already exists. This row makes a new session. If it is the same session, map a session ID column with "${id}".`;
+    }
   }
   return { ok: false, reason: 'slug: no free session ID could be made from this title. Map a session ID column.' };
 }
@@ -294,6 +332,9 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
     const allocated = await allocateId({ db, tx, input, claimed });
     if (!allocated.ok) return { verdict: 'error', label: incoming.title ?? null, reasons: [allocated.reason] };
     const docId = allocated.id;
+    if (allocated.matched) {
+      return planUpdate({ db, tx, incoming, key: { docId, values: null }, actor, now, matched: true });
+    }
     const fields = { speakerIds: [], ...incoming };
     const checked = await checkSession({ db, tx, docId, fields });
     if (!checked.ok) return { verdict: 'error', docId, label: incoming.title ?? null, reasons: checked.reasons };
@@ -302,6 +343,7 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
       docId,
       label: checked.fields.title,
       changedFields: Object.keys(incoming),
+      notes: allocated.note ? [allocated.note] : [],
       values: incoming,
       claims: [`session:${docId}`],
       async write(writeTx) {
@@ -311,7 +353,10 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
       },
     };
   }
+  return planUpdate({ db, tx, incoming, key, actor, now });
+}
 
+async function planUpdate({ db, tx, incoming, key, actor, now, matched = false }) {
   const docId = key.docId;
   const [draftSnap, liveSnap] = await Promise.all([
     tx.get(db.collection(SESSIONS_DRAFTS).doc(docId)),
@@ -323,14 +368,21 @@ async function planRow({ db, tx, input, key, claimed, actor, now }) {
 
   const { patch, conflicts } = reconcileFields({ incoming, last: key.values, current });
   const notes = conflicts.map(conflictNote);
+  if (matched) notes.unshift(matchNote('session', docId, 'session ID'));
   const changedFields = Object.keys(patch);
   const label = patch.title ?? current.title ?? null;
-  if (changedFields.length === 0) return { verdict: 'unchanged', docId, label, notes, values: incoming };
+  const claims = matched ? [`session:${docId}`] : [];
+  if (changedFields.length === 0) {
+    // A matched row still links the record, so it is an update.
+    return { verdict: matched ? 'update' : 'unchanged', matched, docId, label, notes, values: incoming, claims };
+  }
 
   const checked = await checkSession({ db, tx, docId, fields: { ...current, ...patch } });
   if (!checked.ok) return { verdict: 'error', docId, label, reasons: checked.reasons };
   return {
     verdict: 'update',
+    matched,
+    claims,
     docId,
     label,
     changedFields,
