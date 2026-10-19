@@ -1221,3 +1221,56 @@ describe('ContentPage section edit links', () => {
     }
   });
 });
+
+// Launch rehearsal: a link to a section that is off led to "This event
+// doesn't have a public schedule". The recap page's "More from the event"
+// section is seeded for exactly such links (scripts/lib/seed.cjs).
+describe('ContentPage — links to a section that is off', () => {
+  const page = {
+    id: 'after',
+    label: 'After the event',
+    path: '/after',
+    icon: null,
+    order: 99,
+    visible: true,
+    systemPage: false,
+    sections: [
+      { id: 'after_intro', label: 'Introduction', description: '', allowedBlocks: ['text'], maxBlocks: 2, reorderable: true, defaultBlocks: [] },
+      { id: 'after_next', label: 'More from the event', description: '', allowedBlocks: ['link_group'], maxBlocks: 10, reorderable: true, defaultBlocks: [] },
+      { id: 'after_survey', label: 'Feedback', description: '', allowedBlocks: ['cta', 'link_group'], maxBlocks: 4, reorderable: true, defaultBlocks: [] },
+    ],
+  };
+  const link = (section, field, blockType, label, url) => ({
+    id: `${section}__${field}`, section, field, blockType, group: 'Next', label, url, visible: true, order: 0,
+  });
+  const blocks = [
+    { id: 'after_intro__body', section: 'after_intro', field: 'body', blockType: 'text', value: 'Thanks for coming.', visible: true, order: 0 },
+    link('after_next', 'program', 'link_group', 'Browse the schedule', '/schedule'),
+    { ...link('after_next', 'people', 'link_group', 'Meet the speakers', '/speakers'), order: 1 },
+    link('after_survey', 'survey', 'cta', 'See the program', '/schedule/abc'),
+  ];
+
+  function renderWithFeatures(features) {
+    renderAt('/after');
+    act(() => {
+      configSubscriptions.get('features')(features);
+      subscriptions.get('cmsPages')([...pagesData, page]);
+      subscriptions.get('cmsContent')(blocks);
+    });
+  }
+
+  it('draws no link to a section that is off, and no heading over a section left empty', async () => {
+    renderWithFeatures({ schedule: false, speakers: true });
+    expect(await screen.findByText('Thanks for coming.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Browse the schedule' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Meet the speakers' })).toHaveAttribute('href', '/speakers');
+    expect(screen.queryByRole('link', { name: 'See the program' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Feedback' })).toBeNull();
+  });
+
+  it('draws every link while the sections are on', async () => {
+    renderWithFeatures({ schedule: true, speakers: true });
+    expect(await screen.findByRole('link', { name: 'Browse the schedule' })).toHaveAttribute('href', '/schedule');
+    expect(screen.getByRole('link', { name: 'See the program' })).toHaveAttribute('href', '/schedule/abc');
+  });
+});
