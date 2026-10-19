@@ -14,8 +14,8 @@ import {
   forgetCheckoutAttempt, formatTicketMoney, formatTicketTime, newTicketingRequestId, readCheckoutAttempt,
   rememberCheckoutAttempt, safeCheckoutUrl, ticketingRequest,
 } from '../lib/ticketingCommerce.js';
+import { EMAIL_ADDRESS_RE as EMAIL_RE } from 'shared/email';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPTY_CART = 'Choose at least one ticket.';
 
 export default function Tickets() {

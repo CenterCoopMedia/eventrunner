@@ -62,7 +62,11 @@ import { ContentProvider } from '../contexts/ContentContext.jsx';
 import snapshotTimelineData from '@generated/timelineData.js';
 import snapshotSiteContent from '@generated/siteContent.js';
 
-const STORY_TEXT = snapshotSiteContent.history__story.value.replace(/<[^>]*>/g, '').slice(0, 40);
+// The story as a reader sees it: parsed, so tags drop and entities decode.
+const STORY_TEXT = new DOMParser()
+  .parseFromString(snapshotSiteContent.history__story.value, 'text/html')
+  .body.textContent.slice(0, 40);
+const STORY_PATTERN = new RegExp(STORY_TEXT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
 function renderHome() {
   return render(
@@ -115,7 +119,7 @@ describe('Home History section, on the real content provider', () => {
     // Read at once: no waiting on a chunk, a listener, or a timer.
     expect(screen.getByRole('article')).toHaveAttribute('data-content-source', 'snapshot');
     expect(titlesIn(historySection())).toEqual(SNAPSHOT_TITLES);
-    expect(within(historySection()).getByText(new RegExp(STORY_TEXT))).toBeInTheDocument();
+    expect(within(historySection()).getByText(STORY_PATTERN)).toBeInTheDocument();
   });
 
   it('adds an entry the listener reports to the mounted page, first when it is oldest', () => {
@@ -144,6 +148,6 @@ describe('Home History section, on the real content provider', () => {
     expect(section.isConnected).toBe(true);
     expect(section.querySelector('ol')).toBeNull();
     expect(within(section).getByRole('heading', { level: 2, name: 'History' })).toBeInTheDocument();
-    expect(within(section).getByText(new RegExp(STORY_TEXT))).toBeInTheDocument();
+    expect(within(section).getByText(STORY_PATTERN)).toBeInTheDocument();
   });
 });
