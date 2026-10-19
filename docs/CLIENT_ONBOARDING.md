@@ -383,7 +383,7 @@ The client keeps its data. At the end of the engagement, hand over the event's r
 
 1. An operator downloads the event data package from **Data export** (or runs `scripts/export-event-package.cjs` for a large event) and checks it with `--verify`.
 2. The operator takes a Firebase managed export and copies the Storage bucket when the client wants a full backup.
-3. The operator sets the archive date and `config/event.historicalDemo` to keep the past site online and read-only, or disables Hosting.
+3. The operator sets the archive date and `config/event.historicalDemo` to keep the past site online and read-only, or disables Hosting. After `historicalDemo` is on, only Google sign-in opens the admin panel, so export first.
 4. The handoff record names the package date, the parts included, who received each file, and the retention period.
 
 Explain the difference between access to the cloud project, the client's ownership of the data, and the portable export. The runbook's first table states it.

@@ -107,7 +107,7 @@ The public site can stay online after the event:
 1. Settle ticketing first. Pause sales, finish refunds and reconciliation, and wait until the ticket sync queue is empty. The [deploy runbook](../DEPLOY_RUNBOOK.md) section "Archiving an event with ticket sales" gives the order.
 2. Close the pitch call in **Session pitches**.
 3. In **Settings → Event settings**, set the **archive date**. Every day becomes a back issue: the content stays, and bookmarking, reactions and calendar links go away.
-4. Set `config/event.historicalDemo` to `true`. Account, feedback and email actions then refuse writes. The admin panel stays readable, and both exports still work.
+4. Download the event data package and the spreadsheets first. Then set `config/event.historicalDemo` to `true`. Account, feedback and email actions then refuse writes, and so does sign-in with an email code. An admin who signs in with Google can still open the admin panel and run both exports. An admin who signs in only with an email code cannot get back in until an operator sets `historicalDemo` to `false` again.
 5. Remove staff access the client no longer needs on **Access**.
 
 To take the site offline instead, export first, then disable Hosting (`firebase hosting:disable --project <project-id>`).
