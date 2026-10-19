@@ -516,6 +516,15 @@
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The web toolchain moves to Vite 8, <code>@vitejs/plugin-react</code> 6 and Vitest 5 (from Vite 5,
+          plugin-react 4 and Vitest 3). This clears the Dependabot alerts for <code>vitest</code> and <code>tinypool</code>
+          (critical), <code>vite</code> (high), and <code>@vitest/mocker</code> and <code>esbuild</code> (moderate). The repository now
+          needs Node 22.12 or later on Node 22, Node 24, or Node 26 and later, the range Vitest 5
+          supports. Vite 8 bundles with Rolldown, so <code>vite.config.js</code> keeps the first
+          paint in one chunk, and the specimen route reads its build switches beside its dynamic import
+          so a client build still emits no specimen chunk.</li>
+          </ul>
+          <ul>
           <li><strong>Breaking:</strong> <code>submitSessionPitch</code> now requires <code>consent: true</code>. Callers must record agreement
           to organizer review before submitting; requests without it return 400. Stored proposals
           record the consent version and time (#323).</li>

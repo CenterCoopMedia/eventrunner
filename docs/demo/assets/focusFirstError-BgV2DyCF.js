@@ -1,0 +1,1 @@
+function e(e,t){try{return e.querySelector(t)}catch{return null}}function t(t){if(!t||typeof t.querySelector!=`function`)return!1;let n=e(t,`[aria-invalid="true"]:not([disabled])`)||e(t,`:invalid:not([disabled])`);return!n||typeof n.focus!=`function`?!1:(n.focus(),!0)}export{t};
