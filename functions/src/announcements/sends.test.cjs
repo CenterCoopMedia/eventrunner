@@ -524,6 +524,22 @@ for (const backend of backends) {
     assert.ok((await docsOf(h.db, 'admin_logs')).some((row) => row.action === 'removeEmailSuppression' && row.email === STAFF));
   });
 
+  t('the email log stores each copy with the inert link, never the recipient\'s live signed link', async () => {
+    const h = await harness({ backend });
+    await previewAndSend(h);
+    const ben = h.mail.find((m) => m.to === 'ben@example.org');
+    const live = ben.headers['List-Unsubscribe'].slice(1, -1);
+    assert.ok(ben.text.includes(live), 'the sent copy carries the live link');
+    const rows = (await docsOf(h.db, 'sent_emails')).filter((row) => row.source === 'announcement');
+    assert.equal(rows.length, 2);
+    const signature = new URL(live).searchParams.get('t');
+    for (const row of rows) {
+      assert.ok(!row.text.includes(signature) && !row.html.includes(signature), `${row.to}: no signature stored`);
+      assert.ok(row.text.includes(`${SITE}/unsubscribe?test=1`), `${row.to}: the inert link stands in`);
+      assert.ok(row.html.includes(`${SITE}/unsubscribe?test=1`));
+    }
+  });
+
   t('an unsubscribe opt-out recorded during a send holds for the rest of that send', async () => {
     const people = Array.from({ length: sendsInternals.CHUNK_SIZE + 1 }, (_, n) => ({
       uid: `p${n}`, email: `person${String(n).padStart(3, '0')}@example.org`, registrationStatus: 'approved', speakerId: null,
