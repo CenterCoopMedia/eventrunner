@@ -175,7 +175,7 @@
           </code></pre>
           <p><code>packages/shared</code> is CommonJS with hand-written ESM shims so the same module serves Vite and Cloud Functions with no transpile step.</p>
           <h2 id="develop">Develop<a class="heading-anchor" href="#develop" aria-label="Link to this section">#</a></h2>
-          <p>Node 22+.</p>
+          <p>Node 22 (22.12 or later), Node 24, or Node 26 and later. Vitest 5 does not run on Node 23 or 25.</p>
           <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">npm test
           </code></pre>
           <p>That runs the shared-package suite on Node&#39;s built-in test runner. No install step and no credentials. The emulator loop (<code>npm run dev:emulators</code>) lands with the web app and functions.</p>
