@@ -102,8 +102,22 @@ const submit = (overrides = {}) => call(createSubmitSessionPitchHandler, 'submit
   ...overrides,
 });
 const review = (body, token = 'staff') => call(createReviewSessionPitchHandler, token, body, () => T0 + 1000);
-const notice = (body, token = 'staff', now = () => T0 + 2000) => call(createSendSessionPitchNoticeHandler, token, body, now);
-const saveSettings = (body, token = 'operator') => call(createSavePitchNoticeSettingsHandler, token, body);
+async function settingsRevision() {
+  const snap = await db.collection('session_pitch_settings').doc('notices').get();
+  return snap.exists ? snap.data().revision : 0;
+}
+// A send carries the settings revision its preview showed. These helpers
+// fill in the current one unless a test passes its own.
+const rawNotice = (body, token = 'staff', now = () => T0 + 2000) => call(createSendSessionPitchNoticeHandler, token, body, now);
+const notice = async (body, token, now) => rawNotice(
+  body.preview || 'expectedSettingsRevision' in body ? body : { ...body, expectedSettingsRevision: await settingsRevision() },
+  token, now,
+);
+const rawSaveSettings = (body, token = 'operator') => call(createSavePitchNoticeSettingsHandler, token, body);
+const saveSettings = async (body, token) => rawSaveSettings(
+  'expectedRevision' in body ? body : { ...body, expectedRevision: await settingsRevision() },
+  token,
+);
 
 async function readPitch(id = PITCH_ID) {
   return (await db.collection('session_pitches').doc(id).get()).data();
@@ -210,10 +224,23 @@ describe('automatic pitch receipt', () => {
     expect(provider.messages).toHaveLength(1);
   });
 
-  it('keeps the submission when the provider throws', async () => {
+  it('records a provider throw as unknown and retries it only after staff confirm', async () => {
     provider.mode = 'throw';
     expect((await submit()).statusCode).toBe(201);
-    expect((await readPitch()).notices.receipt).toMatchObject({ state: 'failed', error: 'socket hang up' });
+    expect((await readPitch()).notices.receipt).toMatchObject({ state: 'unknown', error: 'socket hang up' });
+
+    provider.mode = 'ok';
+    const body = { id: PITCH_ID, kind: 'receipt', expectedStatus: 'new', expectedRevision: 0 };
+    const unconfirmed = await notice(body);
+    expect(unconfirmed.statusCode).toBe(409);
+    expect(unconfirmed.body.error.code).toBe('delivery-unknown');
+    expect(provider.messages).toHaveLength(0);
+    expect((await readPitch()).notices.receipt.attempt).toBe(1);
+
+    const confirmed = await notice({ ...body, confirmUnknown: true });
+    expect(confirmed.statusCode).toBe(200);
+    expect(confirmed.body.attempt).toBe(2);
+    expect(provider.messages).toHaveLength(1);
   });
 
   it('sends no receipt in the manual mode until staff send it', async () => {
@@ -280,6 +307,8 @@ describe('decision emails', () => {
     });
     expect(preview.body.preview.text).toContain('A note from the organizers:\nPlan for 45 minutes.');
     expect(preview.body.preview.text).not.toContain('PRIVATE-NOTE');
+    expect(preview.body.preview.otherDecisionSent).toBeNull();
+    expect(preview.body.preview.settingsRevision).toBe(1);
     expect(provider.messages).toHaveLength(0);
     expect((await readPitch()).notices).toBeUndefined();
     expect(await logs('sendSessionPitchNotice')).toHaveLength(0);
@@ -319,6 +348,9 @@ describe('decision emails', () => {
 
     // A repeated decision (declined, then accepted again) cannot resend the acceptance.
     const declinedRevision = await accept(PITCH_ID, 'rejected');
+    // The decline preview tells staff that an acceptance already went.
+    const declinePreview = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'rejected', expectedRevision: declinedRevision, preview: true });
+    expect(declinePreview.body.preview.otherDecisionSent).toBe('accepted');
     const decline = await notice({ id: PITCH_ID, kind: 'decision', expectedStatus: 'rejected', expectedRevision: declinedRevision });
     expect(decline.statusCode).toBe(200);
     expect(provider.messages[1].tag).toBe('pitch.declined');
@@ -370,9 +402,13 @@ describe('decision emails', () => {
     const fresh = await notice(body, 'staff', () => T0 + 60 * 1000);
     expect(fresh.statusCode).toBe(409);
     expect(fresh.body.error.code).toBe('in-progress');
+    // A stale queued send may have reached the provider, so it needs the same confirmation.
     const stale = await notice(body, 'staff', () => T0 + QUEUED_STALE_MS + 1);
-    expect(stale.statusCode).toBe(200);
-    expect(stale.body.attempt).toBe(2);
+    expect(stale.statusCode).toBe(409);
+    expect(stale.body.error.code).toBe('delivery-unknown');
+    const confirmed = await notice({ ...body, confirmUnknown: true }, 'staff', () => T0 + QUEUED_STALE_MS + 1);
+    expect(confirmed.statusCode).toBe(200);
+    expect(confirmed.body.attempt).toBe(2);
   });
 
   it('refuses stale reviews, undecided pitches, notes on receipts, non-staff, and demos without side effects', async () => {
@@ -401,6 +437,39 @@ describe('decision emails', () => {
 });
 
 describe('pitch email settings', () => {
+  it('refuses a send whose preview used other wording, and a stale settings save', async () => {
+    expect((await submit()).statusCode).toBe(201);
+    const body = { id: PITCH_ID, kind: 'receipt', expectedStatus: 'new', expectedRevision: 0 };
+    provider.messages.length = 0;
+    await db.collection('session_pitches').doc(PITCH_ID).update({ notices: {} });
+
+    const preview = await rawNotice({ ...body, preview: true });
+    expect(preview.body.preview.settingsRevision).toBe(0);
+    expect((await rawNotice(body)).statusCode).toBe(400);
+
+    // A second operator saves new wording between the preview and the send.
+    expect((await rawSaveSettings({ receiptMode: 'manual', expectedRevision: 0 })).statusCode).toBe(200);
+    const stale = await rawNotice({ ...body, expectedSettingsRevision: 0 });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.body.error.code).toBe('settings-changed');
+    expect(provider.messages).toHaveLength(0);
+    expect((await readPitch()).notices).toEqual({});
+
+    // A save from an operator who loaded revision 0 does not overwrite revision 1.
+    const conflict = await rawSaveSettings({ receiptMode: 'automatic', expectedRevision: 0 });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.body.error.code).toBe('settings-conflict');
+    expect((await db.collection('session_pitch_settings').doc('notices').get()).data()).toMatchObject({ receiptMode: 'manual', revision: 1 });
+    expect((await rawSaveSettings({ receiptMode: 'automatic' })).statusCode).toBe(400);
+  });
+
+  it('keeps a line break in a pitch title out of the subject', async () => {
+    await saveSettings({ receiptMode: 'automatic', templates: { 'pitch.receipt': { subject: 'Thanks: {{pitch_title}}', wording: 'We have “{{pitch_title}}”.' } } });
+    expect((await submit({ title: 'Line one\r\nBcc: x@example.test\n\tend' })).statusCode).toBe(201);
+    expect(provider.messages[0].subject).toBe('Thanks: Line one Bcc: x@example.test end');
+    expect(provider.messages[0].text).toContain('Line one\r\nBcc: x@example.test');
+  });
+
   it('lets only an operator save validated wording, audits it, and uses it for the next email', async () => {
     const wording = 'Hello,\n\nWe have “{{pitch_title}}” for {{event_name}}.';
     expect((await saveSettings({ receiptMode: 'automatic', templates: {} }, 'staff')).statusCode).toBe(403);
@@ -420,6 +489,7 @@ describe('pitch email settings', () => {
     expect(saved.statusCode).toBe(200);
     expect(saved.body.templates['pitch.receipt']).toEqual({ subject: 'Thanks: {{pitch_title}}', wording, custom: true });
     expect(saved.body.templates['pitch.accepted'].custom).toBe(false);
+    expect(saved.body.revision).toBe(1);
     const stored = (await db.collection('session_pitch_settings').doc('notices').get()).data();
     expect(Object.keys(stored.templates)).toEqual(['pitch.receipt']);
     const [audit] = await logs('savePitchNoticeSettings');

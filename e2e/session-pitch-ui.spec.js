@@ -139,6 +139,8 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await expect(preview).toBeFocused();
     await expect(preview).toContainText('Plan for 45 minutes.');
     await expect(preview).not.toContainText('PRIVATE-STAFF-NOTE');
+    // The fixture has no Firebase identity, like an imported pitch.
+    await expect(preview).toContainText('This address came from an imported CSV. Nobody verified it.');
     await expect(page.getByRole('button', { name: 'Send the acceptance email' })).toBeDisabled();
     await page.getByRole('checkbox', { name: `I reviewed this email. Send it to ${email}.` }).check();
     await page.getByRole('button', { name: 'Send the acceptance email' }).click();

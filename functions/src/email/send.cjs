@@ -184,12 +184,14 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
 
     let result = null;
     let attempts = 0;
+    let ambiguous = false;
     while (attempts < MAX_ATTEMPTS) {
       attempts += 1;
       try {
         result = await provider.send(fullMessage);
       } catch (err) {
         // Never retry a throw: ambiguous about acceptance.
+        ambiguous = true;
         result = {
           providerMessageId: null,
           status: 'failed',
@@ -208,6 +210,9 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       providerStatus: result.providerStatus,
       error: result.error,
       retries,
+      // A caller that offers its own retry must not treat this as a refusal:
+      // the provider may have accepted the message before the throw.
+      ...(ambiguous ? { ambiguous: true } : {}),
     };
 
     // Audit what was actually handed to the adapter (footer included).

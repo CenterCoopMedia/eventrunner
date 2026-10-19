@@ -237,7 +237,10 @@ export default function AdminSessionPitches() {
   const [selected, setSelected] = useState(null);
   const detailRef = useRef(null);
   useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs); setListError(null); }, setListError), []);
-  useEffect(() => subscribeAdminCollection('session_pitch_settings', (docs) => setNoticeSettings(readPitchNoticeSettings(docs.find((d) => d.id === 'notices')))), []);
+  useEffect(() => subscribeAdminCollection('session_pitch_settings', (docs) => {
+    const stored = docs.find((d) => d.id === 'notices');
+    setNoticeSettings({ ...readPitchNoticeSettings(stored), revision: stored?.revision ?? 0 });
+  }), []);
   useEffect(() => subscribePitchCall((value) => { setSettings(value); setConfigError(false); }, () => setConfigError(true)), []);
   const shown = (rows || []).filter((row) => (filter === 'all' || row.status === filter) && `${row.title} ${row.email} ${row.organization || ''}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => (toMillis(b.createdAt) ?? -Infinity) - (toMillis(a.createdAt) ?? -Infinity) || a.id.localeCompare(b.id));
   const current = rows?.find((row) => row.id === selected?.id);
@@ -246,7 +249,7 @@ export default function AdminSessionPitches() {
     <AdminPageHeader title="Session pitches" description="Review private proposals. Saving a decision does not send an email or publish event content." actions={<button className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))}>Export filtered queue</button>} />
     <p className="text-admin-sm text-admin-ink-secondary"><Link to="/pitch" className={rowTitleLinkClass}>Open public pitch form</Link>. CSV contains contact details: Keep the downloaded file private. Review notes are excluded.</p>
     {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings settings={settings} call={call} timeZone={eventConfig?.timezone} /></details> : null}
-    {isOperator && noticeSettings ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage pitch emails</summary><PitchEmailSettings key={JSON.stringify(noticeSettings)} settings={noticeSettings} call={call} /></details> : null}
+    {isOperator && noticeSettings ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage pitch emails</summary><PitchEmailSettings settings={noticeSettings} call={call} /></details> : null}
     {configError ? <Notice tone="caution" message="Cannot check call settings. Reconnecting…" /> : null}
     <ImportPitches call={call} />
     <div className="grid gap-sm sm:grid-cols-2 sm:items-end"><SelectField label="Filter by decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...statuses]} /><TextField label="Search pitches" value={search} onChange={setSearch} hint="Title, email, or organization." /></div>

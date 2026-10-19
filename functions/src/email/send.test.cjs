@@ -154,7 +154,18 @@ test('a thrown exception is never retried', async () => {
   assert.equal(calls, 1);
   assert.equal(result.status, 'failed');
   assert.match(result.error, /socket hang up/);
+  // A throw does not say whether the provider accepted the message.
+  assert.equal(result.ambiguous, true);
   assert.equal(db.state.sentRows.length, 1);
+});
+
+test('a provider-reported failure is not ambiguous', async () => {
+  const { core: c } = core({
+    provider: { name: 'x', send: async () => ({ providerMessageId: null, status: 'failed', providerStatus: 422, error: 'Inactive recipient' }) },
+  });
+  const result = await c.send({ to: 'a@example.org', subject: 's' });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.ambiguous, undefined);
 });
 
 test('onceKey: first send claims, second skips without provider contact or audit row', async () => {

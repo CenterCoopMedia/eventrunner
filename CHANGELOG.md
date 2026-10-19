@@ -29,10 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Staff send acceptance and decline emails from each pitch, after a preview and a
   confirmation, with an optional note to the submitter. Saving a decision still sends
   nothing, imported pitches never get an automatic email, and private review notes are
-  never sent. Each pitch shows a queued, sent, or failed record for each email. Send-once
-  keys stop a retry or a repeated decision from sending an email twice, and a failed
-  email can be retried. Operators choose automatic or manual receipts and edit the
-  wording of all three emails.
+  never sent. The preview says when an imported address was not verified and when the
+  other decision email was already sent. Each pitch shows a sending, sent, not sent, or
+  may-have-been-sent record for each email. Send-once keys stop a retry or a repeated
+  decision from sending an email twice. A refused email can be retried; an email whose
+  delivery is unknown is retried only after staff confirm that they checked the Email log.
+  Operators choose automatic or manual receipts and edit the wording of all three
+  emails. A send is refused if the wording changed after its preview, and a settings
+  save is refused if another operator saved first.
 
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
@@ -441,6 +445,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The admin guide's early launch steps now say how to take a home section off the site (hide or
   delete its blocks, or remove the section in Pages), that "[Replace]" text and seeded statistics
   show until edited, and that **Pitch a session** appears in the home page lead only.
+
+- **Upgrade behavior:** session pitch receipts (#324) are on by default. After the upgrade, each
+  new pitch from this site's form gets a receipt email, with no further step. To turn this off,
+  an operator chooses **Staff send each receipt** under **Session pitches → Manage pitch emails**
+  and saves it before deploying this version.
 - **Breaking:** `submitSessionPitch` now requires `consent: true`. Callers must record agreement
   to organizer review before submitting; requests without it return 400. Stored proposals
   record the consent version and time (#323).
