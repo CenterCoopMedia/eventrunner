@@ -417,6 +417,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A delivery, bounce or opt-out event that reaches the email webhook before the site has
+  recorded the message is no longer lost. For 15 minutes after the event the webhook
+  answers 503, so Postmark sends it again; an older event for an unknown message is
+  acknowledged and dropped.
+
 - The documentation site's page description decodes each entity once, so a
   paragraph that shows "&lt;b&gt;" no longer gets "<b>" in its description.
   An HTML comment that forms again when an inner comment is removed is also

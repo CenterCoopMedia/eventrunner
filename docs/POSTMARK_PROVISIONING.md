@@ -293,6 +293,12 @@ HTTP Basic credentials embedded in the webhook URL itself, checked against
    **SubscriptionChange**. A record with `SuppressSending: true` on an announcement becomes the
    application's suppression record; a resubscribe record (`SuppressSending: false`) is accepted
    with nothing to record.
+   The site records each message after Postmark accepts it. An event that arrives first,
+   for a message the site has no record of yet, gets `503` with `Retry-After: 60` for 15
+   minutes after the event's own time, and Postmark retries it (after 1, 5 and 10 minutes).
+   An older event for an unknown message gets `200` and is dropped. Mail that another
+   application sends through the same Server is such an unknown message; give that
+   application its own Server so its events do not reach this webhook.
 4. This webhook registration is scoped to the Server (and, within it, the stream you attached it
    to) — it does not need repeating for other deployments' Servers, and other deployments' webhooks
    do not need repeating here.

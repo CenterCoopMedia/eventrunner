@@ -482,17 +482,30 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
 }
 
 /**
+ * How long an event for a message with no sent_emails row is answered with
+ * a retryable 503. The sender writes the row after the provider answers
+ * (after every batch retry, in sendBatch), so a fast bounce or delivery can
+ * arrive first. Postmark retries a 5xx after 1, 5 and 10 minutes; an event
+ * older than this window, or dated far ahead, is acknowledged and dropped,
+ * so mail this deployment never sent is not retried for ever.
+ */
+const UNMATCHED_RETRY_MS = 15 * 60 * 1000;
+
+/**
  * Delivery-event ingest (spec §3.1): authenticates through the adapter,
  * parses events, and patches matching sent_emails rows. Writes nothing
  * else except the announcement opt-out it mirrors into
  * `email_suppressions` (issue #490). Returns 401 on a failed check and never
- * falls back to accepting unauthenticated deliveries.
+ * falls back to accepting unauthenticated deliveries. A recent event whose
+ * message has no row yet gets 503 with Retry-After (UNMATCHED_RETRY_MS);
+ * the events that matched are applied first, and applying one again on the
+ * retry changes nothing.
  *
- * @param {{ db: FirebaseFirestore.Firestore,
- *           provider: object, log?: Pick<Console, 'warn'|'error'> }} deps
+ * @param {{ db: FirebaseFirestore.Firestore, provider: object,
+ *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  * @returns {(req: any, res: any) => Promise<void>}
  */
-function createDeliveryWebhookHandler({ db, provider, log = console }) {
+function createDeliveryWebhookHandler({ db, provider, now = Date.now, log = console }) {
   return async function emailDeliveryWebhook(req, res) {
     if (req.method !== 'POST') {
       res.set('Allow', 'POST');
@@ -519,6 +532,7 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
     }
 
     let patched = 0;
+    let waiting = 0;
     for (const event of events) {
       if (!event?.providerMessageId) continue;
       const snap = await db
@@ -526,7 +540,11 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
         .where('providerMessageId', '==', event.providerMessageId)
         .limit(1)
         .get();
-      if (snap.empty) continue;
+      if (snap.empty) {
+        const age = now() - Date.parse(event.occurredAt);
+        if (Math.abs(age) < UNMATCHED_RETRY_MS) waiting += 1;
+        continue;
+      }
       const ref = snap.docs[0].ref;
       // A provider-side opt-out from an announcement (a Postmark broadcast
       // stream with Postmark unsubscribe handling, issue #490) becomes the
@@ -564,6 +582,16 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
         return true;
       });
       if (applied) patched += 1;
+    }
+    if (waiting > 0) {
+      log.warn('delivery event for a message with no sent_emails row yet; asking for a retry', { waiting });
+      res.set('Retry-After', '60');
+      res.status(503).json({
+        error: { code: 'not-recorded-yet', message: 'The message is not recorded yet. Retry later.' },
+        processed: events.length,
+        patched,
+      });
+      return;
     }
     res.status(200).json({ processed: events.length, patched });
   };
@@ -623,6 +651,7 @@ module.exports = {
     claimIdForOnceKey,
     isAlreadyExists,
     resolveMessage,
+    UNMATCHED_RETRY_MS,
     MAX_ATTEMPTS,
     BACKOFF_MS,
     BODY_STORE_LIMIT,
