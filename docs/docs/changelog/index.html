@@ -117,6 +117,27 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Announcement email. On the Announcements page, staff write a subject, a plain-text message,
+          and an optional button, pick registered attendees, approved attendees, or speakers, preview
+          the branded email with the recipient count, send a test to themselves, and confirm the count
+          to send. The server picks the audience from account records, refuses a send that no longer
+          matches the preview, and sends 200 recipients per provider batch call with a send-once key
+          each, so a continued send never mails anyone twice. A send history lists counts and failed
+          addresses, and a past send can be loaded as a new draft (#201, #202, #203).</li>
+          <li>Announcements use their own Postmark broadcast stream, checked through the Postmark API
+          before every chunk, never the transactional stream. Every announcement has a one-click
+          unsubscribe link: Postmark-managed by default, or, for a client on another email
+          provider, the site&#39;s signed link with <code>List-Unsubscribe</code> headers (Custom handling). An opt-out is honored by every later send, and staff can restore an address on
+          request. The webhook relay is refused until it has a batch and unsubscribe contract (#490).</li>
+          <li>Staff can retry the addresses an announcement send could not reach because the email
+          provider was down or busy. The retry is a new send, previewed and confirmed, and each send
+          can be retried once. The history says when its failed address list is cut short (#202).</li>
+          <li>A correctly signed unsubscribe is never rate limited, so one-click opt-outs that mail
+          providers and link scanners send from shared addresses are all recorded. The email log
+          stores each announcement with an inert unsubscribe link in place of the recipient&#39;s live
+          one (#490).</li>
+          </ul>
+          <ul>
           <li>A call for sessions can use an external form, such as Airtable, instead of this site&#39;s
           form. Operators save its https address with the call. <code>/pitch</code> then links to it while the
           call is open, and native submission is refused so one call has one queue. The home page
