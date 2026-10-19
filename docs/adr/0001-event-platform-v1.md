@@ -2117,7 +2117,7 @@ exists only to compensate for infrastructure v1 does not have.
 | `Local.jsx`, `CampusMap.jsx` | ~1,900 lines | — | not ported — city-guide and campus-map content is covered by the `travel_local` section of the travel page |
 | Video generator, Remotion, `imageProxy` | ~13,900 lines | — | not ported |
 | Invoices | 2,352 + backend | — | not ported |
-| Airtable sync | 4 exports + 6 scripts + `escapeAirtableFormula` | — | not ported |
+| Airtable sync | 4 exports + 6 scripts + `escapeAirtableFormula` | — | not ported. [ADR 0005](0005-airtable-pitch-intake.md) adds a read-only refresh for session pitch intake only |
 | Social layer | `posts`, `onPostCreated`, `deletePostWithAudit`, notifications | — | not ported |
 | Speaker chat / Q&A | 5 exports + lifecycle hooks | — | not ported |
 | Drift detectors | `detectSyncDrift`, `detectSpeakerSoTDrift`, `reconcileStaleStateMachines`, `reconcileSessionMaterialCounts` | — | **drop on port** — each compensates for a denormalization or a queue v1 does not have |

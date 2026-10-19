@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   emails. A send is refused if the wording changed after its preview, and a settings
   save is refused if another operator saved first.
 
+- Session pitches can refresh from one approved Airtable table. An operator saves the base,
+  table, optional view, field names and an optional automatic refresh (every 15 or 60
+  minutes, off by default). Staff choose **Refresh from Airtable**. New records with a ticked
+  consent box become private pitches; unchanged records change nothing; a changed record
+  updates the proposal text, keeps its decision, notes and drafts, and shows **Updated in
+  Airtable**. Removed records are flagged, never deleted. Each run shows its counts, skip
+  reasons and last error to staff and writes an audit row. The token is the
+  `AIRTABLE_API_TOKEN` managed secret, bound only with `EVENT_AIRTABLE_ENABLED=true`. ADR 0005
+  brings Airtable into scope for pitch intake only.
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page

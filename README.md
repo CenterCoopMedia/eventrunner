@@ -45,7 +45,7 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 - An admin CMS on its own editorial desk, in the event's own colours
 - Transactional email through a provider adapter (Postmark is the reference)
 
-What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, bulk broadcast email, invoicing, Airtable, social feeds, and speaker chat stay out.
+What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, bulk broadcast email, invoicing, social feeds, and speaker chat stay out. Airtable is in scope for session pitch intake only: a read-only refresh from one approved table into the private review queue ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md)). Other Airtable sync stays out.
 
 ## Operating model
 
