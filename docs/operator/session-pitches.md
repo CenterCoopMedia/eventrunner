@@ -15,7 +15,7 @@ The call is closed when the document is missing or malformed, when `enabled` is 
 A call uses one intake at a time:
 
 - **This site's pitch form** (`externalFormUrl: null`). Proposals go directly into the private queue.
-- **An external form** (for example, Airtable). `/pitch` shows the call status, the deadline and one **Open the pitch form** link while the call is open. The site's own form and sign-in are hidden. `submitSessionPitch` refuses new pitches, so one call never has two queues. The external service stores the answers under its own terms. Bring them into the queue with the [reviewed CSV import](#reviewed-csv-import-and-private-export).
+- **An external form** (for example, Airtable). `/pitch` shows the call status, the deadline and one **Open the pitch form** link while the call is open. The site's own form and sign-in are hidden. `submitSessionPitch` refuses new pitches, so one call never has two queues. A retry of a pitch stored before the switch is still acknowledged; it creates nothing new. The external service stores the answers under its own terms. Bring them into the queue with the [reviewed CSV import](#reviewed-csv-import-and-private-export).
 
 The deadline and the enabled state apply in both modes. While the call is open, the home page lead shows a **Pitch a session** action to `/pitch`. Share `/pitch`, not the external address, so closing the call also removes the link.
 
@@ -45,7 +45,7 @@ All endpoints use `POST`, the configured Functions region, the normal CORS allow
 }
 ```
 
-The server stores the closing time as a canonical UTC RFC3339 value. `externalFormUrl` must be empty, `null` or an https address of 2,048 characters or fewer. An empty or absent value saves `null` and selects this site's form. The response returns all three stored fields. It writes the configuration and its `admin_logs` row in one transaction. The public configuration does not store an operator uid or email.
+The server stores the closing time as a canonical UTC RFC3339 value. `externalFormUrl` must be empty, `null` or an https address of 2,048 characters or fewer. An empty string or `null` saves `null` and selects this site's form. A request without the field keeps the stored form, so a deadline-only update cannot reopen native intake. The response returns all three stored fields. It writes the configuration and its `admin_logs` row in one transaction. The public configuration does not store an operator uid or email.
 
 ### Submit a pitch
 

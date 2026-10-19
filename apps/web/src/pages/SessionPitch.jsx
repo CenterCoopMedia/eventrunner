@@ -65,7 +65,9 @@ export default function SessionPitch() {
   const deadline = Date.parse(readClosesAt(settings?.closesAt));
   const open = !configError && settings?.enabled === true && Number.isFinite(deadline) && deadline > now;
   // An external form (for example, Airtable) replaces this site's form for the whole call.
-  const externalForm = configError ? null : readPitchFormUrl(settings?.externalFormUrl);
+  // The last known mode holds through a read error; an unknown mode shows neither form.
+  const externalForm = readPitchFormUrl(settings?.externalFormUrl);
+  const modeKnown = IS_DEMO || Boolean(settings);
   function edit(field, value) {
     setPitch((previous) => ({ ...previous, [field]: value, submissionKey: newSubmissionKey() }));
     setErrors((previous) => ({ ...previous, [field]: null }));
@@ -106,7 +108,7 @@ export default function SessionPitch() {
               <p className="text-caption text-text-secondary">{externalForm ? 'You do not need a ticket to pitch a session.' : 'A verified email address is required. You do not need a ticket or attendee approval.'}</p>
             </section>
       </header>
-      {externalForm ? (
+      {!modeKnown ? null : externalForm ? (
         <section className="max-w-prose space-y-sm border-hairline border-rule-hairline bg-surface-alt p-md sm:p-lg" aria-labelledby="pitch-form-heading">
           <h2 id="pitch-form-heading" className="font-heading text-h2 font-semibold">Pitch form</h2>
           {open ? <>

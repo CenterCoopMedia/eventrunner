@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { readPitchFormUrl } from 'shared/pitch';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -24,8 +25,10 @@ const intakeOptions = [
 function PitchCallSettings({ settings, call }) {
   const [enabled, setEnabled] = useState(settings.enabled === true);
   const [closesAt, setClosesAt] = useState(settings.closesAt || '');
-  const [intake, setIntake] = useState(settings.externalFormUrl ? 'external' : 'native');
-  const [formUrl, setFormUrl] = useState(settings.externalFormUrl || '');
+  // The same reader as the server and /pitch, so the choice shown is the one in effect.
+  const savedFormUrl = readPitchFormUrl(settings.externalFormUrl);
+  const [intake, setIntake] = useState(savedFormUrl ? 'external' : 'native');
+  const [formUrl, setFormUrl] = useState(savedFormUrl || '');
   const [formUrlError, setFormUrlError] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -38,8 +41,11 @@ function PitchCallSettings({ settings, call }) {
     if (busy) return;
     const externalFormUrl = intake === 'external' ? formUrl.trim() : null;
     // A blank address would save as "no external form" and silently reopen native intake.
-    if (intake === 'external' && !externalFormUrl) {
-      setFormUrlError('Enter the form address, or choose this site’s pitch form.');
+    const formUrlProblem = intake !== 'external' ? ''
+      : !externalFormUrl ? 'Enter the form address, or choose this site’s pitch form.'
+        : !readPitchFormUrl(externalFormUrl) ? 'Use an address that starts with https://.' : '';
+    if (formUrlProblem) {
+      setFormUrlError(formUrlProblem);
       formRef.current?.querySelector('input[name="externalFormUrl"]')?.focus();
       return;
     }

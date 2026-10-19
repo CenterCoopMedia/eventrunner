@@ -1,13 +1,19 @@
 // The /pitch page in its two intake modes: this site's own form, or a link
 // to an external form (for example, Airtable) that replaces it for the call.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 
+// `undefined` keeps the subscription waiting for its first snapshot.
 let pitchCall;
 let user;
+let listener;
 const call = vi.fn();
 vi.mock('../lib/pitchSource.js', () => ({
-  subscribePitchCall: (onNext) => { onNext(pitchCall); return () => {}; },
+  subscribePitchCall: (onNext, onError) => {
+    listener = { onNext, onError };
+    if (pitchCall !== undefined) onNext(pitchCall);
+    return () => {};
+  },
 }));
 vi.mock('../contexts/AuthContext.jsx', () => ({
   useAuth: () => ({ user, loading: false, signOut: vi.fn() }),
@@ -69,6 +75,26 @@ describe('SessionPitch with an external form', () => {
       expect(screen.getByLabelText(/Session title/)).toBeInTheDocument();
       cleanup();
     }
+  });
+});
+
+describe('SessionPitch before the call is known', () => {
+  it('shows neither form while the first snapshot loads', () => {
+    pitchCall = undefined;
+    render(<SessionPitch />);
+    expect(screen.getByRole('status')).toHaveTextContent('Checking submissions…');
+    expect(screen.queryByLabelText(/Session title/)).toBeNull();
+    expect(screen.queryByRole('link', { name: /Open the pitch form/ })).toBeNull();
+  });
+
+  it('keeps the external form mode through a read error', () => {
+    pitchCall = { enabled: true, closesAt: OPEN_UNTIL, externalFormUrl: FORM };
+    render(<SessionPitch />);
+    act(() => listener.onError(new Error('offline')));
+    expect(screen.getByRole('status')).toHaveTextContent('Cannot check submissions. Reconnecting…');
+    expect(screen.queryByLabelText(/Session title/)).toBeNull();
+    expect(screen.queryByRole('link', { name: /Open the pitch form/ })).toBeNull();
+    expect(screen.getByText('The pitch form is not available now.')).toBeInTheDocument();
   });
 });
 

@@ -276,18 +276,27 @@ function createUpdatePitchCallHandler({ db, auth, getConfig, now = Date.now, log
     const closesAt = readClosesAt(req.body?.closesAt);
     if (!closesAt) return badRequest(res, 'closesAt: must be an RFC3339 date and time.');
 
+    // Leaving the field out keeps the stored form, so an older admin tab or a
+    // deadline-only script cannot silently reopen native intake. Only an
+    // explicit null or empty string selects this site's form.
+    const keepFormUrl = !Object.hasOwn(req.body ?? {}, 'externalFormUrl');
     const rawFormUrl = req.body?.externalFormUrl;
-    const blankFormUrl = rawFormUrl == null || (typeof rawFormUrl === 'string' && !rawFormUrl.trim());
-    const externalFormUrl = blankFormUrl ? null : readPitchFormUrl(rawFormUrl);
-    if (!blankFormUrl && !externalFormUrl) {
+    const blankFormUrl = rawFormUrl === null || (typeof rawFormUrl === 'string' && !rawFormUrl.trim());
+    let externalFormUrl = keepFormUrl || blankFormUrl ? null : readPitchFormUrl(rawFormUrl);
+    if (!keepFormUrl && !blankFormUrl && !externalFormUrl) {
       return badRequest(res, 'externalFormUrl: must be empty or an https:// address of 2,048 characters or fewer.');
     }
 
     const enabled = req.body.enabled;
+    const callRef = db.collection('config').doc('pitch_call');
     try {
       await db.runTransaction(async (tx) => {
+        if (keepFormUrl) {
+          const stored = await tx.get(callRef);
+          externalFormUrl = readPitchFormUrl(stored.exists ? stored.data()?.externalFormUrl : null);
+        }
         const at = new Date(now());
-        tx.set(db.collection('config').doc('pitch_call'), { enabled, closesAt, externalFormUrl });
+        tx.set(callRef, { enabled, closesAt, externalFormUrl });
         tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
           action: 'updatePitchCall',
           docPath: PITCH_CALL_PATH,

@@ -46,7 +46,7 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 
 A site can open before the program exists. For example, it can sell early bird tickets and take session pitches months before the event.
 
-1. **Turn off what is not ready.** On Settings → Features, switch off **schedule**, **speakers**, **sponsors**, **attendeeDirectory** and **updates**. Their navigation links leave the header and footer. On **Pages**, hide any other page that is not ready.
+1. **Turn off what is not ready.** On Settings → Features, switch off **Public schedule**, **Speaker directory**, **Sponsor list**, **Attendee directory** and **Written updates**. Their navigation links leave the header and footer. On **Pages**, hide any other page that is not ready.
 2. **Write the home page.** In the Content editor, keep the opening section short: the event name, dates, place and one paragraph. Hide or empty other home sections that are not ready.
 3. **Open ticket sales.** Publish the reviewed Stripe catalog (see [Ticketing](#ticketing)). The home page lead and the header then show **Get tickets**.
 4. **Open the call for sessions.** In **Session pitches**, an operator sets the deadline, chooses this site's form or an external form (for example, Airtable) and selects **Accept session pitches**. While the call is open, the home page lead shows **Pitch a session**.

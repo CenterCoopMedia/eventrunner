@@ -223,10 +223,32 @@ describe('external pitch form', () => {
     const logs = await db.collection('admin_logs').where('action', '==', 'updatePitchCall').get();
     expect(logs.docs[0].data().details.externalFormUrl).toBe(FORM);
 
-    for (const externalFormUrl of ['', null, undefined]) {
+    // An update that leaves the field out (an older admin tab, a script) keeps the stored form.
+    const kept = await updateCall({ enabled: false, closesAt: CLOSES_AT });
+    expect(kept.body).toEqual({ enabled: false, closesAt: CLOSES_AT, externalFormUrl: FORM });
+    expect((await db.collection('config').doc('pitch_call').get()).data().externalFormUrl).toBe(FORM);
+
+    for (const externalFormUrl of ['', '  ', null]) {
+      await updateCall({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: FORM });
       const cleared = await updateCall({ enabled: true, closesAt: CLOSES_AT, externalFormUrl });
       expect(cleared.body.externalFormUrl).toBeNull();
+      expect((await db.collection('config').doc('pitch_call').get()).data().externalFormUrl).toBeNull();
     }
+  });
+
+  it('keeps an invalid stored form out of a call updated without the field', async () => {
+    await db.collection('config').doc('pitch_call').set({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: 'http://airtable.com/shr' });
+    const response = await updateCall({ enabled: true, closesAt: CLOSES_AT });
+    expect(response.body.externalFormUrl).toBeNull();
+  });
+
+  it('acknowledges a retry of a pitch stored before the call moved to an external form', async () => {
+    await db.collection('config').doc('pitch_call').set({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: null });
+    expect((await submit()).statusCode).toBe(201);
+    await db.collection('config').doc('pitch_call').set({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: FORM });
+    expect((await submit()).statusCode).toBe(201);
+    expect((await submit(pitch({ submissionKey: 'pitch-key-000002' }))).statusCode).toBe(404);
+    expect((await db.collection('session_pitches').get()).size).toBe(1);
   });
 
   it('refuses a native pitch while the call sends people to an external form', async () => {

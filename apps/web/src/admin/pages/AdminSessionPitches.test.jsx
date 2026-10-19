@@ -64,6 +64,23 @@ describe('AdminSessionPitches call settings', () => {
     expect(screen.getByText('Enter the form address, or choose this site’s pitch form.')).toBeInTheDocument();
   });
 
+  it('refuses an http address in place before calling the server', () => {
+    pitchCall = { enabled: true, closesAt: CLOSES_AT, externalFormUrl: null };
+    open();
+    fireEvent.change(screen.getByLabelText('Where people pitch'), { target: { value: 'external' } });
+    fireEvent.change(screen.getByLabelText('External form address'), { target: { value: 'http://airtable.com/shrExample' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Save call settings' }).closest('form'));
+    expect(call).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('External form address')).toHaveFocus();
+    expect(screen.getByText('Use an address that starts with https://.')).toBeInTheDocument();
+  });
+
+  it('shows this site’s form when the stored address is one the site would not use', () => {
+    pitchCall = { enabled: true, closesAt: CLOSES_AT, externalFormUrl: 'http://airtable.com/shr' };
+    open();
+    expect(screen.getByLabelText('Where people pitch')).toHaveValue('native');
+  });
+
   it('opens on the saved external form', () => {
     pitchCall = { enabled: false, closesAt: CLOSES_AT, externalFormUrl: FORM };
     open();
