@@ -2,7 +2,7 @@
 
 How to run a client's site from the admin panel, in the order the work happens. For the narrative "why does this work this way" version, hand a new staff member [`docs/handbook/for-event-staff.md`](handbook/for-event-staff.md) first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see [`design-reference.md`](design-reference.md). You do not need it to run a site.
 
-Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators control the call deadline and choose this site's form or an external form, such as Airtable. See [Operate session pitch intake](operator/session-pitches.md) for decisions, CSV import and export, draft conversion, and private data boundaries.
+Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators control the call deadline and choose this site's form or an external form, such as Airtable. A person who pitches through this site's form gets a receipt. Staff send acceptance and decline emails from each pitch, after a preview. Saving a decision sends no email. See [Operate session pitch intake](operator/session-pitches.md) for decisions, pitch emails, CSV import and export, draft conversion, and private data boundaries.
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
@@ -377,7 +377,7 @@ Every submission from the public feedback modal, newest first, with a mark-revie
 
 ## Email log
 
-Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
+Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, pitch receipts and decision emails, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
 
 - **Search** looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers **Search older messages**, which reads the next 500.
 - **Source** picks one kind of message. **Status** picks **Sent** or **Failed**, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed. **Bounced** means the recipient's mail server refused the message. **Complained** means the recipient marked it as spam. **Suppressed** means the mail provider did not send it, because the address is on the provider's block list.

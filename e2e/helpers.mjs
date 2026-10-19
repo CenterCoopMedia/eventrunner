@@ -196,6 +196,16 @@ async function waitForMail(since, email, extract, timeoutMs = 30000) {
   );
 }
 
+/** The newest mail with this template tag sent to `email` since `since`. */
+export function waitForTaggedMail(since, email, tag, timeoutMs) {
+  return waitForMail(since, email, (mail) => (mail.tag === tag ? mail : null), timeoutMs);
+}
+
+/** Every captured mail with this template tag sent to `email` since `since`. */
+export function taggedMailSince(since, email, tag) {
+  return readMailSince(since).filter((mail) => mail.to === email && mail.tag === tag);
+}
+
 /** Current size of the captured-mail file, to bound a later mail wait. */
 export function mailFileSize() {
   if (!MAIL_FILE) return 0;

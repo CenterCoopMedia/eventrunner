@@ -14,7 +14,9 @@
  * `externalFormUrl` sends people to another form (for example, Airtable),
  * and this API then refuses native submissions so one call never has two
  * intake queues. Rate-limit rows are server-only. This module does not
- * publish a session, change an account, or send mail.
+ * publish a session or change an account. Its only mail is the automatic
+ * pitch receipt (./pitchNotices.cjs), queued with the new pitch and sent
+ * after the commit. Saving a review decision sends nothing.
  */
 
 const crypto = require('node:crypto');
@@ -23,6 +25,7 @@ const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
+const { automaticReceipt, deliverNotice } = require('./pitchNotices.cjs');
 
 const PITCHES = 'session_pitches';
 const RATE_LIMITS = 'session_pitch_rate_limits';
@@ -201,6 +204,8 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
     if (window.limited) return { outcome: 'limited', retryAfterMs: window.retryAfterMs };
 
     const at = new Date(nowMs);
+    // Reads stay ahead of the writes below, as transactions require.
+    const receipt = await automaticReceipt({ db, tx, pitchId: id, email: actor.email, at });
     tx.create(pitchRef, {
       title: pitch.title,
       description: pitch.description,
@@ -215,13 +220,14 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
       createdAt: at,
       reviewedAt: null,
       reviewedBy: null,
+      ...(receipt ? { notices: { receipt: receipt.record } } : {}),
     });
     tx.set(limitRef, { requests: [...window.requests, nowMs], updatedAt: at });
-    return { outcome: 'stored', id };
+    return { outcome: 'stored', id, receipt };
   });
 }
 
-function createSubmitSessionPitchHandler({ db, auth, now = Date.now, log = console }) {
+function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }) {
   return async function submitSessionPitch(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
@@ -261,6 +267,19 @@ function createSubmitSessionPitchHandler({ db, auth, now = Date.now, log = conso
         },
       });
       return;
+    }
+    // The pitch is durable before the receipt is sent. A replay finds the
+    // record already queued and sends nothing, and a send failure only
+    // marks the record failed for staff to retry.
+    if (result.outcome === 'stored' && result.receipt) {
+      try {
+        await deliverNotice({
+          db, sendEmail, getConfig, now, log, pitchId: result.id, slot: 'receipt',
+          record: result.receipt.record, pitch: { title: pitch.title }, settings: result.receipt.settings,
+        });
+      } catch (err) {
+        log.error('session pitch receipt failed', err);
+      }
     }
     return res.status(201).json({ id: pitchIdFor(decoded.uid, pitch.submissionKey), ok: true });
   };
@@ -401,12 +420,24 @@ function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
 
+  const { defineSecret } = require('firebase-functions/params');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const providerName = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
+  // Only the endpoints that send mail bind the provider's send secrets.
+  const secrets = (SEND_SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
+
   const buildDeps = () => {
     const { getDb } = require('../core/firestore.cjs');
     const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
     const db = getDb();
-    return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }) };
+    const getConfig = () => getEventConfig({ db });
+    const sendEmail = (message) => {
+      const { createEmailCore } = require('../email/send.cjs');
+      const { getEmailProvider } = require('../email/providers/index.cjs');
+      return createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig }).send(message);
+    };
+    return { db, auth: getAuth(), getConfig, sendEmail };
   };
   const withCors = (handler) => async (req, res) => {
     const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
@@ -415,14 +446,20 @@ function buildHandlers() {
     })) return;
     await handler(req, res);
   };
-  const expose = (create) => onRequest({ region }, withCors(async (req, res) => {
+  const expose = (create, options = {}) => onRequest({ region, ...options }, withCors(async (req, res) => {
     await create(buildDeps())(req, res);
   }));
+  const {
+    createSendSessionPitchNoticeHandler,
+    createSavePitchNoticeSettingsHandler,
+  } = require('./pitchNotices.cjs');
 
   return {
-    submitSessionPitch: expose(createSubmitSessionPitchHandler),
+    submitSessionPitch: expose(createSubmitSessionPitchHandler, { secrets }),
     updatePitchCall: expose(createUpdatePitchCallHandler),
     reviewSessionPitch: expose(createReviewSessionPitchHandler),
+    sendSessionPitchNotice: expose(createSendSessionPitchNoticeHandler, { secrets }),
+    savePitchNoticeSettings: expose(createSavePitchNoticeSettingsHandler),
   };
 }
 

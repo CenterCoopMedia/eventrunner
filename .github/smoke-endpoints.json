@@ -73,6 +73,8 @@
     "reviewSessionPitch",
     "importSessionPitches",
     "convertSessionPitch",
+    "sendSessionPitchNotice",
+    "savePitchNoticeSettings",
     "submitChangeRequest",
     "updateChangeRequestStatus",
     "deleteChangeRequest",

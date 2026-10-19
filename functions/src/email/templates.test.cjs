@@ -80,6 +80,10 @@ test('listTemplateIds includes account, speaker, claim, and native ticket confir
     'account.welcome',
     'auth.otp',
     'feedback.confirmation',
+    // Issue #324: session pitch receipt and decision emails.
+    'pitch.accepted',
+    'pitch.declined',
+    'pitch.receipt',
     // §6.3 phase 3: tokenized WITH the invite/wizard pipeline, not after
     // it — a non-CJS deployment cannot exercise the pipeline otherwise
     // (issue #21, issue #22).

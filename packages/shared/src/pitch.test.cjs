@@ -22,3 +22,29 @@ test('an external pitch form address has a length limit', () => {
   assert.equal(readPitchFormUrl(base + 'a'.repeat(MAX_FORM_URL_LENGTH - base.length)).length, MAX_FORM_URL_LENGTH);
   assert.equal(readPitchFormUrl(base + 'a'.repeat(MAX_FORM_URL_LENGTH)), null);
 });
+
+test('pitch email settings default to automatic receipts and the shipped wording', () => {
+  const { readPitchNoticeSettings, PITCH_NOTICE_DEFAULTS, PITCH_NOTICE_TEMPLATE_IDS } = require('./pitch.cjs');
+  for (const raw of [undefined, null, [], 'x', { receiptMode: 'sometimes', templates: 'x' }]) {
+    const settings = readPitchNoticeSettings(raw);
+    assert.equal(settings.receiptMode, 'automatic');
+    assert.deepEqual(Object.keys(settings.templates), [...PITCH_NOTICE_TEMPLATE_IDS]);
+    for (const id of PITCH_NOTICE_TEMPLATE_IDS) {
+      assert.deepEqual(settings.templates[id], { ...PITCH_NOTICE_DEFAULTS[id], custom: false });
+    }
+  }
+});
+
+test('pitch email settings keep usable custom wording and drop unusable fields', () => {
+  const { readPitchNoticeSettings, PITCH_NOTICE_DEFAULTS, MAX_NOTICE_WORDING_LENGTH } = require('./pitch.cjs');
+  const settings = readPitchNoticeSettings({
+    receiptMode: 'manual',
+    templates: {
+      'pitch.accepted': { subject: 'Accepted: {{pitch_title}}', wording: 'Hi.\n\nWelcome.' },
+      'pitch.declined': { subject: '   ', wording: 'x'.repeat(MAX_NOTICE_WORDING_LENGTH + 1) },
+    },
+  });
+  assert.equal(settings.receiptMode, 'manual');
+  assert.deepEqual(settings.templates['pitch.accepted'], { subject: 'Accepted: {{pitch_title}}', wording: 'Hi.\n\nWelcome.', custom: true });
+  assert.deepEqual(settings.templates['pitch.declined'], { ...PITCH_NOTICE_DEFAULTS['pitch.declined'], custom: false });
+});

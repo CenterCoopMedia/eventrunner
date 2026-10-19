@@ -27,6 +27,9 @@ const DEFAULTS = {
   'ticket.claim_prompt': require('./templates/ticket.claim_prompt.cjs'),
   'ticket.order_confirmation': require('./templates/ticket.order_confirmation.cjs'),
   'ticket.attendee_confirmation': require('./templates/ticket.attendee_confirmation.cjs'),
+  'pitch.receipt': require('./templates/pitch.receipt.cjs'),
+  'pitch.accepted': require('./templates/pitch.accepted.cjs'),
+  'pitch.declined': require('./templates/pitch.declined.cjs'),
 };
 
 const OVERRIDE_KEYS = ['subject', 'html', 'text'];
