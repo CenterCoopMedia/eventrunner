@@ -8,7 +8,7 @@
 // an unreviewed one still fails CI.
 //
 // This deliberately does not audit devDependencies at all. Dev-only tooling
-// (firebase-tools, vite, and their transitive tar/uuid findings) is recorded
+// (firebase-tools, vite, and their transitive findings) is recorded
 // in the exceptions file for visibility, but it can never fail this check --
 // see the issue's decision that dev-tooling findings are logged, not gated.
 
