@@ -15,6 +15,13 @@
  * only those functions. The script refuses that step if a selector would
  * also reach a deployed function or another local function, so the forced
  * plan holds creates only. The full deploy then runs without --force.
+ *
+ * After the full deploy, the script reads the complete inventory again and
+ * fails unless every local function is there in each of its regions.
+ * firebase-tools 15.22.4 can exit 0 with a create still unfinished: after a
+ * quota 429, the retry waits on a source token that only its own first try
+ * would have supplied, the event loop empties, and Node exits 0 with no
+ * summary.
  */
 
 const { spawnSync } = require('node:child_process');
@@ -170,6 +177,20 @@ function planNewRetryFunctions(inventory, localFunctions, config) {
   return { functions: newRetry, selectors };
 }
 
+/**
+ * List each local function, as id(region), that the complete inventory does
+ * not hold. A function with no literal region cannot be checked, so it
+ * counts as absent.
+ */
+function absentFunctions(inventory, localFunctions) {
+  const deployedKeys = new Set(inventory.map(label));
+  return localFunctions.flatMap((fn) => {
+    if (!fn.regions) return [`${fn.id}(no literal region)`];
+    return fn.regions.map((region) => label({ id: fn.id, region }))
+      .filter((key) => !deployedKeys.has(key));
+  });
+}
+
 function deployFailure(deployment) {
   return Number.isInteger(deployment.status) && deployment.status > 0 ? deployment.status : 1;
 }
@@ -203,13 +224,13 @@ async function main({
   }
 
   const forceInitialDeploy = bootstrap === 'true' && inventory.length === 0;
+  let localFunctions;
   if (forceInitialDeploy) {
     log.log('deploy-functions: bootstrap inventory is empty; accepting initial retry and cleanup policies');
   } else {
     if (bootstrap === 'true') {
       log.log(`deploy-functions: bootstrap inventory has ${inventory.length} function(s); deploying without --force`);
     }
-    let localFunctions;
     try {
       localFunctions = await discoverFunctions(projectId);
     } catch (error) {
@@ -244,6 +265,22 @@ async function main({
     log.error(reportFailure('deploy-functions: Firebase deploy failed', deployment));
     return deployFailure(deployment);
   }
+
+  let deployed;
+  try {
+    localFunctions ??= await discoverFunctions(projectId);
+    deployed = await verifyCompleteInventory(projectId);
+  } catch (error) {
+    log.error(reportFailure('deploy-functions: could not verify the deployed functions', {}, error));
+    return 1;
+  }
+  const absent = absentFunctions(deployed, localFunctions);
+  if (absent.length > 0) {
+    log.error(`deploy-functions: Firebase deploy exited 0, but ${absent.length} function(s) are not deployed: `
+      + `${absent.join(', ')}. Run the deploy again; unchanged functions are skipped.`);
+    return 1;
+  }
+  log.log(`deploy-functions: verified ${localFunctions.length} function(s) in the deployed inventory`);
   return 0;
 }
 
