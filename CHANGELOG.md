@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unsubscribe link (Postmark-managed, or the site's signed link with `List-Unsubscribe`
   headers). An opt-out is honored by every later send, and staff can restore an address on
   request. The webhook relay is refused until it has a batch and unsubscribe contract (#490).
+- Staff can retry the addresses an announcement send could not reach because the email
+  provider was down or busy. The retry is a new send, previewed and confirmed, and each send
+  can be retried once. The history says when its failed address list is cut short (#202).
+- A correctly signed unsubscribe is never rate limited, so one-click opt-outs that mail
+  providers and link scanners send from shared addresses are all recorded. The email log
+  stores each announcement with an inert unsubscribe link in place of the recipient's live
+  one (#490).
 
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the

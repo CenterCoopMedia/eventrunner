@@ -96,6 +96,8 @@ or an unsubscribe on an announcement cannot hold back a sign-in code.
 2. In the new stream → **Settings** → **Unsubscribe handling**, pick one:
    - **Postmark** (the default path): Postmark adds an unsubscribe link at the end of every
      message and suppresses the address on this stream. The application adds no link of its own.
+     A staff restore on the Announcements page removes only the site's record: reactivate the
+     address on this stream's suppression list as well, or Postmark keeps refusing it.
    - **Custom**: The application adds a signed per-recipient link and the `List-Unsubscribe` and
      `List-Unsubscribe-Post` headers. Postmark adds nothing. Use this only if the client wants the
      site's own unsubscribe page.
