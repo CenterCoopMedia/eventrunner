@@ -72,7 +72,7 @@ const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 const { PROMPTS, parseAnswersFile, buildConfigDocs } = require('./lib/answers.cjs');
 const {
   defaultPages, buildSeedContent, buildLegalContentDocs, buildEmailTemplateSeeds, OBSOLETE_CONTENT_IDS,
-  REPLACED_CONTENT_IDS, internals: { CONFIG_SEEDS },
+  REPLACED_CONTENT_IDS,
 } = require('./lib/seed.cjs');
 const { validatePageDoc } = require('../functions/src/cms/pages.cjs');
 const { getTierA } = require('../functions/src/core/config.cjs');
@@ -81,7 +81,7 @@ const { evaluateReadiness, allReady, formatReadinessTable, DEFAULT_SEEDED_THRESH
 const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const {
   parseTemplateFile, mergeTemplateAnswers, templateApplyErrors, mergeTemplatePages, mergeTemplateContent,
-  templateReadinessRows, formatInventory,
+  templateReadinessRows, formatInventory, pageSetErrors, isConfigDerived,
 } = require('./lib/event-template.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
@@ -102,9 +102,19 @@ const FLAGS = [
  * that already started, and a template must never merge into either.
  */
 const TEMPLATE_TARGET_EMPTY = Object.freeze([
-  'config', 'cmsPages', 'cmsPages_drafts', 'cmsContent', 'cmsContent_drafts',
-  'users', 'tickets', 'session_pitches',
+  'config', 'cmsPages', 'cmsPages_drafts', 'cmsContent', 'cmsContent_drafts', 'email_templates',
+  'users', 'users_public', 'speakers', 'tickets', 'ticket_orders', 'ticket_payment_attempts',
+  'session_pitches', 'admin_logs', 'sent_emails', 'email_claims',
 ]);
+
+/**
+ * What a template apply itself writes. A project whose apply stopped part
+ * way holds only these, and a rerun with the same template may resume it.
+ */
+const TEMPLATE_APPLY_WRITES = Object.freeze([
+  'config', 'cmsPages', 'cmsPages_drafts', 'cmsContent', 'cmsContent_drafts', 'email_templates',
+]);
+const TEMPLATE_APPLY_CONFIG = Object.freeze(['event', 'features', 'theme', 'badges', 'providers', 'bootstrap', 'template']);
 
 function usage() {
   return [
@@ -279,9 +289,15 @@ async function runAttestAuth({ db, store, dryRun, env = process.env, now = Date.
 /**
  * Load a template and check the target before anything is written.
  *
- * @returns {Promise<{ ok: true, template: object } | { ok: false }>}
+ * An apply is several writes, not one transaction. Its first write is
+ * `config/template` with status 'applying', and its last write sets
+ * 'applied'. A project left at 'applying' by a failed run may be resumed by
+ * the SAME template (same source project, same export time), as long as it
+ * holds nothing an apply does not write.
+ *
+ * @returns {Promise<{ ok: true, template: object, resume: boolean } | { ok: false }>}
  */
-async function loadTemplateForTarget({ db, file, force, tierA }) {
+async function loadTemplateForTarget({ db, file, force, tierA, listAuthUsers }) {
   const resolved = path.resolve(process.cwd(), file);
   if (!fs.existsSync(resolved)) {
     console.error(`Template file not found: ${resolved}`);
@@ -304,10 +320,39 @@ async function loadTemplateForTarget({ db, file, force, tierA }) {
     );
     return { ok: false };
   }
+  const marker = await db.collection('config').doc('template').get();
+  let resume = false;
+  if (marker.exists) {
+    const prior = marker.data();
+    const same = prior.sourceProjectId === template.source.projectId
+      && prior.exportedAt === (template.source.exportedAt || null);
+    if (prior.status === 'applied') {
+      console.error(
+        `${tierA.projectId} was already made from a template (${prior.sourceProjectId}); it is already applied. ` +
+        'Edit the event in the admin, or run init without --template to refresh its seed.',
+      );
+      return { ok: false };
+    }
+    if (!same) {
+      console.error(
+        `${tierA.projectId} holds an unfinished apply of a different template (${prior.sourceProjectId}, ` +
+        `exported ${prior.exportedAt}). Run that template again to finish it — nothing was written.`,
+      );
+      return { ok: false };
+    }
+    resume = true;
+  }
   const occupied = [];
   for (const name of TEMPLATE_TARGET_EMPTY) {
+    if (resume && TEMPLATE_APPLY_WRITES.includes(name)) continue;
     const snap = await db.collection(name).limit(1).get();
     if (!snap.empty) occupied.push(name);
+  }
+  if (resume) {
+    const configSnap = await db.collection('config').get();
+    for (const doc of configSnap.docs) {
+      if (!TEMPLATE_APPLY_CONFIG.includes(doc.id)) occupied.push(`config/${doc.id}`);
+    }
   }
   if (occupied.length > 0) {
     console.error(
@@ -316,12 +361,39 @@ async function loadTemplateForTarget({ db, file, force, tierA }) {
     );
     return { ok: false };
   }
-  return { ok: true, template };
+  // Accounts live in Firebase Authentication, not Firestore. The check runs
+  // where the Admin SDK can list them (a real project, or the Auth
+  // emulator); elsewhere the operator is told to confirm it by hand.
+  if (typeof listAuthUsers === 'function') {
+    let users;
+    try {
+      users = await listAuthUsers();
+    } catch (err) {
+      console.error(`Cannot list Firebase Authentication accounts (${err.message}) — nothing was written.`);
+      return { ok: false };
+    }
+    if (users.length > 0) {
+      console.error(
+        `${tierA.projectId} already has Firebase Authentication accounts. ` +
+        'A template applies only to a fresh project — nothing was written.',
+      );
+      return { ok: false };
+    }
+  } else {
+    console.warn(
+      'warning: Firebase Authentication accounts were not checked here; confirm in the console that ' +
+      'this project has none.',
+    );
+  }
+  if (resume) console.log(`${tierA.projectId}: resuming the apply of the same template.`);
+  return { ok: true, template, resume };
 }
 
-async function runInit({ db, store, bucket, args, tierA, env = process.env, now = Date.now }) {
+async function runInit({
+  db, store, bucket, args, tierA, env = process.env, now = Date.now, listAuthUsers = null,
+}) {
   const dryRun = Boolean(args['dry-run']);
-  const force = Boolean(args.force);
+  const userForce = Boolean(args.force);
 
   // (a) Tier A first: a deployment seeded from a half-configured
   // environment is worse than one that refused to seed.
@@ -335,6 +407,26 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
     return 2;
   }
 
+  // A template (issue #328) is checked against the target before answers
+  // are read: the same project, a used project, or --force stops the run.
+  let template = null;
+  let resume = false;
+  if (args.template !== undefined) {
+    if (typeof args.template !== 'string' || !args.template) {
+      console.error('--template needs a file path.');
+      return 2;
+    }
+    const loaded = await loadTemplateForTarget({
+      db, file: args.template, force: userForce, tierA, listAuthUsers,
+    });
+    if (!loaded.ok) return 2;
+    template = loaded.template;
+    resume = loaded.resume;
+  }
+  // Resuming an unfinished apply refreshes what that apply wrote, by the
+  // same seeded-flag rules a --force re-run follows.
+  const force = userForce || resume;
+
   // (a, continued) Refuse an already-initialized project unless --force. The common
   // accident is running init twice, or against the wrong project; stopping
   // before the first write is better than merging around it.
@@ -346,19 +438,6 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
       'or run --check for launch readiness.',
     );
     return 2;
-  }
-
-  // A template (issue #328) is checked against the target before answers
-  // are read: the same project, a used project, or --force stops the run.
-  let template = null;
-  if (args.template !== undefined) {
-    if (typeof args.template !== 'string' || !args.template) {
-      console.error('--template needs a file path.');
-      return 2;
-    }
-    const loaded = await loadTemplateForTarget({ db, file: args.template, force, tierA });
-    if (!loaded.ok) return 2;
-    template = loaded.template;
   }
 
   // (b) Collect answers.
@@ -415,7 +494,7 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
     ? mergeTemplatePages({ templatePages: template.pages, defaults: defaultPages() })
     : defaultPages();
   const pages = basePages.map((page) => ({ ...page, seeded: true }));
-  const pageErrors = [];
+  const pageErrors = template ? pageSetErrors(basePages) : [];
   for (const page of pages) {
     // `seeded`/`seededAt` are seed bookkeeping, not part of the page
     // contract, so the CONTRACT is what gets validated.
@@ -436,6 +515,24 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   // publish, and delete below then changes the count atomically through store.
   // A dry run remains read-only and leaves a missing document for the deployed
   // cmsEnsurePendingCounts endpoint to prepare.
+  // A template apply's first write marks it unfinished, so a failed run can
+  // be resumed by the same template and by nothing else.
+  let templateDoc = null;
+  if (template) {
+    templateDoc = {
+      kind: template.kind,
+      status: 'applying',
+      sourceProjectId: template.source.projectId,
+      sourceEventName: template.source.eventName || '',
+      sourceDays: template.source.days,
+      exportedAt: template.source.exportedAt || null,
+      startedAt: new Date(now()).toISOString(),
+      appliedAt: null,
+      owner: { name: answers.owner.name.trim(), email: answers.owner.email.trim().toLowerCase() },
+    };
+    if (!dryRun) await db.collection('config').doc('template').set(templateDoc);
+  }
+
   if (!dryRun) await store.ensurePendingCounts({ db, now });
 
   // On a re-run, only the explicit flags may add to config/bootstrap: the
@@ -446,19 +543,12 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   const { results: configResults, effective } = await writeConfigDocs({
     db, docs, force, dryRun, now, bootstrapAdditions,
   });
-  if (template) {
-    const templateDoc = {
-      kind: template.kind,
-      sourceProjectId: template.source.projectId,
-      sourceEventName: template.source.eventName || '',
-      sourceDays: template.source.days,
-      exportedAt: template.source.exportedAt || null,
-      appliedAt: new Date(now()).toISOString(),
-      owner: { name: answers.owner.name.trim(), email: answers.owner.email.trim().toLowerCase() },
-    };
-    effective.template = templateDoc;
-    if (!dryRun) await db.collection('config').doc('template').set(templateDoc);
-    configResults.push({ docId: 'template', action: 'create', reason: `from ${templateDoc.sourceProjectId}` });
+  if (templateDoc) {
+    configResults.unshift({
+      docId: 'template',
+      action: resume ? 'overwrite' : 'create',
+      reason: `${resume ? 'resumed' : 'started'} from ${templateDoc.sourceProjectId}`,
+    });
   }
   for (const r of configResults) {
     let note = r.reason;
@@ -527,9 +617,9 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
     ? mergeTemplateContent({
       generated,
       template: { ...template, pages: template.pages.filter((p) => seedablePages.some((s) => s.id === p.id)) },
-      configDerivedIds: new Set(generated
-        .filter((doc) => CONFIG_SEEDS[`${doc.section}.${doc.field}`])
-        .map((doc) => doc.id)),
+      configDerived: buildSeedContent({ pages: defaultPages(), docs: effective, tierA, seededAt })
+        .filter((doc) => isConfigDerived(doc)
+          && seedablePages.some((page) => page.sections.some((sec) => sec.id === doc.section))),
       seededAt,
     })
     : generated;
@@ -620,6 +710,16 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
     }
   }
 
+  // Every write of the apply has landed: mark it finished. Until this
+  // write, the same command can be run again to resume (loadTemplateForTarget).
+  if (templateDoc) {
+    templateDoc.status = 'applied';
+    templateDoc.appliedAt = new Date(now()).toISOString();
+    if (!dryRun) {
+      await db.collection('config').doc('template').update({ status: 'applied', appliedAt: templateDoc.appliedAt });
+    }
+  }
+
   // (h) Manual checklist, then readiness — warnings only, exit 0.
   console.log('\nManual steps a deploy cannot automate (spec §5.6)\n');
   console.log(formatChecklist(manualChecklist({
@@ -647,7 +747,7 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
       providers: effective.providers,
       theme: effective.theme,
       bootstrap: effective.bootstrap,
-      template: effective.template || null,
+      template: templateDoc,
       seededContentCount,
       seededThreshold: DEFAULT_SEEDED_THRESHOLD,
     },
@@ -693,7 +793,18 @@ async function main(argv) {
   if (args['attest-auth']) {
     return runAttestAuth({ db, store, dryRun: Boolean(args['dry-run']) });
   }
-  return runInit({ db, store, bucket, args, tierA });
+  // Listing Auth accounts needs real credentials or the Auth emulator. Under
+  // the Firestore emulator alone there is nothing to ask, so the template
+  // apply warns instead (loadTemplateForTarget).
+  const { usingEmulator } = require('./lib/firebase-init.cjs');
+  const canListAuth = !usingEmulator(process.env) || Boolean((process.env.FIREBASE_AUTH_EMULATOR_HOST || '').trim());
+  const listAuthUsers = canListAuth
+    ? async () => {
+      const { getAuth } = require('firebase-admin/auth');
+      return (await getAuth(handles.app).listUsers(1)).users;
+    }
+    : null;
+  return runInit({ db, store, bucket, args, tierA, listAuthUsers });
 }
 
 if (require.main === module) {

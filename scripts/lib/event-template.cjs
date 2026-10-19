@@ -26,7 +26,7 @@
 const { KNOWN_FEATURE_KEYS } = require('shared/config');
 const { validatePageDoc } = require('../../functions/src/cms/pages.cjs');
 const { BLOCK_TYPES } = require('../../functions/src/cms/blockTypes.cjs');
-const { LEGAL_PAGE_IDS, internals: { CONFIG_SEEDS } } = require('./seed.cjs');
+const { LEGAL_PAGE_IDS, defaultPages, internals: { CONFIG_SEEDS } } = require('./seed.cjs');
 const { BRANDING_ASSETS } = require('./branding.cjs');
 
 const TEMPLATE_KIND = 'eventrunner-event-template';
@@ -199,6 +199,41 @@ function plain(value) {
   return value;
 }
 
+/**
+ * The Storage object path a value names, without a host, a bucket or a
+ * download token. A download URL's token is a credential: it is never
+ * printed or written to a template.
+ */
+function storageObjectPath(value) {
+  const text = String(value || '').trim();
+  const fromApi = text.match(/\/o\/([^?#]+)/);
+  if (STORAGE_URL_RE.test(text) && fromApi) {
+    try {
+      return decodeURIComponent(fromApi[1]);
+    } catch {
+      return fromApi[1];
+    }
+  }
+  if (STORAGE_URL_RE.test(text)) {
+    const url = text.split(/[?#]/)[0].replace(/^https?:\/\/[^/]+\//, '');
+    return url.replace(/^[^/]+\.(appspot\.com|firebasestorage\.app)\//, '');
+  }
+  return text.replace(/^\//, '').split(/[?#]/)[0];
+}
+
+/** Feature switches that let the public send something in, or show people. */
+const PUBLIC_INTAKE_FEATURES = Object.freeze([
+  'feedbackInbox', 'changeRequests', 'publicAttendeeProfiles', 'autoApproveTicketHolders', 'webmcpPublic',
+  'calendarSync', 'attendeeDirectory',
+]);
+
+const EMAIL_IN_TEXT_RE = /mailto:|[^\s@<>"']+@[^\s@<>"']+\.[a-z]{2,}/i;
+
+/** True for a content block init builds from configuration on every apply. */
+function isConfigDerived(block) {
+  return Boolean(CONFIG_SEEDS[`${block?.section}.${block?.field}`]);
+}
+
 /** The placeholder Storage paths init uploads into every project. */
 const PLACEHOLDER_PATHS = new Set(Object.keys(BRANDING_ASSETS));
 
@@ -213,7 +248,7 @@ function pickEvent(event) {
     const v = getPath(event, field);
     if (v === undefined || v === null) continue;
     if (field === 'seo.defaultOgImagePath' && !PLACEHOLDER_PATHS.has(v)) {
-      assets.push({ ref: `config/event.${field}`, value: v });
+      assets.push({ ref: `config/event.${field}`, value: storageObjectPath(v) });
       continue;
     }
     setPath(value, field, plain(v));
@@ -232,7 +267,7 @@ function pickTheme(theme) {
   }
   for (const [slot, objectPath] of Object.entries(isPlainObject(theme?.logos) ? theme.logos : {})) {
     const placeholder = Array.isArray(theme.placeholderLogos) && theme.placeholderLogos.includes(slot);
-    if (!placeholder) assets.push({ ref: `config/theme.logos.${slot}`, value: objectPath });
+    if (!placeholder) assets.push({ ref: `config/theme.logos.${slot}`, value: storageObjectPath(objectPath) });
   }
   const dropped = Object.keys(isPlainObject(theme) ? theme : {}).filter((k) => !THEME_TEMPLATE_KEYS.includes(k));
   return { value, dropped, assets };
@@ -323,6 +358,12 @@ async function exportTemplate({ db, projectId, pageIds = null, now = Date.now })
   const features = pickFeatures(config.features || {});
   const badges = pickBadges(config.badges || {});
   assets.push(...event.assets, ...theme.assets);
+  // A carried contact address may belong to someone who has left.
+  for (const field of ['supportEmail', 'conductEmail']) {
+    if (typeof event.value.legal?.[field] === 'string' && event.value.legal[field]) {
+      warnings.push(`config/event.legal.${field}: carried contact address; confirm it is still right`);
+    }
+  }
 
   const pagesSnap = await db.collection('cmsPages').get();
   const allPages = pagesSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
@@ -362,23 +403,29 @@ async function exportTemplate({ db, projectId, pageIds = null, now = Date.now })
       warnings.push(`cmsContent/${doc.id}: left out, unknown block type ${JSON.stringify(data.blockType)}`);
       continue;
     }
+    // A block init builds from configuration (the title, the dates, the
+    // venue, the contact links) is built again from the new event's
+    // settings on every apply. Carrying it could only carry old values.
+    if (isConfigDerived(data)) continue;
     if (referencesStorage(picked.value)) {
       // A block that shows a stored file stays behind; the operator copies
       // the file into the new bucket and adds the block again there.
-      assets.push({ ref: `cmsContent/${doc.id}`, value: strings(picked.value).find((s) => STORAGE_URL_RE.test(s) || STORAGE_PATH_RE.test(s.trim())) });
+      const named = strings(picked.value).find((t) => STORAGE_URL_RE.test(t) || STORAGE_PATH_RE.test(t.trim()));
+      assets.push({ ref: `cmsContent/${doc.id}`, value: storageObjectPath(named) });
       continue;
     }
-    // A block init builds from configuration (the title, the dates) is
-    // built again from the new event's settings on apply, so it needs no
-    // review here.
-    if (CONFIG_SEEDS[`${data.section}.${data.field}`]) {
-      content.push(picked.value);
-      continue;
-    }
+    // Review lines name the block and the reason, never the value: the
+    // inventory is printed and shared, and the value may be personal.
     const text = strings(picked.value).join('\n');
-    const mentions = [...sourceNames, ...sourceYears].filter((s) => text.includes(s));
+    const mentions = [...sourceNames, ...sourceYears].filter((t) => text.includes(t));
     if (mentions.length > 0) {
       warnings.push(`cmsContent/${doc.id}: mentions ${mentions.map((m) => JSON.stringify(m)).join(', ')}; review before reuse`);
+    }
+    if (EMAIL_IN_TEXT_RE.test(text)) {
+      warnings.push(`cmsContent/${doc.id}: names an email address; confirm it is still right`);
+    }
+    if (picked.value.blockType === 'quote') {
+      warnings.push(`cmsContent/${doc.id}: a quote names a person; confirm they agree to its reuse`);
     }
     content.push(picked.value);
   }
@@ -451,6 +498,15 @@ function formatInventory(template) {
   for (const [path, fields] of Object.entries(inventory.leftOut)) {
     if (fields.length > 0) lines.push(`  - ${path} fields: ${fields.join(', ')}`);
   }
+  const features = isPlainObject(template.answers?.features) ? template.answers.features : {};
+  if (Object.keys(features).length > 0) {
+    lines.push('');
+    lines.push('Feature switches carried:');
+    for (const [key, on] of Object.entries(features)) {
+      const intake = on && PUBLIC_INTAKE_FEATURES.includes(key) ? ' (public intake: review)' : '';
+      lines.push(`  ${key}: ${on ? 'on' : 'off'}${intake}`);
+    }
+  }
   if (inventory.assets.length > 0) {
     lines.push('');
     lines.push('Stored files to copy into the new project by hand (left out of the template):');
@@ -491,7 +547,11 @@ function parseTemplateFile(text) {
   if (!isPlainObject(t.source) || typeof t.source.projectId !== 'string' || !t.source.projectId) {
     errors.push('template.source.projectId: required');
   }
-  if (!Array.isArray(t.source?.days)) errors.push('template.source.days: must be an array');
+  if (!Array.isArray(t.source?.days) || t.source.days.length === 0
+    || !t.source.days.every((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))) {
+    errors.push('template.source.days: the source event has no dates; a template needs them to check the new dates');
+  }
+  errors.push(...inventoryErrors(t.inventory));
 
   const answers = isPlainObject(t.answers) ? t.answers : {};
   for (const key of Object.keys(answers)) {
@@ -524,8 +584,10 @@ function parseTemplateFile(text) {
     }
     const verdict = validatePageDoc(page);
     if (!verdict.ok) errors.push(...verdict.errors.map((e) => `template.pages[${i}] (${page.id}): ${e}`));
+    errors.push(...systemPageErrors(page).map((e) => `template.pages[${i}] (${page.id}): ${e}`));
     for (const section of Array.isArray(page.sections) ? page.sections : []) sectionOwner.set(section?.id, page.id);
   }
+  errors.push(...pageSetErrors(pages.filter(isPlainObject)).map((e) => `template.pages: ${e}`));
   const content = Array.isArray(t.content) ? t.content : [];
   for (const [i, block] of content.entries()) {
     const at = `template.content[${i}] (${block?.id})`;
@@ -538,12 +600,134 @@ function parseTemplateFile(text) {
     if (typeof block.id !== 'string' || block.id !== `${block.section}__${block.field}`) {
       errors.push(`${at}: id must be <section>__<field>`);
     }
+    if (isConfigDerived(block)) {
+      errors.push(`${at}: built from the new event's settings on apply; leave it out of the template`);
+    }
     const owner = sectionOwner.get(block.section);
     if (!owner) errors.push(`${at}: section ${block.section} is on no template page`);
     else if (LEGAL_PAGE_IDS.includes(owner)) errors.push(`${at}: legal page content is reseeded, not reused`);
     if (referencesStorage(block)) errors.push(`${at}: names a stored file; copy the file and add the block by hand`);
   }
   return { ok: errors.length === 0, errors, template: errors.length === 0 ? { ...t, answers, pages, content } : null };
+}
+
+const INVENTORY_ROW_KEYS = Object.freeze({
+  included: { path: 'string', detail: 'string', count: 'number?' },
+  excluded: { path: 'string', reason: 'string', count: 'number' },
+  assets: { ref: 'string', value: 'string' },
+});
+
+/**
+ * The inventory travels in the file and is printed at apply time, so it is
+ * held to a shape too: known keys, known row fields, plain values.
+ *
+ * @param {*} inventory
+ * @returns {string[]}
+ */
+function inventoryErrors(inventory) {
+  if (inventory === undefined) return [];
+  if (!isPlainObject(inventory)) return ['template.inventory: must be an object'];
+  const errors = [];
+  for (const key of Object.keys(inventory)) {
+    if (!['included', 'excluded', 'leftOut', 'assets', 'warnings'].includes(key)) {
+      errors.push(`template.inventory.${key}: not on the template allowlist`);
+    }
+  }
+  for (const [list, shape] of Object.entries(INVENTORY_ROW_KEYS)) {
+    if (inventory[list] === undefined) continue;
+    if (!Array.isArray(inventory[list])) {
+      errors.push(`template.inventory.${list}: must be an array`);
+      continue;
+    }
+    inventory[list].forEach((row, i) => {
+      const at = `template.inventory.${list}[${i}]`;
+      if (!isPlainObject(row)) {
+        errors.push(`${at}: must be an object`);
+        return;
+      }
+      for (const key of Object.keys(row)) {
+        if (!(key in shape)) errors.push(`${at}.${key}: not on the template allowlist`);
+      }
+      for (const [key, type] of Object.entries(shape)) {
+        const optional = type.endsWith('?');
+        if (optional && row[key] === undefined) continue;
+        if (typeof row[key] !== type.replace('?', '')) errors.push(`${at}.${key}: must be a ${type.replace('?', '')}`);
+      }
+    });
+  }
+  if (inventory.leftOut !== undefined) {
+    if (!isPlainObject(inventory.leftOut)) {
+      errors.push('template.inventory.leftOut: must be an object');
+    } else {
+      for (const [key, list] of Object.entries(inventory.leftOut)) {
+        if (!Array.isArray(list) || !list.every((v) => typeof v === 'string')) {
+          errors.push(`template.inventory.leftOut.${key}: must be a list of field names`);
+        }
+      }
+    }
+  }
+  if (inventory.warnings !== undefined) {
+    if (!Array.isArray(inventory.warnings)) {
+      errors.push('template.inventory.warnings: must be an array');
+    } else {
+      inventory.warnings.forEach((w, i) => {
+        if (typeof w !== 'string') errors.push(`template.inventory.warnings[${i}]: must be a string`);
+      });
+    }
+  }
+  return errors;
+}
+
+/** Default system page id → the route it owns. */
+function systemRoutes() {
+  return new Map(defaultPages().filter((p) => p.systemPage === true).map((p) => [p.id, p.path]));
+}
+
+/**
+ * A system page owns a dedicated route, so a file may only name the
+ * default system pages as system pages, each at its own route. Every other
+ * page is a generic page, and validatePageDoc keeps it off reserved routes.
+ *
+ * @param {object} page
+ * @returns {string[]}
+ */
+function systemPageErrors(page) {
+  const routes = systemRoutes();
+  if (routes.has(page.id)) {
+    const route = routes.get(page.id);
+    if (page.systemPage !== true || page.path !== route) {
+      return [`${page.id} is a system page and must stay at ${route} with systemPage true`];
+    }
+    return [];
+  }
+  if (page.systemPage === true) {
+    return [`${page.id}: systemPage is only for the default system pages (${[...routes.keys()].join(', ')})`];
+  }
+  return [];
+}
+
+/**
+ * Ids, paths and section ids must each belong to one page in a set.
+ *
+ * @param {object[]} pages
+ * @returns {string[]}
+ */
+function pageSetErrors(pages) {
+  const errors = [];
+  for (const [label, values] of [
+    ['id', pages.map((p) => p.id)],
+    ['path', pages.map((p) => p.path)],
+    ['section', pages.flatMap((p) => (Array.isArray(p.sections) ? p.sections : []).map((sec) => sec?.id))],
+  ]) {
+    const seen = new Set();
+    const repeated = new Set();
+    for (const v of values) {
+      if (seen.has(v)) repeated.add(v);
+      seen.add(v);
+    }
+    for (const v of repeated) errors.push(`${label} ${v} is used by more than one page`);
+  }
+  return errors;
 }
 
 function deepMerge(base, over) {
@@ -573,10 +757,13 @@ function templateApplyErrors({ template, answers, adminEmails }) {
   if (days.length === 0) {
     errors.push('event.days: a template needs the new event\'s own dates in the answers file');
   }
-  const old = new Set(template.source.days);
-  const reused = days.map((d) => d?.date).filter((date) => old.has(date));
-  if (reused.length > 0) {
-    errors.push(`event.days: ${reused.join(', ')} ${reused.length === 1 ? 'is a date' : 'are dates'} of the source event; give the new event its own dates`);
+  // ISO dates compare as strings. Every new date must come after the
+  // source event's last day: a template makes a later event, never a copy
+  // of the same one.
+  const lastSourceDay = [...template.source.days].sort().at(-1);
+  const early = days.map((d) => d?.date).filter((date) => typeof date !== 'string' || date <= lastSourceDay);
+  if (early.length > 0) {
+    errors.push(`event.days: ${early.join(', ')} ${early.length === 1 ? 'is' : 'are'} not later than the source event (${lastSourceDay}); give the new event its own dates`);
   }
   const owner = answers?.owner;
   const name = typeof owner?.name === 'string' ? owner.name.trim() : '';
@@ -613,20 +800,30 @@ function mergeTemplatePages({ templatePages, defaults }) {
  * a block init derives from configuration (the title, the dates), which is
  * built again from the NEW event's configuration.
  *
- * @param {{ generated: object[], template: object, configDerivedIds: Set<string>,
+ * @param {{ generated: object[], template: object, configDerived?: object[],
  *           seededAt: string }} args
+ *   `configDerived` holds the settings-built blocks for every section of
+ *   the merged page set, built from the new configuration.
  * @returns {object[]}
  */
-function mergeTemplateContent({ generated, template, configDerivedIds, seededAt }) {
+function mergeTemplateContent({ generated, template, configDerived = [], seededAt }) {
   const templateSections = new Set();
   for (const page of template.pages) {
     if (LEGAL_PAGE_IDS.includes(page.id)) continue;
     for (const section of page.sections || []) templateSections.add(section.id);
   }
-  const fresh = generated.filter((doc) => !templateSections.has(doc.section) || configDerivedIds.has(doc.id));
+  const fresh = generated.filter((doc) => !templateSections.has(doc.section) || isConfigDerived(doc));
   const freshIds = new Set(fresh.map((doc) => doc.id));
+  // A settings-built block for a section the merged pages hold is always
+  // built fresh, even when the template page no longer lists the field.
+  for (const doc of configDerived) {
+    if (!freshIds.has(doc.id)) {
+      fresh.push(doc);
+      freshIds.add(doc.id);
+    }
+  }
   const reused = template.content
-    .filter((doc) => !freshIds.has(doc.id))
+    .filter((doc) => !freshIds.has(doc.id) && !isConfigDerived(doc))
     .map((doc) => ({ ...doc, seeded: true, seededAt }));
   return [...fresh, ...reused];
 }
@@ -645,8 +842,10 @@ function templateReadinessRows({ template, event, bootstrap }) {
   const admins = Array.isArray(bootstrap?.adminEmails) ? bootstrap.adminEmails : [];
   const owner = template.owner || {};
   const problems = [];
+  if (template.status !== 'applied') problems.push('the template apply did not finish; run the same command again');
+  const lastSourceDay = [...old].sort().at(-1) || '';
   if (days.length === 0) problems.push('no event dates');
-  if (days.some((d) => old.has(d))) problems.push(`dates repeat ${template.sourceProjectId}`);
+  if (days.some((d) => d <= lastSourceDay)) problems.push(`dates are not later than ${template.sourceProjectId}`);
   if (!owner.name || !owner.email) problems.push('no named owner');
   else if (!admins.includes(owner.email)) problems.push(`owner ${owner.email} is not an operator`);
   return [{
@@ -675,5 +874,7 @@ module.exports = {
   mergeTemplatePages,
   mergeTemplateContent,
   templateReadinessRows,
-  internals: { pickEvent, pickTheme, pickContent, referencesStorage, leafPaths },
+  pageSetErrors,
+  isConfigDerived,
+  internals: { pickEvent, pickTheme, pickContent, referencesStorage, leafPaths, storageObjectPath, systemPageErrors },
 };

@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A new event can start from a past event's template. `scripts/export-event-template.cjs`
   reads an allowlist from the past project: branding, page templates, their content blocks and
   selected static settings. A dry run prints the inventory, with every excluded collection.
-  `init-event.cjs --template` applies the file only to a new, empty project. It needs new dates
-  and a named owner who is an operator. Accounts, tickets, pitches, credentials, the admin
+  `init-event.cjs --template` applies the file only to a new, empty project. It needs dates
+  later than the past event and a named owner who is an operator. An apply that stops part way
+  resumes when the same command runs again. Accounts, tickets, pitches, credentials, the admin
   allowlist, email logs and other records stay in the past project. `--check` adds a
   **Template reuse** row (#328).
 

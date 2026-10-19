@@ -111,6 +111,7 @@ describe('two event deployments from one template', () => {
     expect(event.name).toBe('Next Example Summit');
     expect(event.legal.operatorName).toBe('Example Newsroom Network');
     expect((await dbs[TARGET].doc('config/theme').get()).data().radius).toBe('round');
+    expect((await dbs[TARGET].doc('config/template').get()).data().status).toBe('applied');
     expect((await dbs[TARGET].doc('config/bootstrap').get()).data().adminEmails)
       .toEqual(['next-ops@example.test', 'next-owner@example.test']);
 

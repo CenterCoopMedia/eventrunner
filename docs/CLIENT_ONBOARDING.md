@@ -266,14 +266,20 @@ collection added in a later release.
 | `config/features` and `config/badges` | `config/bootstrap` (the admin allowlist) and `config/providers` |
 | `config/event`: tagline, timezone, operator and contact lines, social accounts, search description, registration action label | Name, dates, venue, tracks, registration window, sender, Auth attestation, legal review |
 | Live page documents and their sections | Accounts, profiles, bookmarks and speakers |
-| Live content blocks on those pages | Tickets, orders, payments and `ticket_sync_queue` |
-| | Session pitches, schedule, sponsors, timeline and updates |
+| Live content blocks on those pages, including sponsor package blocks | Tickets, orders, payments and `ticket_sync_queue` |
+| | Session pitches and the pitch call, schedule, sponsor organizations, timeline and updates |
 | | Sent email rows, sign-in codes, rate limits, admin logs and every other record |
 
 The privacy and terms content is not carried. Init builds it again from the new project's providers,
-and legal review starts again. A block that init builds from settings, such as the home page title
-and dates, is built again from the new event's settings. A block that shows a stored file stays out:
-copy the file into the new project and add the block there.
+and legal review starts again. A block that init builds from settings is not carried either: the home
+page title, the When and Where lines, the venue blocks, and the support and conduct contact links.
+Init builds them from the new event's answers. A block that shows a stored file stays out: copy the
+file into the new project and add the block there. The inventory names the file by its storage path
+only, never by a download link.
+
+A page in the template must keep the safety rules of a page saved in the admin. Only the default
+system pages may be system pages, each at its own route. Other pages cannot use a reserved route,
+such as `/admin` or `/pitch`. No two pages may share an id, a path or a section.
 
 ### Steps
 
@@ -285,7 +291,9 @@ copy the file into the new project and add the block there.
    node scripts/export-event-template.cjs --dry-run
    ```
 
-   Read every row. "Review" rows name blocks that still mention the past event's name or year.
+   Read every row. "Review" rows name each block that mentions the past event's name or year, names
+   an email address, or quotes a person, and each carried contact address. They name the block, not
+   its text. "Feature switches carried" lists each switch and marks the ones that open public intake.
 3. Write the template file, then review the JSON with the client:
 
    ```sh
@@ -293,8 +301,8 @@ copy the file into the new project and add the block there.
    ```
 
    Pass `--page <id>` (repeatable) to carry only some pages. The default pages fill the rest.
-4. Write the new answers file (§2). It needs the new name, the new dates, the sender address and a
-   named owner. The owner must also be an operator:
+4. Write the new answers file (§2). It needs the new name, dates later than every date of the past
+   event, the sender address and a named owner. The owner must also be an operator:
 
    ```json
    {
@@ -310,16 +318,32 @@ copy the file into the new project and add the block there.
    node scripts/init-event.cjs --answers next-answers.json --admin owner@client-domain --template past-event-template.json
    ```
 
-   Init refuses the template when the project is the past project, when the project already holds
-   configuration, pages, accounts, tickets or pitches, under `--force`, without dates, with a date of
-   the past event, or without a named owner who is an operator. Nothing is written when it refuses.
+   Init refuses the template, and writes nothing, in each of these cases:
+
+   - The project is the past project.
+   - The project already holds configuration, pages, content, email templates, accounts, speakers,
+     tickets, orders, pitches, admin logs or email rows.
+   - The project has Firebase Authentication accounts. Init checks this with real credentials. Under
+     the Firestore emulator alone it cannot, so it prints a warning: confirm in the console that the
+     project has no accounts.
+   - `--force` is given.
+   - The answers file has no dates, or a date that is not later than the past event.
+   - The answers file has no named owner, or the owner is not an operator.
+
    `--dry-run` reports the writes first.
+
+   **If the apply stops part way** (a network error, a closed laptop), run the same command again with
+   the same template file. The first write of an apply is `config/template` with status `applying`.
+   A rerun with the same template continues from there, as long as the project holds only what the
+   apply writes. Init then sets the status to `applied`. A different template, or a project that has
+   gained accounts or other records since, is refused. In that case delete the project and start
+   again from a new one.
 6. Work through §3 in full for the new project. The sender domain, ticketing provider, Auth steps and
    Cloud Billing start unmet, even when the past event passed them. Confirm that the billing account
    and the provider accounts are the ones for the new event.
 7. Run `--check` (§4). A project made from a template has one more row, **Template reuse**. It passes
-   when the event has dates that are not the past event's dates and the named owner is still an
-   operator. Each reused block counts as seeded until an editor saves it, so review every page before
+   when the apply finished, every event date is later than the past event, and the named owner is
+   still an operator. Each reused block counts as seeded until an editor saves it, so review every page before
    launch.
 
 ### Accounts across separate events

@@ -129,11 +129,15 @@ node scripts/export-event-template.cjs --out past-event-template.json # refuses 
 node scripts/export-event-template.cjs --out t.json --page home --page faq
 ```
 
-The inventory names every excluded collection with its size and reason, the stored files to copy by
-hand, and the blocks that still mention the past event. Apply the file with
-`init-event.cjs --template` against a new project. Init re-checks the allowlist, so a hand-edited
-file that carries `bootstrap`, a sender or an unknown field is refused. It also refuses the source
-project, a project that already holds data, `--force`, the past event's dates, and a missing owner.
+The inventory names every excluded collection with its size and reason, the carried feature switches,
+the stored files to copy by hand (storage paths only), and the blocks to review: those that mention
+the past event, name an email address or quote a person. Settings-built blocks (CONFIG_SEEDS) are
+never exported; init builds them from the new answers. Apply the file with `init-event.cjs --template`
+against a new project. Init re-checks the allowlist, the page rules and the inventory shape, so a
+hand-edited file that carries `bootstrap`, a sender, a system page at a new route or an unknown field
+is refused. It also refuses the source project, a project that already holds data or Auth accounts,
+`--force`, dates not later than the past event, and a missing owner. An apply that stops part way
+leaves `config/template` at `applying`; the same command resumes it.
 `tests/event-template.rules.test.js` proves two projects stay isolated on the emulator.
 
 ### `seed-demo-event.cjs`

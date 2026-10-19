@@ -63,9 +63,20 @@ async function pastEvent() {
     revision: 3, updatedBy: 'editor@example.test', publishedBy: 'editor@example.test',
   });
   await db.collection('cmsContent').doc('hero__image').set({
-    section: 'hero', field: 'image', blockType: 'image', url: 'cms-images/asset-1/crowd.jpg', alt: 'A crowd',
-    visible: true, order: 2,
+    section: 'hero', field: 'image', blockType: 'image',
+    url: 'https://firebasestorage.googleapis.com/v0/b/demo-past-event.appspot.com/o/cms-images%2Fasset-1%2Fcrowd.jpg?alt=media&token=secret-download-token',
+    alt: 'A crowd', visible: true, order: 2,
   });
+  // Copy that names a person: an address in a block, and a quote.
+  await db.collection('cmsContent').doc('faq_items__what_is_this').set({
+    section: 'faq_items', field: 'what_is_this', blockType: 'richtext',
+    value: '<p>Write to <a href="mailto:old-staffer@example.test">our coordinator</a>.</p>', visible: true, order: 0,
+  });
+  await db.collection('cmsContent').doc('details__quote').set({
+    section: 'details', field: 'quote', blockType: 'quote', text: 'We came back every year.',
+    attribution: 'A past attendee', visible: true, order: 1,
+  });
+  await db.collection('config').doc('features').update({ feedbackInbox: true });
   for (const [docPath, data] of Object.entries(operationalRecords())) {
     const [col, id] = docPath.split('/');
     await db.collection(col).doc(id).set(data);
@@ -79,9 +90,11 @@ async function exportFrom(db, args = {}) {
   return { ...result, out, template: fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, 'utf8')) : null };
 }
 
-async function applyTo(db, { template, answers = nextEventAnswers(), extra = {} } = {}) {
+async function applyTo(db, {
+  template, answers = nextEventAnswers(), extra = {}, store: useStore = store, listAuthUsers,
+} = {}) {
   return quietly(() => runInit({
-    db, store, bucket: noBucket,
+    db, store: useStore, bucket: noBucket, listAuthUsers,
     args: {
       answers: tmpFile('next.json', answers),
       admin: ['next-ops@example.test', 'next-owner@example.test'],
@@ -112,16 +125,24 @@ test('the dry run prints the inventory and writes no file', async () => {
   assert.match(output, /- cmsSchedule \(1\): prior event records/);
   assert.match(output, /- ticket_sync_queue \(1\): tickets and orders/);
   assert.match(output, /\* config\/theme\.logos\.primary: branding\/client-logo\.svg/);
-  assert.match(output, /\* cmsContent\/hero__image: cms-images\/asset-1\/crowd\.jpg/);
+  assert.match(output, /\* cmsContent\/hero__image: cms-images\/asset-1\/crowd\.jpg\n/);
+  assert.equal(output.includes('secret-download-token'), false, 'a download token is never printed');
+  assert.match(output, /feedbackInbox: on \(public intake: review\)/);
+  assert.match(output, /changeRequests: off/);
+  assert.match(output, /! cmsContent\/faq_items__what_is_this: names an email address/);
+  assert.equal(output.includes('old-staffer@example.test'), false, 'the review line does not repeat the address');
+  assert.match(output, /! cmsContent\/details__quote: a quote names a person/);
+  assert.match(output, /! config\/event\.legal\.supportEmail: carried contact address/);
 });
 
 test('the template carries branding, pages and selected settings, and nothing else', async () => {
   const db = await pastEvent();
   const { value, template } = await exportFrom(db);
   assert.equal(value, 0);
-  const text = JSON.stringify({ ...template, inventory: undefined });
+  const text = JSON.stringify(template);
   for (const secret of ['past-ops@example.test', 'attendee@example.test', 'pitch-secret', 'tok_fixture',
-    'sent-subject', 'audit-entry', 'acct_fixture', 'Past Session']) {
+    'sent-subject', 'audit-entry', 'acct_fixture', 'Past Session', 'secret-download-token',
+    'Attendee One', 'speaker@example.test']) {
     assert.equal(text.includes(secret), false, `${secret} must stay in the source project`);
   }
   assert.deepEqual(Object.keys(template.answers).sort(), ['badges', 'event', 'features', 'theme']);
@@ -207,7 +228,7 @@ test('--check on the new event keeps the sender, provider, Auth and template row
   const event = target.read('config', 'event');
   await target.collection('config').doc('event').set({ ...event, days: [{ ...event.days[0], date: '2026-06-04' }] });
   const again = await quietly(() => runCheck({ db: target, seededThreshold: 1000 }));
-  assert.match(again.output, /Template reuse\s+UNMET\s+dates repeat demo-past-event/);
+  assert.match(again.output, /Template reuse\s+UNMET\s+dates are not later than demo-past-event/);
 });
 
 test('a template refuses the same project, a used project and --force', async () => {
@@ -239,7 +260,9 @@ test('a template refuses the source dates, missing dates and a missing or non-op
   const { out } = await exportFrom(source);
   const cases = [
     [{ event: { days: [{ id: 'day-1', label: 'Day 1', date: '2026-06-04', startTime: '09:00', endTime: '17:00' }] } },
-      /2026-06-04 is a date of the source event/],
+      /2026-06-04 is not later than the source event/],
+    [{ event: { days: [{ id: 'day-1', label: 'Day 1', date: '2025-06-04', startTime: '09:00', endTime: '17:00' }] } },
+      /2025-06-04 is not later than the source event/],
     [{ event: { days: [] } }, /needs the new event's own dates/],
     [{ owner: undefined }, /owner.name: a template needs a named owner/],
     [{ owner: { name: 'Someone Else', email: 'not-an-operator@example.test' } }, /must also be an operator/],
@@ -283,4 +306,160 @@ test('a template dry run reports the apply and writes nothing', async () => {
   assert.equal(value, 0, output);
   assert.equal(target.writes.length, 0);
   assert.match(output, /config\/template\s+create/);
+});
+
+// ------------------------------------------------- review fixes (wave 2)
+
+test('settings-built blocks are left out of the export, refused in a file, and built fresh', async () => {
+  const source = await pastEvent();
+  const { template } = await exportFrom(source);
+  const configIds = ['hero__title', 'info__when', 'info__where', 'footer__contact_link'];
+  for (const id of configIds) {
+    assert.equal(template.content.some((c) => c.id === id), false, `${id} is not exported`);
+  }
+
+  const smuggled = structuredClone(template);
+  smuggled.content.push({
+    id: 'hero__title', section: 'hero', field: 'title', blockType: 'text', visible: true, order: 0,
+    value: 'Past Example Summit',
+  });
+  const refused = parseTemplateFile(JSON.stringify(smuggled));
+  assert.equal(refused.ok, false);
+  assert.match(refused.errors.join('\n'), /hero__title.*built from the new event's settings/);
+
+  // A template page whose section no longer lists the field still gets it fresh.
+  const trimmed = structuredClone(template);
+  const home = trimmed.pages.find((p) => p.id === 'home');
+  home.sections.find((sec) => sec.id === 'hero').defaultBlocks =
+    home.sections.find((sec) => sec.id === 'hero').defaultBlocks.filter((b) => b.field !== 'title');
+  const target = makeFakeDb();
+  const { value, output } = await applyTo(target, { template: tmpFile('trimmed.json', trimmed) });
+  assert.equal(value, 0, output);
+  assert.equal(target.read('cmsContent', 'hero__title').value, 'Next Example Summit');
+  assert.match(target.read('cmsContent', 'info__when').value, /2027/);
+});
+
+test('a template page cannot claim a system route, a reserved path, or a taken id, path or section', async () => {
+  const source = await pastEvent();
+  const { template } = await exportFrom(source);
+  const page = (overrides) => ({
+    id: 'extra', label: 'Extra', path: '/extra', icon: null, order: 99, visible: true, systemPage: false,
+    sections: [{ id: 'extra_body', label: 'Body', description: 'Body', allowedBlocks: ['text'], maxBlocks: 1,
+      reorderable: true, defaultBlocks: [] }],
+    ...overrides,
+  });
+  const cases = [
+    [(t) => t.pages.push(page({ id: 'evil', path: '/admin', systemPage: true })), /evil.*systemPage/],
+    [(t) => t.pages.push(page({ id: 'evil', path: '/', systemPage: true })), /evil.*systemPage/],
+    [(t) => t.pages.push(page({ path: '/pitch' })), /'pitch' is a reserved route/],
+    [(t) => t.pages.push(page({ path: '/faq' })), /path \/faq is used by more than one page/],
+    [(t) => t.pages.push(page({ id: 'faq', path: '/faq-two' })), /id faq is used by more than one page/],
+    [(t) => t.pages.push(page({ sections: [{ ...page().sections[0], id: 'hero' }] })),
+      /section hero is used by more than one page/],
+    [(t) => { t.pages.find((p) => p.id === 'home').path = '/start'; }, /home.*must stay at \//],
+    [(t) => { t.pages.find((p) => p.id === 'faq').systemPage = true; }, /faq.*systemPage/],
+  ];
+  for (const [mutate, pattern] of cases) {
+    const copy = structuredClone(template);
+    mutate(copy);
+    const verdict = parseTemplateFile(JSON.stringify(copy));
+    assert.equal(verdict.ok, false, String(pattern));
+    assert.match(verdict.errors.join('\n'), pattern);
+  }
+});
+
+test('the template file refuses an empty source date list and a malformed inventory', async () => {
+  const source = await pastEvent();
+  const { template } = await exportFrom(source);
+  const noDays = structuredClone(template);
+  noDays.source.days = [];
+  assert.match(parseTemplateFile(JSON.stringify(noDays)).errors.join('\n'), /source\.days: the source event has no dates/);
+  for (const [mutate, pattern] of [
+    [(t) => { t.inventory.users = []; }, /inventory\.users: not on the template allowlist/],
+    [(t) => { t.inventory.assets = [{ ref: 'x', value: 'y', email: 'a@example.test' }]; }, /inventory\.assets\[0\]/],
+    [(t) => { t.inventory.warnings = [{}]; }, /inventory\.warnings\[0\]: must be a string/],
+  ]) {
+    const copy = structuredClone(template);
+    mutate(copy);
+    assert.match(parseTemplateFile(JSON.stringify(copy)).errors.join('\n'), pattern);
+  }
+});
+
+test('a target that holds speakers, orders, logs, email rows or Auth users is refused', async () => {
+  const source = await pastEvent();
+  const { out } = await exportFrom(source);
+  for (const docPath of ['speakers/s', 'ticket_orders/o', 'admin_logs/l', 'sent_emails/m', 'email_claims/c',
+    'email_templates/t']) {
+    const target = makeFakeDb({ [docPath]: { any: true } });
+    const { value, output } = await applyTo(target, { template: out });
+    assert.equal(value, 2, docPath);
+    assert.match(output, new RegExp(`is not empty \\(${docPath.split('/')[0]}\\)`));
+  }
+  const target = makeFakeDb();
+  const { value, output } = await applyTo(target, {
+    template: out, extra: {}, listAuthUsers: async () => ['someone'],
+  });
+  assert.equal(value, 2);
+  assert.match(output, /already has Firebase Authentication accounts/);
+  assert.equal(target.writes.length, 0);
+});
+
+test('a failed apply resumes with the same template and finishes', async () => {
+  const source = await pastEvent();
+  const { out } = await exportFrom(source);
+  const target = makeFakeDb();
+  let failed = false;
+  const flaky = {
+    ...store,
+    async publishDocs(...a) {
+      if (!failed) {
+        failed = true;
+        throw new Error('network dropped');
+      }
+      return store.publishDocs(...a);
+    },
+  };
+  await assert.rejects(applyTo(target, { template: out, store: flaky }), /network dropped/);
+  assert.equal(target.read('config', 'template').status, 'applying');
+  assert.equal(target.read('config', 'template').sourceProjectId, SOURCE);
+
+  // A different template cannot take over the half-applied project.
+  const other = JSON.parse(fs.readFileSync(out, 'utf8'));
+  other.source.exportedAt = '2030-01-01T00:00:00.000Z';
+  const otherRun = await applyTo(target, { template: tmpFile('other.json', other) });
+  assert.equal(otherRun.value, 2);
+  assert.match(otherRun.output, /a different template/);
+
+  const { value, output } = await applyTo(target, { template: out });
+  assert.equal(value, 0, output);
+  assert.match(output, /resuming the apply/);
+  assert.equal(target.read('config', 'template').status, 'applied');
+  assert.equal(target.read('cmsContent', 'hero__subtitle').value, 'Reporting together');
+
+  // Once applied, the same template is not applied again.
+  const again = await applyTo(target, { template: out });
+  assert.equal(again.value, 2);
+  assert.match(again.output, /already applied/);
+});
+
+test('a half-applied project that has gained other data is not resumed', async () => {
+  const source = await pastEvent();
+  const { out } = await exportFrom(source);
+  const target = makeFakeDb();
+  const failing = { ...store, async publishDocs() { throw new Error('network dropped'); } };
+  await assert.rejects(applyTo(target, { template: out, store: failing }), /network dropped/);
+  await target.collection('users').doc('someone').set({ email: 'someone@example.test' });
+  const { value, output } = await applyTo(target, { template: out });
+  assert.equal(value, 2);
+  assert.match(output, /is not empty \(users\)/);
+});
+
+test('--check fails the template row while an apply is unfinished', async () => {
+  const source = await pastEvent();
+  const { out } = await exportFrom(source);
+  const target = makeFakeDb();
+  const failing = { ...store, async publishDocs() { throw new Error('network dropped'); } };
+  await assert.rejects(applyTo(target, { template: out, store: failing }), /network dropped/);
+  const { output } = await quietly(() => runCheck({ db: target, seededThreshold: 1000 }));
+  assert.match(output, /Template reuse\s+UNMET\s+.*apply did not finish/);
 });
