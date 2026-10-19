@@ -251,6 +251,130 @@ After acceptance, the operator and the client's authorized project owner must:
    pass. Sync runs while the personal schedule page is open. Confirm the production audience
    can grant access. Leave or set the flag off if setup or verification is incomplete.
 
+## Reuse a past event as a template
+
+Each event runs in its own Firebase project. A second event, or next year's edition of the same
+event, gets a new project, not a new section of the old one. This keeps accounts, tickets, pitches
+and logs of one event out of the other. A template carries the parts the client already approved:
+branding, page templates and selected static settings.
+
+### What a template carries
+
+The export reads an allowlist. Anything not on the list stays in the past project, including any
+collection added in a later release.
+
+| Carried | Stays in the past project |
+|---|---|
+| `config/theme`: colours, fonts, style and layout choices | Logo and image files (the inventory lists them) |
+| `config/features` and `config/badges` | `config/bootstrap` (the admin allowlist) and `config/providers` |
+| `config/event`: tagline, timezone, operator and contact lines, social accounts, search description, registration action label | Name, dates, venue, tracks, registration window, sender, Auth attestation, legal review |
+| Live page documents and their sections | Accounts, profiles, bookmarks and speakers |
+| Live content blocks on those pages, including sponsor package blocks | Tickets, orders, payments and `ticket_sync_queue` |
+| | Session pitches and the pitch call, schedule, sponsor organizations, timeline and updates |
+| | Sent email rows, sign-in codes, rate limits, admin logs and every other record |
+
+The privacy and terms content is not carried. Init builds it again from the new project's providers,
+and legal review starts again. A block that init builds from settings is not carried either: the home
+page title, the When and Where lines, the venue blocks, and the support and conduct contact links.
+Init builds them from the new event's answers. A block that shows a stored file stays out: copy the
+file into the new project and add the block there. The inventory names the file by its storage path
+only, never by a download link.
+
+A page in the template must keep the safety rules of a page saved in the admin. Only the default
+system pages may be system pages, each at its own route. Other pages cannot use a reserved route,
+such as `/admin` or `/pitch`. No two pages may share an id, a path or a section.
+
+A content block in the template must keep the rules of a block saved in the content editor. Each
+required field has a value, and a sponsor package limit is a whole number of 1 or more. Rich text
+is cleaned by the editor's sanitizer before it is stored, so a script or an event handler in a
+hand-edited file never reaches the site. A block that breaks a rule is named, and nothing is
+written.
+
+### Steps
+
+1. Provision a new project for the new event (§1). Never point a template at the past project.
+2. Print the inventory from the past project. This writes nothing:
+
+   ```sh
+   export EVENT_FIREBASE_PROJECT_ID=<the past event's project id>
+   node scripts/export-event-template.cjs --dry-run
+   ```
+
+   Read every row. "Review" rows name each block that mentions the past event's name or year, names
+   an email address, or quotes a person, and each carried contact address. They name the block, not
+   its text. "Feature switches carried" lists each switch and marks the ones that open public intake.
+3. Write the template file, then review the JSON with the client:
+
+   ```sh
+   node scripts/export-event-template.cjs --out past-event-template.json
+   ```
+
+   Pass `--page <id>` (repeatable) to carry only some pages. The default pages fill the rest.
+4. Write the new answers file (§2). It needs the new name, dates later than every date of the past
+   event, the sender address and a named owner. The owner must also be an operator:
+
+   ```json
+   {
+     "event": { "name": "...", "shortName": "...", "timezone": "...", "days": [...], "sender": { "email": "..." } },
+     "owner": { "name": "...", "email": "owner@client-domain" }
+   }
+   ```
+
+5. Seed the new project from the template:
+
+   ```sh
+   export EVENT_FIREBASE_PROJECT_ID=<the new event's project id>
+   node scripts/init-event.cjs --answers next-answers.json --admin owner@client-domain --template past-event-template.json
+   ```
+
+   Init refuses the template, and writes nothing, in each of these cases:
+
+   - The project is the past project.
+   - The project already holds any event record: configuration, pages, content, email templates,
+     accounts, speakers, sessions, organizations, timeline entries, updates, tickets, orders,
+     pitches, admin logs, email rows, or any other collection.
+   - The project has Firebase Authentication accounts. Init checks this with real credentials. Under
+     the Firestore emulator alone it cannot, so it prints a warning: confirm in the console that the
+     project has no accounts.
+   - `--force` is given.
+   - The answers file has no dates, or a date that is not later than the past event.
+   - The answers file has no named owner, or the owner is not an operator.
+
+   `--dry-run` reports the writes first.
+
+   **If the apply stops part way** (a network error, a closed laptop), run the same command again with
+   the same template file. The first write of an apply is `config/template` with status `applying`.
+   A rerun with the same template continues from there, as long as the project holds only what the
+   apply writes. Init then sets the status to `applied`. A different template, or a project that has
+   gained accounts or other records since, is refused. In that case delete the project and start
+   again from a new one.
+6. Work through §3 in full for the new project. The sender domain, ticketing provider, Auth steps and
+   Cloud Billing start unmet, even when the past event passed them. Confirm that the billing account
+   and the provider accounts are the ones for the new event.
+7. Run `--check` (§4). A project made from a template has one more row, **Template reuse**. It passes
+   when the apply finished, every event date is later than the past event, and the named owner is
+   still an operator. Each reused block counts as seeded until an editor saves it, so review every page before
+   launch.
+
+### Accounts across separate events
+
+Accounts belong to one project. An attendee of both events signs in to the new site and gets a new
+account. Their profile, bookmarks, badges and tickets do not move. Grant operators and staff again
+with `--admin`, `--staff` or admin Settings → Access. Invite speakers again. To show that someone came
+before, an admin records it in **Past attendance** on that person's record in the new event
+(`docs/ADMIN_GUIDE.md`).
+
+### Export and archive of the past event
+
+- The template file holds no accounts, but it holds the client's copy. Keep it with the client's
+  records. Do not put it in a public repository or issue.
+- Take the past event's own exports before you change it: the attendee export and the session
+  materials archive (`docs/ADMIN_GUIDE.md`).
+- Set the past event's archive date in admin Event settings. Its pages then show as back issues.
+  With ticket sales, follow "Archiving an event with ticket sales" in `docs/DEPLOY_RUNBOOK.md` first.
+- The past project keeps its records until the client asks for their removal. The new event does not
+  read from the past project, so removing the past project later does not change the new event.
+
 ## Handoff to the client
 
 Once the site is live, point the client at the two handbook pages instead of re-explaining their
@@ -262,6 +386,17 @@ content here:
   what staff can change without a developer: pages, schedule, speakers, attendees, live updates,
   theme, badges. Pair it with [`docs/ADMIN_GUIDE.md`](ADMIN_GUIDE.md) for the task-by-task reference
   to every admin surface.
+
+### After the event: data export and archive
+
+The client keeps its data. At the end of the engagement, hand over the event's records and agree how long they are kept. [Archive and hand off a past event](operator/archive-handoff.md) is the runbook:
+
+1. An operator downloads the event data package from **Data export** (or runs `scripts/export-event-package.cjs` for a large event) and checks it with `--verify`.
+2. The operator takes a Firebase managed export and copies the Storage bucket when the client wants a full backup.
+3. The operator sets the archive date and `config/event.historicalDemo` to keep the past site online and read-only, or disables Hosting. After `historicalDemo` is on, only Google sign-in opens the admin panel, so export first.
+4. The handoff record names the package date, the parts included, who received each file, and the retention period.
+
+Explain the difference between access to the cloud project, the client's ownership of the data, and the portable export. The runbook's first table states it.
 
 Do not send the client screenshots of another client's event data, and do not put their attendee
 list, admin emails, or any other client-specific detail in a public GitHub issue or discussion —

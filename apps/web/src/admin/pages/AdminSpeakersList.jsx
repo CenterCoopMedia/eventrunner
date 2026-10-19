@@ -193,9 +193,14 @@ export default function AdminSpeakersList() {
         identifiers={`${speakers.length} record${speakers.length === 1 ? '' : 's'}`}
         description="One record per speaker. Sessions reference these records by id, so editing a name here updates it everywhere it appears."
         actions={
-          <Link to="new" className={primaryButtonClass}>
-            Create a speaker
-          </Link>
+          <>
+            <Link to="reminders/send" className={secondaryButtonClass}>
+              Send reminders
+            </Link>
+            <Link to="new" className={primaryButtonClass}>
+              Create a speaker
+            </Link>
+          </>
         }
       />
 
@@ -325,6 +330,15 @@ export default function AdminSpeakersList() {
                             {busy === `${speaker.id}:discard` ? 'Discarding…' : 'Discard changes'}
                           </button>
                         </>
+                      ) : null}
+                      {speaker.status === 'accepted' || speaker.status === 'approved' ? (
+                        <Link
+                          to={`reminders/send?speaker=${encodeURIComponent(speaker.id)}`}
+                          aria-label={`Remind ${speaker.displayName || speaker.id}`}
+                          className={linkButtonClass}
+                        >
+                          Remind
+                        </Link>
                       ) : null}
                       <Link to={speaker.id} className={linkButtonClass}>
                         Edit

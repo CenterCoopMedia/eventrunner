@@ -16,7 +16,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router';
+import { isPublicPage, pageFeatureGate } from 'shared/page';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { toEditablePage, toPagePayload } from '../pageDoc.js';
@@ -27,6 +30,7 @@ import { summarizePublish } from '../publishResult.js';
 import {
   Notice,
   Panel,
+  fieldHintClass,
   linkButtonClass,
   primaryButtonClass,
   rowClass,
@@ -49,8 +53,43 @@ import AdminPageHeader, {
   proofRowClass,
 } from '../components/adminChrome.jsx';
 
-function PageRow({ row, index, count, moveRow, disabled, resolved }) {
+/**
+ * Whether a reader can open the page, as a word, and why when the word is
+ * not the whole story (launch rehearsal, admin-03-pages.png: every row read
+ * "Live" and none said whether the page was on the site).
+ *
+ * The word is about the public site, so it reads the PUBLISHED revision with
+ * the predicate the site applies (shared/page isPublicPage): `visible`
+ * strictly true, and a system page's feature on. A page never published is
+ * Hidden, whatever its draft says; its state badge already says Draft. A
+ * visibility change that is saved but not published is named under the
+ * word, because the site does not have it yet.
+ *
+ * @returns {{ word: 'Visible'|'Hidden', reason: string|null }}
+ */
+function pageVisibility(row, features) {
+  const live = row.live ?? null;
+  if (!live) return { word: 'Hidden', reason: null };
+  const word = isPublicPage(live, features) ? 'Visible' : 'Hidden';
+  const draftVisible = row.draft ? row.draft.visible === true : live.visible === true;
+  if (draftVisible !== (live.visible === true)) {
+    return {
+      word,
+      reason: draftVisible
+        ? 'Your unpublished changes show this page. Publish to show it.'
+        : 'Your unpublished changes hide this page. Publish to hide it.',
+    };
+  }
+  const gate = live.visible === true ? pageFeatureGate(live) : null;
+  if (gate && features?.[gate] !== true) {
+    return { word, reason: `${featureLabel(gate)} is off in Features. The public site hides this page.` };
+  }
+  return { word, reason: null };
+}
+
+function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
   const label = row.current?.label || row.id;
+  const visibility = pageVisibility(row, features);
   const drag = useRowDrag(`page:${index}`, disabled);
   const drop = bindReorderDrop('page:', index, moveRow);
   const [over, setOver] = useState(false);
@@ -85,14 +124,17 @@ function PageRow({ row, index, count, moveRow, disabled, resolved }) {
             {row.current?.systemPage ? (
               <StatusBadge tone="neutral">System page</StatusBadge>
             ) : null}
-            {row.current?.visible === false ? (
-              <StatusBadge tone="neutral">Hidden</StatusBadge>
-            ) : null}
+            <StatusBadge tone="neutral">{visibility.word}</StatusBadge>
           </div>
           <p className={`mt-3xs truncate ${rowMetaClass}`} data-reorder-block="">
             {row.current?.path} · {sections.length} section
             {sections.length === 1 ? '' : 's'}
           </p>
+          {visibility.reason ? (
+            <p className={`mt-3xs ${fieldHintClass}`} data-reorder-block="">
+              {visibility.reason}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-xs">
           <ReorderControls
@@ -116,6 +158,7 @@ export default function AdminPagesList() {
   const { rows, loading, error } = useAdminPages();
   const call = useAdminApi();
   const { showToast } = useToast();
+  const { features } = useEventConfig();
   const draft = useDraftOrder(rows);
   const [publishing, setPublishing] = useState(null);
   const [savingOrder, setSavingOrder] = useState(false);
@@ -309,6 +352,7 @@ export default function AdminPagesList() {
                 moveRow={moveRow}
                 disabled={savingOrder || publishing !== null}
                 resolved={resolvedIds.has(row.id)}
+                features={features}
               />
             ))}
           </ul>

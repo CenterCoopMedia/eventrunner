@@ -40,6 +40,7 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // sessions list, so its figures and panels stay out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
+const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
 const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
@@ -58,6 +59,8 @@ const AdminContentBlockEditor = lazy(() => import('./pages/AdminContentBlockEdit
 // Branding is the largest page left in the entry chunk (the style picker,
 // the option groups and the preview frame), and only an operator opens it.
 const AdminBranding = lazy(() => import('./pages/AdminBranding.jsx'));
+// Data export (issue #329) is one link in the System group.
+const AdminDataExport = lazy(() => import('./pages/AdminDataExport.jsx'));
 // The email log carries the preview frame and its document builder; it is
 // one screen behind one link, so it waits for somebody to ask for it.
 const AdminEmailLog = lazy(() => import('./pages/AdminEmailLog.jsx'));
@@ -74,6 +77,9 @@ const AdminMaterialsTab = lazy(() => import('./pages/AdminMaterialsTab.jsx'));
 // The organizations list and editor (issue #192) load the same way.
 const AdminOrganizationsList = lazy(() => import('./pages/AdminOrganizationsList.jsx'));
 const AdminOrganizationEditor = lazy(() => import('./pages/AdminOrganizationEditor.jsx'));
+// Import records (speakers, sessions and organizations from a CSV): one
+// screen behind one link, loaded the same way.
+const AdminRecordImport = lazy(() => import('./pages/AdminRecordImport.jsx'));
 // The updates list and editor (issue #190), loaded the same way.
 const AdminUpdatesList = lazy(() => import('./pages/AdminUpdatesList.jsx'));
 const AdminUpdateEditor = lazy(() => import('./pages/AdminUpdateEditor.jsx'));
@@ -194,6 +200,11 @@ export default function AdminApp() {
           />
           <Route path="speakers" element={<AdminSpeakersList />} />
           <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />
+          {/* Two segments, so no speaker id can shadow it: an id holds no slash. */}
+          <Route
+            path="speakers/reminders/send"
+            element={<DeferredAdminPage label="speaker reminders"><AdminSpeakerReminders /></DeferredAdminPage>}
+          />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
           <Route
             path="updates"
@@ -261,6 +272,10 @@ export default function AdminApp() {
             element={<DeferredAdminPage label="attendees"><AdminAttendees /></DeferredAdminPage>}
           />
           <Route path="ticketing" element={<AdminTicketing />} />
+          <Route
+            path="import"
+            element={<DeferredAdminPage label="the record import"><AdminRecordImport /></DeferredAdminPage>}
+          />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="announcements" element={<AdminAnnouncements />} />
           <Route path="feedback" element={<AdminFeedback />} />
@@ -271,6 +286,10 @@ export default function AdminApp() {
           <Route
             path="change-requests"
             element={<DeferredAdminPage label="change requests"><AdminChangeRequests /></DeferredAdminPage>}
+          />
+          <Route
+            path="data-export"
+            element={<DeferredAdminPage label="data export"><AdminDataExport /></DeferredAdminPage>}
           />
           <Route path="system-errors" element={<AdminSystemErrors />} />
           <Route path="access" element={<AdminAccess />} />

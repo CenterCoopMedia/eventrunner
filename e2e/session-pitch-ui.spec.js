@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
-import { adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, signIn, mailFileSize, waitForOtpCode } from './helpers.mjs';
+import { adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, signIn, mailFileSize, waitForOtpCode, waitForTaggedMail, taggedMailSince } from './helpers.mjs';
 
 const email = 'pitch-ui@example.test';
 const fixture = { title: 'Reporting together', description: 'A practical workshop on shared local reporting. Learn to plan a project, share evidence, and reach new readers.', organization: 'Example newsroom', format: 'Workshop' };
@@ -64,6 +64,7 @@ test('pitch entries survive sign-in, keyboard validation, a lost response, and r
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
   // One committed request loses its answer. The next request must replay it.
+  const receiptSince = mailFileSize();
   await page.route('**/submitSessionPitch', async (route) => {
     if (route.request().method() !== 'POST') return route.continue();
     await route.fetch();
@@ -81,6 +82,11 @@ test('pitch entries survive sign-in, keyboard validation, a lost response, and r
   const submitted = await db.collection('session_pitches').where('email', '==', email).get();
   expect(submitted.size).toBe(1);
   expect(submitted.docs[0].data()).toMatchObject({ ...fixture, status: 'new', consent: { version: 'session-pitch-review-v1' } });
+  // Issue #324: one receipt for the stored pitch, although the form sent it twice.
+  const receipt = await waitForTaggedMail(receiptSince, email, 'pitch.receipt');
+  expect(receipt.text).toContain(`We received “${fixture.title}”.`);
+  expect(taggedMailSince(receiptSince, email, 'pitch.receipt')).toHaveLength(1);
+  expect(submitted.docs[0].data().notices.receipt).toMatchObject({ state: 'sent', attempt: 1 });
   const token = await idTokenFor(await ensureUser(email));
   expect((await callFunction('convertSessionPitch', {}, token)).status).toBe(403);
   expect((await callFunction('importSessionPitches', {}, token)).status).toBe(403);
@@ -120,8 +126,30 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await expect(page.getByLabel('Private review notes')).toHaveValue('Other reviewer note');
     await page.getByLabel('Private review notes').fill('PRIVATE-STAFF-NOTE');
     await page.getByLabel('Decision', { exact: true }).selectOption('accepted');
+    const decisionSince = mailFileSize();
     await page.getByRole('button', { name: 'Save review decision' }).click();
-    await expect(page.getByText('Review saved. No notification was sent.')).toBeVisible();
+    await expect(page.getByText('Review saved. No email was sent.')).toBeVisible();
+    // Issue #324: a decision sends nothing until staff preview and confirm its email.
+    await expect(page.getByText('No email was sent for this pitch.')).toBeVisible();
+    expect(taggedMailSince(decisionSince, email, 'pitch.accepted')).toHaveLength(0);
+    await page.getByText('Prepare the acceptance email', { exact: true }).click();
+    await page.getByLabel('Note to the submitter (optional)').fill('Plan for 45 minutes.');
+    await page.getByRole('button', { name: 'Preview the acceptance email' }).click();
+    const preview = page.getByRole('region', { name: 'Preview of the acceptance email' });
+    await expect(preview).toBeFocused();
+    await expect(preview).toContainText('Plan for 45 minutes.');
+    await expect(preview).not.toContainText('PRIVATE-STAFF-NOTE');
+    // The fixture has no Firebase identity, like an imported pitch.
+    await expect(preview).toContainText('This address came from an imported CSV. Nobody verified it.');
+    await expect(page.getByRole('button', { name: 'Send the acceptance email' })).toBeDisabled();
+    await page.getByRole('checkbox', { name: `I reviewed this email. Send it to ${email}.` }).check();
+    await page.getByRole('button', { name: 'Send the acceptance email' }).click();
+    await expect(page.getByText(`Acceptance email sent to ${email}.`)).toBeVisible();
+    await expect(page.getByText('Sent', { exact: true })).toBeVisible();
+    const accepted = await waitForTaggedMail(decisionSince, email, 'pitch.accepted');
+    expect(accepted.text).toContain('Plan for 45 minutes.');
+    expect(`${accepted.subject} ${accepted.text} ${accepted.html}`).not.toContain('PRIVATE-STAFF-NOTE');
+    await expect(page.getByText('Prepare the acceptance email', { exact: true })).toHaveCount(0);
     await page.getByLabel('Filter by decision').selectOption('accepted');
     await expect(page.getByRole('button', { name: fixture.title, exact: true })).toBeVisible();
     const download = page.waitForEvent('download');
@@ -148,7 +176,7 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await expect(page.getByRole('button', { name: 'Save review decision' })).toBeEnabled();
     await page.getByLabel('Private review notes').fill('Post-conversion review');
     await page.getByRole('button', { name: 'Save review decision' }).click();
-    await expect(page.getByText('Review saved. No notification was sent.')).toBeVisible();
+    await expect(page.getByText('Review saved. No email was sent.')).toBeVisible();
     expect((await ref.get()).data()).toMatchObject({ privateNotes: 'Post-conversion review', reviewRevision: 4 });
     await ref.update({ reviewRevision: 5, privateNotes: 'Another reviewer after conversion' });
     await expect(page.getByText(/This pitch changed. Your unsaved notes/)).toBeVisible();

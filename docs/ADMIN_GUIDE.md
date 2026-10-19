@@ -2,7 +2,7 @@
 
 How to run a client's site from the admin panel, in the order the work happens. For the narrative "why does this work this way" version, hand a new staff member [`docs/handbook/for-event-staff.md`](handbook/for-event-staff.md) first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see [`design-reference.md`](design-reference.md). You do not need it to run a site.
 
-Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators control the call deadline and choose this site's form or an external form, such as Airtable. See [Operate session pitch intake](operator/session-pitches.md) for decisions, CSV import and export, draft conversion, and private data boundaries.
+Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators control the call deadline and choose this site's form or an external form, such as Airtable. With an Airtable form, an operator connects the approved table once; staff then choose **Refresh from Airtable**, or an operator turns on an automatic refresh. A refresh adds new pitches, updates changed text, keeps every decision and note, and marks changed or removed records in the queue. A person who pitches through this site's form gets a receipt. Receipts are on by default; to turn them off, choose **Staff send each receipt** under **Manage pitch emails**. Staff send acceptance and decline emails from each pitch, after a preview. Saving a decision sends no email. See [Operate session pitch intake](operator/session-pitches.md) for decisions, pitch emails, the Airtable refresh, CSV import and export, draft conversion, and private data boundaries.
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
@@ -22,8 +22,8 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 
 | Tier | Sections | For |
 |---|---|---|
-| Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Operator | Everything below, plus Features, Branding, Access, System errors, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -47,9 +47,9 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 A site can open before the program exists. For example, it can sell early bird tickets and take session pitches months before the event.
 
 1. **Turn off what is not ready.** On Settings → Features, switch off **Public schedule**, **Speaker directory**, **Sponsor list**, **Attendee directory** and **Written updates**. Their navigation links leave the header and footer. On **Pages**, hide any other page that is not ready.
-2. **Write the home page.** In the Content editor, keep the opening section short: the event name, dates, place and one paragraph. Hide or empty other home sections that are not ready.
+2. **Write the home page.** In the Content editor, keep the opening section short: the event name, dates, place and one paragraph. The Content editor has no switch that hides a whole section. To take a section off the home page, hide or delete each block in it: open the block, select **Edit block settings**, clear **Visible**, and publish, or delete the block. A section with no visible block is not shown, and neither is its heading. Three home sections also draw from other lists: the key facts row always shows the event dates, the sponsor strip shows while **Sponsor list** is on, and the history section shows the past editions in Timeline. To take one of those off, or to remove any section itself, open the home page in **Pages** and remove the section there. Check every seeded block before launch. Placeholder text that starts with "[Replace]", and the seeded **By the numbers** statistics (0 attendees expected, 0 sessions planned), show on the public site until you edit or hide them. A button or link that leads to a section you switched off, or to a page that is hidden or does not exist, is not shown. The Content editor says so under **Destination** as you type. The save still succeeds, and the link appears when you switch the section on or make the page visible.
 3. **Open ticket sales.** Publish the reviewed Stripe catalog (see [Ticketing](#ticketing)). The home page lead and the header then show **Get tickets**. Before the catalog is published, neither shows a ticket action.
-4. **Open the call for sessions.** In **Session pitches**, an operator sets the deadline, chooses this site's form or an external form (for example, Airtable) and selects **Accept session pitches**. While the call is open, the home page lead shows **Pitch a session**.
+4. **Open the call for sessions.** In **Session pitches**, an operator sets the deadline as a date and a time on the event's clock, chooses this site's form or an external form (for example, Airtable) and selects **Accept session pitches**. While the call is open, the home page lead shows **Pitch a session**. It appears in the home page lead only: the header, the navigation and the footer have no link to it.
 
 Switch the features on again, and publish the pages, when the program is ready. No deploy is needed for any of these steps.
 
@@ -116,6 +116,10 @@ The admin opens here, for staff and operators alike. The page states how the eve
 
 Every page document (About, Travel, Conduct, and anything else seeded or added) shows its state in the list, in the same three words every editor uses: **Draft** (never published), **Live** (published, with nothing pending), or **Live with unpublished changes** (published, with newer edits saved but not published yet). Create, edit, and publish from here.
 
+**Each row also says Visible or Hidden.** **Visible** means a reader can open the page and the navigation links it. **Hidden** means the page is not on the public site. The word describes the published page, so a page that was never published reads **Hidden**. When you change a page's visibility and do not publish, a line under the word says that the change waits for a publish. A built-in page whose feature is off on the Features tab also reads **Hidden**, and a line under it names that feature, because the site hides the page whatever its own setting is.
+
+**Three seeded pages start hidden.** A fresh site seeds **Recap**, **Guidelines** and **City guide** hidden, because each starts empty and a recap belongs after the event. Write a page, then open it, select **Visible**, and publish it. A site seeded before this release keeps the visibility it has.
+
 **The site navigation is this list.** Every page that is visible gets a link in the header, in the order the list shows, under the label you gave it — so adding a page adds its link, hiding a page removes it, and renaming a page renames it in the navigation too. Nobody has to deploy anything for that to happen. One thing keeps a visible page out: a system page whose feature is switched off on the Features tab. An Updates page is still a page when *Updates* is off — it just has nowhere to send a reader.
 
 **A page can carry two names.** The **navigation label** is what the header and the footer print, and every page shares one row, so keep it short — the seeded pages use FAQ, Conduct, Privacy, Terms. The **page heading** is the heading at the top of the page itself, and it is optional: leave it blank and the page is headed by its label. Set it only where the short label would read oddly as a heading, the way the FAQ page is labelled FAQ and headed *Frequently asked questions*. The heading is also what the browser tab and a shared link show.
@@ -124,7 +128,7 @@ Every page document (About, Travel, Conduct, and anything else seeded or added) 
 
 **One item is not a page.** The navigation ends with the account control, which the site adds itself. It reads **Sign in** for a reader who is not signed in and **Dashboard** for one who is. You cannot remove it or reorder it, and it needs no page document. Multi-role accounts also get an **Account** menu with attendee, speaker, and admin views. The choice stays in the browser tab for the session; direct role links take precedence. **Manage event** on attendee and speaker dashboards opens the admin home. Single-role accounts get no switcher or extra admin link. The phone admin **Menu** sheet carries the same full-width view rows. These controls change navigation only; server access checks still decide every read and write.
 
-**The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Below it the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. Each account link is labelled with the service and the handle together, such as Mastodon @eventname, so two accounts on one service can be told apart; an account recorded with no handle is labelled with the service name alone. An event with no social accounts gets no social block, not an empty one. You add and edit the accounts under Settings → Event settings, in the **Social accounts** panel.
+**The footer lists the same pages.** The footer repeats the page list under the same rules, so a page you hide leaves both places at once and a page you rename is renamed in both. Under the page list, the footer shows the links in the home page's **Footer links** section, one list per group. Edit them in Content, under the home page. They appear in the footer of every page and not in the home page body. Below them the footer names the organization that operates the event and links its support address, both from the event configuration, and lists the event's social accounts if the configuration records any. Each account link is labelled with the service and the handle together, such as Mastodon @eventname, so two accounts on one service can be told apart; an account recorded with no handle is labelled with the service name alone. An event with no social accounts gets no social block, not an empty one. You add and edit the accounts under Settings → Event settings, in the **Social accounts** panel.
 
 **Pick what kind of page this is.** Six named tasks, and picking one shapes the page:
 
@@ -285,6 +289,37 @@ The canonical speaker list, with each record's pipeline status and the entry poi
 
 One speaker record is the source of truth. If a name is wrong in three places on the public site, fix the speaker record — do not patch each place it appears.
 
+### Speaker reminders
+
+Email accepted speakers about the items they still owe. Select **Send reminders** at the top of the Speakers list, or **Remind** on the row of one accepted or approved speaker. Staff and operators can use this page.
+
+**What counts as missing.** The page uses the same rule as the speaker's own **Your next steps** list:
+
+- **Biography** and **Headshot**: The field is empty. A change the speaker sent for review counts as done.
+- **Session description**: A published session the speaker is on has no description text.
+- **Materials**: A published session the speaker is on has no pending or approved material. A rejected material does not count.
+
+Only published sessions that are not hidden count. Only speakers who accepted an invitation are listed. A speaker who is not invited yet, or whose invitation is still open, gets the invitation instead.
+
+**Choose speakers.** **Show** narrows the list: **Anything missing** (the default), one item, or **Every accepted speaker**. The choice stays in the page address. Each row names the missing items with the session titles, and says when the speaker was last reminded and about what. Tick one speaker, or select **Select all shown**. A change to **Show** clears the selection. **Items to include** picks the items a reminder may name. Each speaker's message names only the chosen items that speaker still owes.
+
+**Preview.** **Preview reminders** shows the message each speaker gets: the address, the subject, the HTML version in a safe frame, and the plain text version. Choose a speaker under **Recipient** to read their copy. The preview also names each selected speaker who gets no reminder and why: No email address, nothing missing in the chosen items, a reminder in the last 24 hours, or no accepted invitation. A change to the selection or the items clears the preview.
+
+**Send.** **Send 3 reminders** (the number is the recipient count) opens a confirmation that names the speakers. The server sends only the messages the preview showed:
+
+- **One reminder per click.** Each preview has its own id. The server records it for each speaker before the email goes. If you press **Send** twice, or the connection drops and the browser tries again, nothing more is sent.
+- **At most one reminder per speaker in 24 hours.** A speaker reminded less than 24 hours ago is left out, and the row says when the next reminder is possible.
+- **The wording the preview showed.** If someone saves new reminder wording after your preview, the server refuses the send. Preview again, then send.
+- **The messages the preview showed.** If a speaker's address, a missing item, a session title, or the site address changes after your preview, the server refuses the whole send. Preview again, then send.
+- **A message that could not be emailed** is reported after the send. Preview again to retry it.
+- **A message the provider may have accepted.** If the email provider stops answering after it took the message, the send reports that the speaker may have the reminder. The site does not send that speaker another reminder for 24 hours. Check the Email log.
+
+Every reminder goes through the event's email provider and appears in the Email log with its body. Each send writes one admin log entry with your account, the items, and the speakers who got a reminder. If a send stops part way, the entry is still written, names the speakers emailed so far, and is marked incomplete. A historical demo refuses the send.
+
+**Reminder wording.** The **Reminder wording** panel edits the subject, the HTML body, and the plain text body. Each missing item is one line inside a condition, for example `{{#if materials_sessions}}…{{/if}}`, so a line appears only when the speaker owes that item. `{{description_sessions}}` and `{{materials_sessions}}` hold the session titles. Both bodies must keep `{{dashboard_url}}`, the link to the speaker's dashboard. The server refuses a token the template does not know and says which one. **Use the shipped wording** deletes the saved wording. Each save and each reset writes an admin log entry. Save, then preview, to read the new wording as each speaker gets it.
+
+**Export this list as CSV** saves the speakers the current **Show** choice lists, one row per speaker, with the name, the email address, the status, the missing items, the session titles, and the last reminder. Use it with your own mailing tool. A cell that starts like a spreadsheet formula is escaped. Each export writes an admin log entry first. If that entry cannot be written, no file is made.
+
 ## Attendees
 
 The full attendee list with registration status and a search/filter. What action is available depends on the current status:
@@ -359,9 +394,112 @@ For complimentary seats, an operator opens **Issue complimentary admission**, en
 
 If a payment response is lost, the purchaser uses **Resume existing checkout** or **Recover existing checkout**. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the [support matrix](operator/stripe-ticketing.md#6-support-the-payment-and-the-attendee-separately) before suggesting another payment, refund, resend, or admission change.
 
+## Import records
+
+Add speakers, sessions and organizations (sponsors and partners) from a CSV file, for example an export from a spreadsheet or another event system. Open **Import records** under Operations. Staff and operators can use it.
+
+**The import saves drafts only.** It publishes nothing and sends no email or invitation:
+
+- A new speaker has the status **Not invited** (draft). It is not in the public speaker directory. Approve or invite the speaker on the **Speakers** page.
+- A new session or organization is a draft, and it is hidden: **Show this session when it is published** and **Show this organization when it is published** are cleared. Turn the option on in the editor, then publish.
+- A changed session or organization gets a new draft. The published version does not change until you publish.
+- A speaker has no draft. A change to a speaker who is not yet approved is saved on the speaker. A change to an approved speaker is not shown on the site: it waits on the **Speakers** page as **Changes pending review**, the same as a change the speaker makes. Apply or discard it there. The import does not change an approved speaker's slug. Change it in the speaker editor.
+- The import does not change a speaker's status or a record's **Show** option.
+
+**Steps.**
+
+1. Select the **Record type**: Speakers, Sessions or Organizations. Import speakers before sessions, so that the sessions can name their speakers.
+2. Choose the CSV file. The first row names the columns. A file can have up to 500 rows and 5 MB. A cell can have up to 5000 characters. Split a larger file.
+3. Under **Columns**, point each field at a column of the file. A column with the template's header, or with the field's name, is selected for you. A field set to **Not in this file** is never read or changed. Only the columns you map leave your browser.
+4. Select **Preview import**. The preview lists each row with its result: **New**, **Update**, **Matches existing**, **No change** or **Error**, and the reason for each error. Nothing is saved yet.
+5. Select **Import N speakers as drafts** (the words name the type and count). Rows with an error are skipped. The import checks each record again as it saves it, so a field someone edited after your preview keeps their edit, and a record deleted after your preview is not made again. The result lists what happened to each row, and the import writes one row to the audit log.
+
+If the file or the mapping changes after the preview, the import is refused. Preview again.
+
+**The external ID.** Each row needs an ID from the source system that stays the same each time you export the file, for example a registration number. The import uses it to find the record it made the last time:
+
+- Import the same file again, and nothing changes.
+- Change a value in the file and import it again, and that field changes in the draft. Other fields do not change.
+- If you edited a field in the admin panel and the file also changes that field, the import keeps your edit. The row shows a note that names the field.
+- A field you map for the first time fills only an empty field. A value already in the record is kept, with a note.
+- If you deleted a record that an import made, the import does not make it again. To make it again, give the row a new external ID.
+- After the import keeps your edit, the file's value counts as imported. If you later undo your edit, importing the same file does not bring the file's value back. Type it in the editor, or change it in the file. The same is true if you discard a speaker change that an import queued.
+
+**Records you made before the import.** A row that no import has seen before is matched to a record that already exists, so the import does not make a second copy. The row shows **Matches existing** and names the record. The import links the row's external ID to that record. It fills the record's empty fields and keeps every value the record has, with a note for each field where the file differs.
+
+- A speaker matches by slug: the `slug` cell, or the slug the name makes. If the row has an email address and the speaker has a different one, they are different people, and the row is an error. Give one of them another slug.
+- A session matches by `session_id`. With no `session_id` cell, it matches the session whose ID the title makes, if that session has the same title and is on the same day. A session with the same title on another day is a different session: the row makes a new one, with a note.
+- An organization matches by its address (`slug`, or the address the name makes).
+- A record that an import already linked to another external ID is not matched. The row is an error. Check the external ID.
+
+**Checks.** Each row goes through the same checks as the editor: a speaker's names, email and slug; a session's title, description, day and times; an organization's name, website and order. A row that fails shows the editor's own message.
+
+**Download a template** with **Download the speaker template** (or the session or organization template). Each template has the header row below and one example row. You can use other column names and map them by hand.
+
+| Record type | Template header row |
+|---|---|
+| Speakers | `external_id,first_name,last_name,slug,email,organization,job_title,bio` |
+| Sessions | `external_id,title,description,day,start_time,end_time,track,place,location,recording_url,speakers,session_id` |
+| Organizations | `external_id,name,slug,tier,website,description,order` |
+
+**Speaker columns.** `first_name` and `last_name` are required. If the file has one name column, map it to **Full name** instead. The first word becomes the first name. `slug` is the speaker's page address. Leave it empty and the import makes it from the name. A name change does not change the slug; change the `slug` cell to change it. A new slug that another speaker uses is an error. The import does not change the email address of a speaker who has an open invitation. Change it in the speaker editor.
+
+**Session columns.** `title` is required, and a session also needs a description, a day, a start time and an end time before it can be saved. Write each value the way your event settings name it:
+
+- `day`: the day's ID, its date (`2026-11-12`), or its label.
+- `start_time`, `end_time`: 24-hour (`13:30`) or 12-hour (`1:30 PM`).
+- `track`: the track letter or the track name.
+- `place`: the place ID or the place name.
+- `speakers`: speaker external IDs from a speaker import, or speaker slugs, separated by `;`. A speaker that does not exist, or that was removed, is an error.
+- `session_id`: the session's address on the site, for new sessions only. Leave it empty and the import makes it from the title. A `session_id` that an existing session uses matches that session.
+
+The import does not set a parent session. Set it in the session editor.
+
+**Organization columns.** `name` is required. `slug` is the page address, for new organizations only. Leave it empty and the import makes it from the name. An address that another organization uses matches that organization (see **Records you made before the import**). `website` must start with `http://` or `https://`. `order` is a number. The import does not set a logo. Choose it in the organization editor.
+
+**Remove an imported record** the same way as any other record: **Delete** in its editor or list. The import keeps no copy of the file. For each external ID it keeps only the record it links to and a fingerprint (a digest) of each value it imported, not the values, so a deleted speaker's email address or bio does not stay behind.
+
 ## Announcements
 
+The page has two parts: site banners and announcement email.
+
+### Site banners
+
 Create, edit, and remove the ruled message bands shown across the public site. Choose **Notice** or **Urgent**, then set the start and end time. You can add one absolute `http` or `https` link and its visible label. A save is live immediately. The site shows the announcement only during that window, and a visitor who dismisses it does not see that same record again in that browser.
+
+### Announcement email
+
+Staff and operators can email one announcement to an audience. A banner and an email are separate: Sending an email does not change the site, and saving a banner sends no email.
+
+1. Under **Email an announcement**, choose the **Audience**:
+   - **Registered attendees**: Approved attendees and people who claimed a ticket.
+   - **Approved attendees**: Accounts with approved attendee access.
+   - **Speakers**: Accounts linked to a speaker profile.
+
+   A revoked account is never in an audience. Each address gets one copy, even when two accounts share it.
+2. Write the **Subject** and the **Email message** in plain text. A blank line starts a new paragraph. You can add one button with **Button link (optional)** and **Button label (optional)**. The site puts the message inside the event's email header and footer.
+3. Select **Preview email**. The preview states the recipient count, how many addresses are left out because they unsubscribed, the sender, and where the unsubscribe link goes. It shows the email with links and remote images turned off, and the plain text version. A preview sends nothing.
+4. Select **Send a test to me** to get one copy at your own address. The subject starts with "Test:". Its unsubscribe link changes nothing.
+5. Select **Send to N recipients**. A confirmation repeats the count. Select **Send to N recipients** in the confirmation to send, or **Go back**. A sent email cannot be recalled.
+
+Any edit after the preview removes the preview, so you confirm only what you saw. If someone registers or unsubscribes between the preview and the confirmation, the server refuses the send and asks you to preview again.
+
+**Large audiences.** One send can reach at most 5,000 addresses. The site sends 200 addresses at a time and the page keeps going until the send is done, with a progress line. If you close the page part way, the send shows **Sending** in the history. Select **Continue sending** there. Nobody gets a second copy: Every recipient has a send-once key.
+
+**Email send history** lists the 20 most recent sends, newest first: the subject, the audience, the time on the event's clock, who sent it, and the counts. A failed address and the provider's reason are under **Failed addresses**. The list keeps the first 50; when there are more, it says so, and the Email log filtered by the source **Announcement** has every one. "Unknown result" means the provider did not confirm whether it accepted the message; the site does not resend it. **Use this message** loads a past send into the form as a new draft.
+
+**Retry failed addresses.** When the email provider is down or busy during a send, the addresses it could not take are kept. The history then offers **Retry N failed addresses**. It loads the message and limits the next preview and send to those addresses. Preview and confirm as usual. Each send can be retried once, so nobody gets two copies from two retries; if the retry also fails, retry from the retry's row. An address the provider refused for good (for example, an inactive address) and an unknown result are not retried. If a send stopped part way, **Continue sending** counts an address that failed before the stop as failed again, and offers it for a retry as usual. If it reports recipients "already handled by an earlier call", some of them may not have got the email: the site cannot tell, and it does not resend them. Each recipient's copy is also in the [Email log](#email-log) under the source **Announcement**, and each test under **Announcement test**.
+
+**Unsubscribe.** Every announcement carries a one-click unsubscribe link, so a mail program can show its own unsubscribe button. There are two unsubscribe modes, and the broadcast stream's unsubscribe handling picks one:
+
+- **Postmark** handling (Postmark-managed), the default: Postmark adds the link and the `List-Unsubscribe` headers, and keeps the opt-out on its own list for the stream. The site copies each opt-out from the delivery webhook.
+- **Custom** handling, for clients on another email provider (and the console provider in development): the site adds a signed link and the `List-Unsubscribe` headers, and records the opt-out itself.
+
+With both types of handling, the site leaves that address out of every later announcement and out of the rest of a send in progress. Sign-in codes, receipts, and speaker mail still reach the person. To send announcements to that person again, only when they ask, enter the address under **Restore an unsubscribed address** and select **Restore address**. With Postmark handling, also reactivate the address on the broadcast stream's suppression list in Postmark; until then, Postmark refuses it and it shows under **Failed addresses**.
+
+**When the composer cannot send.** A notice names the reason. The usual ones: The deployment uses the webhook relay, which has no batch send or unsubscribe support yet; the Postmark broadcast stream is not set up (see `docs/POSTMARK_PROVISIONING.md`, section 2a); or this is the historical demo, which is read-only. You can still preview.
+
+Every send, test send, and restored address writes an `admin_logs` row with your address. An unsubscribe writes a row without the person's address.
 
 ## Live updates
 
@@ -373,7 +511,7 @@ Every submission from the public feedback modal, newest first, with a mark-revie
 
 ## Email log
 
-Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
+Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, pitch receipts and decision emails, operator alerts, ticket prompts, and announcement email with its test sends. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
 
 - **Search** looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers **Search older messages**, which reads the next 500.
 - **Source** picks one kind of message. **Status** picks **Sent** or **Failed**, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed. **Bounced** means the recipient's mail server refused the message. **Complained** means the recipient marked it as spam. **Suppressed** means the mail provider did not send it, because the address is on the provider's block list.
@@ -410,7 +548,7 @@ Session materials review — upload or link files against a session, with an opt
 
 **Every archive is recorded.** The server writes one admin log entry per file in the archive, with your address, before it sends the first byte. If those entries cannot be written, the server refuses the archive. A single-file download writes no entry.
 
-**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures.
+**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures. The panel also counts hidden sessions and speakers who have not accepted an invitation. **Speaker reminders** counts neither, so a speaker the panel names can be absent from **Materials missing** there.
 
 ## Version history
 
@@ -424,6 +562,26 @@ Every publish keeps a version of the record. A version holds the record's conten
 ## System errors
 
 Unresolved system-error rows — the operational surface for things like an invalid email-template override falling back to its code default. Each row has a resolve action. If you are chasing down why a template edit "is not working", check here before assuming it is a bug: A rejected override logs here and silently keeps serving the last-good copy rather than breaking the send.
+
+## Data export
+
+The event's records as spreadsheets, and the event data package for the handoff after an event. Open it from the System group on the rail. Every export writes an admin log entry before the file is sent; if the entry cannot be written, no file is made. The server keeps no copy of any file.
+
+**Spreadsheets.** Each row saves one CSV file named for its list and the date, such as `sessions-2026-10-01.csv`. The file shows the current version of every record and its state (Draft, Live, or Live with unpublished changes), so a draft is in the file too. The sessions and organizations files also have a **Hidden** column: `yes` for a record the site does not show. A cell that starts with `=`, `+`, `-`, or `@` gains a leading apostrophe, as in the attendee export, so a spreadsheet shows it as text.
+
+| Spreadsheet | Tier | Columns |
+|---|---|---|
+| Sessions | Staff | Session ID, title, state, hidden, day, date, start and end time, time zone, type, track, location, speakers, speaker IDs, the session it is part of, description, number of materials |
+| Speakers | Staff | Speaker ID, first and last name, email, organization, role, status, published sessions (live and not hidden), social handles, bio, headshot path in Storage |
+| Organizations and sponsors | Staff | Organization ID, name, state, hidden, tier, website, description, support description, logo path, order |
+| Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |
+| Admissions | Operator | Ticket ID, order ID, provider, ticket type, holder's first and last name, email, status, whether an account claimed it, checked in, purchased |
+
+No spreadsheet holds an account id, an invite token, staged speaker edits, a private note, a checkout link, or a raw payment provider record. Amounts are in the currency's major unit (`25.00`). Staff do not see the two operator rows; the page says who exports them. Attendees and session pitches export from their own pages, because those exports follow the page's filter.
+
+**The event data package.** Operators only. **Download event data package** saves one zip file named `event-data-package-<date>.zip`. It holds a JSON file for each record type, CSV files for the main lists, `manifest.json` with record counts and checksums, and `README.md`, which describes each file, the links between files, and how to handle the personal data in it. Choose the parts under **Parts to include**; all eight are chosen at the start. **Include staff notes on session pitches** is off at the start. The package holds live records only, in its CSV files too: a draft that was never published, or a newer draft of a live record, is not in it. A hidden live record is in it, with `visible: false` in JSON and **Hidden** `yes` in CSV. The package never holds the admin allowlist, credentials, the admin log, or raw provider records. It holds file paths and links for media and materials, not the files.
+
+The page sends a package of up to 9 MB built from at most 50,000 stored documents. Each document counts once, even when two files draw on it. A larger event gets a message that names `scripts/export-event-package.cjs`, which builds the same package from a terminal. [Archive and hand off a past event](operator/archive-handoff.md) covers the script, how to check a package, a full Firebase backup, the Storage files, and how to keep the past site online read-only.
 
 ## Settings → Event settings
 

@@ -97,12 +97,22 @@ function addedAccounts(existing, merged) {
  * Seed one publishable collection: draft write then publish, per document,
  * skipping anything a client has edited.
  *
+ * `keepStored` names fields a refresh takes from the stored document rather
+ * than from the seed. The page seed passes `visible`: a release that seeds a
+ * page hidden (recap, guidelines, city guide) must not take that page off a
+ * site an earlier release seeded it visible on. A refresh rewrites an
+ * untouched document, and an untouched page's visibility is still the
+ * site's own state. A created document takes the seed's value.
+ *
  * @param {{ db: object, store: object, collection: string, docs: object[],
- *           dryRun?: boolean, now?: () => number, force?: boolean }} args
+ *           dryRun?: boolean, now?: () => number, force?: boolean,
+ *           keepStored?: readonly string[] }} args
  * @returns {Promise<{ created: string[], refreshed: string[],
  *                     skipped: Array<{ id: string, reason: string }> }>}
  */
-async function seedCollection({ db, store, collection, docs, dryRun = false, now = Date.now, force = false }) {
+async function seedCollection({
+  db, store, collection, docs, dryRun = false, now = Date.now, force = false, keepStored = [],
+}) {
   const created = [];
   const refreshed = [];
   const skipped = [];
@@ -110,7 +120,7 @@ async function seedCollection({ db, store, collection, docs, dryRun = false, now
 
   const draftCollection = draftCollectionFor(collection);
   for (const doc of docs) {
-    const { id, ...fields } = doc;
+    const { id, ...seedFields } = doc;
     // Both revisions: unpublished editor work lives only in the draft, and
     // writeDraft + publishDocs below would overwrite it and then make the
     // placeholder live (§8.4).
@@ -128,6 +138,13 @@ async function seedCollection({ db, store, collection, docs, dryRun = false, now
     if (decision.action === 'create') created.push(id);
     else refreshed.push(id);
     if (dryRun) continue;
+    const stored = existing ?? draft;
+    const fields = { ...seedFields };
+    if (decision.action !== 'create' && stored) {
+      for (const key of keepStored) {
+        if (Object.prototype.hasOwnProperty.call(stored, key)) fields[key] = stored[key];
+      }
+    }
     await store.writeDraft({
       db,
       collection,
@@ -523,10 +540,11 @@ async function countSeeded({ db, collection = 'cmsContent' }) {
  * @param {{ db: object }} args
  * @returns {Promise<{ event: object|null, providers: object|null,
  *                     theme: object|null, bootstrap: object|null,
- *                     features: object|null }>}
+ *                     features: object|null, template: object|null }>}
  */
 async function readConfig({ db }) {
-  const ids = ['event', 'providers', 'theme', 'bootstrap', 'features'];
+  // `template` exists only on a project made from an event template (issue #328).
+  const ids = ['event', 'providers', 'theme', 'bootstrap', 'features', 'template'];
   const snaps = await db.getAll(...ids.map((id) => db.collection('config').doc(id)));
   const out = {};
   ids.forEach((id, i) => {

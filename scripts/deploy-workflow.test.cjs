@@ -250,6 +250,17 @@ test('the functions runtime learns about the publisher only when the client enab
   }
 });
 
+test('Airtable pitch intake is validated and reaches both functions env writers, never its token', () => {
+  const validation = step('Validate Tier A environment (spec §2.1) before touching GCP');
+  assert.match(validation, /EVENT_AIRTABLE_ENABLED: \$\{\{ vars\.EVENT_AIRTABLE_ENABLED \}\}/);
+  const writers = workflow.split('- name: Write the functions runtime env for this project').slice(1);
+  assert.equal(writers.length, 2);
+  for (const writer of writers) {
+    assert.match(writer, /echo "EVENT_AIRTABLE_ENABLED=\$\{EVENT_AIRTABLE_ENABLED:-false\}"/);
+  }
+  assert.doesNotMatch(workflow, /AIRTABLE_API_TOKEN=/);
+});
+
 test('the job name in the workflow matches the one the shared config pins', () => {
   const { SITE_PUBLISHER_JOB_NAME } = require('../packages/shared/src/config/deploy.cjs');
   assert.match(workflow, new RegExp(`EVENT_SITE_PUBLISHER_JOB=${SITE_PUBLISHER_JOB_NAME}`));
@@ -319,7 +330,7 @@ test('both function rewrites name their region in object form, and the deploy pa
   // us-central1, which routes a non-default-region client at a backend
   // that does not exist there.
   const functionRewrites = firebaseJson.hosting.rewrites.filter((r) => r.function);
-  assert.equal(functionRewrites.length, 2);
+  assert.equal(functionRewrites.length, 3);
   for (const rewrite of functionRewrites) {
     assert.equal(typeof rewrite.function, 'object');
     assert.ok(rewrite.function.functionId);
@@ -327,7 +338,9 @@ test('both function rewrites name their region in object form, and the deploy pa
   }
   assert.deepEqual(
     functionRewrites.map((r) => r.function.functionId).sort(),
-    ['routeMeta', 'updatesMeta'],
+    // emailUnsubscribe answers the signed link in announcement email
+    // (issue #490) on the site's own /unsubscribe path.
+    ['emailUnsubscribe', 'routeMeta', 'updatesMeta'],
   );
 
   const patch = step('Set the function rewrite regions for this project');

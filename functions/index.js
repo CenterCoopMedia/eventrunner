@@ -20,6 +20,8 @@ const adminConfig = require('./src/admin/config.cjs');
 const adminCustomBadges = require('./src/admin/customBadges.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminAnnouncements = require('./src/admin/announcements.cjs');
+const announcementSends = require('./src/announcements/sends.cjs');
+const announcementSuppression = require('./src/announcements/suppression.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
 const adminChangeRequests = require('./src/admin/changeRequests.cjs');
 const adminAccess = require('./src/admin/access.cjs');
@@ -40,6 +42,7 @@ const speakersProfile = require('./src/speakers/profile.cjs');
 const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
 const speakersProjection = require('./src/speakers/projection.cjs');
 const speakersInvites = require('./src/speakers/invites.cjs');
+const speakersReminders = require('./src/speakers/reminders.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
 const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
@@ -60,6 +63,9 @@ const ticketingCommerceHttp = require('./src/ticketing/commerceHttp.cjs');
 const ticketingCommerceAdmin = require('./src/ticketing/commerceAdmin.cjs');
 const ticketingCommerceEmail = require('./src/ticketing/commerceEmail.cjs');
 const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
+const recordImport = require('./src/imports/recordImport.cjs');
+const adminDataExport = require('./src/admin/dataExport.cjs');
+const adminEventPackage = require('./src/admin/eventPackage.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -78,6 +84,8 @@ module.exports = {
   ...adminCustomBadges.handlers,
   ...adminLiveUpdates.handlers,
   ...adminAnnouncements.handlers,
+  ...announcementSends.handlers,
+  ...announcementSuppression.handlers,
   ...adminFeedback.handlers,
   ...adminChangeRequests.handlers,
   ...adminAccess.handlers,
@@ -90,6 +98,7 @@ module.exports = {
   ...scheduleReactions.handlers,
   ...sessionPitches.handlers,
   ...require('./src/sessions/pitchQueue.cjs').handlers,
+  ...require('./src/sessions/airtableSync.cjs').handlers,
   ...usersLifecycle.handlers,
   ...usersProjection.handlers,
   ...usersApproval.handlers,
@@ -99,6 +108,7 @@ module.exports = {
   ...speakersLifecycle.handlers,
   ...speakersProjection.handlers,
   ...speakersInvites.handlers,
+  ...speakersReminders.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
   ...systemErrorsAdmin.handlers,
@@ -119,4 +129,7 @@ module.exports = {
   ...ticketingCommerceAdmin.handlers,
   ...ticketingCommerceEmail.handlers,
   ...maintenanceCleanup.handlers,
+  ...recordImport.handlers,
+  ...adminDataExport.handlers,
+  ...adminEventPackage.handlers,
 };

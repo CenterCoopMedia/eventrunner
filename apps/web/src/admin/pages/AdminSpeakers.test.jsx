@@ -145,6 +145,20 @@ describe('speakers list', () => {
     expect(screen.getByText('Account linked')).toBeInTheDocument();
   });
 
+  it('offers reminders to accepted and approved speakers only, and opens the reminders page', async () => {
+    speakerDocs = [
+      RAE,
+      { ...RAE, id: 'sam-example', firstName: 'Sam', lastName: 'Example', slug: 'sam-example', status: 'draft' },
+    ];
+    await renderAt('/admin/speakers');
+    expect(await screen.findByRole('link', { name: 'Remind Rae Okonkwo' })).toHaveAttribute(
+      'href',
+      '/admin/speakers/reminders/send?speaker=rae-okonkwo',
+    );
+    expect(screen.queryByRole('link', { name: 'Remind Sam Example' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Send reminders' })).toHaveAttribute('href', '/admin/speakers/reminders/send');
+  });
+
   it('offers an empty state with a way in when there are no speakers', async () => {
     await renderAt('/admin/speakers');
     expect(screen.getByText('No speakers yet')).toBeInTheDocument();

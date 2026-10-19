@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archive and hand off a past event — Event Runner documentation</title>
+  <meta name="description" content="Export the event data package, back up the project, and keep the past site online read-only.">
+  <link rel="canonical" href="https://centercoopmedia.github.io/eventrunner/docs/archive-handoff/">
+  <link rel="icon" type="image/svg+xml" href="/eventrunner/favicon.svg">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Event Runner">
+  <meta property="og:title" content="Archive and hand off a past event — Event Runner documentation">
+  <meta property="og:description" content="Export the event data package, back up the project, and keep the past site online read-only.">
+  <meta property="og:url" content="https://centercoopmedia.github.io/eventrunner/docs/archive-handoff/">
+  <meta property="og:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Event Runner documentation">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Archive and hand off a past event — Event Runner documentation">
+  <meta name="twitter:description" content="Export the event data package, back up the project, and keep the past site online read-only.">
+  <meta name="twitter:image" content="https://centercoopmedia.github.io/eventrunner/og-default.png">
+  <meta name="twitter:image:alt" content="Event Runner documentation">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191a1c" media="(prefers-color-scheme: dark)">
+
+  <link rel="preload" href="/eventrunner/fonts/source-sans-3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/eventrunner/fonts/bricolage-grotesque-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/eventrunner/tokens.css">
+  <link rel="stylesheet" href="/eventrunner/styles.css">
+  <link rel="stylesheet" href="/eventrunner/docs.css">
+  <script src="/eventrunner/scroll-regions.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="wrap">
+    <header class="site-header">
+      <a class="brand" href="/eventrunner/">
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="2.5" y="2" width="3" height="20"/>
+          <rect x="5.5" y="2" width="16" height="3"/>
+          <rect x="5.5" y="11" width="9.5" height="2"/>
+          <rect x="5.5" y="19.5" width="13" height="2.5"/>
+        </svg>
+        <span class="brand-words">
+          <strong>Event Runner</strong>
+          <span class="brand-line">Documentation</span>
+        </span>
+      </a>
+      <nav aria-label="Site">
+        <a href="/eventrunner/">Home</a>
+        <a href="/eventrunner/docs/">Documentation</a>
+        <a href="/eventrunner/demo/">Demo</a>
+        <a href="https://github.com/CenterCoopMedia/eventrunner">Repo</a>
+      </nav>
+    </header>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+        <li><a href="/eventrunner/">Home</a></li>
+        <li><a href="/eventrunner/docs/">Documentation</a></li>
+        <li><span aria-current="page">Archive and hand off a past event</span></li>
+        </ol>
+      </nav>
+    <div class="docs-layout">
+      <nav class="docs-nav" aria-label="Documentation">
+        <p class="docs-nav-section">Start here</p>
+        <ul>
+          <li><a href="/eventrunner/docs/overview/">Overview</a></li>
+          <li><a href="/eventrunner/docs/handbook/">Handbook</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-clients/">For clients</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-event-staff/">For event staff</a></li>
+          <li><a href="/eventrunner/docs/handbook/for-attendees/">For attendees</a></li>
+          <li><a href="/eventrunner/docs/handbook/faq/">FAQ</a></li>
+          <li><a href="/eventrunner/docs/handbook/getting-help/">Getting help</a></li>
+          <li><a href="/eventrunner/docs/handbook/glossary/">Glossary</a></li>
+        </ul>
+        <p class="docs-nav-section">Operate</p>
+        <ul>
+          <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
+          <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
+          <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
+          <li><a href="/eventrunner/docs/archive-handoff/" aria-current="page" class="is-current">Archive and hand off a past event</a></li>
+          <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
+          <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
+          <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
+          <li><a href="/eventrunner/docs/deploy-runbook/">Deploy runbook</a></li>
+          <li><a href="/eventrunner/docs/postmark-provisioning/">Postmark provisioning</a></li>
+          <li><a href="/eventrunner/docs/eventbrite-verification/">Eventbrite verification</a></li>
+          <li><a href="/eventrunner/docs/npm-name-claim/">npm name claim</a></li>
+        </ul>
+        <p class="docs-nav-section">Build</p>
+        <ul>
+          <li><a href="/eventrunner/docs/contributing/">Contributing</a></li>
+          <li><a href="/eventrunner/docs/code-of-conduct/">Code of conduct</a></li>
+          <li><a href="/eventrunner/docs/governance/">Governance</a></li>
+          <li><a href="/eventrunner/docs/releasing/">Releasing</a></li>
+          <li><a href="/eventrunner/docs/interface-guidelines/">Interface guidelines</a></li>
+          <li><a href="/eventrunner/docs/decisions/0001-event-platform-v1/">ADR 0001: Event platform v1</a></li>
+          <li><a href="/eventrunner/docs/decisions/0003-optional-google-calendar-sync/">ADR 0003: Optional Google Calendar sync</a></li>
+          <li><a href="/eventrunner/docs/roadmap/">Roadmap</a></li>
+          <li><a href="/eventrunner/docs/changelog/">Changelog</a></li>
+        </ul>
+        <p class="docs-nav-section">Get help</p>
+        <ul>
+          <li><a href="/eventrunner/docs/support/">Support</a></li>
+          <li><a href="/eventrunner/docs/security/">Security</a></li>
+        </ul>
+      </nav>
+      <main class="docs-main" id="main">
+        <article class="prose">
+          <h1>Archive and hand off a past event</h1>
+          <nav class="contents" aria-labelledby="contents-title">
+            <p class="contents-title" id="contents-title">On this page</p>
+            <ul>
+              <li><a href="#three-kinds-of-access">Three kinds of access</a></li>
+              <li><a href="#1-spreadsheets-for-staff">1. Spreadsheets for staff</a></li>
+              <li><a href="#2-the-event-data-package">2. The event data package</a></li>
+              <li><a href="#3-a-full-backup-firebase-managed-export">3. A full backup: Firebase managed export</a></li>
+              <li><a href="#4-uploaded-files-in-storage">4. Uploaded files in Storage</a></li>
+              <li><a href="#5-keep-the-past-site-online-read-only">5. Keep the past site online, read-only</a></li>
+              <li><a href="#6-retention-and-deletion">6. Retention and deletion</a></li>
+              <li><a href="#handoff-record">Handoff record</a></li>
+            </ul>
+          </nav>
+          <p>Use this runbook after an event ends. It covers four things: the files the client receives, a full backup of the Firebase project, the uploaded files in Storage, and how to keep the past site online and read-only.</p>
+          <p>The client owns the event data. Each client deployment uses a separate Firebase project, so the data never shares a database with another client.</p>
+          <h2 id="three-kinds-of-access">Three kinds of access<a class="heading-anchor" href="#three-kinds-of-access" aria-label="Link to this section">#</a></h2>
+          <p>These are different things. State which ones the client gets.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>What</th><th>What it gives</th><th>Who has it</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Access to the cloud project</td><td>Console and command-line access to the Firebase and Google Cloud project: the database, Storage, logs and billing.</td><td>The deployment operator. The client gets it only when the contract says so.</td></tr>
+          <tr><td>Data ownership</td><td>The contract terms: the client owns the records the event collected, and decides how long to keep them.</td><td>The client.</td></tr>
+          <tr><td>Portable export</td><td>Files the client can open and keep without the project: spreadsheets and the event data package.</td><td>Anyone the client gives the files to.</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>A portable export is not a backup of the project. A managed export (below) is a backup, and it needs the project to restore.</p>
+          <h2 id="1-spreadsheets-for-staff">1. Spreadsheets for staff<a class="heading-anchor" href="#1-spreadsheets-for-staff" aria-label="Link to this section">#</a></h2>
+          <p>Open <strong>Data export</strong> in the admin panel (System group). Staff and operators can export:</p>
+          <ul>
+          <li><strong>Sessions</strong>: title, state, whether it is hidden, day, times, location, speakers and description.</li>
+          <li><strong>Speakers</strong>: name, email address, organization, status and published sessions.</li>
+          <li><strong>Organizations and sponsors</strong>: name, state, whether it is hidden, tier, website and description.</li>
+          </ul>
+          <p>Operators can also export <strong>Ticket orders</strong> and <strong>Admissions</strong>. Those files name purchasers and amounts.</p>
+          <p>Attendees and session pitches export from their own pages, with the page&#39;s filter: <strong>Attendees</strong> → <strong>Export</strong>, and <strong>Session pitches</strong> → the queue export.</p>
+          <p>Every spreadsheet writes an admin log entry before the file is sent. A cell that starts with =, +, - or @ gains a leading apostrophe, so a spreadsheet shows it as text and does not run it. No file holds an account id, an invite token, a private note or a raw payment provider record.</p>
+          <h2 id="2-the-event-data-package">2. The event data package<a class="heading-anchor" href="#2-the-event-data-package" aria-label="Link to this section">#</a></h2>
+          <p>An operator selects <strong>Download event data package</strong> on the <strong>Data export</strong> page. The package is one zip file:</p>
+          <ul>
+          <li>One JSON file per record type: content and settings, pages, updates, timeline, announcements, live updates, the media library index, sessions, speakers, organizations, session materials, attendees, ticket orders, admissions, the ticket catalog and session pitches with their review state.</li>
+          <li>CSV files for sessions, speakers, organizations, attendees, orders and admissions.</li>
+          <li><code>manifest.json</code>: the format name, the schema version, the export time, each file&#39;s record count and SHA-256 checksum, the relationships between files and the list of what is left out.</li>
+          <li><code>README.md</code>: what each file holds, the formats, the relationships, and the rules for personal data.</li>
+          </ul>
+          <p><strong>Choose the parts.</strong> Every part is selected at the start. Clear the parts the client does not need. <strong>Include staff notes on session pitches</strong> is off at the start. Turn it on only when the client asks for the reviewers&#39; notes.</p>
+          <p><strong>Live records only.</strong> Every file in the package, CSV files included, holds the live version of each record. A draft that was never published, and a newer draft of a live record, are not in it. A hidden live record is in it: <code>visible</code> is <code>false</code> in its JSON record, and <strong>Hidden</strong> is <code>yes</code> in its CSV row. Before you send the package to a third party, check the hidden records. The staff spreadsheets differ: they show drafts, with their state.</p>
+          <p><strong>What the package never holds.</strong> <code>config/bootstrap</code> (the admin allowlist), <code>config/providers</code>, drafts and version history, the admin log, sign-in codes, rate limits, the sent mail log, invite tokens, webhook deliveries, the ticket sync queue, payment attempts, raw provider payloads, and every credential. Credentials live in Secret Manager, not in Firestore. The manifest lists each excluded collection with its reason.</p>
+          <p><strong>Delivery.</strong> The zip goes from the server to the operator&#39;s browser only. The server writes no copy to Firestore or Storage, so there is no link to share by mistake. The server writes the admin log entry before it sends the file. If the entry cannot be written, the server sends nothing.</p>
+          <p><strong>Size.</strong> The page can send a package of up to 9 MB, built from at most 50,000 stored documents. Each document counts once, even when two files draw on it. A larger event gets a message that names the script below.</p>
+          <h3 id="a-large-event-the-script">A large event: the script<a class="heading-anchor" href="#a-large-event-the-script" aria-label="Link to this section">#</a></h3>
+          <p>Run the same export from a terminal with the operator&#39;s credentials:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_FIREBASE_PROJECT_ID=&lt;project-id&gt; node scripts/export-event-package.cjs --out event-data-package.zip --actor &lt;your-email&gt;
+          </code></pre>
+          <ul>
+          <li><code>--actor</code> is required: your email address. The credentials do not name a person, so the admin log entry records this address.</li>
+          <li><code>--sections program,speakers</code> limits the parts. The ids are <code>content</code>, <code>program</code>, <code>speakers</code>, <code>organizations</code>, <code>materials</code>, <code>attendees</code>, <code>orders</code> and <code>pitches</code>.</li>
+          <li><code>--include-staff-notes</code> adds the pitch reviewers&#39; notes.</li>
+          <li><code>--force</code> replaces an existing file.</li>
+          </ul>
+          <p>The script uses application-default credentials or <code>GOOGLE_APPLICATION_CREDENTIALS</code> (<code>scripts/lib/firebase-init.cjs</code>). It writes an admin log entry with your <code>--actor</code> address, <code>details.via: &#39;script&#39;</code> and the credential mode, then the file with owner-only permissions.</p>
+          <h3 id="check-a-package">Check a package<a class="heading-anchor" href="#check-a-package" aria-label="Link to this section">#</a></h3>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">node scripts/export-event-package.cjs --verify event-data-package.zip
+          </code></pre>
+          <p>The check reads the manifest, compares each file with its checksum and record count, and follows each relationship (for example, a session&#39;s <code>speakerIds</code> to <code>speakers/speakers.json</code>). It prints the counts and any reference that does not resolve. A reference that does not resolve is not damage: a speaker deleted after the event, or an admission from an external ticketing source, can name a record the package does not hold. The command exits 1 only when a file is missing, changed or not listed.</p>
+          <p>A consumer reads the package without Event Runner: unzip it, read <code>manifest.json</code>, and join the JSON files on <code>id</code>. <code>README.md</code> names every join.</p>
+          <h2 id="3-a-full-backup-firebase-managed-export">3. A full backup: Firebase managed export<a class="heading-anchor" href="#3-a-full-backup-firebase-managed-export" aria-label="Link to this section">#</a></h2>
+          <p>The package holds the records a client uses. A managed export holds the whole database, and it restores into a Firebase project.</p>
+          <ol>
+          <li><p>Make a Cloud Storage bucket for the archive, in the same project or in the client&#39;s own project. Give it uniform bucket-level access and no public access.</p></li>
+          <li><p>Give the account that runs the export the <strong>Cloud Datastore Import Export Admin</strong> role (<code>roles/datastore.importExportAdmin</code>) and write access to the bucket.</p></li>
+          <li><p>Run the export:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gcloud firestore export gs://&lt;archive-bucket&gt;/firestore-$(date +%Y-%m-%d) --project &lt;project-id&gt;
+          </code></pre></li>
+          </ol>
+          <ol start="4">
+          <li>Wait for the operation to finish: <code>gcloud firestore operations list --project &lt;project-id&gt;</code>.</li>
+          </ol>
+          <p>A managed export includes every collection, the admin log and the excluded collections among them. Treat it as more sensitive than the package. To restore it, run <code>gcloud firestore import</code> into a project.</p>
+          <h2 id="4-uploaded-files-in-storage">4. Uploaded files in Storage<a class="heading-anchor" href="#4-uploaded-files-in-storage" aria-label="Link to this section">#</a></h2>
+          <p>The package lists paths and does not copy files. Logos, images, profile photos and session material files stay in the project&#39;s Storage bucket. Copy them with the backup:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gcloud storage cp --recursive gs://&lt;storage-bucket&gt;/* gs://&lt;archive-bucket&gt;/storage-$(date +%Y-%m-%d)/
+          </code></pre>
+          <p><code>cms-images/</code> and <code>branding/</code> hold the site&#39;s images, and <code>content/media.json</code> in the package names each one&#39;s path. <code>session-materials/&lt;sessionId&gt;/</code> holds material files, and <code>materials/materials.json</code> names each one&#39;s path. <code>speaker-photos/</code> and <code>profile-photos/</code> hold speaker and attendee photos, which are personal data.</p>
+          <h2 id="5-keep-the-past-site-online-read-only">5. Keep the past site online, read-only<a class="heading-anchor" href="#5-keep-the-past-site-online-read-only" aria-label="Link to this section">#</a></h2>
+          <p>The public site can stay online after the event:</p>
+          <ol>
+          <li>Settle ticketing first. Pause sales, finish refunds and reconciliation, and wait until the ticket sync queue is empty. The <a href="/eventrunner/docs/deploy-runbook/">deploy runbook</a> section &quot;Archiving an event with ticket sales&quot; gives the order.</li>
+          <li>Close the pitch call in <strong>Session pitches</strong>.</li>
+          <li>In <strong>Settings → Event settings</strong>, set the <strong>archive date</strong>. Every day becomes a back issue: the content stays, and bookmarking, reactions and calendar links go away.</li>
+          <li>Download the event data package and the spreadsheets first. Then set <code>config/event.historicalDemo</code> to <code>true</code>. Account, feedback and email actions then refuse writes, and so does sign-in with an email code. An admin who signs in with Google can still open the admin panel and run both exports. An admin who signs in only with an email code cannot get back in until an operator sets <code>historicalDemo</code> to <code>false</code> again.</li>
+          <li>Remove staff access the client no longer needs on <strong>Access</strong>.</li>
+          </ol>
+          <p>To take the site offline instead, export first, then disable Hosting (<code>firebase hosting:disable --project &lt;project-id&gt;</code>).</p>
+          <h2 id="6-retention-and-deletion">6. Retention and deletion<a class="heading-anchor" href="#6-retention-and-deletion" aria-label="Link to this section">#</a></h2>
+          <ul>
+          <li>Agree a retention period with the client before the handoff, and write it in the handoff record.</li>
+          <li>Store the package, the managed export and the Storage copy with access control. Do not send any of them as an open link.</li>
+          <li>When a person asks to be deleted after the export, delete the account in <strong>Attendees</strong>, and remove the person from every copy of the package and the backup, or delete those copies.</li>
+          <li>When the retention period ends, delete the archive bucket, every downloaded package, and, when the contract ends, the Firebase project.</li>
+          </ul>
+          <h2 id="handoff-record">Handoff record<a class="heading-anchor" href="#handoff-record" aria-label="Link to this section">#</a></h2>
+          <p>Record these items for each handoff:</p>
+          <ul>
+          <li>The date of the package and its <code>manifest.json</code> checksum list.</li>
+          <li>The parts included, and whether staff notes were included.</li>
+          <li>The location of the managed export and the Storage copy.</li>
+          <li>Who received each one, and the retention period.</li>
+          <li>Whether the site stays online, and the archive date.</li>
+          </ul>
+        </article>
+        <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/archive-handoff.md"><code>docs/operator/archive-handoff.md</code></a>. Edit the Markdown, not the HTML.</p>
+        <nav class="page-nav" aria-label="Documentation pages">
+          <a class="page-nav-link" rel="prev" href="/eventrunner/docs/stripe-ticketing/"><span>Previous</span>Stripe ticketing launch and support</a>
+          <a class="page-nav-link page-nav-next" rel="next" href="/eventrunner/docs/webmcp-diagnostics/"><span>Next</span>Use read-only browser diagnostics</a>
+        </nav>
+      </main>
+    </div>
+    <footer class="site-footer">
+      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>
+      <div>
+        <a href="https://centerforcooperativemedia.org">CCM</a>
+        ·
+        <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/LICENSE">Apache-2.0</a>
+        ·
+        <a href="/eventrunner/docs/security/">Security</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

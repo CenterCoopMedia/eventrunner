@@ -125,9 +125,16 @@ describe('Home', () => {
     // This historical demo supplies neither invented attendance totals nor
     // past-edition history. Normal client block coverage uses isolated fixtures.
     expect(home.sections.some((section) => ['stats', 'history'].includes(section.id))).toBe(false);
-    // Footer link group renders as a descriptive link.
+    // The footer section's link group renders in the site footer, as a
+    // descriptive link, and not a second time in the home body under a
+    // "Footer links" heading (launch rehearsal, v1280-home.png).
+    const footerSection = home.sections.find((s) => s.id === 'footer');
+    expect(within(screen.getByRole('main')).queryByRole('heading', { name: footerSection.label })).toBeNull();
     expect(
-      screen.getByRole('link', { name: siteContent.footer__contact_link.label }),
+      within(screen.getByRole('main')).queryByRole('link', { name: siteContent.footer__contact_link.label }),
+    ).toBeNull();
+    expect(
+      within(screen.getByRole('contentinfo')).getByRole('link', { name: siteContent.footer__contact_link.label }),
     ).toHaveAttribute('href', siteContent.footer__contact_link.url);
   });
 });
@@ -1216,5 +1223,124 @@ describe('ContentPage section edit links', () => {
       expect(screen.queryByRole('link', { name: /^Edit section/ })).toBeNull();
       unmount();
     }
+  });
+});
+
+// Launch rehearsal: a link to a section that is off led to "This event
+// doesn't have a public schedule". The recap page's "More from the event"
+// section is seeded for exactly such links (scripts/lib/seed.cjs).
+describe('ContentPage — links to a section that is off', () => {
+  const page = {
+    id: 'after',
+    label: 'After the event',
+    path: '/after',
+    icon: null,
+    order: 99,
+    visible: true,
+    systemPage: false,
+    sections: [
+      { id: 'after_intro', label: 'Introduction', description: '', allowedBlocks: ['text'], maxBlocks: 2, reorderable: true, defaultBlocks: [] },
+      { id: 'after_next', label: 'More from the event', description: '', allowedBlocks: ['link_group'], maxBlocks: 10, reorderable: true, defaultBlocks: [] },
+      { id: 'after_survey', label: 'Feedback', description: '', allowedBlocks: ['cta', 'link_group'], maxBlocks: 4, reorderable: true, defaultBlocks: [] },
+    ],
+  };
+  const link = (section, field, blockType, label, url) => ({
+    id: `${section}__${field}`, section, field, blockType, group: 'Next', label, url, visible: true, order: 0,
+  });
+  const blocks = [
+    { id: 'after_intro__body', section: 'after_intro', field: 'body', blockType: 'text', value: 'Thanks for coming.', visible: true, order: 0 },
+    link('after_next', 'program', 'link_group', 'Browse the schedule', '/schedule'),
+    { ...link('after_next', 'people', 'link_group', 'Meet the speakers', '/speakers'), order: 1 },
+    link('after_survey', 'survey', 'cta', 'See the program', '/schedule/abc'),
+  ];
+
+  function renderWithFeatures(features) {
+    renderAt('/after');
+    act(() => {
+      configSubscriptions.get('features')(features);
+      subscriptions.get('cmsPages')([...pagesData, page]);
+      subscriptions.get('cmsContent')(blocks);
+    });
+  }
+
+  it('draws no link to a section that is off, and no heading over a section left empty', async () => {
+    renderWithFeatures({ schedule: false, speakers: true });
+    expect(await screen.findByText('Thanks for coming.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Browse the schedule' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Meet the speakers' })).toHaveAttribute('href', '/speakers');
+    expect(screen.queryByRole('link', { name: 'See the program' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Feedback' })).toBeNull();
+  });
+
+  it('draws every link while the sections are on', async () => {
+    renderWithFeatures({ schedule: true, speakers: true });
+    expect(await screen.findByRole('link', { name: 'Browse the schedule' })).toHaveAttribute('href', '/schedule');
+    expect(screen.getByRole('link', { name: 'See the program' })).toHaveAttribute('href', '/schedule/abc');
+  });
+});
+
+// A fresh site now seeds Recap, Guidelines and City guide hidden
+// (scripts/lib/seed.cjs). A link to a hidden page, or to an address no page
+// has, opens the site's 404 page. The public site does not draw it.
+describe('ContentPage — links to a page that is hidden', () => {
+  const page = {
+    id: 'after',
+    label: 'After the event',
+    path: '/after',
+    icon: null,
+    order: 99,
+    visible: true,
+    systemPage: false,
+    sections: [
+      { id: 'after_intro', label: 'Introduction', description: '', allowedBlocks: ['text'], maxBlocks: 2, reorderable: true, defaultBlocks: [] },
+      { id: 'after_next', label: 'More from the event', description: '', allowedBlocks: ['link_group'], maxBlocks: 10, reorderable: true, defaultBlocks: [] },
+      { id: 'after_survey', label: 'Feedback', description: '', allowedBlocks: ['cta'], maxBlocks: 4, reorderable: true, defaultBlocks: [] },
+    ],
+  };
+  const hiddenGuidelines = {
+    id: 'guidelines', label: 'Guidelines', path: '/guidelines', icon: null, order: 13,
+    visible: false, systemPage: false, sections: [],
+  };
+  // The demo shows its guidelines page; this site has not written its own.
+  const demoPagesWithoutGuidelines = () => pagesData.filter((entry) => entry.id !== 'guidelines');
+  const link = (section, field, blockType, label, url, order = 0) => ({
+    id: `${section}__${field}`, section, field, blockType, group: 'Next', label, url, visible: true, order,
+  });
+  const blocks = [
+    { id: 'after_intro__body', section: 'after_intro', field: 'body', blockType: 'text', value: 'Thanks for coming.', visible: true, order: 0 },
+    link('after_next', 'guide', 'link_group', 'Speaker guidelines', '/guidelines'),
+    link('after_next', 'gone', 'link_group', 'Old page', '/no-such-page', 1),
+    link('after_next', 'travel', 'link_group', 'Plan your trip', '/travel', 2),
+    link('after_next', 'tickets', 'link_group', 'Buy a ticket', '/tickets', 3),
+    link('after_next', 'file', 'link_group', 'Speaker kit', '/files/kit.pdf', 4),
+    link('after_survey', 'cta', 'cta', 'Read the guidelines', '/guidelines#formats'),
+  ];
+
+  it('draws no link to a hidden page or an address no page has, and no heading over nothing', async () => {
+    renderAt('/after');
+    act(() => {
+      subscriptions.get('cmsPages')([...demoPagesWithoutGuidelines(), page, hiddenGuidelines]);
+      subscriptions.get('cmsContent')(blocks);
+    });
+    expect(await screen.findByText('Thanks for coming.')).toBeInTheDocument();
+    const main = within(screen.getByRole('main'));
+    expect(main.queryByRole('link', { name: 'Speaker guidelines' })).toBeNull();
+    expect(main.queryByRole('link', { name: 'Old page' })).toBeNull();
+    expect(main.queryByRole('link', { name: 'Read the guidelines' })).toBeNull();
+    expect(main.queryByRole('heading', { name: 'Feedback' })).toBeNull();
+    // A page that is on the site, an app route, and a file all stay.
+    expect(main.getByRole('link', { name: 'Plan your trip' })).toHaveAttribute('href', '/travel');
+    expect(main.getByRole('link', { name: 'Buy a ticket' })).toHaveAttribute('href', '/tickets');
+    expect(main.getByRole('link', { name: 'Speaker kit' })).toHaveAttribute('href', '/files/kit.pdf');
+  });
+
+  it('draws the link once the page is visible', async () => {
+    renderAt('/after');
+    act(() => {
+      subscriptions.get('cmsPages')([...demoPagesWithoutGuidelines(), page, { ...hiddenGuidelines, visible: true }]);
+      subscriptions.get('cmsContent')(blocks);
+    });
+    expect(await screen.findByRole('link', { name: 'Speaker guidelines' })).toHaveAttribute('href', '/guidelines');
+    expect(screen.getByRole('link', { name: 'Read the guidelines' })).toHaveAttribute('href', '/guidelines#formats');
   });
 });

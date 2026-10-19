@@ -22,7 +22,8 @@
  *     "features": { ...booleans },
  *     "theme":    { colors, fonts, texture, radius, logos },
  *     "badges":   { categories: [...] },
- *     "providers":{ email, ticketing, notifier }
+ *     "providers":{ email, ticketing, notifier },
+ *     "owner":    { name, email }               // --template only (issue #328)
  *   }
  *
  * Provider selection is NOT read from the answers file: it is Tier A
@@ -223,7 +224,9 @@ function parseAnswersFile(text) {
     return { ok: false, errors: ['answers file must contain a JSON object'] };
   }
   const errors = [];
-  const known = ['adminEmails', 'staffEmails', 'event', 'features', 'theme', 'badges', 'providers'];
+  // `owner` is read only by `init-event.cjs --template` (issue #328): the
+  // named person who answers for an event made from a past one.
+  const known = ['adminEmails', 'staffEmails', 'event', 'features', 'theme', 'badges', 'providers', 'owner'];
   for (const key of Object.keys(parsed)) {
     if (!known.includes(key)) errors.push(`${key}: unknown top-level key in the answers file`);
   }
@@ -232,6 +235,9 @@ function parseAnswersFile(text) {
   }
   if (parsed.staffEmails !== undefined && !Array.isArray(parsed.staffEmails)) {
     errors.push('staffEmails: must be an array of email addresses');
+  }
+  if (parsed.owner !== undefined && !isPlainObject(parsed.owner)) {
+    errors.push('owner: must be an object with name and email');
   }
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, answers: parsed };
@@ -263,7 +269,7 @@ function buildFeatures(overrides = {}) {
 /**
  * The providers doc. Tier A is the source of truth (§2.2); the answers
  * file may only supply the non-selection details (`messageStream`,
- * `operatorEmail`).
+ * `announcementStream`, `operatorEmail`).
  *
  * @param {{ tierA: object, overrides?: object }} args
  * @returns {{ providers: object, warnings: string[] }}
@@ -289,6 +295,9 @@ function buildProviders({ tierA, overrides = {} }) {
       email: {
         provider: tierA.emailProvider || 'console',
         messageStream: orDefault(isPlainObject(over.email) ? over.email.messageStream : null, null),
+        // The Postmark broadcast stream announcement email uses (issue
+        // #490). Unset means announcement email is refused on Postmark.
+        announcementStream: orDefault(isPlainObject(over.email) ? over.email.announcementStream : null, null),
       },
       ticketing: {
         provider: tierA.ticketingProvider || 'none',

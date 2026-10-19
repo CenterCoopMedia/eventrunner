@@ -99,6 +99,12 @@ const SECTIONS = Object.freeze([
         summary: 'Configure organizer-owned payments, verify readiness, and support orders and admission.',
       },
       {
+        source: 'docs/operator/archive-handoff.md',
+        route: 'archive-handoff/',
+        title: 'Archive and hand off a past event',
+        summary: 'Export the event data package, back up the project, and keep the past site online read-only.',
+      },
+      {
         source: 'docs/operator/webmcp-diagnostics.md',
         route: 'webmcp-diagnostics/',
         title: 'Use read-only browser diagnostics',

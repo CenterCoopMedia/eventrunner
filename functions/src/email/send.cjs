@@ -58,6 +58,81 @@ function isAlreadyExists(err) {
 }
 
 /**
+ * The html and text bodies with the configured legal block appended to any
+ * body that does not already carry it (spec §3.1: footer resolution is a
+ * core duty). Exported so a staff preview shows the bodies send() hands the
+ * provider, footer included.
+ *
+ * @param {{ html?: string, text?: string, hasLegalFooterHtml?: boolean,
+ *           hasLegalFooterText?: boolean }} message
+ * @param {object} config
+ * @returns {{ html: string|undefined, text: string|undefined }}
+ */
+function withLegalFooter(message, config) {
+  let { html, text } = message;
+  const postalHtml = config?.event?.legal?.postalAddressHtml;
+  if (typeof postalHtml === 'string' && postalHtml) {
+    if (typeof html === 'string' && !message.hasLegalFooterHtml) {
+      html += `\n<hr>\n<p>${postalHtml}</p>`;
+    }
+    if (typeof text === 'string' && !message.hasLegalFooterText) {
+      text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
+    }
+  }
+  return { html, text };
+}
+
+/**
+ * The adapter-bound form of one message: sender, reply-to, stream and the
+ * legal footer resolved from config. Shared by send() and sendBatch() so a
+ * batch entry is resolved exactly as a single send is.
+ *
+ * @param {object} message EmailMessage
+ * @param {object} config loaded event config
+ * @returns {object} the message the adapter receives
+ */
+function resolveMessage(message, config) {
+  const sender = config?.event?.sender || {};
+  const fullMessage = {
+    ...message,
+    // The original string-or-EmailAddress form reaches the adapter so a
+    // display name survives; toEmail is for validation and the audit row.
+    to: message.to,
+    from: message.from || { email: sender.email, name: sender.name },
+    replyTo: message.replyTo || sender.replyTo || undefined,
+    // Tier B stream selection (config/providers.email.messageStream)
+    // reaches the adapter here; a per-message value wins.
+    messageStream: message.messageStream
+      ?? config?.providers?.email?.messageStream
+      ?? undefined,
+  };
+
+  // Footer resolution is a core duty (spec §3.1). Rendered mail carries
+  // per-body flags derived from the effective template source; any body
+  // that does not already carry the footer — an override that dropped
+  // the token, the operator email sink, ad-hoc callers — gets the
+  // configured legal block appended here.
+  Object.assign(fullMessage, withLegalFooter(message, config));
+  return fullMessage;
+}
+
+/** The recipient address of a message, or null. @param {object} message */
+function recipientEmail(message) {
+  const to = typeof message?.to === 'string' ? message.to : message?.to?.email;
+  return typeof to === 'string' && to ? to : null;
+}
+
+/** A batch refused before any claim, audit row, or provider request. */
+class EmailBatchError extends Error {
+  /** @param {string} code @param {string} message */
+  constructor(code, message) {
+    super(message);
+    this.name = 'EmailBatchError';
+    this.code = code;
+  }
+}
+
+/**
  * Build the email core around injected dependencies so tests drive it with
  * fakes and no emulator.
  *
@@ -75,14 +150,20 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
   /**
    * @param {object} message EmailMessage (spec §3.1): { to, from?, replyTo?,
    *   subject, text?, html?, headers?, tag?, onceKey?, idempotencyKey?,
-   *   source?, storeRendered? }
+   *   source?, storeRendered?, auditRedact? }. `auditRedact` is a list of
+   *   { find, replace } pairs applied to the bodies the audit row stores,
+   *   never to the mail sent: a per-recipient secret such as a signed
+   *   unsubscribe link stays out of the admin-readable log.
    * @returns {Promise<object>} EmailSendResult
    */
   /** One sent_emails row per permitted send() call, whatever the outcome. */
   async function writeAuditRow(message, fromEmail, toEmail, outcome) {
     const bodyStored = message.storeRendered !== false;
-    const html = bodyStored ? truncateForAudit(message.html) : { value: null, truncated: false };
-    const text = bodyStored ? truncateForAudit(message.text) : { value: null, truncated: false };
+    const redact = (body) => (typeof body === 'string' && Array.isArray(message.auditRedact)
+      ? message.auditRedact.reduce((out, { find, replace }) => (find ? out.split(find).join(replace ?? '') : out), body)
+      : body);
+    const html = bodyStored ? truncateForAudit(redact(message.html)) : { value: null, truncated: false };
+    const text = bodyStored ? truncateForAudit(redact(message.text)) : { value: null, truncated: false };
     try {
       await db.collection('sent_emails').add({
         to: toEmail,
@@ -123,7 +204,6 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     }
 
     const config = await getConfig();
-    const sender = config?.event?.sender || {};
 
     const toEmail = typeof message.to === 'string' ? message.to : message.to?.email;
     if (!toEmail) {
@@ -153,43 +233,18 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       }
     }
 
-    const fullMessage = {
-      ...message,
-      // The original string-or-EmailAddress form reaches the adapter so a
-      // display name survives; toEmail is for validation and the audit row.
-      to: message.to,
-      from: message.from || { email: sender.email, name: sender.name },
-      replyTo: message.replyTo || sender.replyTo || undefined,
-      // Tier B stream selection (config/providers.email.messageStream)
-      // reaches the adapter here; a per-message value wins.
-      messageStream: message.messageStream
-        ?? config?.providers?.email?.messageStream
-        ?? undefined,
-    };
-
-    // Footer resolution is a core duty (spec §3.1). Rendered mail carries
-    // per-body flags derived from the effective template source; any body
-    // that does not already carry the footer — an override that dropped
-    // the token, the operator email sink, ad-hoc callers — gets the
-    // configured legal block appended here.
-    const postalHtml = config?.event?.legal?.postalAddressHtml;
-    if (typeof postalHtml === 'string' && postalHtml) {
-      if (typeof fullMessage.html === 'string' && !message.hasLegalFooterHtml) {
-        fullMessage.html += `\n<hr>\n<p>${postalHtml}</p>`;
-      }
-      if (typeof fullMessage.text === 'string' && !message.hasLegalFooterText) {
-        fullMessage.text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
-      }
-    }
+    const fullMessage = resolveMessage(message, config);
 
     let result = null;
     let attempts = 0;
+    let ambiguous = false;
     while (attempts < MAX_ATTEMPTS) {
       attempts += 1;
       try {
         result = await provider.send(fullMessage);
       } catch (err) {
         // Never retry a throw: ambiguous about acceptance.
+        ambiguous = true;
         result = {
           providerMessageId: null,
           status: 'failed',
@@ -208,6 +263,9 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       providerStatus: result.providerStatus,
       error: result.error,
       retries,
+      // A caller that offers its own retry must not treat this as a refusal:
+      // the provider may have accepted the message before the throw.
+      ...(ambiguous ? { ambiguous: true } : {}),
     };
 
     // Audit what was actually handed to the adapter (footer included).
@@ -215,20 +273,239 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     return outcome;
   }
 
-  return { send };
+  /**
+   * Batch send (issue #201, ADR §3.1): one provider batch call for many
+   * single-recipient messages, one audit row per newly attempted recipient.
+   *
+   * Every entry needs its own stable `onceKey`. The claims are the replay
+   * guard: the provider keeps no idempotency key, so a repeat of the same
+   * batch, or a concurrent one, skips every key that already holds a claim.
+   * A skipped result says an earlier call claimed the key. It does not prove
+   * that the earlier call delivered the message. A failure is recorded on its
+   * claim, and a skipped result for that key carries the failure again
+   * (`status: 'failed'`, `skipped: true`), so a caller that lost the first
+   * answer can still offer a retry.
+   *
+   * Refusals that are the caller's to fix (no batch support, a malformed
+   * batch, a batch over the provider's limits) throw EmailBatchError before
+   * any claim, audit row, or provider request. The demo policy refusal
+   * returns one failed result per entry and writes nothing, as send() does.
+   *
+   * Retry follows send(): only an adapter-reported 5xx, or a 429 with a
+   * retry hint, and at most MAX_ATTEMPTS requests. A retry carries only the
+   * entries that came back retryable. An entry the provider accepted is
+   * never sent again. A throw, or a response the adapter cannot match to an
+   * entry, is uncertain: no retry, the claim stays, and the result carries
+   * `uncertain: true`.
+   *
+   * @param {object[]} messages EmailMessage[], one recipient each
+   * @returns {Promise<object[]>} one EmailSendResult per entry, in input order
+   */
+  async function sendBatch(messages) {
+    if (!Array.isArray(messages)) {
+      throw new EmailBatchError('invalid-batch', 'A batch must be a list of messages.');
+    }
+    if (messages.length === 0) return [];
+    if (typeof provider.sendBatch !== 'function') {
+      throw new EmailBatchError(
+        'batch-unsupported',
+        `The ${provider.name || 'configured'} email provider has no batch send.`,
+      );
+    }
+    const limits = provider.batchLimits || {};
+    if (Number.isInteger(limits.maxMessages) && messages.length > limits.maxMessages) {
+      throw new EmailBatchError(
+        'batch-too-large',
+        `A batch may hold at most ${limits.maxMessages} messages; this one holds ${messages.length}.`,
+      );
+    }
+    const seenKeys = new Set();
+    messages.forEach((message, index) => {
+      if (!recipientEmail(message)) {
+        throw new EmailBatchError('invalid-batch', `Message ${index + 1} has no recipient.`);
+      }
+      if (typeof message.onceKey !== 'string' || message.onceKey.trim() === '') {
+        throw new EmailBatchError('invalid-batch', `Message ${index + 1} has no send-once key.`);
+      }
+      if (seenKeys.has(message.onceKey)) {
+        throw new EmailBatchError('invalid-batch', `Message ${index + 1} repeats a send-once key.`);
+      }
+      seenKeys.add(message.onceKey);
+    });
+
+    const policy = await checkDemoWrites({ db });
+    throwIfDemoPolicyUnavailable(policy);
+    if (!policy.ok) {
+      return messages.map(() => ({ providerMessageId: null, status: 'failed', error: policy.code, retries: 0 }));
+    }
+
+    const config = await getConfig();
+    const resolved = messages.map((message) => resolveMessage(message, config));
+    if (typeof provider.checkBatch === 'function') {
+      const verdict = provider.checkBatch(resolved);
+      if (verdict && verdict.ok === false) {
+        throw new EmailBatchError('batch-too-large', verdict.error || 'The batch is over the provider limit.');
+      }
+    }
+
+    // Claims first, never rolled back (as in send()). A key another call
+    // already holds is skipped here and never reaches the provider.
+    const results = new Array(messages.length).fill(null);
+    const claimed = [];
+    await Promise.all(messages.map(async (message, index) => {
+      const ref = db.collection('email_claims').doc(claimIdForOnceKey(message.onceKey));
+      try {
+        await ref.create({ onceKey: message.onceKey, source: message.source || null, createdAt: new Date() });
+        claimed.push(index);
+      } catch (err) {
+        if (isAlreadyExists(err)) {
+          results[index] = await skippedResult(ref);
+          return;
+        }
+        // A claim that may or may not exist cannot be sent safely.
+        results[index] = {
+          providerMessageId: null,
+          status: 'failed',
+          uncertain: true,
+          error: `send-once claim failed: ${String(err?.message || err)}`,
+          retries: 0,
+        };
+      }
+    }));
+    claimed.sort((a, b) => a - b);
+
+    const attemptsOf = new Map();
+    let pending = claimed;
+    let attempt = 0;
+    while (pending.length > 0 && attempt < MAX_ATTEMPTS) {
+      attempt += 1;
+      let answer;
+      try {
+        answer = await provider.sendBatch(pending.map((index) => resolved[index]));
+      } catch (err) {
+        for (const index of pending) {
+          attemptsOf.set(index, attempt);
+          results[index] = {
+            providerMessageId: null,
+            status: 'failed',
+            uncertain: true,
+            error: String(err?.message || err),
+          };
+        }
+        pending = [];
+        break;
+      }
+      const retry = [];
+      pending.forEach((index, position) => {
+        attemptsOf.set(index, attempt);
+        const result = Array.isArray(answer) ? answer[position] : undefined;
+        if (!result || typeof result !== 'object') {
+          results[index] = {
+            providerMessageId: null,
+            status: 'failed',
+            uncertain: true,
+            error: 'The provider response has no result for this message.',
+          };
+          return;
+        }
+        results[index] = result;
+        if (isRetryable(result) && attempt < MAX_ATTEMPTS) retry.push(index);
+      });
+      pending = retry;
+      if (pending.length > 0) {
+        const hint = Math.max(0, ...pending.map((index) => results[index].retryAfterMs ?? 0));
+        await wait(Math.max(hint, BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]));
+      }
+    }
+
+    // One audit row per newly attempted recipient, after its last attempt.
+    const outcomes = await Promise.all(claimed.map(async (index) => {
+      const result = results[index];
+      const outcome = {
+        providerMessageId: result.providerMessageId ?? null,
+        status: result.status === 'sent' ? 'sent' : 'failed',
+        providerStatus: result.providerStatus,
+        error: result.error,
+        retries: (attemptsOf.get(index) || 1) - 1,
+        ...(result.uncertain ? { uncertain: true } : {}),
+      };
+      const message = resolved[index];
+      await writeAuditRow(message, message.from?.email || null, recipientEmail(message), outcome);
+      return [index, outcome];
+    }));
+    for (const [index, outcome] of outcomes) results[index] = outcome;
+
+    // A failure is kept on its claim, so a replay of the batch can report it
+    // (skippedResult) even when the caller lost the first answer.
+    await Promise.all(outcomes.map(async ([index, outcome]) => {
+      if (outcome.status === 'sent') return;
+      const failure = {
+        providerStatus: outcome.providerStatus ?? null,
+        uncertain: outcome.uncertain === true,
+        error: outcome.error == null ? null : String(outcome.error).slice(0, 300),
+      };
+      try {
+        await db.collection('email_claims').doc(claimIdForOnceKey(messages[index].onceKey)).update({ failure });
+      } catch (err) {
+        log.warn('email_claims failure record failed', err);
+      }
+    }));
+    return results;
+  }
+
+  /**
+   * The result for a key an earlier call claimed. A failure that call
+   * recorded is reported again, marked `skipped`, so a caller that lost the
+   * first answer still sees it. Otherwise the earlier call sent the message
+   * or is sending it now.
+   */
+  async function skippedResult(ref) {
+    let failure = null;
+    try {
+      failure = (await ref.get()).data()?.failure ?? null;
+    } catch (err) {
+      log.warn('email_claims read failed', err);
+    }
+    if (!failure) return { providerMessageId: null, status: 'sent', skipped: true, retries: 0 };
+    return {
+      providerMessageId: null,
+      status: 'failed',
+      skipped: true,
+      retries: 0,
+      providerStatus: typeof failure.providerStatus === 'number' ? failure.providerStatus : undefined,
+      error: failure.error ?? 'An earlier attempt failed.',
+      ...(failure.uncertain ? { uncertain: true } : {}),
+    };
+  }
+
+  return { send, sendBatch };
 }
+
+/**
+ * How long an event for a message with no sent_emails row is answered with
+ * a retryable 503. The sender writes the row after the provider answers
+ * (after every batch retry, in sendBatch), so a fast bounce or delivery can
+ * arrive first. Postmark retries a 5xx after 1, 5 and 10 minutes; an event
+ * older than this window, or dated far ahead, is acknowledged and dropped,
+ * so mail this deployment never sent is not retried for ever.
+ */
+const UNMATCHED_RETRY_MS = 15 * 60 * 1000;
 
 /**
  * Delivery-event ingest (spec §3.1): authenticates through the adapter,
  * parses events, and patches matching sent_emails rows. Writes nothing
- * else and creates no collection. Returns 401 on a failed check and never
- * falls back to accepting unauthenticated deliveries.
+ * else except the announcement opt-out it mirrors into
+ * `email_suppressions` (issue #490). Returns 401 on a failed check and never
+ * falls back to accepting unauthenticated deliveries. A recent event whose
+ * message has no row yet gets 503 with Retry-After (UNMATCHED_RETRY_MS);
+ * the events that matched are applied first, and applying one again on the
+ * retry changes nothing.
  *
- * @param {{ db: FirebaseFirestore.Firestore,
- *           provider: object, log?: Pick<Console, 'warn'|'error'> }} deps
+ * @param {{ db: FirebaseFirestore.Firestore, provider: object,
+ *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  * @returns {(req: any, res: any) => Promise<void>}
  */
-function createDeliveryWebhookHandler({ db, provider, log = console }) {
+function createDeliveryWebhookHandler({ db, provider, now = Date.now, log = console }) {
   return async function emailDeliveryWebhook(req, res) {
     if (req.method !== 'POST') {
       res.set('Allow', 'POST');
@@ -255,6 +532,7 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
     }
 
     let patched = 0;
+    let waiting = 0;
     for (const event of events) {
       if (!event?.providerMessageId) continue;
       const snap = await db
@@ -262,8 +540,25 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
         .where('providerMessageId', '==', event.providerMessageId)
         .limit(1)
         .get();
-      if (snap.empty) continue;
+      if (snap.empty) {
+        const age = now() - Date.parse(event.occurredAt);
+        if (Math.abs(age) < UNMATCHED_RETRY_MS) waiting += 1;
+        continue;
+      }
       const ref = snap.docs[0].ref;
+      // A provider-side opt-out from an announcement (a Postmark broadcast
+      // stream with Postmark unsubscribe handling, issue #490) becomes the
+      // application's suppression record too, so the next audience leaves
+      // the address out. Transactional rows never write one.
+      if (event.type === 'suppressed' && typeof event.recipient === 'string'
+          && snap.docs[0].data?.()?.source === 'announcement') {
+        const { recordSuppression, suppressionIdFor } = require('../announcements/suppression.cjs');
+        try {
+          await recordSuppression({ db, id: suppressionIdFor(event.recipient), via: 'provider' });
+        } catch (err) {
+          log.warn('announcement suppression mirror failed', err);
+        }
+      }
       const occurredAt = event.occurredAt || new Date().toISOString();
       // Providers retry and deliver out of order; a replayed older event
       // must not overwrite a newer bounce/complaint. The compare-and-set
@@ -287,6 +582,16 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
         return true;
       });
       if (applied) patched += 1;
+    }
+    if (waiting > 0) {
+      log.warn('delivery event for a message with no sent_emails row yet; asking for a retry', { waiting });
+      res.set('Retry-After', '60');
+      res.status(503).json({
+        error: { code: 'not-recorded-yet', message: 'The message is not recorded yet. Retry later.' },
+        processed: events.length,
+        patched,
+      });
+      return;
     }
     res.status(200).json({ processed: events.length, patched });
   };
@@ -332,7 +637,9 @@ function buildHandlers() {
 
 module.exports = {
   createEmailCore,
+  withLegalFooter,
   createDeliveryWebhookHandler,
+  EmailBatchError,
   // Lazily built so requiring this module in tests never pulls in
   // firebase-functions.
   get handlers() {
@@ -343,6 +650,8 @@ module.exports = {
     truncateForAudit,
     claimIdForOnceKey,
     isAlreadyExists,
+    resolveMessage,
+    UNMATCHED_RETRY_MS,
     MAX_ATTEMPTS,
     BACKOFF_MS,
     BODY_STORE_LIMIT,

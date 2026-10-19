@@ -898,3 +898,77 @@ describe('Home section edit links', () => {
     }
   });
 });
+
+// Launch rehearsal: "Explore the program → /schedule" saved with the
+// schedule off, drew in the lead, and led to "This event doesn't have a
+// public schedule". A link to a section that is off is not drawn.
+describe('Home links to a section that is off', () => {
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    features = { schedule: false, speakers: true };
+  });
+
+  it('draws no lead action that leads to a section that is off, and keeps the others', () => {
+    heroBlocks = [
+      { section: 'hero', field: 'program', blockType: 'cta', label: 'Explore the program', url: '/schedule' },
+      { section: 'hero', field: 'people', blockType: 'cta', label: 'Meet the speakers', url: '/speakers' },
+    ];
+    render(<Home />);
+    expect(screen.queryByRole('link', { name: 'Explore the program' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Meet the speakers' })).toHaveAttribute('href', '/speakers');
+  });
+
+  it('draws the action once the section is on again', () => {
+    features = { schedule: true };
+    heroBlocks = [
+      { section: 'hero', field: 'program', blockType: 'cta', label: 'Explore the program', url: '/schedule' },
+    ];
+    render(<Home />);
+    expect(screen.getByRole('link', { name: 'Explore the program' })).toHaveAttribute('href', '/schedule');
+  });
+
+  it('leaves no empty action row when every lead action leads to a section that is off', () => {
+    heroBlocks = [
+      { section: 'hero', field: 'program', blockType: 'cta', label: 'Explore the program', url: '/schedule' },
+    ];
+    const { container } = render(<Home />);
+    expect(container.querySelector('.event-hero .no-print.flex')).toBeNull();
+    expect(within(container).queryAllByRole('link')).toHaveLength(0);
+  });
+
+  it('draws no link group item, and no heading over nothing, in a body section', () => {
+    pageDoc = { id: 'home', sections: [{ id: 'more', label: 'More from the event' }] };
+    sectionBlocks = {
+      more: [
+        { section: 'more', field: 'program', blockType: 'link_group', group: 'Program', label: 'Browse the schedule', url: '/schedule/abc' },
+      ],
+    };
+    render(<Home />);
+    expect(screen.queryByRole('link', { name: 'Browse the schedule' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'More from the event' })).toBeNull();
+  });
+});
+
+// The seed's `footer` section is "Grouped links rendered in the page
+// footer" (scripts/lib/seed.cjs). The home body drew it again under a
+// "Footer links" heading (rehearsal v1280-home.png).
+describe('Home footer section', () => {
+  it('leaves the footer section to the site footer', () => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    pageDoc = {
+      id: 'home',
+      sections: [
+        { id: 'details', label: 'Details' },
+        { id: 'footer', label: 'Footer links' },
+      ],
+    };
+    sectionBlocks = {
+      details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
+      footer: [{ section: 'footer', field: 'contact_link', blockType: 'link_group', group: 'About', label: 'Contact the organizers', url: 'mailto:help@example.org' }],
+    };
+    render(<Home />);
+    expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Footer links' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Contact the organizers' })).toBeNull();
+  });
+});

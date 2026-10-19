@@ -158,6 +158,9 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
       'sendSpeakerInvite',
       'speakerPhotoDelete',
       'speakerPhotoUpload',
+      // Staff reminders to accepted speakers about missing items
+      // (speakers/reminders.cjs): list, preview, send, export, wording.
+      'speakerReminders',
       'updateOwnSpeakerProfile',
       'updateSpeaker',
       'validateSpeakerInvite',

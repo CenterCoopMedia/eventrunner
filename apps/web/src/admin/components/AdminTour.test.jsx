@@ -73,7 +73,7 @@ describe('tourSteps', () => {
     for (const operatorOnly of ['Features', 'Branding', 'Access', 'System errors']) {
       expect(named).not.toContain(operatorOnly);
     }
-    expect(steps.find((step) => step.id === 'system').items).toEqual(['Event']);
+    expect(steps.find((step) => step.id === 'system').items).toEqual(['Event', 'Data export']);
   });
 
   it('has one copy line for every docket group, and none of them names a page', () => {

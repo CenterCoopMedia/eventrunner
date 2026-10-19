@@ -2,7 +2,8 @@
 
 /**
  * Postmark adapter (spec §3.1): the reference client-facing provider.
- * One REST call per send, synchronous MessageID, real verifySenderDomain.
+ * One REST call per send or per batch, synchronous MessageID, real
+ * verifySenderDomain.
  *
  * Postmark delivers delivery webhooks UNSIGNED, so verifyDeliveryWebhook is
  * HTTP Basic credentials embedded in the registered webhook URL,
@@ -14,6 +15,13 @@
 const crypto = require('node:crypto');
 
 const API_BASE = 'https://api.postmarkapp.com';
+
+/**
+ * Postmark's batch endpoint limits (developer docs, "Send batch emails"):
+ * at most 500 messages and 50 MB per request, attachments included.
+ */
+const BATCH_MAX_MESSAGES = 500;
+const BATCH_MAX_BYTES = 50 * 1024 * 1024;
 
 /**
  * Constant-time string equality: compare SHA-256 digests so length never
@@ -151,6 +159,122 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
   }
 
   /**
+   * The provider-limit check the core runs on resolved messages before it
+   * takes any claim: the final serialized payload must fit one request.
+   * @param {object[]} messages resolved EmailMessages
+   * @returns {{ ok: boolean, error?: string }}
+   */
+  function checkBatch(messages) {
+    if (messages.length > BATCH_MAX_MESSAGES) {
+      return { ok: false, error: `Postmark accepts at most ${BATCH_MAX_MESSAGES} messages per batch.` };
+    }
+    const bytes = Buffer.byteLength(JSON.stringify(messages.map(toPostmarkPayload)), 'utf8');
+    if (bytes > BATCH_MAX_BYTES) {
+      return { ok: false, error: 'The batch is larger than the 50 MB Postmark accepts in one request.' };
+    }
+    return { ok: true };
+  }
+
+  /**
+   * One POST /email/batch for every message given (issue #201). Postmark
+   * answers in request order, and an HTTP 200 can hold failed entries:
+   * ErrorCode 0 is accepted, any other code is a final rejection of that
+   * entry with no retry hint. A whole-request failure maps onto every entry
+   * with the HTTP status, so the core's retry rule applies to the set.
+   * A 2xx body that is not a list, or is short, leaves the missing entries
+   * uncertain; HTTP status alone never marks the batch sent. A thrown fetch
+   * error propagates: the core treats it as uncertain.
+   *
+   * @param {object[]} messages resolved EmailMessages
+   * @returns {Promise<object[]>} one EmailSendResult per message, in order
+   */
+  async function sendBatch(messages) {
+    const response = await fetchImpl(`${API_BASE}/email/batch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Postmark-Server-Token': serverToken,
+      },
+      body: JSON.stringify(messages.map(toPostmarkPayload)),
+    });
+    const providerStatus = response.status;
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {
+      // Non-JSON body; mapped below by status.
+    }
+
+    if (providerStatus < 200 || providerStatus > 299) {
+      const parts = [body?.ErrorCode, body?.Message].filter((v) => v != null && v !== '');
+      const detail = parts.length > 0 ? parts.join(': ') : `postmark responded ${providerStatus}`;
+      const retryAfterMs = providerStatus === 429
+        ? retryAfterMsFrom(response.headers?.get?.('retry-after'))
+        : undefined;
+      return messages.map(() => ({
+        providerMessageId: null,
+        status: 'failed',
+        providerStatus,
+        error: detail,
+        ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+      }));
+    }
+
+    const entries = Array.isArray(body) ? body : [];
+    return messages.map((_, index) => {
+      const entry = entries[index];
+      if (!entry || typeof entry !== 'object' || typeof entry.ErrorCode !== 'number') {
+        return {
+          providerMessageId: null,
+          status: 'failed',
+          uncertain: true,
+          providerStatus,
+          error: 'Postmark returned no result for this message; acceptance is unknown.',
+        };
+      }
+      if (entry.ErrorCode === 0) {
+        return { providerMessageId: entry.MessageID || null, status: 'sent', providerStatus };
+      }
+      return {
+        providerMessageId: null,
+        status: 'failed',
+        providerStatus,
+        error: [entry.ErrorCode, entry.Message].filter((v) => v != null && v !== '').join(': '),
+      };
+    });
+  }
+
+  /**
+   * Read one message stream with the server token (issue #490). Answers
+   * the fields the announcement preflight checks, or `found: false`.
+   * @param {string} streamId
+   * @returns {Promise<{ found: boolean, id?: string, type?: string|null,
+   *   archived?: boolean, unsubscribeHandling?: string|null, status?: number }>}
+   */
+  async function getMessageStream(streamId) {
+    const response = await fetchImpl(`${API_BASE}/message-streams/${encodeURIComponent(streamId)}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json', 'X-Postmark-Server-Token': serverToken },
+    });
+    if (response.status !== 200) return { found: false, status: response.status };
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {
+      return { found: false, status: response.status };
+    }
+    const handling = body?.SubscriptionManagementConfiguration?.UnsubscribeHandlingType;
+    return {
+      found: true,
+      id: typeof body?.ID === 'string' ? body.ID : streamId,
+      type: typeof body?.MessageStreamType === 'string' ? body.MessageStreamType : null,
+      archived: body?.ArchivedAt != null,
+      unsubscribeHandling: typeof handling === 'string' ? handling : null,
+    };
+  }
+
+  /**
    * Decode Authorization: Basic and constant-time-compare user:pass against
    * EMAIL_WEBHOOK_BASIC_AUTH; false when either side is absent (spec §3.1).
    * @param {Buffer|string} rawBody @param {Record<string,string>} headers
@@ -207,6 +331,10 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
         };
         break;
       case 'SubscriptionChange':
+        // A resubscribe (SuppressSending false) is a recognized record with
+        // nothing to patch: an empty list answers 200, so the broadcast
+        // stream's webhook can carry SubscriptionChange (issue #490).
+        if (record.SuppressSending === false) return [];
         if (record.SuppressSending !== true) return null;
         event = {
           type: 'suppressed',
@@ -318,10 +446,20 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
     };
   }
 
-  return { name: 'postmark', send, verifyDeliveryWebhook, parseDeliveryEvent, verifySenderDomain };
+  return {
+    name: 'postmark',
+    send,
+    sendBatch,
+    checkBatch,
+    batchLimits: { maxMessages: BATCH_MAX_MESSAGES, maxBytes: BATCH_MAX_BYTES },
+    getMessageStream,
+    verifyDeliveryWebhook,
+    parseDeliveryEvent,
+    verifySenderDomain,
+  };
 }
 
 module.exports = {
   createPostmarkProvider,
-  internals: { toPostmarkPayload, formatAddress, passFail, API_BASE },
+  internals: { toPostmarkPayload, formatAddress, passFail, API_BASE, BATCH_MAX_MESSAGES, BATCH_MAX_BYTES },
 };

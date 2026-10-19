@@ -104,7 +104,7 @@ During the authorized rehearsal, create a test order through Event Runner and ob
 
 ## 5. Configure and open the catalog
 
-Open **Ticketing → Configure ticket catalog** as an operator. Set **Currency**, **Event capacity**, **Maximum tickets per order**, **Tax treatment**, event sale windows, and **Refund policy**. Currency becomes fixed when the first catalog is saved. Times are entered in UTC with a preview in the event's timezone.
+Open **Ticketing → Configure ticket catalog** as an operator. Set **Currency**, **Event capacity**, **Maximum tickets per order**, **Tax treatment**, event sale windows, and **Refund policy**. Currency becomes fixed when the first catalog is saved. Enter each sale window as a **Date** and a **Time** on the event's clock. The time zone comes from **Event settings**. The line under each window states it in words, with the zone and the UTC offset for that date. To end an early-bird price at 11:59 PM on January 15, enter January 15 and 11:59 PM. Select **Clear** to remove a window. A time that the clocks skip is refused, and a time that happens twice asks which one you mean. The catalog does not save until each window is complete. The stored values are UTC instants, as before.
 
 For each ticket type, set **Ticket name**, **Price**, **Ticket-type capacity**, **Availability**, quantity bounds, and any narrower sale window. Use a separate ticket type for an early-bird price; all types still share the event capacity. A **Hidden — staff-issued only** type stays out of public purchase selection and may be used for authorized comps. Retire a saved type by clearing **Ticket type is active**; historical orders keep its identity and price.
 

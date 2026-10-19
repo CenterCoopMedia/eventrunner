@@ -80,12 +80,18 @@ test('listTemplateIds includes account, speaker, claim, and native ticket confir
     'account.welcome',
     'auth.otp',
     'feedback.confirmation',
+    // Issue #324: session pitch receipt and decision emails.
+    'pitch.accepted',
+    'pitch.declined',
+    'pitch.receipt',
     // §6.3 phase 3: tokenized WITH the invite/wizard pipeline, not after
     // it — a non-CJS deployment cannot exercise the pipeline otherwise
     // (issue #21, issue #22).
     'speaker.accepted',
     'speaker.confirmation',
     'speaker.invite',
+    // Staff reminders to accepted speakers (speakers/reminders.cjs).
+    'speaker.reminder',
     // §6.3 phase 4: could not be finished before the provider that
     // parameterizes them existed (issue #33).
     'ticket.attendee_confirmation',
@@ -110,6 +116,8 @@ test('storeRendered flags match the spec', () => {
   assert.equal(getDefaultTemplate('speaker.invite').storeRendered, false);
   assert.equal(getDefaultTemplate('speaker.accepted').storeRendered, true);
   assert.equal(getDefaultTemplate('speaker.confirmation').storeRendered, true);
+  // A reminder carries no credential, so the email log keeps its body.
+  assert.equal(getDefaultTemplate('speaker.reminder').storeRendered, true);
   // Neither ticket.* mail carries a bearer credential.
   assert.equal(getDefaultTemplate('ticket.get_ticket').storeRendered, true);
   assert.equal(getDefaultTemplate('ticket.claim_prompt').storeRendered, true);
@@ -121,6 +129,7 @@ test('required tokens match the spec', () => {
   assert.deepEqual(getDefaultTemplate('speaker.invite').requiredTokens, ['invite_url']);
   assert.deepEqual(getDefaultTemplate('speaker.accepted').requiredTokens, ['profile_wizard_url']);
   assert.deepEqual(getDefaultTemplate('speaker.confirmation').requiredTokens, ['session_title']);
+  assert.deepEqual(getDefaultTemplate('speaker.reminder').requiredTokens, ['dashboard_url']);
   // Every provider-parameterized field on the ticket.* pair can legitimately
   // be absent (§3.5 `action: 'await_approval'` sends no CTA at all), so
   // neither template requires one.
@@ -401,6 +410,17 @@ test('loadTemplate reads once within the TTL and re-reads after', async () => {
   clock += 2;
   await loadTemplate({ db, id: 'auth.otp', now });
   assert.equal(db.reads['auth.otp'], 2);
+});
+
+test('loadTemplate with fresh reads past the cache and refills it', async () => {
+  const db = makeFakeDb({ 'speaker.reminder': { subject: 'First {{event_name}}' } });
+  const now = () => 5_000;
+  await loadTemplate({ db, id: 'speaker.reminder', now });
+  const fresh = await loadTemplate({ db, id: 'speaker.reminder', now, fresh: true });
+  assert.equal(db.reads['speaker.reminder'], 2);
+  assert.equal(fresh.override.subject, 'First {{event_name}}');
+  await loadTemplate({ db, id: 'speaker.reminder', now });
+  assert.equal(db.reads['speaker.reminder'], 2);
 });
 
 test('loadTemplate caches an absent override as null', async () => {

@@ -120,6 +120,7 @@ export function TextField({
   onChange,
   error,
   hint,
+  warning,
   type = 'text',
   className = '',
   ...rest
@@ -127,7 +128,8 @@ export function TextField({
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = [hint ? hintId : null, error ? errorId : null]
+  const warningId = `${id}-warning`;
+  const describedBy = [hint ? hintId : null, warning ? warningId : null, error ? errorId : null]
     .filter(Boolean)
     .join(' ');
   return (
@@ -150,6 +152,21 @@ export function TextField({
         aria-describedby={describedBy || undefined}
         {...rest}
       />
+      {/* A warning does not block the save. It states a consequence of the
+          value in words, under the field, and the field names it. It can
+          appear while the operator types, so it lands in a polite live
+          region that is on the page before it: a region added together with
+          its text is not announced. A caller that may warn passes a string,
+          empty while there is nothing to say; undefined draws no region. */}
+      {warning !== undefined ? (
+        <div aria-live="polite">
+          {warning ? (
+            <p id={warningId} className="text-admin-sm font-medium text-admin-state-caution">
+              {warning}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {error ? <FieldError id={errorId} message={error} /> : null}
     </div>
   );

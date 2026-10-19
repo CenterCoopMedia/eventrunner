@@ -154,7 +154,18 @@ test('a thrown exception is never retried', async () => {
   assert.equal(calls, 1);
   assert.equal(result.status, 'failed');
   assert.match(result.error, /socket hang up/);
+  // A throw does not say whether the provider accepted the message.
+  assert.equal(result.ambiguous, true);
   assert.equal(db.state.sentRows.length, 1);
+});
+
+test('a provider-reported failure is not ambiguous', async () => {
+  const { core: c } = core({
+    provider: { name: 'x', send: async () => ({ providerMessageId: null, status: 'failed', providerStatus: 422, error: 'Inactive recipient' }) },
+  });
+  const result = await c.send({ to: 'a@example.org', subject: 's' });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.ambiguous, undefined);
 });
 
 test('onceKey: first send claims, second skips without provider contact or audit row', async () => {
@@ -256,6 +267,8 @@ test('delivery webhook patches the matching sent_emails row', async () => {
   db.state.sentRows.push({ providerMessageId: 'pm-1', status: 'sent' });
   const handler = createDeliveryWebhookHandler({
     db,
+    // A day after the events: the unknown message is no longer waiting for its row.
+    now: () => Date.parse('2027-01-02T00:00:00Z'),
     provider: {
       name: 'postmark',
       verifyDeliveryWebhook: () => true,
@@ -271,6 +284,54 @@ test('delivery webhook patches the matching sent_emails row', async () => {
   assert.deepEqual(res.body, { processed: 2, patched: 1 });
   assert.equal(db.state.sentRows[0].deliveryStatus, 'bounced');
   assert.equal(db.state.sentRows[0].bounceReason, 'mailbox full');
+});
+
+test('delivery webhook asks for a retry when a recent event beats the audit row, and applies it on the retry', async () => {
+  const db = fakeDb();
+  const occurredAt = '2027-01-01T00:00:05Z';
+  const handler = createDeliveryWebhookHandler({
+    db,
+    now: () => Date.parse('2027-01-01T00:00:06Z'),
+    log: { warn() {}, error() {}, info() {} },
+    provider: {
+      name: 'postmark',
+      verifyDeliveryWebhook: () => true,
+      parseDeliveryEvent: () => [
+        { providerMessageId: 'pm-fast', type: 'bounced', recipient: 'a@example.org', occurredAt, reason: 'no such domain' },
+      ],
+    },
+  });
+  const first = fakeRes();
+  await handler({ method: 'POST', headers: {}, body: {} }, first);
+  assert.equal(first.statusCode, 503, 'Postmark retries a 5xx');
+  assert.equal(first.headers['Retry-After'], '60');
+  assert.equal(first.body.error.code, 'not-recorded-yet');
+
+  // The sender's audit row lands; the provider's retry finds it.
+  db.state.sentRows.push({ providerMessageId: 'pm-fast', status: 'sent' });
+  const retry = fakeRes();
+  await handler({ method: 'POST', headers: {}, body: {} }, retry);
+  assert.equal(retry.statusCode, 200);
+  assert.deepEqual(retry.body, { processed: 1, patched: 1 });
+  assert.equal(db.state.sentRows[0].deliveryStatus, 'bounced');
+});
+
+test('delivery webhook acknowledges an unknown message once its event is old, so it is not retried for ever', async () => {
+  const db = fakeDb();
+  const event = { providerMessageId: 'pm-never-sent', type: 'delivered', recipient: 'a@example.org', occurredAt: '2027-01-01T00:00:00Z' };
+  const provider = { name: 'postmark', verifyDeliveryWebhook: () => true, parseDeliveryEvent: () => [event] };
+  const at = (iso) => createDeliveryWebhookHandler({ db, provider, now: () => Date.parse(iso), log: { warn() {}, error() {}, info() {} } });
+  const recent = fakeRes();
+  await at('2027-01-01T00:14:00Z')({ method: 'POST', headers: {}, body: {} }, recent);
+  assert.equal(recent.statusCode, 503);
+  const old = fakeRes();
+  await at('2027-01-01T00:16:00Z')({ method: 'POST', headers: {}, body: {} }, old);
+  assert.equal(old.statusCode, 200);
+  assert.deepEqual(old.body, { processed: 1, patched: 0 });
+  // A timestamp far in the future is not a reason to retry either.
+  const future = fakeRes();
+  await at('2026-12-01T00:00:00Z')({ method: 'POST', headers: {}, body: {} }, future);
+  assert.equal(future.statusCode, 200);
 });
 
 test('a send with no recipient still writes an audit row', async () => {

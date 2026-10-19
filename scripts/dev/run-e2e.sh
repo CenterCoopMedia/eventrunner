@@ -42,6 +42,12 @@ export EVENT_PUBLIC_URL="$E2E_APP_URL"
 export EVENT_ALLOWED_ORIGINS="$E2E_APP_URL"
 export EVENT_STORAGE_BUCKET="${EVENT_FIREBASE_PROJECT_ID}.appspot.com"
 export FUNCTIONS_EMULATOR=true
+# Airtable pitch refresh (e2e/session-pitch-airtable.spec.js) calls the
+# spec's own loopback fake. functions/src/sessions/airtableClient.cjs honours
+# this origin only inside the emulator. The token is a fixed fake value.
+export EVENT_AIRTABLE_ENABLED=true
+export EVENT_AIRTABLE_API_ORIGIN="${EVENT_AIRTABLE_API_ORIGIN:-http://127.0.0.1:5197}"
+export AIRTABLE_API_TOKEN=e2e-airtable-token
 
 npx firebase emulators:exec \
   --only firestore,storage,auth,functions \

@@ -44,10 +44,14 @@ vi.mock('../contexts/EventConfigContext.jsx', () => ({
 // own rule, which is what these tests render unless they set one.
 // The shell also reads the whole page list: the navigation IS that list
 // (lib/siteNavigation.js), so a test that wants nav items supplies pages.
+// The footer draws the home page's `footer` section (FooterLinkGroups.jsx),
+// so the shell reads that section's blocks too. Empty unless a test sets it.
+let sectionBlocks = {};
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
     pages,
-    getPage: (key) => (page && page.path === key ? page : null),
+    getPage: (key) => (page && (page.path === key || page.id === key) ? page : null),
+    getSectionBlocks: (section) => sectionBlocks[section] ?? [],
   }),
 }));
 // The account control at the end of the nav is the one item that depends on
@@ -650,6 +654,65 @@ describe('Layout footer', () => {
     expect(labels).not.toContain('Draft page');
     expect(labels).not.toContain('Schedule');
     expect(labels).toContain('Travel');
+  });
+
+  // The seed's `footer` section is "Grouped links rendered in the page
+  // footer" (scripts/lib/seed.cjs). The footer never drew it; the home body
+  // drew it under a "Footer links" heading (launch rehearsal).
+  describe('the home page footer section', () => {
+    const HOME_DOC = {
+      id: 'home', label: 'Home', path: '/', order: 0, visible: true, systemPage: true,
+      sections: [{ id: 'hero', label: 'Hero' }, { id: 'footer', label: 'Footer links' }],
+    };
+    const link = (field, group, label, url, order = 0) => ({
+      id: `footer__${field}`, section: 'footer', field, blockType: 'link_group', group, label, url, visible: true, order,
+    });
+    const FOOTER_NAV = 'nav[aria-label="Footer links"]';
+    afterEach(() => { sectionBlocks = {}; });
+
+    it('draws each group of links in the footer, on every page', () => {
+      sectionBlocks = {
+        footer: [
+          link('contact', 'About', 'Contact the organizers', 'mailto:help@example.org'),
+          link('travel', 'About', 'Plan your trip', '/travel', 1),
+          link('press', 'Press', 'Press kit', 'https://example.org/press', 2),
+        ],
+      };
+      for (const path of ['/', '/travel']) {
+        const { container, unmount } = renderShell({}, { path, pageDoc: HOME_DOC });
+        const nav = footer(container).querySelector(FOOTER_NAV);
+        expect(nav).not.toBeNull();
+        expect(within(nav).getByRole('list', { name: 'About' })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: 'Contact the organizers' })).toHaveAttribute('href', 'mailto:help@example.org');
+        expect(within(nav).getByRole('link', { name: 'Plan your trip' })).toHaveAttribute('href', '/travel');
+        expect(within(within(nav).getByRole('list', { name: 'Press' })).getByRole('link')).toHaveAttribute('href', 'https://example.org/press');
+        unmount();
+      }
+    });
+
+    it('draws no link to a section that is off, and no group left empty', () => {
+      sectionBlocks = {
+        footer: [
+          link('program', 'Program', 'Browse the schedule', '/schedule'),
+          link('contact', 'About', 'Contact the organizers', 'mailto:help@example.org'),
+        ],
+      };
+      const { container } = renderShell({}, { pageDoc: HOME_DOC, featureFlags: { schedule: false } });
+      const nav = footer(container).querySelector(FOOTER_NAV);
+      expect(within(nav).queryByRole('link', { name: 'Browse the schedule' })).toBeNull();
+      expect(within(nav).queryByText('Program')).toBeNull();
+      expect(within(nav).getByRole('link', { name: 'Contact the organizers' })).toBeInTheDocument();
+    });
+
+    it('draws nothing when the home page states no footer section, or the section holds no link', () => {
+      sectionBlocks = { footer: [link('contact', 'About', 'Contact the organizers', 'mailto:help@example.org')] };
+      const deleted = renderShell({}, { pageDoc: { ...HOME_DOC, sections: [{ id: 'hero', label: 'Hero' }] } });
+      expect(footer(deleted.container).querySelector(FOOTER_NAV)).toBeNull();
+      deleted.unmount();
+      sectionBlocks = { footer: [link('bad', 'About', 'Bad', 'javascript:alert(1)')] };
+      const unsafe = renderShell({}, { pageDoc: HOME_DOC });
+      expect(footer(unsafe.container).querySelector(FOOTER_NAV)).toBeNull();
+    });
   });
 
   it('renders no page list at all when no page is navigable', () => {

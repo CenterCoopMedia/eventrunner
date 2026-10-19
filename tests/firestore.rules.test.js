@@ -60,6 +60,11 @@ const ADMIN_READABLE = [
   { path: "feedback/f-tier", tier: "admin" },
   { path: "change_requests/cr-tier", tier: "admin" },
   { path: "session_pitches/pitch-tier", tier: "admin" },
+  // Pitch email settings (issue #324): the receipt mode and edited wording.
+  { path: "session_pitch_settings/notices", tier: "admin" },
+  // Airtable pitch intake: the operator chooses the source; staff see runs.
+  { path: "session_pitch_sources/airtable", tier: "operator" },
+  { path: "session_pitch_sync/airtable", tier: "admin" },
 ];
 
 /**
@@ -208,6 +213,10 @@ beforeAll(async () => {
       reviewedAt: null,
       reviewedBy: null,
     });
+    await setDoc(doc(db, "session_pitch_settings/notices"), {
+      receiptMode: "automatic",
+      templates: {},
+    });
     // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
     // profile visibility on it, and setPublicProfilesFeature() flips it.
     await setDoc(doc(db, "config/features"), {
@@ -240,6 +249,8 @@ beforeAll(async () => {
       updatedAt: new Date(),
     });
     await setDoc(doc(db, "admin_logs/l1"), { action: "cmsPublish" });
+    await setDoc(doc(db, "session_pitch_sources/airtable"), { enabled: true, baseId: "appAAAAAAAAAAAAAA", table: "Pitches" });
+    await setDoc(doc(db, "session_pitch_sync/airtable"), { running: null, lastRun: null });
     await setDoc(doc(db, "media_assets/asset-1"), {
       path: "cms-images/asset-1/hero.png",
       contentType: "image/png",
@@ -548,6 +559,11 @@ describe("server-only collections stay deny-all", () => {
     "auth_send_ceiling",
     "sent_emails",
     "email_claims",
+    // Announcement email (issues #202, #490): recipient lists, signing keys,
+    // opt-outs, and the unsubscribe rate limit.
+    "announcement_sends",
+    "email_suppressions",
+    "unsubscribe_rate_limits",
     "system_errors",
     "client_error_rate_limits",
     "email_templates",
@@ -557,6 +573,10 @@ describe("server-only collections stay deny-all", () => {
     "cmsContentSectionLocks",
     "speaker_slugs",
     "speaker_invites",
+    // Staff CSV import keys: the external ID map and the last imported values.
+    "record_imports",
+    // Speaker reminder bookkeeping: the batch and time of the last reminder.
+    "speaker_reminders",
     // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
     // address and who claimed it; `ticket_webhook_deliveries` is the dedup
     // claim store a forged pre-claim could use to make a real delivery
@@ -2042,5 +2062,68 @@ describe("cmsTimeline: the listener's query and the editor's list reads (issue 1
       await assertFails(setDoc(doc(db, "cmsTimeline/new-entry"), { year: 2024, title: "x", visible: true }));
       await assertFails(setDoc(doc(db, "cmsTimeline_drafts/new-entry"), { year: 2024, title: "x" }));
     }
+  });
+});
+
+// Event data export (issue 329). Spreadsheets and the package live only in
+// the response body. The rules' part is the stores around them: the order
+// and admission collections no client of any tier may read (so the operator
+// endpoint is the only way to list them), the speaker and pitch collections
+// both admin tiers already read (so a staff spreadsheet adds no reach), the
+// collections a package leaves out, and the audit rows no client can forge.
+describe("event data export: sources and audit rows (issue 329)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "ticket_orders/export-order"), { purchaserEmail: "buyer@example.com", totalAmount: 5000 });
+      await setDoc(doc(db, "tickets/export-ticket"), { orderId: "export-order", email: "holder@example.com" });
+      await setDoc(doc(db, "speakers/export-speaker"), { firstName: "Ada", email: "ada@example.com" });
+      await setDoc(doc(db, "session_pitches/export-pitch"), { title: "Pitch", privateNotes: "note" });
+      await setDoc(doc(db, "admin_logs/export-package-1"), {
+        action: "downloadEventPackage",
+        docPath: "event-package",
+        uid: "admin-1",
+        email: ADMIN_EMAIL,
+        at: new Date(),
+        details: { sections: ["program"], includeStaffNotes: false },
+      });
+    });
+  });
+
+  it("no client of any tier reads orders or admissions: only the operator endpoint lists them", async () => {
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(getDocs(collection(db, "ticket_orders")));
+      await assertFails(getDoc(doc(db, "ticket_orders/export-order")));
+      await assertFails(getDocs(collection(db, "tickets")));
+    }
+  });
+
+  it("both admin tiers already read speakers and pitches, which the staff exports draw on; nobody else does", async () => {
+    for (const db of [admin(), staff()]) {
+      await assertSucceeds(getDocs(collection(db, "speakers")));
+      await assertSucceeds(getDocs(collection(db, "session_pitches")));
+    }
+    for (const db of [nonAdmin(), anon()]) {
+      await assertFails(getDocs(collection(db, "speakers")));
+      await assertFails(getDocs(collection(db, "session_pitches")));
+    }
+  });
+
+  it("config/bootstrap, which a package never carries, stays unreadable to every client", async () => {
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(getDoc(doc(db, "config/bootstrap")));
+    }
+  });
+
+  it("no client can forge, change, or remove an export's audit row, and staff cannot read it", async () => {
+    for (const db of [admin(), staff(), nonAdmin()]) {
+      for (const action of ["exportEventData", "downloadEventPackage"]) {
+        await assertFails(setDoc(doc(db, `admin_logs/forged-${action}`), { action, docPath: "event-package" }));
+      }
+      await assertFails(updateDoc(doc(db, "admin_logs/export-package-1"), { details: {} }));
+      await assertFails(deleteDoc(doc(db, "admin_logs/export-package-1")));
+    }
+    await assertSucceeds(getDoc(doc(admin(), "admin_logs/export-package-1")));
+    await assertFails(getDoc(doc(staff(), "admin_logs/export-package-1")));
   });
 });

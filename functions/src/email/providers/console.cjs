@@ -17,7 +17,8 @@ const fs = require('node:fs');
  * @param {{ env?: Record<string, string|undefined>,
  *           log?: Pick<Console, 'log'>,
  *           appendFileSync?: typeof fs.appendFileSync }} deps
- * @returns {{ name: 'console', send: (message: object) => Promise<object> }}
+ * @returns {{ name: 'console', send: (message: object) => Promise<object>,
+ *   sendBatch: (messages: object[]) => Promise<object[]> }}
  */
 function createConsoleProvider({
   env = process.env,
@@ -59,6 +60,10 @@ function createConsoleProvider({
       tag: message.tag,
       text: message.text,
       html: message.html,
+      // Headers and stream reach the captured file so a test can read the
+      // List-Unsubscribe pair an announcement carries.
+      ...(message.headers && Object.keys(message.headers).length > 0 ? { headers: message.headers } : {}),
+      ...(message.messageStream ? { messageStream: message.messageStream } : {}),
     };
     // Local smoke reads the body from the emulator log. Everywhere else the
     // body stays out of stdout. A bearer-secret template can put the secret
@@ -89,7 +94,21 @@ function createConsoleProvider({
     };
   }
 
-  return { name: 'console', send };
+  /**
+   * The console equivalent of the Postmark batch endpoint (issue #201): one
+   * result per message, in order, each logged and captured exactly as
+   * send() would. No HTTP is involved, so this loop is not a loop of
+   * provider requests.
+   * @param {object[]} messages @returns {Promise<object[]>}
+   */
+  async function sendBatch(messages) {
+    log.log('[email:console] batch of', messages.length);
+    const results = [];
+    for (const message of messages) results.push(await send(message));
+    return results;
+  }
+
+  return { name: 'console', send, sendBatch, batchLimits: { maxMessages: 500 } };
 }
 
 module.exports = { createConsoleProvider };

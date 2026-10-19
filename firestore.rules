@@ -528,6 +528,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Pitch email settings: the receipt mode and the edited wording of the
+    // receipt, acceptance and decline emails. The admin page reads them; only
+    // savePitchNoticeSettings writes them.
+    match /session_pitch_settings/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Airtable connection settings for pitch intake: base, table, view,
+    // field mapping and refresh timing. Operator-only, because they choose
+    // which outside records enter the queue. The access token is a managed
+    // secret and is never stored here. updateAirtablePitchSource writes it.
+    match /session_pitch_sources/{docId} {
+      allow read: if isOperator();
+      allow write: if false;
+    }
+
+    // Airtable refresh status: last run, counts, skip reasons and the last
+    // (redacted) error. Either admin tier reads it; only the refresh writes.
+    match /session_pitch_sync/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // media_assets: the index of uploaded Storage objects behind the media
     // library (spec §4.1, §8.5). Admin-readable so the library can list and
     // search without a callable per keystroke; never client-written — every
@@ -572,6 +596,12 @@ service cloud.firestore {
     match /auth_send_ceiling/{docId} { allow read, write: if false; }
     match /sent_emails/{docId} { allow read, write: if false; }
     match /email_claims/{docId} { allow read, write: if false; }
+    // Announcement email (issues #202, #490): the send records hold the
+    // recipient list and the unsubscribe signing key; the suppression
+    // records and the unsubscribe rate limit are server bookkeeping.
+    match /announcement_sends/{docId} { allow read, write: if false; }
+    match /email_suppressions/{docId} { allow read, write: if false; }
+    match /unsubscribe_rate_limits/{docId} { allow read, write: if false; }
     match /system_errors/{docId} { allow read, write: if false; }
     match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }
@@ -586,6 +616,17 @@ service cloud.firestore {
     // (functions/src/speakers/profile.cjs). Pure bookkeeping: nothing
     // outside those handlers reads or writes it.
     match /speaker_slugs/{slug} { allow read, write: if false; }
+    // Record import keys (`record_imports/{type}__{hash}`), one per
+    // external ID a staff CSV import has written: the document it created
+    // and the values the last import wrote (functions/src/imports/
+    // recordImport.cjs). Server-only; staff see the result in the import
+    // preview, never by reading the keys.
+    match /record_imports/{key} { allow read, write: if false; }
+    // Speaker reminder bookkeeping (`speaker_reminders/{speakerId}`): the
+    // batch that last reached the speaker and when, written only by
+    // functions/src/speakers/reminders.cjs, read by staff through that
+    // endpoint.
+    match /speaker_reminders/{speakerId} { allow read, write: if false; }
     // Speaker invitations (`speaker_invites/{sha256(token)}`, spec §4.1,
     // issue #21). Server-only in BOTH directions, and the read denial is
     // the load-bearing half: the document id is the digest of a live

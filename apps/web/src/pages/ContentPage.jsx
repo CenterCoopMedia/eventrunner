@@ -23,6 +23,7 @@ import { pageHeading } from 'shared/page';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
@@ -132,7 +133,7 @@ function filterSections(sections, query) {
 
 export default function ContentPage() {
   const { pathname } = useLocation();
-  const { getPublicPage, getSectionBlocks } = useContent();
+  const { pages, getPublicPage, getSectionBlocks } = useContent();
   const { eventConfig, features } = useEventConfig();
   // Declared before the early return below so hook order stays fixed across
   // renders regardless of which page (or no page) this URL resolves to
@@ -217,7 +218,10 @@ export default function ContentPage() {
   const baseSections = (page.sections ?? [])
     .map((section) => ({
       section,
-      blocks: getSectionBlocks(section.id),
+      // A cta or link_group that leads to a section that is off, or to a
+      // page that is not public, is not drawn (lib/linkTargets.js). Filtered before the emptiness test
+      // below, so a section left with nothing draws no heading.
+      blocks: withoutSwitchedOffLinks(getSectionBlocks(section.id), features, pages),
       map: section.id === VENUE_MAP_SECTION_ID ? map : null,
       areaMap: section.id === AREA_MAP_SECTION_ID ? areaMap : null,
     }))

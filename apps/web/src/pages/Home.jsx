@@ -22,6 +22,7 @@ import SectionEditLink from '../components/SectionEditLink.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
 import HistorySection from '../components/HistorySection.jsx';
 import { resolvePageLayout } from '../lib/pageLayout.js';
+import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
 import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
 
@@ -132,7 +133,7 @@ export function withLiveDates(block, eventConfig) {
 
 export default function Home() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
+  const { pages, getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
   const registrationAction = useRegistrationLink();
   const pitchOpen = usePitchCallOpen();
 
@@ -164,7 +165,10 @@ export default function Home() {
       ? eventConfig.tagline
       : null;
   const heroBlocks = getSectionBlocks('hero');
-  const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
+  // An action that leads to a section that is off, or to a page that is not
+  // public, is not drawn, and is not counted either, so a lead whose only
+  // action leads there draws no empty action row (lib/linkTargets.js).
+  const heroCtas = withoutSwitchedOffLinks(heroBlocks, features, pages).filter((block) => block.blockType === 'cta');
   // config/event is runtime data, so `days` may arrive as anything.
   const days = Array.isArray(eventConfig.days) ? eventConfig.days : [];
   // Where the summary row is drawn. The row belongs to the key facts
@@ -264,12 +268,17 @@ export default function Home() {
     // from other live collections that may still show snapshot text.
     //
     // The lead is the core (brief §6.2), so the `hero` section is the core's
-    // own and never renders again as a slot section. It is the only one:
-    // every other section this page draws itself is drawn through
-    // `renderSection`, in its own place in the operator's order.
+    // own and never renders again as a slot section. Every other section
+    // this page draws itself is drawn through `renderSection`, in its own
+    // place in the operator's order.
+    //
+    // The `footer` section is not this page's to draw at all: it holds the
+    // grouped links the site footer renders on every page (Layout.jsx,
+    // FooterLinkGroups). Drawn here too, it printed a "Footer links"
+    // heading in the home body (launch rehearsal, v1280-home.png).
     <SystemPage
       pageId={['home', '/']}
-      exclude={['hero']}
+      exclude={['hero', 'footer']}
       renderSection={renderHomeSection}
       data-content-source={source}
       data-cms-content-source={contentSource}
