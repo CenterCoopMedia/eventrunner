@@ -390,10 +390,10 @@ Any edit after the preview removes the preview, so you confirm only what you saw
 
 **Retry failed addresses.** When the email provider is down or busy during a send, the addresses it could not take are kept. The history then offers **Retry N failed addresses**. It loads the message and limits the next preview and send to those addresses. Preview and confirm as usual. Each send can be retried once, so nobody gets two copies from two retries; if the retry also fails, retry from the retry's row. An address the provider refused for good (for example, an inactive address) and an unknown result are not retried. If a send stopped part way and **Continue sending** reports recipients "already handled by an earlier call", some of them may not have got the email: the site cannot tell, and it does not resend them. Each recipient's copy is also in the [Email log](#email-log) under the source **Announcement**, and each test under **Announcement test**.
 
-**Unsubscribe.** Every announcement carries a one-click unsubscribe link, so a mail program can show its own unsubscribe button. Who adds the link depends on the broadcast stream's unsubscribe handling in Postmark:
+**Unsubscribe.** Every announcement carries a one-click unsubscribe link, so a mail program can show its own unsubscribe button. Who adds the link depends on the broadcast stream's unsubscribe handling in Postmark. **Postmark** handling is the default. **Custom** handling is for a client on another email provider.
 
-- **Postmark** handling: Postmark adds the link and the `List-Unsubscribe` headers, and keeps the opt-out on its own list for the stream. The site copies each opt-out from the delivery webhook.
-- **Custom** handling, and the console provider: the site adds a signed link and the `List-Unsubscribe` headers, and records the opt-out itself.
+- **Postmark** handling (the default): Postmark adds the link and the `List-Unsubscribe` headers, and keeps the opt-out on its own list for the stream. The site copies each opt-out from the delivery webhook.
+- **Custom** handling (for a client on another email provider), and the console provider: the site adds a signed link and the `List-Unsubscribe` headers, and records the opt-out itself.
 
 With both types of handling, the site leaves that address out of every later announcement and out of the rest of a send in progress. Sign-in codes, receipts, and speaker mail still reach the person. To send announcements to that person again, only when they ask, enter the address under **Restore an unsubscribed address** and select **Restore address**. With Postmark handling, also reactivate the address on the broadcast stream's suppression list in Postmark; until then, Postmark refuses it and it shows under **Failed addresses**.
 

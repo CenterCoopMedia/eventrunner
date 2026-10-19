@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   addresses, and a past send can be loaded as a new draft (#201, #202, #203).
 - Announcements use their own Postmark broadcast stream, checked through the Postmark API
   before every chunk, never the transactional stream. Every announcement has a one-click
-  unsubscribe link (Postmark-managed, or the site's signed link with `List-Unsubscribe`
-  headers). An opt-out is honored by every later send, and staff can restore an address on
+  unsubscribe link: Postmark-managed by default, or, for a client on another email
+  provider, the site's signed link with `List-Unsubscribe` headers (Custom handling). An opt-out is honored by every later send, and staff can restore an address on
   request. The webhook relay is refused until it has a batch and unsubscribe contract (#490).
 - Staff can retry the addresses an announcement send could not reach because the email
   provider was down or busy. The retry is a new send, previewed and confirmed, and each send

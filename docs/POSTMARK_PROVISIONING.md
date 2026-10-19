@@ -93,14 +93,16 @@ or an unsubscribe on an announcement cannot hold back a sign-in code.
 
 1. In the deployment's Server → **Message Streams** → **Create message stream**. Type:
    **Broadcasts**. Name and ID: `announcements` (any ID works; the deployment config names it).
-2. In the new stream → **Settings** → **Unsubscribe handling**, pick one:
-   - **Postmark** (the default path): Postmark adds an unsubscribe link at the end of every
+2. In the new stream → **Settings** → **Unsubscribe handling**, pick one. Postmark is the
+   default; pick Custom only for a client on another email provider.
+   - **Postmark** (the default): Postmark adds an unsubscribe link at the end of every
      message and suppresses the address on this stream. The application adds no link of its own.
      A staff restore on the Announcements page removes only the site's record: reactivate the
      address on this stream's suppression list as well, or Postmark keeps refusing it.
    - **Custom**: The application adds a signed per-recipient link and the `List-Unsubscribe` and
-     `List-Unsubscribe-Post` headers. Postmark adds nothing. Use this only if the client wants the
-     site's own unsubscribe page.
+     `List-Unsubscribe-Post` headers. Postmark adds nothing. This is for a client on another email
+     provider: the opt-out lives in the site's own record, not on a Postmark suppression list, so
+     it does not depend on Postmark.
 
    **None** is refused: the composer will not send on a stream with no unsubscribe handling.
 3. Set the stream ID in the deployment's Tier B config: `config/providers.email.announcementStream`
