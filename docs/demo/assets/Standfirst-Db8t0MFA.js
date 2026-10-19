@@ -1,0 +1,1 @@
+import{Mn as e}from"./initial-ylzzJvcs.js";var t=e();function n({children:e,className:n=``}){return e==null||e===``?null:(0,t.jsx)(`p`,{className:[`standfirst max-w-prose`,n].filter(Boolean).join(` `),children:e})}export{n as t};

@@ -1,0 +1,1 @@
+import{gr as e,lr as t,or as n,xr as r}from"./initial-ylzzJvcs.js";function i(i,a,o){return n(n=>e(r(t,i),e=>{a(e.docs.map(e=>({id:e.id,...e.data()})))},n),e=>{console.warn(`${i} admin subscription failed; retrying.`,e),o?.(e)})}export{i as t};
