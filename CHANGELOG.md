@@ -418,6 +418,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The Functions deploy step now fails when a Function is not deployed. After a quota error
+  (HTTP 429) on a create, `firebase-tools` 15.22.4 can exit 0 before the create is done, with
+  no summary. Run 39329645906 reported success while `downloadEventPackage` did not exist.
+  `scripts/deploy-functions.cjs` now reads the complete inventory after the full deploy and
+  names each local Function that is not there in each of its regions. The deploy runbook says
+  what to do on a quota error: run the deploy again; unchanged Functions are skipped.
+
 - A delivery, bounce or opt-out event that reaches the email webhook before the site has
   recorded the message is no longer lost. For 15 minutes after the event the webhook
   answers 503, so Postmark sends it again; an older event for an unknown message is
