@@ -195,6 +195,40 @@ test('a staff edit to a mapped field survives a re-import, and a changed file va
   assert.deepEqual(again.commit.body.rows[0].notes, []);
 });
 
+test('a staff edit or a delete between the preview and the commit survives the commit', async () => {
+  const { callImport } = require('./importTestKit.cjs');
+  const db = makeDb();
+  await previewAndCommit(db, body([ROW]));
+  const id = speakerByExternalId(db, 'SPK-1').id;
+  const commitAfter = async (rows, change) => {
+    const preview = await callImport(db, { ...body(rows), dryRun: true });
+    await change();
+    const commit = await callImport(db, { ...body(rows), dryRun: false, confirmDigest: preview.body.digest });
+    return { preview: preview.body.rows[0], commit: commit.body.rows[0] };
+  };
+
+  // The preview offers the file's new bio; staff write their own first.
+  const newBio = [{ ...ROW, Bio: 'A new bio from the source.' }];
+  const update = await commitAfter(newBio, () => db.collection('speakers').doc(id).set({ bio: 'Edited by staff.' }, { merge: true }));
+  assert.equal(update.preview.verdict, 'update');
+  assert.deepEqual(update.preview.changedFields, ['bio']);
+  assert.equal(update.commit.verdict, 'unchanged');
+  assert.match(update.commit.notes[0], /^bio: kept the value in the admin panel/);
+  assert.equal(speakerByExternalId(db, 'SPK-1').bio, 'Edited by staff.');
+
+  // The preview says nothing changes; staff edit a mapped field first.
+  const quiet = await commitAfter(newBio, () => db.collection('speakers').doc(id).set({ jobTitle: 'Staff title' }, { merge: true }));
+  assert.equal(quiet.preview.verdict, 'unchanged');
+  assert.equal(quiet.commit.verdict, 'unchanged');
+  assert.equal(speakerByExternalId(db, 'SPK-1').jobTitle, 'Staff title');
+
+  // The preview offers an update; staff delete the record first.
+  const gone = await commitAfter([{ ...ROW, Org: 'A new organization' }], () => db.collection('speakers').doc(id).delete());
+  assert.equal(gone.preview.verdict, 'update');
+  assert.equal(gone.commit.verdict, 'unchanged');
+  assert.equal(db.read('speakers', id), undefined, 'the commit does not bring a deleted record back');
+});
+
 test('a name change does not move the slug; a changed slug cell does', async () => {
   const db = makeDb();
   const withSlug = { ...MAPPING, slug: 'Slug' };

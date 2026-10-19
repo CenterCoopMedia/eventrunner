@@ -412,7 +412,7 @@ Add speakers, sessions and organizations (sponsors and partners) from a CSV file
 2. Choose the CSV file. The first row names the columns. A file can have up to 500 rows and 5 MB. A cell can have up to 5000 characters. Split a larger file.
 3. Under **Columns**, point each field at a column of the file. A column with the template's header, or with the field's name, is selected for you. A field set to **Not in this file** is never read or changed. Only the columns you map leave your browser.
 4. Select **Preview import**. The preview lists each row with its result: **New**, **Update**, **Matches existing**, **No change** or **Error**, and the reason for each error. Nothing is saved yet.
-5. Select **Import N speakers as drafts** (the words name the type and count). Rows with an error are skipped. The result lists what happened to each row, and the import writes one row to the audit log.
+5. Select **Import N speakers as drafts** (the words name the type and count). Rows with an error are skipped. The import checks each record again as it saves it, so a field someone edited after your preview keeps their edit, and a record deleted after your preview is not made again. The result lists what happened to each row, and the import writes one row to the audit log.
 
 If the file or the mapping changes after the preview, the import is refused. Preview again.
 

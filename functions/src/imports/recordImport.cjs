@@ -60,7 +60,11 @@
  *
  * EXPLICIT CONFIRMATION. A dry run answers with a digest of the type, the
  * mapping and the rows. A commit must send that digest back, so the commit
- * writes exactly the rows the person previewed.
+ * writes exactly the rows the person previewed. The digest does not cover
+ * the stored records, and needs not: the commit plans each row again inside
+ * its own transaction, against the record and key as they are then, so a
+ * staff edit or delete made after the preview still wins (the result lists
+ * the row's verdict at commit time).
  *
  * One transaction per row: a 500-row import does not fit in one Firestore
  * transaction, and a row that fails must not undo the rows before it. A
