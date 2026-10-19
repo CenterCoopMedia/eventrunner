@@ -714,7 +714,9 @@ test('a successful acceptance mails speaker.accepted with the §3.1 onceKey', as
   assert.notEqual(confirmation, undefined);
   assert.equal(confirmation.onceKey, 'speaker-accepted:rae');
   assert.equal(confirmation.storeRendered, true);
-  assert.equal(confirmation.html.includes('https://summit.example.org/speaker/profile'), true);
+  const cta = confirmation.html.match(/<a href="([^"]*)"[^>]*>Write your speaker profile<\/a>/);
+  assert.ok(cta, 'the profile CTA is rendered');
+  assert.equal(cta[1], 'https://summit.example.org/speaker/profile');
   // The CTA is the WIZARD (issue #22) — the canonical speakers/{id} record
   // an organizer approves, not the attendee /profile page.
   assert.match(confirmation.text, /write your speaker profile/i);

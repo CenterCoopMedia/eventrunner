@@ -31,7 +31,7 @@ function fakeFetch({ token = 'ya29.fake', runStatus = 200, runBody = {}, throwOn
   const impl = async (url, options = {}) => {
     calls.push({ url, options });
     if (throwOn && url.includes(throwOn)) throw new Error('network unreachable');
-    if (url.startsWith('http://metadata.google.internal')) {
+    if (new URL(url).origin === 'http://metadata.google.internal') {
       return {
         ok: true,
         status: 200,
