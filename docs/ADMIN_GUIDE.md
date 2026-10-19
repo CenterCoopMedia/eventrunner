@@ -23,7 +23,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -362,6 +362,61 @@ Money refunds happen through **Open this payment in Stripe Dashboard**, using th
 For complimentary seats, an operator opens **Issue complimentary admission**, enters each attendee and a reason, and uses **Review complimentary tickets** before the final issue confirmation. Comps consume real event/type capacity. At the door, staff enter or scan a human-readable code in **Ticket code for check-in**, then select **Check in attendee**. A repeat reports already checked in. Only an operator can use **Review check-in correction → Undo recorded check-in**, with a reason.
 
 If a payment response is lost, the purchaser uses **Resume existing checkout** or **Recover existing checkout**. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the [support matrix](operator/stripe-ticketing.md#6-support-the-payment-and-the-attendee-separately) before suggesting another payment, refund, resend, or admission change.
+
+## Import records
+
+Add speakers, sessions and organizations (sponsors and partners) from a CSV file, for example an export from a spreadsheet or another event system. Open **Import records** under Operations. Staff and operators can use it.
+
+**The import saves drafts only.** It publishes nothing and sends no email or invitation:
+
+- A new speaker has the status **Not invited** (draft). It is not in the public speaker directory. Approve or invite the speaker on the **Speakers** page.
+- A new session or organization is a draft, and it is hidden: **Show this session when it is published** and **Show this organization when it is published** are cleared. Turn the option on in the editor, then publish.
+- A changed record gets a new draft. The published version does not change until you publish. The import does not change a speaker's status or a record's **Show** option.
+
+**Steps.**
+
+1. Select the **Record type**: Speakers, Sessions or Organizations. Import speakers before sessions, so that the sessions can name their speakers.
+2. Choose the CSV file. The first row names the columns. A file can have up to 500 rows. Split a larger file.
+3. Under **Columns**, point each field at a column of the file. A column with the template's header, or with the field's name, is selected for you. A field set to **Not in this file** is never read or changed. Only the columns you map leave your browser.
+4. Select **Preview import**. The preview lists each row with its result: **New**, **Update**, **No change** or **Error**, and the reason for each error. Nothing is saved yet.
+5. Select **Import N speakers as drafts** (the words name the type and count). Rows with an error are skipped. The result lists what happened to each row, and the import writes one row to the audit log.
+
+If the file or the mapping changes after the preview, the import is refused. Preview again.
+
+**The external ID.** Each row needs an ID from the source system that stays the same each time you export the file, for example a registration number. The import uses it to find the record it made the last time:
+
+- Import the same file again, and nothing changes.
+- Change a value in the file and import it again, and that field changes in the draft. Other fields do not change.
+- If you edited a field in the admin panel and the file also changes that field, the import keeps your edit. The row shows a note that names the field.
+- A field you map for the first time fills only an empty field. A value already in the record is kept, with a note.
+- If you deleted a record that an import made, the import does not make it again. To make it again, give the row a new external ID.
+
+**Checks.** Each row goes through the same checks as the editor: a speaker's names, email and slug; a session's title, description, day and times; an organization's name, website and order. A row that fails shows the editor's own message.
+
+**Download a template** with **Download the speaker template** (or the session or organization template). Each template has the header row below and one example row. You can use other column names and map them by hand.
+
+| Record type | Template header row |
+|---|---|
+| Speakers | `external_id,first_name,last_name,slug,email,organization,job_title,bio` |
+| Sessions | `external_id,title,description,day,start_time,end_time,track,place,location,recording_url,speakers,session_id` |
+| Organizations | `external_id,name,slug,tier,website,description,order` |
+
+**Speaker columns.** `first_name` and `last_name` are required. If the file has one name column, map it to **Full name** instead. The first word becomes the first name. `slug` is the speaker's page address. Leave it empty and the import makes it from the name. A name change does not change the slug; change the `slug` cell to change it. A slug that another speaker uses is an error. The import does not change the email address of a speaker who has an open invitation. Change it in the speaker editor.
+
+**Session columns.** `title` is required, and a session also needs a description, a day, a start time and an end time before it can be saved. Write each value the way your event settings name it:
+
+- `day`: the day's ID, its date (`2026-11-12`), or its label.
+- `start_time`, `end_time`: 24-hour (`13:30`) or 12-hour (`1:30 PM`).
+- `track`: the track letter or the track name.
+- `place`: the place ID or the place name.
+- `speakers`: speaker external IDs from a speaker import, or speaker slugs, separated by `;`. A speaker that does not exist is an error.
+- `session_id`: the session's address on the site, for new sessions only. Leave it empty and the import makes it from the title.
+
+The import does not set a parent session. Set it in the session editor.
+
+**Organization columns.** `name` is required. `slug` is the page address, for new organizations only. Leave it empty and the import makes it from the name. An address that another organization uses is an error. `website` must start with `http://` or `https://`. `order` is a number. The import does not set a logo. Choose it in the organization editor.
+
+**Remove an imported record** the same way as any other record: **Delete** in its editor or list. The import keeps no copy of the file.
 
 ## Announcements
 

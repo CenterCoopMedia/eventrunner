@@ -74,6 +74,9 @@ const AdminMaterialsTab = lazy(() => import('./pages/AdminMaterialsTab.jsx'));
 // The organizations list and editor (issue #192) load the same way.
 const AdminOrganizationsList = lazy(() => import('./pages/AdminOrganizationsList.jsx'));
 const AdminOrganizationEditor = lazy(() => import('./pages/AdminOrganizationEditor.jsx'));
+// Import records (speakers, sessions and organizations from a CSV): one
+// screen behind one link, loaded the same way.
+const AdminRecordImport = lazy(() => import('./pages/AdminRecordImport.jsx'));
 // The updates list and editor (issue #190), loaded the same way.
 const AdminUpdatesList = lazy(() => import('./pages/AdminUpdatesList.jsx'));
 const AdminUpdateEditor = lazy(() => import('./pages/AdminUpdateEditor.jsx'));
@@ -261,6 +264,10 @@ export default function AdminApp() {
             element={<DeferredAdminPage label="attendees"><AdminAttendees /></DeferredAdminPage>}
           />
           <Route path="ticketing" element={<AdminTicketing />} />
+          <Route
+            path="import"
+            element={<DeferredAdminPage label="the record import"><AdminRecordImport /></DeferredAdminPage>}
+          />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
           <Route path="announcements" element={<AdminAnnouncements />} />
           <Route path="feedback" element={<AdminFeedback />} />

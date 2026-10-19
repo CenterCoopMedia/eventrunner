@@ -48,6 +48,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AIRTABLE_API_TOKEN` managed secret, bound only with `EVENT_AIRTABLE_ENABLED=true`. ADR 0005
   brings Airtable into scope for pitch intake only.
 
+- Staff can import speakers, sessions and organizations from a CSV file on the new
+  **Import records** page. Staff map the file's columns, read a preview that lists each row
+  as new, update, no change or error, and confirm the import. The confirm carries the
+  preview's digest, so a changed file is refused. Every record is written as a draft: a
+  speaker in draft status, a session or organization as a hidden draft. The import sends no
+  email or invitation. A stable external ID per row makes a re-import idempotent, and a
+  three-way merge per mapped field keeps staff edits and never writes an unmapped field.
+  Rows go through the editors' own validators, sessions link speakers by external ID or
+  slug, and each import writes an `admin_logs` row. New endpoint `importRecordsCsv`; new
+  server-only collection `record_imports`.
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page

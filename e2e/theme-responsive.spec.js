@@ -341,7 +341,7 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   await summary.click();
   await expect(docket).toHaveAttribute('open', '');
   const links = docket.getByRole('navigation', { name: 'Admin sections' }).getByRole('link');
-  await expect(links).toHaveCount(26);
+  await expect(links).toHaveCount(27);
   await expect(docket.getByRole('link', { name: 'Session pitches', exact: true })).toBeVisible();
   await expect(docket.getByText(ADMIN_EMAIL)).toBeVisible();
   await expect(docket.getByRole('button', { name: 'Sign out' })).toBeVisible();

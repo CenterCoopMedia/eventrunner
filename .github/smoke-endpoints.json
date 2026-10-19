@@ -97,6 +97,7 @@
     "getTicketingStatus",
     "ticketingImportCsv",
     "ticketingListTickets",
+    "importRecordsCsv",
     "ticketingCatalog",
     "ticketingCheckout",
     "ticketingOrderStatus",
