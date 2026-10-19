@@ -696,9 +696,10 @@
           release history → <strong>Rollback</strong> on the last-known-good release; it&#39;s a Console action against
           <code>EVENT_HOSTING_SITE</code>, not a re-run of CI. From the CLI, with the same credentials an operator uses
           for one-off scripts (not the deploy service account — this is a manual, watched action):</p>
-          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">firebase hosting:clone &lt;SITE_ID&gt;:&lt;GOOD_RELEASE_ID&gt; &lt;SITE_ID&gt;:live --project &lt;GCP_PROJECT_ID&gt;
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npx firebase hosting:clone &lt;SITE_ID&gt;@&lt;GOOD_VERSION_ID&gt; &lt;SITE_ID&gt;:live --project &lt;GCP_PROJECT_ID&gt;
           </code></pre>
-          <p>Find <code>&lt;GOOD_RELEASE_ID&gt;</code> from <code>firebase hosting:releases:list</code> or the Console&#39;s release history.
+          <p>Find <code>&lt;GOOD_VERSION_ID&gt;</code> in the Console&#39;s release history. The Firebase CLI has no command that
+          lists releases, and <code>hosting:clone</code> takes a version as <code>&lt;SITE_ID&gt;@&lt;VERSION_ID&gt;</code>, not as a channel.
           This affects the served static bundle only — it does not touch functions, rules, or content.</p>
           <h3 id="functions">Functions<a class="heading-anchor" href="#functions" aria-label="Link to this section">#</a></h3>
           <p>There is no one-click functions rollback the way Hosting has one; the fix is to redeploy the prior

@@ -479,6 +479,18 @@
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The Firebase CLI (<code>firebase-tools</code>, a root devDependency) moves from 14.27.0 to 15.22.4. The
+          upgrade brings <code>tar</code> 7.5.22 and removes the critical <code>tar</code> advisory from the root lockfile. The
+          emulators need Java 21 or later, which CI and the docs already require. The CLI is held at
+          <code>~15.22.4</code>: from 15.23.0, it sends emulator calls to <code>127.0.0.1</code> through <code>HTTPS_PROXY</code> and ignores
+          <code>NO_PROXY</code>, so Storage rules that read Firestore deny valid writes on a machine with a proxy set.
+          The <code>proxy-agent</code>, <code>basic-ftp</code>, <code>get-uri</code>, <code>pac-proxy-agent</code>, and <code>csv-parse</code> findings clear only
+          on 15.34.0. The <code>chokidar</code>, <code>@google-cloud/pubsub</code>, <code>@opentelemetry/core</code>, <code>gaxios</code>, and <code>uuid</code>
+          findings stay on every 15.x release. All are logged in <code>scripts/ci/audit-exceptions.json</code>. The
+          hosting rollback command in <code>docs/DEPLOY_RUNBOOK.md</code> now uses the <code>&lt;SITE_ID&gt;@&lt;VERSION_ID&gt;</code> form
+          that <code>hosting:clone</code> accepts.</li>
+          </ul>
+          <ul>
           <li><strong>Breaking:</strong> <code>submitSessionPitch</code> now requires <code>consent: true</code>. Callers must record agreement
           to organizer review before submitting; requests without it return 400. Stored proposals
           record the consent version and time (#323).</li>
