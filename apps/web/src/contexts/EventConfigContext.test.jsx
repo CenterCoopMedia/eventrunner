@@ -223,7 +223,7 @@ describe('Layout nav', () => {
               layout variants it owns (brief §6.1). These tests are about
               the config subscriptions, so the page lookup answers nothing
               and the shell keeps its own rule. */}
-          <ContentContext.Provider value={{ pages: NAV_PAGES, getPage: () => null }}>
+          <ContentContext.Provider value={{ pages: NAV_PAGES, getPage: () => null, getSectionBlocks: () => [] }}>
             {/* The shell's account control reads the auth state (M7 issue
                 2); nobody is signed in in these tests. */}
             <AuthContext.Provider value={{ user: null, loading: false }}>

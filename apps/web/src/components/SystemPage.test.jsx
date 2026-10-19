@@ -11,11 +11,19 @@ import AuthContext from '../contexts/AuthContext.jsx';
 
 let page;
 let blocksBySection;
+let pages;
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({
+    pages,
     getPage: (key) => (page && (page.id === key || page.path === key) ? page : null),
     getSectionBlocks: (id) => blocksBySection[id] ?? [],
   }),
+}));
+// The shell reads the flags to leave out a link to a section that is off
+// (lib/linkTargets.js). Every section is on unless a test says otherwise.
+let features = { schedule: true, speakers: true, sponsors: true, updates: true, attendeeDirectory: true };
+vi.mock('../contexts/EventConfigContext.jsx', () => ({
+  useEventConfig: () => ({ features }),
 }));
 
 const { default: SystemPage } = await import('./SystemPage.jsx');
