@@ -328,128 +328,82 @@ functions regardless of `bootstrap`, because a fresh project has none yet and ga
 filter would provision an empty, broken deployment (spec §8.1).
 
 The first Functions deploy contains event handlers with retry enabled. Firebase CLI requires an
-explicit acceptance for a new retry policy, even in non-interactive mode. On a bootstrap run, the
-workflow reads the complete Functions inventory through the pinned `firebase-tools` backend used by
-`functions:list`. It rejects missing regional availability or any unreachable region. It passes
-`--force` only when that read succeeds and reports no Functions. A failed or partial inventory stops
-the deploy. An inventory with any existing function uses the normal deployment path without
-`--force`, so Firebase continues to stop for function deletion, unsafe trigger migration, and other
-protected changes.
+explicit acceptance for a new retry policy, even in non-interactive mode. `--force` gives that
+acceptance, but it also accepts function deletion and unsafe trigger migration. So
+`scripts/deploy-functions.cjs` passes `--force` in two narrow cases only.
 
-For that verified-empty initial deploy, `--force` also accepts Firebase CLI's default Artifact
-Registry cleanup policy: container images older than one day are deleted. This is build-artifact
-retention only; it does not change deployed Functions or event data. Retry-enabled event handlers
-can retry failed executions for up to seven days, so they must remain idempotent. Later deployments
-do not use `--force`, including later runs that mistakenly leave `bootstrap: true` after Functions
-exist.
+Before each Functions deploy, the script reads the complete Functions inventory through the pinned
+`firebase-tools` backend used by `functions:list`. It rejects missing regional availability or any
+unreachable region. A failed or partial inventory stops the deploy.
 
-**Recover a partial first Functions deploy.** If the first bootstrap creates some Functions and
-then fails, a rerun sees the nonempty inventory and correctly omits `--force`. It can then stop at
-the retry-policy prompt for retry-enabled handlers that the failed run did not create. Do not add
-blanket `--force` to the workflow. Use this bounded recovery:
+**Case 1: verified-empty bootstrap.** On a bootstrap run, the script passes `--force` to the full
+`--only functions` deploy only when the inventory reports no Functions. For that initial deploy,
+`--force` also accepts Firebase CLI's default Artifact Registry cleanup policy: container images
+older than one day are deleted. This is build-artifact retention only; it does not change deployed
+Functions or event data.
 
-1. Read the failed run and repair its original API, permission, quota, or provider-configuration
-   failure. Keep the failed run's reviewed commit, `EVENT_FIREBASE_REGION`, and GitHub Environment
-   provider settings unchanged through recovery. Use a clean checkout at that exact commit and the
-   same trusted deploy credentials. The targeted command must use the same
-   `functions/.env.<GCP_PROJECT_ID>` content the failed workflow generated; stop if that input cannot
-   be reproduced exactly.
-2. From that checkout with Node 22 and `npm ci` complete, read the full inventory. This uses the same
-   authenticated, pinned `firebase-tools` backend as the workflow and fails if a v1, v2, or Cloud
-   Run region is unreachable:
+**Case 2: new retry-enabled handlers.** On every other run, the script also discovers the local
+Functions with the pinned `firebase-tools` runtime, the same discovery that `firebase deploy` runs.
+A discovery failure stops the deploy. A retry-enabled handler is new when the inventory has no
+Function with the same id in the same region. For new handlers only, the script runs one targeted
+deploy first and logs the names it creates:
 
-   ```sh
-   set -euo pipefail
-   export EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID>
-   export EVENT_FIREBASE_REGION=<the unchanged region from the failed run>
-   export GCLOUD_PROJECT="$EVENT_FIREBASE_PROJECT_ID"
-   export FAILED_DEPLOY_SHA=<the failed workflow's exact commit>
-   test "$(git rev-parse HEAD)" = "$FAILED_DEPLOY_SHA"
-   test -z "$(git status --porcelain)"
+```sh
+npx firebase deploy --only functions:<id>[,functions:<id>...] \
+  --project <GCP_PROJECT_ID> --non-interactive --force
+```
 
-   read_functions_inventory() {
-     node - <<'NODE'
-   const { readCompleteInventory } = require('./scripts/deploy-functions.cjs');
-   readCompleteInventory(process.env.EVENT_FIREBASE_PROJECT_ID).then((functions) => {
-     const rows = functions
-       .map(({ id, region, platform }) => ({ id, region, platform }))
-       .sort((a, b) => `${a.region}/${a.id}`.localeCompare(`${b.region}/${b.id}`));
-     process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
-   }).catch((error) => {
-     console.error(error.message);
-     process.exitCode = 1;
-   });
-   NODE
-   }
+Then it runs the normal full deploy without `--force`. The handlers now exist with retry enabled,
+so Firebase does not ask again. Firebase continues to stop for function deletion, unsafe trigger
+migration, and other protected changes. The script refuses the targeted deploy, and deploys
+nothing, in these cases:
 
-   inventory_file="$(mktemp)"
-   read_functions_inventory > "$inventory_file"
-   cat "$inventory_file"
-   ```
+- A Function with the same id exists in another region. That is a migration, not a new handler.
+- A selector also matches a deployed Function. Firebase matches `functions:<id>` against the
+  dash-separated parts of each id, so `functions:foo` also selects `foo-bar`.
+- A selector also matches a local Function that is not a new retry handler.
+- A retry setting or a retry handler's region is not a literal value.
 
-3. At this source commit, the retry-enabled handlers are `onUserCreated`, `onUserDeleted`,
-   `refreshUserPublicBadges`, `refreshUserPublicFeatures`, `syncScheduleShare`,
-   `syncScheduleShareOnAccountWrite`, `onTicketWritten`, `onUserRegistrationPromptCreated`,
-   `syncSessionMaterialPublic`, and `onSpeakerWritten`. Derive the missing set from the complete
-   inventory. Abort if any name exists in another region; that is a migration, not an absent
-   handler:
+With these checks, the targeted plan contains creates only. `--force` cannot approve deletion or
+unsafe migration of an existing Function. The targeted deploy can also accept other prompts for
+the new handlers: their min-instances cost, an API they need, and a missing Artifact Registry
+cleanup policy. A client deployment that already deploys without `--force` already has a cleanup
+policy.
 
-   ```sh
-   retry_handlers=(
-     onUserCreated onUserDeleted refreshUserPublicBadges refreshUserPublicFeatures
-     syncScheduleShare syncScheduleShareOnAccountWrite onTicketWritten
-     onUserRegistrationPromptCreated syncSessionMaterialPublic onSpeakerWritten
-   )
-   missing=()
-   for handler in "${retry_handlers[@]}"; do
-     if jq -e --arg id "$handler" --arg region "$EVENT_FIREBASE_REGION" \
-       'any(.[]; .id == $id and .region != $region)' "$inventory_file" >/dev/null; then
-       echo "Stop: $handler already exists outside $EVENT_FIREBASE_REGION" >&2
-       exit 1
-     fi
-     if ! jq -e --arg id "$handler" --arg region "$EVENT_FIREBASE_REGION" \
-       'any(.[]; .id == $id and .region == $region)' "$inventory_file" >/dev/null; then
-       missing+=("$handler")
-     fi
-   done
-   printf 'Verified absent retry handlers: %s\n' "${missing[*]:-(none)}"
-   ```
+Retry-enabled event handlers can retry failed executions for up to seven days, so they must remain
+idempotent. Review every new retry handler for idempotency before it merges.
 
-4. If `missing` is empty, do not run a forced command. Otherwise, deploy only those verified-absent
-   names. Do not add any existing handler to this selector and do not replace it with
-   `--only functions`. With exact absent-name filters, Firebase's plan contains creates only, so
-   `--force` cannot approve deletion or unsafe migration of an existing Function:
+**Retry enabled on an existing Function.** Case 2 covers handlers that do not exist yet. If a change
+turns on retry for a Function that is already deployed, the full deploy still stops at the
+retry-policy prompt. Do not add blanket `--force` to the workflow. Deploy that one Function by name
+with `--force` from a clean checkout of the reviewed commit, with the same deploy credentials and
+the same `functions/.env.<GCP_PROJECT_ID>` content as the workflow. Do this only when the same
+change does not also change the Function's trigger. Then rerun the workflow.
 
-   ```sh
-   selectors=()
-   for handler in "${missing[@]}"; do selectors+=("functions:$handler"); done
-   only="$(IFS=,; echo "${selectors[*]}")"
-   test -n "$only"
-   npx firebase deploy \
-     --only "$only" \
-     --project "$EVENT_FIREBASE_PROJECT_ID" \
-     --non-interactive \
-     --force
-   ```
+**Recover a partial first Functions deploy.** If the first bootstrap creates some Functions and then
+fails, read the failed run and repair its original API, permission, quota, or provider-configuration
+failure. Keep the commit, `EVENT_FIREBASE_REGION`, and GitHub Environment provider settings
+unchanged, and rerun the same `bootstrap: true` dispatch. The rerun sees a nonempty inventory, so
+it does not force the full deploy. Case 2 creates the absent retry handlers first, and the full
+deploy then runs without `--force`.
 
-5. Read the complete inventory again and require every retry handler above to exist in the held
-   region:
+To read the complete inventory from an operator's machine, use a clean checkout with Node 22 and
+`npm ci` complete:
 
-   ```sh
-   read_functions_inventory > "$inventory_file"
-   for handler in "${retry_handlers[@]}"; do
-     jq -e --arg id "$handler" --arg region "$EVENT_FIREBASE_REGION" \
-       'any(.[]; .id == $id and .region == $region)' "$inventory_file" >/dev/null || {
-       echo "Stop: $handler is still absent from $EVENT_FIREBASE_REGION" >&2
-       exit 1
-     }
-   done
-   ```
-
-   Then rerun the standard `bootstrap: true` workflow from the same commit and unchanged provider
-   configuration. It now deploys without `--force`: the retry handlers are no longer new, and the
-   ordinary deletion and migration safeguards remain active. Delete the temporary inventory file
-   when recovery is complete.
+```sh
+EVENT_FIREBASE_PROJECT_ID=<GCP_PROJECT_ID> node - <<'NODE'
+const { readCompleteInventory } = require('./scripts/deploy-functions.cjs');
+readCompleteInventory(process.env.EVENT_FIREBASE_PROJECT_ID).then((functions) => {
+  const rows = functions
+    .map(({ id, region, platform }) => ({ id, region, platform }))
+    .sort((a, b) => `${a.region}/${a.id}`.localeCompare(`${b.region}/${b.id}`));
+  process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);
+}).catch((error) => {
+  console.error(error.message);
+  process.exitCode = 1;
+});
+NODE
+```
 
 **Upgrade order for unpublished counts.** Pause CMS saves, publishes, deletes, and seed jobs during
 the first upgrade. Deploy Firestore rules and all Functions, then wait for the deploy and any older
