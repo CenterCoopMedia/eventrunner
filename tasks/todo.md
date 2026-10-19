@@ -15,6 +15,10 @@ A gap check found five promises the code does not deliver:
 | g5-import | Initial imports for speakers, sessions, sponsors | workflow, building |
 | docs | Handoff docs: communications, exports, Airtable, stale Stripe omissions | director, after g1-g5 |
 
+Security and dependencies (Joe, 2026-10-19): 34 CodeQL alerts (s1, /home/user/wt-codeql);
+non-breaking npm audit fix (PR #498); major upgrades as separate PRs: u1 vitest 5 + vite 8,
+u2 firebase-tools 15 (both dispatched), u3 firebase-admin 14 + react-router 7 (queued).
+
 Sponsorship invoicing (#208, #209) stays out: the proposals say it needs a
 separate discussion. Each build gets an adversarial review in the workflow;
 the director integrates onto the stack tip, regenerates, and opens stacked PRs.
