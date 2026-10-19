@@ -66,6 +66,7 @@ import { buildNavItems } from '../lib/siteNavigation.js';
 import { brandingSrc } from '../lib/mediaSource.js';
 import useAccountViews from '../hooks/useAccountViews.js';
 import BackToTop from './BackToTop.jsx';
+import FooterLinkGroups, { FOOTER_SECTION_ID, footerLinkGroups } from './FooterLinkGroups.jsx';
 import Header from './Header.jsx';
 import { quietActionClass } from './controlClasses.js';
 import { buildNameplate } from './editorial/Nameplate.jsx';
@@ -258,7 +259,7 @@ const FOOTER_LINK_CLASS =
 
 export default function Layout() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { pages, getPage } = useContent();
+  const { pages, getPage, getSectionBlocks } = useContent();
   const { user, loading: authLoading } = useAuth();
   const { pathname, key: locationKey } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -346,6 +347,15 @@ export default function Layout() {
   // config or content snapshot, and the list only changes when the pages or
   // the flags do.
   const navItems = useMemo(() => buildNavItems(pages, features), [pages, features]);
+  // The home page's footer section, drawn in the footer on every page
+  // (FooterLinkGroups.jsx). Its label names the landmark.
+  const homePage = getPage('home') ?? getPage('/');
+  const footerSection = (homePage?.sections ?? []).find((section) => section?.id === FOOTER_SECTION_ID);
+  const footerGroups = footerLinkGroups({
+    homePage,
+    blocks: getSectionBlocks(FOOTER_SECTION_ID),
+    features,
+  });
   const primaryNavItems = navPlacement === 'side' ? navItems : navItems.slice(0, 5);
   const moreNavItems = navPlacement === 'side' ? [] : navItems.slice(5);
   const moreIsActive = moreNavItems.some((item) => matchPath({ path: item.to, end: item.end }, pathname));
@@ -576,6 +586,11 @@ export default function Layout() {
                 </ul>
               </nav>
             )}
+            <FooterLinkGroups
+              label={footerSection?.label || 'Footer links'}
+              groups={footerGroups}
+              linkClass={FOOTER_LINK_CLASS}
+            />
             {operatorName || supportEmail ? (
               <p className="mt-md">
                 {operatorName ? `Operated by ${operatorName}` : null}

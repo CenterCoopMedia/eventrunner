@@ -126,9 +126,16 @@ describe('Home', () => {
     // This historical demo supplies neither invented attendance totals nor
     // past-edition history. Normal client block coverage uses isolated fixtures.
     expect(home.sections.some((section) => ['stats', 'history'].includes(section.id))).toBe(false);
-    // Footer link group renders as a descriptive link.
+    // The footer section's link group renders in the site footer, as a
+    // descriptive link, and not a second time in the home body under a
+    // "Footer links" heading (launch rehearsal, v1280-home.png).
+    const footerSection = home.sections.find((s) => s.id === 'footer');
+    expect(within(screen.getByRole('main')).queryByRole('heading', { name: footerSection.label })).toBeNull();
     expect(
-      screen.getByRole('link', { name: siteContent.footer__contact_link.label }),
+      within(screen.getByRole('main')).queryByRole('link', { name: siteContent.footer__contact_link.label }),
+    ).toBeNull();
+    expect(
+      within(screen.getByRole('contentinfo')).getByRole('link', { name: siteContent.footer__contact_link.label }),
     ).toHaveAttribute('href', siteContent.footer__contact_link.url);
   });
 });

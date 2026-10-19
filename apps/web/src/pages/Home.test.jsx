@@ -948,3 +948,27 @@ describe('Home links to a section that is off', () => {
     expect(screen.queryByRole('heading', { name: 'More from the event' })).toBeNull();
   });
 });
+
+// The seed's `footer` section is "Grouped links rendered in the page
+// footer" (scripts/lib/seed.cjs). The home body drew it again under a
+// "Footer links" heading (rehearsal v1280-home.png).
+describe('Home footer section', () => {
+  it('leaves the footer section to the site footer', () => {
+    eventConfig = { name: 'Demo Event', days: [] };
+    pageDoc = {
+      id: 'home',
+      sections: [
+        { id: 'details', label: 'Details' },
+        { id: 'footer', label: 'Footer links' },
+      ],
+    };
+    sectionBlocks = {
+      details: [{ section: 'details', field: 'body', blockType: 'text', value: 'Details body' }],
+      footer: [{ section: 'footer', field: 'contact_link', blockType: 'link_group', group: 'About', label: 'Contact the organizers', url: 'mailto:help@example.org' }],
+    };
+    render(<Home />);
+    expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Footer links' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Contact the organizers' })).toBeNull();
+  });
+});
