@@ -209,3 +209,19 @@ test('Markdown comments and code examples are not prose', () => {
 
   assert.deepEqual(findFindings(source, 'docs/example.md'), []);
 });
+
+test('html script and style bodies are not prose, whatever their end tag spells', () => {
+  for (const close of ['</script>', '</script >', '</SCRIPT\t>', '</script\n>']) {
+    const source = `<p>Plain.</p>\n<script>const note = 'A robust layout.';${close}\n<p>A robust layout.</p>\n`;
+    assert.deepEqual(
+      findFindings(source, 'docs/example.html').map(({ line }) => line),
+      // Only the paragraph after the script; a newline in the end tag moves it down.
+      [close.includes('\n') ? 4 : 3],
+      close,
+    );
+  }
+  for (const close of ['</style>', '</style >', '</STYLE\n>']) {
+    const source = `<style>/* A robust layout. */${close}\n<p>Plain.</p>\n`;
+    assert.deepEqual(findFindings(source, 'docs/example.html'), [], close);
+  }
+});

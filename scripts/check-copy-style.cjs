@@ -228,8 +228,9 @@ function extractHtmlFragments(source) {
     {
       text: maskNonProse(source, [
         /<!--[\s\S]*?-->/gu,
-        /<script\b[^>]*>[\s\S]*?<\/script>/giu,
-        /<style\b[^>]*>[\s\S]*?<\/style>/giu,
+        // An end tag may carry spaces or junk before its `>` (`</script >`).
+        /<script\b[^>]*>[\s\S]*?<\/script\b[^>]*>/giu,
+        /<style\b[^>]*>[\s\S]*?<\/style\b[^>]*>/giu,
       ]),
       startLine: 1,
     },
