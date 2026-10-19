@@ -28,6 +28,16 @@ const CONFIG = {
 };
 const ACTOR = { uid: 'staff-1', email: 'staff@example.test' };
 const HOSTILE = '<script>alert(1)</script> & "quotes"';
+const DASHBOARD = 'https://site.example.test/speaker/dashboard';
+
+// Whole URLs in a message, so a check compares the full link, not a substring.
+function linksIn(text) {
+  return text.match(/https?:\/\/[^\s"'<>]+/g) ?? [];
+}
+
+function hrefsIn(html) {
+  return [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
+}
 
 function hostileRecipient(overrides = {}) {
   const speaker = { firstName: HOSTILE, lastName: '', email: ' speaker@example.test ', bio: '', headshotPath: '' };
@@ -57,8 +67,8 @@ test('the shipped reminder escapes names and session titles in html and keeps th
   assert.ok(text.includes(`- Send your slides or other materials for: Panel ${HOSTILE}.`));
   assert.ok(text.includes('- Add a short biography to your speaker profile.'));
   assert.ok(text.includes('- Add a headshot to your speaker profile.'));
-  assert.ok(html.includes('href="https://site.example.test/speaker/dashboard"'));
-  assert.ok(text.includes('https://site.example.test/speaker/dashboard'));
+  assert.ok(hrefsIn(html).includes(DASHBOARD), 'the html body links to the dashboard');
+  assert.ok(linksIn(text).includes(DASHBOARD), 'the text body names the dashboard');
   assert.ok(text.includes('write to staff@example.test'));
   // The footer the provider gets is in the preview, once.
   assert.equal(text.split('Example Org').length - 1, 1);
@@ -113,7 +123,7 @@ test('wording that hides the dashboard link inside an {{#if}} block never reache
   const items = recipient.readiness.missing.filter((item) => item !== 'bio');
   const out = renderShipped({ ...recipient, items }, override);
   assert.equal(out.usedFallback, true);
-  assert.ok(out.delivered.text.includes('https://site.example.test/speaker/dashboard'));
+  assert.ok(linksIn(out.delivered.text).includes(DASHBOARD), 'the fallback names the dashboard');
 });
 
 test('saved wording is used, and wording with an unknown token or no dashboard link is refused', () => {
