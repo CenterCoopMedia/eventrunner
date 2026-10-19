@@ -25,7 +25,7 @@ The deadline and the enabled state apply in both modes. While the call is open, 
 2. For the CSV import only, add a formula field named `externalId` with the formula `RECORD_ID()`. Airtable fills it for each response. The Airtable refresh uses the record ID directly and does not need this field.
 3. Make a form view from these fields. Make `email`, `title`, `description` and `consent` required. Copy the form's public share link.
 4. In **Session pitches**, expand **Manage the call for sessions**. Choose **An external form, such as Airtable**, paste the share link, set the deadline, select **Accept session pitches** and save.
-5. Bring the responses into the review queue. Use the [Airtable refresh](#refresh-pitches-from-airtable) when the deployment has an Airtable token. Otherwise download a CSV of a grid view (**Download CSV**) and use the [reviewed CSV import](#reviewed-csv-import-and-private-export). In a CSV, a ticked checkbox exports as `checked`, which the import reads as consent. Import 50 rows or fewer at a time, and keep the same source name for every import from this form.
+5. Bring the responses into the review queue. Use the [Airtable refresh](#refresh-pitches-from-airtable) when the deployment has an Airtable token. Otherwise download a CSV of a grid view (**Download CSV**) and use the [reviewed CSV import](#reviewed-csv-import-and-private-export). In a CSV, a ticked checkbox exports as `checked`, which the import reads as consent. Import 50 rows or fewer at a time. Use the source name `airtable` for every import from this form, so a later Airtable refresh adopts those rows and does not duplicate them.
 
 Firestore stays the record for the review queue. Airtable stays the record for the form answers.
 
@@ -40,7 +40,8 @@ The refresh reads one approved Airtable table and brings its records into the pr
 3. **Turn the feature on for the deployment.** Set the GitHub Environment variable `EVENT_AIRTABLE_ENABLED` to `true` and deploy. Without the flag, every refresh fails with "Airtable is not turned on for this deployment". With the flag and without the secret, the deploy fails.
 4. **Find the IDs.** Open the table in Airtable. The address has the form `airtable.com/<base ID>/<table ID>/<view ID>`. The base ID starts with `app`, the table ID with `tbl` and the view ID with `viw`. Each ID has 17 characters.
 5. **Save the settings.** In **Session pitches**, expand **Refresh pitches from Airtable**, then **Connection settings** (operators only). Enter the base ID and the table ID. A table name also works, but a renamed table then stops the refresh. Enter a view ID or name to bring in only the records that view shows, for example a view that hides test rows. Type the name of each Airtable field. Choose the automatic refresh timing. Select **Use this Airtable connection** and save.
-6. **Test it.** Choose **Refresh from Airtable**. Check the counts. Open one new pitch and compare it with its Airtable record.
+6. **Check earlier CSV imports.** If responses from this form were imported as CSV before, choose **Export filtered queue** and read the `source` column. A refresh adopts only rows imported under the exact source name `airtable` (lowercase) with the Airtable record ID as the external ID. Rows imported under another source name, such as `Airtable` or `pitch-form`, come in a second time on the first refresh. Tell staff before that refresh, so they review only one copy of each pitch and decline the other.
+7. **Test it.** Choose **Refresh from Airtable**. Check the counts. Open one new pitch and compare it with its Airtable record. Staff see the **Refresh pitches from Airtable** panel only after this first refresh.
 
 The settings are stored in `session_pitch_sources/airtable`. Only operators can read them. `updateAirtablePitchSource` writes them and an `admin_logs` row.
 
@@ -60,10 +61,12 @@ The names must match the Airtable field names exactly, including capitals and sp
 
 ### Refresh timing
 
-- **By hand.** Staff or an operator choose **Refresh from Airtable**. A refresh can start once a minute. A second refresh while one runs is refused.
+- **By hand.** Staff or an operator choose **Refresh from Airtable**. Staff see the panel after the first refresh; until then only operators see it. A refresh can start once a minute. A second refresh while one runs is refused.
 - **Automatic.** An operator picks **Every 15 minutes** or **Every hour** in the settings. The default is off. `scheduledAirtablePitchRefresh` runs every 15 minutes. It returns at once unless a timing is set and that much time has passed since the last run. It does the same work as the button. It is not a queue: nothing waits in Firestore for a later run.
 
 Each refresh reads up to 1,000 records (10 pages of 100). It sends at most four requests a second, below Airtable's limit of five per base. After a rate-limit answer (429) it waits 30 seconds and tries again, two times at most. The read stops after 4 minutes, so the run always records its result inside the function's 5-minute limit. A view with more than 1,000 records ends as **Completed in part**. Use a smaller view, for example one that hides declined records.
+
+Each complete refresh reads about two Firestore documents per Airtable record: one to compare the record with its pitch, and one to look for removed records. With 1,000 records, the 15-minute timing reads about 192,000 documents a day and the hourly timing about 48,000. Choose the hourly timing unless the client needs faster updates.
 
 ### What a refresh changes
 
