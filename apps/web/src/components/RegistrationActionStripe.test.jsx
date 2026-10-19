@@ -22,7 +22,7 @@ describe('registration provider destination', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it('uses one public lookup to replace both configured external actions with native ticketing', async () => {
-    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: true });
+    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: true, catalogRevision: 3 });
     render(surface());
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
     for (const link of screen.getAllByRole('link')) {
@@ -35,7 +35,26 @@ describe('registration provider destination', () => {
 
   it('provides a native action even when no external registration destination is configured', async () => {
     state.eventConfig = {};
-    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: false });
+    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: false, catalogRevision: 0 });
+    render(surface());
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
+  });
+
+  it('shows no ticket action before a Stripe catalog is published', async () => {
+    // The public catalog read answers catalogRevision null until staff publish.
+    ticketingRequest.mockResolvedValue({
+      provider: 'stripe', salesEnabled: false, catalogRevision: null, closedReason: 'Ticket sales are not configured.',
+    });
+    render(surface());
+    await waitFor(() => expect(ticketingRequest).toHaveBeenCalledExactlyOnceWith('ticketingCatalog'));
+    await act(async () => {});
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+  });
+
+  it('keeps the native action while a published catalog has paused sales or closed windows', async () => {
+    ticketingRequest.mockResolvedValue({
+      provider: 'stripe', salesEnabled: false, catalogRevision: 2, closedReason: 'Ticket sales are paused.',
+    });
     render(surface());
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
   });
@@ -61,7 +80,7 @@ describe('registration provider destination', () => {
     ticketingRequest.mockImplementation(() => new Promise((done) => { resolve = done; }));
     render(surface());
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    await act(async () => resolve({ provider: 'stripe' }));
+    await act(async () => resolve({ provider: 'stripe', catalogRevision: 1 }));
     expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2);
   });
 

@@ -44,6 +44,30 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
   });
   test.afterAll(async () => { if (originalEvent) await adminDb().doc('config/event').set(originalEvent); });
 
+  test('the header and home lead offer tickets only once a catalog is published', async ({ page }) => {
+    // The shape the public catalog read answers before staff publish a catalog.
+    const UNPUBLISHED = { provider: 'stripe', mode: 'test', salesEnabled: false, catalogRevision: null, currency: null, ticketTypes: [], closedReason: 'Ticket sales are not configured.' };
+    let response = UNPUBLISHED;
+    let reads = 0;
+    await mockEndpoint(page, 'ticketingCatalog', async () => { reads += 1; return response; });
+    await page.goto('/');
+    await expect.poll(() => reads).toBeGreaterThan(0);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Get tickets' })).toHaveCount(0);
+    await expect(page.locator('a[href="/tickets"]')).toHaveCount(0);
+    await screenshot(page, 'stripe-action-before-catalog', page.locator('header').first());
+
+    // Paused sales keep the action, so a visitor can read when sales open.
+    response = { ...PUBLIC, salesEnabled: false, closedReason: 'Ticket sales are paused.' };
+    await page.reload();
+    await expect(page.getByRole('link', { name: 'Get tickets' }).first()).toBeVisible();
+    for (const link of await page.getByRole('link', { name: 'Get tickets' }).all()) await expect(link).toHaveAttribute('href', '/tickets');
+    await screenshot(page, 'stripe-action-after-catalog', page.locator('header').first());
+    await page.getByRole('link', { name: 'Get tickets' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Ticket sales are closed' })).toBeVisible();
+    await expect(page.getByText('Ticket sales are paused.')).toBeVisible();
+  });
+
   test('selection, lost handoff recovery, authoritative status, and printable ticket reflow', async ({ page }) => {
     test.setTimeout(180_000);
     let status = 'pending';
