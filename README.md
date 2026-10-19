@@ -71,7 +71,7 @@ docs                Spec, roadmap, design records, and the GitHub Pages site
 
 ## Develop
 
-Node 22+.
+Node 22.12+.
 
 ```bash
 npm test
