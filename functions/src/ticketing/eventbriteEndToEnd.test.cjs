@@ -26,7 +26,7 @@ const { createEventbriteProvider, internals: eventbriteInternals } = require('./
 const FIXTURES = path.join(__dirname, 'providers', '__fixtures__');
 const fixture = (name) => require(path.join(FIXTURES, name));
 
-const SECRET = 'fixture-webhook-secret';
+const SECRET = 'fixture-url-secret-0123456789abcdef0123';
 const TOKEN = 'fixture-api-token';
 const QUIET = { warn() {}, error() {}, info() {} };
 
@@ -41,10 +41,21 @@ function makeRes() {
   return res;
 }
 
-function signedWebhookRequest(fixtureName) {
+/**
+ * A delivery as Eventbrite sends it (issue 356): no signature header, the
+ * shared secret in the query string of the registered callback URL, which
+ * the Functions runtime parses into `req.query`.
+ */
+function signedWebhookRequest(fixtureName, secret = SECRET) {
   const rawBody = Buffer.from(JSON.stringify(fixture(fixtureName)), 'utf8');
-  const headers = { 'X-Eventbrite-Signature': eventbriteInternals.signBody(SECRET, rawBody) };
-  return { method: 'POST', rawBody, headers, body: fixture(fixtureName) };
+  const headers = { 'content-type': 'application/json', 'user-agent': 'Eventbrite Hookshot' };
+  return {
+    method: 'POST',
+    rawBody,
+    headers,
+    query: { [eventbriteInternals.URL_SECRET_PARAM]: secret },
+    body: fixture(fixtureName),
+  };
 }
 
 /** Route-table fake fetch, same shape as providers/eventbrite.test.cjs's. */
@@ -200,7 +211,7 @@ test('a wrong-event delivery is acknowledged and ignored, never enqueued (§3.3 
   assert.equal(db.read('ticket_sync_queue', 'ord-9001'), undefined);
 });
 
-test('an unsigned / tampered delivery never reaches the transaction (webhook signature verification is security-critical)', async () => {
+test('a delivery with a missing or wrong URL secret never reaches the transaction (issue 356)', async () => {
   const db = makeFakeDb();
   const provider = createEventbriteProvider({
     env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
@@ -208,9 +219,120 @@ test('an unsigned / tampered delivery never reaches the transaction (webhook sig
   });
   const webhookHandler = createTicketingWebhookHandler({ db, provider, log: QUIET });
   const rawBody = Buffer.from(JSON.stringify(fixture('webhook-order-placed.json')), 'utf8');
-  const res = makeRes();
-  await webhookHandler({ method: 'POST', rawBody, headers: {}, body: fixture('webhook-order-placed.json') }, res);
-  assert.equal(res.statusCode, 401);
+  const refusals = [
+    { method: 'POST', rawBody, headers: {}, body: fixture('webhook-order-placed.json') },
+    { method: 'POST', rawBody, headers: {}, query: {}, body: fixture('webhook-order-placed.json') },
+    signedWebhookRequest('webhook-order-placed.json', 'not-the-real-secret-0123456789abcdef'),
+  ];
+  for (const req of refusals) {
+    const res = makeRes();
+    await webhookHandler(req, res);
+    assert.equal(res.statusCode, 401);
+    assert.deepEqual(res.body, { error: { code: 'unauthorized', message: 'Verification failed.' } });
+  }
   assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
   assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(rawBody)), undefined);
+});
+
+test('a forged delivery with the secret cannot inject ticket data: tickets come only from the API re-fetch (issue 356)', async () => {
+  const db = makeFakeDb();
+  const fetched = [];
+  const fetchImpl = async (url, opts = {}) => {
+    fetched.push(url);
+    return fakeFetch({ 'GET /orders/ord-2001/': fixture('order-complete.json') })(url, opts);
+  };
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl,
+  });
+  const forged = {
+    ...fixture('webhook-order-placed.json'),
+    attendees: [{ id: 'att-forged', profile: { email: 'forged@example.com' }, status: 'Attending' }],
+  };
+  const rawBody = Buffer.from(JSON.stringify(forged), 'utf8');
+  const res = makeRes();
+  await createTicketingWebhookHandler({ db, provider, log: QUIET })({
+    method: 'POST', rawBody, headers: {}, query: { [eventbriteInternals.URL_SECRET_PARAM]: SECRET }, body: forged,
+  }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(fetched.length, 0, 'the webhook itself fetches nothing');
+
+  await drainTicketSyncQueue({ db, provider, log: QUIET });
+  assert.ok(fetched.length > 0);
+  for (const url of fetched) assert.ok(url.startsWith(`${eventbriteInternals.API_BASE}/`), `${url} is on the API host`);
+  assert.equal(db.read('tickets', 'att-forged'), undefined, 'nothing from the body becomes a ticket');
+  assert.ok(db.read('tickets', 'att-5001'), 'the ticket comes from the API response');
+});
+
+test('an authenticated delivery in an unknown shape is acknowledged and ignored, never retried (review fix 6)', async () => {
+  const db = makeFakeDb();
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: async () => { throw new Error('must not be called'); },
+  });
+  const handler = createTicketingWebhookHandler({ db, provider, log: QUIET });
+  for (const body of [
+    { config: { action: 'order.placed' }, api_url: 'https://www.eventbriteapi.com/v3/events/evt-1/' },
+    { config: { action: 'order.placed' }, api_url: 'https://attacker.example/v3/orders/ord-2001/' },
+    'not json{{{',
+  ]) {
+    const rawBody = Buffer.from(typeof body === 'string' ? body : JSON.stringify(body), 'utf8');
+    const res = makeRes();
+    await handler({
+      method: 'POST', rawBody, headers: {}, query: { [eventbriteInternals.URL_SECRET_PARAM]: SECRET }, body: {},
+    }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ignored, 'not_actionable');
+    assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(rawBody)), undefined);
+  }
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
+});
+
+test('the /v3/orders/{id}/ form enqueues, and the drain drops an order for another event (review fix 6)', async () => {
+  const db = makeFakeDb();
+  const otherEventOrder = { ...fixture('order-complete.json'), event_id: 'evt-OTHER' };
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: fakeFetch({ 'GET /orders/ord-2001/': otherEventOrder }),
+  });
+  const res = makeRes();
+  await createTicketingWebhookHandler({ db, provider, log: QUIET })(
+    signedWebhookRequest('webhook-order-placed-order-path.json'), res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.enqueued, true);
+  assert.ok(db.read('ticket_sync_queue', 'ord-2001'));
+
+  await drainTicketSyncQueue({ db, provider, now: () => new Date(), log: QUIET });
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined, 'the row is removed');
+  assert.equal(db.read('tickets', 'att-5001'), undefined, 'no ticket from another event');
+});
+
+test('the attendee form enqueues the attendee\'s order (review fix 6)', async () => {
+  const db = makeFakeDb();
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': fixture('attendee.json') }),
+  });
+  const res = makeRes();
+  await createTicketingWebhookHandler({ db, provider, log: QUIET })(
+    signedWebhookRequest('webhook-attendee-updated-attendee-path.json'), res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.enqueued, true);
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001').lastEventType, 'attendee.updated');
+});
+
+test('an attendee delivery whose attendee is not readable yet answers 500 and writes nothing, so Eventbrite retries (Codex 5)', async () => {
+  const db = makeFakeDb();
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': { status: 404, body: {} } }),
+  });
+  const req = signedWebhookRequest('webhook-attendee-updated-attendee-path.json');
+  const res = makeRes();
+  await createTicketingWebhookHandler({ db, provider, log: QUIET })(req, res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(req.rawBody)), undefined);
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
 });

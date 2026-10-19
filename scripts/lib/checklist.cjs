@@ -72,8 +72,10 @@ function manualChecklist(ctx = {}) {
         : {
           title: 'Ticketing → create the API token, then register the webhook',
           detail:
-            `Provider is ${ticketing}: run scripts/register-ticketing-webhook.cjs and confirm the delivery ` +
-            'in getTicketingStatus.',
+            `Provider is ${ticketing}: generate TICKETING_WEBHOOK_SECRET with \`openssl rand -hex 32\` ` +
+            '(Eventbrite does not sign deliveries; the script puts this secret in the webhook URL). ' +
+            'Run scripts/register-ticketing-webhook.cjs, delete any older webhook it names, and confirm ' +
+            'the delivery in getTicketingStatus.',
         },
     {
       title: 'Google Cloud Console → confirm the Cloud Billing API is enabled',

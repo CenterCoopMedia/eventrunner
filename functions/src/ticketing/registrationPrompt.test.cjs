@@ -90,7 +90,7 @@ function makeOnceKeyedSendEmail(calls, claims = new Set()) {
 
 function eventbrite(getConfig) {
   return createEventbriteProvider({
-    env: { TICKETING_API_TOKEN: 'tok', TICKETING_WEBHOOK_SECRET: 'sec' },
+    env: { TICKETING_API_TOKEN: 'tok', TICKETING_WEBHOOK_SECRET: 'fixture-url-secret-0123456789abcdef0123' },
     getConfig,
   });
 }

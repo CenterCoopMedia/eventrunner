@@ -1,6 +1,6 @@
 {
   "id": "hook-6666",
-  "endpoint_url": "https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook",
+  "endpoint_url": "https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook?token=fixture-placeholder",
   "actions": "order.placed,order.updated,attendee.updated",
   "event_id": "evt-1"
 }

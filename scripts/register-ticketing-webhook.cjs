@@ -51,8 +51,15 @@ const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 
 const FLAGS = ['callback-url', 'no-write', 'help'];
 
-/** Default Eventbrite events; adapters may supply their own required list. */
-const WEBHOOK_EVENTS = ['order.placed', 'order.updated', 'attendee.updated'];
+/**
+ * The events to register come from the provider (`webhookEventTypes`),
+ * never from a list kept here. This script once kept its own Eventbrite
+ * list, and it left out `order.refunded` (#357).
+ * @param {object} provider @returns {string[]}
+ */
+function webhookEventsFor(provider) {
+  return Array.isArray(provider.webhookEventTypes) ? [...provider.webhookEventTypes] : [];
+}
 
 /**
  * The deployed `ticketingWebhook` function's default URL, same shape as
@@ -97,6 +104,7 @@ function usage() {
     '  EVENT_STRIPE_MODE           required for stripe; test | live',
     '  TICKETING_API_TOKEN         required when provider is not none',
     '  TICKETING_WEBHOOK_SECRET    required for eventbrite or stripe',
+    '  Eventbrite: a random secret of 32+ characters; it is registered in the webhook URL.',
     '  Stripe: create the Dashboard endpoint and bind its generated signing secret first.',
     '  EVENT_FIREBASE_PROJECT_ID   the project whose config/providers is read and stamped',
     '  EVENT_FIREBASE_REGION       default us-central1',
@@ -141,8 +149,8 @@ async function run({ args, env = process.env, deps = {} }) {
 
   console.log(`\nRegistering the ${provider.name} webhook (spec §3.3)\n`);
   console.log(`  Callback URL: ${callbackUrl}`);
-  const webhookEvents = provider.webhookEventTypes || WEBHOOK_EVENTS;
-  console.log(`  Events:       ${webhookEvents.join(', ')}`);
+  const webhookEvents = webhookEventsFor(provider);
+  console.log(`  Events:       ${webhookEvents.length > 0 ? webhookEvents.join(', ') : '(provider default)'}`);
 
   let result;
   try {
@@ -156,6 +164,13 @@ async function run({ args, env = process.env, deps = {} }) {
     return 1;
   }
   console.log(`\nRegistered. webhookId = ${result.webhookId}`);
+  const stale = Array.isArray(result.staleWebhookIds) ? result.staleWebhookIds : [];
+  if (stale.length > 0) {
+    console.log(
+      `Older webhooks at this endpoint do not carry every event: ${stale.join(', ')}. ` +
+      'Delete them in the provider dashboard.',
+    );
+  }
 
   if (args['no-write']) {
     console.log('--no-write: config/providers.ticketing not stamped.');
@@ -207,5 +222,5 @@ if (require.main === module) {
 module.exports = {
   main,
   run,
-  internals: { defaultCallbackUrl, stampWebhookRegistration, usage, FLAGS, WEBHOOK_EVENTS },
+  internals: { defaultCallbackUrl, stampWebhookRegistration, usage, FLAGS, webhookEventsFor },
 };

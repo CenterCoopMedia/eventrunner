@@ -251,7 +251,7 @@
           <tr><th>Provider</th><th>Step</th></tr>
           </thead>
           <tbody>
-          <tr><td><code>eventbrite</code></td><td>Create the API token in the ticketing provider (<code>TICKETING_API_TOKEN</code> — already set as a GitHub Environment secret per the runbook §3). Then register the webhook: <code>node scripts/register-ticketing-webhook.cjs</code>. Confirm the delivery via <code>getTicketingStatus</code> (admin Settings, or the Cloud Functions log for the registration call).</td></tr>
+          <tr><td><code>eventbrite</code></td><td>Create the API token in the ticketing provider (<code>TICKETING_API_TOKEN</code> — already set as a GitHub Environment secret per the runbook §3). Generate <code>TICKETING_WEBHOOK_SECRET</code> with <code>openssl rand -hex 32</code> and set it the same way. Eventbrite does not sign deliveries, so the script registers this secret in the webhook URL, and the function refuses a delivery without it. Then register the webhook: <code>node scripts/register-ticketing-webhook.cjs</code>. The script registers every Eventbrite action the adapter handles, refunds included. If it names an older webhook at the same endpoint, delete that webhook in Eventbrite. Confirm the delivery via <code>getTicketingStatus</code> (admin Settings, or the Cloud Functions log for the registration call).</td></tr>
           <tr><td><code>manual</code></td><td>No webhook to register. Upload the first attendee CSV through the admin Ticketing tab instead — that upload <em>is</em> the equivalent step for this provider.</td></tr>
           <tr><td><code>none</code></td><td>Nothing to do. There is no token, no webhook, and no import.</td></tr>
           </tbody>

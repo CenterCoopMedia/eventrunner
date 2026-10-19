@@ -304,3 +304,23 @@ test('rawBodyOf prefers the exact bytes the signature covers', () => {
   circular.self = circular;
   assert.equal(internals.rawBodyOf({ body: circular }).length, 0);
 });
+
+test('the handler passes the delivery URL query to verifyWebhook, for providers that authenticate by URL secret (issue 356)', async () => {
+  let seen = null;
+  const provider = {
+    name: 'url-secret-stub',
+    async verifyWebhook(rawBody, headers, context) {
+      seen = context;
+      return { valid: false, deliveryId: '', eventType: 'unknown', resourceId: null, reason: 'invalid_secret' };
+    },
+  };
+  const res = makeRes();
+  const req = { ...makeReq({ rawBody: Buffer.from('{}'), headers: {} }), query: { token: 'from-the-url' } };
+  await makeHandler({ provider })(req, res);
+  assert.deepEqual(seen, { query: { token: 'from-the-url' } });
+  assert.equal(res.statusCode, 401);
+
+  const res2 = makeRes();
+  await makeHandler({ provider })(makeReq({ rawBody: Buffer.from('{}'), headers: {} }), res2);
+  assert.deepEqual(seen, { query: {} }, 'no query parses to an empty object, never undefined');
+});

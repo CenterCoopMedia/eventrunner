@@ -35,10 +35,11 @@
  *
  * No rate-limit collection here, deliberately, unlike logClientError:
  * that endpoint persists a document for any caller, so it needs a bucket
- * to bound durable writes. This one writes nothing at all until a
- * cryptographic check passes, and §4.1 enumerates the collections that
- * exist — adding a fourth ticketing collection to bound what the
- * signature check already bounds is not a trade worth making.
+ * to bound durable writes. This one writes nothing at all until the
+ * provider's verification passes (a Stripe signature, or Eventbrite's
+ * shared URL secret compared in constant time), and §4.1 enumerates the
+ * collections that exist — adding a fourth ticketing collection to bound
+ * what that check already bounds is not a trade worth making.
  */
 
 const {
@@ -194,7 +195,9 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
 
     let verification = null;
     try {
-      verification = await provider.verifyWebhook(rawBody, req.headers || {});
+      // The query is passed for providers that authenticate by a secret in
+      // the registered URL (eventbrite, #356). It is never logged.
+      verification = await provider.verifyWebhook(rawBody, req.headers || {}, { query: req.query || {} });
     } catch (err) {
       // A throw is ambiguous — a malformed body and an unreachable key
       // store look the same from here. 500 so the provider retries; the

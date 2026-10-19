@@ -17,23 +17,28 @@ network dependency — not as a substitute for that verification.
 `functions/src/ticketing/providers/eventbrite.cjs`'s module doc numbers six judgment calls in
 detail; the short version, because it drives what these fixtures look like:
 
-1. **Webhook signing.** Eventbrite's classic webhook delivery is not documented as carrying a
-   payload signature. This adapter was specified to implement HMAC-SHA256 over the raw body with
-   `TICKETING_WEBHOOK_SECRET`, delivered as `X-Eventbrite-Signature: <hex>`. The fixture webhook
-   bodies below are **unsigned** — signatures are computed in tests, over these exact bytes, using
-   `internals.signBody` from the adapter itself, so the fixture stays valid if the wire format
-   ever changes. #79 must confirm whether a real Eventbrite delivery carries this header at all;
-   if not, the fallback is the same shared-secret-in-callback-URL trick the ADR (§3.1) already
-   uses for Postmark's unsigned delivery webhooks.
+1. **Webhook authentication (#356).** Eventbrite's webhook delivery carries no payload signature,
+   and its webhook API takes no signing secret. The adapter uses the shared-secret-in-URL fallback
+   the ADR (§3.1) uses for Postmark: `registerWebhook` registers `<callback>?token=<secret>`, and
+   `verifyWebhook` compares the `token` query parameter with `TICKETING_WEBHOOK_SECRET` in constant
+   time. The fixture webhook bodies are unsigned, as real deliveries are. Every
+   `config.endpoint_url` holds `token=fixture-placeholder`, because a real body echoes the secret
+   there. Tests pass the secret as
+   the parsed query (`{ query: { token } }`). `webhooks-list-current.json` holds the placeholder
+   `token=fixture-placeholder`, which a test swaps for its own secret. #79 must confirm that
+   Eventbrite keeps the query string when it delivers.
 2. **Delivery id.** Eventbrite's webhook payload carries no per-delivery identifier, so the
    adapter derives one as `sha256(rawBody)`. `webhook-order-updated.json` and
    `webhook-order-updated-2.json` are deliberately two DIFFERENT bodies about the same order, to
    exercise "two distinct deliveries collapse onto one queue row, not onto one delivery claim"
    (spec §3.3).
-3. **Resource URL shape.** `api_url` is modeled as always resolving the ORDER resource path
-   (`/v3/events/{eventId}/orders/{orderId}/`), even for `attendee.updated` deliveries, because the
-   sync queue is keyed by order id and an attendee resource's own URI does not carry one. This is
-   the single most load-bearing assumption in this directory.
+3. **Resource URL shape.** The first fixtures model `api_url` as the ORDER resource path
+   (`/v3/events/{eventId}/orders/{orderId}/`) for every action. Eventbrite's documentation shows
+   `/v3/orders/{orderId}/` for `order.*` and `/v3/events/{eventId}/attendees/{attendeeId}/` for
+   `attendee.*`, so `webhook-order-placed-order-path.json` and
+   `webhook-attendee-updated-attendee-path.json` model those, and `attendee.json` is the attendee
+   read that maps one to its order. The adapter accepts all three shapes. This is the single most
+   load-bearing assumption in this directory.
 4. **`order.refunded` folding.** The ADR's `WebhookVerification.eventType` enum has no
    `order.refunded` slot. `webhook-order-refunded.json` carries `config.action: "order.refunded"`
    on the wire (matching Eventbrite's documented action name) and the adapter maps it to
@@ -55,7 +60,10 @@ detail; the short version, because it drives what these fixtures look like:
 | `webhook-order-updated.json` | `order.updated` delivery body (order `ord-2001`) |
 | `webhook-order-updated-2.json` | A second, distinct `order.updated` delivery about the same order — different bytes, same `orderId` (judgment call 2) |
 | `webhook-order-refunded.json` | `order.refunded` delivery body (judgment call 4) |
-| `webhook-attendee-updated.json` | `attendee.updated` delivery body |
+| `webhook-attendee-updated.json` | `attendee.updated` delivery body, order-path `api_url` |
+| `webhook-order-placed-order-path.json` | `order.placed` delivery with the documented `/v3/orders/{id}/` `api_url` |
+| `webhook-attendee-updated-attendee-path.json` | `attendee.updated` delivery with the documented attendee `api_url` |
+| `attendee.json` | `GET /events/{id}/attendees/{id}/` — carries the attendee's `order_id` |
 | `webhook-wrong-event.json` | A correctly-shaped delivery for an event id other than the configured one |
 | `order-complete.json` | `GET /orders/{id}/?expand=attendees` — fully hydrated, two valid attendees |
 | `order-processing.json` | Same order id, `attendees` key absent — the eventual-consistency case |
@@ -65,5 +73,7 @@ detail; the short version, because it drives what these fixtures look like:
 | `orders-page-2.json` | Second (final) page, `pagination.has_more_items: false` |
 | `organizations.json` | `GET /users/me/organizations/` |
 | `webhooks-list-empty.json` | `GET /organizations/{id}/webhooks/` — no existing subscription |
-| `webhooks-list-existing.json` | Same call — one subscription already registered at the callback URL under test |
+| `webhooks-list-existing.json` | Same call — one subscription registered before #357, without `order.refunded` (stale, not reused) |
+| `webhooks-list-page-1.json` | First page of the webhook list, `pagination.has_more_items: true` |
+| `webhooks-list-current.json` | Same call — one subscription already registered at the callback URL under test with every handled action |
 | `webhook-create-response.json` | `POST /organizations/{id}/webhooks/` response |

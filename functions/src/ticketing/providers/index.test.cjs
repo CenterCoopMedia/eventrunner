@@ -82,7 +82,7 @@ test('eventbrite is resolved by convention — adding providers/eventbrite.cjs w
       EVENT_TICKETING_PROVIDER: 'eventbrite',
       EVENT_TICKETING_EVENT_ID: 'evt-1',
       TICKETING_API_TOKEN: 'tok',
-      TICKETING_WEBHOOK_SECRET: 'sekrit',
+      TICKETING_WEBHOOK_SECRET: 'fixture-url-secret-0123456789abcdef0123',
     },
   });
   assert.equal(provider.name, 'eventbrite');

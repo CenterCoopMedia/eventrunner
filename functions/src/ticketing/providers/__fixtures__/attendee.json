@@ -1,0 +1,11 @@
+{
+  "id": "att-5001",
+  "order_id": "ord-2001",
+  "event_id": "evt-1",
+  "status": "Attending",
+  "profile": {
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "email": "ada.lovelace@example.com"
+  }
+}

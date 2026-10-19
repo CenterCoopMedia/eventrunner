@@ -52,6 +52,42 @@ The shared package is packed into `vendor/shared.tgz` by `npm run prepare:functi
 
 Tests live beside each module (`*.test.cjs`, `node --test`) and run with fakes — no emulator, no network. Modules take injected dependencies (`db`, `fetchImpl`, clocks); only `src/core/firestore.cjs` imports firebase-admin.
 
+## Eventbrite webhooks
+
+`ticketingWebhook` serves Eventbrite and Stripe through one handler and one queue
+(`ticket_sync_queue`). Eventbrite does not sign its deliveries, so the adapter does not
+check an HMAC (#356). `TICKETING_WEBHOOK_SECRET` is a random value of at least 32
+characters that the operator generates. The length is checked where the secret is
+used: a short or missing secret refuses every delivery and stops registration, but
+claim, verify, sync, and status keep working. `scripts/register-ticketing-webhook.cjs`
+registers the callback URL with `?token=<secret>` added. The handler passes the parsed
+query to `verifyWebhook`, which compares `token` with the secret in constant time
+(SHA-256 digests and `timingSafeEqual`). A missing or wrong secret gets a 401 before
+the body is read.
+
+The body is not trusted for ticket data. The adapter reads only the action and an order
+id from an `api_url` that is https on `www.eventbriteapi.com`, with no port or
+credentials. It accepts `/v3/events/{e}/orders/{o}/`, `/v3/orders/{o}/`, and
+`/v3/events/{e}/attendees/{a}/`; the attendee form is mapped to its order by reading
+the attendee from the API base. If that read finds no attendee or no order yet, the
+handler answers 500 and Eventbrite retries. An authenticated delivery for an action the
+adapter does not handle, or in any other shape, gets 200 and is ignored, so Eventbrite
+does not retry it. Nothing fetches the delivered URL. The sync drain fetches the order from
+the fixed API base with this deployment's token and drops an order for another event.
+
+Registration sends every action the adapter handles (`webhookEventTypes`), so
+`order.refunded` arrives (#357). The script reads every page of the webhook list. It
+reuses a subscription at the same endpoint (origin, path, and every query parameter
+but the secret) that carries the current secret, every action, and the same event scope
+as the deployment. An org-wide subscription is not reused by a deployment scoped to an
+event. Otherwise it creates one. It names every other
+subscription at the endpoint for the operator to delete.
+
+The secret never appears in Event Runner logs, error messages, or script output.
+Cloud Run request logs record the request URL, query string included, so log access
+must stay with operators. Confirmation against a real Eventbrite sandbox is tracked in
+#79 and described in [`docs/EVENTBRITE_VERIFICATION.md`](../docs/EVENTBRITE_VERIFICATION.md).
+
 ## Stripe commerce
 
 `ticketingCatalog` is a public, redacted GET. `ticketingCheckout` accepts POST from

@@ -316,6 +316,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Eventbrite deliveries are no longer refused for a missing HMAC header. Eventbrite does not
+  sign webhooks, so every real delivery got a 401. The webhook URL now carries the shared secret
+  (`?token=`), compared in constant time; a missing or wrong secret still gets a 401.
+  `TICKETING_WEBHOOK_SECRET` must be at least 32 random characters. A shorter or missing secret
+  refuses every delivery and stops registration; claim, verify, sync, and status keep working. The
+  function reads only an order id from an `api_url` on Eventbrite's own API host, in the order,
+  event-order, or attendee form, and fetches the order from the API, so a delivery body cannot
+  supply ticket data. An authenticated delivery it cannot read gets 200 and is ignored. An attendee
+  delivery whose attendee the API cannot return yet gets 500, so Eventbrite retries it. Errors and script output never print the secret. Run
+  `scripts/register-ticketing-webhook.cjs` again after deploy and delete the old webhook it names.
+  Sandbox confirmation is still open under #79 (#356).
+
+- Eventbrite refunds now reach the sync queue. The webhook registration sends every action the
+  Eventbrite adapter handles, `order.refunded` included. The adapter now publishes that list, and
+  the operator script reads it instead of keeping its own shorter list. An existing subscription
+  that lacks an action is not reused. The script reads every page of the webhook list, creates a
+  complete subscription when none exists, and names every other subscription at the endpoint so
+  the operator can delete it (#357).
+
 - Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
   function deletes older `sent_emails` rows in bounded batches, and the Email log and onboarding
   guide state the period before an operator or client relies on the log (#268).
