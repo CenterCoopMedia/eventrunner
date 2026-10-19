@@ -201,22 +201,72 @@ function extractCodeFragments(source, relativePath) {
   return fragments;
 }
 
-function maskNonProse(source, patterns) {
-  let masked = source;
-  for (const pattern of patterns) {
-    masked = masked.replace(pattern, (match) => match.replace(/[^\n]/gu, ' '));
-  }
-  return masked;
+function blank(text) {
+  return text.replace(/[^\n]/gu, ' ');
 }
+
+function maskNonProse(source, maskers) {
+  return maskers.reduce((masked, mask) => mask(masked), source);
+}
+
+function maskPattern(pattern) {
+  return (text) => text.replace(pattern, blank);
+}
+
+/**
+ * Blank each span from an opening token to the first closing token after
+ * it, as a lazy `open[\s\S]*?close` pattern would, but in one forward scan.
+ * A lazy pattern retries the rest of the text from every opening token
+ * that has no close, which is quadratic. Here a missing close ends the
+ * scan, because no later opening token could find one either.
+ */
+function maskDelimited(findOpen, findClose) {
+  return (text) => {
+    let masked = '';
+    let cursor = 0;
+    for (;;) {
+      const open = findOpen(text, cursor);
+      const close = open && findClose(text, open.end);
+      if (!close) break;
+      masked += text.slice(cursor, open.start) + blank(text.slice(open.start, close.end));
+      cursor = close.end;
+    }
+    return masked + text.slice(cursor);
+  };
+}
+
+function findLiteral(literal) {
+  return (text, from) => {
+    const start = text.indexOf(literal, from);
+    return start === -1 ? null : { start, end: start + literal.length };
+  };
+}
+
+/**
+ * Find a tag by its name pattern (`/<\/script\b/giu`) and run it to the
+ * next `>`, as `<\/script\b[^>]*>` would. An end tag may carry spaces or
+ * junk before its `>` (`</script >`).
+ */
+function findTag(namePattern) {
+  return (text, from) => {
+    namePattern.lastIndex = from;
+    const name = namePattern.exec(text);
+    if (!name) return null;
+    const close = text.indexOf('>', namePattern.lastIndex);
+    return close === -1 ? null : { start: name.index, end: close + 1 };
+  };
+}
+
+const maskComments = maskDelimited(findLiteral('<!--'), findLiteral('-->'));
 
 function extractMarkdownFragments(source) {
   return [
     {
       text: maskNonProse(source, [
-        /<!--[\s\S]*?-->/gu,
-        /```[\s\S]*?```/gu,
-        /~~~[\s\S]*?~~~/gu,
-        /`[^`\n]*`/gu,
+        maskComments,
+        maskDelimited(findLiteral('```'), findLiteral('```')),
+        maskDelimited(findLiteral('~~~'), findLiteral('~~~')),
+        maskPattern(/`[^`\n]*`/gu),
       ]),
       startLine: 1,
     },
@@ -227,9 +277,9 @@ function extractHtmlFragments(source) {
   return [
     {
       text: maskNonProse(source, [
-        /<!--[\s\S]*?-->/gu,
-        /<script\b[^>]*>[\s\S]*?<\/script>/giu,
-        /<style\b[^>]*>[\s\S]*?<\/style>/giu,
+        maskComments,
+        maskDelimited(findTag(/<script\b/giu), findTag(/<\/script\b/giu)),
+        maskDelimited(findTag(/<style\b/giu), findTag(/<\/style\b/giu)),
       ]),
       startLine: 1,
     },

@@ -107,6 +107,18 @@ test('unknown fields are rejected by name', () => {
   assert.deepEqual(verdict.errors, ['sessionInfo: unknown speaker field']);
 });
 
+test('a long hostile email is refused in linear time', () => {
+  // The previous address pattern backtracked over every dot in the domain
+  // and took over 30 s on this value, so the 500 ms ceiling leaves room for a
+  // slow CI worker.
+  const started = performance.now();
+  const verdict = validateSpeaker({ email: `!@!.${'!.'.repeat(100000)}@` }, { partial: true });
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 500,`validation took ${elapsed.toFixed(1)} ms`);
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.errors[0], /^email: /);
+});
+
 test('invited and accepted are not admin-settable statuses', () => {
   assert.deepEqual([...ADMIN_SETTABLE_STATUSES], ['draft', 'approved', 'removed']);
   for (const status of ['invited', 'accepted', 'nonsense']) {

@@ -209,3 +209,34 @@ test('Markdown comments and code examples are not prose', () => {
 
   assert.deepEqual(findFindings(source, 'docs/example.md'), []);
 });
+
+test('html script and style bodies are not prose, whatever their end tag spells', () => {
+  for (const close of ['</script>', '</script >', '</SCRIPT\t>', '</script\n>']) {
+    const source = `<p>Plain.</p>\n<script>const note = 'A robust layout.';${close}\n<p>A robust layout.</p>\n`;
+    assert.deepEqual(
+      findFindings(source, 'docs/example.html').map(({ line }) => line),
+      // Only the paragraph after the script; a newline in the end tag moves it down.
+      [close.includes('\n') ? 4 : 3],
+      close,
+    );
+  }
+  for (const close of ['</style>', '</style >', '</STYLE\n>']) {
+    const source = `<style>/* A robust layout. */${close}\n<p>Plain.</p>\n`;
+    assert.deepEqual(findFindings(source, 'docs/example.html'), [], close);
+  }
+});
+
+test('unclosed comments, code blocks, and end tags are masked in linear time', () => {
+  // A lazy pattern retried the rest of the file from every unclosed opening,
+  // which took seconds here. 500 ms leaves room for a slow CI worker.
+  for (const [source, file] of [
+    [`<script>${'</script '.repeat(200000)}`, 'docs/example.html'],
+    [`<style>${'<style '.repeat(200000)}`, 'docs/example.html'],
+    ['<!--'.repeat(200000), 'docs/example.md'],
+  ]) {
+    const started = performance.now();
+    findFindings(source, file);
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 500, `${source.slice(0, 9)}... took ${elapsed.toFixed(1)} ms`);
+  }
+});
