@@ -301,16 +301,13 @@ jobs:
     needs: changes
     if: needs.changes.outputs.demo == 'true' && needs.changes.outputs.local != 'true'
     runs-on: ubuntu-latest
-    # Rebuilds the static demo (spec issue #94) and fails on any byte-for-byte
-    # difference from the committed docs/demo/, so the GitHub Pages demo
-    # cannot drift from apps/web source or the committed synthetic snapshot
-    # (see the `hygiene` job above for the snapshot itself). The build is
-    # deterministic — verified by hand: three consecutive builds of unchanged
-    # input, including Vite's content-hashed asset filenames, come out
-    # byte-identical (see scripts/build-demo.test.cjs and RELEASING.md).
-    # No credentials — same demo-mode build scripts/build-demo.cjs always
-    # runs, with its own placeholder VITE_FIREBASE_* values — so this runs on
-    # fork PRs too.
+    # Builds the static demo (spec issue #94) twice and fails if the two
+    # builds differ in any byte or the result is over the public bundle
+    # budget. docs/demo/ is build output and is not committed: pages.yml
+    # builds and publishes it on every push to main, so feature branches
+    # never conflict on its content-hashed chunk names. No credentials —
+    # scripts/build-demo.cjs always uses its own placeholder VITE_FIREBASE_*
+    # values — so this runs on fork PRs too.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -322,11 +319,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run demo generator tests
-        run: node --test scripts/build-demo.test.cjs
-      - name: Check the committed demo against a fresh build
+        run: node --test scripts/build-demo.test.cjs scripts/dev/build-demo-at.test.cjs
+      - name: Build the demo twice and enforce its bundle budget
         run: node scripts/build-demo.cjs --check
-      - name: Enforce demo bundle budget
-        run: node scripts/ci/bundle-budget.cjs --dist docs/demo
 
   rules:
     name: Security rules on emulators
@@ -372,8 +367,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Public demo screenshots compare immutable docs/demo blobs at
-          # the PR base with the actual checked-out (normally merge) HEAD.
+          # Public demo screenshots compare the demo built at the PR base
+          # with the one built from the checked-out (normally merge) HEAD.
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -429,12 +424,28 @@ jobs:
         # it before Playwright starts. Reimplementing the emulators:exec
         # call here instead would silently drop that tee.
         run: bash scripts/dev/run-e2e.sh
-      - name: Capture public demo visual evidence
-        id: demo_visuals
+      - name: Build the public demo for visual evidence
+        id: demo_builds
         if: ${{ !cancelled() && steps.e2e_journeys.outcome != 'skipped' }}
         timeout-minutes: 15
         env:
           DEMO_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEMO_VISUAL_BEFORE_DIR: ${{ runner.temp }}/demo-before
+        # docs/demo is build output, not committed. Build HEAD's demo in
+        # place, and the PR base's demo in a temporary worktree. A manual
+        # run has no base and records after-only evidence.
+        run: |
+          node scripts/build-demo.cjs
+          if [ -n "$DEMO_VISUAL_BASE_SHA" ]; then
+            node scripts/dev/build-demo-at.cjs --rev "$DEMO_VISUAL_BASE_SHA" --out "$DEMO_VISUAL_BEFORE_DIR"
+          fi
+      - name: Capture public demo visual evidence
+        id: demo_visuals
+        if: ${{ !cancelled() && steps.demo_builds.outcome == 'success' }}
+        timeout-minutes: 15
+        env:
+          DEMO_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEMO_VISUAL_BEFORE_DIR: ${{ github.event.pull_request.base.sha && format('{0}/demo-before', runner.temp) || '' }}
           DEMO_VISUAL_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/dev/capture-demo-visuals.mjs --out test-results/demo-visual-evidence
       - name: Upload public demo visual evidence

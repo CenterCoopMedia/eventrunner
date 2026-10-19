@@ -5,9 +5,10 @@
 // is worth pinning here is the two guards that make the script safe to run
 // unattended — the trailing-slash normalization Vite silently depends on, and
 // the refusal to delete anything outside the repository — plus the pure
-// directory-diff logic --check is built on (issue #94). The end-to-end
-// "does --check actually catch drift" case is exercised by running the CLI
-// for real; see the ci.yml `demo` job and RELEASING.md for that evidence.
+// directory-diff logic --check uses to prove two builds are identical
+// (issue #94), and the rule that docs/demo/ is build output git never
+// tracks. The build and the budget are exercised by running the CLI for
+// real; see the ci.yml `demo` job and .github/workflows/pages.yml.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -31,7 +32,15 @@ const {
   demoHeadMetadata,
 } = require('./build-demo.cjs');
 
+const { execFileSync } = require('node:child_process');
+
 const REPO_ROOT = path.resolve(__dirname, '..');
+
+test('docs/demo is build output: git ignores it and tracks none of it', () => {
+  const git = (...args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' });
+  assert.match(git('check-ignore', '-v', '--no-index', 'docs/demo/index.html'), /^\.gitignore:\d+:docs\/demo\//);
+  assert.equal(git('ls-files', '--', 'docs/demo').trim(), '');
+});
 
 test('static demo metadata identifies the historical fixture and escapes source text', () => {
   const html = '<head><title>Event site</title><link rel="icon" href="/branding/favicon.svg" /></head>';

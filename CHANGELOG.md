@@ -527,6 +527,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The static demo is no longer committed. `docs/demo/` is in `.gitignore`, and a new
+  `Pages` workflow (`.github/workflows/pages.yml`) builds the demo on every push to `main` and
+  deploys `docs/` with it to GitHub Pages. The demo URL stays `/eventrunner/demo/`. Feature pull
+  requests no longer rebuild the demo, so they no longer conflict on its hashed chunk names, and
+  code scanning no longer reads third-party code in a committed bundle. The `Demo build hygiene`
+  CI job now builds the demo twice, fails when the two builds differ, and runs the demo bundle
+  budget. The public demo screenshots in the E2E job compare a fresh build of the pull request's
+  base with a fresh build of its head (`scripts/dev/build-demo-at.cjs`).
+
 - The Firebase CLI (`firebase-tools`, a root devDependency) moves from 14.27.0 to 15.22.4. The
   upgrade brings `tar` 7.5.22 and removes the critical `tar` advisory from the root lockfile. The
   emulators need Java 21 or later, which CI and the docs already require. The CLI is held at

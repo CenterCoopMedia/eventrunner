@@ -170,6 +170,21 @@ test('Pages checks map the Eventrunner base and scan generated HTML', () => {
   });
 });
 
+test('links into the deploy-built demo are checked only once a local build exists', () => {
+  withTempRoot((root) => {
+    writeLanding(root, '<a href="./demo/">Demo</a><a href="./demo/#/specimen">Specimen</a><a href="./missing/">Missing</a>');
+    // The Pages workflow builds docs/demo; a clean checkout has none.
+    assert.deepEqual(checkPages(root), ['docs/index.html: missing ./missing/']);
+
+    fs.mkdirSync(path.join(root, 'docs', 'demo'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'docs', 'demo', 'index.html'), '<html><body><script src="./assets/app.js"></script></body></html>');
+    assert.deepEqual(checkPages(root), [
+      'docs/demo/index.html: missing ./assets/app.js',
+      'docs/index.html: missing ./missing/',
+    ]);
+  });
+});
+
 test('generated documentation pages require complete public metadata while the issue 109 demo remains excluded', () => {
   withTempRoot((root) => {
     fs.mkdirSync(path.join(root, 'docs', 'docs', 'guide'), { recursive: true });

@@ -22,8 +22,8 @@
  * (apps/web/public/branding/mark.svg), full bleed so the ground fills the
  * square, and committed as two PNGs by scripts/dev/build-app-icons.mjs. The
  * scripts copy those committed bytes and never re-encode them:
- * scripts/build-demo.cjs `--check` compares the demo byte for byte, and
- * deflate output may change between zlib builds.
+ * scripts/build-demo.cjs `--check` compares two demo builds byte for byte,
+ * and deflate output may change between zlib builds.
  *
  * `maskable` is true only for the placeholder, whose ring sits well inside
  * the 40% safe zone. An uploaded mark's safe zone is unknown, so its icons

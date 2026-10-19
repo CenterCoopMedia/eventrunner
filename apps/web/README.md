@@ -150,7 +150,8 @@ curated in `scripts/lib/demo-event.cjs`; no private client data belongs here.
 ## Demo mode (`VITE_DEMO_MODE=1`)
 
 `node scripts/build-demo.cjs` (`npm run build:demo`) produces the public
-click-through demo committed under `docs/demo/` and served from GitHub Pages
+click-through demo in `docs/demo/` (build output, not committed), which
+`.github/workflows/pages.yml` builds and serves from GitHub Pages
 at `/eventrunner/demo/`. It is this same app with one env var set, read in
 exactly one place — `src/lib/demoMode.js` — and consumed at five points:
 

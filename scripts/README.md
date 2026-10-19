@@ -270,7 +270,9 @@ existing "only when configured" behavior doing the right thing with what this pa
 ### `build-demo.cjs`
 
 Builds the public click-through demo and syncs it into `docs/demo/`, which GitHub Pages serves at
-`https://centercoopmedia.github.io/eventrunner/demo/`. The one script here that touches no
+`https://centercoopmedia.github.io/eventrunner/demo/`. `docs/demo/` is build output and is not
+committed: `.github/workflows/pages.yml` runs this script on every push to `main` and deploys
+`docs/` with the result. The one script here that touches no
 Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base /eventrunner/demo/`, run
 against the committed historical demo snapshot, followed by `write-site-files.cjs` writing a real
 sitemap.xml/robots.txt/manifest into the same output (public URL: GitHub Pages' own origin plus
@@ -281,7 +283,17 @@ sitemap.xml/robots.txt/manifest into the same output (public URL: GitHub Pages' 
 npm run build:demo                              # build + sync into docs/demo/
 node scripts/build-demo.cjs --dry-run           # print the plan, execute nothing
 node scripts/build-demo.cjs --base /x/ --out docs/preview
+node scripts/build-demo.cjs --check             # build twice, compare, run the budget (CI)
 ```
+
+`--check` writes nothing to the working tree. It builds into two scratch directories, fails if the
+builds differ in any byte, and runs `scripts/ci/bundle-budget.cjs` on the result.
+
+`scripts/dev/build-demo-at.cjs --rev <full-SHA> --out <dir>` builds the demo of another commit in a
+temporary worktree, with that commit's own locked dependencies, and copies it to `--out`. The CI E2E
+job uses it for the "before" side of the public demo screenshots
+(`scripts/dev/capture-demo-visuals.mjs --base <SHA> --before <dir>`; `--after` defaults to
+`docs/demo/`).
 
 `VITE_DEMO_MODE` (read once, in `apps/web/src/lib/demoMode.js`) is what makes the output safe to
 serve with no backend: HashRouter instead of BrowserRouter (GitHub Pages has no rewrites, and the
@@ -294,7 +306,8 @@ never sets the flag, so every one of those branches compiles away — `deploy-cl
 
 `GENERATED_DIR` is cleared for the child process: the demo is the committed fixture, never a
 deploy-time export of a real client (§8.6). `--out` is refused outside the repository, because the
-destination is deleted before the copy. The script commits nothing.
+destination is deleted before the copy. The script commits nothing, and `docs/demo/` is ignored by
+git.
 
 ### `build-pages.cjs`
 

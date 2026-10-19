@@ -1,10 +1,11 @@
 // Static demo build flag (VITE_DEMO_MODE=1).
 //
-// The public showcase build (scripts/build-demo.cjs → docs/demo/) is a
-// read-only clone of this app served from GitHub Pages with NO Firebase
-// project behind it. Everything it shows comes from the committed synthetic
-// snapshot in src/generated (spec §2.4 first paint); the runtime overlay,
-// auth, and every write path are inert.
+// The public showcase build (scripts/build-demo.cjs → docs/demo/, built and
+// deployed by .github/workflows/pages.yml) is a read-only clone of this app
+// served from GitHub Pages with NO Firebase project behind it. Everything it
+// shows comes from the committed synthetic snapshot in src/generated (spec
+// §2.4 first paint); the runtime overlay, auth, and every write path are
+// inert.
 //
 // This flag is the single switch for that. It is read only through
 // `import.meta.env`, so a normal client build — which never sets

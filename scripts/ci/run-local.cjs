@@ -13,9 +13,8 @@ const CHECKS = {
     ['node', '--test', 'scripts/check-docs.test.cjs', 'scripts/build-pages.test.cjs'],
   ],
   demo: [
-    ['node', '--test', 'scripts/build-demo.test.cjs'],
+    ['node', '--test', 'scripts/build-demo.test.cjs', 'scripts/dev/build-demo-at.test.cjs'],
     ['node', 'scripts/build-demo.cjs', '--check'],
-    ['node', 'scripts/ci/bundle-budget.cjs', '--dist', 'docs/demo'],
   ],
   lint: [['npm', 'run', 'lint'], ['npm', 'run', 'check:copy']],
   audit: [['node', 'scripts/ci/audit-policy.cjs']],
