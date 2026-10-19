@@ -567,6 +567,18 @@ test('an html comment rebuilt by removing an inner one never reaches the page', 
   assert.equal(html, '<p>Before  after.</p>');
 });
 
+test('deeply nested html comments are removed in one pass', () => {
+  // Each removal joins the next comment. A remove-until-stable loop scanned
+  // the whole page once per level, which is quadratic in the depth.
+  const depth = 50000;
+  const nested = `${'<!'.repeat(depth)}<!-- -->${'-- NOTE -->'.repeat(depth)}`;
+  const started = performance.now();
+  const { html } = renderMarkdown(`# T\n\nBefore ${nested} after.\n`);
+  const elapsed = performance.now() - started;
+  assert.equal(html, '<p>Before  after.</p>');
+  assert.ok(elapsed < 500, `rendering took ${elapsed.toFixed(1)} ms`);
+});
+
 test('the description reads the first paragraph as the page shows it', () => {
   // The page shows the text "&lt;b&gt;", so the description must too. The
   // earlier decode turned "&amp;lt;" into "<" by decoding "&amp;" first.

@@ -27,7 +27,6 @@
  * must work from a bare checkout.
  */
 
-const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 const PUNCTUATION_RE = /[!-/:-@[-`{-~]/;
 const AUTOLINK_RE = /^<((?:https?|mailto):[^\s<>]+)>/;
 const EMAIL_AUTOLINK_RE = /^<([^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)>/;
@@ -64,15 +63,27 @@ function unescapeHtml(text) {
  * Remove HTML comments until none is left. Removing one comment can join
  * the text around it into a new one (`<!<!-- -->-- note -->`), and that
  * one must not reach the page as escaped text either.
+ *
+ * One pass: characters go to the output, and when the output ends a
+ * comment that the earliest open `<!--` starts, the output drops back to
+ * that `<!--`. A join then shows up as the next characters arrive, so
+ * nested comments cost no extra pass over the text.
  */
 function removeHtmlComments(text) {
-  let previous;
-  let current = text;
-  do {
-    previous = current;
-    current = current.replace(HTML_COMMENT_RE, '');
-  } while (current !== previous);
-  return current;
+  const out = [];
+  let open = -1;
+  const endsWith = (token) =>
+    out.length >= token.length && out.slice(out.length - token.length).join('') === token;
+  for (const char of String(text)) {
+    out.push(char);
+    if (open === -1) {
+      if (endsWith('<!--')) open = out.length - 4;
+    } else if (out.length - 3 >= open + 4 && endsWith('-->')) {
+      out.length = open;
+      open = -1;
+    }
+  }
+  return out.join('');
 }
 
 /**

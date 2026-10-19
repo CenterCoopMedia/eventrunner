@@ -225,3 +225,18 @@ test('html script and style bodies are not prose, whatever their end tag spells'
     assert.deepEqual(findFindings(source, 'docs/example.html'), [], close);
   }
 });
+
+test('unclosed comments, code blocks, and end tags are masked in linear time', () => {
+  // A lazy pattern retried the rest of the file from every unclosed opening,
+  // which took seconds here. 500 ms leaves room for a slow CI worker.
+  for (const [source, file] of [
+    [`<script>${'</script '.repeat(200000)}`, 'docs/example.html'],
+    [`<style>${'<style '.repeat(200000)}`, 'docs/example.html'],
+    ['<!--'.repeat(200000), 'docs/example.md'],
+  ]) {
+    const started = performance.now();
+    findFindings(source, file);
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 500, `${source.slice(0, 9)}... took ${elapsed.toFixed(1)} ms`);
+  }
+});
