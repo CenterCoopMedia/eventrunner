@@ -131,8 +131,9 @@
           <code>init-event.cjs --template</code> applies the file only to a new, empty project. It needs dates
           later than the past event and a named owner who is an operator. An apply that stops part way
           resumes when the same command runs again. Accounts, tickets, pitches, credentials, the admin
-          allowlist, email logs and other records stay in the past project. <code>--check</code> adds a
-          <strong>Template reuse</strong> row (#328).</li>
+          allowlist, email logs and other records stay in the past project. Each content block in the
+          file must meet the content editor&#39;s rules, and its rich text is cleaned the same way.
+          <code>--check</code> adds a <strong>Template reuse</strong> row (#328).</li>
           </ul>
           <ul>
           <li>Session pitch emails (#324). A person who pitches through this site&#39;s form gets a
@@ -191,7 +192,9 @@
           request. The webhook relay is refused until it has a batch and unsubscribe contract (#490).</li>
           <li>Staff can retry the addresses an announcement send could not reach because the email
           provider was down or busy. The retry is a new send, previewed and confirmed, and each send
-          can be retried once. The history says when its failed address list is cut short (#202).</li>
+          can be retried once. The history says when its failed address list is cut short. A send
+          continued after a lost progress save still counts and offers the addresses that failed
+          before (#202).</li>
           <li>A correctly signed unsubscribe is never rate limited, so one-click opt-outs that mail
           providers and link scanners send from shared addresses are all recorded. The email log
           stores each announcement with an inert unsubscribe link in place of the recipient&#39;s live
@@ -205,8 +208,9 @@
           rule as the speaker&#39;s own next steps list. A double click or a retry sends nothing more,
           a speaker gets at most one reminder in 24 hours, each row shows when the speaker was
           last reminded, and each send is in the admin log. Staff can edit the reminder wording,
-          and the server refuses an unknown token at save and a send whose wording changed after
-          the preview. The readiness list exports as CSV for an organizer&#39;s own mailing tool
+          and the server refuses an unknown token at save and a send whose wording, recipients or
+          messages changed after the preview. A reminder the provider may have accepted counts for
+          the 24-hour limit and is reported as unconfirmed. The readiness list exports as CSV for an organizer&#39;s own mailing tool
           (#332). A historical demo refuses the send.</li>
           </ul>
           <ul>
@@ -534,6 +538,12 @@
           installable (#218).</li>
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>A delivery, bounce or opt-out event that reaches the email webhook before the site has
+          recorded the message is no longer lost. For 15 minutes after the event the webhook
+          answers 503, so Postmark sends it again; an older event for an unknown message is
+          acknowledged and dropped.</li>
+          </ul>
           <ul>
           <li>The documentation site&#39;s page description decodes each entity once, so a
           paragraph that shows &quot;&amp;lt;b&amp;gt;&quot; no longer gets &quot;&lt;b&gt;&quot; in its description.

@@ -370,6 +370,11 @@
           <p>A page in the template must keep the safety rules of a page saved in the admin. Only the default
           system pages may be system pages, each at its own route. Other pages cannot use a reserved route,
           such as <code>/admin</code> or <code>/pitch</code>. No two pages may share an id, a path or a section.</p>
+          <p>A content block in the template must keep the rules of a block saved in the content editor. Each
+          required field has a value, and a sponsor package limit is a whole number of 1 or more. Rich text
+          is cleaned by the editor&#39;s sanitizer before it is stored, so a script or an event handler in a
+          hand-edited file never reaches the site. A block that breaks a rule is named, and nothing is
+          written.</p>
           <h3 id="steps">Steps<a class="heading-anchor" href="#steps" aria-label="Link to this section">#</a></h3>
           <ol>
           <li><p>Provision a new project for the new event (§1). Never point a template at the past project.</p></li>
@@ -400,8 +405,9 @@
           <p>Init refuses the template, and writes nothing, in each of these cases:</p>
           <ul>
           <li>The project is the past project.</li>
-          <li>The project already holds configuration, pages, content, email templates, accounts, speakers,
-          tickets, orders, pitches, admin logs or email rows.</li>
+          <li>The project already holds any event record: configuration, pages, content, email templates,
+          accounts, speakers, sessions, organizations, timeline entries, updates, tickets, orders,
+          pitches, admin logs, email rows, or any other collection.</li>
           <li>The project has Firebase Authentication accounts. Init checks this with real credentials. Under
           the Firestore emulator alone it cannot, so it prints a warning: confirm in the console that the
           project has no accounts.</li>

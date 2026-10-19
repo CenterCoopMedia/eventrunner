@@ -391,7 +391,13 @@
           On the <strong>announcements</strong> broadcast stream (section 2a), register the same URL and also turn on
           <strong>SubscriptionChange</strong>. A record with <code>SuppressSending: true</code> on an announcement becomes the
           application&#39;s suppression record; a resubscribe record (<code>SuppressSending: false</code>) is accepted
-          with nothing to record.</p></li>
+          with nothing to record.
+          The site records each message after Postmark accepts it. An event that arrives first,
+          for a message the site has no record of yet, gets <code>503</code> with <code>Retry-After: 60</code> for 15
+          minutes after the event&#39;s own time, and Postmark retries it (after 1, 5 and 10 minutes).
+          An older event for an unknown message gets <code>200</code> and is dropped. Mail that another
+          application sends through the same Server is such an unknown message; give that
+          application its own Server so its events do not reach this webhook.</p></li>
           <li><p>This webhook registration is scoped to the Server (and, within it, the stream you attached it
           to) — it does not need repeating for other deployments&#39; Servers, and other deployments&#39; webhooks
           do not need repeating here.</p></li>
