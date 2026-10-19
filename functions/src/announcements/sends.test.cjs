@@ -126,6 +126,7 @@ function memoryFirestore() {
           get: (target) => target.get(),
           set: (ref, data) => writes.push(() => ref.set(data)),
           update: (ref, patch) => writes.push(() => ref.update(patch)),
+          create: (ref, data) => writes.push(() => ref.create(data)),
           delete: (ref) => writes.push(() => ref.delete()),
         };
         const result = await fn(tx);
@@ -224,7 +225,7 @@ function consoleProvider() {
 
 const QUIET = { error() {}, warn() {}, info() {}, log() {} };
 
-async function harness({ backend, providerKind = 'console', postmarkStream, seedOptions } = {}) {
+async function harness({ backend, providerKind = 'console', postmarkStream, seedOptions, batchAnswer } = {}) {
   const db = await backend.make();
   await seed(db, seedOptions);
   let provider;
@@ -247,6 +248,9 @@ async function harness({ backend, providerKind = 'console', postmarkStream, seed
       }
       if (url.endsWith('/email/batch')) {
         const body = JSON.parse(init.body);
+        const batchCount = fetchCalls.filter((c) => c.url.endsWith('/email/batch')).length;
+        const custom = batchAnswer?.(body, batchCount);
+        if (custom) return { status: custom.status, headers: { get: () => null }, json: async () => custom.json };
         return { status: 200, headers: { get: () => null }, json: async () => body.map((_, i) => ({ ErrorCode: 0, MessageID: `pm-${fetchCalls.length}-${i}` })) };
       }
       return { status: 200, headers: { get: () => null }, json: async () => ({ ErrorCode: 0, MessageID: 'pm-single' }) };
@@ -710,6 +714,77 @@ for (const backend of backends) {
       assert.deepEqual(names, ['List-Unsubscribe', 'List-Unsubscribe-Post']);
       assert.ok(entry.TextBody.includes(`${SITE}/unsubscribe?`));
     }
+  });
+
+  t('postmark: a provider outage leaves the failed addresses for one retry send that reaches only them', async () => {
+    // Every attempt of the first batch answers 503: the core gives up and
+    // both recipients fail with a transient status.
+    const h = await harness({
+      backend,
+      providerKind: 'postmark',
+      postmarkStream: STREAM(),
+      batchAnswer: (_body, n) => (n <= 3 ? { status: 503, json: { ErrorCode: 500, Message: 'Unavailable' } } : null),
+    });
+    const { preview: first, sent } = await previewAndSend(h);
+    assert.equal(sent.body.send.status, 'sent');
+    assert.equal(sent.body.send.counts.failed, 2);
+    assert.equal(sent.body.send.retryCount, 2);
+    assert.equal(sent.body.send.retriedBy, null);
+    assert.ok(!JSON.stringify(sent.body.send).includes('retryRecipients'), 'the history row holds a count, not the list');
+
+    const retryOf = first.body.sendId;
+    const preview = await call(h.preview, { body: { draft: DRAFT, audience: 'registered', retryOf } });
+    assert.equal(preview.status, 200, JSON.stringify(preview.body));
+    assert.equal(preview.body.recipientCount, 2);
+    assert.equal(preview.body.retryOf, retryOf);
+    assert.notEqual(preview.body.receipt, first.body.receipt);
+    // A receipt from the retry preview cannot start a send to the whole audience.
+    const mismatch = await call(h.send, { body: { sendId: preview.body.sendId, receipt: preview.body.receipt, draft: DRAFT, audience: 'registered' } });
+    assert.equal(mismatch.status, 409);
+    assert.equal(mismatch.body.error.code, 'preview-stale');
+
+    const retried = await call(h.send, { body: { sendId: preview.body.sendId, receipt: preview.body.receipt, draft: DRAFT, audience: 'registered', retryOf } });
+    assert.equal(retried.status, 200, JSON.stringify(retried.body));
+    assert.equal(retried.body.send.status, 'sent');
+    assert.equal(retried.body.send.counts.sent, 2);
+    assert.equal(retried.body.send.retryOf, retryOf);
+    const batches = h.fetchCalls().filter((c) => c.url.endsWith('/email/batch'));
+    assert.equal(batches.length, 4);
+    assert.deepEqual(batches[3].body.map((entry) => entry.To).sort(), ['ada@example.org', 'ben@example.org']);
+
+    const list = await call(h.list, { body: {} });
+    const earlier = list.body.sends.find((row) => row.id === retryOf);
+    assert.equal(earlier.retriedBy, preview.body.sendId);
+    assert.ok((await docsOf(h.db, 'admin_logs')).some((row) => row.action === 'startAnnouncementEmail' && row.details?.retryOf === retryOf));
+
+    // A send's failed addresses get one retry: a second would mail them twice.
+    const again = await call(h.preview, { body: { draft: DRAFT, audience: 'registered', retryOf } });
+    assert.equal(again.status, 409);
+    assert.equal(again.body.error.code, 'retry-used');
+    const againSend = await call(h.send, { body: { sendId: 'send-88-abcdef', receipt: preview.body.receipt, draft: DRAFT, audience: 'registered', retryOf } });
+    assert.equal(againSend.status, 409);
+    assert.equal(againSend.body.error.code, 'retry-used');
+    assert.equal(h.fetchCalls().filter((c) => c.url.endsWith('/email/batch')).length, 4);
+  });
+
+  t('postmark: a recipient the provider refuses for good is not offered for a retry', async () => {
+    const h = await harness({
+      backend,
+      providerKind: 'postmark',
+      postmarkStream: STREAM(),
+      batchAnswer: (body) => ({
+        status: 200,
+        json: body.map((entry, i) => (entry.To === 'ada@example.org'
+          ? { ErrorCode: 406, Message: 'Inactive recipient' }
+          : { ErrorCode: 0, MessageID: `pm-${i}` })),
+      }),
+    });
+    const { preview: first, sent } = await previewAndSend(h);
+    assert.equal(sent.body.send.counts.failed, 1);
+    assert.equal(sent.body.send.retryCount, 0);
+    const retry = await call(h.preview, { body: { draft: DRAFT, audience: 'registered', retryOf: first.body.sendId } });
+    assert.equal(retry.status, 409);
+    assert.equal(retry.body.error.code, 'nothing-to-retry');
   });
 
   t('a Postmark opt-out on an announcement row becomes the suppression record; a transactional one does not', async () => {
