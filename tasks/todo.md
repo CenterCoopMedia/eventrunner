@@ -20,10 +20,10 @@ issues (#35, #79, #91, #92, #99, #100, #259), product decisions (#177, #325,
 | l2 | Launch gaps: CTAs to hidden sections, seeded empty pages, home footer section, launch recipe docs | /home/user/wt-l2 | dispatched |
 | l3 | #476 event-timezone date and time fields (pitch deadline, catalog sales windows) and the pitch call saved message; Joe approved 2026-10-19 | /home/user/wt-l3 | dispatched |
 | w1 | #324 pitch receipts and decision notifications | /home/user/wt-w1 | dispatched |
-| w2 | #357, #356 Eventbrite webhook registration and signing | /home/user/wt-w2 | review fixes in progress |
+| w2 | #357, #356 Eventbrite webhook registration and signing | /home/user/wt-w2 | PR #494 |
 | w3 | #346 docs leftovers | main checkout | PR #492 |
 | d1 | #354 CI gate and DCO from base | main checkout | PR #493 |
-| w4 | #328 repeat event template | /home/user/wt-w4 | dispatched |
+| w4 | #328 repeat event template | /home/user/wt-w4 | review fixes in progress |
 | w5 | #200 live update audience and key dates | — | queued |
 
 Every builder branch gets an adversarial review before it joins the stack.
