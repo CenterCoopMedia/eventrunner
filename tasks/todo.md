@@ -1,5 +1,27 @@
 # Session task list
 
+## 2026-10-19 (wave 2): burn down issues toward the NC Local launch
+
+Goal: a ready-to-start NC Local site in mid-November (early bird tickets and a
+session pitch call), then the backlog an agent can finish without the owner.
+Each PR is cut from the stack tip. Bottom branch: `joe/blissful-einstein-9qvtd1-1-<slug>`;
+later PRs `joe/blissful-einstein-9qvtd1-<n>-<slug>` based on the one below.
+The old `joe/blissful-einstein-9qvtd1` remote branch was merged as #491 and a
+force reset was refused, so it is not reused.
+
+Out of scope: #475-#478 and #345 (the #407 design loop owns them), operator
+issues (#35, #79, #91, #92, #99, #100, #259), product decisions (#177, #325,
+#326, #327, #333-#336, #338). Already fixed on main: #355, #388, #488.
+
+| Id | Issues | Worktree | State |
+| --- | --- | --- | --- |
+| r1 | Launch rehearsal (NC Local shape, emulator) | read-only on main | dispatched |
+| w1 | #324 pitch receipts and decision notifications | /home/user/wt-w1 | dispatched |
+| w2 | #357, #356 Eventbrite webhook registration and signing | /home/user/wt-w2 | dispatched |
+| w3 | #346 docs leftovers | /home/user/wt-w3 | queued |
+
+Every builder branch gets an adversarial review before it joins the stack.
+
 ## 2026-10-19: NC Local pilot launch site (session pitches, native or Airtable)
 
 Goal: close Catherine Komp's October 12 asks for a mid-November launch site
