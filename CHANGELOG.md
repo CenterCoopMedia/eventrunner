@@ -316,6 +316,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The required rich-text check now scans a value once. An unclosed `<hr`
+  or `<` repeated through a long value made the old tag patterns rescan to
+  the end from every bracket; 50,000 characters took most of a second in
+  the editor and in the CMS publish check.
+
 - Every email address check now uses one shared pattern that does not
   backtrack. The old pattern took seconds on a long, dot-heavy value, and the
   OTP sign-in endpoint accepts that value from anyone. Config, speaker,
