@@ -82,6 +82,7 @@
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
           <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
+          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
           <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
@@ -117,6 +118,7 @@
               <li><a href="#0-postmarks-object-model-in-the-terms-this-repo-uses">0. Postmark&#39;s object model, in the terms this repo uses</a></li>
               <li><a href="#1-one-time-the-ccm-account">1. One-time: the CCM account</a></li>
               <li><a href="#2-per-deployment-create-the-server">2. Per deployment: create the Server</a></li>
+              <li><a href="#2a-per-deployment-the-broadcast-stream-for-announcements">2a. Per deployment: the broadcast stream for announcements</a></li>
               <li><a href="#3-store-the-tokens-for-this-environment">3. Store the tokens for this environment</a></li>
               <li><a href="#4-verify-the-sender-domain">4. Verify the sender domain</a></li>
               <li><a href="#5-register-the-delivery-webhook">5. Register the delivery webhook</a></li>
@@ -200,6 +202,42 @@
           Server&#39;s default stream — when that value is unset. Note whatever you name or rename the stream
           to here; §5 needs it to register the webhook on the stream sends actually land on.</li>
           </ol>
+          <h2 id="2a-per-deployment-the-broadcast-stream-for-announcements">2a. Per deployment: the broadcast stream for announcements<a class="heading-anchor" href="#2a-per-deployment-the-broadcast-stream-for-announcements" aria-label="Link to this section">#</a></h2>
+          <p>Announcement email (issues #202, #490) never uses the transactional stream that carries sign-in
+          codes and receipts. It needs its own <strong>Broadcasts</strong> stream on the same Server, so a spam complaint
+          or an unsubscribe on an announcement cannot hold back a sign-in code.</p>
+          <ol>
+          <li><p>In the deployment&#39;s Server → <strong>Message Streams</strong> → <strong>Create message stream</strong>. Type:
+          <strong>Broadcasts</strong>. Name and ID: <code>announcements</code> (any ID works; the deployment config names it).</p></li>
+          <li><p>In the new stream → <strong>Settings</strong> → <strong>Unsubscribe handling</strong>, choose one of the two modes.
+          Postmark-managed is the default; choose it for every client whose mail goes through Postmark.</p>
+          <ul>
+          <li><strong>Postmark</strong> (Postmark-managed, the default): Postmark adds an unsubscribe link at the end
+          of every message and suppresses the address on this stream. The application adds no link of
+          its own. A staff restore on the Announcements page removes only the site&#39;s record:
+          reactivate the address on this stream&#39;s suppression list as well, or Postmark keeps
+          refusing it.</li>
+          <li><strong>Custom</strong>: The application adds a signed per-recipient link and the <code>List-Unsubscribe</code> and
+          <code>List-Unsubscribe-Post</code> headers, and records the opt-out itself. Postmark adds nothing.
+          Custom is for clients on another email provider, where the site must supply the link.</li>
+          </ul>
+          <p><strong>None</strong> is refused: the composer will not send on a stream with no unsubscribe handling.</p></li>
+          <li><p>Set the stream ID in the deployment&#39;s Tier B config: <code>config/providers.email.announcementStream</code>
+          (for a new deployment, <code>providers.email.announcementStream</code> in the <code>init-event.cjs</code> answers file;
+          for an existing one, edit that field in the Firestore console). Leave
+          <code>config/providers.email.messageStream</code> alone: it stays the transactional stream.</p></li>
+          <li><p>Open <strong>Announcements</strong> in the admin panel. The composer reads the stream through the Postmark API
+          with the Server Token before every send and before each chunk of a send. It refuses, with the
+          reason, a missing, archived, or transactional stream, a stream with no unsubscribe handling, or
+          a stream ID that equals the transactional one. No send or send-once claim happens before that
+          check passes.</p></li>
+          <li><p>Register the delivery webhook on this stream too (section 5), with <strong>SubscriptionChange</strong> on as
+          well, so a Postmark opt-out also becomes the application&#39;s suppression record and the next
+          recipient count leaves that address out.</p></li>
+          </ol>
+          <p>The webhook relay provider (<code>EVENT_EMAIL_PROVIDER=webhook</code>) has no batch or unsubscribe contract,
+          so announcement email is refused on it. The console provider sends announcements with the
+          application&#39;s own link, for development and the browser tests.</p>
           <h2 id="3-store-the-tokens-for-this-environment">3. Store the tokens for this environment<a class="heading-anchor" href="#3-store-the-tokens-for-this-environment" aria-label="Link to this section">#</a></h2>
           <p>These two tokens are stored differently — only one of them is a deployment secret.</p>
           <p><code>EMAIL_PROVIDER_API_KEY</code> (the send path, <code>functions/src/email/providers/postmark.cjs</code>) is a
@@ -349,7 +387,11 @@
           exactly <code>true</code>, and <code>emailDeliveryWebhook</code> treats a <code>null</code> parse as a bad request (<code>400</code>) — an
           info-only <code>SubscriptionChange</code> payload (<code>SuppressSending: false</code>, sent for e.g. a manual
           resubscribe) would 400 what is otherwise a legitimate webhook call. Nothing in this repo
-          consumes <code>Open</code>/<code>Click</code> either.</p></li>
+          consumes <code>Open</code>/<code>Click</code> either.
+          On the <strong>announcements</strong> broadcast stream (section 2a), register the same URL and also turn on
+          <strong>SubscriptionChange</strong>. A record with <code>SuppressSending: true</code> on an announcement becomes the
+          application&#39;s suppression record; a resubscribe record (<code>SuppressSending: false</code>) is accepted
+          with nothing to record.</p></li>
           <li><p>This webhook registration is scoped to the Server (and, within it, the stream you attached it
           to) — it does not need repeating for other deployments&#39; Servers, and other deployments&#39; webhooks
           do not need repeating here.</p></li>
@@ -374,6 +416,13 @@
           Bounce, and SpamComplaint triggers.</li>
           <li class="task-item"><input type="checkbox" disabled> A test send (<code>init-event.cjs</code>&#39;s welcome mail, or an OTP sign-in) shows up in this
           deployment&#39;s Server <strong>Activity</strong> tab, not some other deployment&#39;s.</li>
+          <li class="task-item"><input type="checkbox" disabled> The <strong>announcements</strong> Broadcasts stream exists with Postmark-managed unsubscribe handling
+          (the default; Custom only for a client on another email provider),
+          <code>config/providers.email.announcementStream</code> names it, and the Announcements page shows no
+          setup notice. <strong>Send a test to me</strong> arrives from the broadcast stream in <strong>Activity</strong>.</li>
+          <li class="task-item"><input type="checkbox" disabled> With an authorized synthetic recipient, a real announcement&#39;s unsubscribe link suppresses
+          that address on the broadcast stream, and the next preview leaves it out. Local tests prove
+          the mapping only; this check proves the provider&#39;s link replacement and suppression.</li>
           <li class="task-item"><input type="checkbox" disabled> A test bounce (send to a Postmark-provided bounce test address, or an intentionally invalid
           recipient) produces a <code>sent_emails</code> row with <code>deliveryStatus</code> patched. This confirms the
           complete webhook round trip, including the Firestore update.</li>

@@ -83,6 +83,7 @@
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
           <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
+          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
           <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
@@ -2072,7 +2073,7 @@
           <tr><td><code>Local.jsx</code>, <code>CampusMap.jsx</code></td><td>~1,900 lines</td><td>—</td><td>not ported — city-guide and campus-map content is covered by the <code>travel_local</code> section of the travel page</td></tr>
           <tr><td>Video generator, Remotion, <code>imageProxy</code></td><td>~13,900 lines</td><td>—</td><td>not ported</td></tr>
           <tr><td>Invoices</td><td>2,352 + backend</td><td>—</td><td>not ported</td></tr>
-          <tr><td>Airtable sync</td><td>4 exports + 6 scripts + <code>escapeAirtableFormula</code></td><td>—</td><td>not ported</td></tr>
+          <tr><td>Airtable sync</td><td>4 exports + 6 scripts + <code>escapeAirtableFormula</code></td><td>—</td><td>not ported. <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0005-airtable-pitch-intake.md">ADR 0005</a> adds a read-only refresh for session pitch intake only</td></tr>
           <tr><td>Social layer</td><td><code>posts</code>, <code>onPostCreated</code>, <code>deletePostWithAudit</code>, notifications</td><td>—</td><td>not ported</td></tr>
           <tr><td>Speaker chat / Q&amp;A</td><td>5 exports + lifecycle hooks</td><td>—</td><td>not ported</td></tr>
           <tr><td>Drift detectors</td><td><code>detectSyncDrift</code>, <code>detectSpeakerSoTDrift</code>, <code>reconcileStaleStateMachines</code>, <code>reconcileSessionMaterialCounts</code></td><td>—</td><td><strong>drop on port</strong> — each compensates for a denormalization or a queue v1 does not have</td></tr>

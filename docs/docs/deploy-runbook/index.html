@@ -82,6 +82,7 @@
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
           <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
+          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
           <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
@@ -316,6 +317,7 @@
           <tr><td><code>EVENT_SITE_PUBLISHER_ENABLED</code></td><td><code>false</code> by default. <code>true</code> provisions the site-publisher Cloud Run job — do §9 first</td></tr>
           <tr><td><code>EVENT_PUBLISHER_SERVICE_ACCOUNT</code></td><td>required when the publisher is enabled; the job&#39;s own runtime identity (§9)</td></tr>
           <tr><td><code>EVENT_FUNCTIONS_SERVICE_ACCOUNT</code></td><td>optional; overrides the default compute service account that receives <code>run.invoker</code> (§9)</td></tr>
+          <tr><td><code>EVENT_AIRTABLE_ENABLED</code></td><td><code>false</code> by default. <code>true</code> lets staff refresh session pitches from Airtable and binds the <code>AIRTABLE_API_TOKEN</code> secret. Create the secret first (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/session-pitches.md#refresh-pitches-from-airtable">session pitches</a>)</td></tr>
           </tbody>
           </table>
           </div>
@@ -339,6 +341,7 @@
           <tr><td><code>TICKETING_API_TOKEN</code></td><td><code>EVENT_TICKETING_PROVIDER = eventbrite</code> or <code>stripe</code>; Stripe requires a secret or restricted key matching <code>EVENT_STRIPE_MODE</code>. <code>manual</code> and <code>none</code> use no ticketing API token</td></tr>
           <tr><td><code>TICKETING_WEBHOOK_SECRET</code></td><td><code>eventbrite</code> or <code>stripe</code>; for Eventbrite, generate a random value of at least 32 characters (<code>openssl rand -hex 32</code>). Eventbrite does not sign deliveries, so <code>register-ticketing-webhook.cjs</code> puts this secret in the webhook URL. For Stripe, use the signing secret generated for this deployed endpoint in the configured mode. <code>manual</code> and <code>none</code> use no webhook secret</td></tr>
           <tr><td><code>OPERATOR_WEBHOOK_URL</code>, <code>OPERATOR_WEBHOOK_SECRET</code></td><td><code>EVENT_OPERATOR_NOTIFIER = webhook</code></td></tr>
+          <tr><td><code>AIRTABLE_API_TOKEN</code></td><td><code>EVENT_AIRTABLE_ENABLED = true</code>. An Airtable personal access token with only the <code>data.records:read</code> scope and only the pitch base. Store it in Secret Manager only</td></tr>
           </tbody>
           </table>
           </div>

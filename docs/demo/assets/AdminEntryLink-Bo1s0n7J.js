@@ -1,0 +1,1 @@
+import{Bn as e,Lt as t,Zr as n,pt as r,zn as i}from"./initial-BhRhdEP0.js";var a=e();function o({account:e}){let{eventConfig:o}=i(),s=e?.views??[];return r(o)||s.length<2||!s.some(e=>e.id===`admin`)?null:(0,a.jsx)(n,{to:`/admin`,className:`${t} mt-sm`,children:`Manage event`})}export{o as t};

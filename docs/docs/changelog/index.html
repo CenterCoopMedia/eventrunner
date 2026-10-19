@@ -82,6 +82,7 @@
           <li><a href="/eventrunner/docs/admin-guide/">Admin guide</a></li>
           <li><a href="/eventrunner/docs/admin-sessions/">Work with sessions in the admin</a></li>
           <li><a href="/eventrunner/docs/stripe-ticketing/">Stripe ticketing launch and support</a></li>
+          <li><a href="/eventrunner/docs/archive-handoff/">Archive and hand off a past event</a></li>
           <li><a href="/eventrunner/docs/webmcp-diagnostics/">Use read-only browser diagnostics</a></li>
           <li><a href="/eventrunner/docs/design-reference/">Site design reference</a></li>
           <li><a href="/eventrunner/docs/client-onboarding/">Client onboarding</a></li>
@@ -116,6 +117,112 @@
           and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>Staff set the pitch call deadline and the ticket catalog&#39;s sale windows as a date and a
+          time on the event&#39;s clock. The fields name the event&#39;s time zone and state the result in
+          words, with the UTC offset for the chosen date. A time that daylight saving time skips is
+          refused, and a time it repeats asks which one is meant. The stored RFC3339 values do not
+          change (#476).</li>
+          </ul>
+          <ul>
+          <li>A new event can start from a past event&#39;s template. <code>scripts/export-event-template.cjs</code>
+          reads an allowlist from the past project: branding, page templates, their content blocks and
+          selected static settings. A dry run prints the inventory, with every excluded collection.
+          <code>init-event.cjs --template</code> applies the file only to a new, empty project. It needs dates
+          later than the past event and a named owner who is an operator. An apply that stops part way
+          resumes when the same command runs again. Accounts, tickets, pitches, credentials, the admin
+          allowlist, email logs and other records stay in the past project. <code>--check</code> adds a
+          <strong>Template reuse</strong> row (#328).</li>
+          </ul>
+          <ul>
+          <li>Session pitch emails (#324). A person who pitches through this site&#39;s form gets a
+          receipt after the pitch is stored; a failed receipt does not fail the submission.
+          Staff send acceptance and decline emails from each pitch, after a preview and a
+          confirmation, with an optional note to the submitter. Saving a decision still sends
+          nothing, imported pitches never get an automatic email, and private review notes are
+          never sent. The preview says when an imported address was not verified and when the
+          other decision email was already sent. Each pitch shows a sending, sent, not sent, or
+          may-have-been-sent record for each email. Send-once keys stop a retry or a repeated
+          decision from sending an email twice. A refused email can be retried; an email whose
+          delivery is unknown is retried only after staff confirm that they checked the Email log.
+          Operators choose automatic or manual receipts and edit the wording of all three
+          emails. A send is refused if the wording changed after its preview, and a settings
+          save is refused if another operator saved first.</li>
+          </ul>
+          <ul>
+          <li>Session pitches can refresh from one approved Airtable table. An operator saves the base,
+          table, optional view, field names and an optional automatic refresh (every 15 or 60
+          minutes, off by default). Staff choose <strong>Refresh from Airtable</strong>. New records with a ticked
+          consent box become private pitches; unchanged records change nothing; a changed record
+          updates the proposal text, keeps its decision, notes and drafts, and shows <strong>Updated in
+          Airtable</strong>. Removed records are flagged, never deleted. Each run shows its counts, skip
+          reasons and last error to staff and writes an audit row. The token is the
+          <code>AIRTABLE_API_TOKEN</code> managed secret, bound only with <code>EVENT_AIRTABLE_ENABLED=true</code>. ADR 0005
+          brings Airtable into scope for pitch intake only.</li>
+          </ul>
+          <ul>
+          <li>Staff can import speakers, sessions and organizations from a CSV file on the new
+          <strong>Import records</strong> page. Staff map the file&#39;s columns, read a preview that lists each row
+          as new, update, no change or error, and confirm the import. The confirm carries the
+          preview&#39;s digest, so a changed file is refused. Every new record is written as a draft: a
+          speaker in draft status, a session or organization as a hidden draft. A change to a
+          published speaker is queued for review on the Speakers page and does not go live until
+          staff apply it. The import sends no email or invitation. A stable external ID per row
+          makes a re-import idempotent, and a three-way merge per mapped field keeps staff edits and
+          never writes an unmapped field. A row with no earlier import is matched to a record that
+          already has its slug or session ID, so an import does not make a second copy of a record
+          typed in an editor. Rows go through the editors&#39; own validators, sessions link speakers by
+          external ID or slug, and each import writes an <code>admin_logs</code> row before its first record
+          write. New endpoint <code>importRecordsCsv</code>; new server-only collection <code>record_imports</code>, which
+          keeps a digest of each imported value, not the value.</li>
+          </ul>
+          <ul>
+          <li>Announcement email. On the Announcements page, staff write a subject, a plain-text message,
+          and an optional button, pick registered attendees, approved attendees, or speakers, preview
+          the branded email with the recipient count, send a test to themselves, and confirm the count
+          to send. The server picks the audience from account records, refuses a send that no longer
+          matches the preview, and sends 200 recipients per provider batch call with a send-once key
+          each, so a continued send never mails anyone twice. A send history lists counts and failed
+          addresses, and a past send can be loaded as a new draft (#201, #202, #203).</li>
+          <li>Announcements use their own Postmark broadcast stream, checked through the Postmark API
+          before every chunk, never the transactional stream. Every announcement has a one-click
+          unsubscribe link in one of two modes: Postmark-managed, the default, or Custom, the site&#39;s
+          signed link with <code>List-Unsubscribe</code> headers, for clients on another email provider. An opt-out is honored by every later send, and staff can restore an address on
+          request. The webhook relay is refused until it has a batch and unsubscribe contract (#490).</li>
+          <li>Staff can retry the addresses an announcement send could not reach because the email
+          provider was down or busy. The retry is a new send, previewed and confirmed, and each send
+          can be retried once. The history says when its failed address list is cut short (#202).</li>
+          <li>A correctly signed unsubscribe is never rate limited, so one-click opt-outs that mail
+          providers and link scanners send from shared addresses are all recorded. The email log
+          stores each announcement with an inert unsubscribe link in place of the recipient&#39;s live
+          one (#490).</li>
+          </ul>
+          <ul>
+          <li>Speaker reminders. Staff select accepted speakers, alone or as a group such as
+          <strong>Materials missing</strong>, preview the exact email each one gets, confirm the recipient
+          count, and send through the event&#39;s email provider. A message names only what the
+          speaker still owes (biography, headshot, session description, materials), by the same
+          rule as the speaker&#39;s own next steps list. A double click or a retry sends nothing more,
+          a speaker gets at most one reminder in 24 hours, each row shows when the speaker was
+          last reminded, and each send is in the admin log. Staff can edit the reminder wording,
+          and the server refuses an unknown token at save and a send whose wording changed after
+          the preview. The readiness list exports as CSV for an organizer&#39;s own mailing tool
+          (#332). A historical demo refuses the send.</li>
+          </ul>
+          <ul>
+          <li>A <strong>Data export</strong> page in the admin panel (System group). Staff export sessions,
+          speakers, and organizations as CSV files; operators also export ticket orders and
+          admissions, and download the event data package: one zip with a JSON file per record
+          type, CSV files, a versioned <code>manifest.json</code> with record counts and checksums, and a
+          README on formats, links between files, and personal data. The package holds live
+          records only, with hidden ones marked, and leaves out the admin allowlist,
+          credentials, drafts, the audit log, and raw provider records,
+          and staff notes on pitches go only when the operator includes them. Every export
+          writes its admin log entry before the file is sent. <code>scripts/export-event-package.cjs</code>
+          builds the same package for a large event and checks a saved one with <code>--verify</code>.
+          The new runbook <code>docs/operator/archive-handoff.md</code> covers the handoff, a Firebase
+          managed export, Storage files, retention, and a read-only past site (#329).</li>
+          </ul>
           <ul>
           <li>A call for sessions can use an external form, such as Airtable, instead of this site&#39;s
           form. Operators save its https address with the call. <code>/pitch</code> then links to it while the
@@ -472,6 +579,23 @@
           the operator can delete it (#357).</li>
           </ul>
           <ul>
+          <li>A hero button or link group item that leads to a section switched off on Settings → Features
+          (schedule, speakers, sponsors, attendees, updates) is no longer shown on the public site. It led
+          to a &quot;doesn&#39;t have a public schedule&quot; page. The Content editor warns under the destination when
+          a link leads to a section that is off; the save still succeeds, and the link returns when the
+          feature is switched on. The warning is announced to screen readers as it appears.</li>
+          <li>A hero button or link group item that leads to a hidden page, or to an address no page has, is no
+          longer shown on the public site. It led to the 404 page, and a fresh site now seeds three pages
+          hidden. The Content editor warns the same way.</li>
+          <li>The home page body no longer draws the seeded <strong>Footer links</strong> section under its own heading.
+          The site footer now shows those links on every page, one list per group.</li>
+          <li><strong>Call settings saved.</strong> now appears after an operator saves the call for sessions, and the
+          save button keeps focus. The panel used to remount when the saved values came back, which
+          dropped the message. The panel description no longer wraps one word onto a second line, and
+          the filter and search fields on <strong>Session pitches</strong> share one input baseline at wide widths
+          (#476).</li>
+          </ul>
+          <ul>
           <li>With the Stripe provider, the header and the home lead show <strong>Get tickets</strong> only after an
           operator publishes the catalog. Before that, the action led to &quot;Ticket sales are not
           configured&quot;. A published catalog keeps the action while sales are paused or closed, so a
@@ -542,6 +666,20 @@
           so a client build still emits no specimen chunk.</li>
           </ul>
           <ul>
+          <li>A fresh site seeds the <strong>Recap</strong>, <strong>Guidelines</strong> and <strong>City guide</strong> pages hidden, so a new
+          site&#39;s navigation offers no empty page. A re-run of init keeps each page&#39;s stored visibility,
+          so an existing deployment does not change. The admin Pages list now says <strong>Visible</strong> or
+          <strong>Hidden</strong> on every row for the published page, names the feature that hides a built-in page,
+          and says when a visibility change waits for a publish.</li>
+          <li>The admin guide&#39;s early launch steps now say how to take a home section off the site (hide or
+          delete its blocks, or remove the section in Pages), that &quot;[Replace]&quot; text and seeded statistics
+          show until edited, and that <strong>Pitch a session</strong> appears in the home page lead only.</li>
+          </ul>
+          <ul>
+          <li><strong>Upgrade behavior:</strong> session pitch receipts (#324) are on by default. After the upgrade, each
+          new pitch from this site&#39;s form gets a receipt email, with no further step. To turn this off,
+          an operator chooses <strong>Staff send each receipt</strong> under <strong>Session pitches → Manage pitch emails</strong>
+          and saves it before deploying this version.</li>
           <li><strong>Breaking:</strong> <code>submitSessionPitch</code> now requires <code>consent: true</code>. Callers must record agreement
           to organizer review before submitting; requests without it return 400. Stored proposals
           record the consent version and time (#323).</li>
