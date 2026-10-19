@@ -2064,3 +2064,66 @@ describe("cmsTimeline: the listener's query and the editor's list reads (issue 1
     }
   });
 });
+
+// Event data export (issue 329). Spreadsheets and the package live only in
+// the response body. The rules' part is the stores around them: the order
+// and admission collections no client of any tier may read (so the operator
+// endpoint is the only way to list them), the speaker and pitch collections
+// both admin tiers already read (so a staff spreadsheet adds no reach), the
+// collections a package leaves out, and the audit rows no client can forge.
+describe("event data export: sources and audit rows (issue 329)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "ticket_orders/export-order"), { purchaserEmail: "buyer@example.com", totalAmount: 5000 });
+      await setDoc(doc(db, "tickets/export-ticket"), { orderId: "export-order", email: "holder@example.com" });
+      await setDoc(doc(db, "speakers/export-speaker"), { firstName: "Ada", email: "ada@example.com" });
+      await setDoc(doc(db, "session_pitches/export-pitch"), { title: "Pitch", privateNotes: "note" });
+      await setDoc(doc(db, "admin_logs/export-package-1"), {
+        action: "downloadEventPackage",
+        docPath: "event-package",
+        uid: "admin-1",
+        email: ADMIN_EMAIL,
+        at: new Date(),
+        details: { sections: ["program"], includeStaffNotes: false },
+      });
+    });
+  });
+
+  it("no client of any tier reads orders or admissions: only the operator endpoint lists them", async () => {
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(getDocs(collection(db, "ticket_orders")));
+      await assertFails(getDoc(doc(db, "ticket_orders/export-order")));
+      await assertFails(getDocs(collection(db, "tickets")));
+    }
+  });
+
+  it("both admin tiers already read speakers and pitches, which the staff exports draw on; nobody else does", async () => {
+    for (const db of [admin(), staff()]) {
+      await assertSucceeds(getDocs(collection(db, "speakers")));
+      await assertSucceeds(getDocs(collection(db, "session_pitches")));
+    }
+    for (const db of [nonAdmin(), anon()]) {
+      await assertFails(getDocs(collection(db, "speakers")));
+      await assertFails(getDocs(collection(db, "session_pitches")));
+    }
+  });
+
+  it("config/bootstrap, which a package never carries, stays unreadable to every client", async () => {
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(getDoc(doc(db, "config/bootstrap")));
+    }
+  });
+
+  it("no client can forge, change, or remove an export's audit row, and staff cannot read it", async () => {
+    for (const db of [admin(), staff(), nonAdmin()]) {
+      for (const action of ["exportEventData", "downloadEventPackage"]) {
+        await assertFails(setDoc(doc(db, `admin_logs/forged-${action}`), { action, docPath: "event-package" }));
+      }
+      await assertFails(updateDoc(doc(db, "admin_logs/export-package-1"), { details: {} }));
+      await assertFails(deleteDoc(doc(db, "admin_logs/export-package-1")));
+    }
+    await assertSucceeds(getDoc(doc(admin(), "admin_logs/export-package-1")));
+    await assertFails(getDoc(doc(staff(), "admin_logs/export-package-1")));
+  });
+});

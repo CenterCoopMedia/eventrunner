@@ -59,6 +59,8 @@ const AdminContentBlockEditor = lazy(() => import('./pages/AdminContentBlockEdit
 // Branding is the largest page left in the entry chunk (the style picker,
 // the option groups and the preview frame), and only an operator opens it.
 const AdminBranding = lazy(() => import('./pages/AdminBranding.jsx'));
+// Data export (issue #329) is one link in the System group.
+const AdminDataExport = lazy(() => import('./pages/AdminDataExport.jsx'));
 // The email log carries the preview frame and its document builder; it is
 // one screen behind one link, so it waits for somebody to ask for it.
 const AdminEmailLog = lazy(() => import('./pages/AdminEmailLog.jsx'));
@@ -284,6 +286,10 @@ export default function AdminApp() {
           <Route
             path="change-requests"
             element={<DeferredAdminPage label="change requests"><AdminChangeRequests /></DeferredAdminPage>}
+          />
+          <Route
+            path="data-export"
+            element={<DeferredAdminPage label="data export"><AdminDataExport /></DeferredAdminPage>}
           />
           <Route path="system-errors" element={<AdminSystemErrors />} />
           <Route path="access" element={<AdminAccess />} />

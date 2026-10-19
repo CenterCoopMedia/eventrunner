@@ -187,15 +187,17 @@ function makeFakeDb(seed = {}) {
           }));
         if (order) {
           const dir = order.direction === 'desc' ? -1 : 1;
+          // '__name__' orders by document id, as the Admin SDK does.
+          const keyOf = (row) => (order.field === '__name__' ? row.id : row.data[order.field]);
           rows.sort((a, b) => {
-            const av = orderValue(a.data[order.field]);
-            const bv = orderValue(b.data[order.field]);
+            const av = orderValue(keyOf(a));
+            const bv = orderValue(keyOf(b));
             return av < bv ? -dir : av > bv ? dir : 0;
           });
           if (startAfterValue !== undefined) {
             const sv = orderValue(startAfterValue);
-            rows = rows.filter(({ data }) => {
-              const v = orderValue(data[order.field]);
+            rows = rows.filter((row) => {
+              const v = orderValue(keyOf(row));
               return order.direction === 'desc' ? v < sv : v > sv;
             });
           }

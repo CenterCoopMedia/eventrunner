@@ -22,8 +22,8 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 
 | Tier | Sections | For |
 |---|---|---|
-| Operator | Everything below, plus Features, Branding, Access, and System errors | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, and Event settings | The people who run the event day to day |
+| Operator | Everything below, plus Features, Branding, Access, System errors, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -560,6 +560,26 @@ Every publish keeps a version of the record. A version holds the record's conten
 ## System errors
 
 Unresolved system-error rows — the operational surface for things like an invalid email-template override falling back to its code default. Each row has a resolve action. If you are chasing down why a template edit "is not working", check here before assuming it is a bug: A rejected override logs here and silently keeps serving the last-good copy rather than breaking the send.
+
+## Data export
+
+The event's records as spreadsheets, and the event data package for the handoff after an event. Open it from the System group on the rail. Every export writes an admin log entry before the file is sent; if the entry cannot be written, no file is made. The server keeps no copy of any file.
+
+**Spreadsheets.** Each row saves one CSV file named for its list and the date, such as `sessions-2026-10-01.csv`. The file shows the current version of every record and its state (Draft, Live, or Live with unpublished changes), so a draft is in the file too. A cell that starts with `=`, `+`, `-`, or `@` gains a leading apostrophe, as in the attendee export, so a spreadsheet shows it as text.
+
+| Spreadsheet | Tier | Columns |
+|---|---|---|
+| Sessions | Staff | Session ID, title, state, day, date, start and end time, time zone, type, track, location, speakers, speaker IDs, the session it is part of, description, number of materials |
+| Speakers | Staff | Speaker ID, first and last name, email, organization, role, status, published sessions, social handles, bio |
+| Organizations and sponsors | Staff | Organization ID, name, state, tier, website, description, support description, logo path, order |
+| Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |
+| Admissions | Operator | Ticket ID, order ID, provider, ticket type, holder's first and last name, email, status, whether an account claimed it, checked in, purchased |
+
+No spreadsheet holds an account id, an invite token, staged speaker edits, a private note, a checkout link, or a raw payment provider record. Amounts are in the currency's major unit (`25.00`). Staff do not see the two operator rows; the page says who exports them. Attendees and session pitches export from their own pages, because those exports follow the page's filter.
+
+**The event data package.** Operators only. **Download event data package** saves one zip file named `event-data-package-<date>.zip`. It holds a JSON file for each record type, CSV files for the main lists, `manifest.json` with record counts and checksums, and `README.md`, which describes each file, the links between files, and how to handle the personal data in it. Choose the parts under **Parts to include**; all eight are chosen at the start. **Include staff notes on session pitches** is off at the start. The package never holds the admin allowlist, credentials, drafts, the admin log, or raw provider records. It holds file paths and links for media and materials, not the files.
+
+The page sends a package of up to 9 MB and 50,000 records. A larger event gets a message that names `scripts/export-event-package.cjs`, which builds the same package from a terminal. [Archive and hand off a past event](operator/archive-handoff.md) covers the script, how to check a package, a full Firebase backup, the Storage files, and how to keep the past site online read-only.
 
 ## Settings → Event settings
 

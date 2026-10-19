@@ -115,6 +115,8 @@
     "revokeUser",
     "exportAttendees",
     "updateAttendee",
-    "deleteAttendee"
+    "deleteAttendee",
+    "exportEventData",
+    "downloadEventPackage"
   ]
 }

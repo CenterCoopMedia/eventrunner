@@ -94,6 +94,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the preview. The readiness list exports as CSV for an organizer's own mailing tool
   (#332). A historical demo refuses the send.
 
+- A **Data export** page in the admin panel (System group). Staff export sessions,
+  speakers, and organizations as CSV files; operators also export ticket orders and
+  admissions, and download the event data package: one zip with a JSON file per record
+  type, CSV files, a versioned `manifest.json` with record counts and checksums, and a
+  README on formats, links between files, and personal data. The package leaves out
+  the admin allowlist, credentials, drafts, the audit log, and raw provider records,
+  and staff notes on pitches go only when the operator includes them. Every export
+  writes its admin log entry before the file is sent. `scripts/export-event-package.cjs`
+  builds the same package for a large event and checks a saved one with `--verify`.
+  The new runbook `docs/operator/archive-handoff.md` covers the handoff, a Firebase
+  managed export, Storage files, retention, and a read-only past site (#329).
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page

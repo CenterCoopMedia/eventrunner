@@ -304,9 +304,9 @@ describe('the admin shell', () => {
     // Email log, issue #183, Change requests, issue #188, Organizations,
     // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
     // issue #195, Unpublished changes, issue #196, and Announcements,
-    // issue #199), and Import records, every one a word. No
+    // issue #199), Import records, and Data export, issue #329, every one a word. No
     // icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(27);
+    expect(nav.querySelectorAll('a')).toHaveLength(28);
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
       'href',
@@ -379,7 +379,7 @@ describe('the admin shell', () => {
       'versions', 'unpublished',
       'speakers', 'attendees', 'badges',
       'announcements', 'live-updates', 'ticketing', 'import', 'feedback', 'email-log', 'change-requests',
-      'settings',
+      'settings', 'data-export',
     ]);
   });
 
@@ -468,7 +468,7 @@ describe('the admin shell', () => {
     const staffDocket = docketForTier('staff');
     expect(staffDocket.map((group) => group.id)).toEqual(['lead', 'content', 'people', 'operations', 'system']);
     expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview']);
-    expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
+    expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings', 'data-export']);
     expect(docketForTier('operator')).toEqual(DOCKET);
     expect(docketForTier(null)).toEqual([]);
   });

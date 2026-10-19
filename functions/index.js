@@ -64,6 +64,8 @@ const ticketingCommerceAdmin = require('./src/ticketing/commerceAdmin.cjs');
 const ticketingCommerceEmail = require('./src/ticketing/commerceEmail.cjs');
 const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
 const recordImport = require('./src/imports/recordImport.cjs');
+const adminDataExport = require('./src/admin/dataExport.cjs');
+const adminEventPackage = require('./src/admin/eventPackage.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -128,4 +130,6 @@ module.exports = {
   ...ticketingCommerceEmail.handlers,
   ...maintenanceCleanup.handlers,
   ...recordImport.handlers,
+  ...adminDataExport.handlers,
+  ...adminEventPackage.handlers,
 };

@@ -147,6 +147,7 @@ export const DOCKET = Object.freeze([
     label: 'System',
     items: [
       { to: 'settings', label: 'Event', tier: 'staff' },
+      { to: 'data-export', label: 'Data export', tier: 'staff' },
       { to: 'features', label: 'Features', tier: 'operator' },
       { to: 'branding', label: 'Branding', tier: 'operator' },
       { to: 'access', label: 'Access', tier: 'operator' },
