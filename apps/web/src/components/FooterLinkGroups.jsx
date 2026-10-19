@@ -17,7 +17,7 @@
 // Each group's name labels its own list. It is a label, not a heading, so
 // the footer adds nothing to the page's heading outline.
 import { useId } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { isCanonicalPagePath } from 'shared/routing';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';

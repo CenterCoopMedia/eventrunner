@@ -3,7 +3,7 @@
 // convention): the server contract is what matters, not the transport.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));

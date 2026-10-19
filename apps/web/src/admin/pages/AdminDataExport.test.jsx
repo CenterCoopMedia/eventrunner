@@ -2,7 +2,7 @@
 // Mocks the auth tier, adminApi, the text download, and the package fetch.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import * as eventPackageCjs from '../../../../../functions/src/admin/eventPackage.cjs';
 import * as dataExportCjs from '../../../../../functions/src/admin/dataExport.cjs';
 

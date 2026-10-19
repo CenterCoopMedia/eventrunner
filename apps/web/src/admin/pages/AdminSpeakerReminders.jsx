@@ -17,7 +17,7 @@
 // The wording editor saves an email_templates/speaker.reminder override
 // that the server checks against the template's tokens.
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { READINESS_ITEMS, READINESS_ITEM_LABELS } from 'shared/speakerReadiness';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';

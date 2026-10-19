@@ -3,7 +3,7 @@
 // only data source, and every reminder is rendered on the server.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 const callMock = vi.fn();
 const saveTextFile = vi.fn();

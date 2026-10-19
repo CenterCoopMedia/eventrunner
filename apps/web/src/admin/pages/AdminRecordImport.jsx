@@ -18,7 +18,7 @@
 // The preview is a ruled table (RuledTable): each verdict a word in a badge
 // whose tint agrees with it, never colour alone and never a pill.
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
 import { saveTextFile } from '../downloadFile.js';

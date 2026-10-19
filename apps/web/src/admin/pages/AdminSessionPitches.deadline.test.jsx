@@ -4,7 +4,7 @@
 // even though the saved values arrive back through the live snapshot.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 let pitchCall;
 let pushCall;

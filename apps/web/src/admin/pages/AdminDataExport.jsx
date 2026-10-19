@@ -20,7 +20,7 @@
 // why. A running export carries aria-busy and aria-disabled and ignores a
 // second press.
 import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { saveTextFile } from '../downloadFile.js';
