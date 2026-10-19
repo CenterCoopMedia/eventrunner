@@ -126,9 +126,16 @@ test('the documentation and gate jobs retain their required checks', () => {
   assert.doesNotMatch(workflow, /if \[ -f scripts\/build-pages\.test\.cjs \]; then/);
   assert.match(workflow, /git show "\$GITHUB_BASE_SHA:scripts\/ci\/classify-changes\.cjs"/);
   assert.doesNotMatch(workflow, /run: node scripts\/ci\/classify-changes\.cjs/);
-  assert.match(workflow, /run: node scripts\/ci\/verify-gate\.cjs/);
+  // The gate and DCO verdicts are required checks. A pull request must not
+  // be able to replace the scripts that decide them (#354), so both load
+  // the copy from the base commit, as the classifier does.
   const gate = workflow.slice(workflow.indexOf('\n  gate:'));
-  assert.match(gate, /steps:\s+- uses: actions\/checkout@v4\s+- name: Verify the selected CI tiers passed[\s\S]*run: node scripts\/ci\/verify-gate\.cjs/);
+  assert.match(gate, /fetch-depth: 0/);
+  assert.match(gate, /git show "\$GITHUB_BASE_SHA:scripts\/ci\/verify-gate\.cjs"/);
+  assert.doesNotMatch(workflow, /run: node scripts\/ci\/verify-gate\.cjs/);
+  const dco = workflow.slice(workflow.indexOf('\n  dco:'), workflow.indexOf('\n  secrets:'));
+  assert.match(dco, /git show "\$GITHUB_BASE_SHA:scripts\/check-dco\.cjs"/);
+  assert.doesNotMatch(dco, /run: node scripts\/check-dco\.cjs/);
 });
 
 test('workflow, configuration, and dependency changes select the full matrix', () => {

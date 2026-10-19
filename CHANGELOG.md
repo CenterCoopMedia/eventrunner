@@ -588,4 +588,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The venue editor's payload helper sent a blank walking-minutes field as `0`, a real distance an
   operator can mean, instead of failing to save. It now sends `null` (#227).
 
+### Security
+
+- The CI gate and DCO jobs now load their verifier scripts from the pull request's
+  base commit, as the path classifier already did, so a pull request cannot replace
+  the scripts that decide those required checks. A pull request can still edit the
+  workflow file itself; an independent check producer remains #259 (#354).
+
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.

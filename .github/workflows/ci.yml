@@ -92,8 +92,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # The sign-off verdict is a required check, so the pull request runs
+      # the copy from its base commit and cannot replace the rule (#354).
       - name: Verify every commit is signed off
-        run: node scripts/check-dco.cjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+        env:
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          script="$RUNNER_TEMP/check-dco.cjs"
+          git show "$GITHUB_BASE_SHA:scripts/check-dco.cjs" > "$script"
+          node "$script" "$GITHUB_BASE_SHA" "$GITHUB_HEAD_SHA"
 
   secrets:
     name: Secret scan
@@ -468,9 +476,12 @@ jobs:
     # remain hosted; manual runs skip DCO because they have no PR range.
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Verify the selected CI tiers passed
         env:
           EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           LOCAL_VALIDATED: ${{ needs.changes.outputs.local }}
           CHANGES_RESULT: ${{ needs.changes.result }}
           DCO_RESULT: ${{ needs.dco.result }}
@@ -495,4 +506,13 @@ jobs:
           RULES_RESULT: ${{ needs.rules.result }}
           E2E_SELECTED: ${{ needs.changes.outputs.e2e }}
           E2E_RESULT: ${{ needs.e2e.result }}
-        run: node scripts/ci/verify-gate.cjs
+        # The gate is the aggregate required check. A pull request loads the
+        # verifier from its base commit, so it cannot replace the verdict
+        # (#354). A manual run has no base commit and uses the checked-out file.
+        run: |
+          script=scripts/ci/verify-gate.cjs
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            script="$RUNNER_TEMP/verify-gate.cjs"
+            git show "$GITHUB_BASE_SHA:scripts/ci/verify-gate.cjs" > "$script"
+          fi
+          node "$script"
