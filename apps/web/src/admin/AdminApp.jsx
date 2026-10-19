@@ -40,6 +40,7 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // sessions list, so its figures and panels stay out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
+const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
 const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
@@ -197,6 +198,11 @@ export default function AdminApp() {
           />
           <Route path="speakers" element={<AdminSpeakersList />} />
           <Route path="speakers/new" element={<AdminSpeakerEditor mode="create" />} />
+          {/* Two segments, so no speaker id can shadow it: an id holds no slash. */}
+          <Route
+            path="speakers/reminders/send"
+            element={<DeferredAdminPage label="speaker reminders"><AdminSpeakerReminders /></DeferredAdminPage>}
+          />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
           <Route
             path="updates"

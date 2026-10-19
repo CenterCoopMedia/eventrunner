@@ -68,6 +68,7 @@ export default defineConfig({
       'shared/slug',
       'shared/email',
       'shared/readiness',
+      'shared/speakerReadiness',
     ],
   },
   build: {
