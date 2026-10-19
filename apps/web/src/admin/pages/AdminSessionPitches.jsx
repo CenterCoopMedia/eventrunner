@@ -13,6 +13,8 @@ import EventDateTimeField from '../components/EventDateTimeField.jsx';
 import { sameCallSettings } from '../pitchCallSettings.js';
 import { PITCH_COLUMNS, readPitchCsv, pitchQueueCsv } from '../pitchCsv.js';
 import { PitchEmailSettings, PitchEmailDelivery } from '../components/PitchEmails.jsx';
+import AirtablePitchSync from './AirtablePitchSync.jsx';
+import PitchSourceMarkers from './PitchSourceMarkers.jsx';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { Panel, Notice, SaveStatus, TextField, TextAreaField, SelectField, CheckboxField,
   ServerErrorSummary, primaryButtonClass, secondaryButtonClass, rowTitleLinkClass } from '../components/formControls.jsx';
@@ -196,6 +198,7 @@ function PitchReview({ initial, current, call }) {
       <p className="text-admin-sm text-admin-ink-secondary">{baseline.organization || 'No organization'} · {baseline.format || 'No format'}</p>
       <p className="whitespace-pre-wrap break-words">{baseline.description}</p>
       <p className="text-admin-sm text-admin-ink-secondary">Consent: {baseline.consent ? 'Recorded for organizer review' : 'Not recorded by the legacy API; verify before using this proposal.'}</p>
+      <PitchSourceMarkers row={current || baseline} detailed timeZone={event.timezone} />
       {conflict ? <><Notice tone="caution" message="This pitch changed. Your unsaved notes remain below. Copy them before loading the current review." /><button className={secondaryButtonClass} onClick={reload} disabled={busy || !current}>Load current review</button></> : null}
       <ServerErrorSummary error={error} errorRef={errorRef} />
       <form onSubmit={save} className="space-y-sm">
@@ -251,6 +254,7 @@ export default function AdminSessionPitches() {
     {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings settings={settings} call={call} timeZone={eventConfig?.timezone} /></details> : null}
     {isOperator && noticeSettings ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage pitch emails</summary><PitchEmailSettings settings={noticeSettings} call={call} /></details> : null}
     {configError ? <Notice tone="caution" message="Cannot check call settings. Reconnecting…" /> : null}
+    <AirtablePitchSync call={call} isOperator={isOperator} />
     <ImportPitches call={call} />
     <div className="grid gap-sm sm:grid-cols-2 sm:items-end"><SelectField label="Filter by decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...statuses]} /><TextField label="Search pitches" value={search} onChange={setSearch} hint="Title, email, or organization." /></div>
     {listError ? <Notice tone="caution" message="Cannot load the queue. Reconnecting; saved values may be out of date." /> : null}
@@ -261,6 +265,7 @@ export default function AdminSessionPitches() {
           <StatusBadge tone={tones[row.status]}>{labels[row.status]}</StatusBadge>
           <button className={`${rowTitleLinkClass} block max-w-full min-w-0 [overflow-wrap:anywhere] text-start`} aria-pressed={selected?.id === row.id} onClick={() => setSelected(row)}>{row.title}</button>
           <p className="break-all text-admin-sm text-admin-ink-secondary">{row.email} · {row.organization || 'No organization'}</p>
+          <PitchSourceMarkers row={row} />
         </li>)}</ul></Panel> : <AdminEmptyState title="No pitches in this view" description="Try another decision filter or search. Imported and submitted proposals appear here." />}
         <section ref={detailRef} tabIndex={-1} aria-label="Selected pitch" className="min-w-0">{selected ? <PitchReview key={selected.id} initial={selected} current={current} call={call} /> : <AdminEmptyState title="Choose a pitch" description="Open a proposal to see its details, private notes, and review decision." />}</section>
       </div>

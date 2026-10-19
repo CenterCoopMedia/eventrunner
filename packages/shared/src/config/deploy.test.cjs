@@ -185,6 +185,20 @@ test('EVENT_OTP_SEND_CEILING_PER_HOUR must be a positive integer', () => {
   }
 });
 
+// --- Airtable pitch intake ------------------------------------------------------
+
+test('Airtable pitch intake defaults off and accepts only true or false', () => {
+  const result = validateDeployEnv(VALID_ENV);
+  assert.equal(result.ok, true);
+  assert.equal(result.resolved.EVENT_AIRTABLE_ENABLED, 'false');
+  assert.equal(validateDeployEnv({ ...VALID_ENV, EVENT_AIRTABLE_ENABLED: 'true' }).ok, true);
+  for (const bad of ['yes', '1', 'on']) {
+    const invalid = validateDeployEnv({ ...VALID_ENV, EVENT_AIRTABLE_ENABLED: bad });
+    assert.equal(invalid.ok, false, `"${bad}" must fail the build`);
+    assert.ok(invalid.errors.some((e) => e.startsWith('EVENT_AIRTABLE_ENABLED')));
+  }
+});
+
 // --- site publisher (spec §8.4 phase 5, issue #36) -----------------------------
 
 test('the site publisher defaults off and is never reported missing', () => {

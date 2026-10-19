@@ -163,6 +163,7 @@ jobs:
           # as — an unset account would otherwise reach `gcloud run jobs
           # deploy` as a blank and take the project's default identity.
           EVENT_SITE_PUBLISHER_ENABLED: ${{ vars.EVENT_SITE_PUBLISHER_ENABLED }}
+          EVENT_AIRTABLE_ENABLED: ${{ vars.EVENT_AIRTABLE_ENABLED }}
           EVENT_PUBLISHER_SERVICE_ACCOUNT: ${{ vars.EVENT_PUBLISHER_SERVICE_ACCOUNT }}
           EVENT_FUNCTIONS_SERVICE_ACCOUNT: ${{ vars.EVENT_FUNCTIONS_SERVICE_ACCOUNT }}
           VITE_FIREBASE_APP_CHECK_SITE_KEY: ${{ vars.VITE_FIREBASE_APP_CHECK_SITE_KEY }}
@@ -256,6 +257,7 @@ jobs:
           EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
           EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
           EVENT_SITE_PUBLISHER_ENABLED: ${{ vars.EVENT_SITE_PUBLISHER_ENABLED }}
+          EVENT_AIRTABLE_ENABLED: ${{ vars.EVENT_AIRTABLE_ENABLED }}
         run: |
           set -euo pipefail
           {
@@ -276,6 +278,8 @@ jobs:
             # than a blank line the runtime has to reinterpret.
             echo "EVENT_APP_CHECK_ENFORCED=${EVENT_APP_CHECK_ENFORCED:-false}"
             echo "EVENT_OTP_SEND_CEILING_PER_HOUR=${EVENT_OTP_SEND_CEILING_PER_HOUR:-500}"
+            # Airtable pitch intake: binds AIRTABLE_API_TOKEN when true.
+            echo "EVENT_AIRTABLE_ENABLED=${EVENT_AIRTABLE_ENABLED:-false}"
             # Presence-of-config gate for the site publisher (spec §8.4):
             # cms/publisher.cjs treats an unset EVENT_SITE_PUBLISHER_JOB as
             # "this deployment has no publisher" and skips cleanly. The key
@@ -773,6 +777,7 @@ jobs:
           EVENT_APP_CHECK_ENFORCED: ${{ vars.EVENT_APP_CHECK_ENFORCED }}
           EVENT_OTP_SEND_CEILING_PER_HOUR: ${{ vars.EVENT_OTP_SEND_CEILING_PER_HOUR }}
           EVENT_SITE_PUBLISHER_ENABLED: ${{ vars.EVENT_SITE_PUBLISHER_ENABLED }}
+          EVENT_AIRTABLE_ENABLED: ${{ vars.EVENT_AIRTABLE_ENABLED }}
         run: |
           set -euo pipefail
           {
@@ -790,6 +795,8 @@ jobs:
             echo "EVENT_OPERATOR_NOTIFIER=$EVENT_OPERATOR_NOTIFIER"
             echo "EVENT_APP_CHECK_ENFORCED=${EVENT_APP_CHECK_ENFORCED:-false}"
             echo "EVENT_OTP_SEND_CEILING_PER_HOUR=${EVENT_OTP_SEND_CEILING_PER_HOUR:-500}"
+            # Airtable pitch intake: binds AIRTABLE_API_TOKEN when true.
+            echo "EVENT_AIRTABLE_ENABLED=${EVENT_AIRTABLE_ENABLED:-false}"
             # Presence-of-config gate for the site publisher (spec §8.4):
             # cms/publisher.cjs treats an unset EVENT_SITE_PUBLISHER_JOB as
             # "this deployment has no publisher" and skips cleanly. The key

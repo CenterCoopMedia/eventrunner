@@ -56,6 +56,10 @@ const DEFAULTS = {
   // runtime service account that no existing client project has, and a
   // deployment without them must keep deploying exactly as before.
   EVENT_SITE_PUBLISHER_ENABLED: 'false',
+  // Airtable pitch intake (functions/src/sessions/airtableSync.cjs). Off by
+  // default: when true, the refresh functions bind the AIRTABLE_API_TOKEN
+  // secret, and a deploy fails if Secret Manager does not hold it.
+  EVENT_AIRTABLE_ENABLED: 'false',
 };
 
 /**
@@ -159,6 +163,12 @@ function validateDeployEnv(env = process.env) {
   if (present(source.EVENT_SITE_PUBLISHER_ENABLED) &&
       !['true', 'false'].includes(source.EVENT_SITE_PUBLISHER_ENABLED.trim().toLowerCase())) {
     errors.push('EVENT_SITE_PUBLISHER_ENABLED: must be true or false');
+  }
+  // Same reasoning again: a client who believes Airtable refresh is on and
+  // deployed it off would see every refresh refused.
+  if (present(source.EVENT_AIRTABLE_ENABLED) &&
+      !['true', 'false'].includes(source.EVENT_AIRTABLE_ENABLED.trim().toLowerCase())) {
+    errors.push('EVENT_AIRTABLE_ENABLED: must be true or false');
   }
   const publisherEnabled = present(source.EVENT_SITE_PUBLISHER_ENABLED) &&
     source.EVENT_SITE_PUBLISHER_ENABLED.trim().toLowerCase() === 'true';

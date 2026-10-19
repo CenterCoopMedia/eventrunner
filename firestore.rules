@@ -536,6 +536,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Airtable connection settings for pitch intake: base, table, view,
+    // field mapping and refresh timing. Operator-only, because they choose
+    // which outside records enter the queue. The access token is a managed
+    // secret and is never stored here. updateAirtablePitchSource writes it.
+    match /session_pitch_sources/{docId} {
+      allow read: if isOperator();
+      allow write: if false;
+    }
+
+    // Airtable refresh status: last run, counts, skip reasons and the last
+    // (redacted) error. Either admin tier reads it; only the refresh writes.
+    match /session_pitch_sync/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // media_assets: the index of uploaded Storage objects behind the media
     // library (spec §4.1, §8.5). Admin-readable so the library can list and
     // search without a callable per keystroke; never client-written — every
