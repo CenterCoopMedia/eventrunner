@@ -167,9 +167,16 @@ tracked in [issue #259](https://github.com/CenterCoopMedia/eventrunner/issues/25
 
 The documentation check validates local links and the Pages entrypoint's basic
 metadata. Generated pages under `docs/docs/**` must also carry an SVG favicon,
-canonical URL, and complete Open Graph and Twitter metadata. `docs/demo/**`
-remains outside that generated-page metadata rule until the demo redesign in
-#109; its metadata is owned there. Root-page social metadata is tracked in #105.
+canonical URL, and complete Open Graph and Twitter metadata. The built demo in
+`docs/demo/**` remains outside that generated-page metadata rule until the demo
+redesign in #109; its metadata is owned there. Root-page social metadata is
+tracked in #105.
+
+`docs/demo/**` is build output and is not committed. Do not rebuild or commit it
+in a pull request. `.github/workflows/pages.yml` builds it with
+`scripts/build-demo.cjs` on every push to `main` and deploys `docs/` with it to
+GitHub Pages. Links into `docs/demo/` are checked only when a local build is
+present; the Pages workflow checks them after its build.
 
 `docs/docs/**` is generated output, not a place to edit. `scripts/build-pages.cjs`
 renders it from the Markdown listed in `scripts/lib/pages-manifest.cjs`, and
@@ -182,7 +189,7 @@ HTML has drifted from a fresh render — the same freshness rule
 |---|---|
 | Markdown, `docs/**` except `docs/demo/**`, handbook files, and issue/discussion templates | Documentation checks: local links, generated Pages HTML markup, and `docs/docs/**` freshness |
 | Documentation generators (`scripts/build-pages.cjs`, `scripts/build-pages.test.cjs`, `scripts/lib/pages-*.cjs`, `scripts/lib/markdown-pages.cjs`) | Documentation checks and lint |
-| `scripts/build-demo.cjs`, `scripts/build-demo.test.cjs`, or `docs/demo/**` | Lint, demo generator tests, and committed-demo hygiene |
+| `scripts/build-demo.cjs` or `scripts/build-demo.test.cjs` | Lint, demo generator tests, and demo build hygiene: two identical builds and the demo bundle budget |
 | `apps/web/**` | Lint, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E |
 | `functions/**` | Lint, shared/functions unit tests, rules emulators, and E2E |
 | `packages/shared/**` | Lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E |
@@ -224,9 +231,10 @@ changes behavior that the completed review did not cover.
 GitHub Actions does not poll for connector reviews. The required `CI gate` and resolved
 review conversations remain enforced by branch protection.
 
-When web source changes, regenerate both the synthetic content and the committed demo with
-`node scripts/generate-content.cjs --demo` and `node scripts/build-demo.cjs`, then run their
-`--check` modes. Regenerate documentation with `node scripts/build-pages.cjs` after source
+When web source changes, regenerate the synthetic content with
+`node scripts/generate-content.cjs --demo` and run its `--check` mode. Run
+`node scripts/build-demo.cjs --check` to prove the demo builds, builds the same
+twice, and fits its budget. Do not commit `docs/demo/`; it is build output. Regenerate documentation with `node scripts/build-pages.cjs` after source
 Markdown changes. Sign off all repair commits with `git commit -s`.
 
 Branch rules control Git operations. An administrator credential can still edit those rules.

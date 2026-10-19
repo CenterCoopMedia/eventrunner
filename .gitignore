@@ -4,6 +4,8 @@ node_modules/
 !.env.example
 **/vendor/*.tgz
 dist/
+# Static demo: build output, published by .github/workflows/pages.yml
+docs/demo/
 coverage/
 .firebase/
 *.log

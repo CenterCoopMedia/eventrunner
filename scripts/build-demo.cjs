@@ -27,9 +27,10 @@
  * The web config also ignores it while VITE_DEMO_MODE=1, so a direct demo
  * build cannot pick it up either.
  *
- * Output is synced into docs/demo/ — committed, because GitHub Pages serves
- * this repo from /docs. Stale contents are deleted first so a renamed hashed
- * asset never lingers.
+ * Output is synced into docs/demo/. It is build output, not committed:
+ * docs/demo/ is in .gitignore, and .github/workflows/pages.yml runs this
+ * script on every push to main and publishes docs/ with the result. Stale
+ * contents are deleted first so a renamed hashed asset never lingers.
  *
  * Right after the vite build, scripts/write-site-files.cjs writes
  * sitemap.xml, robots.txt, and the web manifest into the same dist/ before
@@ -45,19 +46,20 @@
  *   node scripts/build-demo.cjs --base /other/path/ # different subpath
  *   node scripts/build-demo.cjs --out docs/demo     # different destination
  *   node scripts/build-demo.cjs --dry-run           # print the plan only
- *   node scripts/build-demo.cjs --check             # build to a temp dir,
- *                                                    # diff against --out,
+ *   node scripts/build-demo.cjs --check             # build twice to temp dirs,
+ *                                                    # compare, check the budget,
  *                                                    # write nothing (CI)
  *
- * --check exists to catch the committed docs/demo/ going stale relative to
- * apps/web source or the committed synthetic snapshot (issue #94): the
- * build is deterministic (verified: repeated builds of unchanged input are
- * byte-for-byte identical, including the content-hashed asset filenames
- * Vite derives from file contents, not from a clock or build counter), so
- * any diff here means someone edited source or the snapshot and forgot to
- * rerun `npm run build:demo` and commit the result.
+ * --check is the CI gate for the demo: the demo must build, two builds of
+ * the same input must be byte-for-byte identical (including the
+ * content-hashed asset file names Vite derives from file contents, not from
+ * a clock or build counter), and the result must pass the public bundle
+ * budget (scripts/ci/bundle-budget.cjs). Nothing is compared with a
+ * committed copy: there is none, so feature branches never conflict on
+ * hashed chunk names.
  *
- * Exit codes: 0 ok, 1 unexpected error / drift found, 2 bad arguments, 4 build failed.
+ * Exit codes: 0 ok, 1 unexpected error, two builds differ, or budget exceeded,
+ *   2 bad arguments, 4 build failed.
  */
 
 const fs = require('node:fs');
@@ -67,6 +69,7 @@ const { spawnSync } = require('node:child_process');
 
 const { main: writeSiteFiles } = require('./write-site-files.cjs');
 const { demoSnapshot } = require('./lib/demo-event.cjs');
+const { main: checkBundleBudget } = require('./ci/bundle-budget.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
@@ -250,8 +253,10 @@ function runBuild({ base, dryRun }) {
 }
 
 /**
- * GitHub Pages runs Jekyll over what it serves from /docs, and Jekyll drops
- * files and directories whose name starts with `_`. Vite does not emit any
+ * A branch-built GitHub Pages site runs Jekyll over what it serves from
+ * /docs, and Jekyll drops files and directories whose name starts with `_`.
+ * The Actions deploy in .github/workflows/pages.yml does not run Jekyll, but
+ * the marker keeps a branch-built site safe too. Vite does not emit any
  * today, but a plugin or a future default could, so the check is done against
  * the real output rather than assumed away. `.nojekyll` at the SITE root is
  * the fix, and this repo's site root is docs/ — a file another agent's docs
@@ -339,48 +344,64 @@ function compareDirs(expectedDir, actualDir) {
 }
 
 /**
- * --check: build into a throwaway directory outside the repo (so a drifted
- * build can never partially overwrite the committed docs/demo/ it is being
- * compared against, and so resolveOutDir's inside-repo rule is irrelevant
- * here) and diff it against the committed output. Writes nothing to the
- * working tree either way.
+ * One demo build into `dir`, a scratch directory outside the repository.
+ * Vite's own dist/ is the staging area, as in a normal build.
  */
-async function runCheck({ base, expectedOutDir }) {
+async function buildInto(base, dir) {
+  runBuild({ base, dryRun: false });
+  if (!fs.existsSync(DIST_DIR)) {
+    console.error(`Expected build output at ${DIST_DIR}; it is not there.`);
+    return 4;
+  }
+  await writeDemoSiteFiles({ base });
+  fs.cpSync(DIST_DIR, dir, { recursive: true });
+  normalizeGeneratedHtml(dir);
+  fs.rmSync(DIST_DIR, { recursive: true, force: true });
+  if (!fs.existsSync(path.join(dir, 'index.html'))) {
+    console.error('build-demo --check: the build wrote no index.html.');
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * --check: build the demo twice into throwaway directories outside the
+ * repository, fail if the two builds differ in any byte, then run the public
+ * bundle budget on the result. Writes nothing to the working tree, so it
+ * never touches a local docs/demo/ either.
+ */
+async function runCheck({ base }) {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'run-of-show-demo-check-'));
+  const first = path.join(tmpRoot, 'first');
+  const second = path.join(tmpRoot, 'second');
   try {
-    console.log(`Building demo to a scratch dir for comparison: ${tmpRoot}`);
-    runBuild({ base, dryRun: false });
-    if (!fs.existsSync(DIST_DIR)) {
-      console.error(`Expected build output at ${DIST_DIR}; it is not there.`);
-      return 4;
-    }
-    await writeDemoSiteFiles({ base });
-    fs.cpSync(DIST_DIR, tmpRoot, { recursive: true });
-    normalizeGeneratedHtml(tmpRoot);
-
-    if (!fs.existsSync(expectedOutDir)) {
-      console.error(
-        `--check: ${path.relative(REPO_ROOT, expectedOutDir)} does not exist. ` +
-          'Run `npm run build:demo` and commit the result.',
-      );
-      return 1;
+    console.log(`Building the demo twice in a scratch dir: ${tmpRoot}`);
+    for (const dir of [first, second]) {
+      const code = await buildInto(base, dir);
+      if (code !== 0) return code;
     }
 
-    const { drifted } = compareDirs(expectedOutDir, tmpRoot);
+    const { drifted } = compareDirs(first, second);
     if (drifted.length > 0) {
       console.error(
-        `build-demo --check: ${path.relative(REPO_ROOT, expectedOutDir)} is stale ` +
-          `relative to a fresh build (${drifted.length} path(s) differ):\n` +
+        `build-demo --check: two builds of the same input differ ` +
+          `(${drifted.length} path(s)):\n` +
           drifted.map((d) => `  - ${d}`).join('\n') +
-          '\n\nRegenerate with: npm run build:demo\n' +
-          'then commit the updated docs/demo/.',
+          '\n\nThe demo build must be reproducible. Find the input that varies ' +
+          '(a timestamp, a random id, file order) and make it stable.',
       );
       return 1;
     }
     console.log(
-      `build-demo --check: docs/demo/ matches a fresh build ` +
-        `(${listFilesRecursive(expectedOutDir).length} file(s)).`,
+      `build-demo --check: two builds are identical ` +
+        `(${listFilesRecursive(first).length} file(s)).`,
     );
+
+    const budget = checkBundleBudget(['--dist', first]);
+    if (budget !== 0) {
+      console.error('build-demo --check: the demo is over the public bundle budget.');
+      return 1;
+    }
     return 0;
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
@@ -425,7 +446,7 @@ async function main(argv) {
       console.error('--check and --dry-run are mutually exclusive.');
       return 2;
     }
-    return runCheck({ base: options.base, expectedOutDir: options.outDir });
+    return runCheck({ base: options.base });
   }
 
   console.log(`Demo build → ${path.relative(REPO_ROOT, options.outDir)}`);
@@ -463,7 +484,7 @@ async function main(argv) {
     `Synced ${files} files, ${(bytes / 1024 / 1024).toFixed(2)} MB → ` +
       `${path.relative(REPO_ROOT, options.outDir)}`,
   );
-  console.log('Nothing was committed; review and commit docs/demo/ yourself.');
+  console.log('docs/demo/ is build output and is not committed; the Pages workflow builds it on main.');
   return 0;
 }
 

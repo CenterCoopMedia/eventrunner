@@ -24,6 +24,10 @@ const HTML_REFERENCE_RE = /\b(?:href|src)=['"]([^'"]+)['"]/gi;
 const URL_SCHEME_RE = /^([a-z][a-z\d+.-]*:)/i;
 const SAFE_EXTERNAL_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const GENERATED_DOCS_PREFIX = 'docs/docs/';
+// Built when Pages is deployed (.github/workflows/pages.yml), never committed.
+// A link into it is checked only when a local build is present; the Pages
+// workflow runs this checker after it builds the demo.
+const BUILT_AT_DEPLOY_DIRS = ['docs/demo'];
 
 const BASE_PAGE_METADATA = [
   ['doctype', /^<!doctype html>/i],
@@ -166,11 +170,21 @@ function displayPath(root, sourcePath) {
   return path.relative(root, sourcePath).replaceAll(path.sep, '/');
 }
 
+function isUnbuiltDeployTarget(candidate, root) {
+  return BUILT_AT_DEPLOY_DIRS.some((dir) => {
+    const builtRoot = path.join(root, dir);
+    const relative = path.relative(builtRoot, candidate);
+    const inside = !relative.startsWith('..') && !path.isAbsolute(relative);
+    return inside && !fs.existsSync(path.join(builtRoot, 'index.html'));
+  });
+}
+
 function checkLocalTargets(sourcePath, targets, root, htmlReferences = false) {
   const errors = [];
   for (const target of targets) {
     const resolved = localTargetPath(sourcePath, target, root);
     if (!resolved) continue;
+    if (!resolved.error && isUnbuiltDeployTarget(resolved.path, root)) continue;
     if (resolved.error) {
       errors.push(`${displayPath(root, sourcePath)}: ${target} (${resolved.error})`);
     } else {
@@ -251,6 +265,7 @@ module.exports = {
   checkRepository,
   extractTargets,
   extractMarkdownTargets,
+  isUnbuiltDeployTarget,
   localTargetPath,
   main,
 };

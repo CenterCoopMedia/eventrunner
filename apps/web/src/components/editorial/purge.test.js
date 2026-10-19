@@ -10,9 +10,10 @@
 // decorative device to fail: it is loud, it is wrong, and no unit test that
 // renders markup can see it.
 //
-// So the check is made against the BUILT stylesheet, which is committed as
-// part of the demo (docs/demo). If a device class is missing there, it was
-// purged, and this test says which one.
+// So the check is made against the BUILT stylesheet of the demo build
+// (scripts/build-demo.cjs), which this file builds into a scratch directory
+// before it runs: docs/demo is build output and is not committed. If a
+// device class is missing there, it was purged, and this test says which one.
 //
 // THIS FILE MUST NOT BE SCANNED BY TAILWIND, OR IT CANNOT FAIL. The list
 // below is a list of class names as literal strings, which is exactly what
@@ -21,13 +22,40 @@
 // passed because the assertion itself was the reason. tailwind.config.js now
 // excludes the test files, and the build reflects the app alone.
 import fs from 'node:fs';
+import os from 'node:os';
+import process from 'node:process';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..', '..', '..', '..');
-const ASSETS = path.join(REPO_ROOT, 'docs', 'demo', 'assets');
+const require = createRequire(import.meta.url);
+const { buildCommand, DEFAULT_BASE, DEMO_FIREBASE_ENV } = require(path.join(REPO_ROOT, 'scripts', 'build-demo.cjs'));
+
+/**
+ * The same demo-mode vite build scripts/build-demo.cjs runs, written to a
+ * scratch directory so it never touches apps/web/dist or docs/demo.
+ */
+function buildDemoStylesheet(outDir) {
+  const env = { ...process.env, ...DEMO_FIREBASE_ENV, VITE_DEMO_MODE: '1' };
+  for (const key of Object.keys(env)) {
+    if (key === 'NODE_ENV' || key === 'GENERATED_DIR' || key.startsWith('VITEST')) delete env[key];
+  }
+  const { command, args } = buildCommand(DEFAULT_BASE);
+  const result = spawnSync(command, [...args, '--outDir', outDir, '--emptyOutDir'], {
+    cwd: REPO_ROOT, env, encoding: 'utf8',
+  });
+  if (result.status !== 0) throw new Error(`demo build failed:\n${result.stdout}\n${result.stderr}`);
+  const assets = path.join(outDir, 'assets');
+  return fs
+    .readdirSync(assets)
+    .filter((file) => file.endsWith('.css'))
+    .map((file) => fs.readFileSync(path.join(assets, file), 'utf8'))
+    .join('\n');
+}
 
 /**
  * Every class the preset devices draw with, including every modifier.
@@ -162,11 +190,15 @@ const DEVICE_CLASSES = [
 ];
 
 describe('the built stylesheet', () => {
-  const bundled = fs
-    .readdirSync(ASSETS)
-    .filter((file) => file.endsWith('.css'))
-    .map((file) => fs.readFileSync(path.join(ASSETS, file), 'utf8'))
-    .join('\n');
+  let scratch;
+  let bundled = '';
+  beforeAll(() => {
+    scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'purge-demo-build-'));
+    bundled = buildDemoStylesheet(scratch);
+  }, 180_000);
+  afterAll(() => {
+    if (scratch) fs.rmSync(scratch, { recursive: true, force: true });
+  });
 
   it('keeps every device class Tailwind could otherwise tree-shake', () => {
     expect(bundled.length).toBeGreaterThan(1000);

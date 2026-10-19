@@ -28,6 +28,7 @@ const {
   themeColorTags,
   internals,
 } = require('./build-pages.cjs');
+const { isUnbuiltDeployTarget } = require('./check-docs.cjs');
 const { renderMarkdown, renderInline, slugify, escapeHtml } = require('./lib/markdown-pages.cjs');
 const { DOCS_BASE, SECTIONS, pagesInOrder, routesBySource } = require('./lib/pages-manifest.cjs');
 
@@ -101,6 +102,9 @@ test('every internal link resolves to a generated page or an existing asset', ()
       const [target] = href.split('#');
       if (known.has(target)) continue;
       const onDisk = path.join(ROOT, 'docs', target.replace('/eventrunner/', ''));
+      // The Pages workflow builds docs/demo before it deploys; a checkout
+      // without that build cannot judge links into it.
+      if (isUnbuiltDeployTarget(onDisk, ROOT)) continue;
       assert.ok(
         fs.existsSync(onDisk),
         `${file}: internal link goes nowhere: ${href}`,

@@ -1,1 +1,0 @@
-import{Cr as e,Or as t,_r as n,mr as r}from"./initial-iRdSpEqk.js";function i(i,a,o){return r(r=>e(t(n,i),e=>{a(e.docs.map(e=>({id:e.id,...e.data()})))},r),e=>{console.warn(`${i} admin subscription failed; retrying.`,e),o?.(e)})}export{i as t};

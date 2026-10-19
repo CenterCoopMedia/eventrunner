@@ -81,30 +81,30 @@ dispatching against the tag directly.
 
 ## The demo build (`docs/demo/`)
 
-`docs/demo/` is committed output, not generated at deploy time: `npm run build:demo`
+`docs/demo/` is build output and is not committed; it is in `.gitignore`. `npm run build:demo`
 (`scripts/build-demo.cjs`) runs a demo-mode `vite build` of `apps/web` against the committed
-synthetic snapshot in `apps/web/src/generated/` and syncs the result into `docs/demo/`, which
-GitHub Pages serves at `https://centercoopmedia.github.io/eventrunner/demo/`. Nobody runs this at
-deploy time — it has to be rebuilt and committed by hand whenever its inputs change.
+synthetic snapshot in `apps/web/src/generated/` and syncs the result into `docs/demo/`.
+`.github/workflows/pages.yml` runs it on every push to `main`, checks the result, and deploys
+`docs/` with the demo to GitHub Pages at `https://centercoopmedia.github.io/eventrunner/demo/`.
 
-- **Rebuild and commit `docs/demo/` before tagging** whenever a PR touched `apps/web/src/**` or
-  `apps/web/src/generated/**` since the last rebuild: `npm run build:demo`, review the diff, commit
-  it (a normal DCO-signed commit, same as any other change).
-- **CI catches a forgotten rebuild for you** — the selected demo tier runs
-  `node scripts/build-demo.cjs --check` and fails if a fresh build differs from
-  the committed `docs/demo/` (issue #94). A trusted local result satisfies this
-  tier. Otherwise, the `demo` job runs on GitHub. Manual CI runs use GitHub.
-  Treat a failed demo check as "rebuild and commit", never as a reason to edit
-  `docs/demo/` by hand.
+- **Nothing to rebuild or commit before tagging.** The demo on Pages is the build of the latest
+  `main`. A pull request never commits `docs/demo/`, so two pull requests never conflict on its
+  content-hashed chunk names.
+- **CI proves the build.** The selected demo tier runs `node scripts/build-demo.cjs --check`: it
+  builds the demo twice into scratch directories, fails if the two builds differ in any byte, and
+  runs the demo bundle budget (`scripts/ci/bundle-budget.cjs`). A trusted local result satisfies
+  this tier. Otherwise, the `demo` job runs on GitHub. Manual CI runs use GitHub.
 - **The build is deterministic**: repeated builds of unchanged input, including Vite's
-  content-hashed asset filenames, come out byte-for-byte identical (verified by hand; see
-  `scripts/build-demo.test.cjs` for the directory-diff logic `--check` is built on). That is what
-  makes the CI gate viable without flaking on unrelated reruns.
+  content-hashed asset filenames, come out byte-for-byte identical. `--check` asserts this on
+  every run, with the directory diff in `scripts/build-demo.cjs` (unit tests in
+  `scripts/build-demo.test.cjs`).
+- **Pages deploys from the workflow.** The repository's Pages source must be "GitHub Actions"
+  (Settings → Pages). While it is still "Deploy from a branch", `pages.yml` builds and checks the
+  site and skips the deploy with a warning.
 - **The `--base` / rename caveat**: `scripts/build-demo.cjs` defaults `--base` to
-  `/eventrunner/demo/`, matching this repo's current name and the fact that GitHub Pages serves
-  `docs/` from the repo root. Renaming the repository, or moving the demo to a different Pages
-  path, changes that URL — rerun with `--base /new-path/` (and `--out` if the destination
-  directory changes too) and recommit `docs/demo/`, or every asset URL the built `index.html`
-  emits will 404 under the new address. Nothing checks this automatically: `--check` only proves
-  the committed output matches a fresh build at the *current* `--base`, not that the `--base` is
-  still correct.
+  `/eventrunner/demo/`, matching this repo's current name and the Pages project path. Renaming the
+  repository, or moving the demo to a different Pages path, changes that URL: change the default
+  `--base` (and `--out` if the destination directory changes too), or every asset URL the built
+  `index.html` emits will 404 under the new address. Nothing checks this automatically: `--check`
+  only proves the build is reproducible and within budget at the *current* `--base`, not that the
+  `--base` is still correct.

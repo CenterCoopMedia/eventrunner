@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * Reproducible, read-only public demo evidence from committed Git objects.
+ * Reproducible, read-only public demo evidence from built demo directories.
  *
- * node scripts/dev/capture-demo-visuals.mjs --base <PR-base-SHA> --out <directory>
+ * node scripts/dev/capture-demo-visuals.mjs --base <PR-base-SHA> --before <dir> --out <directory>
  * Add --plan to verify sources and list the matrix without starting a browser.
- * DEMO_VISUAL_BASE_SHA supplies --base in CI. A manual run without a base
- * records after-only evidence explicitly; a PR run must name its base.
+ * DEMO_VISUAL_BASE_SHA supplies --base and DEMO_VISUAL_BEFORE_DIR supplies
+ * --before in CI. --after defaults to docs/demo, the checked-out HEAD's build
+ * (node scripts/build-demo.cjs). A manual run without a base records
+ * after-only evidence explicitly; a PR run must name its base.
+ * scripts/dev/build-demo-at.cjs builds the base's demo into --before.
  *
  * A focused 51-image comparison: 12 before and 39 after. Newsroom/light Home
  * and ordinary/preview Program cover all four widths on both sources. After
@@ -16,9 +19,11 @@
  * overflow, images, requests and first-session geometry; these diagnostics
  * supplement, and never weaken or replace, the existing browser assertions.
  *
- * Only docs/demo blobs from base and checked-out HEAD are served, on loopback.
- * No checkout, build, emulator, credentials, deploy or live website is used.
- * Exact canonical demo asset URLs are fulfilled from the same Git snapshot;
+ * Only the two built demo directories are served, on loopback. Each is read
+ * into memory once, before any capture, so a later write cannot change what
+ * a capture shows; symlinks and unsafe names are refused. This script runs
+ * no checkout, build, emulator, credentials, deploy or live website.
+ * Exact canonical demo asset URLs are fulfilled from the same snapshot;
  * every other external request and every WebSocket is blocked. Fullscreen is
  * denied by Permissions-Policy so the app's real in-page preview fallback
  * keeps the requested viewport. Chromium's sandbox remains enabled. The
@@ -28,6 +33,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_STYLES } from './capture-specimen.mjs';
@@ -50,12 +56,15 @@ const MIME = {
 };
 
 export function parseArgs(argv, env = process.env) {
-  const options = { base: env.DEMO_VISUAL_BASE_SHA || null, out: null, plan: false, help: false };
+  const options = {
+    base: env.DEMO_VISUAL_BASE_SHA || null, before: env.DEMO_VISUAL_BEFORE_DIR || null,
+    after: path.join(ROOT, 'docs', 'demo'), out: null, plan: false, help: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--plan') options.plan = true;
     else if (flag === '--help') options.help = true;
-    else if (flag === '--base' || flag === '--out') {
+    else if (['--base', '--before', '--after', '--out'].includes(flag)) {
       const value = argv[++i];
       if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value`);
       options[flag.slice(2)] = value;
@@ -64,6 +73,8 @@ export function parseArgs(argv, env = process.env) {
   if (options.help) return options;
   if (options.base && !SHA.test(options.base)) throw new Error('--base must be a full commit SHA');
   if (env.GITHUB_EVENT_NAME === 'pull_request' && !options.base) throw new Error('PR capture requires its base SHA');
+  if (options.base && !options.before) throw new Error('--base requires --before, the base commit\'s built demo');
+  if (!options.base && options.before) throw new Error('--before requires --base, the commit it was built from');
   if (!options.out && !options.plan) throw new Error('--out is required');
   return options;
 }
@@ -103,41 +114,55 @@ export async function navigateOrdinaryCapture(page, origin, shot) {
   await page.goto(captureUrl(origin, shot), { waitUntil: 'load' });
 }
 
-/** ls-tree is parsed before serving; symlinks and non-blob entries are refused. */
-export function parseTreeEntries(output) {
+/** A served name is a plain relative path: no escape, no backslash, no empty part. */
+export function isSafeName(name) {
+  return !name.startsWith('/') && !name.includes('\\')
+    && !name.split('/').some((part) => !part || part === '.' || part === '..');
+}
+
+/** Read a built demo into memory; symlinks and non-files are refused. */
+export function readDirectoryEntries(dir) {
   const entries = new Map();
-  for (const entry of output.toString('utf8').split('\0').filter(Boolean)) {
-    const match = /^(100644|100755) blob ([0-9a-f]{40}(?:[0-9a-f]{24})?)\t(.+)$/s.exec(entry);
-    if (!match) throw new Error('Demo snapshot contains an unsupported Git entry');
-    const [, , blob, name] = match;
-    if (name.startsWith('/') || name.includes('\\') || name.split('/').some((part) => !part || part === '.' || part === '..')) {
-      throw new Error('Demo snapshot contains an unsafe path');
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      const name = path.relative(dir, full).split(path.sep).join('/');
+      if (!isSafeName(name)) throw new Error('Demo snapshot contains an unsafe path');
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) entries.set(name, fs.readFileSync(full));
+      else throw new Error('Demo snapshot contains an unsupported entry');
     }
-    entries.set(name, blob);
-  }
-  if (!entries.has('index.html')) throw new Error('Committed docs/demo/index.html is missing');
+  };
+  if (!fs.existsSync(dir) || !fs.lstatSync(dir).isDirectory()) throw new Error(`Demo build not found: ${dir}`);
+  walk(dir);
+  if (!entries.has('index.html')) throw new Error('Built demo index.html is missing');
   return entries;
+}
+
+/** A stable digest of the served bytes, so the manifest names exactly what was captured. */
+export function digestEntries(entries) {
+  const hash = crypto.createHash('sha256');
+  for (const name of [...entries.keys()].sort()) {
+    hash.update(`${name}\0${crypto.createHash('sha256').update(entries.get(name)).digest('hex')}\n`);
+  }
+  return hash.digest('hex');
 }
 
 function git(args) {
   return execFileSync('git', args, { cwd: ROOT, maxBuffer: 32 * 1024 * 1024 });
 }
 
-export function readSnapshot(revision, label, runGit = git) {
+export function readSnapshot(revision, dir, label, runGit = git) {
   if (revision !== 'HEAD' && !SHA.test(revision)) throw new Error('Snapshot must be HEAD or a full commit SHA');
   const sha = runGit(['rev-parse', '--verify', '--end-of-options', `${revision}^{commit}`]).toString().trim();
   if (!SHA.test(sha)) throw new Error('Git returned an invalid source SHA');
-  const treeSha = runGit(['rev-parse', '--verify', `${sha}:docs/demo`]).toString().trim();
-  if (!SHA.test(treeSha)) throw new Error('Git returned an invalid demo tree SHA');
-  const entries = parseTreeEntries(runGit(['ls-tree', '-r', '-z', `${sha}:docs/demo`]));
-  const cache = new Map();
+  const entries = readDirectoryEntries(dir);
   return {
-    label, sha, treeSha, fileCount: entries.size,
+    label, sha, demoDigest: digestEntries(entries), fileCount: entries.size,
     read(name) {
-      const blob = entries.get(name);
-      if (!blob) return null;
-      if (!cache.has(blob)) cache.set(blob, runGit(['cat-file', 'blob', blob]));
-      return { body: cache.get(blob), contentType: MIME[path.extname(name)] || 'application/octet-stream' };
+      const body = entries.get(name);
+      if (!body) return null;
+      return { body, contentType: MIME[path.extname(name)] || 'application/octet-stream' };
     },
   };
 }
@@ -153,7 +178,7 @@ export function requestDecision(rawUrl, localOrigin, method = 'GET') {
   let name;
   try { name = decodeURIComponent(url.pathname.slice(BASE_PATH.length)) || 'index.html'; }
   catch { return { kind: 'blocked' }; }
-  if (name.includes('\\') || name.split('/').some((part) => !part || part === '.' || part === '..')) return { kind: 'blocked' };
+  if (!isSafeName(name)) return { kind: 'blocked' };
   return { kind: local ? 'local' : 'snapshot-alias', name };
 }
 
@@ -344,7 +369,7 @@ async function captureSource(browser, snapshot, out, manifest, saveManifest) {
         });
         for (const shot of matrix.filter((item) => item.width === width)) {
           const record = {
-            source: snapshot.label, sourceSha: snapshot.sha, demoTreeSha: snapshot.treeSha,
+            source: snapshot.label, sourceSha: snapshot.sha, demoDigest: snapshot.demoDigest,
             ...shot, requestedViewport: { width, height: HEIGHT, deviceScaleFactor: 1 },
             file: `${snapshot.label}/${captureName(shot)}`,
           };
@@ -393,21 +418,18 @@ async function captureSource(browser, snapshot, out, manifest, saveManifest) {
 export async function main(argv, env = process.env) {
   const options = parseArgs(argv, env);
   if (options.help) {
-    console.log('Usage: node scripts/dev/capture-demo-visuals.mjs [--base <full-SHA>] (--out <directory> | --plan)');
+    console.log('Usage: node scripts/dev/capture-demo-visuals.mjs [--base <full-SHA> --before <dir>] [--after <dir>] (--out <directory> | --plan)');
     return 0;
   }
   const snapshots = [
-    ...(options.base ? [readSnapshot(options.base, 'before')] : []),
-    readSnapshot('HEAD', 'after'),
+    ...(options.base ? [readSnapshot(options.base, path.resolve(options.before), 'before')] : []),
+    readSnapshot('HEAD', path.resolve(options.after), 'after'),
   ];
-  if (git(['status', '--porcelain', '--untracked-files=all', '--', 'docs/demo']).toString().trim()) {
-    throw new Error('docs/demo has uncommitted changes; commit the intended source before capturing');
-  }
   const manifest = {
     version: 1, status: options.plan ? 'plan-only' : 'running',
     createdAt: new Date().toISOString(),
     comparison: options.base ? 'PR base versus checked-out HEAD' : 'after-only; no baseline supplied',
-    sources: snapshots.map(({ label, sha, treeSha, fileCount }) => ({ label, sha, demoTreeSha: treeSha, fileCount, expectedCaptures: captureMatrix(label).length })),
+    sources: snapshots.map(({ label, sha, demoDigest, fileCount }) => ({ label, sha, demoDigest, fileCount, expectedCaptures: captureMatrix(label).length })),
     prHeadSha: env.DEMO_VISUAL_HEAD_SHA || null,
     expectedCaptures: snapshots.reduce((count, snapshot) => count + captureMatrix(snapshot.label).length, 0),
     coverage: {

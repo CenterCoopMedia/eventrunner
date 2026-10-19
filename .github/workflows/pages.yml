@@ -1,0 +1,95 @@
+name: Pages
+
+# Builds and deploys the GitHub Pages site: docs/ as committed, plus the
+# static demo in docs/demo/, which is build output and not committed
+# (scripts/build-demo.cjs). The demo URL stays /eventrunner/demo/.
+#
+# Deploying needs the repository's Pages source set to "GitHub Actions"
+# (Settings → Pages). While Pages still builds from a branch, this workflow
+# builds and checks the site, uploads it, and skips the deploy with a
+# warning, so it never fails or publishes over a branch-built site.
+#
+# No secrets. GITHUB_TOKEN gets only what each job needs.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time. A queued run waits; a running deploy is never
+# canceled half way.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the Pages site
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      deploy: ${{ steps.source.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Pack shared into functions vendor
+        run: npm run prepare:functions
+      - name: Install dependencies
+        run: npm ci
+      - name: Check the committed documentation pages
+        run: node scripts/build-pages.cjs --check
+      - name: Build the static demo
+        run: node scripts/build-demo.cjs
+      - name: Enforce demo bundle budget
+        run: node scripts/ci/bundle-budget.cjs --dist docs/demo
+      - name: Check site links, including the built demo
+        run: node scripts/check-docs.cjs
+      - name: Read the Pages source
+        id: source
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.setOutput('deploy', 'false');
+            let site;
+            try {
+              ({ data: site } = await github.rest.repos.getPages(context.repo));
+            } catch (error) {
+              core.warning(`Pages is not enabled or not readable (${error.status || error.message}). The site was built but not deployed.`);
+              return;
+            }
+            if (site.build_type !== 'workflow') {
+              core.warning(`Pages builds from a branch (${site.source?.branch}${site.source?.path}). Set Settings → Pages → Source to "GitHub Actions" to deploy this build. The site was built but not deployed.`);
+              return;
+            }
+            core.setOutput('deploy', 'true');
+      - name: Configure Pages
+        if: steps.source.outputs.deploy == 'true'
+        uses: actions/configure-pages@v5
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: needs.build.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

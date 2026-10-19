@@ -67,10 +67,13 @@ worktree, a branch, and a list of issues.
 - One commit per issue where you can. The subject says what changed in the
   product; the body says why.
 - Generated output goes in one last commit with the exact subject
-  `Regenerate generated output`: `docs/docs/**`, `docs/demo/**`,
-  `apps/web/src/generated/**`, and lockfile integrity changes caused only by a
-  `packages/shared` edit. The director drops that commit and regenerates on the
-  stack tip. Commit nothing generated anywhere else.
+  `Regenerate generated output`: `docs/docs/**`, `apps/web/src/generated/**`,
+  and lockfile integrity changes caused only by a `packages/shared` edit. The
+  director drops that commit and regenerates on the stack tip. Commit nothing
+  generated anywhere else.
+- Never commit `docs/demo/`. It is build output, ignored by git, and
+  `.github/workflows/pages.yml` builds and deploys it on every push to `main`.
+  Do not rebuild it for a pull request.
 
 ## Heavy commands
 
@@ -81,7 +84,7 @@ flock /tmp/eventrunner-heavy.lock npm run test -w apps/web
 flock /tmp/eventrunner-heavy.lock npm run test:rules
 flock /tmp/eventrunner-heavy.lock npm run test:e2e
 flock /tmp/eventrunner-heavy.lock npm run build -w apps/web
-flock /tmp/eventrunner-heavy.lock node scripts/build-demo.cjs
+flock /tmp/eventrunner-heavy.lock node scripts/build-demo.cjs           # local preview only
 flock /tmp/eventrunner-heavy.lock node scripts/build-demo.cjs --check
 ```
 
@@ -101,14 +104,13 @@ flock /tmp/eventrunner-heavy.lock npm run test -w apps/web
 flock /tmp/eventrunner-heavy.lock npm run test:rules          # rules, functions, or shared touched
 flock /tmp/eventrunner-heavy.lock npm run build -w apps/web
 node scripts/generate-content.cjs --demo --check              # after regenerating
-flock /tmp/eventrunner-heavy.lock node scripts/build-demo.cjs --check
+flock /tmp/eventrunner-heavy.lock node scripts/build-demo.cjs --check   # builds twice, compares, runs the budget
 node scripts/build-pages.cjs --check
 npm run check:copy
 ```
 
-To regenerate: `node scripts/generate-content.cjs --demo`,
-`flock /tmp/eventrunner-heavy.lock node scripts/build-demo.cjs`, and
-`node scripts/build-pages.cjs`.
+To regenerate: `node scripts/generate-content.cjs --demo` and
+`node scripts/build-pages.cjs`. The demo is not regenerated in a branch.
 
 ## Report
 

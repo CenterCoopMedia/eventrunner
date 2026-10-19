@@ -19,6 +19,8 @@ node scripts/ci/bundle-budget.cjs --dist apps/web/dist
 node scripts/ci/bundle-budget.cjs --dist docs/demo
 ```
 
+`node scripts/build-demo.cjs --check` runs the demo budget on its own scratch build, so CI needs no committed `docs/demo/`.
+
 The committed limits are:
 
 - 1,080,000 raw bytes and 292,000 gzip bytes for the initial graph.
