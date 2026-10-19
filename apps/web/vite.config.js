@@ -66,6 +66,7 @@ export default defineConfig({
       'shared/update',
       'shared/seed',
       'shared/slug',
+      'shared/email',
       'shared/readiness',
     ],
   },

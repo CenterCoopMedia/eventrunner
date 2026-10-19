@@ -89,8 +89,8 @@ test('jurisdiction-dependent clauses carry the review marker', () => {
   const legal = build({ ticketing: { provider: 'none' }, email: { provider: 'console' } });
   const retention = legal.privacy.find((b) => b.section === 'privacy_retention');
   const liability = legal.terms.find((b) => b.section === 'terms_liability');
-  assert.match(retention.value, new RegExp(REVIEW_MARKER.replace(/[[\]]/g, '\\$&')));
-  assert.match(liability.value, new RegExp(REVIEW_MARKER.replace(/[[\]]/g, '\\$&')));
+  assert.ok(retention.value.includes(REVIEW_MARKER), retention.value);
+  assert.ok(liability.value.includes(REVIEW_MARKER), liability.value);
 });
 
 test('a missing operator name degrades to a [Replace] marker, never a blank assertion', () => {

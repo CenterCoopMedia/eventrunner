@@ -34,6 +34,18 @@ const CONFIG = {
   tierA: { publicUrl: 'https://summit.example.org' },
 };
 
+/**
+ * The href of the link whose whole text is `label`, or null. A test that
+ * only finds the address somewhere in the body would also pass when it sat
+ * in a query string or behind another host.
+ */
+function linkHref(html, label) {
+  for (const match of html.matchAll(/<a href="([^"]*)"[^>]*>([^<]*)<\/a>/g)) {
+    if (match[2] === label) return match[1];
+  }
+  return null;
+}
+
 /** Minimal fake Firestore over a doc map, counting reads per doc id. */
 function makeFakeDb(docs = {}) {
   const reads = {};
@@ -131,9 +143,8 @@ test('ticket.get_ticket renders the CTA button when cta_url is set', () => {
     },
     config: CONFIG,
   });
-  assert.ok(out.html.includes('https://tickets.example.org/buy'));
-  assert.ok(out.html.includes('Get your ticket'));
-  assert.ok(out.text.includes('https://tickets.example.org/buy'));
+  assert.equal(linkHref(out.html, 'Get your ticket'), 'https://tickets.example.org/buy');
+  assert.match(out.text, /^Get your ticket:\nhttps:\/\/tickets\.example\.org\/buy$/m);
 });
 
 test('ticket.get_ticket omits the CTA button entirely when cta_url is null', () => {
@@ -169,7 +180,7 @@ test('ticket.claim_prompt renders the CTA button when cta_url is set, and the ti
     },
     config: CONFIG,
   });
-  assert.ok(out.html.includes('https://example.org/claim'));
+  assert.equal(linkHref(out.html, 'Claim your ticket'), 'https://example.org/claim');
   assert.ok(out.html.includes('General admission'));
 });
 
@@ -264,8 +275,8 @@ test('account.welcome renders login_url in both bodies and next_steps_html from 
     tokenValues: { first_name: 'Ada', profile_url: 'https://summit.example.org/profile' },
     config: CONFIG,
   });
-  assert.ok(out.html.includes('https://summit.example.org/login'));
-  assert.ok(out.text.includes('https://summit.example.org/login'));
+  assert.equal(linkHref(out.html, 'Sign in'), 'https://summit.example.org/login');
+  assert.match(out.text, /^Sign in: https:\/\/summit\.example\.org\/login$/m);
   assert.ok(out.html.includes('<ul>')); // next_steps_html raw in html
   assert.ok(!out.text.includes('<ul>')); // stripped in text
   assert.deepEqual(out.warnings, []);

@@ -38,6 +38,7 @@ export {
   buildPublicProfile,
 } from './profile.cjs';
 export { generateSlug, generateSpeakerSlug } from './slug.cjs';
+export { EMAIL_ADDRESS_RE, isEmailAddress } from './email.cjs';
 export {
   SPEAKER_STATUSES,
   ADMIN_SETTABLE_STATUSES,

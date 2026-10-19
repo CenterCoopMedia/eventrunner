@@ -11,6 +11,10 @@
 
 const { MAX_TOTAL_BADGES } = require('../badges.cjs');
 const { safeUrlHref } = require('../urlSafety.cjs');
+// Deliberately loose (local@domain.tld) — deliverability is the sender
+// domain verification's job, not the schema's. This only refuses values
+// that cannot be a From address at all.
+const { isEmailAddress } = require('../email.cjs');
 const {
   VENUE_PLACE_KEYS,
   VENUE_MOVEMENT_KEYS,
@@ -56,10 +60,6 @@ const TRACK_KEYS = Object.freeze(['letter', 'name']);
 const HHMM_RE = /^\d{2}:\d{2}$/;
 const NAIVE_ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
-// Deliberately loose (local@domain.tld) — deliverability is the sender
-// domain verification's job, not the schema's. This only refuses values
-// that cannot be a From address at all.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Keys `config/event.legal` may carry (ADR 0001 §2.2). */
 const LEGAL_KEYS = Object.freeze([
@@ -583,13 +583,13 @@ function validateEventConfig(event) {
   if (!sender || typeof sender !== 'object' || Array.isArray(sender)) {
     errors.push('sender: must be an object');
   } else {
-    if (typeof sender.email !== 'string' || !EMAIL_RE.test(sender.email)) {
+    if (!isEmailAddress(sender.email)) {
       errors.push('sender.email: must be an email address');
     }
     if (sender.name != null && !isNonEmptyString(sender.name)) {
       errors.push('sender.name: must be null or a nonempty string');
     }
-    if (sender.replyTo != null && (typeof sender.replyTo !== 'string' || !EMAIL_RE.test(sender.replyTo))) {
+    if (sender.replyTo != null && !isEmailAddress(sender.replyTo)) {
       errors.push('sender.replyTo: must be null or an email address');
     }
   }
@@ -680,7 +680,7 @@ function validateEventConfig(event) {
       }
       for (const key of ['supportEmail', 'conductEmail']) {
         const value = legal[key];
-        if (value != null && value !== '' && (typeof value !== 'string' || !EMAIL_RE.test(value))) {
+        if (value != null && value !== '' && !isEmailAddress(value)) {
           errors.push(`legal.${key}: must be null or an email address, got ${JSON.stringify(value)}`);
         }
       }

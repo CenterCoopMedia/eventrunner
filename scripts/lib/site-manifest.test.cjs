@@ -279,7 +279,7 @@ test('robots.txt names the hidden page, the flag-off system page, and the attend
 test('robots.txt names every non-token static private route, exact-path anchored', () => {
   const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES });
   for (const path of ['/signin', '/profile', '/schedule/mine', '/speaker/profile']) {
-    assert.match(robots, new RegExp(`^Disallow: ${path.replace(/\//g, '\\/')}\\$$`, 'm'), path);
+    assert.ok(robots.split('\n').includes(`Disallow: ${path}$`), path);
   }
 });
 

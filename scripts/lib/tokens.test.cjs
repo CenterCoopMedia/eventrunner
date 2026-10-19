@@ -181,9 +181,8 @@ test('the admin set gets the first-paint block too, on the same policy', () => {
     const adminBlock = blocks.find((block) => block.includes(`${marker}:`));
     assert.ok(adminBlock, `the ${mode} policy gives the admin set a first-paint block`);
     for (const name of names) {
-      assert.match(
-        adminBlock,
-        new RegExp(`${name}: ${values.dark[name].replace(/[()]/g, '\\$&')};`),
+      assert.ok(
+        adminBlock.includes(`${name}: ${values.dark[name]};`),
         `${name} paints its DARK value before data-mode lands`,
       );
     }
@@ -215,9 +214,8 @@ test('printing from dark mode gets the light edition', () => {
   assert.ok(query, 'the stylesheet carries a print block');
 
   for (const name of names) {
-    assert.match(
-      query[1],
-      new RegExp(`${name}: ${values.light[name].replace(/[()]/g, '\\$&')};`),
+    assert.ok(
+      query[1].includes(`${name}: ${values.light[name]};`),
       `${name} prints its LIGHT value`,
     );
   }
@@ -285,8 +283,7 @@ test('every palette block matches a scoped element as well as :root', () => {
     "[data-theme='zine'][data-mode='dark']",
     "[data-motif-set='botanical']",
   ]) {
-    const escaped = attributes.replace(/[[\]]/g, '\\$&');
-    assert.match(css, new RegExp(`:root${escaped},\n${escaped} \\{`), `${attributes} is scoped`);
+    assert.ok(css.includes(`:root${attributes},\n${attributes} {`), `${attributes} is scoped`);
   }
   const adminBlock = css.match(/Admin identity — dark[^{]*\{/);
   assert.ok(adminBlock, 'the admin dark block exists');
