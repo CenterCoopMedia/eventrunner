@@ -230,13 +230,16 @@ test('a partial read never flags removals', async () => {
   assert.equal(db.read('session_pitch_sync', 'airtable').lastRun.outcome, 'partial');
 });
 
-test('a cleared consent box flags the existing pitch, and duplicate ids are skipped', async () => {
+test('a cleared consent box flags the existing pitch, and every record sharing an id is skipped', async () => {
   const db = makeDb({ 'session_pitch_sources/airtable': { ...sourceDoc, fieldMap: { ...fieldMap, externalId: 'Ref' } } });
   const api = fakeAirtable([record(1, { Ref: 'A-1' }), record(2, { Ref: 'A-1' }), record(3, { Ref: 'A-3' })]);
   tick = later();
   const first = await run(db, api);
-  assert.deepEqual(first.skippedReasons, { 'duplicate-id': 1 });
-  assert.equal(first.counts.created, 2);
+  // Airtable's order must not pick which of two records becomes the pitch.
+  assert.deepEqual(first.skippedReasons, { 'duplicate-id': 2 });
+  assert.equal(first.counts.created, 1);
+  assert.equal(db.read('session_pitches', pitchIdFor('A-1')), undefined);
+  assert.deepEqual(first.skippedRecords.map((row) => row.recordId), [recId(1), recId(2)]);
   api.rows = [record(1, { Ref: 'A-1' }), record(3, { Ref: 'A-3', Consent: false })];
   tick = later();
   const cleared = await run(db, api);

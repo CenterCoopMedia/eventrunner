@@ -282,14 +282,22 @@ async function runAirtableSync({ db, fetchImpl, token, env = process.env, actor,
     complete = listed.complete;
     counts.fetched = listed.records.length;
     const at = new Date(now());
+    const mappedRecords = listed.records.map((record) => ({ record, mapped: mapRecord(record, source.fieldMap) }));
+    // Every id Airtable still holds, duplicates included, so flagRemoved
+    // never marks their pitch as gone.
     const seen = new Set();
+    const uses = new Map();
+    for (const { mapped } of mappedRecords) {
+      if (!mapped.externalId) continue;
+      seen.add(mapped.externalId);
+      uses.set(mapped.externalId, (uses.get(mapped.externalId) || 0) + 1);
+    }
     const entries = [];
-    for (const record of listed.records) {
-      const mapped = mapRecord(record, source.fieldMap);
-      if (mapped.externalId && seen.has(mapped.externalId)) {
+    for (const { record, mapped } of mappedRecords) {
+      // Every record that shares an id is skipped, not all but the first:
+      // Airtable's order must not decide which proposal becomes the pitch.
+      if (mapped.externalId && uses.get(mapped.externalId) > 1) {
         mapped.ok = false; mapped.reason = 'duplicate-id'; mapped.field = source.fieldMap.externalId;
-      } else if (mapped.externalId) {
-        seen.add(mapped.externalId);
       }
       if (!mapped.ok) {
         counts.skipped += 1;
