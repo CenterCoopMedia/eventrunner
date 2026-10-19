@@ -42,8 +42,8 @@ const { upsertTickets } = require('./sync.cjs');
 
 const PROVIDER_NAME = 'manual';
 
-/** Same shape auth/otp.cjs and shared/speaker.cjs use. */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** The shared address check auth/otp.cjs and shared/speaker.cjs use. */
+const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
 
 /** A CSV pasted from a full platform export can be large; bound it. */
 const MAX_IMPORT_ROWS = 500;

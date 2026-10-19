@@ -65,6 +65,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import { EMAIL_ADDRESS_RE as EMAIL_RE } from 'shared/email';
 
 /** The tier word and its badge tone. The word is always rendered; the tone agrees with it. */
 const TIER_WORDS = Object.freeze({
@@ -76,8 +77,6 @@ const GRANT_TIERS = [
   { value: 'staff', label: 'Staff' },
   { value: 'operator', label: 'Operator' },
 ];
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * The words a pending change is stated in: the heading, the sentence

@@ -51,7 +51,7 @@ const { sendError, badRequest, methodNotAllowed, internal } = require('../core/e
 const BOOTSTRAP = { collection: 'config', doc: 'bootstrap' };
 /** Every value setAdminAccess accepts for `tier`. */
 const ACCESS_TIERS = Object.freeze([...ADMIN_TIERS, 'none']);
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
 const MAX_EMAIL_LENGTH = 254;
 
 /** Trim, lowercase, drop anything that is not a string, de-duplicate. */

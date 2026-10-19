@@ -316,6 +316,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The documentation site's page description decodes each entity once, so a
+  paragraph that shows "&lt;b&gt;" no longer gets "<b>" in its description.
+  An HTML comment that forms again when an inner comment is removed is also
+  removed, instead of showing on the page as text.
+
+- The plain-text body of an email decodes each entity in the postal address
+  once. Before, "&amp;lt;" became "<" instead of "&lt;". Tag removal is now
+  one linear scan, so a long run of unclosed `<` no longer takes seconds.
+
+- The required rich-text check now scans a value once. An unclosed `<hr`
+  or `<` repeated through a long value made the old tag patterns rescan to
+  the end from every bracket; 50,000 characters took most of a second in
+  the editor and in the CMS publish check.
+
+- Every email address check now uses one shared pattern that does not
+  backtrack. The old pattern took seconds on a long, dot-heavy value, and the
+  OTP sign-in endpoint accepts that value from anyone. Config, speaker,
+  ticket, and admin checks accept the same addresses as before.
+
 - Eventbrite deliveries are no longer refused for a missing HMAC header. Eventbrite does not
   sign webhooks, so every real delivery got a 401. The webhook URL now carries the shared secret
   (`?token=`), compared in constant time; a missing or wrong secret still gets a 401.
