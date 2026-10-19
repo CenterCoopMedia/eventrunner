@@ -460,6 +460,19 @@ function createDeliveryWebhookHandler({ db, provider, log = console }) {
         .get();
       if (snap.empty) continue;
       const ref = snap.docs[0].ref;
+      // A provider-side opt-out from an announcement (a Postmark broadcast
+      // stream with Postmark unsubscribe handling, issue #490) becomes the
+      // application's suppression record too, so the next audience leaves
+      // the address out. Transactional rows never write one.
+      if (event.type === 'suppressed' && typeof event.recipient === 'string'
+          && snap.docs[0].data?.()?.source === 'announcement') {
+        const { recordSuppression, suppressionIdFor } = require('../announcements/suppression.cjs');
+        try {
+          await recordSuppression({ db, id: suppressionIdFor(event.recipient), via: 'provider' });
+        } catch (err) {
+          log.warn('announcement suppression mirror failed', err);
+        }
+      }
       const occurredAt = event.occurredAt || new Date().toISOString();
       // Providers retry and deliver out of order; a replayed older event
       // must not overwrite a newer bounce/complaint. The compare-and-set

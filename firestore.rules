@@ -596,6 +596,12 @@ service cloud.firestore {
     match /auth_send_ceiling/{docId} { allow read, write: if false; }
     match /sent_emails/{docId} { allow read, write: if false; }
     match /email_claims/{docId} { allow read, write: if false; }
+    // Announcement email (issues #202, #490): the send records hold the
+    // recipient list and the unsubscribe signing key; the suppression
+    // records and the unsubscribe rate limit are server bookkeeping.
+    match /announcement_sends/{docId} { allow read, write: if false; }
+    match /email_suppressions/{docId} { allow read, write: if false; }
+    match /unsubscribe_rate_limits/{docId} { allow read, write: if false; }
     match /system_errors/{docId} { allow read, write: if false; }
     match /client_error_rate_limits/{docId} { allow read, write: if false; }
     match /email_templates/{docId} { allow read, write: if false; }

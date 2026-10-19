@@ -559,6 +559,11 @@ describe("server-only collections stay deny-all", () => {
     "auth_send_ceiling",
     "sent_emails",
     "email_claims",
+    // Announcement email (issues #202, #490): recipient lists, signing keys,
+    // opt-outs, and the unsubscribe rate limit.
+    "announcement_sends",
+    "email_suppressions",
+    "unsubscribe_rate_limits",
     "system_errors",
     "client_error_rate_limits",
     "email_templates",
