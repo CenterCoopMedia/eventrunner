@@ -365,19 +365,34 @@ async function readPages({ db, collection, pageSize = PAGE_SIZE, maxDocs = Infin
 }
 
 /**
+ * Every document of a collection, in id order. With a `cache` (one Map per
+ * export), a collection is read once however many files draw on it, so
+ * `maxDocs` counts each document once.
+ *
+ * @param {{ db: object, collection: string, pageSize?: number, maxDocs?: number,
+ *           counter?: { read: number }, cache?: Map<string, Promise<Array<{ id: string, data: object }>>> }} args
+ * @returns {Promise<Array<{ id: string, data: object }>>}
+ */
+function readDocs({ cache, ...args }) {
+  if (cache?.has(args.collection)) return cache.get(args.collection);
+  const docs = [];
+  const read = readPages(args, (page) => {
+    docs.push(...page);
+  }).then(() => docs);
+  cache?.set(args.collection, read);
+  return read;
+}
+
+/**
  * Every document of a collection, mapped through `toRecord`, in id order.
  *
  * @param {{ db: object, collection: string, pageSize?: number, maxDocs?: number,
- *           counter?: { read: number } }} args
+ *           counter?: { read: number }, cache?: Map }} args
  * @param {(id: string, data: object) => object} toRecord
  * @returns {Promise<object[]>}
  */
 async function readRecords(args, toRecord) {
-  const records = [];
-  await readPages(args, (docs) => {
-    for (const { id, data } of docs) records.push(toRecord(id, data));
-  });
-  return records;
+  return (await readDocs(args)).map(({ id, data }) => toRecord(id, data));
 }
 
 /** A read passed its document limit. */
@@ -403,6 +418,7 @@ module.exports = {
   organizationRecord,
   pitchRecord,
   publicRecord,
+  readDocs,
   readPages,
   readRecords,
   scrub,

@@ -35,6 +35,7 @@ const {
   admissionRecord,
   orderRecord,
   organizationRecord,
+  readDocs,
   readRecords,
   sessionRecord,
   speakerRecord,
@@ -84,11 +85,9 @@ function stateWord(live, draft) {
  * live session only (cms/store.cjs RESERVED_FIELDS). The record takes it
  * from the live document.
  */
-async function readCurrent({ db, collection, counter, maxDocs, liveOnly = false }, toRecord) {
-  const live = await readRecords({ db, collection, counter, maxDocs }, (id, data) => ({ id, data }));
-  const drafts = liveOnly
-    ? []
-    : await readRecords({ db, collection: `${collection}_drafts`, counter, maxDocs }, (id, data) => ({ id, data }));
+async function readCurrent({ db, collection, counter, maxDocs, cache, liveOnly = false }, toRecord) {
+  const live = await readDocs({ db, collection, counter, maxDocs, cache });
+  const drafts = liveOnly ? [] : await readDocs({ db, collection: `${collection}_drafts`, counter, maxDocs, cache });
   const liveById = new Map(live.map((entry) => [entry.id, entry.data]));
   const draftById = new Map(drafts.map((entry) => [entry.id, entry.data]));
   const ids = [...new Set([...liveById.keys(), ...draftById.keys()])].sort();
@@ -124,9 +123,9 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'sessions',
     docPath: 'cmsSchedule',
-    async read({ db, counter, maxDocs, config, liveOnly }) {
-      const sessions = await readCurrent({ db, collection: 'cmsSchedule', counter, maxDocs, liveOnly }, sessionRecord);
-      const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs }, speakerRecord);
+    async read({ db, counter, maxDocs, cache, config, liveOnly }) {
+      const sessions = await readCurrent({ db, collection: 'cmsSchedule', counter, maxDocs, cache, liveOnly }, sessionRecord);
+      const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs, cache }, speakerRecord);
       const names = new Map(speakers.map((speaker) => [speaker.id, speakerName(speaker)]));
       const titles = new Map(sessions.map((session) => [session.id, session.title]));
       const timeZone = typeof config?.event?.timezone === 'string' ? config.event.timezone : '';
@@ -162,10 +161,10 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'speakers',
     docPath: 'speakers',
-    async read({ db, counter, maxDocs }) {
-      const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs }, speakerRecord);
+    async read({ db, counter, maxDocs, cache }) {
+      const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs, cache }, speakerRecord);
       // Published: a live session the site shows, not a hidden one.
-      const sessions = (await readRecords({ db, collection: 'cmsSchedule', counter, maxDocs }, sessionRecord))
+      const sessions = (await readRecords({ db, collection: 'cmsSchedule', counter, maxDocs, cache }, sessionRecord))
         .filter((session) => session.visible !== false);
       return speakers.map((speaker) => ({
         ...speaker,
@@ -192,7 +191,7 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'organizations',
     docPath: 'cmsOrganizations',
-    read: ({ db, counter, maxDocs, liveOnly }) => readCurrent({ db, collection: 'cmsOrganizations', counter, maxDocs, liveOnly }, organizationRecord),
+    read: ({ db, counter, maxDocs, cache, liveOnly }) => readCurrent({ db, collection: 'cmsOrganizations', counter, maxDocs, cache, liveOnly }, organizationRecord),
     columns: [
       { header: 'Organization ID', value: (row) => row.id },
       { header: 'Name', value: (row) => row.name },
@@ -210,7 +209,7 @@ const DATASETS = Object.freeze({
     tier: 'operator',
     filename: 'ticket-orders',
     docPath: 'ticket_orders',
-    read: ({ db, counter, maxDocs }) => readRecords({ db, collection: 'ticket_orders', counter, maxDocs }, orderRecord),
+    read: ({ db, counter, maxDocs, cache }) => readRecords({ db, collection: 'ticket_orders', counter, maxDocs, cache }, orderRecord),
     columns: [
       { header: 'Order ID', value: (row) => row.id },
       { header: 'Created', value: (row) => row.createdAt },
@@ -234,7 +233,7 @@ const DATASETS = Object.freeze({
     tier: 'operator',
     filename: 'admissions',
     docPath: 'tickets',
-    read: ({ db, counter, maxDocs }) => readRecords({ db, collection: 'tickets', counter, maxDocs }, admissionRecord),
+    read: ({ db, counter, maxDocs, cache }) => readRecords({ db, collection: 'tickets', counter, maxDocs, cache }, admissionRecord),
     columns: [
       { header: 'Ticket ID', value: (row) => row.id },
       { header: 'Order ID', value: (row) => row.orderId },

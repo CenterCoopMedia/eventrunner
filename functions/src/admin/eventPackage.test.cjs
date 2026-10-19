@@ -314,6 +314,18 @@ test('a package past its document or byte cap answers 413 and names the script',
   }
 });
 
+test('the document cap counts each document once, however many files read its collection', async () => {
+  const seed = exportSeed();
+  // config/* is read by id (db.getAll), not by the paged reader.
+  const read = new Set(SECTIONS.flatMap((section) => section.files.map((file) => file.source)).filter((source) => source !== 'config'));
+  const documents = Object.keys(seed).filter((path) => read.has(path.split('/')[0])).length;
+  const db = makeFakeDb(seed);
+  const args = { db, config: config(), sections: [...SECTION_IDS], includeStaffNotes: false, at: T0 };
+  // users, speakers and cmsSchedule each feed more than one file.
+  await buildEventPackage({ ...args, maxDocs: documents });
+  await assert.rejects(buildEventPackage({ ...args, maxDocs: documents - 1 }), { name: 'LimitError' });
+});
+
 test('scrub removes credential keys at any depth and keeps design tokens', () => {
   for (const key of ['inviteToken', 'tokenHash', 'apiKey', 'webhookSecret', 'password', 'raw', 'privateKey', 'signature']) {
     assert.equal(isSecretKey(key), true, key);

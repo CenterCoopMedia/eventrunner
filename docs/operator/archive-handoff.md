@@ -47,7 +47,7 @@ An operator selects **Download event data package** on the **Data export** page.
 
 **Delivery.** The zip goes from the server to the operator's browser only. The server writes no copy to Firestore or Storage, so there is no link to share by mistake. The server writes the admin log entry before it sends the file. If the entry cannot be written, the server sends nothing.
 
-**Size.** The page can send a package of up to 9 MB (50,000 records). A larger event gets a message that names the script below.
+**Size.** The page can send a package of up to 9 MB, built from at most 50,000 stored documents. Each document counts once, even when two files draw on it. A larger event gets a message that names the script below.
 
 ### A large event: the script
 

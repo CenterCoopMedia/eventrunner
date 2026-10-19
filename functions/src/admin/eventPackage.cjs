@@ -26,7 +26,8 @@
  * strips any key that names a credential.
  *
  * BOUNDED. Collections are read a page at a time (exportRecords.cjs
- * readPages), at most MAX_PACKAGE_DOCS documents in all, and the zip may
+ * readPages), each collection once per package, at most MAX_PACKAGE_DOCS
+ * documents in all, and the zip may
  * not pass MAX_PACKAGE_BYTES: the platform caps an HTTP function's response
  * near 10 MB. A larger event uses scripts/export-event-package.cjs, which
  * builds the same package with no cap from an operator's terminal.
@@ -53,7 +54,7 @@ const {
   organizationRecord,
   pitchRecord,
   publicRecord,
-  readPages,
+  readDocs,
   readRecords,
   scrub,
   sessionRecord,
@@ -87,7 +88,7 @@ function jsonFile(path, source, toRecord, description) {
     source,
     format: 'json',
     description,
-    build: (ctx) => readRecords({ db: ctx.db, collection: source, counter: ctx.counter, maxDocs: ctx.maxDocs }, toRecord),
+    build: (ctx) => readRecords({ db: ctx.db, collection: source, counter: ctx.counter, maxDocs: ctx.maxDocs, cache: ctx.cache }, toRecord),
   };
 }
 
@@ -181,13 +182,9 @@ const SECTIONS = Object.freeze([
         source: 'users',
         format: 'csv',
         description: 'Attendees as a spreadsheet, in the columns of the Attendees page export.',
-        build: async (ctx) => {
-          const users = [];
-          await readPages({ db: ctx.db, collection: 'users', counter: ctx.counter, maxDocs: ctx.maxDocs }, (docs) => {
-            for (const { data } of docs) users.push(data);
-          });
-          return users;
-        },
+        build: async (ctx) => (await readDocs({
+          db: ctx.db, collection: 'users', counter: ctx.counter, maxDocs: ctx.maxDocs, cache: ctx.cache,
+        })).map(({ data }) => data),
         toCsv: (users, ctx) => buildAttendeeCsv(users, ctx.config),
       },
     ],
@@ -213,7 +210,7 @@ const SECTIONS = Object.freeze([
         format: 'json',
         description: 'Session pitches with their review status and revision. convertedSessionId and convertedSpeakerId name the session and speaker a converted pitch became; the session is in program/sessions.json once it is published. staffNotes is present only when the operator chose to include it.',
         build: (ctx) => readRecords(
-          { db: ctx.db, collection: 'session_pitches', counter: ctx.counter, maxDocs: ctx.maxDocs },
+          { db: ctx.db, collection: 'session_pitches', counter: ctx.counter, maxDocs: ctx.maxDocs, cache: ctx.cache },
           (id, data) => pitchRecord(id, data, { includeStaffNotes: ctx.includeStaffNotes }),
         ),
       },
@@ -350,7 +347,8 @@ function buildReadme({ manifest }) {
  * @throws {LimitError}
  */
 async function buildEventPackage({ db, config = {}, sections, includeStaffNotes, at, maxDocs = MAX_PACKAGE_DOCS }) {
-  const ctx = { db, config, counter: { read: 0 }, maxDocs, includeStaffNotes };
+  // One cache per build: a collection that feeds several files is read once.
+  const ctx = { db, config, counter: { read: 0 }, cache: new Map(), maxDocs, includeStaffNotes };
   const name = packageName(at);
   const files = [];
   const entries = [];
