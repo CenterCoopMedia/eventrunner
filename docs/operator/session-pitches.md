@@ -68,6 +68,48 @@ Keep the same `submissionKey` while retrying one unchanged form. The server deri
 
 The limit is five new pitches per account in 15 minutes. The pitch and its rate-limit slot commit in one transaction. A completed retry is still acknowledged after the call closes. A new pitch is refused.
 
+### Send a pitch email
+
+`sendSessionPitchNotice` requires staff or operator access. It sends one receipt or one decision email for a saved pitch.
+
+```json
+{
+  "id": "derived-pitch-record-id",
+  "kind": "decision",
+  "expectedStatus": "accepted",
+  "expectedRevision": 2,
+  "feedback": "Plan for a 45-minute session.",
+  "preview": true
+}
+```
+
+`kind` is `receipt` or `decision`. A decision email needs the saved status `accepted` or `rejected`. `feedback` is an optional note to the submitter of 2,000 characters or fewer. A receipt takes no note. With `preview: true`, the server returns `{ preview: { to, templateId, subject, text } }` and writes nothing. Without it, the server sends the email and returns `{ state: "sent", templateId, attempt }`.
+
+The server compares `expectedStatus` and `expectedRevision` with the stored pitch, so staff send the email for the decision they see. It refuses:
+
+- A stale status or revision: `409 status-conflict`.
+- An email that was already sent for this pitch and decision: `409 already-sent`.
+- An email that another request is sending now: `409 in-progress`. A send that stops before it records a result can be retried after 10 minutes.
+- A receipt for an imported pitch: `400`.
+- Any send in a historical demo: `403 read-only-demo`.
+
+A failed delivery returns `502 delivery-failed`. The decision stays saved, and the email can be retried.
+
+### Change the pitch emails
+
+`savePitchNoticeSettings` requires operator access.
+
+```json
+{
+  "receiptMode": "automatic",
+  "templates": {
+    "pitch.receipt": { "subject": "We received your pitch", "wording": "Hello,\n\nWe received “{{pitch_title}}”." }
+  }
+}
+```
+
+`receiptMode` is `automatic` or `manual`. `templates` can hold `pitch.receipt`, `pitch.accepted` and `pitch.declined`. A missing or `null` email uses the shipped wording. A subject is one line of 200 characters or fewer. The wording is 5,000 characters or fewer. The server checks every `{{token}}` before it saves and refuses an unknown or malformed one. It writes the settings and an `admin_logs` row together and returns the effective settings.
+
 ### Review a pitch
 
 `reviewSessionPitch` requires staff or operator access.
@@ -86,13 +128,48 @@ Statuses are `new`, `in_review`, `accepted`, and `rejected`. `privateNotes` is o
 
 The server compares both expected values inside the write transaction. A stale status or revision returns `409 status-conflict`, so two reviewers cannot silently replace each other's status or notes. Each accepted review increments `reviewRevision` and commits the pitch change with its `admin_logs` row.
 
+## Pitch emails
+
+The site sends three pitch emails through the central email sender:
+
+- **Receipt** (`pitch.receipt`). It goes to a person who pitches through this site's form. An imported pitch and a pitch sent to an external form never get one.
+- **Acceptance email** (`pitch.accepted`) and **decline email** (`pitch.declined`). Staff send them from the pitch after they save the decision.
+
+### Receipts
+
+With **Send automatically** (the default), the server queues the receipt in the transaction that stores the pitch. It sends the receipt after the pitch is stored. A retried submission does not send a second receipt. A failed receipt does not fail the submission. With **Staff send each receipt**, no receipt goes until staff send it from the pitch.
+
+### Send a decision email
+
+1. Save an **Accepted** or **Declined** decision.
+2. Under **Emails to the submitter**, expand **Prepare the acceptance email** or **Prepare the decline email**.
+3. Optionally, write a **Note to the submitter**. Private review notes are never sent.
+4. Choose **Preview the acceptance email** (or the decline email). Read the address, the subject and the text.
+5. Select **I reviewed this email** and choose **Send the acceptance email** (or the decline email).
+
+Each email is sent once for each pitch and decision. If staff decline a pitch, then accept it again, the acceptance email that was already sent does not go again. A changed note clears the preview, so you confirm the email that is sent.
+
+### Delivery records
+
+Each pitch shows the state of its emails: **Sending**, **Sent** or **Not sent**, with the time, who sent it and the attempt number. A record that is **Not sent** shows the reason. Choose **Retry the receipt** or prepare the decision email again to retry. Each attempt has its own send-once key (`pitch-notice:{id}:{receipt|accepted|rejected}:{attempt}`), so a repeated request cannot send one attempt twice. The records sit on the private pitch row in `notices`. The **Email log** keeps each sent message.
+
+A decision is stored apart from its email. A failed email never changes the decision.
+
+### Change the wording
+
+Operators expand **Manage pitch emails**. Choose the receipt mode, then edit the subject and the wording of each email. The wording is plain text. A blank line starts a new paragraph. You can use `{{pitch_title}}`, `{{event_name}}`, `{{site_url}}`, `{{support_email}}` and the other global email tokens. The note to the submitter appears after the wording of a decision email. Choose **Use the shipped receipt wording** (or the acceptance or decline email wording) to restore the default text. The event branding and footer wrap every email.
+
+In a historical demo, the site sends no pitch email and records none.
+
 ## Data boundaries
 
 `session_pitches` is readable only by staff and operators. Direct client writes are denied. Submitters cannot read their own stored row.
 
 `session_pitch_rate_limits` is server-only. No client tier can read or write it.
 
-Reviewing a pitch does not create or publish a schedule session. It does not change a user role and does not send mail. Staff explicitly create private drafts from an accepted proposal, then review the session and speaker editors before publication.
+`session_pitch_settings/notices` holds the receipt mode and the edited email wording. Staff and operators can read it. Only `savePitchNoticeSettings` writes it.
+
+Reviewing a pitch does not create or publish a schedule session. It does not change a user role and does not send mail. Decision emails are a separate staff action (see [Pitch emails](#pitch-emails)). Staff explicitly create private drafts from an accepted proposal, then review the session and speaker editors before publication.
 
 Deleting an attendee account does not delete its submitted pitches. A pitch remains an organizer record with the uid and email captured at submission. Issue [#322](https://github.com/CenterCoopMedia/eventrunner/issues/322) owns this initial retention decision. Each deployment must document its retention period before it opens a pitch call. Track a change to this policy under the [first-customer readiness epic](https://github.com/CenterCoopMedia/eventrunner/issues/337).
 
@@ -104,7 +181,7 @@ The public `/pitch` route uses the event branding and theme. Visitors can write 
 
 The form requires a title, description, and organizer-review consent. Organization and format are optional. It displays the deadline in the visitor's timezone. A missing, malformed, expired, or unreadable call keeps submission unavailable. Configure the deployment's consent and retention policy before opening intake; this acknowledgement does not grant permission to publish a proposal.
 
-Open **Session pitches** at `/admin/pitches`. Staff can search by title, email, or organization, filter by decision, and open each proposal. Save notes and the chosen decision explicitly. A concurrent edit disables saving and keeps your unsaved notes visible. Copy your notes before choosing **Load current review**, then reconcile them with the current revision. Decisions send no notifications. Notification delivery is a separate workflow.
+Open **Session pitches** at `/admin/pitches`. Staff can search by title, email, or organization, filter by decision, and open each proposal. Save notes and the chosen decision explicitly. A concurrent edit disables saving and keeps your unsaved notes visible. Copy your notes before choosing **Load current review**, then reconcile them with the current revision. Saving a decision sends no email. Send the acceptance or decline email from the pitch after you save the decision (see [Pitch emails](#pitch-emails)).
 
 Operators can expand **Manage the call for sessions** and save an enabled state, an RFC3339 deadline and where people pitch. Staff cannot change these settings.
 
@@ -117,7 +194,7 @@ externalId,email,title,description,organization,format,consent
 example-1,presenter@example.test,Reporting together,A practical workshop.,Example newsroom,Workshop,true
 ```
 
-Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form; never infer it from a nonempty field. `consent` must be `true` or `checked` (Airtable's export of a ticked checkbox). Review every displayed row, check the consent acknowledgement, then choose **Import reviewed proposals**. The server validates every row before storing any. A repeated source and external ID with identical content is unchanged. Changed content under the same source ID blocks the complete batch; reconcile it before retrying. Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail.
+Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form; never infer it from a nonempty field. `consent` must be `true` or `checked` (Airtable's export of a ticked checkbox). Review every displayed row, check the consent acknowledgement, then choose **Import reviewed proposals**. The server validates every row before storing any. A repeated source and external ID with identical content is unchanged. Changed content under the same source ID blocks the complete batch; reconcile it before retrying. Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail, and an imported pitch never gets a receipt.
 
 **Export filtered queue** downloads only the current filtered proposals. It includes contact emails; keep the file private. It excludes private review notes, auth UIDs, and reviewer identities. Spreadsheet formulas are escaped. No CSV is stored on a public URL.
 

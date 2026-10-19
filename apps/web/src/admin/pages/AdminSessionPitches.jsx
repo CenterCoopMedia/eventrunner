@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { readPitchFormUrl } from 'shared/pitch';
+import { readPitchFormUrl, readPitchNoticeSettings } from 'shared/pitch';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -9,6 +9,7 @@ import { subscribeAdminCollection } from '../adminSource.js';
 import { saveTextFile } from '../downloadFile.js';
 import { toMillis } from '../versionHistory.js';
 import { PITCH_COLUMNS, readPitchCsv, pitchQueueCsv } from '../pitchCsv.js';
+import { PitchEmailSettings, PitchEmailDelivery } from '../components/PitchEmails.jsx';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { Panel, Notice, SaveStatus, TextField, TextAreaField, SelectField, CheckboxField,
   ServerErrorSummary, primaryButtonClass, secondaryButtonClass, rowTitleLinkClass } from '../components/formControls.jsx';
@@ -139,7 +140,7 @@ function PitchReview({ initial, current, call }) {
     try {
       const response = await call('reviewSessionPitch', { id: baseline.id, status: decision, privateNotes: notes, expectedStatus: baseline.status, expectedRevision: revision(baseline) });
       setBaseline({ ...baseline, privateNotes: notes, status: decision, reviewRevision: response.revision });
-      setResult('Review saved. No notification was sent.');
+      setResult('Review saved. No email was sent.');
     } catch (err) { setError(err); }
     finally { setBusy(false); }
   }
@@ -176,6 +177,7 @@ function PitchReview({ initial, current, call }) {
         <button className={primaryButtonClass} disabled={busy || conflict}>{busy ? 'Saving…' : 'Save review decision'}</button>
       </form>
       {result ? <SaveStatus message={result} /> : null}
+      <PitchEmailDelivery pitch={baseline} notices={current?.notices} disabled={busy || conflict} call={call} />
       {created ? <div className="flex flex-wrap gap-sm"><Link to={`/admin/sessions/${created.sessionId}`} className={secondaryButtonClass}>Review session draft</Link><Link to={`/admin/speakers/${created.speakerId}`} className={secondaryButtonClass}>Review speaker draft</Link></div> : baseline.status === 'accepted' ? <details className="border-t-admin-hairline border-admin-rule-hairline pt-md"><summary className="min-h-admin-control cursor-pointer font-semibold">Create session and speaker drafts</summary>
         <form onSubmit={convert} className="mt-sm space-y-sm">
           <p className="text-admin-sm text-admin-ink-secondary">Confirm the proposed speaker and time. This creates a hidden session draft and an unapproved speaker. It sends no invite or email.</p>
@@ -199,19 +201,22 @@ export default function AdminSessionPitches() {
   const [listError, setListError] = useState(null);
   const [settings, setSettings] = useState(null);
   const [configError, setConfigError] = useState(false);
+  const [noticeSettings, setNoticeSettings] = useState(null);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const detailRef = useRef(null);
   useEffect(() => subscribeAdminCollection('session_pitches', (docs) => { setRows(docs); setListError(null); }, setListError), []);
+  useEffect(() => subscribeAdminCollection('session_pitch_settings', (docs) => setNoticeSettings(readPitchNoticeSettings(docs.find((d) => d.id === 'notices')))), []);
   useEffect(() => subscribePitchCall((value) => { setSettings(value); setConfigError(false); }, () => setConfigError(true)), []);
   const shown = (rows || []).filter((row) => (filter === 'all' || row.status === filter) && `${row.title} ${row.email} ${row.organization || ''}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => (toMillis(b.createdAt) ?? -Infinity) - (toMillis(a.createdAt) ?? -Infinity) || a.id.localeCompare(b.id));
   const current = rows?.find((row) => row.id === selected?.id);
   useEffect(() => { if (selected) detailRef.current?.focus(); }, [selected]);
   return <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
-    <AdminPageHeader title="Session pitches" description="Review private proposals. A decision does not send a notification or publish event content." actions={<button className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))}>Export filtered queue</button>} />
+    <AdminPageHeader title="Session pitches" description="Review private proposals. Saving a decision does not send an email or publish event content." actions={<button className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))}>Export filtered queue</button>} />
     <p className="text-admin-sm text-admin-ink-secondary"><Link to="/pitch" className={rowTitleLinkClass}>Open public pitch form</Link>. CSV contains contact details: Keep the downloaded file private. Review notes are excluded.</p>
     {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings key={`${settings.enabled}-${settings.closesAt}-${settings.externalFormUrl ?? ''}`} settings={settings} call={call} /></details> : null}
+    {isOperator && noticeSettings ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage pitch emails</summary><PitchEmailSettings key={JSON.stringify(noticeSettings)} settings={noticeSettings} call={call} /></details> : null}
     {configError ? <Notice tone="caution" message="Cannot check call settings. Reconnecting…" /> : null}
     <ImportPitches call={call} />
     <div className="grid gap-sm sm:grid-cols-2"><SelectField label="Filter by decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...statuses]} /><TextField label="Search pitches" value={search} onChange={setSearch} hint="Title, email, or organization." /></div>

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Session pitch emails (#324). A person who pitches through this site's form gets a
+  receipt after the pitch is stored; a failed receipt does not fail the submission.
+  Staff send acceptance and decline emails from each pitch, after a preview and a
+  confirmation, with an optional note to the submitter. Saving a decision still sends
+  nothing, imported pitches never get an automatic email, and private review notes are
+  never sent. Each pitch shows a queued, sent, or failed record for each email. Send-once
+  keys stop a retry or a repeated decision from sending an email twice, and a failed
+  email can be retried. Operators choose automatic or manual receipts and edit the
+  wording of all three emails.
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page

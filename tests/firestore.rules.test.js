@@ -60,6 +60,8 @@ const ADMIN_READABLE = [
   { path: "feedback/f-tier", tier: "admin" },
   { path: "change_requests/cr-tier", tier: "admin" },
   { path: "session_pitches/pitch-tier", tier: "admin" },
+  // Pitch email settings (issue #324): the receipt mode and edited wording.
+  { path: "session_pitch_settings/notices", tier: "admin" },
 ];
 
 /**
@@ -207,6 +209,10 @@ beforeAll(async () => {
       createdAt: new Date(),
       reviewedAt: null,
       reviewedBy: null,
+    });
+    await setDoc(doc(db, "session_pitch_settings/notices"), {
+      receiptMode: "automatic",
+      templates: {},
     });
     // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
     // profile visibility on it, and setPublicProfilesFeature() flips it.

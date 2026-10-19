@@ -528,6 +528,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Pitch email settings: the receipt mode and the edited wording of the
+    // receipt, acceptance and decline emails. The admin page reads them; only
+    // savePitchNoticeSettings writes them.
+    match /session_pitch_settings/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // media_assets: the index of uploaded Storage objects behind the media
     // library (spec §4.1, §8.5). Admin-readable so the library can list and
     // search without a callable per keystroke; never client-written — every
