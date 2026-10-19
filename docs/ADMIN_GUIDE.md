@@ -570,7 +570,7 @@ The event's records as spreadsheets, and the event data package for the handoff 
 | Spreadsheet | Tier | Columns |
 |---|---|---|
 | Sessions | Staff | Session ID, title, state, hidden, day, date, start and end time, time zone, type, track, location, speakers, speaker IDs, the session it is part of, description, number of materials |
-| Speakers | Staff | Speaker ID, first and last name, email, organization, role, status, published sessions (live and not hidden), social handles, bio |
+| Speakers | Staff | Speaker ID, first and last name, email, organization, role, status, published sessions (live and not hidden), social handles, bio, headshot path in Storage |
 | Organizations and sponsors | Staff | Organization ID, name, state, hidden, tier, website, description, support description, logo path, order |
 | Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |
 | Admissions | Operator | Ticket ID, order ID, provider, ticket type, holder's first and last name, email, status, whether an account claimed it, checked in, purchased |

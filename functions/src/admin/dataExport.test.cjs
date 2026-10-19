@@ -164,6 +164,8 @@ test('speakers: contact and pipeline fields only, never the account id, invite t
   assert.equal(ada.Organization, '\'@Ledger');
   assert.equal(ada['Published sessions'], '\'=HYPERLINK("http://example.test","Keynote"); Data panel');
   assert.equal(ada['Social handles'], 'mastodon: @ada@example.social');
+  // The photo's Storage path, so a handoff can match the copied files to people.
+  assert.equal(ada['Headshot path'], 'speaker-photos/speaker-ada/asset-3/ada.jpg');
   assert.ok(!res.body.csv.includes('uid-ada'), 'no account id');
   // A hidden session is not published: the site does not show it.
   const cy = rows.find((row) => row['Speaker ID'] === 'pitch-pitch-1');

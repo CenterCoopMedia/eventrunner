@@ -190,6 +190,7 @@ const DATASETS = Object.freeze({
         value: (row) => list(Object.keys(row.socialHandles).sort().map((label) => `${label}: ${row.socialHandles[label]}`)),
       },
       { header: 'Bio', value: (row) => row.bio },
+      { header: 'Headshot path', value: (row) => row.headshotPath },
     ],
   },
   organizations: {
