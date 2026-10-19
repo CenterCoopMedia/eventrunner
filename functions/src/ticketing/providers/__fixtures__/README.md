@@ -17,14 +17,14 @@ network dependency — not as a substitute for that verification.
 `functions/src/ticketing/providers/eventbrite.cjs`'s module doc numbers six judgment calls in
 detail; the short version, because it drives what these fixtures look like:
 
-1. **Webhook signing.** Eventbrite's classic webhook delivery is not documented as carrying a
-   payload signature. This adapter was specified to implement HMAC-SHA256 over the raw body with
-   `TICKETING_WEBHOOK_SECRET`, delivered as `X-Eventbrite-Signature: <hex>`. The fixture webhook
-   bodies below are **unsigned** — signatures are computed in tests, over these exact bytes, using
-   `internals.signBody` from the adapter itself, so the fixture stays valid if the wire format
-   ever changes. #79 must confirm whether a real Eventbrite delivery carries this header at all;
-   if not, the fallback is the same shared-secret-in-callback-URL trick the ADR (§3.1) already
-   uses for Postmark's unsigned delivery webhooks.
+1. **Webhook authentication (#356).** Eventbrite's webhook delivery carries no payload signature,
+   and its webhook API takes no signing secret. The adapter uses the shared-secret-in-URL fallback
+   the ADR (§3.1) uses for Postmark: `registerWebhook` registers `<callback>?token=<secret>`, and
+   `verifyWebhook` compares the `token` query parameter with `TICKETING_WEBHOOK_SECRET` in constant
+   time. The fixture webhook bodies are unsigned, as real deliveries are. Tests pass the secret as
+   the parsed query (`{ query: { token } }`). `webhooks-list-current.json` holds the placeholder
+   `token=fixture-placeholder`, which a test swaps for its own secret. #79 must confirm that
+   Eventbrite keeps the query string when it delivers.
 2. **Delivery id.** Eventbrite's webhook payload carries no per-delivery identifier, so the
    adapter derives one as `sha256(rawBody)`. `webhook-order-updated.json` and
    `webhook-order-updated-2.json` are deliberately two DIFFERENT bodies about the same order, to

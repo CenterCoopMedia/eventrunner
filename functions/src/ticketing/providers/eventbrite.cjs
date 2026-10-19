@@ -17,19 +17,24 @@
  * verification against a real sandbox under issue #79. Nothing below is
  * guessed silently; every gap has an explicit, defensible choice:
  *
- * 1. WEBHOOK SIGNING. Eventbrite's classic webhook delivery is not
- *    documented as carrying a payload signature (unlike, say, Stripe) —
- *    the ADR's own §3.1 makes the same observation about Postmark's
- *    delivery webhooks and resolves it with a shared secret rather than
- *    an HMAC. This adapter was specified to implement "HMAC over payload
- *    with the webhook secret, constant-time compare", so that is what is
- *    built: an `X-Eventbrite-Signature` header carrying
- *    hex(HMAC-SHA256(TICKETING_WEBHOOK_SECRET, rawBody)), checked the same
- *    way `email/providers/postmark.cjs` and `ticketingFake.cjs` compare
- *    secrets (SHA-256 digest + `timingSafeEqual`, so a length mismatch
- *    never short-circuits the comparison). If a real sandbox run (#79)
- *    shows Eventbrite delivers no such header, the fallback is the same
- *    shared-secret-in-URL trick §3.1 uses for Postmark.
+ * 1. WEBHOOK AUTHENTICATION (#356). Eventbrite's webhook delivery carries
+ *    no payload signature, and its webhook API takes no signing secret:
+ *    `registerWebhook` can send only `endpoint_url`, `actions`, and
+ *    `event_id`. An HMAC check would refuse every real delivery. This
+ *    adapter uses the fallback the ADR's §3.1 uses for Postmark: a shared
+ *    secret in the registered URL. `TICKETING_WEBHOOK_SECRET` is a random
+ *    value the operator generates (at least MIN_WEBHOOK_SECRET_LENGTH
+ *    characters). `registerWebhook` registers
+ *    `<callbackUrl>?token=<secret>`, and `verifyWebhook` compares the
+ *    delivery's `token` query parameter with SHA-256 digests and
+ *    `timingSafeEqual`, so a length mismatch never short-circuits the
+ *    comparison. A missing or wrong secret is refused before the body is
+ *    read. The secret proves only that the caller knows the URL, so the
+ *    body is never trusted for ticket data: it yields an order id from an
+ *    `api_url` on Eventbrite's own API host, and `sync.cjs` re-fetches that
+ *    order from API_BASE with this deployment's token. Nothing ever
+ *    fetches the delivered URL itself. #79 must confirm that Eventbrite
+ *    keeps the query string when it delivers.
  * 2. DELIVERY ID. Eventbrite's webhook payload carries no per-delivery
  *    identifier. The dedup key `ticket_webhook_deliveries/{deliveryId}`
  *    (§3.3 step 2) needs one, so this adapter derives it as
@@ -80,8 +85,18 @@ const { resolveRegistrationAction } = require('shared/registration');
 
 const API_BASE = 'https://www.eventbriteapi.com/v3';
 
-/** Header carrying the HMAC signature (judgment call 1, above). */
-const SIGNATURE_HEADER = 'x-eventbrite-signature';
+/** The only host an `api_url` may name (judgment call 1, above). */
+const API_HOST = new URL(API_BASE).hostname;
+
+/** Query parameter in the registered webhook URL that carries the shared secret (judgment call 1). */
+const URL_SECRET_PARAM = 'token';
+
+/**
+ * The URL secret is the only authentication on the webhook, so it must
+ * resist guessing. 32 characters is `openssl rand -hex 16`; the runbook
+ * asks for `openssl rand -hex 32`.
+ */
+const MIN_WEBHOOK_SECRET_LENGTH = 32;
 
 /** Eventbrite webhook `config.action` values this adapter knows how to fold. */
 const ACTION_TO_EVENT_TYPE = Object.freeze({
@@ -109,12 +124,63 @@ function actionList(actions) {
 }
 
 /**
- * Matches the order resource inside `api_url` (judgment call 3). Eventbrite
- * ids are typically numeric, but the segment match is intentionally not
- * restricted to digits — a synthetic or sandbox id shaped like `evt-1` must
- * parse the same way a real numeric id does.
+ * Matches the order resource path inside `api_url` (judgment call 3).
+ * Eventbrite ids are typically numeric, but the segment match is
+ * intentionally not restricted to digits — a synthetic or sandbox id
+ * shaped like `evt-1` must parse the same way a real numeric id does.
  */
-const ORDER_API_URL_RE = /\/events\/([^/]+)\/orders\/([^/?]+)\/?(?:\?.*)?$/;
+const ORDER_API_PATH_RE = /^\/v3\/events\/([^/]+)\/orders\/([^/]+)\/?$/;
+
+/**
+ * `{ eventId, orderId }` from a delivered `api_url`, or null. Only an https
+ * URL on Eventbrite's own API host, with no port or credentials, is
+ * accepted (#356). The URL is never fetched; the ids are.
+ * @param {unknown} apiUrl
+ */
+function parseOrderApiUrl(apiUrl) {
+  if (typeof apiUrl !== 'string') return null;
+  let url;
+  try {
+    url = new URL(apiUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || url.hostname !== API_HOST || url.port !== '' ||
+      url.username !== '' || url.password !== '') {
+    return null;
+  }
+  const match = ORDER_API_PATH_RE.exec(url.pathname);
+  return match ? { eventId: match[1], orderId: match[2] } : null;
+}
+
+/**
+ * The URL registered with Eventbrite: the callback with the shared secret
+ * in its query (judgment call 1). Throws unless the callback is https.
+ * @param {string} callbackUrl @param {string} secret
+ */
+function endpointUrlFor(callbackUrl, secret) {
+  let url;
+  try {
+    url = new URL(callbackUrl);
+  } catch {
+    url = null;
+  }
+  if (!url || url.protocol !== 'https:') {
+    throw new Error('registerWebhook requires an https callbackUrl');
+  }
+  url.searchParams.set(URL_SECRET_PARAM, secret);
+  return url.toString();
+}
+
+/** `origin + pathname` of a URL, or '' when it does not parse. @param {unknown} value */
+function baseOf(value) {
+  try {
+    const url = new URL(String(value));
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '';
+  }
+}
 
 /**
  * Constant-time string equality via SHA-256 digests, so a length mismatch
@@ -126,22 +192,6 @@ function safeEqual(a, b) {
   const da = crypto.createHash('sha256').update(String(a), 'utf8').digest();
   const db = crypto.createHash('sha256').update(String(b), 'utf8').digest();
   return crypto.timingSafeEqual(da, db);
-}
-
-/** Case-insensitive header lookup. @param {Record<string,string>} headers @param {string} name */
-function header(headers, name) {
-  if (!headers) return undefined;
-  if (name in headers) return headers[name];
-  const lower = name.toLowerCase();
-  for (const key of Object.keys(headers)) {
-    if (key.toLowerCase() === lower) return headers[key];
-  }
-  return undefined;
-}
-
-/** @param {string} secret @param {Buffer} rawBody @returns {string} hex HMAC-SHA256 */
-function signBody(secret, rawBody) {
-  return crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
 }
 
 /** @param {Buffer} rawBody @returns {string} a content-derived delivery id (judgment call 2) */
@@ -175,6 +225,26 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
   const webhookSecret = env.TICKETING_WEBHOOK_SECRET;
   if (!webhookSecret) {
     throw new Error('ticketing provider "eventbrite" requires TICKETING_WEBHOOK_SECRET');
+  }
+  if (webhookSecret.length < MIN_WEBHOOK_SECRET_LENGTH) {
+    // Never echo the value: this message reaches deploy and function logs.
+    throw new Error(
+      `ticketing provider "eventbrite" requires TICKETING_WEBHOOK_SECRET of at least ${MIN_WEBHOOK_SECRET_LENGTH} characters`,
+    );
+  }
+
+  /**
+   * The registered URL carries the secret, and an Eventbrite error may
+   * echo that URL. Every API error message passes through here before it
+   * is thrown, so the secret never reaches a log or the operator terminal.
+   * @param {string} text
+   */
+  function redact(text) {
+    let out = String(text);
+    for (const form of new Set([webhookSecret, encodeURIComponent(webhookSecret)])) {
+      out = out.split(form).join('[redacted]');
+    }
+    return out;
   }
   const externalEventId = typeof env.EVENT_TICKETING_EVENT_ID === 'string' &&
     env.EVENT_TICKETING_EVENT_ID.trim().length > 0
@@ -210,7 +280,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     }
     if (response.status < 200 || response.status > 299) {
       const detail = parsed?.error_description || parsed?.error || `eventbrite responded ${response.status}`;
-      throw new Error(`eventbrite API ${method} ${path} failed: ${detail}`);
+      throw new Error(redact(`eventbrite API ${method} ${path} failed: ${detail}`));
     }
     return parsed;
   }
@@ -273,14 +343,17 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     webhookEventTypes: WEBHOOK_ACTIONS,
 
     /**
-     * @param {Buffer} rawBody @param {Record<string,string>} headers
+     * Authenticates by the URL secret (judgment call 1). Headers carry
+     * nothing Eventbrite signs, so they are not read.
+     *
+     * @param {Buffer} rawBody @param {Record<string,string>} _headers
+     * @param {{ query?: Record<string, unknown> }} [context] the delivery URL's parsed query
      * @returns {Promise<object>} WebhookVerification
      */
-    async verifyWebhook(rawBody, headers) {
-      const provided = header(headers, SIGNATURE_HEADER);
-      if (typeof provided !== 'string' || provided.trim().length === 0 ||
-          !safeEqual(provided.trim(), signBody(webhookSecret, rawBody))) {
-        return { valid: false, deliveryId: '', eventType: 'unknown', resourceId: null, reason: 'invalid_signature' };
+    async verifyWebhook(rawBody, _headers, context = {}) {
+      const provided = context?.query?.[URL_SECRET_PARAM];
+      if (typeof provided !== 'string' || provided.length === 0 || !safeEqual(provided, webhookSecret)) {
+        return { valid: false, deliveryId: '', eventType: 'unknown', resourceId: null, reason: 'invalid_secret' };
       }
 
       let body;
@@ -291,13 +364,12 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       }
 
       const action = typeof body?.config?.action === 'string' ? body.config.action : null;
-      const apiUrl = typeof body?.api_url === 'string' ? body.api_url : '';
-      const match = ORDER_API_URL_RE.exec(apiUrl);
-      if (!action || !match) {
+      const resource = parseOrderApiUrl(body?.api_url);
+      if (!action || !resource) {
         return { valid: false, deliveryId: '', eventType: 'unknown', resourceId: null, reason: 'malformed' };
       }
 
-      const [, eventIdFromUrl, orderId] = match;
+      const { eventId: eventIdFromUrl, orderId } = resource;
       const deliveryId = deliveryIdFor(rawBody);
       const eventType = ACTION_TO_EVENT_TYPE[action] || 'unknown';
 
@@ -405,6 +477,8 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       if (typeof callbackUrl !== 'string' || !callbackUrl.trim()) {
         throw new Error('registerWebhook requires a callbackUrl');
       }
+      // Judgment call 1: Eventbrite stores and calls this URL, secret included.
+      const endpointUrl = endpointUrlFor(callbackUrl.trim(), webhookSecret);
       const orgs = await apiCall('/users/me/organizations/');
       const orgId = orgs?.organizations?.[0]?.id;
       if (!orgId) {
@@ -412,11 +486,13 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       }
 
       const existing = await apiCall(`/organizations/${encodeURIComponent(orgId)}/webhooks/`);
+      // Same endpoint = same origin and path, whatever its query. One that
+      // lacks the current secret or an action is stale (#356, #357).
       const sameEndpoint = (Array.isArray(existing?.webhooks) ? existing.webhooks : [])
-        .filter((w) => w?.id != null && w.endpoint_url === callbackUrl);
+        .filter((w) => w?.id != null && baseOf(w.endpoint_url) === baseOf(endpointUrl));
       const complete = (w) => {
         const have = actionList(w.actions);
-        return WEBHOOK_ACTIONS.every((a) => have.includes(a));
+        return w.endpoint_url === endpointUrl && WEBHOOK_ACTIONS.every((a) => have.includes(a));
       };
       const already = sameEndpoint.find(complete);
       if (already) {
@@ -427,7 +503,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       const created = await apiCall(`/organizations/${encodeURIComponent(orgId)}/webhooks/`, {
         method: 'POST',
         body: {
-          endpoint_url: callbackUrl,
+          endpoint_url: endpointUrl,
           actions: WEBHOOK_ACTIONS.join(','),
           ...(externalEventId ? { event_id: externalEventId } : {}),
         },
@@ -491,15 +567,17 @@ module.exports = {
   createEventbriteProvider,
   internals: {
     API_BASE,
-    SIGNATURE_HEADER,
+    API_HOST,
+    URL_SECRET_PARAM,
+    MIN_WEBHOOK_SECRET_LENGTH,
     ACTION_TO_EVENT_TYPE,
     WEBHOOK_ACTIONS,
     actionList,
-    ORDER_API_URL_RE,
+    ORDER_API_PATH_RE,
+    parseOrderApiUrl,
+    endpointUrlFor,
     safeEqual,
-    signBody,
     deliveryIdFor,
-    header,
     claimUrl,
   },
 };

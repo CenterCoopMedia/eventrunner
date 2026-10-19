@@ -16,7 +16,7 @@ page. A dev/staging Event Runner deployment with `EVENT_TICKETING_PROVIDER=event
 ```sh
 EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=<sandbox event id> \
 TICKETING_API_TOKEN=<from Eventbrite account> \
-TICKETING_WEBHOOK_SECRET=<generate one, e.g. `openssl rand -hex 20`, store like EMAIL_WEBHOOK_BASIC_AUTH> \
+TICKETING_WEBHOOK_SECRET=<generate one: `openssl rand -hex 32`, store like EMAIL_WEBHOOK_BASIC_AUTH> \
 EVENT_FIREBASE_PROJECT_ID=<dev project id> \
   node scripts/register-ticketing-webhook.cjs
 ```
@@ -40,20 +40,32 @@ and id, real order/ticket numeric ids, phone numbers, and free-text fields. Repl
 synthetic placeholders in the same shape. Do not use `[REDACTED]` blocks because preserving field shape is the
 whole point), and diff it against the named fixture file.
 
-### 1. Webhook signing
+### 1. Webhook authentication (URL secret, #356)
 
-- **Capture:** the full set of HTTP headers on an actual incoming webhook delivery to your
-  registered callback URL — specifically, is there an `X-Eventbrite-Signature` header at all, and
-  if so what does its value look like (hex length, any prefix)? Capture from Cloud Functions logs
-  (the raw request headers `ticketingWebhook` received) or a temporary logging proxy in front of
-  the function during the test.
-- **Sanitize:** header names and value *shape* (e.g. "64 hex chars, no prefix") are not sensitive —
-  the actual signature value is derived from your webhook secret plus the body, so it's safe to
-  keep or drop; there's no PII here.
-- **Diff against:** there's no fixture file for headers today — the fixtures README's item 1
-  documents the *assumed* scheme (HMAC-SHA256 over raw body via `X-Eventbrite-Signature`, hex
-  digest). Write the observed reality as a one-line verdict: confirmed, or corrected (name the real
-  header and scheme).
+Eventbrite does not sign webhook deliveries, and its webhook API takes no signing secret. The
+adapter does not check an HMAC. `register-ticketing-webhook.cjs` registers the callback URL with
+`?token=<TICKETING_WEBHOOK_SECRET>` added. `ticketingWebhook` compares that query parameter with the
+secret in constant time and answers 401 when it is missing or wrong. The body is not trusted for
+ticket data: the function reads only an order id from an `api_url` on `www.eventbriteapi.com`, and
+the sync drain fetches that order from the Eventbrite API with this deployment's token.
+
+This is proven offline only, with faked fetch (`eventbrite.test.cjs`,
+`eventbriteEndToEnd.test.cjs`). It is not yet confirmed against Eventbrite. Confirm it in the
+sandbox:
+
+- **Check the registration:** in the Eventbrite dashboard, the webhook URL ends in
+  `?token=…`. Do not copy the value into notes, issues, or screenshots.
+- **Check a delivery:** place a sandbox order. `getTicketingStatus` shows the delivery, and the
+  order reaches `ticket_sync_queue`. If Eventbrite drops or rewrites the query string, every
+  delivery gets a 401. Record that as a corrected verdict; do not weaken the check.
+- **Check a refusal:** send one POST to the bare callback URL, without `token`. It must get a 401.
+- **Capture:** the request headers of one delivery, to record whether Eventbrite sends any
+  signature header at all. If it does, record its name and scheme as a corrected verdict.
+- **Know the log exposure:** Cloud Run request logs record the full request URL, query string
+  included. Event Runner code never logs the secret, but anyone who can read the project's request
+  logs can read it. Keep log access to operators. If the secret leaks, generate a new one, update
+  the secret, deploy, and run the registration script again; then delete the old webhook it names.
+- **Verdict:** confirmed, or corrected with what Eventbrite really sends.
 
 ### 2. Delivery id
 

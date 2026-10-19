@@ -104,6 +104,7 @@ function usage() {
     '  EVENT_STRIPE_MODE           required for stripe; test | live',
     '  TICKETING_API_TOKEN         required when provider is not none',
     '  TICKETING_WEBHOOK_SECRET    required for eventbrite or stripe',
+    '  Eventbrite: a random secret of 32+ characters; it is registered in the webhook URL.',
     '  Stripe: create the Dashboard endpoint and bind its generated signing secret first.',
     '  EVENT_FIREBASE_PROJECT_ID   the project whose config/providers is read and stamped',
     '  EVENT_FIREBASE_REGION       default us-central1',

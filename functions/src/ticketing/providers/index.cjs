@@ -167,8 +167,10 @@ function getTicketingProvider({ env = process.env, fetchImpl, factories, db, get
  *
  *   TICKETING_API_TOKEN      — whenever the provider is not `none`
  *   TICKETING_WEBHOOK_SECRET — only for providers that implement
- *                              registerWebhook (§3.3): eventbrite today,
- *                              never manual. Capability, not enablement.
+ *                              registerWebhook (§3.3): eventbrite (the
+ *                              shared secret in its webhook URL, #356) and
+ *                              stripe (its signing secret), never manual.
+ *                              Capability, not enablement.
  *
  * @param {Record<string, string|undefined>} [env]
  * @returns {string[]}

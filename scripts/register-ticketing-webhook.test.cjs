@@ -145,8 +145,9 @@ test('registerWebhook is idempotent from the operator side too — running it tw
   assert.equal(providers.ticketing.webhookId, 'hook-stable');
 });
 
-test('the real Eventbrite adapter registers order.refunded through the operator script (issue 357)', async () => {
+test('the real Eventbrite adapter registers order.refunded, with the URL secret, through the operator script (issues 356, 357)', async () => {
   const { createEventbriteProvider, internals: eb } = require('../functions/src/ticketing/providers/eventbrite.cjs');
+  const SECRET = 'fixture-url-secret-0123456789abcdef0123';
   const posts = [];
   const fetchImpl = async (url, opts = {}) => {
     const route = `${opts.method || 'GET'} ${url.replace(eb.API_BASE, '')}`;
@@ -162,19 +163,31 @@ test('the real Eventbrite adapter registers order.refunded through the operator 
   const provider = createEventbriteProvider({
     env: {
       TICKETING_API_TOKEN: 'fixture-api-token',
-      TICKETING_WEBHOOK_SECRET: 'fixture-url-secret-0123456789abcdef0123',
+      TICKETING_WEBHOOK_SECRET: SECRET,
       EVENT_TICKETING_EVENT_ID: 'evt-1',
     },
     fetchImpl,
   });
   const db = makeFakeDb();
-  const code = await run({ args: {}, env: ENV, deps: fakeDeps({ provider, db }) });
+  const printed = [];
+  const { log, error } = console;
+  console.log = (...a) => printed.push(a.join(' '));
+  console.error = (...a) => printed.push(a.join(' '));
+  let code;
+  try {
+    code = await run({ args: {}, env: ENV, deps: fakeDeps({ provider, db }) });
+  } finally {
+    Object.assign(console, { log, error });
+  }
   assert.equal(code, 0);
   assert.equal(posts.length, 1);
   const actions = posts[0].actions.split(',');
   for (const action of ['order.placed', 'order.updated', 'order.refunded', 'attendee.updated']) {
     assert.ok(actions.includes(action), `${action} is registered`);
   }
+  // Issue 356: the registered URL carries the shared secret; the terminal never shows it.
+  assert.equal(new URL(posts[0].endpoint_url).searchParams.get(eb.URL_SECRET_PARAM), SECRET);
+  assert.equal(printed.join('\n').includes(SECRET), false);
 });
 
 test('internals.defaultCallbackUrl matches the ADR-shaped email-webhook example (§3.1)', () => {
