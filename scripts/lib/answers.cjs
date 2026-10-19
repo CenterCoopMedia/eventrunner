@@ -263,7 +263,7 @@ function buildFeatures(overrides = {}) {
 /**
  * The providers doc. Tier A is the source of truth (§2.2); the answers
  * file may only supply the non-selection details (`messageStream`,
- * `operatorEmail`).
+ * `announcementStream`, `operatorEmail`).
  *
  * @param {{ tierA: object, overrides?: object }} args
  * @returns {{ providers: object, warnings: string[] }}
@@ -289,6 +289,9 @@ function buildProviders({ tierA, overrides = {} }) {
       email: {
         provider: tierA.emailProvider || 'console',
         messageStream: orDefault(isPlainObject(over.email) ? over.email.messageStream : null, null),
+        // The Postmark broadcast stream announcement email uses (issue
+        // #490). Unset means announcement email is refused on Postmark.
+        announcementStream: orDefault(isPlainObject(over.email) ? over.email.announcementStream : null, null),
       },
       ticketing: {
         provider: tierA.ticketingProvider || 'none',

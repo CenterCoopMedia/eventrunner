@@ -206,6 +206,14 @@ test('Tier A wins on provider selection, and an answers-file override warns', ()
   assert.match(warnings.join(' '), /EVENT_EMAIL_PROVIDER/);
 });
 
+test('the announcement stream comes from the answers file and defaults to unset', () => {
+  const set = buildProviders({ tierA: TIER_A, overrides: { email: { announcementStream: 'announcements' } } });
+  assert.equal(set.providers.email.announcementStream, 'announcements');
+  // The transactional stream is left alone.
+  assert.equal(set.providers.email.messageStream, null);
+  assert.equal(buildProviders({ tierA: TIER_A }).providers.email.announcementStream, null);
+});
+
 test('Stripe initialization mirrors deployment scope and refuses answers-file account or mode overrides', () => {
   const { providers, warnings } = buildProviders({
     tierA: { ...TIER_A, ticketingProvider: 'stripe', stripeAccountId: 'acct_fixture', stripeMode: 'test' },

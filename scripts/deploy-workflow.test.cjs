@@ -319,7 +319,7 @@ test('both function rewrites name their region in object form, and the deploy pa
   // us-central1, which routes a non-default-region client at a backend
   // that does not exist there.
   const functionRewrites = firebaseJson.hosting.rewrites.filter((r) => r.function);
-  assert.equal(functionRewrites.length, 2);
+  assert.equal(functionRewrites.length, 3);
   for (const rewrite of functionRewrites) {
     assert.equal(typeof rewrite.function, 'object');
     assert.ok(rewrite.function.functionId);
@@ -327,7 +327,9 @@ test('both function rewrites name their region in object form, and the deploy pa
   }
   assert.deepEqual(
     functionRewrites.map((r) => r.function.functionId).sort(),
-    ['routeMeta', 'updatesMeta'],
+    // emailUnsubscribe answers the signed link in announcement email
+    // (issue #490) on the site's own /unsubscribe path.
+    ['emailUnsubscribe', 'routeMeta', 'updatesMeta'],
   );
 
   const patch = step('Set the function rewrite regions for this project');

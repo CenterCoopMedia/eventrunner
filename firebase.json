@@ -34,6 +34,13 @@
       { "source": "/admin", "destination": "/index.html" },
       { "source": "/admin/**", "destination": "/index.html" },
       {
+        "source": "/unsubscribe",
+        "function": {
+          "functionId": "emailUnsubscribe",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "function": {
           "functionId": "routeMeta",
@@ -77,6 +84,13 @@
       {
         "source": "/admin/**",
         "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/unsubscribe",
+        "headers": [
+          { "key": "X-Robots-Tag", "value": "noindex" },
+          { "key": "Cache-Control", "value": "no-store" }
+        ]
       }
     ]
   },
