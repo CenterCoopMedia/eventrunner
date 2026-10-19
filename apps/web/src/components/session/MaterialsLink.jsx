@@ -9,7 +9,7 @@
 // lands on the list it counts: the session's own detail page, at the
 // materials section. The query string rides along so an admin previewing
 // drafts (?preview=1) does not fall out of the preview by following it.
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { useSessionMaterialsCount } from '../../hooks/useSessionMaterials.js';
 import { rowActionClass } from './sessionActionClass.js';
 

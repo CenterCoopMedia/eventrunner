@@ -10,7 +10,7 @@
 // A home page with no such section draws no entry at all, so the page says
 // so above the list rather than leaving an operator to publish into nothing.
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useContent } from '../../contexts/ContentContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';

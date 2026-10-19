@@ -5,7 +5,7 @@
 // no network (spec §8.1): every source module is mocked.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import AuthContext from '../../contexts/AuthContext.jsx';
 import ProfileContext from '../../contexts/ProfileContext.jsx';
 import { ToastProvider } from '../../contexts/ToastContext.jsx';
@@ -85,7 +85,6 @@ function actionsTree({
   return (
     <MemoryRouter
       initialEntries={initialEntries}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <AuthContext.Provider value={auth}>
         <ProfileContext.Provider value={profile}>

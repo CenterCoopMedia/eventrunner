@@ -15,7 +15,7 @@
 // The shape is the site's one filled action, so it reads that class string
 // from controlClasses.js rather than restating it. Restating it is exactly
 // how the drift that module's header describes got started.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
 import { isCanonicalPagePath } from 'shared/routing';
 import { primaryActionClass } from '../controlClasses.js';

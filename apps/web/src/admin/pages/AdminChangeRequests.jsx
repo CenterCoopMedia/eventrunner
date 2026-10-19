@@ -17,7 +17,7 @@
 // The request text is the requester's own words: it renders as text in a
 // pre-wrapped paragraph, and the page field is text, never a link.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { createSubmissionKey } from '../../lib/submissionKey.js';

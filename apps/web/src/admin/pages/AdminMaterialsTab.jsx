@@ -22,7 +22,7 @@
 // COVERAGE. The panel reads the same material array the table renders,
 // before any filter (admin/materialsCoverage.js holds the rule).
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { isSafeUrl } from 'shared/urlSafety';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';

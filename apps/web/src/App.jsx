@@ -6,7 +6,7 @@
 // The Router wraps everything in main.jsx (tests use MemoryRouter), so
 // ContentProvider can later read search params via hooks.
 import { Suspense, lazy } from 'react';
-import { Route, Routes, useSearchParams } from 'react-router-dom';
+import { Route, Routes, useSearchParams } from 'react-router';
 import { EventConfigProvider } from './contexts/EventConfigContext.jsx';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import { ContentProvider } from './contexts/ContentContext.jsx';

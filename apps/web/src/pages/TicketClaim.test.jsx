@@ -10,7 +10,7 @@
 // collapse rather than trying to distinguish causes the server does not.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 import { signInWithCustomToken } from 'firebase/auth';
 
 vi.mock('../lib/configSource.js', () => ({ subscribeConfigDoc: (id, onNext) => {
@@ -78,7 +78,6 @@ function renderClaim(entry = '/ticket/claim') {
   return render(
     <MemoryRouter
       initialEntries={[entry]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
       <CurrentRoute />

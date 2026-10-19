@@ -7,7 +7,7 @@
 // instead — jsdom applies no CSS.
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 vi.mock('../contexts/ContentContext.jsx', () => ({
   useContent: () => ({ speakers: [] }),
@@ -71,7 +71,7 @@ const SESSIONS = [
 
 function renderGrid(sessions = SESSIONS, columns = COLUMNS) {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <ScheduleGrid
         day={DAY}
         entries={withCallingPoints(sessions)}

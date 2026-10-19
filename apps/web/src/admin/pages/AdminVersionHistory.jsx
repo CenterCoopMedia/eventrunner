@@ -24,7 +24,7 @@
 // FOCUS. Load older versions moves focus to the first new version's
 // heading.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import AdminPageHeader, {

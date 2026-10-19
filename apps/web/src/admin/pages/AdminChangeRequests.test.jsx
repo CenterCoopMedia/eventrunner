@@ -4,7 +4,7 @@
 // can be read from and written to the address.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 
 let rowsCallback;
 let errorCallback;
@@ -36,7 +36,7 @@ function LocationProbe() {
 
 function renderPage(path = '/admin/change-requests') {
   return render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <AdminChangeRequests />
       <LocationProbe />
     </MemoryRouter>,

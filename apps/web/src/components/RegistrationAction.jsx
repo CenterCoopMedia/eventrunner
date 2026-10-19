@@ -1,6 +1,6 @@
 // One destination in the header and home lead. The public catalog selects
 // native ticketing; other providers keep the configured external action.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useRegistrationLink } from '../lib/useRegistrationLink.js';
 import { primaryActionClass, quietActionClass } from './controlClasses.js';
 import ExternalLink from './ExternalLink.jsx';

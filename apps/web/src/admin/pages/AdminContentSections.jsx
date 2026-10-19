@@ -9,7 +9,7 @@
 // cards. This list carries no publish state of its own — a section is
 // structure, not a record — so its rows carry only the count in the data
 // face.
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
 import {

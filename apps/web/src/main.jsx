@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, HashRouter } from 'react-router-dom';
+import { BrowserRouter, HashRouter } from 'react-router';
 import App from './App.jsx';
 import { IS_DEMO } from './lib/demoMode.js';
 // Theme tokens first (the @generated alias honors GENERATED_DIR, spec §2.4),
@@ -38,7 +38,7 @@ const Router = IS_DEMO ? HashRouter : BrowserRouter;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Router>
       <App />
     </Router>
   </React.StrictMode>,

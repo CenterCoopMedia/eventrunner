@@ -3,7 +3,7 @@
 // tests drive the bookmarked-id set without a Firestore listener.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
@@ -117,7 +117,7 @@ function myScheduleElement({
   eventConfig = fixtureConfig,
 } = {}) {
   return (
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <EventConfigContext.Provider
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
       >

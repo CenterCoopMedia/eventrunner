@@ -22,7 +22,7 @@
 // SessionCard.jsx already carry. No avatar card: the headshot, where present,
 // sits inline with the name at directory scale (Speakers.jsx), never boxed
 // or shadowed on its own.
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';

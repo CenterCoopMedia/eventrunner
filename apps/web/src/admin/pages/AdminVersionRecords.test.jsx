@@ -5,7 +5,7 @@
 // the router holds, and how it got there.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router';
 
 const listeners = new Map();
 const subscribed = [];
@@ -63,7 +63,7 @@ function LocationProbe() {
 
 function renderPage(path = '/admin/versions') {
   return render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route
           path="/admin/versions"

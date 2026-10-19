@@ -27,7 +27,7 @@
 // a reader who asked for less motion gets a marker that does not move. The
 // schedule's one EXPRESSIVE moment is the grid's column, never this.
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { sessionMovement } from 'shared/venue';
 import TransferLine from './TransferLine.jsx';
 import { formatSessionStart } from '../lib/eventTime.js';

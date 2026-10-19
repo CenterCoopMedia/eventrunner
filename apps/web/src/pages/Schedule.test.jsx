@@ -5,7 +5,7 @@
 // accidentally passes by matching demo copy.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import AuthContext from '../contexts/AuthContext.jsx';
@@ -128,7 +128,7 @@ function renderSchedule({
   historyControls = false,
 } = {}) {
   return render(
-    <MemoryRouter initialEntries={initialEntries} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={initialEntries}>
       {historyControls ? <HistoryControls /> : null}
       <EventConfigContext.Provider
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}
@@ -898,7 +898,6 @@ describe('the view in the URL', () => {
     return render(
       <MemoryRouter
         initialEntries={[`/${search}`]}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <EventConfigContext.Provider
           value={{

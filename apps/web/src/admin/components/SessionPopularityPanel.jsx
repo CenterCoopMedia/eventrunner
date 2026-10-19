@@ -15,7 +15,7 @@
 // Every state is stated: loading, none saved yet, a lost listener (the
 // last counts stay, under a caution notice), and a saving feature that is
 // switched off, which is why a count would not change.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useBookmarkCounts } from '../../hooks/useBookmarkCounts.js';
 import { rankSessionsBySaves } from '../sessionPopularity.js';

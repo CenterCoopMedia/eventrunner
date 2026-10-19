@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { readPitchFormUrl } from 'shared/pitch';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { subscribePitchCall } from '../../lib/pitchSource.js';

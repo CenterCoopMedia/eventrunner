@@ -12,7 +12,7 @@
 // state sits in a hairline-ruled block tinted by --color-surface-alt, the
 // same flat-tint device SignInPanel itself uses — never a shadowed,
 // rounded card.
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
 import { primaryButtonClass, secondaryButtonClass } from '../components/controlClasses.js';

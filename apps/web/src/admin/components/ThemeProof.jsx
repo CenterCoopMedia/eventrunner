@@ -54,7 +54,7 @@ import {
   MemoryRouter,
   UNSAFE_LocationContext,
   UNSAFE_RouteContext,
-} from 'react-router-dom';
+} from 'react-router';
 import { AppRoutes } from '../../App.jsx';
 import EventConfigContext, { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import ContentContext, { useContent } from '../../contexts/ContentContext.jsx';
@@ -276,11 +276,7 @@ function PreviewFrame({ path, scopeId, onReady, width, height, scale, identifica
               the preview owns a separate history and cannot move the admin. */}
           <UNSAFE_RouteContext.Provider value={{ outlet: null, matches: [], isDataRoute: false }}>
             <UNSAFE_LocationContext.Provider value={null}>
-              <MemoryRouter
-                key={path}
-                initialEntries={[path]}
-                future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-              >
+              <MemoryRouter key={path} initialEntries={[path]}>
                 <AppRoutes />
               </MemoryRouter>
             </UNSAFE_LocationContext.Provider>

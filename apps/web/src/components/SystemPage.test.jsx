@@ -6,7 +6,7 @@
 // rather than asserting that each piece exists somewhere on the page.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 
 let page;
