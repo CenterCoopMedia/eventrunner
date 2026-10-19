@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { resolveRegistrationAction } from 'shared/registration';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { isReadOnlyDemo } from './readOnlyDemo.js';
@@ -36,6 +37,18 @@ export function useRegistrationLink() {
   const enabled = Boolean(endpoint) && !isReadOnlyDemo(eventConfig);
   const key = `${endpoint || ''}:${eventConfig?.id || ''}`;
   const [resolved, setResolved] = useState(null);
+  // The header stays mounted across routes. A route change, or the tab
+  // becoming visible, asks again; readProvider answers from its cache until
+  // the answer is 30 seconds old, so a navigation costs no request.
+  const { pathname } = useLocation();
+  const [visits, setVisits] = useState(0);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const onVisibility = () => { if (document.visibilityState === 'visible') setVisits((value) => value + 1); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -46,7 +59,7 @@ export function useRegistrationLink() {
       if (active) setResolved({ key, provider: null, published: null });
     });
     return () => { active = false; };
-  }, [enabled, key]);
+  }, [enabled, key, pathname, visits]);
 
   if (enabled && resolved?.key !== key) return null;
   // Only a confirmed legacy provider may use its external destination.
