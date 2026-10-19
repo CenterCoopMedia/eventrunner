@@ -543,6 +543,12 @@
           recorded the message is no longer lost. For 15 minutes after the event the webhook
           answers 503, so Postmark sends it again; an older event for an unknown message is
           acknowledged and dropped.</li>
+          <li>A Functions deploy no longer stops when a change adds a retry-enabled event handler to an
+          existing client deployment. The deploy script reads the complete Functions inventory, finds
+          the local retry handlers that it does not hold, and creates only those with a targeted
+          <code>--force</code> deploy. The full deploy then runs without <code>--force</code>. The script deploys nothing when
+          the inventory or local discovery fails, or when a targeted selector would reach any other
+          Function (demo deploy run 39318358467, <code>onTicketOrderConfirmation</code>).</li>
           </ul>
           <ul>
           <li>The documentation site&#39;s page description decodes each entity once, so a
