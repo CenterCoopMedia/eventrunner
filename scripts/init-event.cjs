@@ -81,7 +81,7 @@ const { evaluateReadiness, allReady, formatReadinessTable, DEFAULT_SEEDED_THRESH
 const { manualChecklist, formatChecklist } = require('./lib/checklist.cjs');
 const {
   parseTemplateFile, mergeTemplateAnswers, templateApplyErrors, mergeTemplatePages, mergeTemplateContent,
-  templateReadinessRows, formatInventory, pageSetErrors, isConfigDerived,
+  templateReadinessRows, formatInventory, pageSetErrors, isConfigDerived, EXCLUDED_REASONS,
 } = require('./lib/event-template.cjs');
 const { validateDeployEnv } = require('shared/config');
 const { uploadPlaceholderBranding } = require('./lib/branding.cjs');
@@ -97,15 +97,18 @@ const FLAGS = [
 ];
 
 /**
- * Collections a template target must not hold anything in. A fresh project
- * has none of these; one that does is either the wrong project or an event
- * that already started, and a template must never merge into either.
+ * Collections a template target must not hold anything in: every collection
+ * the template export names (EXCLUDED_REASONS: the schedule, organizations,
+ * timeline, updates, accounts, orders, logs and the rest) and the ones the
+ * apply writes. A fresh project has none of these; one that does is either
+ * the wrong project or an event that already started, and a template must
+ * never merge into either. On a real project, listCollections() adds any
+ * collection no list names yet.
  */
-const TEMPLATE_TARGET_EMPTY = Object.freeze([
+const TEMPLATE_TARGET_EMPTY = Object.freeze([...new Set([
   'config', 'cmsPages', 'cmsPages_drafts', 'cmsContent', 'cmsContent_drafts', 'email_templates',
-  'users', 'users_public', 'speakers', 'tickets', 'ticket_orders', 'ticket_payment_attempts',
-  'session_pitches', 'admin_logs', 'sent_emails', 'email_claims',
-]);
+  ...Object.keys(EXCLUDED_REASONS),
+])]);
 
 /**
  * What a template apply itself writes. A project whose apply stopped part
@@ -113,6 +116,8 @@ const TEMPLATE_TARGET_EMPTY = Object.freeze([
  */
 const TEMPLATE_APPLY_WRITES = Object.freeze([
   'config', 'cmsPages', 'cmsPages_drafts', 'cmsContent', 'cmsContent_drafts', 'email_templates',
+  // cmsMeta/pending, the unpublished-change count the publish keeps.
+  'cmsMeta',
 ]);
 const TEMPLATE_APPLY_CONFIG = Object.freeze(['event', 'features', 'theme', 'badges', 'providers', 'bootstrap', 'template']);
 
@@ -343,7 +348,11 @@ async function loadTemplateForTarget({ db, file, force, tierA, listAuthUsers }) 
     resume = true;
   }
   const occupied = [];
-  for (const name of TEMPLATE_TARGET_EMPTY) {
+  const names = new Set(TEMPLATE_TARGET_EMPTY);
+  if (typeof db.listCollections === 'function') {
+    for (const ref of await db.listCollections()) names.add(ref.id);
+  }
+  for (const name of names) {
     if (resume && TEMPLATE_APPLY_WRITES.includes(name)) continue;
     const snap = await db.collection(name).limit(1).get();
     if (!snap.empty) occupied.push(name);

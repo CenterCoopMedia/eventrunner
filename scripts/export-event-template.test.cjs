@@ -389,12 +389,19 @@ test('a target that holds speakers, orders, logs, email rows or Auth users is re
   const source = await pastEvent();
   const { out } = await exportFrom(source);
   for (const docPath of ['speakers/s', 'ticket_orders/o', 'admin_logs/l', 'sent_emails/m', 'email_claims/c',
-    'email_templates/t']) {
+    'email_templates/t', 'cmsSchedule/s1', 'cmsOrganizations/o', 'cmsTimeline/t', 'cmsUpdates/u']) {
     const target = makeFakeDb({ [docPath]: { any: true } });
     const { value, output } = await applyTo(target, { template: out });
     assert.equal(value, 2, docPath);
     assert.match(output, new RegExp(`is not empty \\(${docPath.split('/')[0]}\\)`));
   }
+  // A collection no list names yet is found through listCollections().
+  const unlisted = makeFakeDb({ 'brandNewRecords/r': { any: true } });
+  unlisted.listCollections = async () => [{ id: 'brandNewRecords' }];
+  const unlistedRun = await applyTo(unlisted, { template: out });
+  assert.equal(unlistedRun.value, 2);
+  assert.match(unlistedRun.output, /is not empty \(brandNewRecords\)/);
+
   const target = makeFakeDb();
   const { value, output } = await applyTo(target, {
     template: out, extra: {}, listAuthUsers: async () => ['someone'],
@@ -452,6 +459,14 @@ test('a half-applied project that has gained other data is not resumed', async (
   const { value, output } = await applyTo(target, { template: out });
   assert.equal(value, 2);
   assert.match(output, /is not empty \(users\)/);
+
+  // A schedule entered in the half-made admin is the same: no hybrid event.
+  const scheduled = makeFakeDb();
+  await assert.rejects(applyTo(scheduled, { template: out, store: failing }), /network dropped/);
+  await scheduled.collection('cmsSchedule').doc('s1').set({ title: 'Opening' });
+  const resumed = await applyTo(scheduled, { template: out });
+  assert.equal(resumed.value, 2);
+  assert.match(resumed.output, /is not empty \(cmsSchedule\)/);
 });
 
 test('--check fails the template row while an apply is unfinished', async () => {
