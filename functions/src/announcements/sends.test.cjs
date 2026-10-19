@@ -681,5 +681,14 @@ for (const backend of backends) {
     }
     const ids = (await docsOf(h.db, 'email_suppressions')).map((row) => row.id);
     assert.deepEqual(ids, [suppressionIdFor('ada@example.org')]);
+
+    // A resubscribe record is accepted with nothing to do, so the broadcast
+    // stream's webhook can carry SubscriptionChange without a 400.
+    const resubscribe = { RecordType: 'SubscriptionChange', MessageID: 'pm-a', Recipient: 'ada@example.org', SuppressSending: false, ChangedAt: '2026-10-02T00:00:00Z' };
+    const answer = await new Promise((resolve) => {
+      const res = { code: 0, set() { return this; }, status(code) { this.code = code; return this; }, json(body) { resolve({ code: this.code, body }); } };
+      webhook({ method: 'POST', headers, body: resubscribe, rawBody: Buffer.from(JSON.stringify(resubscribe)) }, res);
+    });
+    assert.deepEqual(answer, { code: 200, body: { processed: 0, patched: 0 } });
   });
 }

@@ -270,7 +270,7 @@ test('parseDeliveryEvent maps SpamComplaint to complained', () => {
   assert.equal(events[0].recipient, 'a@example.com');
 });
 
-test('parseDeliveryEvent maps SubscriptionChange only when SuppressSending is true', () => {
+test('parseDeliveryEvent maps SubscriptionChange only when SuppressSending is true; a resubscribe is recognized and empty', () => {
   const provider = createPostmarkProvider({ env: ENV, fetchImpl: fakeFetch([]) });
   const suppressed = provider.parseDeliveryEvent({
     RecordType: 'SubscriptionChange',
@@ -287,7 +287,7 @@ test('parseDeliveryEvent maps SubscriptionChange only when SuppressSending is tr
     occurredAt: '2026-08-19T03:00:00Z',
     reason: 'ManualSuppression',
   }]);
-  assert.equal(
+  assert.deepEqual(
     provider.parseDeliveryEvent({
       RecordType: 'SubscriptionChange',
       MessageID: 'pm-4',
@@ -295,7 +295,9 @@ test('parseDeliveryEvent maps SubscriptionChange only when SuppressSending is tr
       ChangedAt: '2026-08-19T03:00:00Z',
       SuppressSending: false,
     }),
-    null,
+    // Recognized, with nothing to record: the webhook answers 200, not 400,
+    // so the broadcast stream can send SubscriptionChange (issue #490).
+    [],
   );
 });
 
