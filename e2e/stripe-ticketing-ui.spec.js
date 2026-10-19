@@ -123,6 +123,41 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await screenshot(page, 'stripe-ticket-print', page.locator('.ticket-document'));
   });
 
+  test('reopening sales updates an unedited catalog editor without an unsaved-edits warning', async ({ page }) => {
+    test.setTimeout(120_000);
+    let saved = { ...CATALOG, salesPaused: true };
+    const writes = [];
+    await mockEndpoint(page, 'getTicketingStatus', async () => ({ provider: 'stripe', webhookSupported: true, webhookRegisteredAt: null, lastDeliveryAt: null, queue: { pending: 0, exhausted: 0 } }));
+    await mockEndpoint(page, 'ticketingCommerceAdmin', async (body) => {
+      if (body.action === 'pauseSales') saved = { ...saved, revision: saved.revision + 1, salesPaused: body.paused };
+      if (body.action === 'saveCatalog') { writes.push(body); saved = { ...body.catalog, revision: saved.revision + 1 }; }
+      if (body.action === 'orders') return { orders: [], nextCursor: null };
+      if (body.action === 'tickets') return { tickets: [], nextCursor: null };
+      return { provider: 'stripe', mode: 'test', catalog: saved, inventory: { held: 0, sold: 0 } };
+    });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/ticketing');
+    await expect(page.getByRole('heading', { name: 'Stripe sales', exact: true })).toBeVisible();
+    const endTour = page.getByRole('button', { name: 'End tour', exact: true });
+    if (await endTour.isVisible()) await endTour.click();
+    await page.getByText('Configure ticket catalog').click();
+    await expect(page.getByRole('checkbox', { name: 'Pause new sales' })).toBeChecked();
+    await page.getByRole('button', { name: 'Review reopening sales' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Reopen new ticket sales?' });
+    await dialog.getByLabel('Reason for changing sales').fill('Launch approved.');
+    await dialog.getByRole('button', { name: 'Reopen new sales' }).click();
+    await expect(page.getByText('New sales enabled')).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked();
+    await expect(page.getByText(/The saved catalog has changed/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Discard unsaved edits and reload catalog' })).toHaveCount(0);
+    await screenshot(page, 'stripe-catalog-after-reopen', page.locator('form').filter({ hasText: 'Ticket types' }));
+    await page.getByRole('button', { name: 'Save catalog' }).click();
+    await expect(page.getByText('Catalog saved. Existing orders keep the prices they were issued with.')).toBeVisible();
+    expect(writes).toHaveLength(1);
+    expect(writes[0].expectedRevision).toBe(CATALOG.revision + 1);
+    expect(writes[0].catalog.salesPaused).toBe(false);
+  });
+
   test('organizer review dialog traps focus, preserves cancellation meaning, and fits desktop/mobile', async ({ page }) => {
     test.setTimeout(180_000);
     const actions = [];
