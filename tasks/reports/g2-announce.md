@@ -191,3 +191,106 @@ director regenerates on the stack tip.
 - A list of unsubscribed addresses. The record holds only a hash, by design; staff restore by
   address.
 - Per-recipient personalization (first name). Not requested.
+
+## Review round
+
+The adversarial review had one must-fix and seven optional findings. Each one is below, with
+the commit that fixed it or the reason it was not changed.
+
+### Must fix: unsubscribe rate limit blocked real one-click opt-outs
+
+Fixed in `Never rate limit a correctly signed unsubscribe`. The handler took a per-IP slot for
+every request before it checked the signature. It now checks the signature first. A correctly
+signed request (GET or POST) never takes a slot. Only a request whose signature fails takes a
+slot, with the same limit (20 per 15 minutes per client address). A GET still shows a button
+and records nothing; the button POSTs. `recordSuppression` is idempotent, so a repeat of a
+signed POST writes nothing new.
+
+Tests, written first and seen to fail (`sends.test.cjs`):
+
+- "signed one-click unsubscribes from one shared address are never rate limited": 50
+  recipients, one client address, a GET and a one-click POST each. All 50 are recorded, and
+  no rate-limit document is written.
+- "requests with a bad signature are rate limited per client address, and a signed one still
+  passes": 20 forged POSTs answer 400, the 21st answers 429, another address still gets 400,
+  and a signed one-click POST from the limited address is recorded.
+
+### Optional findings
+
+1. **Claims are never released, so a provider outage loses a chunk.** Real. Fixed in
+   `Retry an announcement's failed addresses, and show cut-short lists`. A recipient the
+   provider refused with a transient status (5xx or 429, after the core's own retries) goes on
+   `retryRecipients` (addresses only, to keep the record under the Firestore size limit). The
+   history offers "Retry N failed addresses". It loads the message, and the preview and send
+   take `retryOf`. That is a new send with its own identity, receipt and send-once keys,
+   limited to that list less any address that unsubscribed since. The earlier record gets
+   `retriedBy` in the same transaction, so each send is retried once. A refusal for good (for
+   example 406 inactive) and an uncertain result are not retried. The receipt binds the retry,
+   so a retry preview cannot start a send to the whole audience. Tests first:
+   "postmark: a provider outage leaves the failed addresses for one retry send that reaches
+   only them", "postmark: a recipient the provider refuses for good is not offered for a
+   retry", and composer tests "retries the failed addresses of a send as a new previewed send,
+   once" and "drops a retry when staff pick another audience or cancel it".
+   Not fixed: a recipient claimed by a call that died before the provider request counts as
+   "already handled" and is not resent. The site cannot tell that case from a delivered one.
+   The ADMIN_GUIDE now says so.
+2. **Postmark-mode restore leaves Postmark's own suppression.** Real. Fixed with copy and docs,
+   not an API call (`Retry an announcement's failed addresses, …` for the composer, `Document
+   announcement retry and Postmark-managed unsubscribe` for the guides). With Postmark
+   handling, the restore hint and message say to reactivate the address on the broadcast
+   stream in Postmark too. ADMIN_GUIDE describes both modes. POSTMARK_PROVISIONING section 2a
+   has the same step. I did not call Postmark's suppression delete API: Postmark may refuse to
+   reactivate a recipient-originated opt-out, and this sandbox cannot check that against the
+   real API. Test first: "says a restore also needs Postmark when Postmark handles
+   unsubscribes". The resubscribe record is still not mirrored back, and that is intended: a
+   resubscribe through Postmark does not remove the site's record without staff action.
+3. **"Failed addresses (50)" hides that the list is cut short.** Real. Fixed in the retry
+   commit. The label is "Failed addresses (first 50 of N)" when failed plus uncertain is more
+   than the stored list, and a line points to the Email log filtered by the source
+   Announcement. Test first: "says when the failed address list is cut short, and where the
+   rest are".
+4. **The receipt goes stale on a busy registration day.** Not changed. The reviewer calls the
+   behaviour acceptable for safety. A refused send already focuses an error that says to
+   preview again, which is one click. An automatic re-preview would put a new count in front
+   of staff without a new decision, and it would weaken the rule that staff confirm only the
+   count they saw.
+5. **Custom unsubscribe handling is accepted, but #490 names Postmark handling only.** Not
+   changed. This is an owner decision, and the brief forbids GitHub comments from a builder.
+   The director should ask the owner: either refuse Custom on Postmark, or record the change
+   on #490. The key on the send record is server-only (deny-all rules). Anyone who could read
+   it could already read the recipient list beside it.
+6. **The delivery webhook comment says it writes nothing else.** Real. Fixed in `Keep the live
+   unsubscribe link out of the email log`: the comment now names `email_suppressions`.
+7. **The Email log stores each recipient's live signed link.** Real. Fixed in `Keep the live
+   unsubscribe link out of the email log`. The email core takes `auditRedact`, a list of
+   `{ find, replace }` pairs that change only the bodies the audit row stores. An announcement
+   swaps the live link for the inert test link there, in its HTML and plain text forms. The
+   mail sent is unchanged. Test first: "the email log stores each copy with the inert link,
+   never the recipient's live signed link".
+
+### Review round commits
+
+1. `Never rate limit a correctly signed unsubscribe` (must fix)
+2. `Keep the live unsubscribe link out of the email log` (optional 6 and 7)
+3. `Retry an announcement's failed addresses, and show cut-short lists` (optional 1, 2, 3)
+4. `Document announcement retry and Postmark-managed unsubscribe` (optional 1, 2, 3; docs)
+5. `Add the review round to the g2-announce report` (this section)
+
+### Review round checks
+
+Run after the last code and docs commit; lint, npm test and check:copy again after this report.
+
+- `npm run lint`: exit 0.
+- `npm test`: 3150 of 3151 pass. The one failure is the expected "the committed site matches
+  a fresh render": docs/docs is stale for the edited Markdown pages. A local
+  `node scripts/build-pages.cjs` made it pass (`build-pages.test.cjs` 63/63, `--check` 30
+  files match). The regenerated files were then discarded and are not committed.
+- `npm run test -w apps/web` (under the lock): 292 files, 3449 tests pass.
+- `npm run test:rules` (under the lock): 3 files, 375 tests pass.
+- `npm run build -w apps/web` (under the lock): built.
+- `npm run check:copy`: 533 files, no blocked patterns.
+- `sends.test.cjs` on the Firestore emulator as well as in memory (under the lock): 54/54
+  (27 scenarios on each backend). This proves the retry transaction on real Firestore.
+- E2E, `e2e/announcement-email.spec.js` with `e2e/email-log.spec.js`, through a temporary
+  no-sandbox Playwright config (under the lock): 5 passed. The temporary config and runner
+  were deleted.
