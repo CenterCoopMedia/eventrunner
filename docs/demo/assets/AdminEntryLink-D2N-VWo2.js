@@ -1,0 +1,1 @@
+import{Fn as e,In as t,Jr as n,Nt as r,gt as i}from"./initial-D34bsubf.js";var a=t();function o({account:t}){let{eventConfig:o}=e(),s=t?.views??[];return i(o)||s.length<2||!s.some(e=>e.id===`admin`)?null:(0,a.jsx)(n,{to:`/admin`,className:`${r} mt-sm`,children:`Manage event`})}export{o as t};

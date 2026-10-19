@@ -1,0 +1,1 @@
+import{Tr as e,br as t,pr as n,ur as r}from"./initial-D34bsubf.js";function i(i,a,o){return r(r=>t(e(n,i),e=>{a(e.docs.map(e=>({id:e.id,...e.data()})))},r),e=>{console.warn(`${i} admin subscription failed; retrying.`,e),o?.(e)})}export{i as t};
