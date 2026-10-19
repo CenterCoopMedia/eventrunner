@@ -365,6 +365,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Cloud Functions run on firebase-admin 14 and firebase-functions 7. firebase-functions 6
+  does not accept firebase-admin 14, so both moved together. Both need Node 22, which the
+  functions already declare. The upgrade clears the moderate uuid advisory chain
+  (GHSA-w5hq-g745-h8pq) from `functions/package-lock.json`, and its audit exception is gone.
+  firebase-admin 14 no longer exposes `errorInfo` on its errors, so the attendee delete reads
+  only `err.code`.
+
 - **Breaking:** `submitSessionPitch` now requires `consent: true`. Callers must record agreement
   to organizer review before submitting; requests without it return 400. Stored proposals
   record the consent version and time (#323).
