@@ -1,1 +1,0 @@
-import{Et as e,On as t,Vr as n,kn as r,lt as i}from"./initial-C6WiF6a_.js";var a=r();function o({account:r}){let{eventConfig:o}=t(),s=r?.views??[];return i(o)||s.length<2||!s.some(e=>e.id===`admin`)?null:(0,a.jsx)(n,{to:`/admin`,className:`${e} mt-sm`,children:`Manage event`})}export{o as t};

@@ -1,1 +1,0 @@
-import{kn as e}from"./initial-C6WiF6a_.js";var t=e();function n({children:e,className:n=``}){return e==null||e===``?null:(0,t.jsx)(`p`,{className:[`standfirst max-w-prose`,n].filter(Boolean).join(` `),children:e})}export{n as t};
