@@ -131,34 +131,53 @@
           <h2 id="setup-register-the-webhook">Setup: register the webhook<a class="heading-anchor" href="#setup-register-the-webhook" aria-label="Link to this section">#</a></h2>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">EVENT_TICKETING_PROVIDER=eventbrite EVENT_TICKETING_EVENT_ID=&lt;sandbox event id&gt; \
           TICKETING_API_TOKEN=&lt;from Eventbrite account&gt; \
-          TICKETING_WEBHOOK_SECRET=&lt;generate one, e.g. `openssl rand -hex 20`, store like EMAIL_WEBHOOK_BASIC_AUTH&gt; \
+          TICKETING_WEBHOOK_SECRET=&lt;generate one: `openssl rand -hex 32`, store like EMAIL_WEBHOOK_BASIC_AUTH&gt; \
           EVENT_FIREBASE_PROJECT_ID=&lt;dev project id&gt; \
             node scripts/register-ticketing-webhook.cjs
           </code></pre>
           <p>Confirm success via <code>getTicketingStatus</code> (admin Settings) or the Cloud Functions log for the
           registration call.</p>
+          <p>The script registers every action the adapter handles: <code>order.placed</code>, <code>order.updated</code>,
+          <code>order.refunded</code>, and <code>attendee.updated</code> (#357). In the Eventbrite dashboard, confirm that the
+          webhook lists all four. If the script names an older webhook at the same endpoint, delete that
+          webhook in Eventbrite.</p>
           <p>Then exercise all three flows against the sandbox event&#39;s real checkout (or Eventbrite&#39;s test-order
           tooling, if offered): place an order, refund one, cancel one.</p>
           <h2 id="per-assumption-capture-and-diff-plan">Per-assumption capture and diff plan<a class="heading-anchor" href="#per-assumption-capture-and-diff-plan" aria-label="Link to this section">#</a></h2>
           <p>For each of the six numbered assumptions, capture the specific real artifact named below, sanitize
           it (strip every real identifier — attendee/organizer names, emails, the sandbox account&#39;s org name
           and id, real order/ticket numeric ids, phone numbers, and free-text fields. Replace them with clearly
-          synthetic placeholders in the same shape. Do not use <code>[REDACTED]</code> blocks because preserving field shape is the
+          synthetic placeholders in the same shape. Every delivery body echoes <code>config.endpoint_url</code>, and that
+          URL carries <code>TICKETING_WEBHOOK_SECRET</code>: replace the token value in <code>config.endpoint_url</code> with
+          <code>fixture-placeholder</code> (<code>?token=fixture-placeholder</code>) before the body is saved anywhere. Do not use <code>[REDACTED]</code> blocks because preserving field shape is the
           whole point), and diff it against the named fixture file.</p>
-          <h3 id="1-webhook-signing">1. Webhook signing<a class="heading-anchor" href="#1-webhook-signing" aria-label="Link to this section">#</a></h3>
+          <h3 id="1-webhook-authentication-url-secret-356">1. Webhook authentication (URL secret, #356)<a class="heading-anchor" href="#1-webhook-authentication-url-secret-356" aria-label="Link to this section">#</a></h3>
+          <p>Eventbrite does not sign webhook deliveries, and its webhook API takes no signing secret. The
+          adapter does not check an HMAC. <code>register-ticketing-webhook.cjs</code> registers the callback URL with
+          <code>?token=&lt;TICKETING_WEBHOOK_SECRET&gt;</code> added. <code>ticketingWebhook</code> compares that query parameter with the
+          secret in constant time and answers 401 when it is missing or wrong. The body is not trusted for
+          ticket data: the function reads only an order id from an <code>api_url</code> on <code>www.eventbriteapi.com</code>, and
+          the sync drain fetches that order from the Eventbrite API with this deployment&#39;s token. A delivery
+          with the right secret that the adapter cannot read gets 200 and is ignored, so Eventbrite does not
+          retry it. A secret shorter than 32 characters, or none, refuses every delivery and stops the
+          registration script; other ticketing functions keep working.</p>
+          <p>This is proven offline only, with faked fetch (<code>eventbrite.test.cjs</code>,
+          <code>eventbriteEndToEnd.test.cjs</code>). It is not yet confirmed against Eventbrite. Confirm it in the
+          sandbox:</p>
           <ul>
-          <li><strong>Capture:</strong> the full set of HTTP headers on an actual incoming webhook delivery to your
-          registered callback URL — specifically, is there an <code>X-Eventbrite-Signature</code> header at all, and
-          if so what does its value look like (hex length, any prefix)? Capture from Cloud Functions logs
-          (the raw request headers <code>ticketingWebhook</code> received) or a temporary logging proxy in front of
-          the function during the test.</li>
-          <li><strong>Sanitize:</strong> header names and value <em>shape</em> (e.g. &quot;64 hex chars, no prefix&quot;) are not sensitive —
-          the actual signature value is derived from your webhook secret plus the body, so it&#39;s safe to
-          keep or drop; there&#39;s no PII here.</li>
-          <li><strong>Diff against:</strong> there&#39;s no fixture file for headers today — the fixtures README&#39;s item 1
-          documents the <em>assumed</em> scheme (HMAC-SHA256 over raw body via <code>X-Eventbrite-Signature</code>, hex
-          digest). Write the observed reality as a one-line verdict: confirmed, or corrected (name the real
-          header and scheme).</li>
+          <li><strong>Check the registration:</strong> in the Eventbrite dashboard, the webhook URL ends in
+          <code>?token=…</code>. Do not copy the value into notes, issues, or screenshots.</li>
+          <li><strong>Check a delivery:</strong> place a sandbox order. <code>getTicketingStatus</code> shows the delivery, and the
+          order reaches <code>ticket_sync_queue</code>. If Eventbrite drops or rewrites the query string, every
+          delivery gets a 401. Record that as a corrected verdict; do not weaken the check.</li>
+          <li><strong>Check a refusal:</strong> send one POST to the bare callback URL, without <code>token</code>. It must get a 401.</li>
+          <li><strong>Capture:</strong> the request headers of one delivery, to record whether Eventbrite sends any
+          signature header at all. If it does, record its name and scheme as a corrected verdict.</li>
+          <li><strong>Know the log exposure:</strong> Cloud Run request logs record the full request URL, query string
+          included. Event Runner code never logs the secret, but anyone who can read the project&#39;s request
+          logs can read it. Keep log access to operators. If the secret leaks, generate a new one, update
+          the secret, deploy, and run the registration script again; then delete the old webhook it names.</li>
+          <li><strong>Verdict:</strong> confirmed, or corrected with what Eventbrite really sends.</li>
           </ul>
           <h3 id="2-delivery-id">2. Delivery id<a class="heading-anchor" href="#2-delivery-id" aria-label="Link to this section">#</a></h3>
           <ul>
@@ -175,15 +194,20 @@
           </ul>
           <h3 id="3-api_url-shape">3. <code>api_url</code> shape<a class="heading-anchor" href="#3-api_url-shape" aria-label="Link to this section">#</a></h3>
           <ul>
-          <li><strong>Capture:</strong> the full webhook payload body for at least one <code>attendee.updated</code> delivery,
-          specifically its <code>api_url</code> field.</li>
+          <li><strong>Capture:</strong> the full webhook payload body for one delivery of each action (<code>order.placed</code>,
+          <code>order.updated</code>, <code>order.refunded</code>, <code>attendee.updated</code>), specifically its <code>api_url</code> field.</li>
           <li><strong>Sanitize:</strong> replace any real event/order/attendee numeric ids in the URL path with a
-          renumbered fake sequence, keeping the path <em>shape</em> identical.</li>
-          <li><strong>Diff against:</strong> <code>webhook-attendee-updated.json</code>. The adapter assumes <code>api_url</code> always resolves
-          <code>/v3/events/{eventId}/orders/{orderId}/</code> (the order resource), even for <code>attendee.updated</code>. Check
-          whether the real <code>api_url</code> for an <code>attendee.updated</code> delivery is actually an order path or an
-          attendee path (e.g. <code>/v3/events/{eventId}/attendees/{attendeeId}/</code>). This is the single most
-          load-bearing assumption — verify it carefully.</li>
+          renumbered fake sequence, keeping the path <em>shape</em> identical. Replace the token in
+          <code>config.endpoint_url</code> as the general rule above says.</li>
+          <li><strong>Diff against:</strong> the adapter accepts three shapes, none yet confirmed against Eventbrite:
+          <code>/v3/events/{eventId}/orders/{orderId}/</code> (<code>webhook-attendee-updated.json</code> and the other first
+          fixtures), <code>/v3/orders/{orderId}/</code> (<code>webhook-order-placed-order-path.json</code>, the shape
+          Eventbrite&#39;s documentation shows for <code>order.*</code>), and <code>/v3/events/{eventId}/attendees/{attendeeId}/</code>
+          (<code>webhook-attendee-updated-attendee-path.json</code>, the documented <code>attendee.*</code> shape, mapped to its
+          order through <code>GET /events/{id}/attendees/{id}/</code>). An authenticated delivery in any other shape
+          gets 200 and is ignored, so a shape the adapter does not know loses the update without an
+          error. Record which shape each action really uses. This is the single most load-bearing
+          assumption — verify it carefully.</li>
           </ul>
           <h3 id="4-orderrefunded-folding">4. <code>order.refunded</code> folding<a class="heading-anchor" href="#4-orderrefunded-folding" aria-label="Link to this section">#</a></h3>
           <ul>
@@ -192,7 +216,8 @@
           <li><strong>Sanitize:</strong> strip real order/attendee ids and any customer-identifying fields; keep <code>api_url</code>
           and <code>config.action</code> shape intact.</li>
           <li><strong>Diff against:</strong> <code>webhook-order-refunded.json</code>, which models <code>config.action: &quot;order.refunded&quot;</code>
-          on the wire. Confirm the real refund delivery&#39;s <code>config.action</code> string matches what the fixture
+          on the wire. The registration sends <code>order.refunded</code> (#357), so a refund must produce a
+          delivery. Confirm the real refund delivery&#39;s <code>config.action</code> string matches what the fixture
           assumes, and confirm the adapter&#39;s fold into <code>eventType: &#39;order.updated&#39;</code> still makes sense (a
           subsequent <code>GET /orders/{id}/</code> should pick up the refunded ticket status).</li>
           </ul>
