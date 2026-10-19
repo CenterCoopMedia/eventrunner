@@ -11,9 +11,25 @@ function emptyCatalog() {
       visibility: 'public', minPerOrder: 1, maxPerOrder: 10, salesStartAt: null, salesEndAt: null }] };
 }
 
+function priceInputsFor(catalog) {
+  return Object.fromEntries(catalog.ticketTypes.map((type) => [type.id, String(type.unitAmount / (10 ** currencyDigits(catalog.currency)))]));
+}
+
+// The editor state a saved catalog loads as. A draft equal to its baseline
+// holds no unsaved edits.
+function editorState(catalog) {
+  const draft = structuredClone(catalog || emptyCatalog());
+  return { draft, priceInputs: priceInputsFor(draft) };
+}
+
+function sameEditorState(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export default function StripeCatalogPanel({ call, data, isOperator, timezone, onSaved }) {
-  const [draft, setDraft] = useState(() => structuredClone(data.catalog || emptyCatalog()));
-  const [priceInputs, setPriceInputs] = useState(() => Object.fromEntries((data.catalog || emptyCatalog()).ticketTypes.map((type) => [type.id, String(type.unitAmount / (10 ** currencyDigits((data.catalog || emptyCatalog()).currency)))])));
+  const [baseline, setBaseline] = useState(() => editorState(data.catalog));
+  const [draft, setDraft] = useState(() => structuredClone(baseline.draft));
+  const [priceInputs, setPriceInputs] = useState(() => ({ ...baseline.priceInputs }));
   const [busy, setBusy] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [recoveryRequired, setRecoveryRequired] = useState(false);
@@ -35,6 +51,27 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   const updateType = (index, key, value) => setDraft((previous) => ({ ...previous, ticketTypes: previous.ticketTypes.map((type, current) => current === index ? { ...type, [key]: value } : type) }));
   const quantity = (value) => value === '' ? '' : Number(value);
   const revisionChanged = baseRevision !== (data.catalog?.revision || 0);
+  const clean = !recoveryRequired && sameEditorState({ draft, priceInputs }, baseline);
+
+  // Load a saved catalog into the editor and make it the new baseline.
+  function loadSaved(catalog) {
+    const next = editorState(catalog);
+    setBaseline(next);
+    setDraft(structuredClone(next.draft));
+    setPriceInputs({ ...next.priceInputs });
+    setBaseRevision(next.draft.revision || 0);
+  }
+
+  // A sales change (or another operator's save) writes a new revision. An
+  // editor with no unsaved edits follows it at once, so a later save does not
+  // carry the old sales state. Real edits keep the warning and the reload.
+  // The busy state is a dependency, so a revision that lands during a save
+  // or a reload is applied when that request ends.
+  useEffect(() => {
+    if (!revisionChanged || !clean || busy) return;
+    loadSaved(data.catalog);
+    setNotice({ tone: 'ok', message: 'The editor now shows the current saved catalog.' });
+  }, [revisionChanged, clean, busy, data.catalog]);
 
   async function reloadCatalog() {
     if (busyRef.current || !isOperator) return;
@@ -44,10 +81,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
     setNotice(null);
     try {
       const result = await call('ticketingCommerceAdmin', { action: 'catalog' });
-      const current = structuredClone(result.catalog || emptyCatalog());
-      setDraft(current);
-      setBaseRevision(current.revision);
-      setPriceInputs(Object.fromEntries(current.ticketTypes.map((type) => [type.id, String(type.unitAmount / (10 ** currencyDigits(current.currency)))])));
+      loadSaved(result.catalog);
       setPriceErrors({});
       setShowTimeErrors(false);
       setLoads((count) => count + 1);
@@ -87,8 +121,7 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
     setNotice(null);
     try {
       const result = await call('ticketingCommerceAdmin', { action: 'saveCatalog', catalog, expectedRevision: baseRevision });
-      setDraft(structuredClone(result.catalog));
-      setBaseRevision(result.catalog.revision);
+      loadSaved(result.catalog);
       setNotice({ tone: 'ok', message: 'Catalog saved. Existing orders keep the prices they were issued with.' });
       onSaved(result);
     } catch (err) { setRecoveryRequired(true); setNotice({ tone: 'error', message: err.message }); }

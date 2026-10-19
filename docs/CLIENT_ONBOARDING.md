@@ -17,7 +17,8 @@ Before you start provisioning:
 - The client has answered [`docs/handbook/for-clients.md`](handbook/for-clients.md)'s "What you
   will need to give us" list: event name/dates/timezone/venue, the public URL they want, who the
   first admins are, their ticketing choice, and a sender address on **their own domain**.
-- You know which ticketing provider this is: `eventbrite`, `manual` (CSV import), or `none`. Every
+- You know which ticketing provider this is: `stripe` (native sales through the organizer's Stripe
+  account), `eventbrite`, `manual` (CSV import), or `none`. Every
   onboarding step below that mentions ticketing is gated on this choice, not optional busywork —
   a `manual` deployment genuinely has no webhook step, not a skipped one.
 - You have (or can get) `gcloud` access to create a GCP project, and Firebase Console access to add
@@ -150,11 +151,13 @@ the row after 90 days. Sign-in codes and speaker invitations do not store their 
 
 ### 5. Ticketing (capability-gated)
 
-Complete the step for the provider this client selected. The checklist supports Eventbrite,
-manual CSV import, and deployments with no ticketing provider:
+Complete the step for the provider this client selected. The checklist
+(`scripts/lib/checklist.cjs`) supports native Stripe sales, Eventbrite, manual CSV import, and
+deployments with no ticketing provider:
 
 | Provider | Step |
 |---|---|
+| `stripe` | Follow [`docs/operator/stripe-ticketing.md`](operator/stripe-ticketing.md) from §1 to §5. It names the owners, sets up a test deployment, binds `TICKETING_API_TOKEN` and `TICKETING_WEBHOOK_SECRET`, registers and checks the webhook, and opens the catalog. The site shows **Get tickets** only after the catalog is published. |
 | `eventbrite` | Create the API token in the ticketing provider (`TICKETING_API_TOKEN` — already set as a GitHub Environment secret per the runbook §3). Generate `TICKETING_WEBHOOK_SECRET` with `openssl rand -hex 32` and set it the same way. Eventbrite does not sign deliveries, so the script registers this secret in the webhook URL, and the function refuses a delivery without it. Then register the webhook: `node scripts/register-ticketing-webhook.cjs`. The script registers every Eventbrite action the adapter handles, refunds included. If it names an older webhook at the same endpoint, delete that webhook in Eventbrite. Confirm the delivery via `getTicketingStatus` (admin Settings, or the Cloud Functions log for the registration call). |
 | `manual` | No webhook to register. Upload the first attendee CSV through the admin Ticketing tab instead — that upload *is* the equivalent step for this provider. |
 | `none` | Nothing to do. There is no token, no webhook, and no import. |

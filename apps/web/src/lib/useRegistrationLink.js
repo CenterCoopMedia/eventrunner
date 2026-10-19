@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { resolveRegistrationAction } from 'shared/registration';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { isReadOnlyDemo } from './readOnlyDemo.js';
@@ -24,29 +25,53 @@ function readProvider(key) {
   return entry.promise;
 }
 
+// The public catalog read answers a catalog revision only for a published
+// catalog; the /tickets page reads the same field before it accepts terms.
+function isPublishedCatalog(catalog) {
+  return Number.isSafeInteger(catalog?.catalogRevision) && catalog.catalogRevision >= 0;
+}
+
 export function useRegistrationLink() {
   const { eventConfig } = useEventConfig();
   const endpoint = import.meta.env.VITE_FUNCTIONS_ORIGIN || import.meta.env.VITE_FIREBASE_PROJECT_ID;
   const enabled = Boolean(endpoint) && !isReadOnlyDemo(eventConfig);
   const key = `${endpoint || ''}:${eventConfig?.id || ''}`;
   const [resolved, setResolved] = useState(null);
+  // The header stays mounted across routes. A route change, or the tab
+  // becoming visible, asks again; readProvider answers from its cache until
+  // the answer is 30 seconds old, so a navigation costs no request.
+  const { pathname } = useLocation();
+  const [visits, setVisits] = useState(0);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const onVisibility = () => { if (document.visibilityState === 'visible') setVisits((value) => value + 1); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return undefined;
     let active = true;
     readProvider(key).then((catalog) => {
-      if (active) setResolved({ key, provider: catalog?.provider });
+      if (active) setResolved({ key, provider: catalog?.provider, published: isPublishedCatalog(catalog) });
     }).catch(() => {
-      if (active) setResolved({ key, provider: null });
+      if (active) setResolved({ key, provider: null, published: null });
     });
     return () => { active = false; };
-  }, [enabled, key]);
+  }, [enabled, key, pathname, visits]);
 
   if (enabled && resolved?.key !== key) return null;
   // Only a confirmed legacy provider may use its external destination.
   // An outage must not send a Stripe purchaser to an older checkout source;
   // the native page presents the catalog error and its retry control.
   if (enabled && !['eventbrite', 'manual', 'none'].includes(resolved?.provider)) {
+    // A native action needs a published catalog. Until staff publish one, the
+    // page could only say that sales are not configured, so no action shows.
+    // A published catalog keeps the action while sales are paused or every
+    // window is closed, so a visitor can read when sales open. An outage
+    // (published is null) keeps it too: the page carries the retry control.
+    if (resolved?.published === false) return null;
     return { label: 'Get tickets', url: '/tickets', native: true };
   }
   return resolveRegistrationLink(eventConfig);
