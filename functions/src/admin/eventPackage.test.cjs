@@ -12,7 +12,7 @@ const {
 } = require('./eventPackage.cjs');
 const { readEventPackage, verifyEventPackage } = require('./eventPackageReader.cjs');
 const { isSecretKey, scrub } = require('./exportRecords.cjs');
-const { ADMIN, STAFF, BOOTSTRAP_DOC, FORBIDDEN, exportSeed } = require('./exportFixture.cjs');
+const { ADMIN, STAFF, BOOTSTRAP_DOC, FORBIDDEN, FORBIDDEN_VALUES, exportSeed } = require('./exportFixture.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const T0 = new Date('2026-10-01T12:00:00.000Z');
@@ -121,14 +121,16 @@ test('the reader verifies the package: checksums, counts, and every relationship
   assert.equal(report.ok, true);
   assert.equal(report.counts['program/sessions.json'], 3);
   assert.equal(report.counts['attendees/attendees.json'], 2);
-  assert.equal(report.counts['orders/admissions.json'], 2);
+  assert.equal(report.counts['orders/admissions.json'], 3);
   assert.ok(report.relationships.length >= 10);
   for (const rel of report.relationships) {
-    assert.equal(rel.unresolved, 0, `${rel.from} ${rel.field} → ${rel.to}: ${rel.sample}`);
+    // An admission synced from an external source names that source's order.
+    const expected = rel.from === 'orders/admissions.json' && rel.field === 'orderId' ? ['eb-order-3'] : [];
+    assert.deepEqual(rel.sample, expected, `${rel.from} ${rel.field} → ${rel.to}`);
   }
   const checked = Object.fromEntries(report.relationships.map((rel) => [`${rel.from}#${rel.field}`, rel.checked]));
   assert.equal(checked['program/sessions.json#speakerIds[]'], 4);
-  assert.equal(checked['orders/admissions.json#orderId'], 2);
+  assert.equal(checked['orders/admissions.json#orderId'], 3);
   assert.equal(checked['pitches/pitches.json#convertedSessionId'], 1);
   assert.equal(checked['pitches/pitches.json#convertedSpeakerId'], 1);
   assert.equal(checked['materials/materials.json#sessionId'], 2);
@@ -198,17 +200,17 @@ test('no file holds a secret, a credential, a private note, a staff address or a
   const { files } = readEventPackage(res.body);
   for (const [path, data] of files) {
     const text = data.toString('utf8');
-    for (const word of FORBIDDEN) assert.ok(!text.includes(word), `${path} must not contain ${word}`);
-    assert.ok(!text.includes(STAFF), `${path} names no staff address`);
+    for (const word of [...FORBIDDEN, ...FORBIDDEN_VALUES]) assert.ok(!text.includes(word), `${path} must not contain ${word}`);
   }
   const config = json(files, 'content/config.json');
   assert.deepEqual(Object.keys(config).sort(), ['badges', 'event', 'features', 'pitch_call', 'theme']);
-  assert.equal(config.pitch_call, null);
+  assert.deepEqual(config.pitch_call, { enabled: false, closesAt: '2026-02-01T00:00:00.000Z', externalFormUrl: null });
   // A theme's design tokens are not credentials.
   assert.deepEqual(config.theme.tokens, { light: {} });
   const catalog = json(files, 'orders/catalog.json');
   assert.equal(catalog[0].revision, 3);
-  assert.equal(Object.hasOwn(catalog[0], 'stripePriceSecret'), false);
+  assert.equal(Object.hasOwn(catalog[0], 'updatedBy'), false);
+  assert.equal(catalog[0].ticketTypes[0].unitAmount, 2500);
 });
 
 test('records: published sessions only in JSON, the draft in the CSV with its state', async () => {
@@ -234,10 +236,15 @@ test('records: attendees, orders, admissions and pitches keep their joins and th
   assert.match(files.get('attendees/attendees.csv').toString('utf8'), /"'-1\+2"/);
   const [order] = json(files, 'orders/orders.json');
   assert.equal(order.totalAmount, 5000);
-  assert.deepEqual(order.ticketIds, ['ticket-1', 'ticket-2']);
-  assert.equal(Object.hasOwn(order, 'checkoutUrl'), false);
+  assert.deepEqual(order.ticketIds, ['ord_fixture1_0_0', 'ord_fixture1_0_1']);
+  for (const key of ['checkoutUrl', 'seats', 'stripeSessionId', 'requestFingerprint', 'purchaserUid']) {
+    assert.equal(Object.hasOwn(order, key), false, key);
+  }
+  assert.equal(order.purchaserAccountId, 'uid-ada');
   const tickets = json(files, 'orders/admissions.json');
-  assert.ok(tickets.every((ticket) => !Object.hasOwn(ticket, 'raw')));
+  assert.deepEqual(tickets.map((ticket) => ticket.id), ['eb-ticket-7', 'ord_fixture1_0_0', 'ord_fixture1_0_1']);
+  assert.ok(tickets.every((ticket) => !Object.hasOwn(ticket, 'raw') && !Object.hasOwn(ticket, 'checkedInByUid')));
+  assert.equal(tickets[2].claimedByAccountId, 'uid-cy');
   const [pitch] = json(files, 'pitches/pitches.json');
   assert.equal(pitch.status, 'accepted');
   assert.equal(pitch.reviewRevision, 3);
@@ -248,7 +255,8 @@ test('records: attendees, orders, admissions and pitches keep their joins and th
   assert.equal(Object.hasOwn(pitch, 'reviewedBy'), false);
   assert.equal(Object.hasOwn(pitch, 'staffNotes'), false);
   const [file, link] = json(files, 'materials/materials.json');
-  assert.equal(file.storagePath, 'session-materials/session-keynote/slides.pdf');
+  assert.equal(file.storagePath, 'session-materials/session-keynote/obj-1');
+  assert.equal(Object.hasOwn(file, 'createdBy'), false);
   assert.equal(link.url, 'https://example.org/data');
 });
 

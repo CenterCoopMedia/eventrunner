@@ -155,7 +155,6 @@ function speakerRecord(id, data) {
     id,
     firstName: text(source.firstName),
     lastName: text(source.lastName),
-    displayName: text(source.displayName),
     slug: text(source.slug),
     email: text(source.email),
     organization: text(source.organization),

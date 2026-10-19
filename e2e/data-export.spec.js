@@ -10,9 +10,11 @@
 // provider record or bootstrap list. Each export's admin_logs row is read
 // with the Admin SDK.
 //
-// One hidden session, one speaker, one order and one ticket are made for
-// this file, with a stamp in every id, and removed at the end;
-// config/bootstrap is restored.
+// One hidden session (live, with its clean draft), one invited speaker, one
+// Stripe order with its ticket, and one ticket synced from another source
+// are made for this file, in the shapes their writers store, with a stamp in
+// every id, and removed at the end; config/bootstrap is restored.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 import packageReader from '../functions/src/admin/eventPackageReader.cjs';
@@ -54,8 +56,11 @@ test.describe.serial('event data export', () => {
   const sessionId = `e2e-export-session-${stamp}`;
   const speakerId = `e2e-export-speaker-${stamp}`;
   const orderId = `e2e-export-order-${stamp}`;
-  const ticketId = `e2e-export-ticket-${stamp}`;
+  const ticketId = `${orderId}_0_0`;
+  const syncedTicketId = `e2e-export-synced-${stamp}`;
   const title = `=HYPERLINK("http://example.test","Export ${stamp}")`;
+  // speakers/invites.cjs stores the SHA-256 digest of the invite token.
+  const inviteHash = crypto.createHash('sha256').update(`invite-${stamp}`).digest('hex');
   let seededBootstrap;
 
   test.beforeAll(async () => {
@@ -66,23 +71,50 @@ test.describe.serial('event data export', () => {
       ...seededBootstrap,
       staffEmails: [...(seededBootstrap.staffEmails ?? []), STAFF_EMAIL],
     });
+    const at = new Date();
+    const dayId = (await config.doc('event').get()).data()?.days?.[0]?.id ?? 'day-1';
+    // createSpeaker (speakers/profile.cjs), then sendSpeakerInvite (speakers/invites.cjs).
     await db.collection('speakers').doc(speakerId).set({
-      firstName: 'Export', lastName: `Speaker ${stamp}`, email: `speaker-${stamp}@example.test`,
-      status: 'draft', inviteToken: 'SECRET-invite-token', uid: null,
+      firstName: 'Export', lastName: `Speaker ${stamp}`, slug: `e2e-export-speaker-${stamp}`, email: `speaker-${stamp}@example.test`,
+      organization: '', jobTitle: '', bio: 'Reports on budgets.', headshotPath: null, socialHandles: {},
+      status: 'invited', uid: null, inviteToken: inviteHash, inviteSends: [at], approvedAt: null,
+      createdAt: at, updatedAt: at, updatedBy: ADMIN_EMAIL,
     });
-    // Hidden, so no public page or other spec counts it.
+    // A published session (store.publishDocs) with its clean draft. Hidden,
+    // so no public page or other spec counts it.
+    const fields = { title, description: 'Export check.', dayId, startTime: '09:00', endTime: '10:00', speakerIds: [speakerId] };
     await db.collection('cmsSchedule').doc(sessionId).set({
-      title, dayId: 'e2e-no-day', startTime: '09:00', endTime: '10:00', speakerIds: [speakerId], visible: false,
+      ...fields, visible: false, revision: 1, publishedAt: at, publishedBy: 'e2e-staff-uid',
     });
+    await db.collection('cmsSchedule_drafts').doc(sessionId).set({
+      ...fields, visible: false, status: 'clean', basedOnRevision: 1, updatedAt: at, updatedBy: ADMIN_EMAIL,
+    });
+    // A paid Stripe order (ticketing/stripeCheckout.cjs, then stripeReconcile.cjs).
     await db.collection('ticket_orders').doc(orderId).set({
-      id: orderId, provider: 'stripe', livemode: false, status: 'paid', paymentStatus: 'succeeded',
-      purchaserEmail: `buyer-${stamp}@example.test`, currency: 'usd', currencyExponent: 2,
-      totalAmount: 2500, ticketIds: [ticketId], checkoutUrl: 'https://checkout.example.test/SECRET',
-      lines: [{ ticketTypeId: 'general', name: 'General', quantity: 1 }], createdAt: new Date(),
+      id: orderId, orderId, provider: 'stripe', eventId: 'e2e-event', stripeAccountId: 'acct_1E2eExport', livemode: false,
+      attemptId: `att_${stamp}`, source: 'checkout', purchaserUid: null, purchaserEmail: `buyer-${stamp}@example.test`,
+      requestFingerprint: inviteHash, catalogRevision: 1, currency: 'usd', currencyExponent: 2,
+      lines: [{ ticketTypeId: 'general', ticketClass: 'General', name: 'General', quantity: 1, unitAmount: 2500, lineAmount: 2500 }],
+      subtotalAmount: 2500, totalAmount: 2500, taxAmount: 0, discountAmount: 0, feeAmount: 0,
+      taxTreatment: 'not_collected', refundPolicy: 'No refunds.',
+      seats: [{ externalId: ticketId, ticketTypeId: 'general', ticketClass: 'General', lineIndex: 0, seatIndex: 0, firstName: 'Holder', lastName: '', email: `holder-${stamp}@example.test` }],
+      ticketIds: [ticketId], status: 'paid', paymentStatus: 'succeeded', inventoryState: 'sold',
+      stripeSessionId: `cs_test_${stamp}`, stripePaymentIntentId: `pi_${stamp}`, checkoutUrl: `https://checkout.example.test/SECRET-${stamp}`,
+      expiresAt: at.toISOString(), refundStatus: 'none', refundedAmount: 0, refunds: [], disputes: [],
+      reconciliationException: null, reconciliationLease: null, paidAt: at, reconciledAt: at, createdAt: at, updatedAt: at,
     });
     await db.collection('tickets').doc(ticketId).set({
-      externalId: ticketId, orderId, provider: 'stripe', email: `holder-${stamp}@example.test`,
-      status: 'valid', raw: { token: 'SECRET-raw' }, createdAt: new Date(),
+      externalId: ticketId, orderId, provider: 'stripe', eventId: 'e2e-event', source: 'checkout',
+      ticketTypeId: 'general', ticketClass: 'General', quantity: 1, email: `holder-${stamp}@example.test`,
+      firstName: 'Holder', lastName: null, status: 'valid', claimedByUid: null, claimedAt: null, claimPromptSentAt: null,
+      purchasedAt: at.toISOString(), createdAt: at, updatedAt: at,
+    });
+    // A ticket synced from another source (ticketing/sync.cjs), with its raw record.
+    await db.collection('tickets').doc(syncedTicketId).set({
+      externalId: syncedTicketId, orderId: `eb-order-${stamp}`, email: `synced-${stamp}@example.test`, firstName: 'Synced',
+      lastName: null, ticketClass: 'General', quantity: 1, purchasedAt: at.toISOString(), status: 'valid', provider: 'eventbrite',
+      raw: { barcodes: [{ barcode: `SECRET-${stamp}` }] }, claimedByUid: null, claimedAt: null, claimPromptSentAt: null,
+      createdAt: at, updatedAt: at,
     });
   });
 
@@ -90,9 +122,11 @@ test.describe.serial('event data export', () => {
     const db = adminDb();
     await Promise.all([
       db.collection('cmsSchedule').doc(sessionId).delete(),
+      db.collection('cmsSchedule_drafts').doc(sessionId).delete(),
       db.collection('speakers').doc(speakerId).delete(),
       db.collection('ticket_orders').doc(orderId).delete(),
       db.collection('tickets').doc(ticketId).delete(),
+      db.collection('tickets').doc(syncedTicketId).delete(),
     ]);
     if (seededBootstrap) await db.collection('config').doc('bootstrap').set(seededBootstrap);
   });
@@ -117,6 +151,7 @@ test.describe.serial('event data export', () => {
     expect(row[1]).toBe(`'${title}`);
     expect(row[rows[0].indexOf('Speakers')]).toBe(`Export Speaker ${stamp}`);
     expect(text).not.toContain('SECRET');
+    expect(text).not.toContain(inviteHash);
     await expect(page.getByRole('status').filter({ hasText: 'Exported' })).toContainText('The export is in the admin log.');
 
     const logs = await adminDb().collection('admin_logs').where('action', '==', 'exportEventData').get();
@@ -157,9 +192,11 @@ test.describe.serial('event data export', () => {
     const order = read('orders/orders.json').find((record) => record.id === orderId);
     expect(order.ticketIds).toEqual([ticketId]);
     expect(read('orders/admissions.json').find((record) => record.id === ticketId).orderId).toBe(orderId);
+    expect(read('orders/admissions.json').find((record) => record.id === syncedTicketId).provider).toBe('eventbrite');
     expect(Object.keys(read('content/config.json'))).not.toContain('bootstrap');
     for (const [path, data] of files) {
       expect(data.toString('utf8'), path).not.toContain('SECRET');
+      expect(data.toString('utf8'), path).not.toContain(inviteHash);
     }
     expect(files.get('README.md').toString('utf8')).toContain('## Personal data and retention');
 

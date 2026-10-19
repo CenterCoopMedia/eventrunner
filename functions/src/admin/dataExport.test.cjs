@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const { createExportEventDataHandler, internals: { DATASETS, DATASET_NAMES, amount, readRequest } } = require('./dataExport.cjs');
-const { ADMIN, STAFF, BOOTSTRAP_DOC, FORBIDDEN, exportSeed } = require('./exportFixture.cjs');
+const { ADMIN, STAFF, BOOTSTRAP_DOC, FORBIDDEN, FORBIDDEN_VALUES, exportSeed } = require('./exportFixture.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const T0 = new Date('2026-10-01T12:00:00.000Z');
@@ -83,7 +83,7 @@ function parseCsv(text) {
 const asObjects = (rows) => rows.slice(1).map((cells) => Object.fromEntries(rows[0].map((h, i) => [h, cells[i]])));
 
 function assertNoSecrets(text) {
-  for (const word of FORBIDDEN) assert.ok(!text.includes(word), `the file must not contain ${word}: ${text}`);
+  for (const word of [...FORBIDDEN, ...FORBIDDEN_VALUES]) assert.ok(!text.includes(word), `the file must not contain ${word}: ${text}`);
 }
 
 test('readRequest names a missing dataset, an unknown one, and an extra key', () => {
@@ -161,6 +161,8 @@ test('speakers: contact and pipeline fields only, never the account id, invite t
   assert.equal(ada.Organization, '\'@Ledger');
   assert.equal(ada['Published sessions'], '\'=HYPERLINK("http://example.test","Keynote"); Data panel');
   assert.equal(ada['Social handles'], 'mastodon: @ada@example.social');
+  assert.ok(!res.body.csv.includes('uid-ada'), 'no account id');
+  assert.ok(!res.body.csv.includes('PRIVATE-pending-bio'), 'no staged edits');
   assertNoSecrets(res.body.csv);
 });
 
@@ -181,11 +183,11 @@ test('orders: an operator gets amounts in major units and no provider ids, check
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.filename, 'ticket-orders-2026-10-01.csv');
   const [order] = asObjects(parseCsv(res.body.csv));
-  assert.equal(order['Order ID'], 'order-1');
+  assert.equal(order['Order ID'], 'ord_fixture1');
   assert.equal(order.Mode, 'test');
   assert.equal(order.Total, '50.00');
   assert.equal(order.Tickets, '2 × General');
-  assert.equal(order['Ticket IDs'], 'ticket-1; ticket-2');
+  assert.equal(order['Ticket IDs'], 'ord_fixture1_0_0; ord_fixture1_0_1');
   assert.ok(!res.body.csv.includes('uid-ada'));
   assertNoSecrets(res.body.csv);
 });
@@ -194,12 +196,15 @@ test('admissions: holder, status and check-in, an escaped name, and no raw provi
   const { handler } = setup();
   const res = await run(handler, 'admin', { dataset: 'admissions' });
   const rows = asObjects(parseCsv(res.body.csv));
-  assert.equal(rows.length, 2);
-  const two = rows.find((row) => row['Ticket ID'] === 'ticket-2');
+  assert.equal(rows.length, 3);
+  const two = rows.find((row) => row['Ticket ID'] === 'ord_fixture1_0_1');
   assert.equal(two['First name'], '\'=Cy');
   assert.equal(two['Claimed by an account'], 'yes');
   assert.equal(two['Checked in'], '2026-03-27T14:00:00.000Z');
   assert.ok(!res.body.csv.includes('uid-cy'));
+  const synced = rows.find((row) => row['Ticket ID'] === 'eb-ticket-7');
+  assert.equal(synced.Provider, 'eventbrite');
+  assert.equal(synced['Order ID'], 'eb-order-3');
   assertNoSecrets(res.body.csv);
 });
 

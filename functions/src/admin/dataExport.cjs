@@ -75,6 +75,10 @@ function stateWord(live, draft) {
  * The current revision of every record in a publishable collection: the
  * draft where one exists, else the live document, the same record the admin
  * list shows. Each carries its state word.
+ *
+ * A draft never holds `materialCount`: materials/store.cjs keeps it on the
+ * live session only (cms/store.cjs RESERVED_FIELDS). The record takes it
+ * from the live document.
  */
 async function readCurrent({ db, collection, counter, maxDocs }, toRecord) {
   const live = await readRecords({ db, collection, counter, maxDocs }, (id, data) => ({ id, data }));
@@ -85,7 +89,10 @@ async function readCurrent({ db, collection, counter, maxDocs }, toRecord) {
   return ids.map((id) => {
     const liveDoc = liveById.get(id) ?? null;
     const draftDoc = draftById.get(id) ?? null;
-    return { ...toRecord(id, draftDoc ?? liveDoc), state: stateWord(liveDoc, draftDoc) };
+    const current = draftDoc && typeof liveDoc?.materialCount === 'number'
+      ? { ...draftDoc, materialCount: liveDoc.materialCount }
+      : draftDoc ?? liveDoc;
+    return { ...toRecord(id, current), state: stateWord(liveDoc, draftDoc) };
   });
 }
 
@@ -97,7 +104,7 @@ function amount(value, exponent) {
 }
 
 function speakerName(record) {
-  return record.displayName || [record.firstName, record.lastName].filter(Boolean).join(' ') || record.id;
+  return [record.firstName, record.lastName].filter(Boolean).join(' ') || record.id;
 }
 
 const list = (values) => values.filter(Boolean).join(LIST_SEPARATOR);
