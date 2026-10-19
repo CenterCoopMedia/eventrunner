@@ -1184,7 +1184,10 @@ describe('the back issue', () => {
   });
 
   it('marks a live day as no such thing', () => {
-    const { container } = renderSchedule();
+    // A far-future day, so the real clock can never make it a past day.
+    const liveEvent = { ...fixtureConfig, days: [{ id: 'fx-day-1', label: 'Day one', date: '2999-10-15' }] };
+    const { container } = renderSchedule({ eventConfig: liveEvent, scheduleData: pastSessions });
+    expect(onScreen().getByText('[Fixture] Morning kickoff')).toBeInTheDocument();
     expect(container.querySelector('section[data-back-issue]')).toBeNull();
     expect(screen.queryByText(/back issue/i)).toBeNull();
   });
