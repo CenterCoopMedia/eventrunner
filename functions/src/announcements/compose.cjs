@@ -127,6 +127,17 @@ function personalize(rendered, unsubscribeUrl) {
   };
 }
 
+/**
+ * The audit-row redaction (email core `auditRedact`) that swaps a live
+ * unsubscribe link for the inert one, in its HTML and plain text forms.
+ */
+function auditRedactFor(liveUrl, inertUrl) {
+  return [
+    { find: escapeHtml(liveUrl), replace: escapeHtml(inertUrl || '') },
+    { find: liveUrl, replace: inertUrl || '' },
+  ];
+}
+
 /** The headers a one-click unsubscribe needs (RFC 2369, RFC 8058). */
 function unsubscribeHeaders(url) {
   return { 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' };
@@ -228,6 +239,7 @@ module.exports = {
   validateDraft,
   renderAnnouncement,
   personalize,
+  auditRedactFor,
   unsubscribeHeaders,
   senderOf,
   resolveChannel,

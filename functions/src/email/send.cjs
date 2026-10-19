@@ -133,14 +133,20 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
   /**
    * @param {object} message EmailMessage (spec §3.1): { to, from?, replyTo?,
    *   subject, text?, html?, headers?, tag?, onceKey?, idempotencyKey?,
-   *   source?, storeRendered? }
+   *   source?, storeRendered?, auditRedact? }. `auditRedact` is a list of
+   *   { find, replace } pairs applied to the bodies the audit row stores,
+   *   never to the mail sent: a per-recipient secret such as a signed
+   *   unsubscribe link stays out of the admin-readable log.
    * @returns {Promise<object>} EmailSendResult
    */
   /** One sent_emails row per permitted send() call, whatever the outcome. */
   async function writeAuditRow(message, fromEmail, toEmail, outcome) {
     const bodyStored = message.storeRendered !== false;
-    const html = bodyStored ? truncateForAudit(message.html) : { value: null, truncated: false };
-    const text = bodyStored ? truncateForAudit(message.text) : { value: null, truncated: false };
+    const redact = (body) => (typeof body === 'string' && Array.isArray(message.auditRedact)
+      ? message.auditRedact.reduce((out, { find, replace }) => (find ? out.split(find).join(replace ?? '') : out), body)
+      : body);
+    const html = bodyStored ? truncateForAudit(redact(message.html)) : { value: null, truncated: false };
+    const text = bodyStored ? truncateForAudit(redact(message.text)) : { value: null, truncated: false };
     try {
       await db.collection('sent_emails').add({
         to: toEmail,
@@ -417,7 +423,8 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
 /**
  * Delivery-event ingest (spec §3.1): authenticates through the adapter,
  * parses events, and patches matching sent_emails rows. Writes nothing
- * else and creates no collection. Returns 401 on a failed check and never
+ * else except the announcement opt-out it mirrors into
+ * `email_suppressions` (issue #490). Returns 401 on a failed check and never
  * falls back to accepting unauthenticated deliveries.
  *
  * @param {{ db: FirebaseFirestore.Firestore,

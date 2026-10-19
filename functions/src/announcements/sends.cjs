@@ -44,6 +44,7 @@ const {
   unsubscribeUrlFor,
 } = require('./suppression.cjs');
 const {
+  auditRedactFor,
   personalize,
   previewBodies,
   receiptFor,
@@ -413,6 +414,9 @@ function createSendAnnouncementEmailHandler(deps) {
           hasLegalFooterHtml: data.hasLegalFooterHtml,
           hasLegalFooterText: data.hasLegalFooterText,
           ...(url ? { headers: unsubscribeHeaders(url) } : {}),
+          // The email log keeps the inert link: the live one would let anyone
+          // who reads the log unsubscribe this recipient.
+          ...(url ? { auditRedact: auditRedactFor(url, testUnsubscribeUrl(config)) } : {}),
           tag: 'announcement.email',
           source: SOURCE,
           messageStream: data.stream,
