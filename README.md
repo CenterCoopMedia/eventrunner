@@ -49,7 +49,10 @@ What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-
 
 ## Operating model
 
-One Firebase project per client event. Configuration is two tiers:
+One Firebase project per client event. A client with a second event, or a new edition, gets a new
+project. `scripts/export-event-template.cjs` carries the approved branding, page templates and
+selected static settings into it, and nothing else; see "Reuse a past event as a template" in
+[`docs/CLIENT_ONBOARDING.md`](docs/CLIENT_ONBOARDING.md). Configuration is two tiers:
 
 1. **Deploy-time** environment variables (project id, providers, public URL). Documented in [`.env.example`](.env.example).
 2. **Runtime** Firestore `config/*` documents that client admins edit: name, dates, venue, theme, badges.

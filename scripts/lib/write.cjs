@@ -540,10 +540,11 @@ async function countSeeded({ db, collection = 'cmsContent' }) {
  * @param {{ db: object }} args
  * @returns {Promise<{ event: object|null, providers: object|null,
  *                     theme: object|null, bootstrap: object|null,
- *                     features: object|null }>}
+ *                     features: object|null, template: object|null }>}
  */
 async function readConfig({ db }) {
-  const ids = ['event', 'providers', 'theme', 'bootstrap', 'features'];
+  // `template` exists only on a project made from an event template (issue #328).
+  const ids = ['event', 'providers', 'theme', 'bootstrap', 'features', 'template'];
   const snaps = await db.getAll(...ids.map((id) => db.collection('config').doc(id)));
   const out = {};
   ids.forEach((id, i) => {

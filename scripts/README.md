@@ -61,6 +61,7 @@ node scripts/init-event.cjs --attest-auth    # record the manual Firebase Auth s
 | `--dry-run` | report every write without performing it |
 | `--skip-branding` | do not upload the placeholder branding assets |
 | `--seeded-threshold <n>` | how many seeded blocks `--check` tolerates (default 0) |
+| `--template <file>` | seed a new, empty project from an event template (`export-event-template.cjs`); needs new dates and an `owner` in the answers file |
 
 **Init exits 0 even with unmet readiness rows, by design** (§5.1.1): `legal.reviewRequired` is true
 on every fresh deployment because init sets it, and clearing it needs an admin UI that only exists
@@ -113,6 +114,27 @@ The answers file is JSON:
 Provider selection is deliberately NOT read from the file: it is Tier A
 (`EVENT_EMAIL_PROVIDER`, `EVENT_TICKETING_PROVIDER`, `EVENT_OPERATOR_NOTIFIER`), and Tier A wins on
 conflict (§2.2). An answers file that sets one gets a warning.
+
+### `export-event-template.cjs`
+
+Reads a past event's reusable setup into a reviewable template file (issue #328). It reads the
+project in `EVENT_FIREBASE_PROJECT_ID` and writes nothing to it. The allowlist lives in
+`scripts/lib/event-template.cjs`: theme choices, features, badges, selected `config/event` fields,
+live pages and the content blocks on them. Anything not on the list stays behind, so a new collection
+is excluded until someone adds it there.
+
+```sh
+node scripts/export-event-template.cjs --dry-run                      # the inventory; no file
+node scripts/export-event-template.cjs --out past-event-template.json # refuses an existing file
+node scripts/export-event-template.cjs --out t.json --page home --page faq
+```
+
+The inventory names every excluded collection with its size and reason, the stored files to copy by
+hand, and the blocks that still mention the past event. Apply the file with
+`init-event.cjs --template` against a new project. Init re-checks the allowlist, so a hand-edited
+file that carries `bootstrap`, a sender or an unknown field is refused. It also refuses the source
+project, a project that already holds data, `--force`, the past event's dates, and a missing owner.
+`tests/event-template.rules.test.js` proves two projects stay isolated on the emulator.
 
 ### `seed-demo-event.cjs`
 

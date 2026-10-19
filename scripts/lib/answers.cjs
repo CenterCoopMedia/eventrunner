@@ -22,7 +22,8 @@
  *     "features": { ...booleans },
  *     "theme":    { colors, fonts, texture, radius, logos },
  *     "badges":   { categories: [...] },
- *     "providers":{ email, ticketing, notifier }
+ *     "providers":{ email, ticketing, notifier },
+ *     "owner":    { name, email }               // --template only (issue #328)
  *   }
  *
  * Provider selection is NOT read from the answers file: it is Tier A
@@ -223,7 +224,9 @@ function parseAnswersFile(text) {
     return { ok: false, errors: ['answers file must contain a JSON object'] };
   }
   const errors = [];
-  const known = ['adminEmails', 'staffEmails', 'event', 'features', 'theme', 'badges', 'providers'];
+  // `owner` is read only by `init-event.cjs --template` (issue #328): the
+  // named person who answers for an event made from a past one.
+  const known = ['adminEmails', 'staffEmails', 'event', 'features', 'theme', 'badges', 'providers', 'owner'];
   for (const key of Object.keys(parsed)) {
     if (!known.includes(key)) errors.push(`${key}: unknown top-level key in the answers file`);
   }
@@ -232,6 +235,9 @@ function parseAnswersFile(text) {
   }
   if (parsed.staffEmails !== undefined && !Array.isArray(parsed.staffEmails)) {
     errors.push('staffEmails: must be an array of email addresses');
+  }
+  if (parsed.owner !== undefined && !isPlainObject(parsed.owner)) {
+    errors.push('owner: must be an object with name and email');
   }
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, answers: parsed };

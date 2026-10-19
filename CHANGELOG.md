@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused, and a time it repeats asks which one is meant. The stored RFC3339 values do not
   change (#476).
 
+- A new event can start from a past event's template. `scripts/export-event-template.cjs`
+  reads an allowlist from the past project: branding, page templates, their content blocks and
+  selected static settings. A dry run prints the inventory, with every excluded collection.
+  `init-event.cjs --template` applies the file only to a new, empty project. It needs new dates
+  and a named owner who is an operator. Accounts, tickets, pitches, credentials, the admin
+  allowlist, email logs and other records stay in the past project. `--check` adds a
+  **Template reuse** row (#328).
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page

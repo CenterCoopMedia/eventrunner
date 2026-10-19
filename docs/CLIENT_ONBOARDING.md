@@ -248,6 +248,99 @@ After acceptance, the operator and the client's authorized project owner must:
    pass. Sync runs while the personal schedule page is open. Confirm the production audience
    can grant access. Leave or set the flag off if setup or verification is incomplete.
 
+## Reuse a past event as a template
+
+Each event runs in its own Firebase project. A second event, or next year's edition of the same
+event, gets a new project, not a new section of the old one. This keeps accounts, tickets, pitches
+and logs of one event out of the other. A template carries the parts the client already approved:
+branding, page templates and selected static settings.
+
+### What a template carries
+
+The export reads an allowlist. Anything not on the list stays in the past project, including any
+collection added in a later release.
+
+| Carried | Stays in the past project |
+|---|---|
+| `config/theme`: colours, fonts, style and layout choices | Logo and image files (the inventory lists them) |
+| `config/features` and `config/badges` | `config/bootstrap` (the admin allowlist) and `config/providers` |
+| `config/event`: tagline, timezone, operator and contact lines, social accounts, search description, registration action label | Name, dates, venue, tracks, registration window, sender, Auth attestation, legal review |
+| Live page documents and their sections | Accounts, profiles, bookmarks and speakers |
+| Live content blocks on those pages | Tickets, orders, payments and `ticket_sync_queue` |
+| | Session pitches, schedule, sponsors, timeline and updates |
+| | Sent email rows, sign-in codes, rate limits, admin logs and every other record |
+
+The privacy and terms content is not carried. Init builds it again from the new project's providers,
+and legal review starts again. A block that init builds from settings, such as the home page title
+and dates, is built again from the new event's settings. A block that shows a stored file stays out:
+copy the file into the new project and add the block there.
+
+### Steps
+
+1. Provision a new project for the new event (§1). Never point a template at the past project.
+2. Print the inventory from the past project. This writes nothing:
+
+   ```sh
+   export EVENT_FIREBASE_PROJECT_ID=<the past event's project id>
+   node scripts/export-event-template.cjs --dry-run
+   ```
+
+   Read every row. "Review" rows name blocks that still mention the past event's name or year.
+3. Write the template file, then review the JSON with the client:
+
+   ```sh
+   node scripts/export-event-template.cjs --out past-event-template.json
+   ```
+
+   Pass `--page <id>` (repeatable) to carry only some pages. The default pages fill the rest.
+4. Write the new answers file (§2). It needs the new name, the new dates, the sender address and a
+   named owner. The owner must also be an operator:
+
+   ```json
+   {
+     "event": { "name": "...", "shortName": "...", "timezone": "...", "days": [...], "sender": { "email": "..." } },
+     "owner": { "name": "...", "email": "owner@client-domain" }
+   }
+   ```
+
+5. Seed the new project from the template:
+
+   ```sh
+   export EVENT_FIREBASE_PROJECT_ID=<the new event's project id>
+   node scripts/init-event.cjs --answers next-answers.json --admin owner@client-domain --template past-event-template.json
+   ```
+
+   Init refuses the template when the project is the past project, when the project already holds
+   configuration, pages, accounts, tickets or pitches, under `--force`, without dates, with a date of
+   the past event, or without a named owner who is an operator. Nothing is written when it refuses.
+   `--dry-run` reports the writes first.
+6. Work through §3 in full for the new project. The sender domain, ticketing provider, Auth steps and
+   Cloud Billing start unmet, even when the past event passed them. Confirm that the billing account
+   and the provider accounts are the ones for the new event.
+7. Run `--check` (§4). A project made from a template has one more row, **Template reuse**. It passes
+   when the event has dates that are not the past event's dates and the named owner is still an
+   operator. Each reused block counts as seeded until an editor saves it, so review every page before
+   launch.
+
+### Accounts across separate events
+
+Accounts belong to one project. An attendee of both events signs in to the new site and gets a new
+account. Their profile, bookmarks, badges and tickets do not move. Grant operators and staff again
+with `--admin`, `--staff` or admin Settings → Access. Invite speakers again. To show that someone came
+before, an admin records it in **Past attendance** on that person's record in the new event
+(`docs/ADMIN_GUIDE.md`).
+
+### Export and archive of the past event
+
+- The template file holds no accounts, but it holds the client's copy. Keep it with the client's
+  records. Do not put it in a public repository or issue.
+- Take the past event's own exports before you change it: the attendee export and the session
+  materials archive (`docs/ADMIN_GUIDE.md`).
+- Set the past event's archive date in admin Event settings. Its pages then show as back issues.
+  With ticket sales, follow "Archiving an event with ticket sales" in `docs/DEPLOY_RUNBOOK.md` first.
+- The past project keeps its records until the client asks for their removal. The new event does not
+  read from the past project, so removing the past project later does not change the new event.
+
 ## Handoff to the client
 
 Once the site is live, point the client at the two handbook pages instead of re-explaining their
