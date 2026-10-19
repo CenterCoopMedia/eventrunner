@@ -1,1 +1,0 @@
-import{r as e}from"./materialsSource-BJ-EKtb-.js";function t(t,n,r=`text/csv;charset=utf-8`){typeof document<`u`&&e(new Blob([n],{type:r}),t)}export{t};
