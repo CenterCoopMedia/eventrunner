@@ -289,6 +289,34 @@ The canonical speaker list, with each record's pipeline status and the entry poi
 
 One speaker record is the source of truth. If a name is wrong in three places on the public site, fix the speaker record — do not patch each place it appears.
 
+### Speaker reminders
+
+Email accepted speakers about the items they still owe. Select **Send reminders** at the top of the Speakers list, or **Remind** on the row of one accepted or approved speaker. Staff and operators can use this page.
+
+**What counts as missing.** The page uses the same rule as the speaker's own **Your next steps** list:
+
+- **Biography** and **Headshot**: The field is empty. A change the speaker sent for review counts as done.
+- **Session description**: A published session the speaker is on has no description text.
+- **Materials**: A published session the speaker is on has no pending or approved material. A rejected material does not count.
+
+Only published sessions that are not hidden count. Only speakers who accepted an invitation are listed. A speaker who is not invited yet, or whose invitation is still open, gets the invitation instead.
+
+**Choose speakers.** **Show** narrows the list: **Anything missing** (the default), one item, or **Every accepted speaker**. The choice stays in the page address. Each row names the missing items with the session titles, and says when the speaker was last reminded and about what. Tick one speaker, or select **Select all shown**. A change to **Show** clears the selection. **Items to include** picks the items a reminder may name. Each speaker's message names only the chosen items that speaker still owes.
+
+**Preview.** **Preview reminders** shows the message each speaker gets: the address, the subject, the HTML version in a safe frame, and the plain text version. Choose a speaker under **Recipient** to read their copy. The preview also names each selected speaker who gets no reminder and why: No email address, nothing missing in the chosen items, a reminder in the last 24 hours, or no accepted invitation. A change to the selection or the items clears the preview.
+
+**Send.** **Send 3 reminders** (the number is the recipient count) opens a confirmation that names the speakers. The server sends only the messages the preview showed:
+
+- **One reminder per click.** Each preview has its own id. The server records it for each speaker before the email goes. If you press **Send** twice, or the connection drops and the browser tries again, nothing more is sent.
+- **At most one reminder per speaker in 24 hours.** A speaker reminded less than 24 hours ago is left out, and the row says when the next reminder is possible.
+- **A message that could not be emailed** is reported after the send. Preview again to retry it.
+
+Every reminder goes through the event's email provider and appears in the Email log with its body. Each send writes one admin log entry with your account, the items, and the speakers who got a reminder. A historical demo refuses the send.
+
+**Reminder wording.** The **Reminder wording** panel edits the subject, the HTML body, and the plain text body. Each missing item is one line inside a condition, for example `{{#if materials_sessions}}…{{/if}}`, so a line appears only when the speaker owes that item. `{{description_sessions}}` and `{{materials_sessions}}` hold the session titles. Both bodies must keep `{{dashboard_url}}`, the link to the speaker's dashboard. The server refuses a token the template does not know and says which one. **Use the shipped wording** deletes the saved wording. Each save and each reset writes an admin log entry. Save, then preview, to read the new wording as each speaker gets it.
+
+**Export this list as CSV** saves the speakers the current **Show** choice lists, one row per speaker, with the name, the email address, the status, the missing items, the session titles, and the last reminder. Use it with your own mailing tool. A cell that starts like a spreadsheet formula is escaped. Each export writes an admin log entry first. If that entry cannot be written, no file is made.
+
 ## Attendees
 
 The full attendee list with registration status and a search/filter. What action is available depends on the current status:

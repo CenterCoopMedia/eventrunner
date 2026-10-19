@@ -83,6 +83,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stores each announcement with an inert unsubscribe link in place of the recipient's live
   one (#490).
 
+- Speaker reminders. Staff select accepted speakers, alone or as a group such as
+  **Materials missing**, preview the exact email each one gets, confirm the recipient
+  count, and send through the event's email provider. A message names only what the
+  speaker still owes (biography, headshot, session description, materials), by the same
+  rule as the speaker's own next steps list. A double click or a retry sends nothing more,
+  a speaker gets at most one reminder in 24 hours, each row shows when the speaker was
+  last reminded, and each send is in the admin log. Staff can edit the reminder wording,
+  and the server refuses an unknown token at save. The readiness list exports as CSV for
+  an organizer's own mailing tool (#332). A historical demo refuses the send.
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page
