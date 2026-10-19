@@ -268,12 +268,17 @@ export default function Home() {
     // from other live collections that may still show snapshot text.
     //
     // The lead is the core (brief §6.2), so the `hero` section is the core's
-    // own and never renders again as a slot section. It is the only one:
-    // every other section this page draws itself is drawn through
-    // `renderSection`, in its own place in the operator's order.
+    // own and never renders again as a slot section. Every other section
+    // this page draws itself is drawn through `renderSection`, in its own
+    // place in the operator's order.
+    //
+    // The `footer` section is not this page's to draw at all: it holds the
+    // grouped links the site footer renders on every page (Layout.jsx,
+    // FooterLinkGroups). Drawn here too, it printed a "Footer links"
+    // heading in the home body (launch rehearsal, v1280-home.png).
     <SystemPage
       pageId={['home', '/']}
-      exclude={['hero']}
+      exclude={['hero', 'footer']}
       renderSection={renderHomeSection}
       data-content-source={source}
       data-cms-content-source={contentSource}
