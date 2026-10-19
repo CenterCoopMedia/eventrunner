@@ -1,1 +1,0 @@
-import{Br as e,Dn as t,Et as n,On as r,lt as i}from"./initial-BtuiqI7w.js";var a=r();function o({account:r}){let{eventConfig:o}=t(),s=r?.views??[];return i(o)||s.length<2||!s.some(e=>e.id===`admin`)?null:(0,a.jsx)(e,{to:`/admin`,className:`${n} mt-sm`,children:`Manage event`})}export{o as t};
