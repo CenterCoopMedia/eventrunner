@@ -324,8 +324,9 @@ such as `/admin` or `/pitch`. No two pages may share an id, a path or a section.
    Init refuses the template, and writes nothing, in each of these cases:
 
    - The project is the past project.
-   - The project already holds configuration, pages, content, email templates, accounts, speakers,
-     tickets, orders, pitches, admin logs or email rows.
+   - The project already holds any event record: configuration, pages, content, email templates,
+     accounts, speakers, sessions, organizations, timeline entries, updates, tickets, orders,
+     pitches, admin logs, email rows, or any other collection.
    - The project has Firebase Authentication accounts. Init checks this with real credentials. Under
      the Firestore emulator alone it cannot, so it prints a warning: confirm in the console that the
      project has no accounts.
