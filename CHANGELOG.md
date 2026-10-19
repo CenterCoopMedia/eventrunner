@@ -354,6 +354,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   complete subscription when none exists, and names every other subscription at the endpoint so
   the operator can delete it (#357).
 
+- A hero button or link group item that leads to a section switched off on Settings → Features
+  (schedule, speakers, sponsors, attendees, updates) is no longer shown on the public site. It led
+  to a "doesn't have a public schedule" page. The Content editor warns under the destination when
+  a link leads to a section that is off; the save still succeeds, and the link returns when the
+  feature is switched on.
+- The home page body no longer draws the seeded **Footer links** section under its own heading.
+  The site footer now shows those links on every page, one list per group.
 - Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
   function deletes older `sent_emails` rows in bounded batches, and the Email log and onboarding
   guide state the period before an operator or client relies on the log (#268).
@@ -384,6 +391,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A fresh site seeds the **Recap**, **Guidelines** and **City guide** pages hidden, so a new
+  site's navigation offers no empty page. A re-run of init keeps each page's stored visibility,
+  so an existing deployment does not change. The admin Pages list now says **Visible** or
+  **Hidden** on every row, and names the feature that hides a built-in page.
+- The admin guide's early launch steps now say how to take a home section off the site (hide or
+  delete its blocks, or remove the section in Pages), that "[Replace]" text and seeded statistics
+  show until edited, and that **Pitch a session** appears in the home page lead only.
 - **Breaking:** `submitSessionPitch` now requires `consent: true`. Callers must record agreement
   to organizer review before submitting; requests without it return 400. Stored proposals
   record the consent version and time (#323).
