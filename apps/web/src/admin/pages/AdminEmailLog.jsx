@@ -66,6 +66,8 @@ export const SOURCE_LABELS = Object.freeze({
   feedback: 'Feedback receipt',
   'operator-notify': 'Operator alert',
   'ticketing-registration-prompt': 'Ticket prompt',
+  announcement: 'Announcement',
+  'announcement-test': 'Announcement test',
 });
 
 /**

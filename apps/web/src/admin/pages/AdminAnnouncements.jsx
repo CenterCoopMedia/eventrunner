@@ -20,6 +20,7 @@ import AdminPageHeader, {
   AdminLoadingState,
   StatusBadge,
 } from '../components/adminChrome.jsx';
+import AnnouncementEmailComposer from '../components/AnnouncementEmailComposer.jsx';
 
 const EMPTY_FORM = {
   message: '', level: 'info', startsAt: '', endsAt: '', linkUrl: '', linkLabel: '',
@@ -143,7 +144,7 @@ export default function AdminAnnouncements() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Announcements"
-        description="Site-wide messages shown during their active window. Saving here is live immediately."
+        description="Site banners show during their active window, and saving one is live immediately. Announcement email goes only to the audience you confirm."
         identifiers={rows ? `${ordered.length} announcement${ordered.length === 1 ? '' : 's'}` : null}
       />
 
@@ -245,6 +246,8 @@ export default function AdminAnnouncements() {
           </ul>
         </Panel>
       )}
+
+      <AnnouncementEmailComposer />
     </div>
   );
 }
