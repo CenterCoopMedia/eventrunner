@@ -364,6 +364,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hidden. The Content editor warns the same way.
 - The home page body no longer draws the seeded **Footer links** section under its own heading.
   The site footer now shows those links on every page, one list per group.
+- **Call settings saved.** now appears after an operator saves the call for sessions, and the
+  save button keeps focus. The panel used to remount when the saved values came back, which
+  dropped the message. The panel description no longer wraps one word onto a second line, and
+  the filter and search fields on **Session pitches** share one input baseline at wide widths
+  (#476).
+
 - Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
   function deletes older `sent_emails` rows in bounded batches, and the Email log and onboarding
   guide state the period before an operator or client relies on the log (#268).

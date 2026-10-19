@@ -106,7 +106,11 @@ The form requires a title, description, and organizer-review consent. Organizati
 
 Open **Session pitches** at `/admin/pitches`. Staff can search by title, email, or organization, filter by decision, and open each proposal. Save notes and the chosen decision explicitly. A concurrent edit disables saving and keeps your unsaved notes visible. Copy your notes before choosing **Load current review**, then reconcile them with the current revision. Decisions send no notifications. Notification delivery is a separate workflow.
 
-Operators can expand **Manage the call for sessions** and save an enabled state, an RFC3339 deadline and where people pitch. Staff cannot change these settings.
+Operators can expand **Manage the call for sessions** and save an enabled state, a deadline and where people pitch. Staff cannot change these settings.
+
+Enter the **Deadline** as a **Date** and a **Time** on the event's clock. The time zone comes from **Event settings** and shows under the fields. The line under it states the deadline in words, with the zone and the UTC offset for the chosen date. For example, 11:59 PM on January 31 reads "Intake closes Sunday, January 31, 2027 at 11:59 PM Eastern Standard Time (UTC−05:00)." The page stores the same RFC3339 instant as before.
+
+A deadline is required. A cleared deadline does not save. A time that the clocks skip when daylight saving time starts does not exist, so the page refuses it and asks for another time. A time that happens twice when daylight saving time ends shows two choices, one before and one after the clocks go back. Choose one before you save. A failed save keeps your entries. If another operator saves the call while you edit it, your entries stay and a notice offers **Load saved settings**.
 
 ### Reviewed CSV import and private export
 

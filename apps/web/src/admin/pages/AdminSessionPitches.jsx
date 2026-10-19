@@ -8,6 +8,9 @@ import { useAdminApi } from '../adminApi.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { saveTextFile } from '../downloadFile.js';
 import { toMillis } from '../versionHistory.js';
+import { focusFirstError } from '../../lib/focusFirstError.js';
+import EventDateTimeField from '../components/EventDateTimeField.jsx';
+import { sameCallSettings } from '../pitchCallSettings.js';
 import { PITCH_COLUMNS, readPitchCsv, pitchQueueCsv } from '../pitchCsv.js';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { Panel, Notice, SaveStatus, TextField, TextAreaField, SelectField, CheckboxField,
@@ -22,9 +25,14 @@ const intakeOptions = [
   { value: 'external', label: 'An external form, such as Airtable' },
 ];
 
-function PitchCallSettings({ settings, call }) {
+function PitchCallSettings({ settings, call, timeZone }) {
+  const [baseline, setBaseline] = useState(settings);
   const [enabled, setEnabled] = useState(settings.enabled === true);
   const [closesAt, setClosesAt] = useState(settings.closesAt || '');
+  const [deadlineProblem, setDeadlineProblem] = useState(null);
+  const [showDeadlineError, setShowDeadlineError] = useState(false);
+  const [refused, setRefused] = useState(0);
+  const [savedElsewhere, setSavedElsewhere] = useState(false);
   // The same reader as the server and /pitch, so the choice shown is the one in effect.
   const savedFormUrl = readPitchFormUrl(settings.externalFormUrl);
   const [intake, setIntake] = useState(savedFormUrl ? 'external' : 'native');
@@ -36,6 +44,22 @@ function PitchCallSettings({ settings, call }) {
   const errorRef = useRef(null);
   const formRef = useRef(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
+  useEffect(() => { if (refused) focusFirstError(formRef.current); }, [refused]);
+  function load(next) {
+    const nextFormUrl = readPitchFormUrl(next.externalFormUrl);
+    setBaseline(next); setEnabled(next.enabled === true); setClosesAt(next.closesAt || '');
+    setIntake(nextFormUrl ? 'external' : 'native'); setFormUrl(nextFormUrl || ''); setFormUrlError(''); setSavedElsewhere(false);
+  }
+  // The panel is not keyed on the saved values: a remount on this panel's own
+  // save dropped "Call settings saved." and the focus with it (#476). A
+  // snapshot that matches the form, or arrives while nothing is edited, is
+  // taken in place. One that differs from unsaved edits keeps the edits.
+  const formNow = { enabled, closesAt, externalFormUrl: intake === 'external' ? formUrl.trim() : null };
+  useEffect(() => {
+    if (sameCallSettings(settings, baseline)) return;
+    if (sameCallSettings(formNow, settings) || sameCallSettings(formNow, baseline)) load(settings);
+    else { setBaseline(settings); setSavedElsewhere(true); }
+  }, [settings]); // eslint-disable-line react-hooks/exhaustive-deps -- runs only when the saved settings change
   async function save(e) {
     e.preventDefault();
     if (busy) return;
@@ -44,26 +68,31 @@ function PitchCallSettings({ settings, call }) {
     const formUrlProblem = intake !== 'external' ? ''
       : !externalFormUrl ? 'Enter the form address, or choose this site’s pitch form.'
         : !readPitchFormUrl(externalFormUrl) ? 'Use an address that starts with https://.' : '';
-    if (formUrlProblem) {
+    // Mark every refused field at once. Focus goes to the first one, and an
+    // earlier "Call settings saved." does not stay beside the new errors.
+    if (deadlineProblem || formUrlProblem) {
+      if (deadlineProblem) setShowDeadlineError(true);
       setFormUrlError(formUrlProblem);
-      formRef.current?.querySelector('input[name="externalFormUrl"]')?.focus();
+      setResult('');
+      setRefused((count) => count + 1);
       return;
     }
     setFormUrlError(''); setError(null); setResult(''); setBusy(true);
-    try { await call('updatePitchCall', { enabled, closesAt, externalFormUrl }); setResult('Call settings saved.'); }
+    try { await call('updatePitchCall', { enabled, closesAt, externalFormUrl }); setSavedElsewhere(false); setResult('Call settings saved.'); }
     catch (err) { setError(err); }
     finally { setBusy(false); }
   }
-  return <Panel title="Call settings" description="Only operators can open or close intake. Use a date, time, and explicit UTC offset.">
+  return <Panel title="Call settings" description="Only operators can open or close intake.">
     <form ref={formRef} onSubmit={save} className="space-y-sm">
       <ServerErrorSummary error={error} errorRef={errorRef} />
+      {savedElsewhere ? <><Notice tone="caution" message="The saved call settings changed. Your unsaved edits are still here. Saving replaces the saved settings." /><button type="button" className={secondaryButtonClass} onClick={() => load(baseline)} disabled={busy}>Load saved settings</button></> : null}
       <fieldset disabled={busy} className="space-y-sm">
         <CheckboxField label="Accept session pitches" checked={enabled} onChange={setEnabled} />
-        <TextField label="Deadline (RFC3339)" value={closesAt} onChange={setClosesAt} required hint="For example, 2027-01-31T23:59:59-05:00. The offset prevents timezone ambiguity." />
+        <EventDateTimeField label="Deadline" value={closesAt} timeZone={timeZone} onChange={(value) => setClosesAt(value || '')} onProblemChange={setDeadlineProblem} required showError={showDeadlineError} summaryPrefix="Intake closes" emptySummary="No deadline is set. Enter one to save." hint="Intake closes at this date and time." />
         <SelectField label="Where people pitch" value={intake} onChange={setIntake} options={intakeOptions} hint="With an external form, the site links to it and this queue receives pitches only through CSV import." />
         {intake === 'external' ? <TextField name="externalFormUrl" label="External form address" type="url" value={formUrl} onChange={(v) => { setFormUrl(v); setFormUrlError(''); }} required maxLength={2048} error={formUrlError} hint="Use the form’s public https:// share link." /> : null}
       </fieldset>
-      <button className={primaryButtonClass} disabled={busy}>{busy ? 'Saving…' : 'Save call settings'}</button>
+      <button className={primaryButtonClass} aria-disabled={busy} aria-busy={busy}>{busy ? 'Saving…' : 'Save call settings'}</button>
       {result ? <SaveStatus message={result} /> : null}
     </form>
   </Panel>;
@@ -195,6 +224,7 @@ function PitchReview({ initial, current, call }) {
 export default function AdminSessionPitches() {
   const call = useAdminApi();
   const { isOperator } = useAuth();
+  const { eventConfig } = useEventConfig();
   const [rows, setRows] = useState(null);
   const [listError, setListError] = useState(null);
   const [settings, setSettings] = useState(null);
@@ -211,10 +241,10 @@ export default function AdminSessionPitches() {
   return <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
     <AdminPageHeader title="Session pitches" description="Review private proposals. A decision does not send a notification or publish event content." actions={<button className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))}>Export filtered queue</button>} />
     <p className="text-admin-sm text-admin-ink-secondary"><Link to="/pitch" className={rowTitleLinkClass}>Open public pitch form</Link>. CSV contains contact details: Keep the downloaded file private. Review notes are excluded.</p>
-    {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings key={`${settings.enabled}-${settings.closesAt}-${settings.externalFormUrl ?? ''}`} settings={settings} call={call} /></details> : null}
+    {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings settings={settings} call={call} timeZone={eventConfig?.timezone} /></details> : null}
     {configError ? <Notice tone="caution" message="Cannot check call settings. Reconnecting…" /> : null}
     <ImportPitches call={call} />
-    <div className="grid gap-sm sm:grid-cols-2"><SelectField label="Filter by decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...statuses]} /><TextField label="Search pitches" value={search} onChange={setSearch} hint="Title, email, or organization." /></div>
+    <div className="grid gap-sm sm:grid-cols-2 sm:items-end"><SelectField label="Filter by decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...statuses]} /><TextField label="Search pitches" value={search} onChange={setSearch} hint="Title, email, or organization." /></div>
     {listError ? <Notice tone="caution" message="Cannot load the queue. Reconnecting; saved values may be out of date." /> : null}
     {rows === null ? <AdminLoadingState label="Loading session pitches…" /> : <>
       <p role="status" className="text-admin-sm text-admin-ink-secondary">Showing {shown.length} of {rows.length} pitches.</p>
