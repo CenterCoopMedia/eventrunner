@@ -117,21 +117,6 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
-          <li>Session pitch emails (#324). A person who pitches through this site&#39;s form gets a
-          receipt after the pitch is stored; a failed receipt does not fail the submission.
-          Staff send acceptance and decline emails from each pitch, after a preview and a
-          confirmation, with an optional note to the submitter. Saving a decision still sends
-          nothing, imported pitches never get an automatic email, and private review notes are
-          never sent. The preview says when an imported address was not verified and when the
-          other decision email was already sent. Each pitch shows a sending, sent, not sent, or
-          may-have-been-sent record for each email. Send-once keys stop a retry or a repeated
-          decision from sending an email twice. A refused email can be retried; an email whose
-          delivery is unknown is retried only after staff confirm that they checked the Email log.
-          Operators choose automatic or manual receipts and edit the wording of all three
-          emails. A send is refused if the wording changed after its preview, and a settings
-          save is refused if another operator saved first.</li>
-          </ul>
-          <ul>
           <li>A call for sessions can use an external form, such as Airtable, instead of this site&#39;s
           form. Operators save its https address with the call. <code>/pitch</code> then links to it while the
           call is open, and native submission is refused so one call has one queue. The home page
@@ -517,10 +502,15 @@
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
-          <li><strong>Upgrade behavior:</strong> session pitch receipts (#324) are on by default. After the upgrade, each
-          new pitch from this site&#39;s form gets a receipt email, with no further step. To turn this off,
-          an operator chooses <strong>Staff send each receipt</strong> under <strong>Session pitches → Manage pitch emails</strong>
-          and saves it before deploying this version.</li>
+          <li>The web toolchain moves to Vite 8, <code>@vitejs/plugin-react</code> 6 and Vitest 5 (from Vite 5,
+          plugin-react 4 and Vitest 3). This clears the Dependabot alerts for <code>vitest</code> and <code>tinypool</code>
+          (critical), <code>vite</code> (high), and <code>@vitest/mocker</code> and <code>esbuild</code> (moderate). The repository now
+          needs Node 22.12 or later on Node 22, Node 24, or Node 26 and later, the range Vitest 5
+          supports. Vite 8 bundles with Rolldown, so <code>vite.config.js</code> keeps the first
+          paint in one chunk, and the specimen route reads its build switches beside its dynamic import
+          so a client build still emits no specimen chunk.</li>
+          </ul>
+          <ul>
           <li><strong>Breaking:</strong> <code>submitSessionPitch</code> now requires <code>consent: true</code>. Callers must record agreement
           to organizer review before submitting; requests without it return 400. Stored proposals
           record the consent version and time (#323).</li>

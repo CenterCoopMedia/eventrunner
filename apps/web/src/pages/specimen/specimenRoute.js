@@ -6,8 +6,9 @@
 // compile to a constant, so a client production build drops the branch and
 // never emits the chunk.
 //
-// The gate is a pure function so a test can state the whole truth table
-// without a build. App.jsx is the only caller.
+// The page's dynamic import lives here, beside the gate, and App.jsx is the
+// only caller. The gate is also a pure function so a test can state the
+// whole truth table without a build.
 import { IS_DEMO } from '../../lib/demoMode.js';
 
 /** The route path, relative to the site root. */
@@ -19,13 +20,23 @@ export const SPECIMEN_TITLE = 'Specimen book';
 /**
  * Whether the specimen route exists in this build.
  *
- * Written as a plain expression over two constants rather than as a call,
- * because the bundler has to FOLD it. A call across a module boundary is
- * not folded, so the ternary in App.jsx would survive and Rollup would emit
- * the chunk for a client production build even though no route points at
- * it. That was measured, not assumed.
+ * Written as a plain expression over the build constants rather than as a
+ * call, because the bundler has to FOLD it. It also reads
+ * `import.meta.env` here rather than `IS_DEMO` from lib/demoMode.js, and the
+ * import below sits in this same module, for the same reason. Rolldown
+ * (Vite 8) folds only a condition it can read in the module that holds the
+ * `import()`. With the condition imported from another module, it drops the
+ * branch from the code but still writes the chunk into a client production
+ * build. That was measured, not assumed. The comparisons match
+ * lib/demoMode.js; keep the two in step.
  */
-export const SPECIMEN_ENABLED = IS_DEMO || import.meta.env.DEV;
+export const SPECIMEN_ENABLED =
+  import.meta.env.VITE_DEMO_MODE === '1' ||
+  import.meta.env.VITE_DEMO_MODE === 'true' ||
+  import.meta.env.DEV;
+
+/** Loads the page, or is null in a build where the route does not exist. */
+export const loadSpecimenPage = SPECIMEN_ENABLED ? () => import('./Specimen.jsx') : null;
 
 /**
  * The same rule as a pure function, so a test can state its whole truth
