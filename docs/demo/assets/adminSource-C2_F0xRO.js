@@ -1,0 +1,1 @@
+import{_r as e,ar as t,fr as n,nr as r}from"./initial-BtuiqI7w.js";function i(i,a,o){return r(r=>n(e(t,i),e=>{a(e.docs.map(e=>({id:e.id,...e.data()})))},r),e=>{console.warn(`${i} admin subscription failed; retrying.`,e),o?.(e)})}export{i as t};
