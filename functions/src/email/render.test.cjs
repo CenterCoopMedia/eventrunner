@@ -60,6 +60,42 @@ test('_html tokens substitute raw into html, stripped into text', () => {
   assert.ok(out.text.includes('Example Org\n1 Main St\nSpringfield'));
 });
 
+test('an _html token decodes each entity once in the text body', () => {
+  // The address an operator wrote shows the text "&lt;" literally. Decoding
+  // "&amp;" first turned "&amp;lt;" into "<" in the text body.
+  const config = {
+    ...CONFIG,
+    event: {
+      ...CONFIG.event,
+      legal: { ...CONFIG.event.legal, postalAddressHtml: 'R&amp;D &amp;lt;Lab&amp;gt;<br>&quot;Hall&quot; &#39;B&#39; &lt;2&gt;' },
+    },
+  };
+  const out = render({ template: TEMPLATE, tokenValues: { first_name: 'A', code: '1' }, config });
+  assert.ok(out.text.endsWith('R&D &lt;Lab&gt;\n"Hall" \'B\' <2>'), out.text);
+});
+
+test('an _html token leaves no tag in the text body, however it is nested', () => {
+  const config = {
+    ...CONFIG,
+    event: {
+      ...CONFIG.event,
+      legal: { ...CONFIG.event.legal, postalAddressHtml: 'A<scr<script>ipt>x</script><<b>>B<>C<p' },
+    },
+  };
+  const out = render({ template: TEMPLATE, tokenValues: { first_name: 'A', code: '1' }, config });
+  const footer = out.text.slice(out.text.indexOf('code 1.') + 'code 1.'.length + 1);
+  assert.equal(footer, 'Aipt>x>B<>C<p');
+});
+
+test('stripHtmlToText is linear on unclosed and nested brackets', () => {
+  for (const html of ['<'.repeat(50000), '<a'.repeat(25000), '<>'.repeat(25000), '&amp;'.repeat(10000)]) {
+    const started = performance.now();
+    internals.stripHtmlToText(html);
+    const elapsed = performance.now() - started;
+    assert.ok(elapsed < 50, `${html.slice(0, 4)}... took ${elapsed.toFixed(1)} ms`);
+  }
+});
+
 test('per-send values can never populate an _html token', () => {
   const out = render({
     template: TEMPLATE,
