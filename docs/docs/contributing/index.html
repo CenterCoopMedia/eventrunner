@@ -165,7 +165,7 @@
           <h2 id="dev-setup">Dev setup<a class="heading-anchor" href="#dev-setup" aria-label="Link to this section">#</a></h2>
           <ol>
           <li>Fork and clone this repository.</li>
-          <li>Use Node 22 (<code>node -v</code>) — the Cloud Functions runtime pins that major, so <code>functions/package.json</code> declares <code>&quot;node&quot;: &quot;22&quot;</code> and npm warns (<code>EBADENGINE</code>) on newer majors.</li>
+          <li>Use Node 22, release 22.12 or later (<code>node -v</code>); Vitest 5 needs it. The Cloud Functions runtime pins that major, so <code>functions/package.json</code> declares <code>&quot;node&quot;: &quot;22&quot;</code> and npm warns (<code>EBADENGINE</code>) on newer majors.</li>
           <li>From the repo root:</li>
           </ol>
           <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">npm run prepare:functions   # packs packages/shared into functions/vendor/ — required before install
