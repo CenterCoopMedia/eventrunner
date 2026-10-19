@@ -151,10 +151,8 @@ and a pointer in the ADR 0001 porting-map row.
    Airtable record id, which equals the old `RECORD_ID()` formula field.
 6. **Limits:** 1,000 records per run, one manual run per minute, a 10-minute lease, 25 listed
    skipped ids. A rich-text description arrives as Airtable's Markdown text.
-7. **Not touched for conflict reasons:** the call-settings hint in `AdminSessionPitches.jsx` still
-   says an external form's pitches arrive "only through CSV import". It sits next to the deadline
-   field another builder is changing. Change "only through CSV import" to "through an Airtable
-   refresh or CSV import" on the stack tip.
+7. The call-settings hint in `AdminSessionPitches.jsx` that said "only through CSV import" was
+   first left alone to avoid a conflict. The review round changed it (see "Review round").
 8. The new ADR is not added to `scripts/lib/pages-manifest.cjs`, as ADR 0004 is not either.
 
 ## Checks (final run, with `docs/docs` and `docs/demo` regenerated locally)
@@ -184,3 +182,76 @@ regenerates on the stack tip.
 - The pitch email builder's receipt and decision emails are on another branch. Imported rows
   carry `source: 'airtable'` and `uid: null`; that work must not send a receipt for them
   (ADR 0005 says so).
+
+## Review round
+
+The adversarial review had no must-fix items and ten optional findings. I traced each one
+through the code. Every finding was real. Seven are fixed. One is handed to the director. Two
+are not changed, and the reasons are below.
+
+1. **The "only through CSV import" hint in `AdminSessionPitches.jsx`.** Fixed in 96d8092. The hint
+   now says: "With an external form, the site links to it. Pitches reach this queue through a
+   refresh from Airtable or a CSV import." No test asserted the old text.
+2. **The lockfile hash and the `docs/docs` and `docs/demo` output.** Not fixed here, as the
+   dispatch says. The director regenerates them on the stack tip, and the
+   `packages/shared/src/config/deploy.cjs` change needs the lockfile hash refresh. This item stays
+   on the director's checklist.
+3. **Removal tracking with a table name and then a table ID.** Fixed in fde04db, with the failing
+   test first ("a switch from the table name to the table ID keeps removal tracking"). I traced it
+   as follows: `flagRemoved` matched `airtable.table === source.table`, and `applyChunk` wrote
+   `airtable` only when the field was missing. After a change from `Pitches` to `tbl…`, no
+   stored pitch could ever be flagged again. Now `flagRemoved` matches on the base alone. There
+   is one approved source, so the base is a sufficient match. Each seen record also takes the
+   current base, table and record ID.
+4. **A record that comes back without consent kept "Removed from Airtable".** Fixed in fde04db,
+   with the failing test first ("a record that comes back without consent loses its removed
+   flag"). The no-consent branch now clears `sourceRemovedAt`. It keeps the first
+   `sourceConsentMissingAt`.
+5. **No overall time budget against the 300-second timeout.** Fixed in 8a12746, with the failing
+   test first ("stops with a stated reason before rate-limit waits pass the run budget"). Before
+   the fix, 10 pages × 2 × 30 s could reach 600 s of waiting. The read now stops with the code
+   `timed-out` before any wait goes past 240 s. A hanging request is also aborted at the same
+   deadline (`AbortSignal.timeout`). The run then writes its failed status and clears the lease.
+   The operator guide has a troubleshooting row for this error. I did not add the UI fallback
+   (treat a `running` older than the lease as stale). The server fix removes the known cause, and
+   a later run already takes an expired lease.
+6. **Every complete run reads every Airtable pitch.** Documented in a1b495b. No code change. The
+   cost is real but small: about two reads per record per complete run, which is about 192,000
+   reads a day for 1,000 records on the 15-minute timing. At Firestore's read price, that is
+   about two dollars a month. A skip based on the "seen set" would add stored state and a new way
+   to miss a removal. That cost is higher than the saving. The operator guide now gives the read
+   counts and suggests the hourly timing.
+7. **Earlier CSV rows under a source name other than `airtable` are duplicated.** Documented in
+   a1b495b. The CSV source name is case-sensitive (`pitchQueue.cjs` hashes the trimmed name), so
+   `Airtable` does not match. The setup steps now have a step "Check earlier CSV imports"
+   (**Export filtered queue**, `source` column). The Airtable CSV step now says to use the
+   source name `airtable`. I did not add a "legacy source name" setting or duplicate detection,
+   because each adds a new matching rule for a one-time migration.
+8. **"back in airtable" in the result line.** Fixed in 96d8092. `summary()` now lowercases only
+   the first letter of each label. The unit test and the two E2E regexes now expect
+   "back in Airtable".
+9. **The Airtable panel shows on every deployment.** Fixed in b70881d. Staff see the panel only
+   after the status document exists, that is, after an operator's first refresh. Operators always
+   see it, because they set up the connection, and they cannot read a public flag for
+   `EVENT_AIRTABLE_ENABLED`. The tests cover a staff user without a status document (no panel and
+   no button) and an operator ("No refresh has run yet."). The operator guide says when staff see
+   the panel.
+10. **Fixed fake Airtable port 5197.** Not changed. The E2E run already uses fixed ports for the
+    Firestore (8080), Auth (9099), Functions (5001) and Vite (5173) emulators. Two E2E runs on one
+    machine collide on those ports first. The brief puts `test:e2e` under
+    `flock /tmp/eventrunner-heavy.lock`, so E2E runs never overlap. The port can also be changed
+    through `EVENT_AIRTABLE_API_ORIGIN`.
+
+### Checks after the review fixes (last run, on the final code)
+
+- `npm run lint`: exit 0.
+- `npm test`: 3,125 tests, 3,124 pass, 1 fail: "the committed site matches a fresh render", the
+  expected `docs/docs` staleness. With `node scripts/build-pages.cjs` run locally: 3,125 of 3,125
+  pass. The regenerated `docs/docs` (six pages) was then discarded.
+- `npm run test -w apps/web`: 292 files, 3,442 tests passed.
+- `npm run test:rules`: 4 files, 385 tests passed.
+- `npm run build -w apps/web`: built.
+- `npm run check:copy`: 531 files, no blocked patterns.
+- E2E (untracked no-sandbox config, under the lock, deleted after the run):
+  `e2e/session-pitch-airtable.spec.js` 1, `e2e/session-pitch-ui.spec.js` 5 and
+  `e2e/session-pitches.spec.js` 1: 7 passed.
