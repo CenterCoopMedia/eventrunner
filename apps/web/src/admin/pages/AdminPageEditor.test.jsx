@@ -8,7 +8,7 @@
 //   • System page  → delete refused in the UI, matching cmsDeletePage.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
 vi.mock('../../lib/contentSource.js', () => ({
@@ -108,7 +108,6 @@ async function renderAt(path, { waitForHeading = true } = {}) {
   const result = render(
     <MemoryRouter
       initialEntries={[path]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,

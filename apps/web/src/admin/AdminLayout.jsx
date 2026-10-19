@@ -48,7 +48,7 @@
 // chunk (components/AdminTour.jsx), and its steps are this docket.
 import './adminWorkspace.css';
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import useAccountViews from '../hooks/useAccountViews.js';
 import RoleSwitcher from '../components/RoleSwitcher.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';

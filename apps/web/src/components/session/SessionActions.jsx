@@ -27,7 +27,7 @@
 // a session left behind are content, so they stay, and so does its
 // recording link — both surfaces get that one, on a live day and on a back
 // issue, whenever the session record carries a link.
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import BookmarkAction from './BookmarkAction.jsx';
 import CalendarMenu from './CalendarMenu.jsx';
 import MaterialsLink from './MaterialsLink.jsx';

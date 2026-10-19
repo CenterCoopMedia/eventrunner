@@ -4,7 +4,7 @@
 // has no way to fill in what a block actually SAYS. This tree of screens is
 // that: browse → section → block, editing the cmsContent VALUE the public
 // renderers (components/blocks/) read.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAdminPages } from '../useAdminPages.js';
 import {
   Notice,

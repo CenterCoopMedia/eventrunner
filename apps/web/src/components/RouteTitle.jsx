@@ -14,7 +14,7 @@
 // /updates, /attendees) and the home page, which render their own
 // components and would otherwise show the server's title for a moment and
 // then drop to the bare event name.
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { routeTitlePartFor, useDerivedDocumentTitle } from '../lib/useDocumentTitle.js';

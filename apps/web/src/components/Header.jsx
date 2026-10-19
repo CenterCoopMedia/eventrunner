@@ -3,7 +3,7 @@
 // base. The identity is never a heading: each page owns its own <h1>.
 //
 // The four treatments and their rules: docs/interface-guidelines.md, Headers.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { DEFAULT_HEADER, THEME_HEADERS } from 'shared/theme';
 import Nameplate from './editorial/Nameplate.jsx';
 

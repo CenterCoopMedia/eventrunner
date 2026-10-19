@@ -5,7 +5,7 @@
 // listener here — system_errors is server-only).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
 vi.mock('../../lib/contentSource.js', () => ({
@@ -78,7 +78,6 @@ async function renderPage() {
   const result = render(
     <MemoryRouter
       initialEntries={['/admin/system-errors']}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,

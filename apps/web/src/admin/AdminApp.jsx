@@ -14,7 +14,7 @@
 // AdminLayout's concern: each docket item declares the tier it needs, and
 // the layout hides the rest and refuses their routes (issue #186).
 import { Suspense, lazy } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { AdminEmptyState, AdminLoadingState } from './components/adminChrome.jsx';
 import AdminLayout from './AdminLayout.jsx';

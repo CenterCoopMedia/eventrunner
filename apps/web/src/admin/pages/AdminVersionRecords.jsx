@@ -17,7 +17,7 @@
 // THE FIGURE SENTENCE, NOT A TILE. One stated line says how many records
 // are shown and in what order.
 import { useMemo, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import AdminPageHeader, {
   AdminEmptyState,

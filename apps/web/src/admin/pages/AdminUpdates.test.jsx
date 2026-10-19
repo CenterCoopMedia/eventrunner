@@ -3,7 +3,7 @@
 // every endpoint call is read off the wire the page would send.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 
 const adminSubscriptions = new Map();
 const adminErrors = new Map();
@@ -67,7 +67,6 @@ async function renderAt(path) {
   render(
     <MemoryRouter
       initialEntries={[path]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
       <LocationProbe />

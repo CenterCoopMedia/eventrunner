@@ -4,7 +4,7 @@
 // 404 used everywhere else on the site.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, act, fireEvent, within } from '@testing-library/react';
-import { Link, MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter } from 'react-router';
 
 // Credential-free (spec §8.1): stub the provider seams so no Firebase env or
 // network is needed — same approach as App.test.jsx. contentSource's
@@ -77,7 +77,6 @@ function renderAt(path) {
   return render(
     <MemoryRouter
       initialEntries={[path]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,
@@ -1117,7 +1116,6 @@ describe('ContentPage — search and section index on long pages', () => {
     render(
       <MemoryRouter
         initialEntries={['/long-sections']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <Link to="/long-blocks">Go to long blocks</Link>
         <App />
@@ -1175,7 +1173,6 @@ describe('ContentPage section edit links', () => {
     return render(
       <MemoryRouter
         initialEntries={['/faq']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <EventConfigProvider>
           <AuthContext.Provider value={auth}>

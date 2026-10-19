@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { resolveRegistrationAction } from 'shared/registration';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { isReadOnlyDemo } from './readOnlyDemo.js';

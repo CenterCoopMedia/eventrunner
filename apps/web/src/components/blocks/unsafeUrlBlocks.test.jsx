@@ -6,12 +6,10 @@
 // links.
 import { describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import CtaBlock from './CtaBlock.jsx';
 import LinkGroupBlock from './LinkGroupBlock.jsx';
 import ImageBlock from './ImageBlock.jsx';
-
-const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true };
 
 const UNSAFE_URLS = ['javascript:alert(1)', ' JAVASCRIPT:alert(1)', 'data:text/html,<script>alert(1)</script>', 'vbscript:msgbox(1)'];
 
@@ -50,7 +48,7 @@ describe('CtaBlock', () => {
     // under HashRouter (main.jsx), where a raw href="/schedule" 404s
     // instead of navigating within the app.
     const { getByRole } = render(
-      <MemoryRouter future={ROUTER_FUTURE}>
+      <MemoryRouter>
         <CtaBlock block={{ url: '/schedule', label: 'See the schedule' }} />
       </MemoryRouter>,
     );
@@ -96,7 +94,7 @@ describe('LinkGroupBlock', () => {
 
   it('renders an in-app route through the router Link, not a page-reloading anchor', () => {
     const { getByRole } = render(
-      <MemoryRouter future={ROUTER_FUTURE}>
+      <MemoryRouter>
         <ul>
           <LinkGroupBlock block={{ url: '/schedule', label: 'Browse the schedule' }} />
         </ul>

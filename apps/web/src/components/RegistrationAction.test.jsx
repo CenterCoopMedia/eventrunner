@@ -10,7 +10,7 @@
 // written before that rule existed is still unvalidated data at read time.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 let eventConfig;
 

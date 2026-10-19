@@ -15,7 +15,7 @@
 //      nothing else on this surface belongs to the client.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const configSubscriptions = new Map();
 vi.mock('../lib/configSource.js', () => ({
@@ -75,7 +75,6 @@ async function renderAdmin(path = '/admin/pages') {
   const result = render(
     <MemoryRouter
       initialEntries={[path]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,

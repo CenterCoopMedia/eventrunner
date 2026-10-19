@@ -1,6 +1,6 @@
 // Public recovery stays inside the event's existing theme and navigation gates.
 import { useRef, useState, useSyncExternalStore } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { buildNavItems, SYSTEM_PAGES } from '../lib/siteNavigation.js';

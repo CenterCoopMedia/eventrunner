@@ -3,7 +3,7 @@
 // link (a query over scheduleData, not a stored list — spec §4.3).
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 
 let speakers;

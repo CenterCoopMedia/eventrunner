@@ -15,7 +15,7 @@
 // the ticketing tables draw, sticky at the top of the table's own box, and
 // the box is a focusable region so a keyboard can scroll it both ways.
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { publishDateLabel, toPublishDate } from '../../lib/updateDates.js';

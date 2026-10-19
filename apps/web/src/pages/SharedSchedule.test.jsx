@@ -3,7 +3,7 @@
 // stated reason, and the nothing at all for an owner who never consented.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -53,7 +53,7 @@ function sharedTree({ share, error = false, auth = { user: null, isAdmin: false,
   holder.share = share;
   holder.error = error;
   return (
-    <MemoryRouter initialEntries={['/schedule/user/owner-1']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={['/schedule/user/owner-1']}>
       <Routes>
         <Route path="schedule/user/:uid" element={
           <EventConfigContext.Provider value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}>

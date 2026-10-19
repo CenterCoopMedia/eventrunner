@@ -1,0 +1,1 @@
+import{_r as e,fr as t,or as n,rr as r}from"./initial-jC0o0ifW.js";function i(i,a,o){return r(r=>t(e(n,i),e=>{a(e.docs.map(e=>({id:e.id,...e.data()})))},r),e=>{console.warn(`${i} admin subscription failed; retrying.`,e),o?.(e)})}export{i as t};

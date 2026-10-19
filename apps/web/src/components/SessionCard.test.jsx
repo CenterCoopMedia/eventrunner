@@ -5,7 +5,7 @@
 // No Firebase, no network (spec §8.1) — every source module is mocked.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
@@ -71,7 +71,6 @@ function renderCard({
   return render(
     <MemoryRouter
       initialEntries={initialEntries}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <AuthContext.Provider value={auth}>
         <ContentContext.Provider value={content}>

@@ -21,7 +21,7 @@
 // SessionActions; the eligibility above is ProfileContext's `attendeeAccess`
 // (spec §3.4's hasAttendeeAccess predicate, shared with the server).
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useProfile } from '../../contexts/ProfileContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';

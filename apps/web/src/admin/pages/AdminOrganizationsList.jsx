@@ -11,7 +11,7 @@
 // not draw says "Hidden" beside it, so no state is left to the tint.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';

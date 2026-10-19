@@ -516,6 +516,23 @@
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The web app uses React Router 7 (<code>react-router</code> 7.18) in place of <code>react-router-dom</code> 6. It
+          stays a plain single-page app in declarative mode: <code>BrowserRouter</code> on a deployment and
+          <code>HashRouter</code> in the demo, with no framework mode. Every import now names <code>react-router</code>. The
+          v7 future flags were already on, so routing behaves as before, and the <code>future</code> props are
+          gone. The upgrade clears two moderate advisories (GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg),
+          and their audit exception is gone. The initial demo bundle grows by about 5 kB gzip, inside
+          its budget.</li>
+          </ul>
+          <ul>
+          <li>Cloud Functions run on firebase-admin 14 and firebase-functions 7. firebase-functions 6
+          does not accept firebase-admin 14, so both moved together. Both need Node 22, which the
+          functions already declare. The upgrade clears the moderate uuid advisory chain
+          (GHSA-w5hq-g745-h8pq) from <code>functions/package-lock.json</code>, and its audit exception is gone.
+          firebase-admin 14 no longer exposes <code>errorInfo</code> on its errors, so the attendee delete reads
+          only <code>err.code</code>.</li>
+          </ul>
+          <ul>
           <li>The web toolchain moves to Vite 8, <code>@vitejs/plugin-react</code> 6 and Vitest 5 (from Vite 5,
           plugin-react 4 and Vitest 3). This clears the Dependabot alerts for <code>vitest</code> and <code>tinypool</code>
           (critical), <code>vite</code> (high), and <code>@vitest/mocker</code> and <code>esbuild</code> (moderate). The repository now

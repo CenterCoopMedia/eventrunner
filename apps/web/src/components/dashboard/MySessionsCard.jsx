@@ -10,7 +10,7 @@
 // event's own data, the card names itself, and an event with the
 // bookmarking feature off draws nothing at all — there is nothing to list.
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useContent } from '../../contexts/ContentContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useMyBookmarks } from '../../hooks/useMyBookmarks.js';

@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import Nameplate, { buildNameplate } from './Nameplate.jsx';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -18,7 +18,7 @@ const indexCss = fs.readFileSync(path.resolve(here, '..', '..', 'index.css'), 'u
 
 function renderPlate(props) {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <Nameplate {...props} />
     </MemoryRouter>,
   );
@@ -130,7 +130,7 @@ describe('Nameplate', () => {
     expect(container.querySelector('img')).toBeNull();
 
     rerender(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <Nameplate name="X" mark={<img src="/branding/mark.svg" alt="" />} />
       </MemoryRouter>,
     );

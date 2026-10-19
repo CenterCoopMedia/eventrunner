@@ -12,7 +12,7 @@
 // days at all, and asserts that every section is still on the page.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const { MINIMAL_EVENT, FEATURES } = vi.hoisted(() => ({
   MINIMAL_EVENT: Object.freeze({

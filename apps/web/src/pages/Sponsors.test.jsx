@@ -4,7 +4,7 @@
 // through the same isSafeHref allowlist the block renderers use.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const UNSAFE_URL = 'javascript:alert(1)';
 const SAFE_URL = 'https://example.org';

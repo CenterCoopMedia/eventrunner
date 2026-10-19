@@ -2,7 +2,7 @@
 // its running identity; the masthead Header now has a compact navigation bar.
 // A real client mark is optional. Only the closing divider uses a motif.
 // The page owns its h1; the repeated site identity is a paragraph.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { formatEventDateRange } from '../../lib/eventTime.js';
 import Motif from './Motif.jsx';
 

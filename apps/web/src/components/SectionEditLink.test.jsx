@@ -2,7 +2,7 @@
 // names the one editor that holds the section's blocks.
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import SectionEditLink, { sectionEditPath } from './SectionEditLink.jsx';
 

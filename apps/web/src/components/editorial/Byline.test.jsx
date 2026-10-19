@@ -1,7 +1,7 @@
 // Byline and Dateline: who, in what role, and when, on the event's clock.
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import Byline, { Dateline } from './Byline.jsx';
 import { renderInEveryStyle } from '../../test/everyStyle.jsx';
 

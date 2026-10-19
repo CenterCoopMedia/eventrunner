@@ -17,7 +17,7 @@
 // itself, on both the requested URL and the matched doc's stored path, and
 // 404s rather than trusting stored data to already be clean.
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { firstPathSegment, isReservedPathSegment } from 'shared/routing';
 import { pageHeading } from 'shared/page';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';

@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Profiler } from 'react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
@@ -124,7 +124,7 @@ function reportPages({ live = [{ id: 'home', sections: [{ id: 'hero', allowedBlo
 async function renderPage(path = `/admin/versions/${DOC_PATH}`, options) {
   serve(options);
   const result = render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/admin/versions/:collection/:docId" element={<AdminVersionHistory />} />
         <Route path="/admin/versions" element={<p>The record list</p>} />
@@ -159,7 +159,7 @@ async function renderNavigablePage(options) {
     return null;
   }
   render(
-    <MemoryRouter initialEntries={[`/admin/versions/${DOC_PATH}`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[`/admin/versions/${DOC_PATH}`]}>
       <Navigator />
       <Routes>
         <Route path="/admin/versions/:collection/:docId" element={<AdminVersionHistory />} />
@@ -404,7 +404,7 @@ describe('one record’s versions', () => {
     const commits = [];
     render(
       <Profiler id="history" onRender={() => commits.push(document.body.textContent)}>
-        <MemoryRouter initialEntries={[`/admin/versions/${DOC_PATH}`]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <MemoryRouter initialEntries={[`/admin/versions/${DOC_PATH}`]}>
           <Navigator />
           <Routes>
             <Route path="/admin/versions/:collection/:docId" element={<AdminVersionHistory />} />
@@ -432,7 +432,7 @@ describe('one record’s versions', () => {
   it('makes no call for a collection it does not know', async () => {
     serve();
     render(
-      <MemoryRouter initialEntries={['/admin/versions/users/u1']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter initialEntries={['/admin/versions/users/u1']}>
         <Routes>
           <Route path="/admin/versions/:collection/:docId" element={<AdminVersionHistory />} />
         </Routes>

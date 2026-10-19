@@ -15,7 +15,7 @@
 // list until Save draft. Publish stays its own action.
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { isPublicPage, pageFeatureGate } from 'shared/page';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';

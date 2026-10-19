@@ -4,7 +4,7 @@
 // them is a heading: the page's own h1 is at the top of this book. The
 // navigation here is a short standing list, so the four treatments can be
 // compared on the identity rather than on how many links a site has.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import Header from '../../../components/Header.jsx';
 import EventHero from '../../../components/EventHero.jsx';
 import { useEventConfig } from '../../../contexts/EventConfigContext.jsx';

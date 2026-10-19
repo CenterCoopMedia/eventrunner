@@ -34,7 +34,7 @@
 // organizer must be able to see, because the speaker is waiting for mail
 // that will never arrive.
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import { useAdminApi } from '../adminApi.js';
 import {

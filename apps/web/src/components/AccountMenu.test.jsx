@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Link, useLocation } from 'react-router-dom';
+import { MemoryRouter, Link, useLocation } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ProfileContext from '../contexts/ProfileContext.jsx';
 import useAccountViews from '../hooks/useAccountViews.js';
@@ -23,7 +23,7 @@ function Account() {
     {account.views.length > 1 ? <AccountMenu account={account}/> : null}<AdminEntryLink account={account}/><Link to="/schedule">Schedule</Link></>;
 }
 function renderAccount({registered=true, speaker=false, admin=false, path='/dashboard', uid=user.uid} = {}) {
-  return render(<MemoryRouter initialEntries={[path]} future={{v7_startTransition:true, v7_relativeSplatPath:true}}>
+  return render(<MemoryRouter initialEntries={[path]}>
     <AuthContext.Provider value={{user:{...user,uid},loading:false,adminStatus:admin?'admin':'denied'}}>
       <ProfileContext.Provider value={{profile:{registrationStatus:registered?'approved':'pending',speakerId:speaker?'speaker-340':null},status:'ready'}}>
         <Account/>
@@ -50,7 +50,7 @@ describe('read-only demo account entry points', () => {
       current: { id: 'attendee', label: 'Attendee' },
       select: vi.fn(),
     };
-    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    render(<MemoryRouter>
       <RoleSwitcher account={account} />
       <AdminEntryLink account={account} />
     </MemoryRouter>);

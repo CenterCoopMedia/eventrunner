@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ToastContext from '../contexts/ToastContext.jsx';
@@ -18,7 +18,7 @@ const signOut = vi.fn();
 function renderSignIn({ eventConfig = {}, user = null, loading = false, panel = false, from = null } = {}) {
   const entry = from ? { pathname: '/signin', state: { from } } : '/signin';
   return render(
-    <MemoryRouter initialEntries={[entry]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[entry]}>
       <EventConfigContext.Provider value={{ eventConfig }}>
         <AuthContext.Provider value={{ user, loading, signInWithGoogle, sendOtpCode, verifyOtpCode, signOut }}>
           <ToastContext.Provider value={{ showToast: vi.fn() }}>

@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render as testingRender, screen, within } from '@testing-library/react';
 
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 const render = (ui) => testingRender(<MemoryRouter>{ui}</MemoryRouter>);
 
 let eventConfig;
