@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Staff set the pitch call deadline and the ticket catalog's sale windows as a date and a
+  time on the event's clock. The fields name the event's time zone and state the result in
+  words, with the UTC offset for the chosen date. A time that daylight saving time skips is
+  refused, and a time it repeats asks which one is meant. The stored RFC3339 values do not
+  change (#476).
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page
