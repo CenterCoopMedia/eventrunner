@@ -67,8 +67,8 @@ test('the shipped reminder escapes names and session titles in html and keeps th
   assert.ok(text.includes(`- Send your slides or other materials for: Panel ${HOSTILE}.`));
   assert.ok(text.includes('- Add a short biography to your speaker profile.'));
   assert.ok(text.includes('- Add a headshot to your speaker profile.'));
-  assert.ok(hrefsIn(html).includes(DASHBOARD), 'the html body links to the dashboard');
-  assert.ok(linksIn(text).includes(DASHBOARD), 'the text body names the dashboard');
+  assert.deepEqual(hrefsIn(html), [DASHBOARD, 'mailto:staff@example.test', 'mailto:help@example.test']);
+  assert.deepEqual(linksIn(text), [DASHBOARD]);
   assert.ok(text.includes('write to staff@example.test'));
   // The footer the provider gets is in the preview, once.
   assert.equal(text.split('Example Org').length - 1, 1);
@@ -123,7 +123,7 @@ test('wording that hides the dashboard link inside an {{#if}} block never reache
   const items = recipient.readiness.missing.filter((item) => item !== 'bio');
   const out = renderShipped({ ...recipient, items }, override);
   assert.equal(out.usedFallback, true);
-  assert.ok(linksIn(out.delivered.text).includes(DASHBOARD), 'the fallback names the dashboard');
+  assert.deepEqual(linksIn(out.delivered.text), [DASHBOARD]);
 });
 
 test('saved wording is used, and wording with an unknown token or no dashboard link is refused', () => {
