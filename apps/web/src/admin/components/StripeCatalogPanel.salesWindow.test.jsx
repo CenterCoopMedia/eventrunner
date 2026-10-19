@@ -119,4 +119,16 @@ describe('catalog sales windows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save catalog' }));
     await waitFor(() => expect(call).toHaveBeenCalled());
   });
+
+  it('keeps a half-entered sales time as an unsaved edit when a new revision lands', () => {
+    const props = { call: saving(), isOperator: true, timezone: 'America/New_York', onSaved: vi.fn() };
+    const { rerender } = render(<StripeCatalogPanel {...props} data={{ catalog: CATALOG, mode: 'test' }} />);
+    // The date alone does not name an instant yet, so the draft is unchanged.
+    fireEvent.change(screen.getByLabelText('Event sales end Date'), { target: { value: '2027-01-15' } });
+    // Another operator saves an end time while that date is half entered.
+    rerender(<StripeCatalogPanel {...props} data={{ catalog: { ...CATALOG, revision: 2, salesEndAt: '2027-02-01T05:00:00.000Z' }, mode: 'test' }} />);
+    expect(screen.getByLabelText('Event sales end Date')).toHaveValue('2027-01-15');
+    expect(screen.queryByText('The editor now shows the current saved catalog.')).toBeNull();
+    expect(screen.getByText(/The saved catalog has changed/)).toBeInTheDocument();
+  });
 });
