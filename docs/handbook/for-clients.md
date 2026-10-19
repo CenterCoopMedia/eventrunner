@@ -14,9 +14,11 @@ The **Event Runner** name is CCM's. Apache-2.0 does not give anyone else the rig
 
 ## What v1 includes
 
-Schedule, speakers, attendees, a block CMS, emailed login codes, session materials, a media library, Eventbrite or spreadsheet tickets, and your colors and fonts.
+Schedule, speakers, attendees, a block CMS, emailed login codes, announcement email to your registered attendees or speakers, session materials, a media library, Eventbrite or spreadsheet tickets, and your colors and fonts.
 
-What v1 does not include is in the [triage record](https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md): video generation, bulk announcement mail, invoicing, social feeds, speaker chat.
+Confirmation emails, speaker mail, and event announcements go through one agreed email provider (Postmark) from a sender address on your domain. Announcements use their own broadcast stream, apart from login codes and receipts. Every announcement has a one-click unsubscribe link, and the site does not send announcements to anyone who used it.
+
+What v1 does not include is in the [triage record](https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/plans/2026-08-16-event-platform-v1-triage.md): video generation, invoicing, social feeds, speaker chat. Announcement email reaches your event's attendees and speakers only; it is not a newsletter or marketing list tool.
 
 ## What you will need to give us
 
