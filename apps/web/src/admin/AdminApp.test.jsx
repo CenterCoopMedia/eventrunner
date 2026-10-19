@@ -57,8 +57,10 @@ let pendingOperatorProbe = null;
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn((_db, name) => ({ name })),
   doc: vi.fn(() => ({})),
+  // One empty answer for both listener shapes: an empty collection, or a
+  // missing document (the home page listens to config/pitch_call).
   onSnapshot: vi.fn((_ref, onNext) => {
-    onNext({ docs: [] });
+    onNext({ docs: [], exists: () => false, data: () => undefined });
     return () => {};
   }),
   query: vi.fn((ref) => ref),

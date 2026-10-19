@@ -211,3 +211,32 @@ test('closed call retains entries and six themes work in both modes', async ({ p
   }
   } finally { await themeRef.set(themeBefore); }
 });
+
+test('an external form call links out from the home page and /pitch, then leaves when closed', async ({ page }) => {
+  page.on('pageerror', (err) => console.error('Browser error:', err.message));
+  const ref = adminDb().collection('config').doc('pitch_call');
+  const form = 'https://airtable.com/appExample/shrExample';
+  await ref.set({ enabled: true, closesAt: '2030-11-30T23:59:59Z', externalFormUrl: form });
+  for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    const action = page.getByRole('link', { name: 'Pitch a session' });
+    await expect(action).toBeVisible();
+    await shot(page, `external-home-${viewport.width}`);
+    await action.click();
+    await expect(page).toHaveURL(/\/pitch$/);
+    const link = page.getByRole('link', { name: /Open the pitch form/ });
+    await expect(link).toHaveAttribute('href', form);
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(page.getByLabel('Session title', { exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await shot(page, `external-pitch-${viewport.width}`);
+  }
+  await ref.set({ enabled: true, closesAt: '2000-01-01T00:00:00Z', externalFormUrl: form });
+  await expect(page.getByText('Submissions are closed', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open the pitch form/ })).toHaveCount(0);
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Pitch a session' })).toHaveCount(0);
+  await ref.set({ enabled: true, closesAt: '2030-11-30T23:59:59Z' });
+});
