@@ -30,6 +30,7 @@ import { summarizePublish } from '../publishResult.js';
 import {
   Notice,
   Panel,
+  fieldHintClass,
   linkButtonClass,
   primaryButtonClass,
   rowClass,
@@ -117,7 +118,7 @@ function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
             {sections.length === 1 ? '' : 's'}
           </p>
           {visibility.reason ? (
-            <p className={`mt-3xs ${rowMetaClass}`} data-reorder-block="">
+            <p className={`mt-3xs ${fieldHintClass}`} data-reorder-block="">
               {visibility.reason}
             </p>
           ) : null}
