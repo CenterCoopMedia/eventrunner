@@ -1,0 +1,1 @@
+import{or as e,pr as t,rr as n,vr as r}from"./initial-Qtq9Easw.js";function i(i,a,o){return n(n=>t(r(e,i),e=>{a(e.docs.map(e=>({id:e.id,...e.data()})))},n),e=>{console.warn(`${i} admin subscription failed; retrying.`,e),o?.(e)})}export{i as t};
