@@ -422,6 +422,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recorded the message is no longer lost. For 15 minutes after the event the webhook
   answers 503, so Postmark sends it again; an older event for an unknown message is
   acknowledged and dropped.
+- A Functions deploy no longer stops when a change adds a retry-enabled event handler to an
+  existing client deployment. The deploy script reads the complete Functions inventory, finds
+  the local retry handlers that it does not hold, and creates only those with a targeted
+  `--force` deploy. The full deploy then runs without `--force`. The script deploys nothing when
+  the inventory or local discovery fails, or when a targeted selector would reach any other
+  Function (demo deploy run 39318358467, `onTicketOrderConfirmation`).
 
 - The documentation site's page description decodes each entity once, so a
   paragraph that shows "&lt;b&gt;" no longer gets "<b>" in its description.
