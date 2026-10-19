@@ -30,8 +30,8 @@ run web flock $L npm run test -w apps/web
 run rules flock $L npm run test:rules
 run build flock $L npm run build -w apps/web
 run budget-client node scripts/ci/bundle-budget.cjs --dist apps/web/dist
-run budget-demo node scripts/ci/bundle-budget.cjs --dist docs/demo
 run content node scripts/generate-content.cjs --demo --check
+# Builds the demo twice, compares the builds, and runs the demo bundle budget.
 run demo flock $L node scripts/build-demo.cjs --check
 run pages node scripts/build-pages.cjs --check
 run docs node scripts/check-docs.cjs

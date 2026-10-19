@@ -9,7 +9,7 @@ Rules written after user corrections. Read at session start.
 - Commit identity is `Joe Amditis <6799804+jamditis@users.noreply.github.com>` (the address main already uses) with a DCO sign-off. The Montclair address is blocked by GitHub email privacy. Never add AI attribution or Co-authored-by trailers.
 - Fable directs. Opus, Sonnet, and Haiku agents write code, tests, and docs.
 - Builders report "all green" from a run made before their last edit. The brief now says: run every check as the last step, after docs and generated output. The reviewer must re-run `npm test` itself and not trust the report.
-- Any branch that edits a rendered Markdown file must regenerate docs/docs, and any branch that touches apps/web, packages/shared, or the seed must regenerate docs/demo, because the web bundle imports shared modules directly and the CI classifier selects demo hygiene for shared changes. Stacked branches conflict on docs/demo hashed assets; regenerate on the stacked tip, never hand-merge.
+- Any branch that edits a rendered Markdown file must regenerate docs/docs, and any branch that touches apps/web, packages/shared, or the seed must regenerate docs/demo, because the web bundle imports shared modules directly and the CI classifier selects demo hygiene for shared changes. Stacked branches conflict on docs/demo hashed assets; regenerate on the stacked tip, never hand-merge. (From 2026-10-19 docs/demo is not committed and is never regenerated in a branch; see that day's entry. The docs/docs rule stands.)
 - Agents share one machine and one process table. A builder ran `pkill -f` and killed a sibling's test run. The brief now forbids killing processes the agent did not start.
 - Stacked PRs: base every later branch on the current stack tip, not on main. Wave 1 branches were cut from main, so every review fix on a parent forced a cascade merge and a demo regeneration down the whole stack. Wave 2 branches start from the tip.
 - GitHub skips a pull_request workflow run when the PR head conflicts with its base. No CI run on a fresh push means "resolve the conflict first", not "CI is slow".
@@ -122,3 +122,25 @@ Rules written after user corrections. Read at session start.
   wrong. The reaction is how Codex learns which findings to keep making.
 - Before ending any PR event, list the review threads and check each
   Codex comment has a reply, a resolved thread, and a reaction.
+
+## 2026-10-19: run the local CodeQL query before pushing a CodeQL fix
+
+- The first fix for a CodeQL alert on #508 swapped a string `includes` for an
+  array `includes`, and CodeQL flagged the new code again on the next push.
+  Before pushing any CodeQL fix, run the same suite on the changed code with
+  the local CLI (`/home/user/codeql/codeql/codeql`) and confirm the alert is
+  gone. A fix that only reads right to a person is not a fix to CodeQL.
+
+## 2026-10-19: committed generated output makes parallel pull requests collide
+
+- Committed generated output (docs/demo, docs/docs, lockfile hashes) and
+  several parallel pull requests mean every merge forces every other open
+  pull request to merge main, regenerate, and test again. docs/demo was the
+  worst: its hashed chunk names changed on every web change, so any two pull
+  requests conflicted. It cost hours on one day, and it put third-party SDK
+  code in front of CodeQL. docs/demo is now build output, built and deployed
+  by `.github/workflows/pages.yml`; never commit it.
+- Land related work as one combined pull request, not several parallel ones.
+- Do not run several full test suites at once on this machine. They starve
+  each other and cause false timing failures. Run heavy commands one at a
+  time under `flock /tmp/eventrunner-heavy.lock`.
