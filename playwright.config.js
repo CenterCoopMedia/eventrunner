@@ -80,7 +80,7 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    // --host pins the bind address explicitly. Without it, Vite 5 binds
+    // --host pins the bind address explicitly. Without it, Vite binds
     // "localhost", and on ubuntu-latest runners Node's DNS resolution of
     // "localhost" can land on ::1 while Playwright's own webServer probe
     // (and baseURL/APP_URL above) hit 127.0.0.1 — a bind/probe mismatch that

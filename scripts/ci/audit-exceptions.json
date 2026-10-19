@@ -1,22 +1,5 @@
 [
   {
-    "package": "vite",
-    "exposure": "build",
-    "severity": "high",
-    "advisories": [
-      "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
-      "https://github.com/advisories/GHSA-v6wh-96g9-6wx3",
-      "https://github.com/advisories/GHSA-fx2h-pf6j-xcff"
-    ],
-    "affects": [
-      "vite",
-      "esbuild"
-    ],
-    "rationale": "apps/web pins vite@^5.4.19 and is already at 5.4.21, the last 5.x release ever published. The fix needs vite@6.4.3 or later, a major upgrade with breaking config and plugin API changes. Vite only runs the local dev server and the build step; it never ships to a deployed environment or handles untrusted input in production. Not blocking CI under the production-only audit policy.",
-    "reviewedBy": "amditisj@montclair.edu",
-    "reviewDate": "2026-08-27"
-  },
-  {
     "package": "firebase-tools",
     "exposure": "devTooling",
     "severity": "high",

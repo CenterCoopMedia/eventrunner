@@ -71,7 +71,7 @@ docs                Spec, roadmap, design records, and the GitHub Pages site
 
 ## Develop
 
-Node 22+.
+Node 22 (22.12 or later), Node 24, or Node 26 and later. Vitest 5 does not run on Node 23 or 25.
 
 ```bash
 npm test
