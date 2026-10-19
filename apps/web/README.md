@@ -189,11 +189,14 @@ beside each one. Use it to review a change across all six styles without
 opening six pages.
 
 - **The gate.** `SPECIMEN_ENABLED` in `src/pages/specimen/specimenRoute.js` is
-  `IS_DEMO || import.meta.env.DEV`. It is written as an expression over two
-  build constants rather than as a function call, because a call across a
-  module boundary is not folded: with a call, Rollup emitted the lazy chunk
-  for a client production build even though no route pointed at it.
-  `specimenRouteEnabled()` is the same rule as a pure function, for tests.
+  the demo switch or `import.meta.env.DEV`, and `loadSpecimenPage` beside it
+  holds the page's dynamic import. The gate is an expression over build
+  constants, not a function call, and it reads `import.meta.env` in the same
+  module as the `import()`. Rolldown (Vite 8) folds only a condition it reads
+  in that module. With the condition imported from `lib/demoMode.js`, it
+  wrote the lazy chunk into a client production build even though no route
+  pointed at it. `specimenRouteEnabled()` is the same rule as a pure
+  function, for tests.
 - **Reaching it.** `npm run dev` then `/specimen`. In the demo build the
   router is a hash router, so it is `#/specimen`, and the demo banner's
   `?style=` and `?mode=` values apply to it like any other page.
@@ -301,6 +304,13 @@ npm run test -w apps/web   # vitest run — components, contexts, lib
 npm run lint                # from repo root — hex-literal ban, hooks rules, this workspace included
 npm run build -w apps/web   # production build; verifies dist/index.html + hashed assets
 ```
+
+The toolchain is Vite 8 (Rolldown bundler), `@vitejs/plugin-react` 6 and
+Vitest 5. Vitest 5 needs Node 22.12 or later. `vite.config.js` puts the
+static import graph of `src/main.jsx` in one `initial` chunk. Without that
+group, Rolldown splits it into about 40 small files, and the first paint
+costs about 8 kB more gzip than the budget in
+`scripts/ci/bundle-budget.json` can absorb over time.
 
 ### Live smoke test (sign-in flow)
 
