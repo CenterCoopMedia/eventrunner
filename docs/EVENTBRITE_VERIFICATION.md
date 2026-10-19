@@ -24,6 +24,11 @@ EVENT_FIREBASE_PROJECT_ID=<dev project id> \
 Confirm success via `getTicketingStatus` (admin Settings) or the Cloud Functions log for the
 registration call.
 
+The script registers every action the adapter handles: `order.placed`, `order.updated`,
+`order.refunded`, and `attendee.updated` (#357). In the Eventbrite dashboard, confirm that the
+webhook lists all four. If the script names an older webhook at the same endpoint, delete that
+webhook in Eventbrite.
+
 Then exercise all three flows against the sandbox event's real checkout (or Eventbrite's test-order
 tooling, if offered): place an order, refund one, cancel one.
 
@@ -82,7 +87,8 @@ whole point), and diff it against the named fixture file.
 - **Sanitize:** strip real order/attendee ids and any customer-identifying fields; keep `api_url`
   and `config.action` shape intact.
 - **Diff against:** `webhook-order-refunded.json`, which models `config.action: "order.refunded"`
-  on the wire. Confirm the real refund delivery's `config.action` string matches what the fixture
+  on the wire. The registration sends `order.refunded` (#357), so a refund must produce a
+  delivery. Confirm the real refund delivery's `config.action` string matches what the fixture
   assumes, and confirm the adapter's fold into `eventType: 'order.updated'` still makes sense (a
   subsequent `GET /orders/{id}/` should pick up the refunded ticket status).
 

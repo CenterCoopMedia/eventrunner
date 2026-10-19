@@ -24,12 +24,13 @@ test('a webhook-capable provider registers and stamps config/providers.ticketing
   let calledWith = null;
   const provider = {
     name: 'eventbrite',
+    webhookEventTypes: ['order.placed', 'order.refunded'],
     registerWebhook: async (opts) => { calledWith = opts; return { webhookId: 'hook-42' }; },
   };
   const code = await run({ args: {}, env: ENV, deps: fakeDeps({ provider, db }) });
   assert.equal(code, 0);
   assert.equal(calledWith.callbackUrl, 'https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook');
-  assert.ok(Array.isArray(calledWith.events) && calledWith.events.includes('order.placed'));
+  assert.deepEqual(calledWith.events, ['order.placed', 'order.refunded'], 'the provider\'s own list is passed through');
 
   const providers = (await db.collection('config').doc('providers').get()).data();
   assert.equal(providers.ticketing.webhookId, 'hook-42');
@@ -142,6 +143,38 @@ test('registerWebhook is idempotent from the operator side too — running it tw
   assert.equal(code2, 0);
   const providers = (await db.collection('config').doc('providers').get()).data();
   assert.equal(providers.ticketing.webhookId, 'hook-stable');
+});
+
+test('the real Eventbrite adapter registers order.refunded through the operator script (issue 357)', async () => {
+  const { createEventbriteProvider, internals: eb } = require('../functions/src/ticketing/providers/eventbrite.cjs');
+  const posts = [];
+  const fetchImpl = async (url, opts = {}) => {
+    const route = `${opts.method || 'GET'} ${url.replace(eb.API_BASE, '')}`;
+    const routes = {
+      'GET /users/me/organizations/': { organizations: [{ id: 'org-1' }] },
+      'GET /organizations/org-1/webhooks/': { webhooks: [] },
+      'POST /organizations/org-1/webhooks/': { id: 'hook-new' },
+    };
+    if (!(route in routes)) throw new Error(`no route for ${route}`);
+    if (opts.method === 'POST') posts.push(JSON.parse(opts.body));
+    return { status: 200, json: async () => routes[route] };
+  };
+  const provider = createEventbriteProvider({
+    env: {
+      TICKETING_API_TOKEN: 'fixture-api-token',
+      TICKETING_WEBHOOK_SECRET: 'fixture-url-secret-0123456789abcdef0123',
+      EVENT_TICKETING_EVENT_ID: 'evt-1',
+    },
+    fetchImpl,
+  });
+  const db = makeFakeDb();
+  const code = await run({ args: {}, env: ENV, deps: fakeDeps({ provider, db }) });
+  assert.equal(code, 0);
+  assert.equal(posts.length, 1);
+  const actions = posts[0].actions.split(',');
+  for (const action of ['order.placed', 'order.updated', 'order.refunded', 'attendee.updated']) {
+    assert.ok(actions.includes(action), `${action} is registered`);
+  }
 });
 
 test('internals.defaultCallbackUrl matches the ADR-shaped email-webhook example (§3.1)', () => {

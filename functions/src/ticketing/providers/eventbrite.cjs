@@ -94,6 +94,21 @@ const ACTION_TO_EVENT_TYPE = Object.freeze({
 });
 
 /**
+ * Every action registered with Eventbrite (#357). Derived from the map
+ * above so an action the adapter handles can never be left out of the
+ * registration again — the operator script used to send its own shorter
+ * list, and refunds never arrived.
+ */
+const WEBHOOK_ACTIONS = Object.freeze(Object.keys(ACTION_TO_EVENT_TYPE));
+
+/** @param {unknown} actions Eventbrite's `actions` field: a comma list or an array. @returns {string[]} */
+function actionList(actions) {
+  if (Array.isArray(actions)) return actions.map((a) => String(a).trim()).filter(Boolean);
+  if (typeof actions === 'string') return actions.split(',').map((a) => a.trim()).filter(Boolean);
+  return [];
+}
+
+/**
  * Matches the order resource inside `api_url` (judgment call 3). Eventbrite
  * ids are typically numeric, but the segment match is intentionally not
  * restricted to digits — a synthetic or sandbox id shaped like `evt-1` must
@@ -255,6 +270,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
   return {
     name: 'eventbrite',
     externalEventId,
+    webhookEventTypes: WEBHOOK_ACTIONS,
 
     /**
      * @param {Buffer} rawBody @param {Record<string,string>} headers
@@ -372,13 +388,20 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     /**
      * Create (or find) the org-level webhook subscription (§3.3, §5.6
      * item 5). Idempotent: an existing subscription with the same
-     * `endpoint_url` is reused rather than duplicated (judgment call 6
-     * covers organization discovery).
+     * `endpoint_url` AND every handled action is reused rather than
+     * duplicated (judgment call 6 covers organization discovery).
      *
-     * @param {{ callbackUrl: string, events: string[] }} opts
-     * @returns {Promise<{ webhookId: string }>}
+     * The subscription always carries every action in WEBHOOK_ACTIONS
+     * (#357). `events` is accepted for the provider interface but cannot
+     * narrow the list: an action the adapter handles and Eventbrite never
+     * sends is a silent gap. A subscription at the same endpoint that lacks
+     * an action is not reused; a new one is created and the old id is
+     * returned in `staleWebhookIds` so the operator can delete it.
+     *
+     * @param {{ callbackUrl: string, events?: string[] }} opts
+     * @returns {Promise<{ webhookId: string, staleWebhookIds: string[] }>}
      */
-    async registerWebhook({ callbackUrl, events }) {
+    async registerWebhook({ callbackUrl }) {
       if (typeof callbackUrl !== 'string' || !callbackUrl.trim()) {
         throw new Error('registerWebhook requires a callbackUrl');
       }
@@ -389,26 +412,30 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       }
 
       const existing = await apiCall(`/organizations/${encodeURIComponent(orgId)}/webhooks/`);
-      const already = (Array.isArray(existing?.webhooks) ? existing.webhooks : [])
-        .find((w) => w?.endpoint_url === callbackUrl);
-      if (already?.id != null) {
-        return { webhookId: String(already.id) };
+      const sameEndpoint = (Array.isArray(existing?.webhooks) ? existing.webhooks : [])
+        .filter((w) => w?.id != null && w.endpoint_url === callbackUrl);
+      const complete = (w) => {
+        const have = actionList(w.actions);
+        return WEBHOOK_ACTIONS.every((a) => have.includes(a));
+      };
+      const already = sameEndpoint.find(complete);
+      if (already) {
+        return { webhookId: String(already.id), staleWebhookIds: [] };
       }
+      const staleWebhookIds = sameEndpoint.map((w) => String(w.id));
 
       const created = await apiCall(`/organizations/${encodeURIComponent(orgId)}/webhooks/`, {
         method: 'POST',
         body: {
           endpoint_url: callbackUrl,
-          actions: Array.isArray(events) && events.length > 0
-            ? events.join(',')
-            : Object.keys(ACTION_TO_EVENT_TYPE).join(','),
+          actions: WEBHOOK_ACTIONS.join(','),
           ...(externalEventId ? { event_id: externalEventId } : {}),
         },
       });
       if (created?.id == null) {
         throw new Error('eventbrite registerWebhook: create response carried no webhook id');
       }
-      return { webhookId: String(created.id) };
+      return { webhookId: String(created.id), staleWebhookIds };
     },
 
     /**
@@ -466,6 +493,8 @@ module.exports = {
     API_BASE,
     SIGNATURE_HEADER,
     ACTION_TO_EVENT_TYPE,
+    WEBHOOK_ACTIONS,
+    actionList,
     ORDER_API_URL_RE,
     safeEqual,
     signBody,

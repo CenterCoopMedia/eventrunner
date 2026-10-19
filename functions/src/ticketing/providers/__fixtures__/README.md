@@ -65,5 +65,6 @@ detail; the short version, because it drives what these fixtures look like:
 | `orders-page-2.json` | Second (final) page, `pagination.has_more_items: false` |
 | `organizations.json` | `GET /users/me/organizations/` |
 | `webhooks-list-empty.json` | `GET /organizations/{id}/webhooks/` — no existing subscription |
-| `webhooks-list-existing.json` | Same call — one subscription already registered at the callback URL under test |
+| `webhooks-list-existing.json` | Same call — one subscription registered before #357, without `order.refunded` (stale, not reused) |
+| `webhooks-list-current.json` | Same call — one subscription already registered at the callback URL under test with every handled action |
 | `webhook-create-response.json` | `POST /organizations/{id}/webhooks/` response |

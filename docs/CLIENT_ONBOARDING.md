@@ -155,7 +155,7 @@ manual CSV import, and deployments with no ticketing provider:
 
 | Provider | Step |
 |---|---|
-| `eventbrite` | Create the API token in the ticketing provider (`TICKETING_API_TOKEN` — already set as a GitHub Environment secret per the runbook §3). Then register the webhook: `node scripts/register-ticketing-webhook.cjs`. Confirm the delivery via `getTicketingStatus` (admin Settings, or the Cloud Functions log for the registration call). |
+| `eventbrite` | Create the API token in the ticketing provider (`TICKETING_API_TOKEN` — already set as a GitHub Environment secret per the runbook §3). Then register the webhook: `node scripts/register-ticketing-webhook.cjs`. The script registers every Eventbrite action the adapter handles, refunds included. If it names an older webhook at the same endpoint, delete that webhook in Eventbrite. Confirm the delivery via `getTicketingStatus` (admin Settings, or the Cloud Functions log for the registration call). |
 | `manual` | No webhook to register. Upload the first attendee CSV through the admin Ticketing tab instead — that upload *is* the equivalent step for this provider. |
 | `none` | Nothing to do. There is no token, no webhook, and no import. |
 

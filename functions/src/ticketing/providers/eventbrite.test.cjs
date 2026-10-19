@@ -30,7 +30,7 @@ function fakeFetch(routes, { calls = [] } = {}) {
   return async (url, opts = {}) => {
     const method = opts.method || 'GET';
     const path_ = url.replace(internals.API_BASE, '');
-    calls.push({ method, path: path_ });
+    calls.push({ method, path: path_, body: opts.body ? JSON.parse(opts.body) : undefined });
     const key = `${method} ${path_}`;
     let entry = routes[key];
     if (entry === undefined) {
@@ -394,18 +394,63 @@ test('registerWebhook: no existing subscription → creates one', async () => {
   assert.ok(calls.some((c) => c.method === 'POST'));
 });
 
+test('webhookEventTypes: every action the adapter handles is registered, order.refunded included (issue 357)', () => {
+  const p = provider();
+  assert.ok(Array.isArray(p.webhookEventTypes));
+  assert.deepEqual([...p.webhookEventTypes].sort(), Object.keys(internals.ACTION_TO_EVENT_TYPE).sort());
+  assert.ok(p.webhookEventTypes.includes('order.refunded'));
+});
+
+test('registerWebhook: registers every handled action even when the caller passes a narrower list (issue 357)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': fixture('webhooks-list-empty.json'),
+    'POST /organizations/org-8001/webhooks/': fixture('webhook-create-response.json'),
+  }, { calls });
+  const p = provider({ fetchImpl });
+  await p.registerWebhook({
+    callbackUrl: 'https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook',
+    events: ['order.placed', 'order.updated', 'attendee.updated'],
+  });
+  const post = calls.find((c) => c.method === 'POST');
+  const registered = post.body.actions.split(',');
+  for (const action of Object.keys(internals.ACTION_TO_EVENT_TYPE)) {
+    assert.ok(registered.includes(action), `${action} is registered`);
+  }
+});
+
+test('registerWebhook: an existing subscription that lacks order.refunded is not reused (issue 357)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    // The pre-#357 registration: order.placed, order.updated, attendee.updated only.
+    'GET /organizations/org-8001/webhooks/': fixture('webhooks-list-existing.json'),
+    'POST /organizations/org-8001/webhooks/': fixture('webhook-create-response.json'),
+  }, { calls });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({
+    callbackUrl: 'https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook',
+    events: p.webhookEventTypes,
+  });
+  assert.equal(result.webhookId, 'hook-6666');
+  assert.deepEqual(result.staleWebhookIds, ['hook-5555']);
+  const post = calls.find((c) => c.method === 'POST');
+  assert.ok(post.body.actions.split(',').includes('order.refunded'));
+});
+
 test('registerWebhook: idempotent — an existing subscription at the same callback URL is reused, no dup POST', async () => {
   const calls = [];
   const fetchImpl = fakeFetch({
     'GET /users/me/organizations/': fixture('organizations.json'),
-    'GET /organizations/org-8001/webhooks/': fixture('webhooks-list-existing.json'),
+    'GET /organizations/org-8001/webhooks/': fixture('webhooks-list-current.json'),
   }, { calls });
   const p = provider({ fetchImpl });
   const result = await p.registerWebhook({
     callbackUrl: 'https://us-central1-demo-event.cloudfunctions.net/ticketingWebhook',
     events: ['order.placed'],
   });
-  assert.equal(result.webhookId, 'hook-5555');
+  assert.equal(result.webhookId, 'hook-7777');
   assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
 });
 

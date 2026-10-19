@@ -316,6 +316,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Eventbrite refunds now reach the sync queue. The webhook registration sends every action the
+  Eventbrite adapter handles, `order.refunded` included. The adapter now publishes that list, and
+  the operator script reads it instead of keeping its own shorter list. An existing subscription
+  that lacks an action is not reused. The script creates a complete one and names the old
+  subscription so the operator can delete it (#357).
+
 - Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
   function deletes older `sent_emails` rows in bounded batches, and the Email log and onboarding
   guide state the period before an operator or client relies on the log (#268).
