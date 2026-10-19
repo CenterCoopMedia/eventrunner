@@ -1,0 +1,11 @@
+{
+  "pagination": { "has_more_items": true, "continuation": "hooks-cont-2" },
+  "webhooks": [
+    {
+      "id": "hook-other",
+      "endpoint_url": "https://other.example.org/hooks",
+      "actions": "order.placed",
+      "event_id": "evt-1"
+    }
+  ]
+}

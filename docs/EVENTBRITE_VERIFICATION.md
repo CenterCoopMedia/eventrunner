@@ -37,7 +37,9 @@ tooling, if offered): place an order, refund one, cancel one.
 For each of the six numbered assumptions, capture the specific real artifact named below, sanitize
 it (strip every real identifier — attendee/organizer names, emails, the sandbox account's org name
 and id, real order/ticket numeric ids, phone numbers, and free-text fields. Replace them with clearly
-synthetic placeholders in the same shape. Do not use `[REDACTED]` blocks because preserving field shape is the
+synthetic placeholders in the same shape. Every delivery body echoes `config.endpoint_url`, and that
+URL carries `TICKETING_WEBHOOK_SECRET`: replace the token value in `config.endpoint_url` with
+`fixture-placeholder` (`?token=fixture-placeholder`) before the body is saved anywhere. Do not use `[REDACTED]` blocks because preserving field shape is the
 whole point), and diff it against the named fixture file.
 
 ### 1. Webhook authentication (URL secret, #356)
@@ -47,7 +49,10 @@ adapter does not check an HMAC. `register-ticketing-webhook.cjs` registers the c
 `?token=<TICKETING_WEBHOOK_SECRET>` added. `ticketingWebhook` compares that query parameter with the
 secret in constant time and answers 401 when it is missing or wrong. The body is not trusted for
 ticket data: the function reads only an order id from an `api_url` on `www.eventbriteapi.com`, and
-the sync drain fetches that order from the Eventbrite API with this deployment's token.
+the sync drain fetches that order from the Eventbrite API with this deployment's token. A delivery
+with the right secret that the adapter cannot read gets 200 and is ignored, so Eventbrite does not
+retry it. A secret shorter than 32 characters, or none, refuses every delivery and stops the
+registration script; other ticketing functions keep working.
 
 This is proven offline only, with faked fetch (`eventbrite.test.cjs`,
 `eventbriteEndToEnd.test.cjs`). It is not yet confirmed against Eventbrite. Confirm it in the
@@ -82,15 +87,20 @@ sandbox:
 
 ### 3. `api_url` shape
 
-- **Capture:** the full webhook payload body for at least one `attendee.updated` delivery,
-  specifically its `api_url` field.
+- **Capture:** the full webhook payload body for one delivery of each action (`order.placed`,
+  `order.updated`, `order.refunded`, `attendee.updated`), specifically its `api_url` field.
 - **Sanitize:** replace any real event/order/attendee numeric ids in the URL path with a
-  renumbered fake sequence, keeping the path *shape* identical.
-- **Diff against:** `webhook-attendee-updated.json`. The adapter assumes `api_url` always resolves
-  `/v3/events/{eventId}/orders/{orderId}/` (the order resource), even for `attendee.updated`. Check
-  whether the real `api_url` for an `attendee.updated` delivery is actually an order path or an
-  attendee path (e.g. `/v3/events/{eventId}/attendees/{attendeeId}/`). This is the single most
-  load-bearing assumption — verify it carefully.
+  renumbered fake sequence, keeping the path *shape* identical. Replace the token in
+  `config.endpoint_url` as the general rule above says.
+- **Diff against:** the adapter accepts three shapes, none yet confirmed against Eventbrite:
+  `/v3/events/{eventId}/orders/{orderId}/` (`webhook-attendee-updated.json` and the other first
+  fixtures), `/v3/orders/{orderId}/` (`webhook-order-placed-order-path.json`, the shape
+  Eventbrite's documentation shows for `order.*`), and `/v3/events/{eventId}/attendees/{attendeeId}/`
+  (`webhook-attendee-updated-attendee-path.json`, the documented `attendee.*` shape, mapped to its
+  order through `GET /events/{id}/attendees/{id}/`). An authenticated delivery in any other shape
+  gets 200 and is ignored, so a shape the adapter does not know loses the update without an
+  error. Record which shape each action really uses. This is the single most load-bearing
+  assumption — verify it carefully.
 
 ### 4. `order.refunded` folding
 

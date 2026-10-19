@@ -84,14 +84,10 @@ function provider(overrides = {}) {
 // Construction
 // ---------------------------------------------------------------------------
 
-test('construction requires both secrets, and reads externalEventId once (§3.3)', () => {
+test('construction requires the API token, and reads externalEventId once (§3.3)', () => {
   assert.throws(
     () => createEventbriteProvider({ env: { TICKETING_WEBHOOK_SECRET: SECRET } }),
     /TICKETING_API_TOKEN/,
-  );
-  assert.throws(
-    () => createEventbriteProvider({ env: { TICKETING_API_TOKEN: TOKEN } }),
-    /TICKETING_WEBHOOK_SECRET/,
   );
   const p = provider();
   assert.equal(p.name, 'eventbrite');
@@ -99,13 +95,53 @@ test('construction requires both secrets, and reads externalEventId once (§3.3)
   assert.equal(typeof p.registerWebhook, 'function');
 });
 
-test('construction refuses a short URL secret, and the error never prints it (issue 356)', () => {
-  const short = 'short-secret-value';
-  assert.throws(
-    () => provider({ env: { TICKETING_WEBHOOK_SECRET: short } }),
-    (err) => /at least 32 characters/.test(err.message) && !err.message.includes(short),
-  );
+// Review fix 1: every ticketing function builds this provider. A short or
+// missing webhook secret must cost webhooks only, never claim, verify,
+// sync, or status.
+for (const [label, secret] of [['missing', undefined], ['short', 'short-secret-value']]) {
+  test(`a ${label} URL secret: construction succeeds and the order reads still work (issue 356)`, async () => {
+    const fetchImpl = fakeFetch({ 'GET /orders/ord-2001/': fixture('order-complete.json') });
+    const p = provider({ env: { TICKETING_WEBHOOK_SECRET: secret }, fetchImpl });
+    assert.equal(p.name, 'eventbrite');
+    assert.equal((await p.fetchOrder('ord-2001')).tickets.length, 2);
+    assert.equal((await p.lookupByOrderNumber('ord-2001', 'ada.lovelace@example.com')).length, 2);
+  });
+
+  test(`a ${label} URL secret: verifyWebhook refuses, even a delivery that carries that same value (issue 356)`, async () => {
+    const p = provider({ env: { TICKETING_WEBHOOK_SECRET: secret } });
+    const rawBody = rawBodyFor('webhook-order-placed.json');
+    for (const context of [withSecret(secret ?? ''), withSecret(SECRET), {}]) {
+      const result = await p.verifyWebhook(rawBody, {}, context);
+      assert.equal(result.valid, false);
+      assert.equal(result.reason, 'invalid_secret');
+    }
+  });
+
+  test(`a ${label} URL secret: registerWebhook throws before any API call and never prints it (issue 356)`, async () => {
+    let called = false;
+    const p = provider({ env: { TICKETING_WEBHOOK_SECRET: secret }, fetchImpl: async () => { called = true; } });
+    await assert.rejects(
+      () => p.registerWebhook({ callbackUrl: CALLBACK }),
+      (err) => /TICKETING_WEBHOOK_SECRET of at least 32 characters/.test(err.message) &&
+        (secret === undefined || !err.message.includes(secret)),
+    );
+    assert.equal(called, false);
+  });
+}
+
+test('the minimum URL secret length is 32 characters', () => {
   assert.equal(internals.MIN_WEBHOOK_SECRET_LENGTH, 32);
+});
+
+test('every webhook fixture body holds the placeholder token, never a real one (review fix 2)', () => {
+  const fs = require('node:fs');
+  const names = fs.readdirSync(FIXTURES).filter((n) => /^webhook.*\.json$/.test(n));
+  assert.ok(names.length >= 8);
+  for (const name of names) {
+    const url = fixture(name)?.config?.endpoint_url ?? fixture(name)?.endpoint_url;
+    if (url === undefined) continue;
+    assert.equal(new URL(url).searchParams.get(internals.URL_SECRET_PARAM), 'fixture-placeholder', name);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -174,6 +210,30 @@ test('verifyWebhook: a repeated secret parameter (array) refuses', async () => {
   assert.equal(result.reason, 'invalid_secret');
 });
 
+test('verifyWebhook: the query parser Functions uses (Express 4) — repeated, bracketed, and encoded tokens (review fix 7)', async () => {
+  const express = require('express');
+  const parse = express().get('query parser fn');
+  const p = provider();
+  const rawBody = rawBodyFor('webhook-order-placed.json');
+  const check = (qs) => p.verifyWebhook(rawBody, {}, { query: parse(qs) });
+  const param = internals.URL_SECRET_PARAM;
+
+  assert.equal((await check(`${param}=${SECRET}`)).valid, true, 'plain');
+  assert.equal((await check(`${param}=${SECRET}&${param}=${SECRET}`)).reason, 'invalid_secret', 'repeated');
+  assert.equal((await check(`${param}[]=${SECRET}`)).reason, 'invalid_secret', 'bracketed array');
+  assert.equal((await check(`${param}[0]=${SECRET}`)).reason, 'invalid_secret', 'indexed array');
+  assert.equal((await check(`${param}[a]=${SECRET}`)).reason, 'invalid_secret', 'object');
+  assert.equal((await check(`${param}=${SECRET}%00`)).reason, 'invalid_secret', 'trailing encoded byte');
+  assert.equal((await check(`${param}=`)).reason, 'invalid_secret', 'empty');
+
+  // A secret with characters that need encoding round-trips through the
+  // URL registerWebhook builds and the parser the handler sees.
+  const odd = 'a+b/c=d&e%f g?h#i-0123456789abcdef0123456789';
+  const q = new URL(internals.endpointUrlFor(CALLBACK, odd)).search.slice(1);
+  const oddProvider = provider({ env: { TICKETING_WEBHOOK_SECRET: odd } });
+  assert.equal((await oddProvider.verifyWebhook(rawBody, {}, { query: parse(q) })).valid, true, 'encoded round trip');
+});
+
 test('verifyWebhook: an HMAC header alone no longer authenticates (issue 356)', async () => {
   const p = provider();
   const rawBody = rawBodyFor('webhook-order-placed.json');
@@ -228,22 +288,71 @@ test('verifyWebhook: wrong-event delivery → valid: false, reason: wrong_event 
   assert.equal(result.eventType, 'order.placed');
 });
 
-test('verifyWebhook: malformed JSON body → reason malformed, even with the right secret', async () => {
+/** An authenticated delivery the adapter cannot act on: 200 + ignored, so Eventbrite stops retrying. */
+function assertIgnored(result, label) {
+  assert.equal(result.valid, true, `${label}: authenticated`);
+  assert.equal(result.resourceId, null, `${label}: no order to fetch`);
+  assert.equal(result.deliveryId.length, 64);
+}
+
+test('verifyWebhook: malformed JSON with the right secret is acknowledged and ignored, not refused (review fix 6)', async () => {
   const p = provider();
-  const result = await p.verifyWebhook(Buffer.from('not json{{{', 'utf8'), {}, withSecret());
-  assert.equal(result.valid, false);
-  assert.equal(result.reason, 'malformed');
+  assertIgnored(await p.verifyWebhook(Buffer.from('not json{{{', 'utf8'), {}, withSecret()), 'malformed JSON');
 });
 
-test('verifyWebhook: valid JSON but unrecognized shape (no api_url match) → malformed', async () => {
+test('verifyWebhook: an unknown api_url shape with the right secret is ignored, not refused (review fix 6)', async () => {
   const p = provider();
-  const result = await verifyBody(p, { config: { action: 'order.placed' }, api_url: 'nope' });
+  assertIgnored(await verifyBody(p, { config: { action: 'order.placed' }, api_url: 'nope' }), 'nope');
+  assertIgnored(await verifyBody(p, { config: { action: 'order.placed' } }), 'no api_url');
+  assertIgnored(await verifyBody(p, { api_url: 'https://www.eventbriteapi.com/v3/orders/ord-1/' }), 'no action');
+  assertIgnored(await verifyBody(p, {
+    config: { action: 'order.placed' }, api_url: 'https://www.eventbriteapi.com/v3/events/evt-1/',
+  }), 'event resource');
+});
+
+test('verifyWebhook: the documented /v3/orders/{id}/ form resolves the order (review fix 6)', async () => {
+  let called = false;
+  const p = provider({ fetchImpl: async () => { called = true; } });
+  const result = await verify(p, 'webhook-order-placed-order-path.json');
+  assert.equal(result.valid, true);
+  assert.equal(result.eventType, 'order.placed');
+  assert.equal(result.resourceId, 'ord-2001');
+  assert.equal(called, false, 'no fetch: the event is checked when sync re-fetches the order');
+});
+
+test('verifyWebhook: the attendee form maps to its order through the API host, never the delivered URL (review fix 6)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': fixture('attendee.json') }, { calls });
+  const p = provider({ fetchImpl });
+  const result = await verify(p, 'webhook-attendee-updated-attendee-path.json');
+  assert.equal(result.valid, true);
+  assert.equal(result.eventType, 'attendee.updated');
+  assert.equal(result.resourceId, 'ord-2001');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, `${internals.API_BASE}/events/evt-1/attendees/att-5001/`);
+});
+
+test('verifyWebhook: an attendee that no longer exists is acknowledged and ignored', async () => {
+  const fetchImpl = fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': { status: 404, body: {} } });
+  const p = provider({ fetchImpl });
+  assertIgnored(await verify(p, 'webhook-attendee-updated-attendee-path.json'), 'attendee 404');
+});
+
+test('verifyWebhook: an attendee for another event is wrong_event, with no API call', async () => {
+  let called = false;
+  const p = provider({ fetchImpl: async () => { called = true; } });
+  const result = await verifyBody(p, {
+    config: { action: 'attendee.updated' },
+    api_url: 'https://www.eventbriteapi.com/v3/events/evt-OTHER/attendees/att-1/',
+  });
   assert.equal(result.valid, false);
-  assert.equal(result.reason, 'malformed');
+  assert.equal(result.reason, 'wrong_event');
+  assert.equal(called, false);
 });
 
 test('verifyWebhook: api_url must name Eventbrite\'s own API host over https (no SSRF, issue 356)', async () => {
-  const p = provider();
+  let called = false;
+  const p = provider({ fetchImpl: async () => { called = true; } });
   const order = '/v3/events/evt-1/orders/ord-1/';
   for (const apiUrl of [
     `https://attacker.example${order}`,
@@ -253,13 +362,15 @@ test('verifyWebhook: api_url must name Eventbrite\'s own API host over https (no
     `https://www.eventbriteapi.com:8443${order}`,
     `https://user:pass@www.eventbriteapi.com${order}`,
     `https://169.254.169.254${order}`,
+    'https://attacker.example/v3/orders/ord-1/',
+    'https://attacker.example/v3/events/evt-1/attendees/att-1/',
     `https://www.eventbriteapi.com/v3/events/evt-1/orders/ord-1/extra/`,
     `https://www.eventbriteapi.com/v2/events/evt-1/orders/ord-1/`,
   ]) {
-    const result = await verifyBody(p, { config: { action: 'order.placed' }, api_url: apiUrl });
-    assert.equal(result.valid, false, `${apiUrl} must be refused`);
-    assert.equal(result.reason, 'malformed');
+    // Authenticated, so acknowledged; but no order id and no fetch.
+    assertIgnored(await verifyBody(p, { config: { action: 'order.placed' }, api_url: apiUrl }), apiUrl);
   }
+  assert.equal(called, false);
   const ok = await verifyBody(p, { config: { action: 'order.placed' }, api_url: `https://www.eventbriteapi.com${order}` });
   assert.equal(ok.valid, true);
   assert.equal(ok.resourceId, 'ord-1');
@@ -499,6 +610,93 @@ test('registerWebhook: a subscription at the bare endpoint (no URL secret) is st
   const result = await p.registerWebhook({ callbackUrl: CALLBACK });
   assert.equal(result.webhookId, 'hook-6666');
   assert.deepEqual(result.staleWebhookIds, ['hook-bare']);
+});
+
+test('registerWebhook: staleWebhookIds lists every other same-endpoint id, even when one is reused (review fix 3)', async () => {
+  const keep = { id: 'hook-keep', endpoint_url: `${CALLBACK}?token=${SECRET}`, actions: internals.WEBHOOK_ACTIONS.join(','), event_id: 'evt-1' };
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': {
+      webhooks: [
+        { id: 'hook-bare', endpoint_url: CALLBACK, actions: 'order.placed' },
+        keep,
+        { id: 'hook-dup', endpoint_url: `${CALLBACK}?token=${SECRET}`, actions: internals.WEBHOOK_ACTIONS.join(','), event_id: 'evt-1' },
+        { id: 'hook-elsewhere', endpoint_url: 'https://other.example.org/hooks', actions: 'order.placed' },
+      ],
+    },
+  });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  assert.equal(result.webhookId, 'hook-keep');
+  assert.deepEqual(result.staleWebhookIds, ['hook-bare', 'hook-dup']);
+});
+
+test('registerWebhook: a stored URL Eventbrite normalized (host case, extra params) is still reused (review fix 4)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': {
+      webhooks: [{
+        id: 'hook-norm',
+        endpoint_url: `https://US-Central1-Demo-Event.cloudfunctions.net/ticketingWebhook?src=eb&${internals.URL_SECRET_PARAM}=${encodeURIComponent(SECRET)}`,
+        actions: internals.WEBHOOK_ACTIONS.join(','),
+        event_id: 'evt-1',
+      }],
+    },
+  }, { calls });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  assert.equal(result.webhookId, 'hook-norm');
+  assert.deepEqual(result.staleWebhookIds, []);
+  assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
+});
+
+test('registerWebhook: a same-endpoint subscription with another secret is stale', async () => {
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': {
+      webhooks: [{ id: 'hook-old-secret', endpoint_url: `${CALLBACK}?token=an-older-secret-0123456789abcdef0123`, actions: internals.WEBHOOK_ACTIONS.join(','), event_id: 'evt-1' }],
+    },
+    'POST /organizations/org-8001/webhooks/': fixture('webhook-create-response.json'),
+  });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  assert.equal(result.webhookId, 'hook-6666');
+  assert.deepEqual(result.staleWebhookIds, ['hook-old-secret']);
+});
+
+test('registerWebhook: follows pagination.continuation through the webhook list (review fix 5)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/?continuation=hooks-cont-2': {
+      webhooks: fixture('webhooks-list-current.json').webhooks.map((w) => ({
+        ...w,
+        endpoint_url: w.endpoint_url.replace(`${internals.URL_SECRET_PARAM}=fixture-placeholder`, `${internals.URL_SECRET_PARAM}=${SECRET}`),
+      })),
+      pagination: { has_more_items: false },
+    },
+    'GET /organizations/org-8001/webhooks/': fixture('webhooks-list-page-1.json'),
+  }, { calls });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  assert.equal(result.webhookId, 'hook-7777');
+  assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
+  assert.equal(calls.filter((c) => c.path.startsWith('/organizations/org-8001/webhooks/')).length, 2);
+});
+
+test('registerWebhook: a subscription bound to another event is not reused (review note 8)', async () => {
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': {
+      webhooks: [{ id: 'hook-old-event', endpoint_url: `${CALLBACK}?token=${SECRET}`, actions: internals.WEBHOOK_ACTIONS.join(','), event_id: 'evt-OLD' }],
+    },
+    'POST /organizations/org-8001/webhooks/': fixture('webhook-create-response.json'),
+  });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  assert.equal(result.webhookId, 'hook-6666');
+  assert.deepEqual(result.staleWebhookIds, ['hook-old-event']);
 });
 
 test('webhookEventTypes: every action the adapter handles is registered, order.refunded included (issue 357)', () => {

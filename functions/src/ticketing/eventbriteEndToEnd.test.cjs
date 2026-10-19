@@ -263,3 +263,62 @@ test('a forged delivery with the secret cannot inject ticket data: tickets come 
   assert.equal(db.read('tickets', 'att-forged'), undefined, 'nothing from the body becomes a ticket');
   assert.ok(db.read('tickets', 'att-5001'), 'the ticket comes from the API response');
 });
+
+test('an authenticated delivery in an unknown shape is acknowledged and ignored, never retried (review fix 6)', async () => {
+  const db = makeFakeDb();
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: async () => { throw new Error('must not be called'); },
+  });
+  const handler = createTicketingWebhookHandler({ db, provider, log: QUIET });
+  for (const body of [
+    { config: { action: 'order.placed' }, api_url: 'https://www.eventbriteapi.com/v3/events/evt-1/' },
+    { config: { action: 'order.placed' }, api_url: 'https://attacker.example/v3/orders/ord-2001/' },
+    'not json{{{',
+  ]) {
+    const rawBody = Buffer.from(typeof body === 'string' ? body : JSON.stringify(body), 'utf8');
+    const res = makeRes();
+    await handler({
+      method: 'POST', rawBody, headers: {}, query: { [eventbriteInternals.URL_SECRET_PARAM]: SECRET }, body: {},
+    }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ignored, 'not_actionable');
+    assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(rawBody)), undefined);
+  }
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
+});
+
+test('the /v3/orders/{id}/ form enqueues, and the drain drops an order for another event (review fix 6)', async () => {
+  const db = makeFakeDb();
+  const otherEventOrder = { ...fixture('order-complete.json'), event_id: 'evt-OTHER' };
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: fakeFetch({ 'GET /orders/ord-2001/': otherEventOrder }),
+  });
+  const res = makeRes();
+  await createTicketingWebhookHandler({ db, provider, log: QUIET })(
+    signedWebhookRequest('webhook-order-placed-order-path.json'), res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.enqueued, true);
+  assert.ok(db.read('ticket_sync_queue', 'ord-2001'));
+
+  await drainTicketSyncQueue({ db, provider, now: () => new Date(), log: QUIET });
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined, 'the row is removed');
+  assert.equal(db.read('tickets', 'att-5001'), undefined, 'no ticket from another event');
+});
+
+test('the attendee form enqueues the attendee\'s order (review fix 6)', async () => {
+  const db = makeFakeDb();
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': fixture('attendee.json') }),
+  });
+  const res = makeRes();
+  await createTicketingWebhookHandler({ db, provider, log: QUIET })(
+    signedWebhookRequest('webhook-attendee-updated-attendee-path.json'), res,
+  );
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.enqueued, true);
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001').lastEventType, 'attendee.updated');
+});
