@@ -37,13 +37,17 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_STYLES } from './capture-specimen.mjs';
+import pagesSiteModule from '../lib/pages-site.cjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const WIDTHS = Object.freeze([485, 639, 640, 1165]);
 export const HEIGHT = 900;
 export const MODES = Object.freeze(['light', 'dark']);
-export const BASE_PATH = '/eventrunner/demo/';
-export const CANONICAL_ORIGIN = 'https://centercoopmedia.github.io';
+// The committed site address, the one `node scripts/build-demo.cjs` builds
+// for when PAGES_BASE_URL is unset (scripts/lib/pages-site.cjs).
+const COMMITTED_SITE = pagesSiteModule.pagesSite({});
+export const BASE_PATH = COMMITTED_SITE.demoBase;
+export const CANONICAL_ORIGIN = COMMITTED_SITE.origin;
 export const NO_RESULTS_QUERY = 'visual-no-session-match-398399';
 const SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i;
 const MIME = {

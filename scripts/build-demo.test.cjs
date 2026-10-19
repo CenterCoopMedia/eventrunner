@@ -56,12 +56,26 @@ test('static demo metadata identifies the historical fixture and escapes source 
 });
 
 test('defaults target the Pages subpath and docs/demo', () => {
-  const options = parseArgs([]);
+  const options = parseArgs([], {});
   assert.equal(DEFAULT_BASE, '/eventrunner/demo/');
   assert.equal(options.base, '/eventrunner/demo/');
+  assert.equal(options.origin, 'https://centercoopmedia.github.io');
   assert.equal(options.out, DEFAULT_OUT);
   assert.equal(options.dryRun, false);
   assert.ok(DEFAULT_BASE.endsWith('/'));
+});
+
+test('the base and origin follow the Pages site address for both bases', () => {
+  // A custom domain serves the site from `/`, so the demo sits at /demo/.
+  const custom = parseArgs([], { PAGES_BASE_URL: 'https://docs.eventrunner.org/' });
+  assert.equal(custom.base, '/demo/');
+  assert.equal(custom.origin, 'https://docs.eventrunner.org');
+  const project = parseArgs([], { PAGES_BASE_URL: '' });
+  assert.equal(project.base, '/eventrunner/demo/');
+  assert.equal(project.origin, 'https://centercoopmedia.github.io');
+  // --base still wins over the address's own demo path.
+  assert.equal(parseArgs(['--base', '/x/'], { PAGES_BASE_URL: 'https://docs.eventrunner.org/' }).base, '/x/');
+  assert.throws(() => parseArgs([], { PAGES_BASE_URL: 'http://docs.eventrunner.org/' }), UsageError);
 });
 
 test('a base without a trailing slash is normalized', () => {

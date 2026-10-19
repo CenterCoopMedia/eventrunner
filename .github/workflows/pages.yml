@@ -2,7 +2,15 @@ name: Pages
 
 # Builds and deploys the GitHub Pages site: docs/ as committed, plus the
 # static demo in docs/demo/, which is build output and not committed
-# (scripts/build-demo.cjs). The demo URL stays /eventrunner/demo/.
+# (scripts/build-demo.cjs).
+#
+# The site's public address is one value (scripts/lib/pages-site.cjs). The
+# repository variable PAGES_BASE_URL overrides it for the deploy, for example
+# https://docs.eventrunner.org/ for the custom domain. When the variable is
+# unset or empty, the committed default (the github.io project path) is used.
+# The deploy stops when the address does not match where Pages serves the
+# site, so links never point at a path the site is not served from. The order
+# of a domain switch is in docs/DEPLOY_RUNBOOK.md §10.
 #
 # Deploying needs the repository's Pages source set to "GitHub Actions"
 # (Settings → Pages). While Pages still builds from a branch, this workflow
@@ -34,6 +42,8 @@ jobs:
       pages: read
     outputs:
       deploy: ${{ steps.source.outputs.deploy }}
+    env:
+      PAGES_BASE_URL: ${{ vars.PAGES_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,7 +55,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Check the committed documentation pages
+        # The committed pages are built for the committed default address.
+        env:
+          PAGES_BASE_URL: ""
         run: node scripts/build-pages.cjs --check
+      - name: Render the documentation pages for the site address
+        # Does not change a file when PAGES_BASE_URL is unset.
+        run: node scripts/build-pages.cjs
+      - name: Read the site address
+        id: address
+        run: |
+          url="$(node scripts/lib/pages-site.cjs)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Build the static demo
         run: node scripts/build-demo.cjs
       - name: Enforce demo bundle budget
@@ -55,6 +76,8 @@ jobs:
       - name: Read the Pages source
         id: source
         uses: actions/github-script@v7
+        env:
+          SITE_URL: ${{ steps.address.outputs.url }}
         with:
           script: |
             core.setOutput('deploy', 'false');
@@ -67,6 +90,19 @@ jobs:
             }
             if (site.build_type !== 'workflow') {
               core.warning(`Pages builds from a branch (${site.source?.branch}${site.source?.path}). Set Settings → Pages → Source to "GitHub Actions" to deploy this build. The site was built but not deployed.`);
+              return;
+            }
+            // html_url is where Pages serves the site now: the custom domain
+            // once one is set, the github.io project path before. The scheme
+            // is ignored, because html_url reads http until HTTPS is enforced.
+            const where = (value) => {
+              const url = new URL(value);
+              return `${url.host}${url.pathname.replace(/\/?$/, '/')}`;
+            };
+            if (!site.html_url) {
+              core.warning('Pages did not report its URL, so the site address was not compared with it.');
+            } else if (where(site.html_url) !== where(process.env.SITE_URL)) {
+              core.setFailed(`The site was built for ${process.env.SITE_URL}, but Pages serves it at ${site.html_url}. Set the PAGES_BASE_URL repository variable to match the Pages address (or connect the custom domain first), then run this workflow again. Nothing was deployed.`);
               return;
             }
             core.setOutput('deploy', 'true');

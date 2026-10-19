@@ -534,6 +534,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The public address of the Pages site is one value, in `scripts/lib/pages-site.cjs`. The
+  documentation generator, the demo build, and the link checker read it, so the canonical and
+  social card URLs, the root-relative links, the demo's base, and the link checker's path mapping
+  change together. The committed default is still `https://centercoopmedia.github.io/eventrunner/`.
+  The `PAGES_BASE_URL` repository variable sets another address for the Pages workflow, for
+  example `https://docs.eventrunner.org/`, which serves from `/`. The workflow does not deploy
+  when the address and the URL Pages reports are not the same. `docs/DEPLOY_RUNBOOK.md` §10 gives
+  the order of the switch (#514).
+
 - The static demo is no longer committed. `docs/demo/` is in `.gitignore`, and a new
   `Pages` workflow (`.github/workflows/pages.yml`) builds the demo on every push to `main` and
   deploys `docs/` with it to GitHub Pages. The demo URL stays `/eventrunner/demo/`. Feature pull

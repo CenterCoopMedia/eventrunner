@@ -270,12 +270,14 @@ existing "only when configured" behavior doing the right thing with what this pa
 ### `build-demo.cjs`
 
 Builds the public click-through demo and syncs it into `docs/demo/`, which GitHub Pages serves at
+`demo/` under the site address (`scripts/lib/pages-site.cjs`), today
 `https://centercoopmedia.github.io/eventrunner/demo/`. `docs/demo/` is build output and is not
 committed: `.github/workflows/pages.yml` runs this script on every push to `main` and deploys
 `docs/` with the result. The one script here that touches no
-Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base /eventrunner/demo/`, run
+Firestore at all: it is `vite build` with `VITE_DEMO_MODE=1` and `--base` set to the site's demo
+path (`/eventrunner/demo/` by default), run
 against the committed historical demo snapshot, followed by `write-site-files.cjs` writing a real
-sitemap.xml/robots.txt/manifest into the same output (public URL: GitHub Pages' own origin plus
+sitemap.xml/robots.txt/manifest into the same output (public URL: the site's origin plus
 `--base`) — so the published demo carries real ones, not only the neutral fallback Vite copies from
 `apps/web/public/manifest.webmanifest`.
 
@@ -311,9 +313,17 @@ git.
 
 ### `build-pages.cjs`
 
-Renders the documentation site GitHub Pages serves at
+Renders the documentation site GitHub Pages serves at `docs/` under the site address, today
 `https://centercoopmedia.github.io/eventrunner/docs/`. The Markdown in this repository is the only
 source; the HTML under `docs/docs/` is generated output and is committed.
+
+The site address is one value, in `scripts/lib/pages-site.cjs`: an https origin and a path base.
+This script, `build-demo.cjs`, and `check-docs.cjs` read it. `PAGES_BASE_URL` overrides the
+committed default for one run, and `node scripts/lib/pages-site.cjs` prints the address in use.
+This script also moves the hand-written landing pages (`docs/index.html`, `docs/videos/index.html`)
+to that address: their canonical and social card URLs. `--check` fails when they name another
+address. The Pages workflow reads the `PAGES_BASE_URL` repository variable; the switch to the
+custom domain is in `docs/DEPLOY_RUNBOOK.md` §10.
 
 ```sh
 node scripts/build-pages.cjs                    # write docs/tokens.css + docs/docs/

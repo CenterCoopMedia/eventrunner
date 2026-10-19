@@ -14,6 +14,12 @@
  * `apps/web/src/generated/theme.css`. `docs/styles.css` is the handwritten
  * half — layout, devices, and rhythm — and reads those tokens by name.
  *
+ * Every URL it writes follows the site address in scripts/lib/pages-site.cjs
+ * (PAGES_BASE_URL overrides it for one run). The hand-written pages in
+ * LANDING_PAGES carry that address in their canonical and social card URLs;
+ * this script moves them to the configured address too, so one value decides
+ * where the whole site says it lives (#514).
+ *
  * Usage:
  *   node scripts/build-pages.cjs            # write docs/tokens.css + docs/docs/
  *   node scripts/build-pages.cjs --check    # compare only, write nothing
@@ -21,7 +27,8 @@
  * `--check` is the freshness gate, and it mirrors
  * scripts/generate-content.cjs --check: it fails on any file whose
  * committed bytes differ from a fresh render, on any unexpected file left
- * behind in the output directory, and on a stale `docs/tokens.css`. It runs
+ * behind in the output directory, on a stale `docs/tokens.css`, and on a
+ * landing page that names a different site address. It runs
  * from scripts/build-pages.test.cjs so the credential-free documentation CI
  * tier enforces it without an npm install.
  *
@@ -38,27 +45,26 @@ const { renderMarkdown, escapeHtml, plainText } = require('./lib/markdown-pages.
 const { DEFAULT_PRESET_ID, rgbToHex } = require('./lib/shared-theme.cjs');
 const { buildTokenCss, loadTokens, resolveColorTokens } = require('./lib/tokens.cjs');
 const {
-  DOCS_BASE,
   REPO_BLOB,
   REPO_URL,
   SECTIONS,
-  SITE_BASE,
-  SITE_ORIGIN,
   pagesInOrder,
   routesBySource,
 } = require('./lib/pages-manifest.cjs');
+const { GITHUB_PAGES_URL, pagesSite, parsePagesBaseUrl } = require('./lib/pages-site.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(ROOT, 'docs', 'docs');
-const LANDING_PAGE = path.join(ROOT, 'docs', 'index.html');
 const TOKENS_FILE = 'tokens.css';
+// Hand-written pages under docs/ that state the site's absolute address in
+// their head. The first is the landing page: its canonical URL is the address
+// the committed site is built for, and the address the others are moved from.
+const LANDING_PAGES = Object.freeze(['index.html', 'videos/index.html']);
 
 const PRODUCT = 'Event Runner';
-const SITE_URL = `${SITE_ORIGIN}${SITE_BASE}`;
-const DOCS_URL = `${SITE_ORIGIN}${DOCS_BASE}`;
 // The documentation site has its own social card, so a link to a guide is not
 // previewed as the product landing page (docs/social-preview.png).
-const SOCIAL_IMAGE = `${SITE_URL}og-default.png`;
+const SOCIAL_IMAGE_FILE = 'og-default.png';
 const SOCIAL_IMAGE_ALT = 'Event Runner documentation';
 const DOCS_DESCRIPTION =
   'Guides, runbooks, and decision records for Event Runner, the white-label event CMS ' +
@@ -304,15 +310,23 @@ function themeColorProblems(landingHtml) {
  * repository becomes an absolute GitHub URL, and is reported so a reviewer
  * can see which links leave the documentation site.
  *
- * @param {{ source: string, routes: Map<string,string>, departures: Array, errors: Array }} context
+ * A link to the project's github.io address is moved to the configured site
+ * address, so a rendered page never sends a reader through the redirect
+ * GitHub adds once a custom domain is set.
+ *
+ * @param {{ source: string, routes: Map<string,string>, departures: Array, errors: Array,
+ *           site?: ReturnType<typeof pagesSite> }} context
  * @returns {(href: string) => string}
  */
-function linkResolver({ source, routes, departures, errors }) {
+function linkResolver({ source, routes, departures, errors, site = pagesSite() }) {
   return (href) => {
     const target = String(href).trim();
     if (target === '' || target.startsWith('#')) return target;
 
     if (EXTERNAL_SCHEME_RE.test(target)) {
+      if (target.startsWith(GITHUB_PAGES_URL)) {
+        return `${site.url}${target.slice(GITHUB_PAGES_URL.length)}`;
+      }
       // A link that already points at a GitHub blob page for a document
       // this site publishes is rewritten to the published route: raw blob
       // pages are no longer the normal reader path.
@@ -362,7 +376,8 @@ function routeDepth(route) {
   return route.split('/').filter(Boolean).length;
 }
 
-function head({ title, description, canonical, themeTags, ogType }) {
+function head({ site, title, description, canonical, themeTags, ogType }) {
+  const socialImage = `${site.url}${SOCIAL_IMAGE_FILE}`;
   const safeTitle = escapeHtml(title);
   const safeDescription = escapeHtml(description);
   return [
@@ -374,14 +389,14 @@ function head({ title, description, canonical, themeTags, ogType }) {
     `  <title>${safeTitle}</title>`,
     `  <meta name="description" content="${safeDescription}">`,
     `  <link rel="canonical" href="${escapeHtml(canonical)}">`,
-    `  <link rel="icon" type="image/svg+xml" href="${SITE_BASE}favicon.svg">`,
+    `  <link rel="icon" type="image/svg+xml" href="${site.base}favicon.svg">`,
     '',
     `  <meta property="og:type" content="${ogType}">`,
     `  <meta property="og:site_name" content="${PRODUCT}">`,
     `  <meta property="og:title" content="${safeTitle}">`,
     `  <meta property="og:description" content="${safeDescription}">`,
     `  <meta property="og:url" content="${escapeHtml(canonical)}">`,
-    `  <meta property="og:image" content="${SOCIAL_IMAGE}">`,
+    `  <meta property="og:image" content="${socialImage}">`,
     '  <meta property="og:image:type" content="image/png">',
     '  <meta property="og:image:width" content="1200">',
     '  <meta property="og:image:height" content="630">',
@@ -389,17 +404,17 @@ function head({ title, description, canonical, themeTags, ogType }) {
     '  <meta name="twitter:card" content="summary_large_image">',
     `  <meta name="twitter:title" content="${safeTitle}">`,
     `  <meta name="twitter:description" content="${safeDescription}">`,
-    `  <meta name="twitter:image" content="${SOCIAL_IMAGE}">`,
+    `  <meta name="twitter:image" content="${socialImage}">`,
     `  <meta name="twitter:image:alt" content="${SOCIAL_IMAGE_ALT}">`,
     ...themeTags.map((tag) => `  ${tag}`),
     '',
     ...PRELOADED_FONTS.map((file) => (
-      `  <link rel="preload" href="${SITE_BASE}fonts/${file}" as="font" type="font/woff2" crossorigin>`
+      `  <link rel="preload" href="${site.base}fonts/${file}" as="font" type="font/woff2" crossorigin>`
     )),
-    `  <link rel="stylesheet" href="${SITE_BASE}${TOKENS_FILE}">`,
-    `  <link rel="stylesheet" href="${SITE_BASE}styles.css">`,
-    `  <link rel="stylesheet" href="${SITE_BASE}docs.css">`,
-    `  <script src="${SITE_BASE}scroll-regions.js" defer></script>`,
+    `  <link rel="stylesheet" href="${site.base}${TOKENS_FILE}">`,
+    `  <link rel="stylesheet" href="${site.base}styles.css">`,
+    `  <link rel="stylesheet" href="${site.base}docs.css">`,
+    `  <script src="${site.base}scroll-regions.js" defer></script>`,
     '</head>',
     '<body>',
     '  <a class="skip-link" href="#main">Skip to content</a>',
@@ -410,7 +425,7 @@ function head({ title, description, canonical, themeTags, ogType }) {
     // (design brief §2.1). The line under the name states which surface of
     // the site the reader is on.
     '    <header class="site-header">',
-    `      <a class="brand" href="${SITE_BASE}">`,
+    `      <a class="brand" href="${site.base}">`,
     ...MARK,
     '        <span class="brand-words">',
     `          <strong>${PRODUCT}</strong>`,
@@ -418,9 +433,9 @@ function head({ title, description, canonical, themeTags, ogType }) {
     '        </span>',
     '      </a>',
     '      <nav aria-label="Site">',
-    `        <a href="${SITE_BASE}">Home</a>`,
-    `        <a href="${DOCS_BASE}">Documentation</a>`,
-    `        <a href="${SITE_BASE}demo/">Demo</a>`,
+    `        <a href="${site.base}">Home</a>`,
+    `        <a href="${site.docsBase}">Documentation</a>`,
+    `        <a href="${site.demoBase}">Demo</a>`,
     `        <a href="${REPO_URL}">Repo</a>`,
     '      </nav>',
     '    </header>',
@@ -444,13 +459,13 @@ function breadcrumbs(trail) {
   ].join('\n');
 }
 
-function sidebar(currentRoute) {
+function sidebar(site, currentRoute) {
   const lines = ['      <nav class="docs-nav" aria-label="Documentation">'];
   for (const section of SECTIONS) {
     lines.push(`        <p class="docs-nav-section">${escapeHtml(section.title)}</p>`);
     lines.push('        <ul>');
     for (const page of section.pages) {
-      const href = `${DOCS_BASE}${page.route}`;
+      const href = `${site.docsBase}${page.route}`;
       const current = page.route === currentRoute
         ? ' aria-current="page" class="is-current"'
         : '';
@@ -462,18 +477,18 @@ function sidebar(currentRoute) {
   return lines.join('\n');
 }
 
-function pagination(previous, next) {
+function pagination(site, previous, next) {
   if (!previous && !next) return '';
   const lines = ['        <nav class="page-nav" aria-label="Documentation pages">'];
   if (previous) {
     lines.push(
-      `          <a class="page-nav-link" rel="prev" href="${DOCS_BASE}${previous.route}">` +
+      `          <a class="page-nav-link" rel="prev" href="${site.docsBase}${previous.route}">` +
       `<span>Previous</span>${escapeHtml(previous.title)}</a>`,
     );
   }
   if (next) {
     lines.push(
-      `          <a class="page-nav-link page-nav-next" rel="next" href="${DOCS_BASE}${next.route}">` +
+      `          <a class="page-nav-link page-nav-next" rel="next" href="${site.docsBase}${next.route}">` +
       `<span>Next</span>${escapeHtml(next.title)}</a>`,
     );
   }
@@ -481,7 +496,7 @@ function pagination(previous, next) {
   return lines.join('\n');
 }
 
-function footer() {
+function footer(site) {
   return [
     '    <footer class="site-footer">',
     '      <div>An initiative of the Center for Cooperative Media at Montclair State University.</div>',
@@ -490,7 +505,7 @@ function footer() {
     '        ·',
     `        <a href="${REPO_URL}/blob/main/LICENSE">Apache-2.0</a>`,
     '        ·',
-    `        <a href="${DOCS_BASE}security/">Security</a>`,
+    `        <a href="${site.docsBase}security/">Security</a>`,
     '      </div>',
     '    </footer>',
     '  </div>',
@@ -528,21 +543,21 @@ function contents(headings) {
  *
  * @returns {{ path: string, contents: string, headings: Array, links: Array }}
  */
-function renderPage(page, { themeTags, routes, departures, errors, root }) {
+function renderPage(page, { site, themeTags, routes, departures, errors, root }) {
   const sourcePath = path.join(root, page.source);
   const markdown = fs.readFileSync(sourcePath, 'utf8');
   const rendered = renderMarkdown(markdown, {
-    resolveLink: linkResolver({ source: page.source, routes, departures, errors }),
+    resolveLink: linkResolver({ source: page.source, routes, departures, errors, site }),
   });
   const title = page.title;
   const description = page.summary;
-  const canonical = `${DOCS_URL}${page.route}`;
+  const canonical = `${site.docsUrl}${page.route}`;
   const trail = [
-    { label: 'Home', href: SITE_BASE },
-    { label: 'Documentation', href: DOCS_BASE },
+    { label: 'Home', href: site.base },
+    { label: 'Documentation', href: site.docsBase },
   ];
   if (routeDepth(page.route) > 1) {
-    trail.push({ label: page.section.title, href: `${DOCS_BASE}#${page.section.id}` });
+    trail.push({ label: page.section.title, href: `${site.docsBase}#${page.section.id}` });
   }
   trail.push({ label: title });
 
@@ -550,7 +565,7 @@ function renderPage(page, { themeTags, routes, departures, errors, root }) {
     breadcrumbs(trail),
     '',
     '    <div class="docs-layout">',
-    sidebar(page.route),
+    sidebar(site, page.route),
     '',
     '      <main class="docs-main" id="main">',
     '        <article class="prose">',
@@ -562,7 +577,7 @@ function renderPage(page, { themeTags, routes, departures, errors, root }) {
     '        <p class="source-note">This page is generated from ' +
     `<a href="${REPO_BLOB}${page.source}"><code>${escapeHtml(page.source)}</code></a>. ` +
     'Edit the Markdown, not the HTML.</p>',
-    pagination(page.previous, page.next),
+    pagination(site, page.previous, page.next),
     '      </main>',
     '    </div>',
     '',
@@ -570,6 +585,7 @@ function renderPage(page, { themeTags, routes, departures, errors, root }) {
 
   const html = [
     head({
+      site,
       title: `${title} — ${PRODUCT} documentation`,
       description,
       canonical,
@@ -577,7 +593,7 @@ function renderPage(page, { themeTags, routes, departures, errors, root }) {
       ogType: 'article',
     }),
     body,
-    footer(),
+    footer(site),
   ].join('\n');
 
   return { path: `${page.route}index.html`, contents: html, headings: rendered.headings };
@@ -588,12 +604,12 @@ function renderPage(page, { themeTags, routes, departures, errors, root }) {
  *
  * @returns {{ path: string, contents: string }}
  */
-function renderIndex({ themeTags, pages }) {
+function renderIndex({ site, themeTags, pages }) {
   const sections = SECTIONS.map((section) => {
     const items = section.pages
       .map((page) => [
         '            <li>',
-        `              <a href="${DOCS_BASE}${page.route}">${escapeHtml(page.title)}</a>`,
+        `              <a href="${site.docsBase}${page.route}">${escapeHtml(page.title)}</a>`,
         `              <span>${escapeHtml(page.summary)}</span>`,
         '            </li>',
       ].join('\n'))
@@ -610,21 +626,21 @@ function renderIndex({ themeTags, pages }) {
   }).join('\n');
 
   const body = [
-    breadcrumbs([{ label: 'Home', href: SITE_BASE }, { label: 'Documentation' }]),
+    breadcrumbs([{ label: 'Home', href: site.base }, { label: 'Documentation' }]),
     '',
     '    <div class="docs-layout">',
-    sidebar(''),
+    sidebar(site, ''),
     '',
     '      <main class="docs-main" id="main">',
     '        <article class="prose">',
     '          <h1>Documentation</h1>',
     `          <p class="lede">${escapeHtml(DOCS_DESCRIPTION)}</p>`,
     '          <p>Every page here is rendered from the Markdown in the repository. ' +
-    `The <a href="${SITE_BASE}demo/">demo site</a> shows what attendees see; ` +
+    `The <a href="${site.demoBase}">demo site</a> shows what attendees see; ` +
     'the guides below cover running one.</p>',
     sections,
     '        </article>',
-    pagination(null, pages[0]),
+    pagination(site, null, pages[0]),
     '      </main>',
     '    </div>',
     '',
@@ -632,14 +648,15 @@ function renderIndex({ themeTags, pages }) {
 
   const html = [
     head({
+      site,
       title: `Documentation — ${PRODUCT}`,
       description: DOCS_DESCRIPTION,
-      canonical: DOCS_URL,
+      canonical: site.docsUrl,
       themeTags,
       ogType: 'website',
     }),
     body,
-    footer(),
+    footer(site),
   ].join('\n');
 
   return { path: 'index.html', contents: html };
@@ -654,34 +671,100 @@ function indent(html, spaces) {
 }
 
 /**
+ * The site address the hand-written pages state: the landing page's
+ * canonical URL, or null when it has none that parses.
+ *
+ * @param {string} landingHtml
+ * @returns {string|null}
+ */
+function landingSiteUrl(landingHtml) {
+  const match = landingHtml.match(/<link\b(?=[^>]*\brel=["']canonical["'])[^>]*\bhref=["']([^"']+)["'][^>]*>/i);
+  if (!match) return null;
+  try {
+    return parsePagesBaseUrl(match[1]).url;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Move one hand-written page from one site address to another.
+ *
+ * Only quoted attribute values that start with the old address change. The
+ * landing pages link to each other with relative paths, so those need
+ * nothing.
+ *
+ * @param {string} html
+ * @param {string} fromUrl
+ * @param {string} toUrl
+ * @returns {string}
+ */
+function rebaseLandingPage(html, fromUrl, toUrl) {
+  if (fromUrl === toUrl) return html;
+  return html.replaceAll(`"${fromUrl}`, `"${toUrl}`).replaceAll(`'${fromUrl}`, `'${toUrl}`);
+}
+
+/**
+ * Each hand-written page in LANDING_PAGES as it reads for `site`.
+ *
+ * @returns {{ landingPages: Map<string,string>, errors: string[] }}
+ */
+function landingPagesFor(site, root, landing) {
+  const fromUrl = landingSiteUrl(landing);
+  if (!fromUrl) {
+    return { landingPages: new Map(), errors: ['docs/index.html has no canonical link with an https site address'] };
+  }
+  const landingPages = new Map();
+  for (const name of LANDING_PAGES) {
+    const file = path.join(root, 'docs', name);
+    if (!fs.existsSync(file)) continue;
+    landingPages.set(name, rebaseLandingPage(fs.readFileSync(file, 'utf8'), fromUrl, site.url));
+  }
+  return { landingPages, errors: [] };
+}
+
+/**
  * Render the whole site into memory.
  *
- * @param {{ root?: string }} [options]
- * @returns {{ files: Map<string,string>, tokensCss: string, departures: Array,
- *             errors: string[], headingsByRoute: Map }}
+ * @param {{ root?: string, site?: ReturnType<typeof pagesSite> }} [options]
+ * @returns {{ files: Map<string,string>, landingPages: Map<string,string>, tokensCss: string,
+ *             departures: Array, errors: string[], headingsByRoute: Map, site: object }}
  */
-function buildSite({ root = ROOT } = {}) {
-  const landing = fs.readFileSync(
-    root === ROOT ? LANDING_PAGE : path.join(root, 'docs', 'index.html'),
-    'utf8',
-  );
+function buildSite({ root = ROOT, site = pagesSite() } = {}) {
+  const landing = fs.readFileSync(path.join(root, 'docs', 'index.html'), 'utf8');
   const themeTags = themeColorTags();
-  const routes = routesBySource();
+  const routes = routesBySource(site.docsBase);
   const pages = pagesInOrder();
   const departures = [];
-  const errors = themeColorProblems(landing);
+  const { landingPages, errors: landingErrors } = landingPagesFor(site, root, landing);
+  const errors = [...themeColorProblems(landing), ...landingErrors];
   const files = new Map();
   const headingsByRoute = new Map();
 
   for (const page of pages) {
-    const result = renderPage(page, { themeTags, routes, departures, errors, root });
+    const result = renderPage(page, { site, themeTags, routes, departures, errors, root });
     files.set(result.path, result.contents);
     headingsByRoute.set(page.route, result.headings);
   }
-  const index = renderIndex({ themeTags, pages });
+  const index = renderIndex({ site, themeTags, pages });
   files.set(index.path, index.contents);
 
-  return { files, tokensCss: buildTokensCss(), departures, errors, headingsByRoute };
+  return { files, landingPages, tokensCss: buildTokensCss(), departures, errors, headingsByRoute, site };
+}
+
+/**
+ * The hand-written pages whose committed text differs from the text for the
+ * built site address.
+ *
+ * @param {Map<string,string>} landingPages
+ * @param {string} docsDir
+ * @returns {string[]} names relative to docs/
+ */
+function compareLandingPages(landingPages, docsDir) {
+  const normalize = (text) => text.replace(/\r\n/g, '\n');
+  return [...landingPages]
+    .filter(([name, contents]) => normalize(fs.readFileSync(path.join(docsDir, name), 'utf8')) !== normalize(contents))
+    .map(([name]) => name);
 }
 
 /**
@@ -746,8 +829,11 @@ function usage() {
   return [
     'Usage: node scripts/build-pages.cjs [--check]',
     '',
-    `  --check   compare docs/docs and docs/${TOKENS_FILE} against a fresh`,
-    '            render and exit non-zero on any difference; writes nothing',
+    `  --check   compare docs/docs, docs/${TOKENS_FILE}, and the landing pages`,
+    '            against a fresh render and exit non-zero on any difference;',
+    '            writes nothing',
+    '',
+    'PAGES_BASE_URL sets the public site address (scripts/lib/pages-site.cjs).',
   ].join('\n');
 }
 
@@ -781,7 +867,14 @@ function main(argv = []) {
     return 2;
   }
 
-  const site = buildSite();
+  let address;
+  try {
+    address = pagesSite();
+  } catch (error) {
+    console.error(`build-pages: ${error.message}`);
+    return 2;
+  }
+  const site = buildSite({ site: address });
   if (site.errors.length > 0) {
     console.error('build-pages: the sources this site is built from do not hold together:');
     for (const error of site.errors) console.error(`- ${error}`);
@@ -789,15 +882,23 @@ function main(argv = []) {
   }
 
   const tokensPath = path.join(ROOT, 'docs', TOKENS_FILE);
+  const docsDir = path.join(ROOT, 'docs');
 
   if (argv.includes('--check')) {
     const { differences, unexpected } = compare(site.files, OUTPUT_DIR);
+    const staleLanding = compareLandingPages(site.landingPages, docsDir);
     const tokensStale = !fs.existsSync(tokensPath)
       || fs.readFileSync(tokensPath, 'utf8').replace(/\r\n/g, '\n') !== site.tokensCss;
-    if (differences.length > 0 || unexpected.length > 0 || tokensStale) {
-      const lines = [];
+    if (differences.length > 0 || unexpected.length > 0 || tokensStale || staleLanding.length > 0) {
+      const lines = [`site address: ${address.url}`];
       if (tokensStale) {
         lines.push(`docs/${TOKENS_FILE} does not match the tokens in design/tokens/`);
+      }
+      if (staleLanding.length > 0) {
+        lines.push(
+          `${staleLanding.length} landing page(s) name a different site address:`,
+          ...staleLanding.map((name) => `  - docs/${name}`),
+        );
       }
       if (differences.length > 0) {
         lines.push(
@@ -819,16 +920,20 @@ function main(argv = []) {
       return 1;
     }
     console.log(
-      `build-pages --check: ${site.files.size} file(s) and docs/${TOKENS_FILE} ` +
-      'match the committed site',
+      `build-pages --check: ${site.files.size} file(s), docs/${TOKENS_FILE}, and ` +
+      `${site.landingPages.size} landing page(s) match the committed site for ${address.url}`,
     );
     return 0;
   }
 
   fs.writeFileSync(tokensPath, site.tokensCss);
   writeSite(site.files, OUTPUT_DIR);
+  for (const name of compareLandingPages(site.landingPages, docsDir)) {
+    fs.writeFileSync(path.join(docsDir, name), site.landingPages.get(name));
+    console.log(`build-pages: moved docs/${name} to ${address.url}`);
+  }
   console.log(
-    `build-pages: rebuilt docs/${TOKENS_FILE} and docs/docs from empty, ` +
+    `build-pages: rebuilt docs/${TOKENS_FILE} and docs/docs from empty for ${address.url}, ` +
     `${site.files.size} file(s)`,
   );
   if (site.departures.length > 0) {
@@ -848,11 +953,15 @@ module.exports = {
   buildSite,
   buildTokensCss,
   compare,
+  compareLandingPages,
+  landingSiteUrl,
   linkResolver,
   main,
+  rebaseLandingPage,
   themeColorTags,
   themeColorProblems,
   internals: {
+    LANDING_PAGES,
     OUTPUT_DIR,
     PRODUCT,
     SITE_COLOR_TOKENS,

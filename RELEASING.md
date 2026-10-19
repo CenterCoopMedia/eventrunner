@@ -85,7 +85,8 @@ dispatching against the tag directly.
 (`scripts/build-demo.cjs`) runs a demo-mode `vite build` of `apps/web` against the committed
 synthetic snapshot in `apps/web/src/generated/` and syncs the result into `docs/demo/`.
 `.github/workflows/pages.yml` runs it on every push to `main`, checks the result, and deploys
-`docs/` with the demo to GitHub Pages at `https://centercoopmedia.github.io/eventrunner/demo/`.
+`docs/` with the demo to GitHub Pages at `demo/` under the site address, today
+`https://centercoopmedia.github.io/eventrunner/demo/`.
 
 - **Nothing to rebuild or commit before tagging.** The demo on Pages is the build of the latest
   `main`. A pull request never commits `docs/demo/`, so two pull requests never conflict on its
@@ -101,10 +102,9 @@ synthetic snapshot in `apps/web/src/generated/` and syncs the result into `docs/
 - **Pages deploys from the workflow.** The repository's Pages source must be "GitHub Actions"
   (Settings → Pages). While it is still "Deploy from a branch", `pages.yml` builds and checks the
   site and skips the deploy with a warning.
-- **The `--base` / rename caveat**: `scripts/build-demo.cjs` defaults `--base` to
-  `/eventrunner/demo/`, matching this repo's current name and the Pages project path. Renaming the
-  repository, or moving the demo to a different Pages path, changes that URL: change the default
-  `--base` (and `--out` if the destination directory changes too), or every asset URL the built
-  `index.html` emits will 404 under the new address. Nothing checks this automatically: `--check`
-  only proves the build is reproducible and within budget at the *current* `--base`, not that the
-  `--base` is still correct.
+- **The site address**: `scripts/build-demo.cjs` defaults `--base` to `demo/` under the Pages
+  site address in `scripts/lib/pages-site.cjs`, today `/eventrunner/demo/`. The documentation and
+  the link checker read the same value. A move to a custom domain or a repository rename changes
+  that one value: the `PAGES_BASE_URL` repository variable for a deploy, or the committed default.
+  The Pages workflow refuses to deploy when the address does not match the URL Pages reports. The
+  switch to `docs.eventrunner.org` is in `docs/DEPLOY_RUNBOOK.md` §10.

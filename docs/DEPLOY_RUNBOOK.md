@@ -909,3 +909,89 @@ gcloud artifacts docker images list \
 The alternative — putting the snapshot refresh on a nightly schedule — is what phases 2–4 specified
 and costs a build a day whether or not anything changed (spec §8.4, §10 Q7). Nothing in this repo
 implements it: the refresh went straight from "next deploy" to this on-demand job.
+
+## 10. Project site on GitHub Pages
+
+This section is not per client. It covers the project's own site: the landing page, the
+documentation under `docs/docs/`, and the static demo under `docs/demo/`.
+`.github/workflows/pages.yml` builds the site and deploys it on every push to `main`.
+
+**One value sets the address.** `scripts/lib/pages-site.cjs` holds the public address of the site:
+an https origin and a path base. `scripts/build-pages.cjs`, `scripts/build-demo.cjs`, and
+`scripts/check-docs.cjs` read it. It sets the canonical and social card URLs, every root-relative
+link, the demo's Vite base, and how the link checker maps a path to a file under `docs/`.
+
+| Address | Path base | Where it comes from |
+|---|---|---|
+| `https://centercoopmedia.github.io/eventrunner/` | `/eventrunner/` | the committed default |
+| `https://docs.eventrunner.org/` | `/` | the `PAGES_BASE_URL` repository variable, after the switch below |
+
+The committed `docs/docs/` and the landing pages (`docs/index.html`, `docs/videos/index.html`) are
+built for the committed default. When the `PAGES_BASE_URL` repository variable is set, the
+workflow renders the pages again for that address before it builds the demo and checks the links.
+The workflow commits nothing.
+
+**The workflow does not deploy to a wrong address.** Before it deploys, the workflow compares the
+address with the URL that Pages reports. If they are not the same, the run fails and the site that
+is live now stays live. The message names both addresses.
+
+**The address and the domain change together.** With a base of `/`, every link points at the
+domain root. While the site is served at the github.io project path, those links break. A site
+built for `/eventrunner/` breaks in the same way when it is served from the custom domain. Do the
+steps below in this order.
+
+### 10.1 Switch the site to docs.eventrunner.org
+
+1. **DNS.** Add `CNAME docs → centercoopmedia.github.io` for `eventrunner.org`. On Cloudflare, set
+   the record to **DNS only** (grey cloud). If the record is proxied, GitHub cannot issue the
+   certificate. Wait until `dig +short docs.eventrunner.org CNAME` returns
+   `centercoopmedia.github.io.`.
+2. **Optional: verify the domain.** In the organization settings, go to Pages → Verified domains
+   and verify `eventrunner.org`. This prevents a domain takeover.
+3. **Variable.** Go to Settings → Secrets and variables → Actions → Variables. Add the repository
+   variable `PAGES_BASE_URL` with the value `https://docs.eventrunner.org/`. Until step 4, a Pages
+   run fails at the address check and deploys nothing. The live site does not change.
+4. **Custom domain.** Go to Settings → Pages → Custom domain. Enter `docs.eventrunner.org` and
+   save. With a workflow-deployed site, GitHub ignores a `CNAME` file in the artifact, so this
+   setting is the only place for the domain. From now until step 5 ends, the live site has broken
+   links, so do step 5 immediately. The DNS check can finish while step 5 runs.
+5. **Deploy.** Go to Actions → Pages → Run workflow, on `main`. The run renders the site for the
+   new address, checks every link, compares the address with the Pages URL, and deploys.
+6. **HTTPS.** When the DNS check passes and the certificate is issued, turn on "Enforce HTTPS" in
+   Settings → Pages.
+
+To check the result:
+
+```sh
+curl -sI https://docs.eventrunner.org/ | head -1           # 200
+curl -sI https://docs.eventrunner.org/demo/ | head -1      # 200
+curl -sI https://docs.eventrunner.org/docs/ | head -1      # 200
+curl -sI https://centercoopmedia.github.io/eventrunner/ | grep -i '^location'   # the new host
+curl -s https://docs.eventrunner.org/ | grep canonical     # https://docs.eventrunner.org/
+```
+
+Open a documentation page and the demo, and make sure that the styles, fonts, favicon, and links
+load from the new host.
+
+**Later, in a pull request.** When the domain works, make the custom domain the committed default:
+
+1. In `scripts/lib/pages-site.cjs`, set `DEFAULT_PAGES_BASE_URL = 'https://docs.eventrunner.org/'`.
+   This is the one line to change.
+2. Run `node scripts/build-pages.cjs`. It renders `docs/docs/` again and moves the landing pages to
+   the new address. Commit the output.
+3. Update the tests that name the default address, and the links to the github.io address in
+   `README.md`, `docs/handbook/`, `RELEASING.md`, and `scripts/README.md`. The links still work
+   before this step, because GitHub redirects the github.io address to the custom domain, and the
+   generated pages already send a reader to the configured address.
+4. After that pull request is merged, you can delete the `PAGES_BASE_URL` variable.
+
+**To go back** to the github.io address, delete the custom domain in Settings → Pages. Then delete
+the `PAGES_BASE_URL` variable, or set it to `https://centercoopmedia.github.io/eventrunner/`. Run
+the Pages workflow again.
+
+To see what an address changes, without writing a file:
+
+```sh
+PAGES_BASE_URL=https://docs.eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
+node scripts/lib/pages-site.cjs                                                    # prints the address in use
+```

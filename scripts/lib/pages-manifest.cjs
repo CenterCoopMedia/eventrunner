@@ -9,13 +9,13 @@
  * planning records (`docs/plans/**`) are deliberately absent: they stay
  * readable on GitHub, but they are not public navigation.
  *
- * `route` is relative to `/eventrunner/docs/`. Order inside a section is
- * reading order, and it drives the previous/next links.
+ * `route` is relative to the documentation root, `docs/` under the site's
+ * path base (scripts/lib/pages-site.cjs). Order inside a section is reading
+ * order, and it drives the previous/next links.
  */
 
-const SITE_ORIGIN = 'https://centercoopmedia.github.io';
-const SITE_BASE = '/eventrunner/';
-const DOCS_BASE = `${SITE_BASE}docs/`;
+const { pagesSite } = require('./pages-site.cjs');
+
 const REPO_URL = 'https://github.com/CenterCoopMedia/eventrunner';
 const REPO_BLOB = `${REPO_URL}/blob/main/`;
 
@@ -254,17 +254,20 @@ function pagesInOrder() {
  *
  * @returns {Map<string, string>}
  */
-function routesBySource() {
-  return new Map(pagesInOrder().map((page) => [page.source, `${DOCS_BASE}${page.route}`]));
+/**
+ * Published route for each source document, under one site's docs base.
+ *
+ * @param {string} [docsBase] the site's `docsBase`; the configured site's by default
+ * @returns {Map<string, string>}
+ */
+function routesBySource(docsBase = pagesSite().docsBase) {
+  return new Map(pagesInOrder().map((page) => [page.source, `${docsBase}${page.route}`]));
 }
 
 module.exports = {
-  DOCS_BASE,
   REPO_BLOB,
   REPO_URL,
   SECTIONS,
-  SITE_BASE,
-  SITE_ORIGIN,
   pagesInOrder,
   routesBySource,
 };
