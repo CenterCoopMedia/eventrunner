@@ -18,7 +18,10 @@ issues (#35, #79, #91, #92, #99, #100, #259), product decisions (#177, #325,
 | r1 | Launch rehearsal (NC Local shape, emulator) | read-only on main | dispatched |
 | w1 | #324 pitch receipts and decision notifications | /home/user/wt-w1 | dispatched |
 | w2 | #357, #356 Eventbrite webhook registration and signing | /home/user/wt-w2 | dispatched |
-| w3 | #346 docs leftovers | /home/user/wt-w3 | queued |
+| w3 | #346 docs leftovers | main checkout | PR #492 |
+| d1 | #354 CI gate and DCO from base | main checkout | PR #493 |
+| w4 | #328 repeat event template | /home/user/wt-w4 | dispatched |
+| w5 | #200 live update audience and key dates | — | queued |
 
 Every builder branch gets an adversarial review before it joins the stack.
 
