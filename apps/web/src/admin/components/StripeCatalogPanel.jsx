@@ -51,7 +51,10 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   const updateType = (index, key, value) => setDraft((previous) => ({ ...previous, ticketTypes: previous.ticketTypes.map((type, current) => current === index ? { ...type, [key]: value } : type) }));
   const quantity = (value) => value === '' ? '' : Number(value);
   const revisionChanged = baseRevision !== (data.catalog?.revision || 0);
-  const clean = !recoveryRequired && sameEditorState({ draft, priceInputs }, baseline);
+  // A sales time field holding a half-entered or unsettled time is an unsaved
+  // edit too, though the draft does not carry it yet.
+  const timesPending = Object.values(timeProblems).some(Boolean);
+  const clean = !recoveryRequired && !timesPending && sameEditorState({ draft, priceInputs }, baseline);
 
   // Load a saved catalog into the editor and make it the new baseline.
   function loadSaved(catalog) {
