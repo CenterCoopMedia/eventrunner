@@ -1,5 +1,38 @@
 # Session task list
 
+## 2026-10-19: NC Local pilot launch site (session pitches, native or Airtable)
+
+Goal: close Catherine Komp's October 12 asks for a mid-November launch site
+with early bird tickets and a session pitch call to action. The pitch form must
+work as this site's own form or as a link to an external form (Airtable).
+Stripe ticketing (#484-#486) and multiple events (one deployment per event)
+are already done. #476 (deadline controls) belongs to the #407 loop and stays
+out of this change. #324 (receipts) was not asked for.
+
+Design: `config/pitch_call` gets one optional field, `externalFormUrl`
+(https URL or null). No Airtable API key and no sync: the site links to the
+Airtable form, and staff bring answers back with the existing CSV import.
+
+- [x] Shared: `readPitchFormUrl` (https only) in `packages/shared/src/pitch.cjs`.
+- [x] Functions: `updatePitchCall` validates, stores and audits `externalFormUrl`.
+- [x] Functions: `submitSessionPitch` refuses native intake while an external form is set.
+- [x] Admin: call settings choose "This site's form" or "An external form" with a URL field.
+- [x] Public `/pitch`: external mode shows status, deadline and one link to the form.
+- [x] Home: a "Pitch a session" action in the lead while the call is open.
+- [x] CSV import: accept Airtable's checkbox export (`checked`) and ignore extra columns.
+- [x] Tests: shared unit, rules/handler, web unit, E2E where the flow changes.
+- [x] Docs: admin guide launch-site recipe and Airtable steps; changelog; generated docs/demo.
+- [x] Run every check last; independent review; PR; draft email to Catherine.
+
+Review: an independent review found that an update without `externalFormUrl`,
+a read error on `/pitch`, and an http address in the admin could each reopen
+or misreport native intake. All three are fixed with tests. The full check run
+also exposed a date-bound Schedule test that fails on main since October 17;
+it now uses a far-future day. Local E2E needs Chromium without its sandbox
+(root container); the pitch and Stripe specs pass that way, and CI runs the
+full suite with the sandbox.
+
+
 ## 2026-10-13: Stripe ticket commerce epic #483
 
 Goal: open the complete MVP implementation as a reviewable stack, address connector

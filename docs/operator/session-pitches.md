@@ -2,12 +2,32 @@
 
 Session pitch intake is a private server workflow. A caller needs a verified Firebase sign-in. A ticket and attendee approval are not required.
 
-The public `config/pitch_call` document contains only two fields:
+The public `config/pitch_call` document contains only three fields:
 
 - `enabled`: A Boolean.
 - `closesAt`: An RFC3339 date and time.
+- `externalFormUrl`: An https address of an external form, or `null`. Older documents without this field use this site's form.
 
-The call is closed when the document is missing or malformed, when `enabled` is false, or when `closesAt` has passed. Operators set both fields through `updatePitchCall`. Clients cannot write the document directly.
+The call is closed when the document is missing or malformed, when `enabled` is false, or when `closesAt` has passed. Operators set all three fields through `updatePitchCall`. Clients cannot write the document directly.
+
+## Choose where people pitch
+
+A call uses one intake at a time:
+
+- **This site's pitch form** (`externalFormUrl: null`). Proposals go directly into the private queue.
+- **An external form** (for example, Airtable). `/pitch` shows the call status, the deadline and one **Open the pitch form** link while the call is open. The site's own form and sign-in are hidden. `submitSessionPitch` refuses new pitches, so one call never has two queues. A retry of a pitch stored before the switch is still acknowledged; it creates nothing new. The external service stores the answers under its own terms. Bring them into the queue with the [reviewed CSV import](#reviewed-csv-import-and-private-export).
+
+The deadline and the enabled state apply in both modes. While the call is open, the home page lead shows a **Pitch a session** action to `/pitch`. Share `/pitch`, not the external address, so closing the call also removes the link.
+
+### Set up an Airtable form
+
+1. In the Airtable base, make these fields: `email` (email), `title` (single line text), `description` (long text), `organization` (single line text), `format` (single line text or single select) and `consent` (checkbox). State the review and contact purpose in the checkbox's form label.
+2. Add a formula field named `externalId` with the formula `RECORD_ID()`. Airtable fills it for each response.
+3. Make a form view from these fields. Make `email`, `title`, `description` and `consent` required. Copy the form's public share link.
+4. In **Session pitches**, expand **Manage the call for sessions**. Choose **An external form, such as Airtable**, paste the share link, set the deadline, select **Accept session pitches** and save.
+5. To review responses here, download a CSV of a grid view (**Download CSV**). Other columns in the view are ignored. A ticked checkbox exports as `checked`, which the import reads as consent. Import 50 rows or fewer at a time, and keep the same source name for every import from this form.
+
+No Airtable key or sync is used. Firestore stays the record for the review queue.
 
 ## API
 
@@ -20,11 +40,12 @@ All endpoints use `POST`, the configured Functions region, the normal CORS allow
 ```json
 {
   "enabled": true,
-  "closesAt": "2026-11-30T23:59:59Z"
+  "closesAt": "2026-11-30T23:59:59Z",
+  "externalFormUrl": "https://airtable.com/appExample/shrExample"
 }
 ```
 
-The server stores the closing time as a canonical UTC RFC3339 value. It writes the configuration and its `admin_logs` row in one transaction. The public configuration does not store an operator uid or email.
+The server stores the closing time as a canonical UTC RFC3339 value. `externalFormUrl` must be empty, `null` or an https address of 2,048 characters or fewer. An empty string or `null` saves `null` and selects this site's form. A request without the field keeps the stored form, so a deadline-only update cannot reopen native intake. The response returns all three stored fields. It writes the configuration and its `admin_logs` row in one transaction. The public configuration does not store an operator uid or email.
 
 ### Submit a pitch
 
@@ -85,18 +106,18 @@ The form requires a title, description, and organizer-review consent. Organizati
 
 Open **Session pitches** at `/admin/pitches`. Staff can search by title, email, or organization, filter by decision, and open each proposal. Save notes and the chosen decision explicitly. A concurrent edit disables saving and keeps your unsaved notes visible. Copy your notes before choosing **Load current review**, then reconcile them with the current revision. Decisions send no notifications. Notification delivery is a separate workflow.
 
-Operators can expand **Manage the call for sessions** and save an enabled state and RFC3339 deadline. Staff cannot change these settings.
+Operators can expand **Manage the call for sessions** and save an enabled state, an RFC3339 deadline and where people pitch. Staff cannot change these settings.
 
 ### Reviewed CSV import and private export
 
-Expand **Import proposals from CSV**. Use a stable source name and these exact headers:
+Expand **Import proposals from CSV**. Use a stable source name and these headers. Other columns are ignored. A header name must not repeat:
 
 ```csv
 externalId,email,title,description,organization,format,consent
 example-1,presenter@example.test,Reporting together,A practical workshop.,Example newsroom,Workshop,true
 ```
 
-Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form; never infer it from a nonempty field. Review every displayed row, check the consent acknowledgement, then choose **Import reviewed proposals**. The server validates every row before storing any. A repeated source and external ID with identical content is unchanged. Changed content under the same source ID blocks the complete batch; reconcile it before retrying. Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail.
+Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form; never infer it from a nonempty field. `consent` must be `true` or `checked` (Airtable's export of a ticked checkbox). Review every displayed row, check the consent acknowledgement, then choose **Import reviewed proposals**. The server validates every row before storing any. A repeated source and external ID with identical content is unchanged. Changed content under the same source ID blocks the complete batch; reconcile it before retrying. Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail.
 
 **Export filtered queue** downloads only the current filtered proposals. It includes contact emails; keep the file private. It excludes private review notes, auth UIDs, and reviewer identities. Spreadsheet formulas are escaped. No CSV is stored on a public URL.
 

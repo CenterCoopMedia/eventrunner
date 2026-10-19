@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { readPitchFormUrl } from 'shared/pitch';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
@@ -16,29 +17,51 @@ const labels = { new: 'New', in_review: 'In review', accepted: 'Accepted', rejec
 const tones = { new: 'caution', in_review: 'info', accepted: 'ok', rejected: 'dead' };
 const statuses = Object.entries(labels).map(([value, label]) => ({ value, label }));
 const revision = (row) => row.reviewRevision ?? 0;
+const intakeOptions = [
+  { value: 'native', label: 'This site’s pitch form' },
+  { value: 'external', label: 'An external form, such as Airtable' },
+];
 
 function PitchCallSettings({ settings, call }) {
   const [enabled, setEnabled] = useState(settings.enabled === true);
   const [closesAt, setClosesAt] = useState(settings.closesAt || '');
+  // The same reader as the server and /pitch, so the choice shown is the one in effect.
+  const savedFormUrl = readPitchFormUrl(settings.externalFormUrl);
+  const [intake, setIntake] = useState(savedFormUrl ? 'external' : 'native');
+  const [formUrl, setFormUrl] = useState(savedFormUrl || '');
+  const [formUrlError, setFormUrlError] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState('');
   const errorRef = useRef(null);
+  const formRef = useRef(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   async function save(e) {
     e.preventDefault();
     if (busy) return;
-    setError(null); setResult(''); setBusy(true);
-    try { await call('updatePitchCall', { enabled, closesAt }); setResult('Call settings saved.'); }
+    const externalFormUrl = intake === 'external' ? formUrl.trim() : null;
+    // A blank address would save as "no external form" and silently reopen native intake.
+    const formUrlProblem = intake !== 'external' ? ''
+      : !externalFormUrl ? 'Enter the form address, or choose this site’s pitch form.'
+        : !readPitchFormUrl(externalFormUrl) ? 'Use an address that starts with https://.' : '';
+    if (formUrlProblem) {
+      setFormUrlError(formUrlProblem);
+      formRef.current?.querySelector('input[name="externalFormUrl"]')?.focus();
+      return;
+    }
+    setFormUrlError(''); setError(null); setResult(''); setBusy(true);
+    try { await call('updatePitchCall', { enabled, closesAt, externalFormUrl }); setResult('Call settings saved.'); }
     catch (err) { setError(err); }
     finally { setBusy(false); }
   }
   return <Panel title="Call settings" description="Only operators can open or close intake. Use a date, time, and explicit UTC offset.">
-    <form onSubmit={save} className="space-y-sm">
+    <form ref={formRef} onSubmit={save} className="space-y-sm">
       <ServerErrorSummary error={error} errorRef={errorRef} />
       <fieldset disabled={busy} className="space-y-sm">
         <CheckboxField label="Accept session pitches" checked={enabled} onChange={setEnabled} />
         <TextField label="Deadline (RFC3339)" value={closesAt} onChange={setClosesAt} required hint="For example, 2027-01-31T23:59:59-05:00. The offset prevents timezone ambiguity." />
+        <SelectField label="Where people pitch" value={intake} onChange={setIntake} options={intakeOptions} hint="With an external form, the site links to it and this queue receives pitches only through CSV import." />
+        {intake === 'external' ? <TextField name="externalFormUrl" label="External form address" type="url" value={formUrl} onChange={(v) => { setFormUrl(v); setFormUrlError(''); }} required maxLength={2048} error={formUrlError} hint="Use the form’s public https:// share link." /> : null}
       </fieldset>
       <button className={primaryButtonClass} disabled={busy}>{busy ? 'Saving…' : 'Save call settings'}</button>
       {result ? <SaveStatus message={result} /> : null}
@@ -78,7 +101,7 @@ function ImportPitches({ call }) {
   return <details className="border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md">
     <summary className="min-h-admin-control cursor-pointer font-semibold">Import proposals from CSV</summary>
     <form onSubmit={importRows} className="mt-sm space-y-sm">
-      <p className="break-words text-admin-sm text-admin-ink-secondary">Required headers: {PITCH_COLUMNS.join(', ')}. Keep the original source IDs. Consent must be true, with evidence in the source form.</p>
+      <p className="break-words text-admin-sm text-admin-ink-secondary">Required headers: {PITCH_COLUMNS.join(', ')}. Other columns are ignored. Keep the original source IDs. Consent must be true (or checked, from an Airtable checkbox), with evidence in the source form.</p>
       <ServerErrorSummary error={error} errorRef={errorRef} />
       <fieldset disabled={busy} className="space-y-sm">
         <TextField label="Source name" value={source} onChange={(v) => { setSource(v); setReviewed(false); }} required maxLength={80} pattern="[A-Za-z0-9_-]+" hint="A stable name for the original form. Reuse it for retries." />
@@ -188,7 +211,7 @@ export default function AdminSessionPitches() {
   return <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
     <AdminPageHeader title="Session pitches" description="Review private proposals. A decision does not send a notification or publish event content." actions={<button className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))}>Export filtered queue</button>} />
     <p className="text-admin-sm text-admin-ink-secondary"><Link to="/pitch" className={rowTitleLinkClass}>Open public pitch form</Link>. CSV contains contact details: Keep the downloaded file private. Review notes are excluded.</p>
-    {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings key={`${settings.enabled}-${settings.closesAt}`} settings={settings} call={call} /></details> : null}
+    {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings key={`${settings.enabled}-${settings.closesAt}-${settings.externalFormUrl ?? ''}`} settings={settings} call={call} /></details> : null}
     {configError ? <Notice tone="caution" message="Cannot check call settings. Reconnecting…" /> : null}
     <ImportPitches call={call} />
     <div className="grid gap-sm sm:grid-cols-2"><SelectField label="Filter by decision" value={filter} onChange={setFilter} options={[{ value: 'all', label: 'All pitches' }, ...statuses]} /><TextField label="Search pitches" value={search} onChange={setSearch} hint="Title, email, or organization." /></div>

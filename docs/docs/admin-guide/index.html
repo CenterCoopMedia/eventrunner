@@ -117,6 +117,7 @@
               <li><a href="#find-your-way-the-tour">Find your way: The tour</a></li>
               <li><a href="#who-can-do-what-operator-and-staff">Who can do what: Operator and staff</a></li>
               <li><a href="#set-the-site-up-six-steps">Set the site up: Six steps</a></li>
+              <li><a href="#launch-early-with-tickets-and-pitches-only">Launch early with tickets and pitches only</a></li>
               <li><a href="#settings-branding">Settings → Branding</a></li>
               <li><a href="#overview">Overview</a></li>
               <li><a href="#pages">Pages</a></li>
@@ -146,7 +147,7 @@
             </ul>
           </nav>
           <p>How to run a client&#39;s site from the admin panel, in the order the work happens. For the narrative &quot;why does this work this way&quot; version, hand a new staff member <a href="/eventrunner/docs/handbook/for-event-staff/"><code>docs/handbook/for-event-staff.md</code></a> first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see <a href="/eventrunner/docs/design-reference/"><code>design-reference.md</code></a>. You do not need it to run a site.</p>
-          <p>Open <strong>Session pitches</strong> to review private proposals. Share <code>/pitch</code> for public intake. Operators control the call deadline. See <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/session-pitches.md">Operate session pitch intake</a> for decisions, CSV import and export, draft conversion, and private data boundaries.</p>
+          <p>Open <strong>Session pitches</strong> to review private proposals. Share <code>/pitch</code> for public intake. Operators control the call deadline and choose this site&#39;s form or an external form, such as Airtable. See <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/operator/session-pitches.md">Operate session pitch intake</a> for decisions, CSV import and export, draft conversion, and private data boundaries.</p>
           <p><strong>Draft and live are separate almost everywhere below.</strong> Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.</p>
           <p><strong>The banner above each admin page counts what is saved and not published.</strong> It names the count by kind, such as &quot;2 unpublished changes: 1 content block, 1 page.&quot;, and links to <strong>Unpublished changes</strong>, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.</p>
           <p><strong>On a phone, the compact top bar names the event and current section.</strong> Open <strong>Menu</strong> to use the grouped admin sections and account controls in a full-screen sheet. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.</p>
@@ -179,6 +180,15 @@
           <li><strong>Publish.</strong> The live public site restyles with no deploy. This is a config write, not a code change.</li>
           </ol>
           <p><strong>Two things are worth knowing before you start.</strong> A contrast failure stops a publish, not a save — you can leave a draft broken and come back. And nothing you do here reaches attendees until step 6.</p>
+          <h2 id="launch-early-with-tickets-and-pitches-only">Launch early with tickets and pitches only<a class="heading-anchor" href="#launch-early-with-tickets-and-pitches-only" aria-label="Link to this section">#</a></h2>
+          <p>A site can open before the program exists. For example, it can sell early bird tickets and take session pitches months before the event.</p>
+          <ol>
+          <li><strong>Turn off what is not ready.</strong> On Settings → Features, switch off <strong>Public schedule</strong>, <strong>Speaker directory</strong>, <strong>Sponsor list</strong>, <strong>Attendee directory</strong> and <strong>Written updates</strong>. Their navigation links leave the header and footer. On <strong>Pages</strong>, hide any other page that is not ready.</li>
+          <li><strong>Write the home page.</strong> In the Content editor, keep the opening section short: the event name, dates, place and one paragraph. Hide or empty other home sections that are not ready.</li>
+          <li><strong>Open ticket sales.</strong> Publish the reviewed Stripe catalog (see <a href="#ticketing">Ticketing</a>). The home page lead and the header then show <strong>Get tickets</strong>.</li>
+          <li><strong>Open the call for sessions.</strong> In <strong>Session pitches</strong>, an operator sets the deadline, chooses this site&#39;s form or an external form (for example, Airtable) and selects <strong>Accept session pitches</strong>. While the call is open, the home page lead shows <strong>Pitch a session</strong>.</li>
+          </ol>
+          <p>Switch the features on again, and publish the pages, when the program is ready. No deploy is needed for any of these steps.</p>
           <h2 id="settings-branding">Settings → Branding<a class="heading-anchor" href="#settings-branding" aria-label="Link to this section">#</a></h2>
           <p>One tab decides how the whole public site looks. Controls on one side, the <strong>Page preview</strong> on the other rendering your own pages with the draft applied — the client&#39;s real pages, not swatches.</p>
           <p><strong>What the preview can show you.</strong> Pick the page — Home, Schedule, Session, Speakers, or Updates. Switch between <strong>Desktop</strong> and <strong>Phone</strong>, which render at real widths so the page&#39;s own breakpoints fire inside the frame. <strong>Fit</strong> the frame or see it at <strong>Actual size</strong>. Show it <strong>Light</strong>, <strong>Dark</strong>, or <strong>Compare light and dark</strong> side by side. And turn on the <strong>stress test</strong>: A made-up event name that wraps three times and a day packed with 28 sessions, so you meet a hard page here rather than after a client sends one. Nothing in the stress test is saved. If a colour or a font will not render as you asked, the preview says so.</p>

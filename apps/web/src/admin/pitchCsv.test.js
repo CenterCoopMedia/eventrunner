@@ -16,6 +16,18 @@ describe('reviewed pitch CSV contract', () => {
     expect(() => readPitchCsv(headers + 'id,one@example.test,Title,Description,,,true\nid,two@example.test,Other,Description,,,true')).toThrow(/unique source ID/);
     expect(() => readPitchCsv('email,email,title,description,organization,format,consent')).toThrow(/exact headers/);
   });
+  it('reads an Airtable export: a ticked checkbox as consent and extra view columns ignored', () => {
+    const airtable = 'externalId,Created,email,title,description,organization,format,consent,Status\n'
+      + 'rec001,10/19/2026 9:00am,one@example.test,Title,Description,,Panel,checked,Todo';
+    expect(readPitchCsv(airtable)).toEqual([
+      { externalId: 'rec001', email: 'one@example.test', title: 'Title', description: 'Description', organization: '', format: 'Panel', consent: true },
+    ]);
+    expect(() => readPitchCsv(airtable.replace(',checked,', ',,'))).toThrow(/Consent/);
+  });
+  it('rejects a missing required column or a repeated column name', () => {
+    expect(() => readPitchCsv('externalId,email,title,description,organization,format\nid,one@example.test,T,D,,')).toThrow(/headers/);
+    expect(() => readPitchCsv('externalId,email,title,description,organization,format,consent,Notes,Notes\nid,one@example.test,T,D,,,true,a,b')).toThrow(/headers/);
+  });
   it('exports only explicit queue fields and escapes spreadsheet formulas', () => {
     const csv = pitchQueueCsv([{ id: 'id', title: '=CMD()', description: 'Text, "quoted"', email: 'one@example.test', privateNotes: 'PRIVATE-NOTE', uid: 'PRIVATE-UID', reviewedBy: 'PRIVATE-REVIEWER' }]);
     expect(csv).toContain('"\'=CMD()"');

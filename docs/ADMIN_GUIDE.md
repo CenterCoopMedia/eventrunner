@@ -2,7 +2,7 @@
 
 How to run a client's site from the admin panel, in the order the work happens. For the narrative "why does this work this way" version, hand a new staff member [`docs/handbook/for-event-staff.md`](handbook/for-event-staff.md) first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see [`design-reference.md`](design-reference.md). You do not need it to run a site.
 
-Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators control the call deadline. See [Operate session pitch intake](operator/session-pitches.md) for decisions, CSV import and export, draft conversion, and private data boundaries.
+Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators control the call deadline and choose this site's form or an external form, such as Airtable. See [Operate session pitch intake](operator/session-pitches.md) for decisions, CSV import and export, draft conversion, and private data boundaries.
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
@@ -41,6 +41,17 @@ This is the whole visual setup, start to finish. It takes about twenty minutes a
 6. **Publish.** The live public site restyles with no deploy. This is a config write, not a code change.
 
 **Two things are worth knowing before you start.** A contrast failure stops a publish, not a save — you can leave a draft broken and come back. And nothing you do here reaches attendees until step 6.
+
+## Launch early with tickets and pitches only
+
+A site can open before the program exists. For example, it can sell early bird tickets and take session pitches months before the event.
+
+1. **Turn off what is not ready.** On Settings → Features, switch off **Public schedule**, **Speaker directory**, **Sponsor list**, **Attendee directory** and **Written updates**. Their navigation links leave the header and footer. On **Pages**, hide any other page that is not ready.
+2. **Write the home page.** In the Content editor, keep the opening section short: the event name, dates, place and one paragraph. Hide or empty other home sections that are not ready.
+3. **Open ticket sales.** Publish the reviewed Stripe catalog (see [Ticketing](#ticketing)). The home page lead and the header then show **Get tickets**.
+4. **Open the call for sessions.** In **Session pitches**, an operator sets the deadline, chooses this site's form or an external form (for example, Airtable) and selects **Accept session pitches**. While the call is open, the home page lead shows **Pitch a session**.
+
+Switch the features on again, and publish the pages, when the program is ready. No deploy is needed for any of these steps.
 
 ## Settings → Branding
 
