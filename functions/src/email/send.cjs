@@ -58,6 +58,64 @@ function isAlreadyExists(err) {
 }
 
 /**
+ * The adapter-bound form of one message: sender, reply-to, stream and the
+ * legal footer resolved from config. Shared by send() and sendBatch() so a
+ * batch entry is resolved exactly as a single send is.
+ *
+ * @param {object} message EmailMessage
+ * @param {object} config loaded event config
+ * @returns {object} the message the adapter receives
+ */
+function resolveMessage(message, config) {
+  const sender = config?.event?.sender || {};
+  const fullMessage = {
+    ...message,
+    // The original string-or-EmailAddress form reaches the adapter so a
+    // display name survives; toEmail is for validation and the audit row.
+    to: message.to,
+    from: message.from || { email: sender.email, name: sender.name },
+    replyTo: message.replyTo || sender.replyTo || undefined,
+    // Tier B stream selection (config/providers.email.messageStream)
+    // reaches the adapter here; a per-message value wins.
+    messageStream: message.messageStream
+      ?? config?.providers?.email?.messageStream
+      ?? undefined,
+  };
+
+  // Footer resolution is a core duty (spec §3.1). Rendered mail carries
+  // per-body flags derived from the effective template source; any body
+  // that does not already carry the footer — an override that dropped
+  // the token, the operator email sink, ad-hoc callers — gets the
+  // configured legal block appended here.
+  const postalHtml = config?.event?.legal?.postalAddressHtml;
+  if (typeof postalHtml === 'string' && postalHtml) {
+    if (typeof fullMessage.html === 'string' && !message.hasLegalFooterHtml) {
+      fullMessage.html += `\n<hr>\n<p>${postalHtml}</p>`;
+    }
+    if (typeof fullMessage.text === 'string' && !message.hasLegalFooterText) {
+      fullMessage.text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
+    }
+  }
+  return fullMessage;
+}
+
+/** The recipient address of a message, or null. @param {object} message */
+function recipientEmail(message) {
+  const to = typeof message?.to === 'string' ? message.to : message?.to?.email;
+  return typeof to === 'string' && to ? to : null;
+}
+
+/** A batch refused before any claim, audit row, or provider request. */
+class EmailBatchError extends Error {
+  /** @param {string} code @param {string} message */
+  constructor(code, message) {
+    super(message);
+    this.name = 'EmailBatchError';
+    this.code = code;
+  }
+}
+
+/**
  * Build the email core around injected dependencies so tests drive it with
  * fakes and no emulator.
  *
@@ -123,7 +181,6 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     }
 
     const config = await getConfig();
-    const sender = config?.event?.sender || {};
 
     const toEmail = typeof message.to === 'string' ? message.to : message.to?.email;
     if (!toEmail) {
@@ -153,34 +210,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       }
     }
 
-    const fullMessage = {
-      ...message,
-      // The original string-or-EmailAddress form reaches the adapter so a
-      // display name survives; toEmail is for validation and the audit row.
-      to: message.to,
-      from: message.from || { email: sender.email, name: sender.name },
-      replyTo: message.replyTo || sender.replyTo || undefined,
-      // Tier B stream selection (config/providers.email.messageStream)
-      // reaches the adapter here; a per-message value wins.
-      messageStream: message.messageStream
-        ?? config?.providers?.email?.messageStream
-        ?? undefined,
-    };
-
-    // Footer resolution is a core duty (spec §3.1). Rendered mail carries
-    // per-body flags derived from the effective template source; any body
-    // that does not already carry the footer — an override that dropped
-    // the token, the operator email sink, ad-hoc callers — gets the
-    // configured legal block appended here.
-    const postalHtml = config?.event?.legal?.postalAddressHtml;
-    if (typeof postalHtml === 'string' && postalHtml) {
-      if (typeof fullMessage.html === 'string' && !message.hasLegalFooterHtml) {
-        fullMessage.html += `\n<hr>\n<p>${postalHtml}</p>`;
-      }
-      if (typeof fullMessage.text === 'string' && !message.hasLegalFooterText) {
-        fullMessage.text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
-      }
-    }
+    const fullMessage = resolveMessage(message, config);
 
     let result = null;
     let attempts = 0;
@@ -220,7 +250,168 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     return outcome;
   }
 
-  return { send };
+  /**
+   * Batch send (issue #201, ADR §3.1): one provider batch call for many
+   * single-recipient messages, one audit row per newly attempted recipient.
+   *
+   * Every entry needs its own stable `onceKey`. The claims are the replay
+   * guard: the provider keeps no idempotency key, so a repeat of the same
+   * batch, or a concurrent one, skips every key that already holds a claim.
+   * A skipped result says an earlier call claimed the key. It does not prove
+   * that the earlier call delivered the message.
+   *
+   * Refusals that are the caller's to fix (no batch support, a malformed
+   * batch, a batch over the provider's limits) throw EmailBatchError before
+   * any claim, audit row, or provider request. The demo policy refusal
+   * returns one failed result per entry and writes nothing, as send() does.
+   *
+   * Retry follows send(): only an adapter-reported 5xx, or a 429 with a
+   * retry hint, and at most MAX_ATTEMPTS requests. A retry carries only the
+   * entries that came back retryable. An entry the provider accepted is
+   * never sent again. A throw, or a response the adapter cannot match to an
+   * entry, is uncertain: no retry, the claim stays, and the result carries
+   * `uncertain: true`.
+   *
+   * @param {object[]} messages EmailMessage[], one recipient each
+   * @returns {Promise<object[]>} one EmailSendResult per entry, in input order
+   */
+  async function sendBatch(messages) {
+    if (!Array.isArray(messages)) {
+      throw new EmailBatchError('invalid-batch', 'A batch must be a list of messages.');
+    }
+    if (messages.length === 0) return [];
+    if (typeof provider.sendBatch !== 'function') {
+      throw new EmailBatchError(
+        'batch-unsupported',
+        `The ${provider.name || 'configured'} email provider has no batch send.`,
+      );
+    }
+    const limits = provider.batchLimits || {};
+    if (Number.isInteger(limits.maxMessages) && messages.length > limits.maxMessages) {
+      throw new EmailBatchError(
+        'batch-too-large',
+        `A batch may hold at most ${limits.maxMessages} messages; this one holds ${messages.length}.`,
+      );
+    }
+    const seenKeys = new Set();
+    messages.forEach((message, index) => {
+      if (!recipientEmail(message)) {
+        throw new EmailBatchError('invalid-batch', `Message ${index + 1} has no recipient.`);
+      }
+      if (typeof message.onceKey !== 'string' || message.onceKey.trim() === '') {
+        throw new EmailBatchError('invalid-batch', `Message ${index + 1} has no send-once key.`);
+      }
+      if (seenKeys.has(message.onceKey)) {
+        throw new EmailBatchError('invalid-batch', `Message ${index + 1} repeats a send-once key.`);
+      }
+      seenKeys.add(message.onceKey);
+    });
+
+    const policy = await checkDemoWrites({ db });
+    throwIfDemoPolicyUnavailable(policy);
+    if (!policy.ok) {
+      return messages.map(() => ({ providerMessageId: null, status: 'failed', error: policy.code, retries: 0 }));
+    }
+
+    const config = await getConfig();
+    const resolved = messages.map((message) => resolveMessage(message, config));
+    if (typeof provider.checkBatch === 'function') {
+      const verdict = provider.checkBatch(resolved);
+      if (verdict && verdict.ok === false) {
+        throw new EmailBatchError('batch-too-large', verdict.error || 'The batch is over the provider limit.');
+      }
+    }
+
+    // Claims first, never rolled back (as in send()). A key another call
+    // already holds is skipped here and never reaches the provider.
+    const results = new Array(messages.length).fill(null);
+    const claimed = [];
+    await Promise.all(messages.map(async (message, index) => {
+      const ref = db.collection('email_claims').doc(claimIdForOnceKey(message.onceKey));
+      try {
+        await ref.create({ onceKey: message.onceKey, source: message.source || null, createdAt: new Date() });
+        claimed.push(index);
+      } catch (err) {
+        if (isAlreadyExists(err)) {
+          results[index] = { providerMessageId: null, status: 'sent', skipped: true, retries: 0 };
+          return;
+        }
+        // A claim that may or may not exist cannot be sent safely.
+        results[index] = {
+          providerMessageId: null,
+          status: 'failed',
+          uncertain: true,
+          error: `send-once claim failed: ${String(err?.message || err)}`,
+          retries: 0,
+        };
+      }
+    }));
+    claimed.sort((a, b) => a - b);
+
+    const attemptsOf = new Map();
+    let pending = claimed;
+    let attempt = 0;
+    while (pending.length > 0 && attempt < MAX_ATTEMPTS) {
+      attempt += 1;
+      let answer;
+      try {
+        answer = await provider.sendBatch(pending.map((index) => resolved[index]));
+      } catch (err) {
+        for (const index of pending) {
+          attemptsOf.set(index, attempt);
+          results[index] = {
+            providerMessageId: null,
+            status: 'failed',
+            uncertain: true,
+            error: String(err?.message || err),
+          };
+        }
+        pending = [];
+        break;
+      }
+      const retry = [];
+      pending.forEach((index, position) => {
+        attemptsOf.set(index, attempt);
+        const result = Array.isArray(answer) ? answer[position] : undefined;
+        if (!result || typeof result !== 'object') {
+          results[index] = {
+            providerMessageId: null,
+            status: 'failed',
+            uncertain: true,
+            error: 'The provider response has no result for this message.',
+          };
+          return;
+        }
+        results[index] = result;
+        if (isRetryable(result) && attempt < MAX_ATTEMPTS) retry.push(index);
+      });
+      pending = retry;
+      if (pending.length > 0) {
+        const hint = Math.max(0, ...pending.map((index) => results[index].retryAfterMs ?? 0));
+        await wait(Math.max(hint, BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]));
+      }
+    }
+
+    // One audit row per newly attempted recipient, after its last attempt.
+    const outcomes = await Promise.all(claimed.map(async (index) => {
+      const result = results[index];
+      const outcome = {
+        providerMessageId: result.providerMessageId ?? null,
+        status: result.status === 'sent' ? 'sent' : 'failed',
+        providerStatus: result.providerStatus,
+        error: result.error,
+        retries: (attemptsOf.get(index) || 1) - 1,
+        ...(result.uncertain ? { uncertain: true } : {}),
+      };
+      const message = resolved[index];
+      await writeAuditRow(message, message.from?.email || null, recipientEmail(message), outcome);
+      return [index, outcome];
+    }));
+    for (const [index, outcome] of outcomes) results[index] = outcome;
+    return results;
+  }
+
+  return { send, sendBatch };
 }
 
 /**
@@ -338,6 +529,7 @@ function buildHandlers() {
 module.exports = {
   createEmailCore,
   createDeliveryWebhookHandler,
+  EmailBatchError,
   // Lazily built so requiring this module in tests never pulls in
   // firebase-functions.
   get handlers() {
@@ -348,6 +540,7 @@ module.exports = {
     truncateForAudit,
     claimIdForOnceKey,
     isAlreadyExists,
+    resolveMessage,
     MAX_ATTEMPTS,
     BACKOFF_MS,
     BODY_STORE_LIMIT,
