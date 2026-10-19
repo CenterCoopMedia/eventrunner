@@ -1,0 +1,7 @@
+# CodeQL scans source, not build output. docs/demo holds the committed demo
+# bundle, which includes third-party SDK code (Firebase Storage) whose alerts
+# we cannot fix and which get new file names on every rebuild.
+name: Event Runner CodeQL config
+paths-ignore:
+  - docs/demo
+  - apps/web/dist
