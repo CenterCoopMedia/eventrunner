@@ -767,6 +767,41 @@ for (const backend of backends) {
     assert.equal(h.fetchCalls().filter((c) => c.url.endsWith('/email/batch')).length, 4);
   });
 
+  t('postmark: an outage whose progress write fails still leaves the failed addresses for a retry', async () => {
+    const h = await harness({
+      backend,
+      providerKind: 'postmark',
+      postmarkStream: STREAM(),
+      batchAnswer: (_body, n) => (n <= 3 ? { status: 503, json: { ErrorCode: 500, Message: 'Unavailable' } } : null),
+    });
+    // The lease transaction runs, then the chunk's progress transaction
+    // fails once, after the provider answered.
+    const realTransaction = h.db.runTransaction.bind(h.db);
+    let transactions = 0;
+    h.db.runTransaction = (fn) => {
+      transactions += 1;
+      return transactions === 2 ? Promise.reject(new Error('deadline exceeded')) : realTransaction(fn);
+    };
+    const preview = await call(h.preview, { body: { draft: DRAFT, audience: 'registered' } });
+    const { sendId, receipt } = preview.body;
+    const lost = await call(h.send, { body: { sendId, receipt, draft: DRAFT, audience: 'registered' } });
+    assert.equal(lost.status, 500);
+
+    // The lease runs out; staff continue the send.
+    await h.db.collection('announcement_sends').doc(sendId).update({ lease: null });
+    const resumed = await call(h.send, { body: { sendId } });
+    assert.equal(resumed.status, 200, JSON.stringify(resumed.body));
+    assert.equal(resumed.body.send.status, 'sent');
+    assert.equal(resumed.body.send.counts.failed, 2);
+    assert.equal(resumed.body.send.counts.skipped, 0);
+    assert.equal(resumed.body.send.retryCount, 2);
+    assert.equal(h.fetchCalls().filter((c) => c.url.endsWith('/email/batch')).length, 3, 'the claims keep the resumed chunk from the provider');
+
+    const retry = await call(h.preview, { body: { draft: DRAFT, audience: 'registered', retryOf: sendId } });
+    assert.equal(retry.status, 200, JSON.stringify(retry.body));
+    assert.equal(retry.body.recipientCount, 2);
+  });
+
   t('postmark: a recipient the provider refuses for good is not offered for a retry', async () => {
     const h = await harness({
       backend,

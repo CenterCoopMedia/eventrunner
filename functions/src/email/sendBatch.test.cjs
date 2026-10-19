@@ -34,6 +34,8 @@ function fakeDb() {
               if (state.claims.has(id)) throw alreadyExistsError();
               state.claims.set(id, data);
             },
+            async get() { return { exists: state.claims.has(id), data: () => state.claims.get(id) }; },
+            async update(patch) { state.claims.set(id, { ...state.claims.get(id), ...patch }); },
           }),
         };
       }
@@ -178,6 +180,23 @@ test('the attempt cap holds: three 503 answers make three requests and stop', as
   assert.equal(results[0].status, 'failed');
   assert.equal(results[0].retries, 2);
   assert.equal(db.state.sentRows.length, 1);
+});
+
+test('a repeat of the batch reports the failure an earlier call recorded on the claim', async () => {
+  const db = fakeDb();
+  const first = setup([
+    fakeResponse({ status: 503 }), fakeResponse({ status: 503 }), fakeResponse({ status: 503 }),
+  ], { db });
+  await first.core.sendBatch([message(1)]);
+  assert.equal([...db.state.claims.values()][0].failure.providerStatus, 503);
+
+  const again = setup([], { db });
+  const [result] = await again.core.sendBatch([message(1)]);
+  assert.equal(again.fetchImpl.calls.length, 0);
+  assert.equal(result.skipped, true);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.providerStatus, 503);
+  assert.equal(db.state.sentRows.length, 1, 'a replay writes no audit row');
 });
 
 test('a repeat of the same batch sends nothing twice and writes no extra audit row', async () => {

@@ -281,7 +281,10 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    * guard: the provider keeps no idempotency key, so a repeat of the same
    * batch, or a concurrent one, skips every key that already holds a claim.
    * A skipped result says an earlier call claimed the key. It does not prove
-   * that the earlier call delivered the message.
+   * that the earlier call delivered the message. A failure is recorded on its
+   * claim, and a skipped result for that key carries the failure again
+   * (`status: 'failed'`, `skipped: true`), so a caller that lost the first
+   * answer can still offer a retry.
    *
    * Refusals that are the caller's to fix (no batch support, a malformed
    * batch, a batch over the provider's limits) throw EmailBatchError before
@@ -356,7 +359,7 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         claimed.push(index);
       } catch (err) {
         if (isAlreadyExists(err)) {
-          results[index] = { providerMessageId: null, status: 'sent', skipped: true, retries: 0 };
+          results[index] = await skippedResult(ref);
           return;
         }
         // A claim that may or may not exist cannot be sent safely.
@@ -431,7 +434,48 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       return [index, outcome];
     }));
     for (const [index, outcome] of outcomes) results[index] = outcome;
+
+    // A failure is kept on its claim, so a replay of the batch can report it
+    // (skippedResult) even when the caller lost the first answer.
+    await Promise.all(outcomes.map(async ([index, outcome]) => {
+      if (outcome.status === 'sent') return;
+      const failure = {
+        providerStatus: outcome.providerStatus ?? null,
+        uncertain: outcome.uncertain === true,
+        error: outcome.error == null ? null : String(outcome.error).slice(0, 300),
+      };
+      try {
+        await db.collection('email_claims').doc(claimIdForOnceKey(messages[index].onceKey)).update({ failure });
+      } catch (err) {
+        log.warn('email_claims failure record failed', err);
+      }
+    }));
     return results;
+  }
+
+  /**
+   * The result for a key an earlier call claimed. A failure that call
+   * recorded is reported again, marked `skipped`, so a caller that lost the
+   * first answer still sees it. Otherwise the earlier call sent the message
+   * or is sending it now.
+   */
+  async function skippedResult(ref) {
+    let failure = null;
+    try {
+      failure = (await ref.get()).data()?.failure ?? null;
+    } catch (err) {
+      log.warn('email_claims read failed', err);
+    }
+    if (!failure) return { providerMessageId: null, status: 'sent', skipped: true, retries: 0 };
+    return {
+      providerMessageId: null,
+      status: 'failed',
+      skipped: true,
+      retries: 0,
+      providerStatus: typeof failure.providerStatus === 'number' ? failure.providerStatus : undefined,
+      error: failure.error ?? 'An earlier attempt failed.',
+      ...(failure.uncertain ? { uncertain: true } : {}),
+    };
   }
 
   return { send, sendBatch };

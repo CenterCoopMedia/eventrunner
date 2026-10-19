@@ -37,7 +37,9 @@
  * record then holds `retriedBy`, so the same failures are not retried
  * twice. A refusal for good (an inactive or invalid address) and an
  * uncertain result are never on the list: the first would fail again,
- * and the second may have been delivered.
+ * and the second may have been delivered. The email core keeps each failure
+ * on its claim, so a chunk replayed after a lost progress write counts the
+ * same failures again and still lists the transient ones for a retry.
  */
 
 const crypto = require('node:crypto');
@@ -114,7 +116,9 @@ function summarize(id, data, nowMs) {
 
 /** A failure the provider may not repeat: 5xx, or 429, with a definite answer. */
 function isTransientFailure(result) {
-  if (!result || result.status === 'sent' || result.skipped || result.uncertain) return false;
+  // A skipped result can carry a failure an earlier call recorded on the
+  // claim (a progress write lost after the provider answered).
+  if (!result || result.status === 'sent' || result.uncertain) return false;
   const status = result.providerStatus;
   return typeof status === 'number' && (status === 429 || (status >= 500 && status <= 599));
 }
@@ -160,7 +164,7 @@ function receiptAudience(audience, retryOf) {
 
 /** Map a result from sendBatch onto the record's counters. */
 function tally(result) {
-  if (result.skipped) return 'skipped';
+  if (result.skipped && result.status === 'sent') return 'skipped';
   if (result.status === 'sent') return 'sent';
   if (result.uncertain) return 'uncertain';
   return 'failed';

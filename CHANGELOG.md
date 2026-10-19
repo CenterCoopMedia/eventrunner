@@ -77,7 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   request. The webhook relay is refused until it has a batch and unsubscribe contract (#490).
 - Staff can retry the addresses an announcement send could not reach because the email
   provider was down or busy. The retry is a new send, previewed and confirmed, and each send
-  can be retried once. The history says when its failed address list is cut short (#202).
+  can be retried once. The history says when its failed address list is cut short. A send
+  continued after a lost progress save still counts and offers the addresses that failed
+  before (#202).
 - A correctly signed unsubscribe is never rate limited, so one-click opt-outs that mail
   providers and link scanners send from shared addresses are all recorded. The email log
   stores each announcement with an inert unsubscribe link in place of the recipient's live
