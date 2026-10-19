@@ -1,1 +1,5 @@
+<<<<<<<< HEAD:docs/demo/assets/useMyBookmarks-Dowxh-4o.js
 import{r as e}from"./rolldown-runtime-XKyaHtl9.js";import{En as t,ri as n}from"./initial-BIjaoXWq.js";import{n as r}from"./bookmarksSource-BRLU2KJw.js";var i=e(n(),1);function a(){let{user:e}=t(),[n,a]=(0,i.useState)(new Set),[o,s]=(0,i.useState)(!!e);return(0,i.useEffect)(()=>{let t=!0;a(new Set),s(!!e);let n=r(e?.uid,e=>{t&&(a(e),s(!1))},()=>{t&&s(!1)});return()=>{t=!1,n()}},[e?.uid]),{bookmarkedIds:n,loading:o}}export{a as t};
+========
+import{r as e}from"./rolldown-runtime-XKyaHtl9.js";import{En as t,ri as n}from"./initial-BfsvExIw.js";import{n as r}from"./bookmarksSource-D6VMJdPn.js";var i=e(n(),1);function a(){let{user:e}=t(),[n,a]=(0,i.useState)(new Set),[o,s]=(0,i.useState)(!!e);return(0,i.useEffect)(()=>{let t=!0;a(new Set),s(!!e);let n=r(e?.uid,e=>{t&&(a(e),s(!1))},()=>{t&&s(!1)});return()=>{t=!1,n()}},[e?.uid]),{bookmarkedIds:n,loading:o}}export{a as t};
+>>>>>>>> origin/main:docs/demo/assets/useMyBookmarks-wg1xKrbR.js

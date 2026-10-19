@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router';
 
 const state = vi.hoisted(() => ({ eventConfig: {} }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: state.eventConfig }) }));
@@ -9,6 +9,16 @@ import { ticketingRequest } from '../lib/ticketingCommerce.js';
 import RegistrationAction from './RegistrationAction.jsx';
 
 let endpoint = 0;
+function Navigator() {
+  const navigate = useNavigate();
+  return <><button type="button" onClick={() => navigate('/travel')}>Open travel</button><button type="button" onClick={() => navigate('/faq')}>Open FAQ</button></>;
+}
+function persistentHeader() {
+  return <MemoryRouter><RegistrationAction placement="header" /><Navigator /></MemoryRouter>;
+}
+const UNPUBLISHED = { provider: 'stripe', salesEnabled: false, catalogRevision: null };
+const PUBLISHED = { provider: 'stripe', salesEnabled: true, catalogRevision: 1 };
+
 function surface() {
   return <MemoryRouter><RegistrationAction placement="header" /><RegistrationAction placement="lead" /></MemoryRouter>;
 }
@@ -19,10 +29,10 @@ describe('registration provider destination', () => {
     state.eventConfig = { registration: { externalUrl: 'https://register.example.test/event', actionLabel: 'Register externally' } };
     ticketingRequest.mockReset();
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
   it('uses one public lookup to replace both configured external actions with native ticketing', async () => {
-    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: true });
+    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: true, catalogRevision: 3 });
     render(surface());
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
     for (const link of screen.getAllByRole('link')) {
@@ -35,7 +45,56 @@ describe('registration provider destination', () => {
 
   it('provides a native action even when no external registration destination is configured', async () => {
     state.eventConfig = {};
-    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: false });
+    ticketingRequest.mockResolvedValue({ provider: 'stripe', salesEnabled: false, catalogRevision: 0 });
+    render(surface());
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
+  });
+
+  it('shows no ticket action before a Stripe catalog is published', async () => {
+    // The public catalog read answers catalogRevision null until staff publish.
+    ticketingRequest.mockResolvedValue({
+      provider: 'stripe', salesEnabled: false, catalogRevision: null, closedReason: 'Ticket sales are not configured.',
+    });
+    render(surface());
+    await waitFor(() => expect(ticketingRequest).toHaveBeenCalledExactlyOnceWith('ticketingCatalog'));
+    await act(async () => {});
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+  });
+
+  it('asks again on a route change once the cached answer is older than 30 seconds', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    ticketingRequest.mockResolvedValueOnce(UNPUBLISHED).mockResolvedValue(PUBLISHED);
+    render(persistentHeader());
+    await waitFor(() => expect(ticketingRequest).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    // A navigation inside the cache window reuses the answer.
+    fireEvent.click(screen.getByRole('button', { name: 'Open travel' }));
+    await act(async () => {});
+    expect(ticketingRequest).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(Date.now() + 31_000);
+    fireEvent.click(screen.getByRole('button', { name: 'Open FAQ' }));
+    expect(await screen.findByRole('link', { name: 'Get tickets' })).toHaveAttribute('href', '/tickets');
+    expect(ticketingRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks again when the tab becomes visible once the cached answer is older than 30 seconds', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    ticketingRequest.mockResolvedValueOnce(UNPUBLISHED).mockResolvedValue(PUBLISHED);
+    render(persistentHeader());
+    await waitFor(() => expect(ticketingRequest).toHaveBeenCalledTimes(1));
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(ticketingRequest).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(Date.now() + 31_000);
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(await screen.findByRole('link', { name: 'Get tickets' })).toBeInTheDocument();
+    expect(ticketingRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the native action while a published catalog has paused sales or closed windows', async () => {
+    ticketingRequest.mockResolvedValue({
+      provider: 'stripe', salesEnabled: false, catalogRevision: 2, closedReason: 'Ticket sales are paused.',
+    });
     render(surface());
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2));
   });
@@ -61,7 +120,7 @@ describe('registration provider destination', () => {
     ticketingRequest.mockImplementation(() => new Promise((done) => { resolve = done; }));
     render(surface());
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    await act(async () => resolve({ provider: 'stripe' }));
+    await act(async () => resolve({ provider: 'stripe', catalogRevision: 1 }));
     expect(screen.getAllByRole('link', { name: 'Get tickets' })).toHaveLength(2);
   });
 
