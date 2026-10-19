@@ -4,42 +4,28 @@
     "exposure": "devTooling",
     "severity": "high",
     "advisories": [
+      "https://github.com/advisories/GHSA-c475-qrg2-pj4r",
+      "https://github.com/advisories/GHSA-8cw4-87c7-c6xx",
+      "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "https://github.com/advisories/GHSA-8988-4f7v-96qf",
       "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
     ],
     "affects": [
       "firebase-tools",
+      "proxy-agent",
+      "pac-proxy-agent",
+      "get-uri",
+      "basic-ftp",
+      "csv-parse",
+      "chokidar",
+      "braces",
       "@google-cloud/pubsub",
+      "@opentelemetry/core",
       "gaxios",
-      "tar",
       "uuid"
     ],
-    "rationale": "firebase-tools carries no advisory of its own; its high severity comes from bundled tar (see the tar entry below) plus a transitive uuid finding. It is a devDependency used only to run local emulators and to deploy from a developer or release machine; it never ships in a deployed artifact. Pinned to ^14.11.1 and already at 14.27.0, the newest 14.x release. The fix is firebase-tools@15.28.1, a major upgrade. Scheduling that upgrade and its migration notes separately.",
+    "rationale": "firebase-tools carries no advisory of its own. It is a devDependency used only to run local emulators and to deploy from a developer or release machine; it never ships in a deployed artifact. It is held at ~15.22.4, which brings tar 7.5.22 and clears every tar advisory. 15.34.0 also drops proxy-agent (and with it basic-ftp, get-uri, and pac-proxy-agent) and moves to csv-parse 7, but since 15.23.0 the CLI sends every request, emulator calls to 127.0.0.1 included, through HTTPS_PROXY and ignores NO_PROXY. On a machine with a proxy set, the Storage emulator then cannot read Firestore, and the storage rules that call firestore.exists() deny the owner. The chokidar ^3 (braces 3.0.3, no patched release), @google-cloud/pubsub ^5 (@opentelemetry/core 1.x), and gaxios ^6 (uuid 9.x) findings remain in every 15.x release, 15.34.0 included. npm's proposed fix is firebase-tools@13.13.3, a downgrade. Move to the newest 15.x once a release honours NO_PROXY for emulator traffic.",
     "reviewedBy": "amditisj@montclair.edu",
-    "reviewDate": "2026-08-27"
-  },
-  {
-    "package": "tar",
-    "exposure": "devTooling",
-    "severity": "critical",
-    "advisories": [
-      "https://github.com/advisories/GHSA-34x7-hfp2-rc4v",
-      "https://github.com/advisories/GHSA-8qq5-rm4j-mr97",
-      "https://github.com/advisories/GHSA-83g3-92jg-28cx",
-      "https://github.com/advisories/GHSA-qffp-2rhf-9h96",
-      "https://github.com/advisories/GHSA-9ppj-qmqm-q256",
-      "https://github.com/advisories/GHSA-r6q2-hw4h-h46w",
-      "https://github.com/advisories/GHSA-vmf3-w455-68vh",
-      "https://github.com/advisories/GHSA-w8wr-v893-vjvp",
-      "https://github.com/advisories/GHSA-23hp-3jrh-7fpw",
-      "https://github.com/advisories/GHSA-8x88-c5mf-7j5w",
-      "https://github.com/advisories/GHSA-gvwx-54wh-qm9j",
-      "https://github.com/advisories/GHSA-r292-9mhp-454m"
-    ],
-    "affects": [
-      "tar"
-    ],
-    "rationale": "tar is a transitive devDependency pulled in by firebase-tools, only used to unpack CLI/emulator archives on a developer or release machine; it is never a runtime dependency of a deployed function or the web app. The fix requires the same firebase-tools@15.28.1 major upgrade tracked above. Scheduling together with that migration.",
-    "reviewedBy": "amditisj@montclair.edu",
-    "reviewDate": "2026-08-27"
+    "reviewDate": "2026-10-19"
   }
 ]

@@ -646,10 +646,11 @@ release history → **Rollback** on the last-known-good release; it's a Console 
 for one-off scripts (not the deploy service account — this is a manual, watched action):
 
 ```sh
-firebase hosting:clone <SITE_ID>:<GOOD_RELEASE_ID> <SITE_ID>:live --project <GCP_PROJECT_ID>
+npx firebase hosting:clone <SITE_ID>@<GOOD_VERSION_ID> <SITE_ID>:live --project <GCP_PROJECT_ID>
 ```
 
-Find `<GOOD_RELEASE_ID>` from `firebase hosting:releases:list` or the Console's release history.
+Find `<GOOD_VERSION_ID>` in the Console's release history. The Firebase CLI has no command that
+lists releases, and `hosting:clone` takes a version as `<SITE_ID>@<VERSION_ID>`, not as a channel.
 This affects the served static bundle only — it does not touch functions, rules, or content.
 
 ### Functions

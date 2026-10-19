@@ -175,6 +175,7 @@
           npm test
           npm run test:rules   # needs Java 21+ for the Firebase emulators
           </code></pre>
+          <p>The Firebase CLI is <code>firebase-tools</code> 15, a root devDependency, so <code>npx firebase</code> runs the pinned version. Version 15 does not start the emulators on Java below 21. It is held at <code>~15.22.4</code>. Later 15.x releases send emulator calls to <code>127.0.0.1</code> through <code>HTTPS_PROXY</code> and ignore <code>NO_PROXY</code>. Do not raise the range until a release fixes that; <code>scripts/ci/audit-exceptions.json</code> has the detail.</p>
           <p>No <code>.env</code> and no cloud credentials are required for any of these — <code>test:rules</code> starts local Firestore and Storage emulators against a <code>demo-*</code> project id.</p>
           <p><code>apps/web</code> has its own vitest suite (<code>npm run test -w apps/web</code>) and its own dev loop against the Functions/Firestore/Auth emulators — see <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/apps/web/README.md">apps/web/README.md</a> for the full commands, including the Playwright-driven sign-in smoke test (<code>scripts/dev/login-smoke.mjs</code>).</p>
           <h2 id="how-to-send-a-change">How to send a change<a class="heading-anchor" href="#how-to-send-a-change" aria-label="Link to this section">#</a></h2>
