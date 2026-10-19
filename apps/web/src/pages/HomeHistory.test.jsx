@@ -11,7 +11,7 @@
 // with no remount.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { renderToString } from 'react-dom/server';
 
 const { subscriptions } = vi.hoisted(() => ({ subscriptions: new Map() }));
@@ -66,7 +66,7 @@ const STORY_TEXT = snapshotSiteContent.history__story.value.replace(/<[^>]*>/g, 
 
 function renderHome() {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <ContentProvider>
         <Home />
       </ContentProvider>
@@ -94,7 +94,7 @@ describe('Home History section, on the real content provider', () => {
     // A server render runs no effect at all: this is the page's first render,
     // exactly what the browser paints before any listener or chunk arrives.
     const html = renderToString(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <ContentProvider>
           <Home />
         </ContentProvider>

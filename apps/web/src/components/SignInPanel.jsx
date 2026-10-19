@@ -29,7 +29,7 @@
 // that is a control label, the one exemption the eyebrow ban names (§2.4),
 // never an eyebrow to "fix".
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { OtpRequestError, useAuth } from '../contexts/AuthContext.jsx';
 import { useToast } from '../contexts/ToastContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

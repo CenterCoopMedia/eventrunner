@@ -8,7 +8,7 @@
 import { Suspense, lazy } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { Link, MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useNavigate } from 'react-router';
 import ScrollReset, { FRAGMENT_WINDOW_MS } from './ScrollReset.jsx';
 
 let scrollTo;
@@ -28,8 +28,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true };
-
 /**
  * The reset, the moves a reader can make from one page, and three fragment
  * targets that are present from the start: one that invites focus, one that
@@ -37,7 +35,7 @@ const ROUTER_FUTURE = { v7_startTransition: true, v7_relativeSplatPath: true };
  */
 function renderAt(path) {
   const view = render(
-    <MemoryRouter initialEntries={[path]} future={ROUTER_FUTURE}>
+    <MemoryRouter initialEntries={[path]}>
       <ScrollReset />
       <Link to="/travel">Another page</Link>
       <Link to="/travel#rooms">Another page, at a heading</Link>
@@ -149,7 +147,7 @@ describe('ScrollReset, at a fragment that has not rendered yet', () => {
   function renderLazyApp() {
     const { Page, arrive } = lateRoute();
     render(
-      <MemoryRouter initialEntries={['/faq']} future={ROUTER_FUTURE}>
+      <MemoryRouter initialEntries={['/faq']}>
         <ScrollReset />
         <Link to="/travel#section-rooms">Travel, at a section</Link>
         <Link to="/faq">Back to the FAQ</Link>
@@ -252,7 +250,7 @@ describe('ScrollReset, on a POP navigation', () => {
 
   function renderHistory(entries, index) {
     render(
-      <MemoryRouter initialEntries={entries} initialIndex={index} future={ROUTER_FUTURE}>
+      <MemoryRouter initialEntries={entries} initialIndex={index}>
         <ScrollReset />
         <Stepper />
         <Link to="/travel">Another page</Link>
@@ -340,7 +338,7 @@ describe('ScrollReset, on a move within one page', () => {
 describe('ScrollReset itself', () => {
   it('renders nothing of its own', () => {
     const { container } = render(
-      <MemoryRouter future={ROUTER_FUTURE}>
+      <MemoryRouter>
         <ScrollReset />
       </MemoryRouter>,
     );
@@ -351,7 +349,7 @@ describe('ScrollReset itself', () => {
     delete window.scrollTo;
     expect(() =>
       render(
-        <MemoryRouter future={ROUTER_FUTURE}>
+        <MemoryRouter>
           <ScrollReset />
         </MemoryRouter>,
       ),

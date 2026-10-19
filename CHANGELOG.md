@@ -365,6 +365,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The web app uses React Router 7 (`react-router` 7.18) in place of `react-router-dom` 6. It
+  stays a plain single-page app in declarative mode: `BrowserRouter` on a deployment and
+  `HashRouter` in the demo, with no framework mode. Every import now names `react-router`. The
+  v7 future flags were already on, so routing behaves as before, and the `future` props are
+  gone. The upgrade clears two moderate advisories (GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg),
+  and their audit exception is gone. The initial demo bundle grows by about 5 kB gzip, inside
+  its budget.
+
 - Cloud Functions run on firebase-admin 14 and firebase-functions 7. firebase-functions 6
   does not accept firebase-admin 14, so both moved together. Both need Node 22, which the
   functions already declare. The upgrade clears the moderate uuid advisory chain

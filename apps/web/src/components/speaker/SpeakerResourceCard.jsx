@@ -6,7 +6,7 @@
 // config/event. A missing, hidden, or unsafe resource is omitted, and an empty
 // set draws nothing.
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { isCanonicalPagePath } from 'shared/routing';
 import { safeUrlHref } from 'shared/urlSafety';
 import { resolveVenueMap, VENUE_MAP_SECTION_ID } from 'shared/venue';

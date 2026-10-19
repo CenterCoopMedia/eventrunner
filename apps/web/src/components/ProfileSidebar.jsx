@@ -10,7 +10,7 @@
 // ink reads the tier 2 role names, its type sits on the named scale, and its
 // two actions are the shared filled and outlined controls (design brief
 // §3.1, §3.7) — the vocabulary SessionCard and the restyled pages use.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { validateCustomBadges } from 'shared/badges';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';

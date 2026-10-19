@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { isReadOnlyDemo } from '../lib/readOnlyDemo.js';
 import { quietActionClass } from './controlClasses.js';

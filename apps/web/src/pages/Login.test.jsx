@@ -3,7 +3,7 @@
 // 429 rate-limit copy, error focus handling, and the never-block-paste rule.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { signInWithCustomToken } from 'firebase/auth';
 import App from '../App.jsx';
 import { functionsOrigin } from '../contexts/AuthContext.jsx';
@@ -30,7 +30,6 @@ function renderSignIn() {
   return render(
     <MemoryRouter
       initialEntries={['/signin']}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,

@@ -14,7 +14,7 @@
 //
 // It sits ABOVE the stone, never inside it: the title band pulls itself up
 // by the stone's top padding, and inside the stone it would slide over this.
-import { Link, matchPath, useLocation } from 'react-router-dom';
+import { Link, matchPath, useLocation } from 'react-router';
 import { usePendingChanges } from '../PendingChangesContext.jsx';
 
 export const UNPUBLISHED_PATH = '/admin/unpublished';

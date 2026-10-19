@@ -7,7 +7,7 @@
 // above the name: the tier used to sit there as a line of small type, which
 // is an eyebrow. The About section draws only when the record has a
 // biography, so the description never prints twice.
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { visibleOrganizations } from '../components/SponsorWall.jsx';

@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Figure, plural } from './figures.jsx';
 
 function FigureCard({ title, action, to, className = '', children }) {

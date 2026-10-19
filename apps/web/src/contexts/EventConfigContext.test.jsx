@@ -3,7 +3,7 @@
 // callbacks, the runtime theme style element, and feature-driven nav.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 // Capture each config doc subscription so tests can fire fake snapshots.
 const { subscriptions } = vi.hoisted(() => ({ subscriptions: new Map() }));
@@ -216,7 +216,6 @@ describe('Layout nav', () => {
   function renderShell() {
     return render(
       <MemoryRouter
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <EventConfigProvider>
           {/* The shell reads the current URL's page document for the two

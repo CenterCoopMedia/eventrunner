@@ -16,7 +16,7 @@
 // (admin/updatesDoc.js toUpdatePayload), and a panel says so.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { UPDATE_CATEGORY_MAX, validUpdateCategory } from 'shared/update';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, Link } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, Link } from 'react-router';
 import { inAppPath, useUnsavedNavigation } from './useUnsavedNavigation.js';
 import { UnsavedChangesDialog } from './components/UnsavedChanges.jsx';
 

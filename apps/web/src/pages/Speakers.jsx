@@ -10,7 +10,7 @@
 // Feature-gated by config/features.speakers — the nav link already hides
 // when the feature is off, but the route itself must gate too, since direct
 // navigation bypasses the nav (matches the Schedule.jsx pattern).
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';

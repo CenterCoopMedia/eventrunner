@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { secondaryActionClass } from './controlClasses.js';
 import { formatTicketTime, ticketStatusLabel } from '../lib/ticketingCommerce.js';
 

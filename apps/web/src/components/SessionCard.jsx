@@ -9,7 +9,7 @@
 // Everything below the title reads at the same weight, so the eye keeps
 // running down the time column instead of stopping at a shelf of boxes.
 import { useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { formatSessionTimeRange } from '../lib/eventTime.js';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';

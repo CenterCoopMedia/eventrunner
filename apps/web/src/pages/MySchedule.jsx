@@ -11,7 +11,7 @@
 // folio-on-a-rule SectionHead device Schedule.jsx uses, and the page actions
 // are ruled rectangles rather than filled pill buttons.
 import { Fragment, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth, functionsOrigin } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

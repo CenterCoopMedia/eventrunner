@@ -16,7 +16,7 @@
 // with no auth provider (a component test, a specimen) is "not an admin" and
 // draws nothing instead of throwing.
 import { useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import { textControlStateClass } from './controlClasses.js';
 

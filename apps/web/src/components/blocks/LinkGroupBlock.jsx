@@ -20,7 +20,7 @@
 // shapes in controlClasses.js, so it draws the prose-link treatment the
 // .rich-text anchor rule already sets in index.css: accent ink, an
 // underline at 40%, accent-strong on hover.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { isSafeHref } from '../../lib/sanitizeHtml.js';
 import { isCanonicalPagePath } from 'shared/routing';
 

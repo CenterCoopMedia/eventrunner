@@ -23,7 +23,7 @@
 // #180), then the registration funnel and the content readiness table
 // (issue #181), both read from the same response.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';

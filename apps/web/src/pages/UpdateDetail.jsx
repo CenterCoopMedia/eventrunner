@@ -9,7 +9,7 @@
 //
 // Editorial base restyle (design brief §2.1): the same back-link, header,
 // and body treatment SessionDetail.jsx gives its own detail page.
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import UpdateContent, { UpdateImage } from '../components/UpdateContent.jsx';

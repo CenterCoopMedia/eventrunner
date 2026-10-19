@@ -4,7 +4,7 @@
 // SELF_EDITABLE_SPEAKER_FIELDS through updateOwnSpeakerProfile.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 let authValue;
 let profileValue;

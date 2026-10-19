@@ -11,7 +11,7 @@
 // date it carries, in the mono face with tabular figures, and it sits
 // BESIDE the entry's title on the same line — never above it, because
 // nothing sits directly above a heading.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 /**
  * @param {{

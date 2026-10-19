@@ -9,7 +9,7 @@
 // index draws the seeded speaker records as index rows, and the feed draws
 // three seeded pages as dated entries. The copy is real snapshot copy in
 // both, and each figure says which records it drew.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import SectionHead from '../../../components/editorial/SectionHead.jsx';
 import SpecimenLabel from '../../../components/editorial/SpecimenLabel.jsx';
 import Tag from '../../../components/editorial/Tag.jsx';

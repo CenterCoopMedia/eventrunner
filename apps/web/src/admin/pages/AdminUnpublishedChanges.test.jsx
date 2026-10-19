@@ -7,7 +7,7 @@
 // (e2e/cms-unpublished.spec.js) proves the same on the emulators.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 // A docket that does not own an editor yet gives its rows no link. The
 // editors land one branch at a time, so the tests that need an unlinked row
@@ -102,7 +102,7 @@ function refused(status, body) {
 
 async function renderAt(path) {
   render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   );

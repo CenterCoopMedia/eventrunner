@@ -3,7 +3,7 @@
 // pattern as Sponsors.test.jsx / SessionDetail.test.jsx.
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import Updates from './Updates.jsx';

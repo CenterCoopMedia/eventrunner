@@ -8,7 +8,7 @@
 // The operator then chooses Stay or Discard. A running save hides Discard.
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 /**
  * Path the router should move to, or null when this click should not be

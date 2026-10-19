@@ -1,21 +1,5 @@
 [
   {
-    "package": "react-router-dom",
-    "exposure": "production",
-    "severity": "moderate",
-    "advisories": [
-      "https://github.com/advisories/GHSA-wrjc-x8rr-h8h6",
-      "https://github.com/advisories/GHSA-337j-9hxr-rhxg"
-    ],
-    "affects": [
-      "react-router-dom",
-      "react-router"
-    ],
-    "rationale": "react-router-dom is already at 6.30.6, the latest release inside the declared ^6.30.1 range. The fix requires react-router-dom@7.18.2, a major-version rewrite of the router API. Scheduling that migration separately from this audit pass.",
-    "reviewedBy": "amditisj@montclair.edu",
-    "reviewDate": "2026-08-27"
-  },
-  {
     "package": "vite",
     "exposure": "build",
     "severity": "high",

@@ -1,6 +1,6 @@
 // Home owns the visible hero heading, CMS actions, and optional artwork.
 // Other CMS sections stay in their authored order through SystemPage.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';

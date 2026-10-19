@@ -3,7 +3,7 @@
 // before the account document exists (issue #17, spec §3.4, §4.5).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { installPhotoCropStubs, uninstallPhotoCropStubs } from '../test/photoCropStubs.js';
 
 let features;

@@ -3,7 +3,7 @@
 // reaches the DOM with no Firebase connection (spec §2.4 first-paint path).
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 // The smoke test needs no Firebase env or network (spec §8.1 credential-free
 // CI): stub the two provider seams that would otherwise initialize the SDK.
@@ -96,7 +96,6 @@ function renderAt(path) {
   return render(
     <MemoryRouter
       initialEntries={[path]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,
@@ -212,7 +211,6 @@ describe('app shell', () => {
     render(
       <MemoryRouter
         initialEntries={['/?preview=1']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <App />
       </MemoryRouter>,
@@ -231,7 +229,6 @@ describe('app shell', () => {
     render(
       <MemoryRouter
         initialEntries={['/?preview=1']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <App />
       </MemoryRouter>,
@@ -299,7 +296,6 @@ describe('app shell', () => {
     render(
       <MemoryRouter
         initialEntries={['/?preview=1']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <App />
       </MemoryRouter>,

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { eventConfig, features } from '@generated/eventConfig.js';
 import { organizationsData } from '@generated/organizationsData.js';
 import { speakers } from '@generated/scheduleData.js';

@@ -11,7 +11,7 @@
 // client that read `response.ok` and fail in production.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 // Invite acceptance exercises an ordinary client, with account actions enabled.
 vi.mock('../lib/configSource.js', () => ({
@@ -81,7 +81,6 @@ function renderAccept(query = `?token=${TOKEN}`) {
   return render(
     <MemoryRouter
       initialEntries={[`/speaker/accept${query}`]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,

@@ -5,7 +5,7 @@
 // holds, because the search text must never reach it.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
@@ -96,7 +96,7 @@ function LocationProbe() {
 async function renderPage(path = '/admin/email-log', options) {
   serve(options);
   const result = render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route
           path="/admin/email-log"
@@ -365,7 +365,7 @@ describe('AdminEmailLog', () => {
     async function startFeedbackSearch() {
       const held = serveHeld();
       render(
-        <MemoryRouter initialEntries={['/admin/email-log']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <MemoryRouter initialEntries={['/admin/email-log']}>
           <Routes>
             <Route path="/admin/email-log" element={<><AdminEmailLog /><LocationProbe /></>} />
           </Routes>
