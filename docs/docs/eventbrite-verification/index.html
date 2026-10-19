@@ -204,9 +204,12 @@
           fixtures), <code>/v3/orders/{orderId}/</code> (<code>webhook-order-placed-order-path.json</code>, the shape
           Eventbrite&#39;s documentation shows for <code>order.*</code>), and <code>/v3/events/{eventId}/attendees/{attendeeId}/</code>
           (<code>webhook-attendee-updated-attendee-path.json</code>, the documented <code>attendee.*</code> shape, mapped to its
-          order through <code>GET /events/{id}/attendees/{id}/</code>). An authenticated delivery in any other shape
-          gets 200 and is ignored, so a shape the adapter does not know loses the update without an
-          error. Record which shape each action really uses. This is the single most load-bearing
+          order through <code>GET /events/{id}/attendees/{id}/</code>). If that read returns 404 or no <code>order_id</code>,
+          the function answers 500 so Eventbrite retries: the attendee may not have propagated yet. An
+          attendee that is gone for good is retried until Eventbrite stops, so record in the sandbox how
+          soon after <code>attendee.updated</code> the attendee read succeeds, and how long Eventbrite keeps
+          retrying a 500. An authenticated delivery in any other shape gets 200 and is ignored, so a
+          shape the adapter does not know loses the update without an error. Record which shape each action really uses. This is the single most load-bearing
           assumption — verify it carefully.</li>
           </ul>
           <h3 id="4-orderrefunded-folding">4. <code>order.refunded</code> folding<a class="heading-anchor" href="#4-orderrefunded-folding" aria-label="Link to this section">#</a></h3>
