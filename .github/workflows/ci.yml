@@ -190,7 +190,7 @@ jobs:
     # #103): fail only on high/critical findings in production dependencies
     # (`npm audit --omit=dev`) that are not listed in
     # scripts/ci/audit-exceptions.json. Dev-tooling findings (firebase-tools,
-    # vite, and their transitive tar/uuid findings) are tracked in that same
+    # vite, and their transitive findings) are tracked in that same
     # file but can never fail this job.
     steps:
       - uses: actions/checkout@v4

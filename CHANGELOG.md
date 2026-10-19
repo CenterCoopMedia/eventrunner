@@ -365,6 +365,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The Firebase CLI (`firebase-tools`, a root devDependency) moves from 14.27.0 to 15.22.4. The
+  upgrade brings `tar` 7.5.22 and removes the critical `tar` advisory from the root lockfile. The
+  emulators need Java 21 or later, which CI and the docs already require. The CLI is held at
+  `~15.22.4`: from 15.23.0, it sends emulator calls to `127.0.0.1` through `HTTPS_PROXY` and ignores
+  `NO_PROXY`, so Storage rules that read Firestore deny valid writes on a machine with a proxy set.
+  The `proxy-agent`, `basic-ftp`, `get-uri`, `pac-proxy-agent`, and `csv-parse` findings clear only
+  on 15.34.0. The `chokidar`, `@google-cloud/pubsub`, `@opentelemetry/core`, `gaxios`, and `uuid`
+  findings stay on every 15.x release. All are logged in `scripts/ci/audit-exceptions.json`. The
+  hosting rollback command in `docs/DEPLOY_RUNBOOK.md` now uses the `<SITE_ID>@<VERSION_ID>` form
+  that `hosting:clone` accepts.
+
 - **Breaking:** `submitSessionPitch` now requires `consent: true`. Callers must record agreement
   to organizer review before submitting; requests without it return 400. Stored proposals
   record the consent version and time (#323).

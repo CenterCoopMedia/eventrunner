@@ -53,6 +53,8 @@ npm test
 npm run test:rules   # needs Java 21+ for the Firebase emulators
 ```
 
+The Firebase CLI is `firebase-tools` 15, a root devDependency, so `npx firebase` runs the pinned version. Version 15 does not start the emulators on Java below 21. It is held at `~15.22.4`. Later 15.x releases send emulator calls to `127.0.0.1` through `HTTPS_PROXY` and ignore `NO_PROXY`. Do not raise the range until a release fixes that; `scripts/ci/audit-exceptions.json` has the detail.
+
 No `.env` and no cloud credentials are required for any of these — `test:rules` starts local Firestore and Storage emulators against a `demo-*` project id.
 
 `apps/web` has its own vitest suite (`npm run test -w apps/web`) and its own dev loop against the Functions/Firestore/Auth emulators — see [apps/web/README.md](apps/web/README.md) for the full commands, including the Playwright-driven sign-in smoke test (`scripts/dev/login-smoke.mjs`).
