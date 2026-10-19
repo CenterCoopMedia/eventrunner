@@ -560,6 +560,21 @@ test('html comments never reach the page', () => {
   assert.ok(html.includes('After.'));
 });
 
+test('an html comment rebuilt by removing an inner one never reaches the page', () => {
+  const { html } = renderMarkdown('# T\n\nBefore <!<!-- -->-- OPERATOR NOTE --> after.\n');
+  assert.ok(!html.includes('OPERATOR NOTE'), html);
+  assert.ok(!html.includes('&lt;!--'), html);
+  assert.equal(html, '<p>Before  after.</p>');
+});
+
+test('the description reads the first paragraph as the page shows it', () => {
+  // The page shows the text "&lt;b&gt;", so the description must too. The
+  // earlier decode turned "&amp;lt;" into "<" by decoding "&amp;" first.
+  const { html, description } = renderMarkdown('# T\n\nUse &lt;b&gt; for **bold**, and `<x>` & "y".\n');
+  assert.equal(html, '<p>Use &amp;lt;b&amp;gt; for <strong>bold</strong>, and <code>&lt;x&gt;</code> &amp; &quot;y&quot;.</p>');
+  assert.equal(description, 'Use &lt;b&gt; for bold, and <x> & "y".');
+});
+
 test('escapeHtml covers every dangerous character', () => {
   assert.equal(escapeHtml(`&<>"'`), '&amp;&lt;&gt;&quot;&#39;');
 });

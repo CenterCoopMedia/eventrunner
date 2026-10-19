@@ -316,6 +316,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The documentation site's page description decodes each entity once, so a
+  paragraph that shows "&lt;b&gt;" no longer gets "<b>" in its description.
+  An HTML comment that forms again when an inner comment is removed is also
+  removed, instead of showing on the page as text.
+
 - The plain-text body of an email decodes each entity in the postal address
   once. Before, "&amp;lt;" became "<" instead of "&lt;". Tag removal is now
   one linear scan, so a long run of unclosed `<` no longer takes seconds.
