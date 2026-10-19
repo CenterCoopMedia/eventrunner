@@ -99,6 +99,23 @@ test('a reminder is refused when the event has no public site address', () => {
   );
 });
 
+test('wording that hides the dashboard link inside an {{#if}} block never reaches a speaker', () => {
+  // A link only inside another item's block is refused at save, and a stored
+  // copy of it falls back to the shipped wording, so the only "no link"
+  // refusal left is a missing site address.
+  const override = {
+    text: 'Dear {{speaker_name}}.{{#if needs_bio}} Add a biography at {{dashboard_url}}.{{/if}}',
+  };
+  const check = validateOverridePayload('speaker.reminder', override);
+  assert.equal(check.ok, false);
+  assert.match(check.errors.join(';'), /missing required token \{\{dashboard_url\}\}/);
+  const recipient = hostileRecipient();
+  const items = recipient.readiness.missing.filter((item) => item !== 'bio');
+  const out = renderShipped({ ...recipient, items }, override);
+  assert.equal(out.usedFallback, true);
+  assert.ok(out.delivered.text.includes('https://site.example.test/speaker/dashboard'));
+});
+
 test('saved wording is used, and wording with an unknown token or no dashboard link is refused', () => {
   const override = {
     subject: 'Reminder from {{event_name}}',
