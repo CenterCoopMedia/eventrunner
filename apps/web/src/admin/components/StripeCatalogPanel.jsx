@@ -59,9 +59,13 @@ export default function StripeCatalogPanel({ call, data, isOperator, timezone, o
   // A sales change (or another operator's save) writes a new revision. An
   // editor with no unsaved edits follows it at once, so a later save does not
   // carry the old sales state. Real edits keep the warning and the reload.
+  // The busy state is a dependency, so a revision that lands during a save
+  // or a reload is applied when that request ends.
   useEffect(() => {
-    if (revisionChanged && clean && !busyRef.current) loadSaved(data.catalog);
-  }, [revisionChanged, clean, data.catalog]);
+    if (!revisionChanged || !clean || busy) return;
+    loadSaved(data.catalog);
+    setNotice({ tone: 'ok', message: 'The editor now shows the current saved catalog.' });
+  }, [revisionChanged, clean, busy, data.catalog]);
 
   async function reloadCatalog() {
     if (busyRef.current || !isOperator) return;

@@ -11,6 +11,7 @@ import StripeTicketingWorkspace from './StripeTicketingWorkspace.jsx';
 
 const TYPE = { id: 'general', name: 'General admission', description: '', unitAmount: 2500, capacity: 100, active: true, visibility: 'public', minPerOrder: 1, maxPerOrder: 10, salesStartAt: null, salesEndAt: null };
 const CATALOG = { schemaVersion: 1, revision: 1, published: true, salesPaused: true, currency: 'usd', capacity: 100, maxPerOrder: 10, refundPolicy: 'Contact the organizer.', taxTreatment: 'inclusive', commercialTermsConfirmed: true, salesStartAt: null, salesEndAt: null, ticketTypes: [TYPE] };
+const REBASED = 'The editor now shows the current saved catalog.';
 const CHANGED = 'The saved catalog has changed. Your unsaved edits are still here; reload to use the current saved version.';
 
 let saved;
@@ -51,6 +52,8 @@ describe('catalog editor after a sales change', () => {
     await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked());
     expect(screen.queryByText(CHANGED)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Discard unsaved edits and reload catalog' })).not.toBeInTheDocument();
+    // The flipped checkbox is explained in a status line.
+    expect(screen.getByText(REBASED)).toHaveAttribute('role', 'status');
     const submit = screen.getByRole('button', { name: 'Save catalog' });
     expect(submit).toHaveAttribute('aria-disabled', 'false');
     // A save from the rebased editor keeps sales open and names the new revision.
@@ -70,6 +73,7 @@ describe('catalog editor after a sales change', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reopen new sales' }));
     expect(await screen.findByText(CHANGED)).toBeInTheDocument();
     expect(screen.getByLabelText('Ticket name')).toHaveValue('Unsaved early bird');
+    expect(screen.queryByText(REBASED)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save catalog' })).toHaveAttribute('aria-disabled', 'true');
   });
 

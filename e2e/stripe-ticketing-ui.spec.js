@@ -149,6 +149,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByText('New sales enabled')).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked();
     await expect(page.getByText(/The saved catalog has changed/)).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'The editor now shows the current saved catalog.' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Discard unsaved edits and reload catalog' })).toHaveCount(0);
     await screenshot(page, 'stripe-catalog-after-reopen', page.locator('form').filter({ hasText: 'Ticket types' }));
     await page.getByRole('button', { name: 'Save catalog' }).click();
