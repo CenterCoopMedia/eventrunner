@@ -236,6 +236,61 @@ describe('AnnouncementEmailComposer', () => {
     expect(screen.getByLabelText('Button label (optional)')).toHaveValue('Open the map');
   });
 
+  it('says when the failed address list is cut short, and where the rest are', async () => {
+    const many = { ...SENT, total: 400, counts: { sent: 100, failed: 280, uncertain: 20 }, failures: Array.from({ length: 50 }, (_, n) => ({ email: `f${n}@example.org`, error: '503: Unavailable' })) };
+    respond({ listAnnouncementSends: listResponse([many]) });
+    await renderLoaded();
+    fireEvent.click(screen.getByText('Failed addresses (first 50 of 300)'));
+    expect(screen.getByText(/The Email log, filtered by the source Announcement, lists every one\./)).toBeInTheDocument();
+  });
+
+  it('retries the failed addresses of a send as a new previewed send, once', async () => {
+    const failed = { ...SENT, retryCount: 2, retriedBy: null };
+    respond({
+      listAnnouncementSends: listResponse([failed, { ...SENT, id: 'send-done', subject: 'Already retried', retryCount: 1, retriedBy: 'send-later' }]),
+      previewAnnouncementEmail: { ...PREVIEW, audience: 'speakers', audienceLabel: 'Speakers', recipientCount: 2, retryOf: 'send-old' },
+      sendAnnouncementEmail: { send: { ...SENT, id: 'send-new-1', total: 2, processed: 2, counts: { sent: 2 }, failures: [], retryOf: 'send-old' } },
+    });
+    await renderLoaded();
+    // One retry per send: the row that was retried offers none.
+    expect(screen.getAllByRole('button', { name: /Retry .* failed addresses?/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry 2 failed addresses' }));
+    expect(screen.getByLabelText('Subject')).toHaveValue('Speaker check-in moved');
+    expect(screen.getByLabelText('Subject')).toHaveFocus();
+    expect(screen.getByText('This email goes only to the 2 addresses that failed in "Speaker check-in moved".')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    await screen.findByRole('heading', { name: 'Preview' });
+    expect(call).toHaveBeenCalledWith('previewAnnouncementEmail', {
+      draft: { subject: 'Speaker check-in moved', message: 'Check in at the side door.', linkUrl: 'https://example.org/map', linkLabel: 'Open the map' },
+      audience: 'speakers',
+      retryOf: 'send-old',
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to 2 recipients' }));
+    const confirm = await screen.findByRole('heading', { name: 'Send this email to 2 recipients?' });
+    await act(async () => {
+      fireEvent.click(within(confirm.closest('section')).getByRole('button', { name: 'Send to 2 recipients' }));
+    });
+    await screen.findByText(/The send is complete/);
+    const [, body] = call.mock.calls.find(([name]) => name === 'sendAnnouncementEmail');
+    expect(body).toMatchObject({ sendId: 'send-new-1', audience: 'speakers', retryOf: 'send-old' });
+    expect(screen.queryByText(/This email goes only to/)).not.toBeInTheDocument();
+  });
+
+  it('drops a retry when staff pick another audience or cancel it', async () => {
+    respond({ listAnnouncementSends: listResponse([{ ...SENT, retryCount: 1, retriedBy: null }]), previewAnnouncementEmail: PREVIEW });
+    await renderLoaded();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry 1 failed address' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send to the whole audience instead' }));
+    expect(screen.queryByText(/This email goes only to/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry 1 failed address' }));
+    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'registered' } });
+    expect(screen.queryByText(/This email goes only to/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview email' }));
+    await screen.findByRole('heading', { name: 'Preview' });
+    expect(call.mock.calls.find(([name]) => name === 'previewAnnouncementEmail')[1]).not.toHaveProperty('retryOf');
+  });
+
   it('continues a send that stopped part way', async () => {
     const partial = { ...SENT, id: 'send-part', status: 'sending', total: 400, processed: 200, counts: { sent: 200 }, failures: [] };
     let calls = 0;
@@ -260,6 +315,18 @@ describe('AnnouncementEmailComposer', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Restore address' })); });
     expect(call).toHaveBeenCalledWith('removeEmailSuppression', { email: 'back@example.org' });
     expect(showToast).toHaveBeenCalledWith('This address gets announcement email again.');
+  });
+
+  it('says a restore also needs Postmark when Postmark handles unsubscribes', async () => {
+    respond({
+      listAnnouncementSends: listResponse([], { canSend: true, blocker: null, mode: 'provider' }),
+      removeEmailSuppression: { removed: true },
+    });
+    await renderLoaded();
+    expect(screen.getByText(/Postmark keeps its own list of addresses that unsubscribed/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Restore an unsubscribed address/), { target: { value: 'back@example.org' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Restore address' })); });
+    expect(showToast).toHaveBeenCalledWith('This site no longer leaves the address out. Reactivate it on the broadcast stream in Postmark too.');
   });
 
   it('states every count it has and nothing it does not', () => {

@@ -27,6 +27,17 @@
  * Per-recipient send-once key: `announcement:{sendId}:{suppression id}`.
  * The same send identity and recipient always give the same key. A
  * deliberate resend is a new send with a new identity.
+ *
+ * RETRY OF FAILED ADDRESSES. Claims are never released, so a recipient
+ * whose message failed is never sent again under the same identity. When
+ * the provider failed with a transient status (5xx or 429, after the
+ * core's own retries), the recipient goes on the record's
+ * `retryRecipients`. Staff can start one new send, with its own preview,
+ * receipt and identity, limited to that list (`retryOf`). The earlier
+ * record then holds `retriedBy`, so the same failures are not retried
+ * twice. A refusal for good (an inactive or invalid address) and an
+ * uncertain result are never on the list: the first would fail again,
+ * and the second may have been delivered.
  */
 
 const crypto = require('node:crypto');
@@ -95,7 +106,56 @@ function summarize(id, data, nowMs) {
     createdBy: data.createdBy?.email || null,
     completedAt: toMillis(data.completedAt),
     busy: leaseUntil !== null && leaseUntil > nowMs,
+    retryCount: Array.isArray(data.retryRecipients) ? data.retryRecipients.length : 0,
+    retryOf: data.retryOf || null,
+    retriedBy: data.retriedBy || null,
   };
+}
+
+/** A failure the provider may not repeat: 5xx, or 429, with a definite answer. */
+function isTransientFailure(result) {
+  if (!result || result.status === 'sent' || result.skipped || result.uncertain) return false;
+  const status = result.providerStatus;
+  return typeof status === 'number' && (status === 429 || (status >= 500 && status <= 599));
+}
+
+class RetryError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'RetryError';
+    this.code = code;
+  }
+}
+
+/**
+ * The recipients of a retry: the earlier send's transient failures, less
+ * every address that unsubscribed since. Refuses an earlier send that is
+ * missing, still sending, has nothing to retry, or was retried already.
+ */
+async function resolveRetry({ db, retryOf, audience }) {
+  if (typeof retryOf !== 'string' || !SEND_ID_RE.test(retryOf)) {
+    throw new AudienceError('bad-retry', 'retryOf: must name an earlier send');
+  }
+  const snap = await db.collection(SENDS).doc(retryOf).get();
+  const earlier = snap.exists ? snap.data() : null;
+  if (!earlier) throw new RetryError('not-found', 'The earlier send does not exist.');
+  if (earlier.audience !== audience) throw new AudienceError('bad-retry', 'audience: must be the audience of the earlier send');
+  if (earlier.retriedBy) {
+    throw new RetryError('retry-used', 'The failed addresses of this send were already sent again. Retry from that later send instead.');
+  }
+  if (earlier.status !== 'sent') throw new RetryError('retry-early', 'Finish this send before you retry its failed addresses.');
+  const list = (Array.isArray(earlier.retryRecipients) ? earlier.retryRecipients : [])
+    .filter((email) => typeof email === 'string')
+    .map((email) => ({ uid: null, email }));
+  if (list.length === 0) throw new RetryError('nothing-to-retry', 'This send has no failed addresses that can be sent again.');
+  const suppressedIds = await readSuppressedIds(db, list.map((r) => suppressionIdFor(r.email)));
+  const recipients = list.filter((r) => !suppressedIds.has(suppressionIdFor(r.email)));
+  return { recipients, suppressed: list.length - recipients.length, unusable: 0 };
+}
+
+/** The audience string a receipt binds: a retry never matches a full send. */
+function receiptAudience(audience, retryOf) {
+  return retryOf ? `${audience}:retry:${retryOf}` : audience;
 }
 
 /** Map a result from sendBatch onto the record's counters. */
@@ -162,7 +222,10 @@ function createPreviewAnnouncementEmailHandler(deps) {
       const channel = await resolveChannel({ provider, config });
       const policy = await checkDemoWrites({ db });
       const mode = channel.ok ? channel.mode : 'app';
-      const { recipients, suppressed, unusable } = await resolveAudience({ db, audience });
+      const retryOf = req.body?.retryOf ?? null;
+      const { recipients, suppressed, unusable } = retryOf
+        ? await resolveRetry({ db, retryOf, audience })
+        : await resolveAudience({ db, audience });
       const rendered = renderAnnouncement({ config, draft: draft.value, mode });
       const sender = senderOf(config);
       const shown = previewBodies({ rendered, config });
@@ -172,8 +235,11 @@ function createPreviewAnnouncementEmailHandler(deps) {
       else if (recipients.length === 0) blocker = 'Nobody in this audience can get the email.';
       return res.status(200).json({
         sendId: newId(),
-        receipt: channel.ok ? receiptFor({ audience, recipients, rendered, sender, channel }) : null,
+        receipt: channel.ok
+          ? receiptFor({ audience: receiptAudience(audience, retryOf), recipients, rendered, sender, channel })
+          : null,
         audience,
+        retryOf,
         audienceLabel: AUDIENCES[audience].label,
         recipientCount: recipients.length,
         suppressedCount: suppressed,
@@ -190,6 +256,7 @@ function createPreviewAnnouncementEmailHandler(deps) {
       });
     } catch (err) {
       if (err instanceof AudienceError) return badRequest(res, `Invalid announcement: ${err.message}`);
+      if (err instanceof RetryError) return sendError(res, 409, err.code, err.message);
       log.error('previewAnnouncementEmail failed', err);
       return internal(res, 'The preview could not be built.');
     }
@@ -260,16 +327,22 @@ async function startSend({ deps, gate, body, sendId, nowMs }) {
   const config = await getConfig();
   const channel = await resolveChannel({ provider, config });
   if (!channel.ok) return { error: [409, channel.code, channel.message] };
+  const retryOf = body.retryOf ?? null;
   let audience;
   try {
-    audience = await resolveAudience({ db, audience: body.audience });
+    audience = retryOf
+      ? await resolveRetry({ db, retryOf, audience: body.audience })
+      : await resolveAudience({ db, audience: body.audience });
   } catch (err) {
     if (err instanceof AudienceError) return { error: [400, 'bad-request', `Invalid announcement: ${err.message}`] };
+    if (err instanceof RetryError) return { error: [409, err.code, err.message] };
     throw err;
   }
   const rendered = renderAnnouncement({ config, draft: draft.value, mode: channel.mode });
   const sender = senderOf(config);
-  const receipt = receiptFor({ audience: body.audience, recipients: audience.recipients, rendered, sender, channel });
+  const receipt = receiptFor({
+    audience: receiptAudience(body.audience, retryOf), recipients: audience.recipients, rendered, sender, channel,
+  });
   if (receipt !== body.receipt) {
     return { error: [409, 'preview-stale', 'The audience or the email changed after the preview. Preview the email again.'] };
   }
@@ -296,6 +369,9 @@ async function startSend({ deps, gate, body, sendId, nowMs }) {
     nextIndex: 0,
     counts: { ...EMPTY_COUNTS, suppressed: 0 },
     failures: [],
+    retryRecipients: [],
+    retryOf,
+    retriedBy: null,
     unsubscribeKey: newUnsubscribeKey(),
     lease: null,
     createdAt: new Date(nowMs),
@@ -303,8 +379,27 @@ async function startSend({ deps, gate, body, sendId, nowMs }) {
     completedAt: null,
     createdBy: { uid: gate.uid, email: gate.email },
   };
+  const ref = db.collection(SENDS).doc(sendId);
   try {
-    await db.collection(SENDS).doc(sendId).create(record);
+    if (retryOf) {
+      // The new record and the earlier record's mark land together, so two
+      // confirmations cannot both retry the same failures.
+      const refused = await db.runTransaction(async (tx) => {
+        const earlierRef = db.collection(SENDS).doc(retryOf);
+        const [mine, earlier] = [await tx.get(ref), await tx.get(earlierRef)];
+        if (mine.exists) return 'existing';
+        if (earlier.data()?.retriedBy) return 'retry-used';
+        tx.create(ref, record);
+        tx.update(earlierRef, { retriedBy: sendId, updatedAt: new Date(nowMs) });
+        return null;
+      });
+      if (refused === 'existing') return { existing: true };
+      if (refused) {
+        return { error: [409, refused, 'The failed addresses of this send were already sent again. Retry from that later send instead.'] };
+      }
+    } else {
+      await ref.create(record);
+    }
   } catch (err) {
     if (err?.code === 6 || err?.code === 'already-exists' || /ALREADY_EXISTS/i.test(String(err?.message || ''))) {
       return { existing: true };
@@ -316,7 +411,7 @@ async function startSend({ deps, gate, body, sendId, nowMs }) {
     action: 'startAnnouncementEmail',
     docPath: `${SENDS}/${sendId}`,
     actor: { uid: gate.uid, email: gate.email },
-    details: { audience: body.audience, total: record.total, mode: channel.mode },
+    details: { audience: body.audience, total: record.total, mode: channel.mode, ...(retryOf ? { retryOf } : {}) },
     now,
     log,
   });
@@ -386,6 +481,7 @@ function createSendAnnouncementEmailHandler(deps) {
     const chunk = data.recipients.slice(start, start + CHUNK_SIZE);
     const delta = { ...EMPTY_COUNTS };
     const failures = [];
+    const retryable = [];
     try {
       const config = await getConfig();
       // The stream is checked again before every chunk's claims (issue #490).
@@ -430,6 +526,8 @@ function createSendAnnouncementEmailHandler(deps) {
         if ((bucket === 'failed' || bucket === 'uncertain') && failures.length < MAX_FAILURES_KEPT) {
           failures.push({ email: targets[index].email, error: String(result.error || 'Not sent').slice(0, 300) });
         }
+        // Addresses only: the record also holds up to 5,000 recipients.
+        if (isTransientFailure(result)) retryable.push(targets[index].email);
       });
     } catch (err) {
       await releaseLease({ db, sendId, token }).catch(() => {});
@@ -453,6 +551,7 @@ function createSendAnnouncementEmailHandler(deps) {
           counts,
           nextIndex,
           failures: [...(current.failures || []), ...failures].slice(0, MAX_FAILURES_KEPT),
+          retryRecipients: [...(current.retryRecipients || []), ...retryable],
           lease: null,
           updatedAt: at,
           status: done ? 'sent' : 'sending',
@@ -527,5 +626,5 @@ module.exports = {
   createSendAnnouncementTestHandler,
   createSendAnnouncementEmailHandler,
   get handlers() { return buildHandlers(); },
-  internals: { SENDS, CHUNK_SIZE, LEASE_MS, MAX_FAILURES_KEPT, summarize, tally },
+  internals: { SENDS, CHUNK_SIZE, LEASE_MS, MAX_FAILURES_KEPT, summarize, tally, isTransientFailure },
 };

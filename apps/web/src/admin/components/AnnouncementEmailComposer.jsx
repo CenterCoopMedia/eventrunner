@@ -18,6 +18,11 @@
 // stays in the history as "Sending" with a "Continue sending" control;
 // the send-once keys mean a continued send never mails anyone twice.
 //
+// RETRY. A send whose provider failed for a time (an outage or a rate
+// limit) keeps those addresses. "Retry N failed addresses" loads the
+// message and limits the next preview and send to them (`retryOf`). The
+// server allows one retry per send, so the history offers it once.
+//
 // THE PREVIEW renders the server's HTML only through buildPreviewDoc in an
 // <iframe sandbox="">, as the email log does, with the plain text beside it.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -119,7 +124,14 @@ function PreviewFrame({ html, text }) {
   );
 }
 
-function SendHistory({ sends, timeZone, onReuse, onContinue, continuingId }) {
+/** How many failures the record kept, and how many there were in all. */
+function failureCounts(send) {
+  const shown = send.failures.length;
+  const all = (send.counts?.failed ?? 0) + (send.counts?.uncertain ?? 0);
+  return { shown, all, cut: all > shown };
+}
+
+function SendHistory({ sends, timeZone, onReuse, onRetry, onContinue, continuingId }) {
   if (sends.length === 0) {
     return <p className="text-admin-sm text-admin-ink-secondary">No announcement email has been sent yet.</p>;
   }
@@ -128,6 +140,7 @@ function SendHistory({ sends, timeZone, onReuse, onContinue, continuingId }) {
       {sends.map((send) => {
         const word = STATUS_WORDS[send.status] ?? { label: send.status, tone: 'neutral' };
         const when = formatWhen(send.createdAt, timeZone);
+        const failures = failureCounts(send);
         return (
           <li key={send.id} className="flex flex-col gap-3xs border-b-admin-hairline border-admin-rule-hairline py-sm last:border-b-0">
             <div className="flex flex-wrap items-center gap-x-sm gap-y-2xs">
@@ -143,8 +156,15 @@ function SendHistory({ sends, timeZone, onReuse, onContinue, continuingId }) {
             {send.failures.length > 0 ? (
               <details className="text-admin-sm">
                 <summary className="admin-target cursor-pointer font-semibold text-admin-ink">
-                  {`Failed addresses (${send.failures.length})`}
+                  {failures.cut
+                    ? `Failed addresses (first ${failures.shown} of ${failures.all.toLocaleString('en-US')})`
+                    : `Failed addresses (${failures.shown})`}
                 </summary>
+                {failures.cut ? (
+                  <p className="mt-2xs text-admin-ink-secondary">
+                    This list keeps the first failures only. The Email log, filtered by the source Announcement, lists every one.
+                  </p>
+                ) : null}
                 <ul className="mt-2xs flex flex-col gap-3xs">
                   {send.failures.map((failure) => (
                     <li key={failure.email} className="break-words">
@@ -159,6 +179,11 @@ function SendHistory({ sends, timeZone, onReuse, onContinue, continuingId }) {
               <button type="button" className={linkButtonClass} onClick={() => onReuse(send)}>
                 Use this message
               </button>
+              {send.status === 'sent' && send.retryCount > 0 && !send.retriedBy ? (
+                <button type="button" className={linkButtonClass} onClick={() => onRetry(send)}>
+                  {`Retry ${plural(send.retryCount, 'failed address', 'failed addresses')}`}
+                </button>
+              ) : null}
               {send.status === 'sending' ? (
                 <button
                   type="button"
@@ -193,6 +218,7 @@ export default function AnnouncementEmailComposer() {
   const [progress, setProgress] = useState(null);
   const [result, setResult] = useState(null);
   const [continuingId, setContinuingId] = useState(null);
+  const [retry, setRetry] = useState(null); // { id, count, subject } of the send to retry
   const [restoreEmail, setRestoreEmail] = useState('');
   const [restoring, setRestoring] = useState(false);
 
@@ -234,6 +260,8 @@ export default function AnnouncementEmailComposer() {
   /** Any edit drops the preview: a confirmation must match what was shown. */
   function edit(field, value) {
     setDraft((current) => ({ ...current, [field]: value }));
+    // A retry goes to the earlier send's audience only.
+    if (field === 'audience') setRetry(null);
     setPreview(null);
     setConfirming(false);
   }
@@ -245,8 +273,12 @@ export default function AnnouncementEmailComposer() {
     setError(null);
     setResult(null);
     try {
-      const response = await call('previewAnnouncementEmail', { draft: draftBody(draft), audience: draft.audience });
-      setPreview({ ...response, draft: { ...draft } });
+      const response = await call('previewAnnouncementEmail', {
+        draft: draftBody(draft),
+        audience: draft.audience,
+        ...(retry ? { retryOf: retry.id } : {}),
+      });
+      setPreview({ ...response, draft: { ...draft }, retryOf: retry?.id ?? null });
       setConfirming(false);
     } catch (err) {
       setError(err);
@@ -291,10 +323,12 @@ export default function AnnouncementEmailComposer() {
         receipt: preview.receipt,
         draft: draftBody(preview.draft),
         audience: preview.audience,
+        ...(preview.retryOf ? { retryOf: preview.retryOf } : {}),
       }, preview.sendId);
       setResult(send);
       setPreview(null);
       setConfirming(false);
+      setRetry(null);
       if (send?.status === 'sent') setDraft((current) => ({ ...EMPTY_DRAFT, audience: current.audience }));
     } catch (err) {
       setError(err);
@@ -331,7 +365,19 @@ export default function AnnouncementEmailComposer() {
     setPreview(null);
     setConfirming(false);
     setResult(null);
+    setRetry(null);
     subjectRef.current?.querySelector('input')?.focus();
+  }
+
+  function retryFailed(send) {
+    reuse(send);
+    setRetry({ id: send.id, count: send.retryCount, subject: send.subject });
+  }
+
+  function cancelRetry() {
+    setRetry(null);
+    setPreview(null);
+    setConfirming(false);
   }
 
   async function restore(event) {
@@ -340,9 +386,14 @@ export default function AnnouncementEmailComposer() {
     setRestoring(true);
     try {
       const response = await call('removeEmailSuppression', { email: restoreEmail });
-      showToast(response.removed
-        ? 'This address gets announcement email again.'
-        : 'This address was not unsubscribed. Nothing changed.');
+      let message = 'This address was not unsubscribed. Nothing changed.';
+      if (response.removed) {
+        // With Postmark unsubscribe handling, Postmark keeps its own opt-out.
+        message = providerManaged
+          ? 'This site no longer leaves the address out. Reactivate it on the broadcast stream in Postmark too.'
+          : 'This address gets announcement email again.';
+      }
+      showToast(message);
       if (response.removed) setRestoreEmail('');
     } catch (err) {
       showToast(err.message, { tone: 'error' });
@@ -352,6 +403,7 @@ export default function AnnouncementEmailComposer() {
   }
 
   const channel = history?.channel;
+  const providerManaged = channel?.mode === 'provider';
   const audiences = history?.audiences ?? [];
   const audienceOptions = audiences.map((audience) => ({ value: audience.id, label: audience.label }));
   const audienceHint = audiences.find((audience) => audience.id === draft.audience)?.description;
@@ -369,6 +421,19 @@ export default function AnnouncementEmailComposer() {
         {history ? (
           <form className="mt-sm flex flex-col gap-sm" onSubmit={runPreview} noValidate>
             <ServerErrorSummary error={error} errorRef={errorRef} title="The server refused this email" />
+            {retry ? (
+              <div className="flex flex-col gap-2xs">
+                <Notice
+                  tone="caution"
+                  message={`This email goes only to the ${plural(retry.count, 'address', 'addresses')} that failed in "${retry.subject}".`}
+                />
+                <div>
+                  <button type="button" className={linkButtonClass} onClick={cancelRetry}>
+                    Send to the whole audience instead
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <SelectField
               label="Audience"
               value={draft.audience}
@@ -533,6 +598,7 @@ export default function AnnouncementEmailComposer() {
             sends={history.sends}
             timeZone={timeZone}
             onReuse={reuse}
+            onRetry={retryFailed}
             onContinue={continueSend}
             continuingId={continuingId}
           />
@@ -540,7 +606,9 @@ export default function AnnouncementEmailComposer() {
         <form className="mt-md flex flex-col gap-xs border-t-admin-hairline border-admin-rule-hairline pt-sm" onSubmit={restore}>
           <TextField
             label="Restore an unsubscribed address"
-            hint="Use this only when the person asks to get announcement email again."
+            hint={providerManaged
+              ? 'Use this only when the person asks to get announcement email again. Postmark keeps its own list of addresses that unsubscribed: reactivate the address on the broadcast stream in Postmark too.'
+              : 'Use this only when the person asks to get announcement email again.'}
             type="email"
             autoComplete="off"
             value={restoreEmail}
