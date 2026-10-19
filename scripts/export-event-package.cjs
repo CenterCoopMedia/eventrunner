@@ -17,12 +17,15 @@
  *
  * The script writes one admin_logs row (`downloadEventPackage`, with
  * `details.via: 'script'`) before it writes the file, as the endpoint
- * does. The file is written with owner-only permissions (0600).
+ * does. The credentials of a service account or of application-default
+ * login do not name a person, so `--actor` is required: the operator's
+ * email address, which the row records with the credential mode. The file
+ * is written with owner-only permissions (0600).
  *
  * Usage:
- *   EVENT_FIREBASE_PROJECT_ID=… node scripts/export-event-package.cjs --out package.zip
- *   node scripts/export-event-package.cjs --out package.zip --sections program,speakers
- *   node scripts/export-event-package.cjs --out package.zip --include-staff-notes
+ *   EVENT_FIREBASE_PROJECT_ID=… node scripts/export-event-package.cjs --out package.zip --actor you@example.com
+ *   node scripts/export-event-package.cjs --out package.zip --actor you@example.com --sections program,speakers
+ *   node scripts/export-event-package.cjs --out package.zip --actor you@example.com --include-staff-notes
  *   node scripts/export-event-package.cjs --verify package.zip
  *
  * Exit codes: 0 done (or verified), 1 the export or the check failed,
@@ -33,10 +36,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parseArgv, unknownFlags } = require('./lib/args.cjs');
 
-const FLAGS = ['out', 'sections', 'include-staff-notes', 'verify', 'force', 'help'];
+const FLAGS = ['out', 'actor', 'sections', 'include-staff-notes', 'verify', 'force', 'help'];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const USAGE = `Usage:
-  node scripts/export-event-package.cjs --out <file.zip> [--sections a,b] [--include-staff-notes] [--force]
+  node scripts/export-event-package.cjs --out <file.zip> --actor <your email> [--sections a,b] [--include-staff-notes] [--force]
   node scripts/export-event-package.cjs --verify <file.zip>`;
 
 /**
@@ -44,12 +49,12 @@ const USAGE = `Usage:
  *
  * @param {string[]} argv
  * @param {string[]} sectionIds the package's section ids
- * @returns {{ ok: true, mode: 'export', out: string, sections: string[], includeStaffNotes: boolean, force: boolean }
+ * @returns {{ ok: true, mode: 'export', out: string, actor: string, sections: string[], includeStaffNotes: boolean, force: boolean }
  *         | { ok: true, mode: 'verify', file: string } | { ok: true, mode: 'help' }
  *         | { ok: false, message: string }}
  */
 function readArgs(argv, sectionIds) {
-  const args = parseArgv(argv, { withValue: ['out', 'sections', 'verify'] });
+  const args = parseArgv(argv, { withValue: ['out', 'actor', 'sections', 'verify'] });
   const unknown = unknownFlags(args, FLAGS);
   if (unknown.length > 0) return { ok: false, message: `Unknown flag: ${unknown.map((f) => `--${f}`).join(', ')}` };
   if (args.help) return { ok: true, mode: 'help' };
@@ -61,6 +66,10 @@ function readArgs(argv, sectionIds) {
   }
   if (typeof args.out !== 'string' || !args.out) return { ok: false, message: '--out needs a file name ending in .zip.' };
   if (!args.out.endsWith('.zip')) return { ok: false, message: '--out must end in .zip.' };
+  const actor = typeof args.actor === 'string' ? args.actor.trim().toLowerCase() : '';
+  if (!EMAIL_RE.test(actor)) {
+    return { ok: false, message: '--actor needs the email address of the operator who runs the export. The admin log records it.' };
+  }
   let sections = [...sectionIds];
   if (args.sections !== undefined) {
     sections = String(args.sections).split(',').map((id) => id.trim()).filter(Boolean);
@@ -73,6 +82,7 @@ function readArgs(argv, sectionIds) {
     ok: true,
     mode: 'export',
     out: args.out,
+    actor,
     sections: sectionIds.filter((id) => sections.includes(id)),
     includeStaffNotes: args['include-staff-notes'] === true,
     force: args.force === true,
@@ -97,7 +107,13 @@ function formatReport(report) {
   return lines;
 }
 
-async function main(argv = process.argv.slice(2), { stdout = console.log, stderr = console.error } = {}) {
+/**
+ * @param {string[]} [argv]
+ * @param {{ stdout?: Function, stderr?: Function,
+ *           init?: () => { db: object, projectId: string, mode: string } }} [io]
+ *        `init` defaults to scripts/lib/firebase-init.cjs; a test passes a fake.
+ */
+async function main(argv = process.argv.slice(2), { stdout = console.log, stderr = console.error, init } = {}) {
   const { buildEventPackage, zipPackage, internals: { SECTION_IDS } } = require('../functions/src/admin/eventPackage.cjs');
   const plan = readArgs(argv, SECTION_IDS);
   if (!plan.ok) {
@@ -128,9 +144,8 @@ async function main(argv = process.argv.slice(2), { stdout = console.log, stderr
     stderr(`${plan.out} exists. Choose another name, or pass --force to replace it.`);
     return 2;
   }
-  const { initFirebase } = require('./lib/firebase-init.cjs');
   const { getEventConfig } = require('../functions/src/core/config.cjs');
-  const { db, projectId, mode } = initFirebase();
+  const { db, projectId, mode } = (init ?? require('./lib/firebase-init.cjs').initFirebase)();
   stdout(`Reading project ${projectId} (${mode}).`);
   const at = new Date();
   const config = await getEventConfig({ db, forceRefresh: true });
@@ -142,10 +157,11 @@ async function main(argv = process.argv.slice(2), { stdout = console.log, stderr
     action: 'downloadEventPackage',
     docPath: 'event-package',
     uid: null,
-    email: null,
+    email: plan.actor,
     at,
     details: {
       via: 'script',
+      credentials: mode,
       sections: plan.sections,
       includeStaffNotes: plan.includeStaffNotes,
       files: built.manifest.files.map((file) => ({ path: file.path, records: file.records })),

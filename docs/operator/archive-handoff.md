@@ -54,14 +54,15 @@ An operator selects **Download event data package** on the **Data export** page.
 Run the same export from a terminal with the operator's credentials:
 
 ```sh
-EVENT_FIREBASE_PROJECT_ID=<project-id> node scripts/export-event-package.cjs --out event-data-package.zip
+EVENT_FIREBASE_PROJECT_ID=<project-id> node scripts/export-event-package.cjs --out event-data-package.zip --actor <your-email>
 ```
 
+- `--actor` is required: your email address. The credentials do not name a person, so the admin log entry records this address.
 - `--sections program,speakers` limits the parts. The ids are `content`, `program`, `speakers`, `organizations`, `materials`, `attendees`, `orders` and `pitches`.
 - `--include-staff-notes` adds the pitch reviewers' notes.
 - `--force` replaces an existing file.
 
-The script uses application-default credentials or `GOOGLE_APPLICATION_CREDENTIALS` (`scripts/lib/firebase-init.cjs`). It writes an admin log entry with `details.via: 'script'`, then the file with owner-only permissions.
+The script uses application-default credentials or `GOOGLE_APPLICATION_CREDENTIALS` (`scripts/lib/firebase-init.cjs`). It writes an admin log entry with your `--actor` address, `details.via: 'script'` and the credential mode, then the file with owner-only permissions.
 
 ### Check a package
 

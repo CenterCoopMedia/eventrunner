@@ -13,18 +13,49 @@ const { exportSeed } = require('../functions/src/admin/exportFixture.cjs');
 
 const T0 = new Date('2026-10-01T12:00:00.000Z');
 
-test('readArgs: an export takes --out, optional sections in package order, and the staff-note choice', () => {
-  assert.deepEqual(readArgs(['--out', 'p.zip'], SECTION_IDS), {
-    ok: true, mode: 'export', out: 'p.zip', sections: [...SECTION_IDS], includeStaffNotes: false, force: false,
+const ACTOR = ['--actor', 'operator@example.com'];
+
+test('readArgs: an export takes --out, the operator, optional sections in package order, and the staff-note choice', () => {
+  assert.deepEqual(readArgs(['--out', 'p.zip', ...ACTOR], SECTION_IDS), {
+    ok: true, mode: 'export', out: 'p.zip', actor: 'operator@example.com', sections: [...SECTION_IDS], includeStaffNotes: false, force: false,
   });
-  assert.deepEqual(readArgs(['--out=p.zip', '--sections', 'pitches,program', '--include-staff-notes'], SECTION_IDS), {
-    ok: true, mode: 'export', out: 'p.zip', sections: ['program', 'pitches'], includeStaffNotes: true, force: false,
+  assert.deepEqual(readArgs(['--out=p.zip', '--sections', 'pitches,program', '--include-staff-notes', '--actor=Operator@Example.com'], SECTION_IDS), {
+    ok: true, mode: 'export', out: 'p.zip', actor: 'operator@example.com', sections: ['program', 'pitches'], includeStaffNotes: true, force: false,
   });
+});
+
+test('readArgs: an export names the operator who runs it, for the admin log', () => {
+  assert.match(readArgs(['--out', 'p.zip'], SECTION_IDS).message, /--actor needs the email address of the operator/);
+  assert.match(readArgs(['--out', 'p.zip', '--actor', 'nobody'], SECTION_IDS).message, /--actor needs the email address/);
+});
+
+test('an export writes an admin_logs row that names the operator, then the file', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'event-package-'));
+  try {
+    const db = makeFakeDb(exportSeed());
+    const file = path.join(dir, 'package.zip');
+    const out = [];
+    const code = await main(['--out', file, '--sections', 'program', ...ACTOR], {
+      stdout: (line) => out.push(line),
+      stderr: (line) => out.push(line),
+      init: () => ({ db, projectId: 'demo-project', mode: 'application-default' }),
+    });
+    assert.equal(code, 0, out.join('\n'));
+    const logs = await db.collection('admin_logs').where('action', '==', 'downloadEventPackage').get();
+    assert.equal(logs.size, 1);
+    const row = logs.docs[0].data();
+    assert.equal(row.uid, null);
+    assert.equal(row.email, 'operator@example.com');
+    assert.deepEqual({ via: row.details.via, credentials: row.details.credentials }, { via: 'script', credentials: 'application-default' });
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('readArgs refuses a typo, an unknown section, a missing file and a file that is not a zip', () => {
   assert.equal(readArgs(['--out', 'p.zip', '--section', 'x'], SECTION_IDS).ok, false);
-  assert.match(readArgs(['--out', 'p.zip', '--sections', 'secrets'], SECTION_IDS).message, /comma-separated list/);
+  assert.match(readArgs(['--out', 'p.zip', ...ACTOR, '--sections', 'secrets'], SECTION_IDS).message, /comma-separated list/);
   assert.equal(readArgs([], SECTION_IDS).ok, false);
   assert.equal(readArgs(['--out', 'p.json'], SECTION_IDS).ok, false);
   assert.equal(readArgs(['--verify'], SECTION_IDS).ok, false);
@@ -73,7 +104,7 @@ test('an export refuses to overwrite a file without --force', async () => {
     const file = path.join(dir, 'existing.zip');
     fs.writeFileSync(file, 'keep me');
     const err = [];
-    assert.equal(await main(['--out', file], { stdout() {}, stderr: (line) => err.push(line) }), 2);
+    assert.equal(await main(['--out', file, ...ACTOR], { stdout() {}, stderr: (line) => err.push(line) }), 2);
     assert.match(err[0], /exists\. Choose another name, or pass --force/);
     assert.equal(fs.readFileSync(file, 'utf8'), 'keep me');
   } finally {
