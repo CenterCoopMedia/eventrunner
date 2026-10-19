@@ -11,6 +11,9 @@
 //      Hidden, and a built-in page whose feature is off says why.
 //   3. The home body drew the seeded footer section under a "Footer links"
 //      heading. The site footer draws it now, and the body does not.
+//   4. A fresh site seeds three pages hidden, and a hero button to a hidden
+//      page, or to an address no page has, led to the 404 page. The editor
+//      warns, and the public home page does not draw the button.
 //
 // config/features is restored and the new block deleted when the file is
 // done, because later specs read the flags and the home page.
@@ -18,6 +21,8 @@ import { test, expect } from '@playwright/test';
 import { ADMIN_EMAIL, adminDb, adminIdToken, callFunction, signIn } from './helpers.mjs';
 
 const LABEL = 'Explore the program';
+const NO_PAGE_LABEL = 'Read the speaker notes';
+const NO_PAGE_WARNING = 'No page has this address. The public site does not show this link until a visible page does.';
 const WARNING = 'Public schedule is off in Features. The public site does not show this link until you turn it on.';
 
 async function endTour(page) {
@@ -29,14 +34,15 @@ async function setSchedule(on) {
   await adminDb().collection('config').doc('features').set({ schedule: on }, { merge: true });
 }
 
-async function findCta() {
+async function findCta(label = LABEL) {
   const snap = await adminDb().collection('cmsContent').where('section', '==', 'hero').get();
-  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).find((doc) => doc.label === LABEL) ?? null;
+  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).find((doc) => doc.label === label) ?? null;
 }
 
 test.describe.serial('links to a switched-off section, page visibility, and the footer links', () => {
   let seededFeatures;
   let ctaField = null;
+  let noPageField = null;
 
   test.beforeAll(async () => {
     seededFeatures = (await adminDb().collection('config').doc('features').get()).data();
@@ -44,8 +50,8 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
   });
 
   test.afterAll(async () => {
-    if (ctaField) {
-      await callFunction('cmsDeleteContent', { section: 'hero', field: ctaField }, await adminIdToken());
+    for (const field of [ctaField, noPageField].filter(Boolean)) {
+      await callFunction('cmsDeleteContent', { section: 'hero', field }, await adminIdToken());
     }
     await adminDb().collection('config').doc('features').set(seededFeatures);
   });
@@ -83,6 +89,29 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
     await expect(main.getByRole('link', { name: LABEL })).toHaveAttribute('href', '/schedule', { timeout: 20_000 });
     await setSchedule(false);
     await expect(main.getByRole('link', { name: LABEL })).toHaveCount(0, { timeout: 20_000 });
+    await context.close();
+  });
+
+  test('a hero button to an address no page has is saved with a warning and not drawn', async ({ page, browser }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/content/home/hero/_new');
+    await endTour(page);
+    await page.getByLabel('Block type').selectOption('cta');
+    await page.getByLabel('Button text').fill(NO_PAGE_LABEL);
+    await page.getByLabel('Destination').fill('/speaker-notes');
+    await expect(page.getByText(NO_PAGE_WARNING)).toBeVisible();
+    await page.getByRole('button', { name: 'Save and publish' }).click();
+    await expect.poll(async () => (await findCta(NO_PAGE_LABEL))?.revision ?? 0, { timeout: 20_000 }).toBeGreaterThan(0);
+    noPageField = (await findCta(NO_PAGE_LABEL)).field;
+
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const visitor = await context.newPage();
+    await visitor.goto('/');
+    await expect(visitor.locator('article[data-cms-content-source="live"]')).toBeVisible({ timeout: 30_000 });
+    await expect(visitor.getByRole('main').locator('h1')).toBeVisible();
+    await expect(visitor.getByRole('main').getByRole('link', { name: NO_PAGE_LABEL })).toHaveCount(0);
     await context.close();
   });
 

@@ -355,6 +355,7 @@ export default function Layout() {
     homePage,
     blocks: getSectionBlocks(FOOTER_SECTION_ID),
     features,
+    pages,
   });
   const primaryNavItems = navPlacement === 'side' ? navItems : navItems.slice(0, 5);
   const moreNavItems = navPlacement === 'side' ? [] : navItems.slice(5);

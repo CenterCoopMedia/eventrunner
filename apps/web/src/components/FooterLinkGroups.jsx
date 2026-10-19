@@ -11,7 +11,8 @@
 // blocks stay in cmsContent. Blocks follow the same reader rules as
 // LinkGroupBlock: an unsafe href is dropped, an in-site path renders through
 // the router's <Link> (the demo runs under HashRouter), and a link to a
-// section that is off is not drawn (lib/linkTargets.js).
+// section that is off or to a page that is not public is not drawn
+// (lib/linkTargets.js).
 //
 // Each group's name labels its own list. It is a label, not a heading, so
 // the footer adds nothing to the page's heading outline.
@@ -28,14 +29,14 @@ export const FOOTER_SECTION_ID = 'footer';
  * The drawable links of the footer section, grouped by `group` in reading
  * order. Empty when the home page states no footer section.
  *
- * @param {{ homePage: object|null, blocks: object[], features: object|null }} args
+ * @param {{ homePage: object|null, blocks: object[], features: object|null, pages?: object[] }} args
  * @returns {Array<[string, object[]]>}
  */
-export function footerLinkGroups({ homePage, blocks, features }) {
+export function footerLinkGroups({ homePage, blocks, features, pages }) {
   const stated = (homePage?.sections ?? []).some((section) => section?.id === FOOTER_SECTION_ID);
   if (!stated) return [];
   const groups = new Map();
-  for (const block of withoutSwitchedOffLinks(blocks, features)) {
+  for (const block of withoutSwitchedOffLinks(blocks, features, pages)) {
     if (block?.blockType !== 'link_group') continue;
     if (typeof block.label !== 'string' || !block.label.trim()) continue;
     if (!block.url || !isSafeHref(block.url)) continue;

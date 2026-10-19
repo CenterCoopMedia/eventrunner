@@ -20,7 +20,7 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
-import { switchedOffSectionFor } from '../../lib/linkTargets.js';
+import { leadsToNoPublicPage, switchedOffSectionFor } from '../../lib/linkTargets.js';
 import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
@@ -96,23 +96,49 @@ function hintFor(blockTypeId, fieldId) {
 }
 
 /**
- * What the public site does with a link to a section that is off: it does
- * not draw it (lib/linkTargets.js). The launch rehearsal saved "Explore the
- * program → /schedule" with the schedule off and the editor said nothing.
- * The save still goes through: the operator may be about to switch the
- * section on, and the link then appears with no further edit.
+ * What the public site does with a link that leads nowhere a reader can
+ * use: it does not draw it (lib/linkTargets.js). The launch rehearsal saved
+ * "Explore the program → /schedule" with the schedule off and the editor
+ * said nothing. A link to a hidden page (a fresh site seeds Recap,
+ * Guidelines and City guide hidden), or to an address no page has, opens
+ * the 404 page, so it is the same case. The save still goes through: the
+ * operator may be about to switch the section on or show the page, and the
+ * link then appears with no further edit.
  *
+ * Returns undefined for a field that is never a link a reader follows, and
+ * a string, empty when there is nothing to say, for one that is: the field
+ * then keeps its live region (formControls.jsx TextField).
+ *
+ * @param {string} blockTypeId
+ * @param {string} fieldId
+ * @param {unknown} value
+ * @param {Record<string, boolean>|null|undefined} features
+ * @param {Array<object>|null} pageRows useAdminPages rows, null while loading
  * @returns {string|undefined}
  */
-function linkTargetWarning(blockTypeId, fieldId, value, features) {
+function linkTargetWarning(blockTypeId, fieldId, value, features, pageRows) {
   if (fieldId !== 'url' || (blockTypeId !== 'cta' && blockTypeId !== 'link_group')) return undefined;
-  const gate = switchedOffSectionFor(typeof value === 'string' ? value.trim() : value, features);
-  if (!gate) return undefined;
-  return `${featureLabel(gate)} is off in Features. The public site does not show this link until you turn it on.`;
+  const url = typeof value === 'string' ? value.trim() : value;
+  const gate = switchedOffSectionFor(url, features);
+  if (gate) {
+    return `${featureLabel(gate)} is off in Features. The public site does not show this link until you turn it on.`;
+  }
+  // The public site reads the published pages, so this does too.
+  const published = pageRows ? pageRows.map((row) => row.live).filter(Boolean) : null;
+  if (!leadsToNoPublicPage(url, published, features)) return '';
+  const path = url.split(/[?#]/, 1)[0].replace(/\/+$/, '');
+  const row = pageRows.find((entry) => (entry.live ?? entry.current)?.path === path);
+  const label = (row?.live ?? row?.current)?.label;
+  if (row && typeof label === 'string' && label.trim()) {
+    return row.live
+      ? `The ${label.trim()} page is hidden. The public site does not show this link until you make the page visible in Pages.`
+      : `The ${label.trim()} page is not published. The public site does not show this link until you publish the page.`;
+  }
+  return 'No page has this address. The public site does not show this link until a visible page does.';
 }
 
 /** One control per registry field, chosen by the field's declared type. */
-function BlockValueFields({ blockTypeId, values, onChange, errorFor, features }) {
+function BlockValueFields({ blockTypeId, values, onChange, errorFor, features, pageRows }) {
   const fields = valueFieldsOf(blockTypeId);
   if (!blockTypeFor(blockTypeId)) {
     return (
@@ -200,7 +226,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor, features })
               value={value}
               onChange={(next) => onChange(field.id, next)}
               error={error}
-              warning={linkTargetWarning(blockTypeId, field.id, value, features)}
+              warning={linkTargetWarning(blockTypeId, field.id, value, features, pageRows)}
             />
           );
         }
@@ -225,7 +251,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { features } = useEventConfig();
-  const { findRow: findPage, loading: pagesLoading } = useAdminPages();
+  const { rows: pageRows, findRow: findPage, loading: pagesLoading } = useAdminPages();
   const {
     rows: contentRows,
     ready: contentReady,
@@ -608,6 +634,7 @@ export default function AdminContentBlockEditor({ mode }) {
         onChange={changeValue}
         errorFor={errorFor}
         features={features}
+        pageRows={pagesLoading ? null : pageRows}
       />
     </Panel>
   );

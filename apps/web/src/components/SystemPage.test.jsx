@@ -375,3 +375,31 @@ describe('SystemPage section edit links', () => {
     expect(readingOrder(admin.container)).toEqual(expected);
   });
 });
+
+// A cta or link_group that leads to a section that is off, or to a page
+// that is not public, opens a dead end. The shell leaves it out, and a
+// section left with nothing draws no heading.
+describe('SystemPage links that lead nowhere', () => {
+  it('leaves out a link to a section that is off or to a hidden page, and keeps the rest', () => {
+    features = { schedule: false, speakers: true };
+    pages = [{ id: 'travel', path: '/travel', visible: true }, { id: 'guidelines', path: '/guidelines', visible: false }];
+    page = { id: 'schedule', sections: [section('links'), section('dead')] };
+    const link = (sectionId, field, label, url) => ({
+      section: sectionId, field, blockType: 'link_group', group: 'More', label, url, order: 0,
+    });
+    blocksBySection = {
+      links: [link('links', 'a', 'Browse the schedule', '/schedule'), link('links', 'b', 'Plan your trip', '/travel')],
+      dead: [link('dead', 'c', 'Speaker guidelines', '/guidelines')],
+    };
+    try {
+      renderPage();
+      expect(screen.queryByRole('link', { name: 'Browse the schedule' })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Plan your trip' })).toHaveAttribute('href', '/travel');
+      expect(screen.queryByRole('link', { name: 'Speaker guidelines' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'dead label' })).toBeNull();
+    } finally {
+      features = { schedule: true, speakers: true, sponsors: true, updates: true, attendeeDirectory: true };
+      pages = undefined;
+    }
+  });
+});

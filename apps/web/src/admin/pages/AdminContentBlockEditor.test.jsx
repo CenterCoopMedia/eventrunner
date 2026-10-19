@@ -238,6 +238,54 @@ describe('AdminContentBlockEditor value fields', () => {
     )).toBeInTheDocument();
   });
 
+  // A fresh site seeds Recap, Guidelines and City guide hidden. A link to a
+  // hidden page, or to an address no page has, opens the 404 page, so the
+  // public site does not draw it and the editor says so.
+  it('warns when a link leads to a hidden page or to an address no page has', async () => {
+    pagesLive = [
+      HOME_PAGE,
+      { id: 'guidelines', label: 'Guidelines', path: '/guidelines', order: 13, visible: false, systemPage: false, sections: [] },
+      { id: 'travel', label: 'Travel', path: '/travel', order: 2, visible: true, systemPage: false, sections: [] },
+    ];
+    await renderAt('/admin/content/home/hero/_new');
+    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
+      target: { value: 'cta' },
+    });
+    const urlInput = screen.getByLabelText('Destination');
+    fireEvent.change(urlInput, { target: { value: '/travel' } });
+    expect(screen.queryByText(/does not show this link/)).toBeNull();
+    fireEvent.change(urlInput, { target: { value: '/guidelines#formats' } });
+    expect(screen.getByText(
+      'The Guidelines page is hidden. The public site does not show this link until you make the page visible in Pages.',
+    )).toBeInTheDocument();
+    fireEvent.change(urlInput, { target: { value: '/no-such-page' } });
+    expect(screen.getByText(
+      'No page has this address. The public site does not show this link until a visible page does.',
+    )).toBeInTheDocument();
+    // An app route and a file are not pages, and are never this question.
+    fireEvent.change(urlInput, { target: { value: '/tickets' } });
+    expect(screen.queryByText(/does not show this link/)).toBeNull();
+    fireEvent.change(urlInput, { target: { value: '/files/kit.pdf' } });
+    expect(screen.queryByText(/does not show this link/)).toBeNull();
+  });
+
+  // The warning appears while the operator types. A screen reader hears it
+  // only if it lands in a live region that was on the page before it.
+  it('announces the warning through a polite live region that is there before it appears', async () => {
+    liveFeatures = { schedule: false };
+    await renderAt('/admin/content/home/hero/_new');
+    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
+      target: { value: 'cta' },
+    });
+    const urlInput = screen.getByLabelText('Destination');
+    const region = urlInput.parentElement.querySelector('[aria-live="polite"]');
+    expect(region).not.toBeNull();
+    expect(region).toBeEmptyDOMElement();
+    fireEvent.change(urlInput, { target: { value: '/schedule' } });
+    expect(urlInput.parentElement.querySelector('[aria-live="polite"]')).toBe(region);
+    expect(region).toHaveTextContent('Public schedule is off in Features.');
+  });
+
   // Issue 193: the sponsors page's package section takes the new block, and
   // the editor says what the limit is for under the field itself.
   it('edits a sponsor package, with the limit a number and its hint under it', async () => {
