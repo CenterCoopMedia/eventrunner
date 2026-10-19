@@ -119,7 +119,7 @@ test('the reader verifies the package: checksums, counts, and every relationship
   const report = verifyEventPackage(res.body);
   assert.deepEqual(report.problems, []);
   assert.equal(report.ok, true);
-  assert.equal(report.counts['program/sessions.json'], 2);
+  assert.equal(report.counts['program/sessions.json'], 3);
   assert.equal(report.counts['attendees/attendees.json'], 2);
   assert.equal(report.counts['orders/admissions.json'], 2);
   assert.ok(report.relationships.length >= 10);
@@ -127,10 +127,51 @@ test('the reader verifies the package: checksums, counts, and every relationship
     assert.equal(rel.unresolved, 0, `${rel.from} ${rel.field} → ${rel.to}: ${rel.sample}`);
   }
   const checked = Object.fromEntries(report.relationships.map((rel) => [`${rel.from}#${rel.field}`, rel.checked]));
-  assert.equal(checked['program/sessions.json#speakerIds[]'], 3);
+  assert.equal(checked['program/sessions.json#speakerIds[]'], 4);
   assert.equal(checked['orders/admissions.json#orderId'], 2);
   assert.equal(checked['pitches/pitches.json#convertedSessionId'], 1);
+  assert.equal(checked['pitches/pitches.json#convertedSpeakerId'], 1);
   assert.equal(checked['materials/materials.json#sessionId'], 2);
+});
+
+test('a pitch converted by convertSessionPitch names its session and speaker in the package', async () => {
+  const { createQueueHandler } = require('../sessions/pitchQueue.cjs');
+  const { publishDocs } = require('../cms/store.cjs');
+  const seed = exportSeed();
+  // A pitch as submitSessionPitch stores it, after one accepting review.
+  seed['session_pitches/pitch-2'] = {
+    title: 'Open records', description: 'Requests that work.', organization: 'Weekly', format: 'Talk',
+    consent: { version: 'session-pitch-review-v1', at: T0 }, uid: 'uid-cy', email: 'cy@example.com',
+    status: 'accepted', reviewRevision: 1, privateNotes: null, createdAt: T0, reviewedAt: T0, reviewedBy: STAFF,
+  };
+  const db = makeFakeDb(seed);
+  const convert = createQueueHandler({ db, auth, getConfig: async () => config(), now: () => T0.getTime(), log: QUIET }, 'convert');
+  const converted = await run(convert, 'staff', {
+    id: 'pitch-2', expectedRevision: 1, firstName: 'Cy', lastName: 'Park', dayId: 'day-1', startTime: '15:00', endTime: '16:00',
+  });
+  assert.equal(converted.statusCode, 200, JSON.stringify(converted.body));
+  const sections = ['program', 'speakers', 'pitches'];
+  const pitchOf = async () => {
+    const built = await buildEventPackage({ db, config: config(), sections, includeStaffNotes: false, at: T0 });
+    const report = verifyEventPackage(await zipPackage({ name: built.name, files: built.files, at: T0 }));
+    const pitches = JSON.parse(built.files.find((file) => file.path === 'pitches/pitches.json').buffer.toString('utf8'));
+    const rel = (field) => report.relationships.find((entry) => entry.from === 'pitches/pitches.json' && entry.field === field);
+    return { pitch: pitches.find((entry) => entry.id === 'pitch-2'), rel };
+  };
+
+  // The session is a draft until someone publishes it: the link names it, and the reader reports it as not found.
+  let { pitch, rel } = await pitchOf();
+  assert.equal(pitch.convertedSessionId, 'pitch-pitch-2');
+  assert.equal(pitch.convertedSpeakerId, 'pitch-pitch-2');
+  assert.equal(pitch.convertedAt, T0.toISOString());
+  assert.deepEqual(rel('convertedSessionId').sample, ['pitch-pitch-2']);
+  assert.equal(rel('convertedSpeakerId').unresolved, 0);
+
+  await publishDocs({ db, collection: 'cmsSchedule', docIds: ['pitch-pitch-2'], actor: { uid: 'staff-1', email: STAFF }, now: () => T0.getTime() });
+  ({ pitch, rel } = await pitchOf());
+  assert.equal(pitch.convertedSessionId, 'pitch-pitch-2');
+  assert.equal(rel('convertedSessionId').unresolved, 0);
+  assert.equal(rel('convertedSpeakerId').unresolved, 0);
 });
 
 test('the reader reports damage: a changed file and a dangling reference', async () => {
@@ -173,9 +214,9 @@ test('no file holds a secret, a credential, a private note, a staff address or a
 test('records: published sessions only in JSON, the draft in the CSV with its state', async () => {
   const { files } = readEventPackage((await packageFor()).body);
   const sessions = json(files, 'program/sessions.json');
-  assert.deepEqual(sessions.map((s) => s.id), ['session-keynote', 'session-panel']);
-  assert.equal(sessions[1].title, 'Data panel');
-  assert.equal(Object.hasOwn(sessions[0], 'publishedBy'), false);
+  assert.deepEqual(sessions.map((s) => s.id), ['pitch-pitch-1', 'session-keynote', 'session-panel']);
+  assert.equal(sessions[2].title, 'Data panel');
+  assert.equal(Object.hasOwn(sessions[1], 'publishedBy'), false);
   const csv = files.get('program/sessions.csv').toString('utf8');
   assert.ok(csv.startsWith('\uFEFF'));
   assert.match(csv, /"session-draft","Unpublished workshop","Draft"/);
@@ -199,8 +240,12 @@ test('records: attendees, orders, admissions and pitches keep their joins and th
   assert.ok(tickets.every((ticket) => !Object.hasOwn(ticket, 'raw')));
   const [pitch] = json(files, 'pitches/pitches.json');
   assert.equal(pitch.status, 'accepted');
-  assert.equal(pitch.reviewRevision, 2);
-  assert.equal(pitch.convertedSessionId, 'session-panel');
+  assert.equal(pitch.reviewRevision, 3);
+  assert.equal(pitch.convertedSessionId, 'pitch-pitch-1');
+  assert.equal(pitch.convertedSpeakerId, 'pitch-pitch-1');
+  assert.equal(pitch.convertedAt, '2026-03-27T14:00:00.000Z');
+  assert.equal(Object.hasOwn(pitch, 'convertedBy'), false);
+  assert.equal(Object.hasOwn(pitch, 'reviewedBy'), false);
   assert.equal(Object.hasOwn(pitch, 'staffNotes'), false);
   const [file, link] = json(files, 'materials/materials.json');
   assert.equal(file.storagePath, 'session-materials/session-keynote/slides.pdf');
@@ -225,7 +270,7 @@ test('every package writes an admin_logs row before it is sent; no row, no packa
     action: 'downloadEventPackage', docPath: 'event-package', uid: 'admin-1', email: ADMIN, at: T0,
     details: {
       sections: ['program'], includeStaffNotes: false,
-      files: [{ path: 'program/sessions.json', records: 2 }, { path: 'program/sessions.csv', records: 3 }],
+      files: [{ path: 'program/sessions.json', records: 3 }, { path: 'program/sessions.csv', records: 4 }],
       bytes: res.body.length,
     },
   });

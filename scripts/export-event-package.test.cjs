@@ -44,8 +44,8 @@ test('--verify reads a saved package back and names every count and relationship
     const code = await main(['--verify', file], { stdout: (line) => out.push(line), stderr: (line) => err.push(line) });
     assert.equal(code, 0, err.join('\n'));
     assert.match(out[0], /^Format eventrunner-event-data-package, schema version 1, exported 2026-10-01T12:00:00.000Z\.$/);
-    assert.ok(out.includes('  program/sessions.json: 2 records'));
-    assert.ok(out.includes('  program/sessions.json speakerIds[] -> speakers/speakers.json: 3 checked'));
+    assert.ok(out.includes('  program/sessions.json: 3 records'));
+    assert.ok(out.includes('  program/sessions.json speakerIds[] -> speakers/speakers.json: 4 checked'));
     assert.equal(out.at(-1), 'The package is complete. Every file matches its checksum.');
 
     fs.writeFileSync(file, 'not a zip');

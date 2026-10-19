@@ -207,7 +207,7 @@ const SECTIONS = Object.freeze([
         path: 'pitches/pitches.json',
         source: 'session_pitches',
         format: 'json',
-        description: 'Session pitches with their review status and revision. convertedSessionId names the session a pitch became. staffNotes is present only when the operator chose to include it.',
+        description: 'Session pitches with their review status and revision. convertedSessionId and convertedSpeakerId name the session and speaker a converted pitch became; the session is in program/sessions.json once it is published. staffNotes is present only when the operator chose to include it.',
         build: (ctx) => readRecords(
           { db: ctx.db, collection: 'session_pitches', counter: ctx.counter, maxDocs: ctx.maxDocs },
           (id, data) => pitchRecord(id, data, { includeStaffNotes: ctx.includeStaffNotes }),
@@ -249,6 +249,7 @@ const RELATIONSHIPS = Object.freeze([
   { from: 'orders/orders.json', field: 'purchaserAccountId', to: 'attendees/attendees.json' },
   { from: 'pitches/pitches.json', field: 'submitterAccountId', to: 'attendees/attendees.json' },
   { from: 'pitches/pitches.json', field: 'convertedSessionId', to: 'program/sessions.json' },
+  { from: 'pitches/pitches.json', field: 'convertedSpeakerId', to: 'speakers/speakers.json' },
 ]);
 
 /** The package's folder name inside the zip, and the saved file name. */

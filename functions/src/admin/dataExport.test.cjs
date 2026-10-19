@@ -135,7 +135,7 @@ test('sessions: the current revision with its state, speaker names, the day, and
   const rows = parseCsv(res.body.csv);
   assert.deepEqual(rows[0], DATASETS.sessions.columns.map((c) => c.header));
   const byId = Object.fromEntries(asObjects(rows).map((row) => [row['Session ID'], row]));
-  assert.equal(res.body.rowCount, 3);
+  assert.equal(res.body.rowCount, 4);
   assert.equal(byId['session-keynote'].Title, '\'=HYPERLINK("http://example.test","Keynote")');
   assert.equal(byId['session-keynote'].State, 'Live');
   assert.equal(byId['session-keynote'].Day, 'Main day');
@@ -210,7 +210,7 @@ test('every export writes its admin_logs row with the dataset and the count', as
   assert.equal(logs.size, 1);
   assert.deepEqual(logs.docs[0].data(), {
     action: 'exportEventData', docPath: 'speakers', uid: 'staff-1', email: STAFF, at: T0,
-    details: { dataset: 'speakers', rowCount: 2 },
+    details: { dataset: 'speakers', rowCount: 3 },
   });
 });
 

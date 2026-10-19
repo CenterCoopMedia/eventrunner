@@ -128,11 +128,33 @@ function exportSeed() {
       stripePriceSecret: 'SECRET-catalog', updatedBy: 'PRIVATE-staff-uid',
     },
 
+    // The shape submitSessionPitch creates, reviewSessionPitch updates, and
+    // convertSessionPitch (sessions/pitchQueue.cjs) completes: the stored
+    // `conversion` names the draft session and speaker it created.
     'session_pitches/pitch-1': {
       title: 'Local data desks', description: 'How small rooms share data.', organization: 'Weekly', format: 'Panel',
       consent: { version: 'session-pitch-review-v1', at: AT }, uid: 'uid-cy', email: 'cy@example.com',
-      status: 'accepted', reviewRevision: 2, privateNotes: 'PRIVATE-staff-note', createdAt: AT, reviewedAt: AT,
-      reviewedBy: 'PRIVATE-reviewer-uid', convertedSessionId: 'session-panel',
+      status: 'accepted', reviewRevision: 3, privateNotes: 'PRIVATE-staff-note', createdAt: AT, reviewedAt: AT,
+      reviewedBy: STAFF, conversion: { sessionId: 'pitch-pitch-1', speakerId: 'pitch-pitch-1', revision: 3 },
+      convertedAt: AT, convertedBy: STAFF,
+    },
+    // What the conversion wrote, after a staff member published the session.
+    // convertSessionPitch writes the draft with visible: false, so the live
+    // session stays hidden until someone shows it.
+    'cmsSchedule/pitch-pitch-1': {
+      title: 'Local data desks', description: '<p>How small rooms share data.</p>', dayId: 'day-1',
+      startTime: '14:00', endTime: '15:00', speakerIds: ['pitch-pitch-1'], type: 'Panel',
+      visible: false, revision: 1, publishedAt: AT, publishedBy: 'PRIVATE-staff-uid',
+    },
+    'cmsSchedule_drafts/pitch-pitch-1': {
+      title: 'Local data desks', description: '<p>How small rooms share data.</p>', dayId: 'day-1',
+      startTime: '14:00', endTime: '15:00', speakerIds: ['pitch-pitch-1'], type: 'Panel',
+      visible: false, status: 'clean', basedOnRevision: 1, updatedAt: AT, updatedBy: STAFF,
+    },
+    'speakers/pitch-pitch-1': {
+      firstName: 'Cy', lastName: 'Park', slug: 'pitch-pitch-1', email: 'cy@example.com', organization: 'Weekly',
+      bio: '', jobTitle: '', socialHandles: {}, headshotPath: null, status: 'draft', uid: null, inviteToken: null,
+      approvedAt: null, createdAt: AT, updatedAt: AT, updatedBy: STAFF,
     },
 
     // Collections a package never reads.

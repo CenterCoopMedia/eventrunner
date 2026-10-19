@@ -201,7 +201,12 @@ function attendeeRecord(id, data) {
 
 /**
  * A session_pitches document with its review state. Staff notes go only
- * when the operator asks for them; the reviewer's account id never goes.
+ * when the operator asks for them; the reviewer's and converter's
+ * addresses never go.
+ *
+ * convertSessionPitch (sessions/pitchQueue.cjs) stores
+ * `conversion: { sessionId, speakerId, revision }` and `convertedAt`. The
+ * record names the session and the speaker the pitch became.
  */
 function pitchRecord(id, data, { includeStaffNotes = false } = {}) {
   const source = data && typeof data === 'object' ? data : {};
@@ -220,7 +225,9 @@ function pitchRecord(id, data, { includeStaffNotes = false } = {}) {
     status: text(source.status),
     reviewRevision: numberOrNull(source.reviewRevision) ?? 0,
     reviewedAt: toIso(source.reviewedAt),
-    convertedSessionId: textOrNull(source.convertedSessionId),
+    convertedSessionId: textOrNull(source.conversion?.sessionId),
+    convertedSpeakerId: textOrNull(source.conversion?.speakerId),
+    convertedAt: toIso(source.convertedAt),
     createdAt: toIso(source.createdAt),
   };
   if (includeStaffNotes) record.staffNotes = textOrNull(source.privateNotes);
