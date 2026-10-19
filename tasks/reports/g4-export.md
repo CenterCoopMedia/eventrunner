@@ -42,7 +42,7 @@ Branch `joe/wave3-g4-export`. Issue #329 ("Export a portable event data package 
 
 ## Decisions the owner may want to change
 
-- Spreadsheets show the current revision (draft if any) with its state word, matching the admin lists. The package's JSON holds published records only; its CSV files are the same spreadsheets. The README says so.
+- Spreadsheets show the current revision (draft if any) with its state word, matching the admin lists. Since the review round, every package file (JSON and CSV) holds live records only, and a hidden live record is in the package, marked (see "Review round").
 - Account ids are in the package (attendee `id`, `purchaserAccountId`, `claimedByAccountId`, `submitterAccountId`) so records join. They are not in any spreadsheet.
 - The package includes announcements, live updates, the media index and the ticket catalog, and leaves out feedback, change requests and system errors (listed as "request separately").
 - The endpoint cap is 9 MB of zip, the same reasoning as the materials archive (10 MB response cap). Larger events use the script.
@@ -75,3 +75,45 @@ Without regeneration, `npm test` fails the two docs/docs freshness tests ("the c
 
 - No importer writes a package back into Firestore. Full recovery is the managed Firestore export and import, documented in the runbook; the package's consumer path is the reader and the README.
 - The archive runbook's commands (`gcloud firestore export`, `gcloud storage cp`, `firebase hosting:disable`) were not run against a real project; this sandbox has no credentials.
+
+## Review round
+
+The adversarial review (two must-fix items, six optional ones) was fixed on this branch. Rule for the round: every fixture uses the shape its real writer stores, and each new test failed against the old code before the fix.
+
+### Must fix
+
+1. **The pitch record read a made-up `convertedSessionId`.** Fixed in `f3262ad`. `pitchRecord` now reads `conversion.sessionId` and `conversion.speakerId` and writes `convertedSessionId`, `convertedSpeakerId` and `convertedAt`. The manifest adds the `convertedSpeakerId -> speakers/speakers.json` link. The fixture pitch has the shape the submit, review and convert handlers write, plus the hidden session and draft speaker the conversion creates. The new test "a pitch converted by convertSessionPitch names its session and speaker in the package" runs the real `convertSessionPitch` handler and `publishDocs`. Before the publish the session link is reported as not found (the session is a draft); after it, both links resolve. Against the old code, three tests failed (the link was `null`).
+2. **The package CSV files held drafts while every text said they did not.** Fixed in `f54c023`, option (a). The package CSV files read the live documents only (`liveOnly`), as the JSON does. The new test "records: no file holds a draft; a hidden live record is in, and marked hidden" uses a draft-only "Embargoed sponsor" and a revised panel draft, and fails against the old code. The staff spreadsheets still show drafts with their state, and the page now says so.
+
+### Fixture audit
+
+`fc9b94f` checked every fixture field against its writer and fixed what no code writes: a speaker `displayName`, a `sessionPitches` feature key, page `slug` and `blocks`, a timeline `date`, a catalog secret, raw payloads on Stripe tickets, live sessions with `updatedBy` and no draft, draft status `"draft"`, made-up order and ticket fields. The new `exportFixture.test.cjs` runs the fixture through the writers' validators and builders (config, session, organization, page, update, timeline, speaker and catalog validators, `buildNewUserDoc`, the Stripe and sync ticket shapes). The E2E spec seeds the same shapes. The real shapes found two more faults, fixed in the same commit:
+- The sessions spreadsheet showed 0 materials for every published session: each published session keeps a clean draft, and `materialCount` lives on the live document only. The count now comes from the live document.
+- The speaker record copied a `displayName` field that speakers do not have. It is gone.
+
+The rules test block (`tests/firestore.rules.test.js`) keeps its short seed documents: they use real field names, and the rules it tests read no field.
+
+### Optional
+
+1. **Hidden live records labeled "Published" and "Live".** Fixed in `f54c023`. They stay in the package (a converted pitch's session is hidden until shown), keep `visible: false`, and the descriptions say "Live". The sessions and organizations spreadsheets gain a Hidden column. The speakers sheet's "Published sessions" leaves out hidden sessions.
+2. **Repeated reads counted toward the 50,000 cap.** Fixed in `426d7ff`. One read cache per package build; each collection is read once. The guide, runbook and functions/README state the cap in stored documents. New test: the cap equal to the documents read passes, one less fails.
+3. **The script's audit row had no person.** Fixed in `86d53f1`. `--actor <email>` is required; the row records it as `email`, with the credential mode. A new test runs a full export on the Firestore fake. The credentials cannot name a person (service account or ADC), so a flag is the reliable source.
+4. **Runbook: exports after `historicalDemo`.** Fixed in `6df4cf0` (docs). Verified: `sendOtpCode` and `verifyOtpCode` call `checkDemoWrites`. The runbook and CLIENT_ONBOARDING say to export first and that only Google sign-in opens the panel after the freeze.
+5. **The staff 413 message named a path staff cannot use.** Fixed in `07534c1`. Staff are told to ask an operator; operators are told to run the script. Both name the package file, and a test checks each named path is a package file.
+6. **Missing fields.** Headshot path added to the speakers spreadsheet in `a21db44`. Not done for the admission `externalId`: every writer keys `tickets` by `externalId` (`stripeReconcile.cjs` and `stripeCheckout.cjs` write `doc(seat.externalId)`, `sync.cjs` `upsertTicket` writes `doc(ticket.externalId)`), so the record's `id` already is the external id; the fixture test asserts this. Not done for `checkedInBy`: the real field is `checkedInByUid`, a staff account id, and no export carries staff ids by design.
+
+Also `282d916`: functions/README said drafts are never read; it now says which exports read them.
+
+### Review round checks
+
+Last run, after every edit:
+
+- `npm run lint`: pass.
+- `npm test`: 3141 tests, 3139 pass, 2 fail: the two docs/docs freshness tests. After `node scripts/build-pages.cjs` locally: 3141 of 3141 pass, and `build-pages --check` passes. The regenerated docs/docs was then discarded.
+- `npm run test -w apps/web`: 293 files, 3447 tests passed.
+- `npm run test:rules`: 3 files, 376 tests passed.
+- `npm run build -w apps/web`: pass.
+- `npm run check:copy`: 534 files, no blocked patterns.
+- E2E (untracked no-sandbox config, deleted after): `e2e/data-export.spec.js`, `e2e/attendee-admin.spec.js`, `e2e/materials-archive.spec.js`: 7 passed.
+
+Generated output (docs/docs, docs/demo) is still not committed; regenerate on the stack tip.
