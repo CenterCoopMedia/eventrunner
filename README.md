@@ -44,8 +44,9 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 - Per-event theming: six site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode
 - An admin CMS on its own editorial desk, in the event's own colours
 - Transactional email through a provider adapter (Postmark is the reference)
+- Announcement email from the admin panel to registered attendees, approved attendees, or speakers, with a preview, a test send, a confirmation of the recipient count, a separate broadcast stream, and one-click unsubscribe
 
-What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, bulk broadcast email, invoicing, Airtable, social feeds, and speaker chat stay out.
+What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, invoicing, Airtable, social feeds, and speaker chat stay out. Announcement email goes only to the event's attendees and speakers; it is not a marketing list tool.
 
 ## Operating model
 

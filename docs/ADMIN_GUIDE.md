@@ -361,7 +361,38 @@ If a payment response is lost, the purchaser uses **Resume existing checkout** o
 
 ## Announcements
 
+The page has two parts: site banners and announcement email.
+
+### Site banners
+
 Create, edit, and remove the ruled message bands shown across the public site. Choose **Notice** or **Urgent**, then set the start and end time. You can add one absolute `http` or `https` link and its visible label. A save is live immediately. The site shows the announcement only during that window, and a visitor who dismisses it does not see that same record again in that browser.
+
+### Announcement email
+
+Staff and operators can email one announcement to an audience. A banner and an email are separate: Sending an email does not change the site, and saving a banner sends no email.
+
+1. Under **Email an announcement**, choose the **Audience**:
+   - **Registered attendees**: Approved attendees and people who claimed a ticket.
+   - **Approved attendees**: Accounts with approved attendee access.
+   - **Speakers**: Accounts linked to a speaker profile.
+
+   A revoked account is never in an audience. Each address gets one copy, even when two accounts share it.
+2. Write the **Subject** and the **Email message** in plain text. A blank line starts a new paragraph. You can add one button with **Button link (optional)** and **Button label (optional)**. The site puts the message inside the event's email header and footer.
+3. Select **Preview email**. The preview states the recipient count, how many addresses are left out because they unsubscribed, the sender, and where the unsubscribe link goes. It shows the email with links and remote images turned off, and the plain text version. A preview sends nothing.
+4. Select **Send a test to me** to get one copy at your own address. The subject starts with "Test:". Its unsubscribe link changes nothing.
+5. Select **Send to N recipients**. A confirmation repeats the count. Select **Send to N recipients** in the confirmation to send, or **Go back**. A sent email cannot be recalled.
+
+Any edit after the preview removes the preview, so you confirm only what you saw. If someone registers or unsubscribes between the preview and the confirmation, the server refuses the send and asks you to preview again.
+
+**Large audiences.** One send can reach at most 5,000 addresses. The site sends 200 addresses at a time and the page keeps going until the send is done, with a progress line. If you close the page part way, the send shows **Sending** in the history. Select **Continue sending** there. Nobody gets a second copy: Every recipient has a send-once key.
+
+**Email send history** lists the 20 most recent sends, newest first: the subject, the audience, the time on the event's clock, who sent it, and the counts. A failed address and the provider's reason are under **Failed addresses**. "Unknown result" means the provider did not confirm whether it accepted the message; the site does not resend it. **Use this message** loads a past send into the form as a new draft. Each recipient's copy is also in the [Email log](#email-log) under the source **Announcement**, and each test under **Announcement test**.
+
+**Unsubscribe.** Every announcement carries a one-click unsubscribe link and the matching `List-Unsubscribe` headers, so a mail program can show its own unsubscribe button. The site records the opt-out and leaves that address out of every later announcement and out of the rest of a send in progress. Sign-in codes, receipts, and speaker mail still reach the person. To send announcements to that person again, only when they ask, enter the address under **Restore an unsubscribed address** and select **Restore address**.
+
+**When the composer cannot send.** A notice names the reason. The usual ones: The deployment uses the webhook relay, which has no batch send or unsubscribe support yet; the Postmark broadcast stream is not set up (see `docs/POSTMARK_PROVISIONING.md`, section 2a); or this is the historical demo, which is read-only. You can still preview.
+
+Every send, test send, and restored address writes an `admin_logs` row with your address. An unsubscribe writes a row without the person's address.
 
 ## Live updates
 
@@ -373,7 +404,7 @@ Every submission from the public feedback modal, newest first, with a mark-revie
 
 ## Email log
 
-Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, and ticket prompts. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
+Every message the site sent, newest first: Sign-in codes, speaker invitations, acceptances and confirmations, feedback receipts, operator alerts, ticket prompts, and announcement email with its test sends. Staff and operators can open it. Nobody can edit or delete a row here. The site keeps each row for 90 days after it sends the message. Automatic maintenance then removes the row, including its recipient address and any stored body.
 
 - **Search** looks for your text in the recipient address and in the subject. Case does not matter. One search reads the 500 most recent messages. If nothing in those 500 matches, the page says so and offers **Search older messages**, which reads the next 500.
 - **Source** picks one kind of message. **Status** picks **Sent** or **Failed**, which is what the mail provider answered when the site sent the message. A later delivery report shows as a word in the Status column: Delivered, Bounced, Complained, or Suppressed. **Bounced** means the recipient's mail server refused the message. **Complained** means the recipient marked it as spam. **Suppressed** means the mail provider did not send it, because the address is on the provider's block list.

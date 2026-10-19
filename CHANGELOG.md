@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Announcement email. On the Announcements page, staff write a subject, a plain-text message,
+  and an optional button, pick registered attendees, approved attendees, or speakers, preview
+  the branded email with the recipient count, send a test to themselves, and confirm the count
+  to send. The server picks the audience from account records, refuses a send that no longer
+  matches the preview, and sends 200 recipients per provider batch call with a send-once key
+  each, so a continued send never mails anyone twice. A send history lists counts and failed
+  addresses, and a past send can be loaded as a new draft (#201, #202, #203).
+- Announcements use their own Postmark broadcast stream, checked through the Postmark API
+  before every chunk, never the transactional stream. Every announcement has a one-click
+  unsubscribe link (Postmark-managed, or the site's signed link with `List-Unsubscribe`
+  headers). An opt-out is honored by every later send, and staff can restore an address on
+  request. The webhook relay is refused until it has a batch and unsubscribe contract (#490).
+
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
   call is open, and native submission is refused so one call has one queue. The home page
