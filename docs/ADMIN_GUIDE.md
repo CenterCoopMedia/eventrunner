@@ -309,9 +309,10 @@ Only published sessions that are not hidden count. Only speakers who accepted an
 
 - **One reminder per click.** Each preview has its own id. The server records it for each speaker before the email goes. If you press **Send** twice, or the connection drops and the browser tries again, nothing more is sent.
 - **At most one reminder per speaker in 24 hours.** A speaker reminded less than 24 hours ago is left out, and the row says when the next reminder is possible.
+- **The wording the preview showed.** If someone saves new reminder wording after your preview, the server refuses the send. Preview again, then send.
 - **A message that could not be emailed** is reported after the send. Preview again to retry it.
 
-Every reminder goes through the event's email provider and appears in the Email log with its body. Each send writes one admin log entry with your account, the items, and the speakers who got a reminder. A historical demo refuses the send.
+Every reminder goes through the event's email provider and appears in the Email log with its body. Each send writes one admin log entry with your account, the items, and the speakers who got a reminder. If a send stops part way, the entry is still written, names the speakers emailed so far, and is marked incomplete. A historical demo refuses the send.
 
 **Reminder wording.** The **Reminder wording** panel edits the subject, the HTML body, and the plain text body. Each missing item is one line inside a condition, for example `{{#if materials_sessions}}…{{/if}}`, so a line appears only when the speaker owes that item. `{{description_sessions}}` and `{{materials_sessions}}` hold the session titles. Both bodies must keep `{{dashboard_url}}`, the link to the speaker's dashboard. The server refuses a token the template does not know and says which one. **Use the shipped wording** deletes the saved wording. Each save and each reset writes an admin log entry. Save, then preview, to read the new wording as each speaker gets it.
 
@@ -545,7 +546,7 @@ Session materials review — upload or link files against a session, with an opt
 
 **Every archive is recorded.** The server writes one admin log entry per file in the archive, with your address, before it sends the first byte. If those entries cannot be written, the server refuses the archive. A single-file download writes no entry.
 
-**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures.
+**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures. The panel also counts hidden sessions and speakers who have not accepted an invitation. **Speaker reminders** counts neither, so a speaker the panel names can be absent from **Materials missing** there.
 
 ## Version history
 

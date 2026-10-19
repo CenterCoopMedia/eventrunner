@@ -90,8 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rule as the speaker's own next steps list. A double click or a retry sends nothing more,
   a speaker gets at most one reminder in 24 hours, each row shows when the speaker was
   last reminded, and each send is in the admin log. Staff can edit the reminder wording,
-  and the server refuses an unknown token at save. The readiness list exports as CSV for
-  an organizer's own mailing tool (#332). A historical demo refuses the send.
+  and the server refuses an unknown token at save and a send whose wording changed after
+  the preview. The readiness list exports as CSV for an organizer's own mailing tool
+  (#332). A historical demo refuses the send.
 
 - A call for sessions can use an external form, such as Airtable, instead of this site's
   form. Operators save its https address with the call. `/pitch` then links to it while the
