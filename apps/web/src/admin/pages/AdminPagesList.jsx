@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { SYSTEM_PAGE_ROUTES } from 'shared/routing';
+import { isPublicPage, pageFeatureGate } from 'shared/page';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { featureLabel } from '../featureChoices.js';
@@ -54,24 +54,37 @@ import AdminPageHeader, {
 } from '../components/adminChrome.jsx';
 
 /**
- * Whether a reader can open the page, as a word, and why not when a switch
- * elsewhere decides it (launch rehearsal, admin-03-pages.png: every row
- * read "Live" and none said whether the page was on the site). A system
- * page is also hidden while its feature is off, whatever its own setting
- * says, which is the same two gates the navigation applies
- * (shared/page isPublicPage).
+ * Whether a reader can open the page, as a word, and why when the word is
+ * not the whole story (launch rehearsal, admin-03-pages.png: every row read
+ * "Live" and none said whether the page was on the site).
+ *
+ * The word is about the public site, so it reads the PUBLISHED revision with
+ * the predicate the site applies (shared/page isPublicPage): `visible`
+ * strictly true, and a system page's feature on. A page never published is
+ * Hidden, whatever its draft says; its state badge already says Draft. A
+ * visibility change that is saved but not published is named under the
+ * word, because the site does not have it yet.
  *
  * @returns {{ word: 'Visible'|'Hidden', reason: string|null }}
  */
 function pageVisibility(row, features) {
-  if (row.current?.visible === false) return { word: 'Hidden', reason: null };
-  const gate = row.current?.systemPage === true && Object.prototype.hasOwnProperty.call(SYSTEM_PAGE_ROUTES, row.id)
-    ? SYSTEM_PAGE_ROUTES[row.id].feature
-    : null;
-  if (gate && features && !features[gate]) {
-    return { word: 'Hidden', reason: `${featureLabel(gate)} is off in Features. The public site hides this page.` };
+  const live = row.live ?? null;
+  if (!live) return { word: 'Hidden', reason: null };
+  const word = isPublicPage(live, features) ? 'Visible' : 'Hidden';
+  const draftVisible = row.draft ? row.draft.visible === true : live.visible === true;
+  if (draftVisible !== (live.visible === true)) {
+    return {
+      word,
+      reason: draftVisible
+        ? 'Your unpublished changes show this page. Publish to show it.'
+        : 'Your unpublished changes hide this page. Publish to hide it.',
+    };
   }
-  return { word: 'Visible', reason: null };
+  const gate = live.visible === true ? pageFeatureGate(live) : null;
+  if (gate && features?.[gate] !== true) {
+    return { word, reason: `${featureLabel(gate)} is off in Features. The public site hides this page.` };
+  }
+  return { word, reason: null };
 }
 
 function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {

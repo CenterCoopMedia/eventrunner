@@ -186,6 +186,32 @@ describe('page list', () => {
     expect(within(attendees).getByText(/Attendee directory is off in Features/)).toBeInTheDocument();
   });
 
+  // The word is about the public site, so it reads the published revision.
+  // A page never published is not on the site whatever its draft says, and
+  // an unpublished visibility change has not reached the site yet.
+  it('states visibility from the published revision and names an unpublished change', async () => {
+    liveDocs = [
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [] },
+      { id: 'recap', label: 'Recap', path: '/recap', order: 1, visible: false, sections: [] },
+    ];
+    draftDocs = [
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: false, sections: [], status: 'dirty' },
+      { id: 'recap', label: 'Recap', path: '/recap', order: 1, visible: true, sections: [], status: 'dirty' },
+      { id: 'press', label: 'Press', path: '/press', order: 2, visible: true, sections: [], status: 'dirty' },
+    ];
+    await renderAt('/admin/pages');
+    const row = async (name) => (await within(screen.getByRole('main')).findByRole('link', { name })).closest('li');
+    const faq = await row('FAQ');
+    expect(within(faq).getByText('Visible')).toBeInTheDocument();
+    expect(within(faq).getByText('Your unpublished changes hide this page. Publish to hide it.')).toBeInTheDocument();
+    const recap = await row('Recap');
+    expect(within(recap).getByText('Hidden')).toBeInTheDocument();
+    expect(within(recap).getByText('Your unpublished changes show this page. Publish to show it.')).toBeInTheDocument();
+    const press = await row('Press');
+    expect(within(press).getByText('Hidden')).toBeInTheDocument();
+    expect(within(press).queryByText('Visible')).toBeNull();
+  });
+
   it('saves a moved page order as drafts and does not publish', async () => {
     liveDocs = [
       { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [] },
