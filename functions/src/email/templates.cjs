@@ -23,6 +23,7 @@ const DEFAULTS = {
   'speaker.invite': require('./templates/speaker.invite.cjs'),
   'speaker.accepted': require('./templates/speaker.accepted.cjs'),
   'speaker.confirmation': require('./templates/speaker.confirmation.cjs'),
+  'speaker.reminder': require('./templates/speaker.reminder.cjs'),
   'ticket.get_ticket': require('./templates/ticket.get_ticket.cjs'),
   'ticket.claim_prompt': require('./templates/ticket.claim_prompt.cjs'),
   'ticket.order_confirmation': require('./templates/ticket.order_confirmation.cjs'),
@@ -53,17 +54,22 @@ function listTemplateIds() {
  * An absent override doc caches as null for the same TTL — a missing doc
  * must not cost a read per send.
  *
- * @param {{ db: FirebaseFirestore.Firestore, id: string, now?: () => number }} deps
+ * `fresh: true` skips the cache and refills it. A staff preview must show the
+ * wording saved a moment ago on another instance, and the send that follows
+ * the preview must use the same wording the preview showed.
+ *
+ * @param {{ db: FirebaseFirestore.Firestore, id: string, now?: () => number,
+ *           fresh?: boolean }} deps
  * @returns {Promise<{ template: object, override: object|null }>}
  * @throws {Error} for an id no default ships — a code bug, not a data state
  */
-async function loadTemplate({ db, id, now = Date.now }) {
+async function loadTemplate({ db, id, now = Date.now, fresh = false }) {
   const template = getDefaultTemplate(id);
   if (!template) {
     throw new Error(`unknown template id: ${id}`);
   }
   const cached = overrideCache.get(id);
-  if (cached && now() - cached.loadedAt < CACHE_TTL_MS) {
+  if (!fresh && cached && now() - cached.loadedAt < CACHE_TTL_MS) {
     return { template, override: cached.override };
   }
   const snap = await db.collection('email_templates').doc(id).get();

@@ -24,6 +24,7 @@
     "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" },
     "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
     "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" },
+    "./speakerReadiness": { "require": "./src/speakerReadiness.cjs", "import": "./src/speakerReadiness.mjs" },
     "./announcement": { "require": "./src/announcement.cjs", "import": "./src/announcement.mjs" },
     "./richText": { "require": "./src/richText.cjs", "import": "./src/richText.mjs" },
     "./seed": { "require": "./src/seed.cjs", "import": "./src/seed.mjs" }

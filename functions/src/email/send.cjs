@@ -58,6 +58,31 @@ function isAlreadyExists(err) {
 }
 
 /**
+ * The html and text bodies with the configured legal block appended to any
+ * body that does not already carry it (spec §3.1: footer resolution is a
+ * core duty). Exported so a staff preview shows the bodies send() hands the
+ * provider, footer included.
+ *
+ * @param {{ html?: string, text?: string, hasLegalFooterHtml?: boolean,
+ *           hasLegalFooterText?: boolean }} message
+ * @param {object} config
+ * @returns {{ html: string|undefined, text: string|undefined }}
+ */
+function withLegalFooter(message, config) {
+  let { html, text } = message;
+  const postalHtml = config?.event?.legal?.postalAddressHtml;
+  if (typeof postalHtml === 'string' && postalHtml) {
+    if (typeof html === 'string' && !message.hasLegalFooterHtml) {
+      html += `\n<hr>\n<p>${postalHtml}</p>`;
+    }
+    if (typeof text === 'string' && !message.hasLegalFooterText) {
+      text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
+    }
+  }
+  return { html, text };
+}
+
+/**
  * The adapter-bound form of one message: sender, reply-to, stream and the
  * legal footer resolved from config. Shared by send() and sendBatch() so a
  * batch entry is resolved exactly as a single send is.
@@ -87,15 +112,7 @@ function resolveMessage(message, config) {
   // that does not already carry the footer — an override that dropped
   // the token, the operator email sink, ad-hoc callers — gets the
   // configured legal block appended here.
-  const postalHtml = config?.event?.legal?.postalAddressHtml;
-  if (typeof postalHtml === 'string' && postalHtml) {
-    if (typeof fullMessage.html === 'string' && !message.hasLegalFooterHtml) {
-      fullMessage.html += `\n<hr>\n<p>${postalHtml}</p>`;
-    }
-    if (typeof fullMessage.text === 'string' && !message.hasLegalFooterText) {
-      fullMessage.text += `\n\n--\n${renderInternals.stripHtmlToText(postalHtml)}`;
-    }
-  }
+  Object.assign(fullMessage, withLegalFooter(message, config));
   return fullMessage;
 }
 
@@ -548,6 +565,7 @@ function buildHandlers() {
 
 module.exports = {
   createEmailCore,
+  withLegalFooter,
   createDeliveryWebhookHandler,
   EmailBatchError,
   // Lazily built so requiring this module in tests never pulls in

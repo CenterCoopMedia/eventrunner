@@ -622,6 +622,11 @@ service cloud.firestore {
     // recordImport.cjs). Server-only; staff see the result in the import
     // preview, never by reading the keys.
     match /record_imports/{key} { allow read, write: if false; }
+    // Speaker reminder bookkeeping (`speaker_reminders/{speakerId}`): the
+    // batch that last reached the speaker and when, written only by
+    // functions/src/speakers/reminders.cjs, read by staff through that
+    // endpoint.
+    match /speaker_reminders/{speakerId} { allow read, write: if false; }
     // Speaker invitations (`speaker_invites/{sha256(token)}`, spec §4.1,
     // issue #21). Server-only in BOTH directions, and the read denial is
     // the load-bearing half: the document id is the digest of a live

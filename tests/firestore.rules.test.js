@@ -575,6 +575,8 @@ describe("server-only collections stay deny-all", () => {
     "speaker_invites",
     // Staff CSV import keys: the external ID map and the last imported values.
     "record_imports",
+    // Speaker reminder bookkeeping: the batch and time of the last reminder.
+    "speaker_reminders",
     // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
     // address and who claimed it; `ticket_webhook_deliveries` is the dedup
     // claim store a forged pre-claim could use to make a real delivery

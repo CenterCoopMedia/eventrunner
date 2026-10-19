@@ -1,19 +1,25 @@
-/** One set of requirements supplies both the outstanding list and the meter. */
+import { materialCounts, speakerHasBio, speakerHasHeadshot } from 'shared/speakerReadiness';
+
+/**
+ * One set of requirements supplies both the outstanding list and the meter.
+ * The test behind each item is shared/speakerReadiness, the same rule the
+ * staff reminder email reads, so a reminder never asks for an item this list
+ * shows as done.
+ */
 export function speakerCompletion({ speaker, sessions, materialsBySession }) {
-  const effective = { ...speaker, ...(speaker?.pendingEdits ?? {}) };
   const profilePath = '/speaker/profile';
   const requirements = [
     {
       id: 'bio',
       label: 'Add your biography',
       to: profilePath,
-      complete: Boolean(effective.bio?.trim()),
+      complete: speakerHasBio(speaker),
     },
     {
       id: 'headshot',
       label: 'Add your headshot',
       to: profilePath,
-      complete: Boolean(effective.headshotPath?.trim()),
+      complete: speakerHasHeadshot(speaker),
     },
   ];
 
@@ -25,9 +31,7 @@ export function speakerCompletion({ speaker, sessions, materialsBySession }) {
       id: `materials:${session.id}`,
       label: `Send materials for ${session.title || 'your session'}`,
       to: `/speaker/dashboard?session=${encodeURIComponent(session.id)}&tab=materials#speaker-sessions-heading`,
-      complete: (materialsBySession[session.id] ?? []).some(
-        (material) => material.reviewStatus === 'pending' || material.reviewStatus === 'approved',
-      ),
+      complete: (materialsBySession[session.id] ?? []).some(materialCounts),
     });
   }
 
