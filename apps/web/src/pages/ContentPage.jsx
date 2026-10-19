@@ -133,7 +133,7 @@ function filterSections(sections, query) {
 
 export default function ContentPage() {
   const { pathname } = useLocation();
-  const { getPublicPage, getSectionBlocks } = useContent();
+  const { pages, getPublicPage, getSectionBlocks } = useContent();
   const { eventConfig, features } = useEventConfig();
   // Declared before the early return below so hook order stays fixed across
   // renders regardless of which page (or no page) this URL resolves to
@@ -218,10 +218,10 @@ export default function ContentPage() {
   const baseSections = (page.sections ?? [])
     .map((section) => ({
       section,
-      // A cta or link_group that leads to a section that is off is not
-      // drawn (lib/linkTargets.js). Filtered before the emptiness test
+      // A cta or link_group that leads to a section that is off, or to a
+      // page that is not public, is not drawn (lib/linkTargets.js). Filtered before the emptiness test
       // below, so a section left with nothing draws no heading.
-      blocks: withoutSwitchedOffLinks(getSectionBlocks(section.id), features),
+      blocks: withoutSwitchedOffLinks(getSectionBlocks(section.id), features, pages),
       map: section.id === VENUE_MAP_SECTION_ID ? map : null,
       areaMap: section.id === AREA_MAP_SECTION_ID ? areaMap : null,
     }))

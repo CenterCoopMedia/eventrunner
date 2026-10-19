@@ -133,7 +133,7 @@ export function withLiveDates(block, eventConfig) {
 
 export default function Home() {
   const { eventConfig, features, theme } = useEventConfig();
-  const { getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
+  const { pages, getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
   const registrationAction = useRegistrationLink();
   const pitchOpen = usePitchCallOpen();
 
@@ -165,10 +165,10 @@ export default function Home() {
       ? eventConfig.tagline
       : null;
   const heroBlocks = getSectionBlocks('hero');
-  // An action that leads to a section that is off is not drawn, and is not
-  // counted either, so a lead whose only action leads there draws no empty
-  // action row (lib/linkTargets.js).
-  const heroCtas = withoutSwitchedOffLinks(heroBlocks, features).filter((block) => block.blockType === 'cta');
+  // An action that leads to a section that is off, or to a page that is not
+  // public, is not drawn, and is not counted either, so a lead whose only
+  // action leads there draws no empty action row (lib/linkTargets.js).
+  const heroCtas = withoutSwitchedOffLinks(heroBlocks, features, pages).filter((block) => block.blockType === 'cta');
   // config/event is runtime data, so `days` may arrive as anything.
   const days = Array.isArray(eventConfig.days) ? eventConfig.days : [];
   // Where the summary row is drawn. The row belongs to the key facts

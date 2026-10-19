@@ -3,7 +3,7 @@
 // launch rehearsal saved "Explore the program → /schedule" with the schedule
 // off, and the home page drew it.
 import { describe, expect, it } from 'vitest';
-import { switchedOffSectionFor, withoutSwitchedOffLinks } from './linkTargets.js';
+import { leadsToNoPublicPage, switchedOffSectionFor, withoutSwitchedOffLinks } from './linkTargets.js';
 
 const OFF = { schedule: false, speakers: false, sponsors: false, updates: false, attendeeDirectory: false };
 const ON = { schedule: true, speakers: true, sponsors: true, updates: true, attendeeDirectory: true };
@@ -64,5 +64,35 @@ describe('withoutSwitchedOffLinks', () => {
 
   it('meets a missing list', () => {
     expect(withoutSwitchedOffLinks(undefined, OFF)).toEqual([]);
+  });
+});
+
+describe('leadsToNoPublicPage', () => {
+  const PAGES = [
+    { id: 'travel', path: '/travel', visible: true, systemPage: false },
+    { id: 'guidelines', path: '/guidelines', visible: false, systemPage: false },
+    { id: 'press', path: '/press', systemPage: false },
+  ];
+
+  it('names a hidden page, a page with no visible field, and an address no page has', () => {
+    expect(leadsToNoPublicPage('/guidelines', PAGES, ON)).toBe(true);
+    expect(leadsToNoPublicPage('/guidelines/#formats', PAGES, ON)).toBe(true);
+    expect(leadsToNoPublicPage('/press', PAGES, ON)).toBe(true);
+    expect(leadsToNoPublicPage('/no-such-page', PAGES, ON)).toBe(true);
+  });
+
+  it('keeps a public page, the home page, a system route, an app route, a file, and a link off the site', () => {
+    expect(leadsToNoPublicPage('/travel?day=1', PAGES, ON)).toBe(false);
+    expect(leadsToNoPublicPage('/', PAGES, ON)).toBe(false);
+    expect(leadsToNoPublicPage('/schedule', PAGES, ON)).toBe(false);
+    expect(leadsToNoPublicPage('/tickets', PAGES, ON)).toBe(false);
+    expect(leadsToNoPublicPage('/files/kit.pdf', PAGES, ON)).toBe(false);
+    expect(leadsToNoPublicPage('https://example.org/guidelines', PAGES, ON)).toBe(false);
+  });
+
+  it('keeps the link while the pages are not known', () => {
+    expect(leadsToNoPublicPage('/guidelines', undefined, ON)).toBe(false);
+    expect(withoutSwitchedOffLinks([{ blockType: 'cta', url: '/guidelines' }], ON)).toHaveLength(1);
+    expect(withoutSwitchedOffLinks([{ blockType: 'cta', url: '/guidelines' }], ON, PAGES)).toHaveLength(0);
   });
 });

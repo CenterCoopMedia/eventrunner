@@ -134,12 +134,12 @@ export default function SystemPage({
   children,
   ...articleProps
 }) {
-  const { getPage, getSectionBlocks: storedSectionBlocks } = useContent();
+  const { pages, getPage, getSectionBlocks: storedSectionBlocks } = useContent();
   const { features } = useEventConfig();
-  // A cta or link_group that leads to a section that is off is not drawn
-  // (lib/linkTargets.js). Filtered here, before any section decides whether
+  // A cta or link_group that leads to a section that is off, or to a page
+  // that is not public, is not drawn (lib/linkTargets.js). Filtered here, before any section decides whether
   // it is empty, so a section left with nothing draws no heading.
-  const getSectionBlocks = (sectionId) => withoutSwitchedOffLinks(storedSectionBlocks(sectionId), features);
+  const getSectionBlocks = (sectionId) => withoutSwitchedOffLinks(storedSectionBlocks(sectionId), features, pages);
   // Every system route now seeds a cmsPages document (scripts/lib/seed.cjs,
   // held by a test that reads every <SystemPage pageId="…"> in this app).
   // A route can still find nothing — an operator deleted the page, or the
