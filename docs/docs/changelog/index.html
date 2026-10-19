@@ -656,6 +656,16 @@
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The static demo is no longer committed. <code>docs/demo/</code> is in <code>.gitignore</code>, and a new
+          <code>Pages</code> workflow (<code>.github/workflows/pages.yml</code>) builds the demo on every push to <code>main</code> and
+          deploys <code>docs/</code> with it to GitHub Pages. The demo URL stays <code>/eventrunner/demo/</code>. Feature pull
+          requests no longer rebuild the demo, so they no longer conflict on its hashed chunk names, and
+          code scanning no longer reads third-party code in a committed bundle. The <code>Demo build hygiene</code>
+          CI job now builds the demo twice, fails when the two builds differ, and runs the demo bundle
+          budget. The public demo screenshots in the E2E job compare a fresh build of the pull request&#39;s
+          base with a fresh build of its head (<code>scripts/dev/build-demo-at.cjs</code>).</li>
+          </ul>
+          <ul>
           <li>The Firebase CLI (<code>firebase-tools</code>, a root devDependency) moves from 14.27.0 to 15.22.4. The
           upgrade brings <code>tar</code> 7.5.22 and removes the critical <code>tar</code> advisory from the root lockfile. The
           emulators need Java 21 or later, which CI and the docs already require. The CLI is held at

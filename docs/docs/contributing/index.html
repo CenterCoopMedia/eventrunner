@@ -263,9 +263,15 @@
           tracked in <a href="https://github.com/CenterCoopMedia/eventrunner/issues/259">issue #259</a>.</p>
           <p>The documentation check validates local links and the Pages entrypoint&#39;s basic
           metadata. Generated pages under <code>docs/docs/**</code> must also carry an SVG favicon,
-          canonical URL, and complete Open Graph and Twitter metadata. <code>docs/demo/**</code>
-          remains outside that generated-page metadata rule until the demo redesign in
-          #109; its metadata is owned there. Root-page social metadata is tracked in #105.</p>
+          canonical URL, and complete Open Graph and Twitter metadata. The built demo in
+          <code>docs/demo/**</code> remains outside that generated-page metadata rule until the demo
+          redesign in #109; its metadata is owned there. Root-page social metadata is
+          tracked in #105.</p>
+          <p><code>docs/demo/**</code> is build output and is not committed. Do not rebuild or commit it
+          in a pull request. <code>.github/workflows/pages.yml</code> builds it with
+          <code>scripts/build-demo.cjs</code> on every push to <code>main</code> and deploys <code>docs/</code> with it to
+          GitHub Pages. Links into <code>docs/demo/</code> are checked only when a local build is
+          present; the Pages workflow checks them after its build.</p>
           <p><code>docs/docs/**</code> is generated output, not a place to edit. <code>scripts/build-pages.cjs</code>
           renders it from the Markdown listed in <code>scripts/lib/pages-manifest.cjs</code>, and
           <code>scripts/build-pages.test.cjs</code> fails the documentation tier when the committed
@@ -280,7 +286,7 @@
           <tbody>
           <tr><td>Markdown, <code>docs/**</code> except <code>docs/demo/**</code>, handbook files, and issue/discussion templates</td><td>Documentation checks: local links, generated Pages HTML markup, and <code>docs/docs/**</code> freshness</td></tr>
           <tr><td>Documentation generators (<code>scripts/build-pages.cjs</code>, <code>scripts/build-pages.test.cjs</code>, <code>scripts/lib/pages-*.cjs</code>, <code>scripts/lib/markdown-pages.cjs</code>)</td><td>Documentation checks and lint</td></tr>
-          <tr><td><code>scripts/build-demo.cjs</code>, <code>scripts/build-demo.test.cjs</code>, or <code>docs/demo/**</code></td><td>Lint, demo generator tests, and committed-demo hygiene</td></tr>
+          <tr><td><code>scripts/build-demo.cjs</code> or <code>scripts/build-demo.test.cjs</code></td><td>Lint, demo generator tests, and demo build hygiene: two identical builds and the demo bundle budget</td></tr>
           <tr><td><code>apps/web/**</code></td><td>Lint, web unit tests, web build, generated-content hygiene, demo hygiene, and E2E</td></tr>
           <tr><td><code>functions/**</code></td><td>Lint, shared/functions unit tests, rules emulators, and E2E</td></tr>
           <tr><td><code>packages/shared/**</code></td><td>Lint, shared/functions unit tests, web unit tests, web build, generated-content hygiene, demo hygiene, rules emulators, and E2E</td></tr>
@@ -313,9 +319,10 @@
           changes behavior that the completed review did not cover.</p>
           <p>GitHub Actions does not poll for connector reviews. The required <code>CI gate</code> and resolved
           review conversations remain enforced by branch protection.</p>
-          <p>When web source changes, regenerate both the synthetic content and the committed demo with
-          <code>node scripts/generate-content.cjs --demo</code> and <code>node scripts/build-demo.cjs</code>, then run their
-          <code>--check</code> modes. Regenerate documentation with <code>node scripts/build-pages.cjs</code> after source
+          <p>When web source changes, regenerate the synthetic content with
+          <code>node scripts/generate-content.cjs --demo</code> and run its <code>--check</code> mode. Run
+          <code>node scripts/build-demo.cjs --check</code> to prove the demo builds, builds the same
+          twice, and fits its budget. Do not commit <code>docs/demo/</code>; it is build output. Regenerate documentation with <code>node scripts/build-pages.cjs</code> after source
           Markdown changes. Sign off all repair commits with <code>git commit -s</code>.</p>
           <p>Branch rules control Git operations. An administrator credential can still edit those rules.
           Agents should use a separate identity with write access and no repository or organization

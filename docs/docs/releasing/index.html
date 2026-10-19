@@ -193,33 +193,33 @@
           deploying from an arbitrary tag currently means merging that tag&#39;s tree to <code>main</code> first, not
           dispatching against the tag directly.</p>
           <h2 id="the-demo-build-docsdemo">The demo build (<code>docs/demo/</code>)<a class="heading-anchor" href="#the-demo-build-docsdemo" aria-label="Link to this section">#</a></h2>
-          <p><code>docs/demo/</code> is committed output, not generated at deploy time: <code>npm run build:demo</code>
+          <p><code>docs/demo/</code> is build output and is not committed; it is in <code>.gitignore</code>. <code>npm run build:demo</code>
           (<code>scripts/build-demo.cjs</code>) runs a demo-mode <code>vite build</code> of <code>apps/web</code> against the committed
-          synthetic snapshot in <code>apps/web/src/generated/</code> and syncs the result into <code>docs/demo/</code>, which
-          GitHub Pages serves at <code>https://centercoopmedia.github.io/eventrunner/demo/</code>. Nobody runs this at
-          deploy time — it has to be rebuilt and committed by hand whenever its inputs change.</p>
+          synthetic snapshot in <code>apps/web/src/generated/</code> and syncs the result into <code>docs/demo/</code>.
+          <code>.github/workflows/pages.yml</code> runs it on every push to <code>main</code>, checks the result, and deploys
+          <code>docs/</code> with the demo to GitHub Pages at <code>https://centercoopmedia.github.io/eventrunner/demo/</code>.</p>
           <ul>
-          <li><strong>Rebuild and commit <code>docs/demo/</code> before tagging</strong> whenever a PR touched <code>apps/web/src/**</code> or
-          <code>apps/web/src/generated/**</code> since the last rebuild: <code>npm run build:demo</code>, review the diff, commit
-          it (a normal DCO-signed commit, same as any other change).</li>
-          <li><strong>CI catches a forgotten rebuild for you</strong> — the selected demo tier runs
-          <code>node scripts/build-demo.cjs --check</code> and fails if a fresh build differs from
-          the committed <code>docs/demo/</code> (issue #94). A trusted local result satisfies this
-          tier. Otherwise, the <code>demo</code> job runs on GitHub. Manual CI runs use GitHub.
-          Treat a failed demo check as &quot;rebuild and commit&quot;, never as a reason to edit
-          <code>docs/demo/</code> by hand.</li>
+          <li><strong>Nothing to rebuild or commit before tagging.</strong> The demo on Pages is the build of the latest
+          <code>main</code>. A pull request never commits <code>docs/demo/</code>, so two pull requests never conflict on its
+          content-hashed chunk names.</li>
+          <li><strong>CI proves the build.</strong> The selected demo tier runs <code>node scripts/build-demo.cjs --check</code>: it
+          builds the demo twice into scratch directories, fails if the two builds differ in any byte, and
+          runs the demo bundle budget (<code>scripts/ci/bundle-budget.cjs</code>). A trusted local result satisfies
+          this tier. Otherwise, the <code>demo</code> job runs on GitHub. Manual CI runs use GitHub.</li>
           <li><strong>The build is deterministic</strong>: repeated builds of unchanged input, including Vite&#39;s
-          content-hashed asset filenames, come out byte-for-byte identical (verified by hand; see
-          <code>scripts/build-demo.test.cjs</code> for the directory-diff logic <code>--check</code> is built on). That is what
-          makes the CI gate viable without flaking on unrelated reruns.</li>
+          content-hashed asset filenames, come out byte-for-byte identical. <code>--check</code> asserts this on
+          every run, with the directory diff in <code>scripts/build-demo.cjs</code> (unit tests in
+          <code>scripts/build-demo.test.cjs</code>).</li>
+          <li><strong>Pages deploys from the workflow.</strong> The repository&#39;s Pages source must be &quot;GitHub Actions&quot;
+          (Settings → Pages). While it is still &quot;Deploy from a branch&quot;, <code>pages.yml</code> builds and checks the
+          site and skips the deploy with a warning.</li>
           <li><strong>The <code>--base</code> / rename caveat</strong>: <code>scripts/build-demo.cjs</code> defaults <code>--base</code> to
-          <code>/eventrunner/demo/</code>, matching this repo&#39;s current name and the fact that GitHub Pages serves
-          <code>docs/</code> from the repo root. Renaming the repository, or moving the demo to a different Pages
-          path, changes that URL — rerun with <code>--base /new-path/</code> (and <code>--out</code> if the destination
-          directory changes too) and recommit <code>docs/demo/</code>, or every asset URL the built <code>index.html</code>
-          emits will 404 under the new address. Nothing checks this automatically: <code>--check</code> only proves
-          the committed output matches a fresh build at the <em>current</em> <code>--base</code>, not that the <code>--base</code> is
-          still correct.</li>
+          <code>/eventrunner/demo/</code>, matching this repo&#39;s current name and the Pages project path. Renaming the
+          repository, or moving the demo to a different Pages path, changes that URL: change the default
+          <code>--base</code> (and <code>--out</code> if the destination directory changes too), or every asset URL the built
+          <code>index.html</code> emits will 404 under the new address. Nothing checks this automatically: <code>--check</code>
+          only proves the build is reproducible and within budget at the <em>current</em> <code>--base</code>, not that the
+          <code>--base</code> is still correct.</li>
           </ul>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/RELEASING.md"><code>RELEASING.md</code></a>. Edit the Markdown, not the HTML.</p>
