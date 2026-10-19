@@ -16,7 +16,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import { SYSTEM_PAGE_ROUTES } from 'shared/routing';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { toEditablePage, toPagePayload } from '../pageDoc.js';
@@ -49,8 +52,30 @@ import AdminPageHeader, {
   proofRowClass,
 } from '../components/adminChrome.jsx';
 
-function PageRow({ row, index, count, moveRow, disabled, resolved }) {
+/**
+ * Whether a reader can open the page, as a word, and why not when a switch
+ * elsewhere decides it (launch rehearsal, admin-03-pages.png: every row
+ * read "Live" and none said whether the page was on the site). A system
+ * page is also hidden while its feature is off, whatever its own setting
+ * says, which is the same two gates the navigation applies
+ * (shared/page isPublicPage).
+ *
+ * @returns {{ word: 'Visible'|'Hidden', reason: string|null }}
+ */
+function pageVisibility(row, features) {
+  if (row.current?.visible === false) return { word: 'Hidden', reason: null };
+  const gate = row.current?.systemPage === true && Object.prototype.hasOwnProperty.call(SYSTEM_PAGE_ROUTES, row.id)
+    ? SYSTEM_PAGE_ROUTES[row.id].feature
+    : null;
+  if (gate && features && !features[gate]) {
+    return { word: 'Hidden', reason: `${featureLabel(gate)} is off in Features. The public site hides this page.` };
+  }
+  return { word: 'Visible', reason: null };
+}
+
+function PageRow({ row, index, count, moveRow, disabled, resolved, features }) {
   const label = row.current?.label || row.id;
+  const visibility = pageVisibility(row, features);
   const drag = useRowDrag(`page:${index}`, disabled);
   const drop = bindReorderDrop('page:', index, moveRow);
   const [over, setOver] = useState(false);
@@ -85,14 +110,17 @@ function PageRow({ row, index, count, moveRow, disabled, resolved }) {
             {row.current?.systemPage ? (
               <StatusBadge tone="neutral">System page</StatusBadge>
             ) : null}
-            {row.current?.visible === false ? (
-              <StatusBadge tone="neutral">Hidden</StatusBadge>
-            ) : null}
+            <StatusBadge tone="neutral">{visibility.word}</StatusBadge>
           </div>
           <p className={`mt-3xs truncate ${rowMetaClass}`} data-reorder-block="">
             {row.current?.path} · {sections.length} section
             {sections.length === 1 ? '' : 's'}
           </p>
+          {visibility.reason ? (
+            <p className={`mt-3xs ${rowMetaClass}`} data-reorder-block="">
+              {visibility.reason}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-xs">
           <ReorderControls
@@ -116,6 +144,7 @@ export default function AdminPagesList() {
   const { rows, loading, error } = useAdminPages();
   const call = useAdminApi();
   const { showToast } = useToast();
+  const { features } = useEventConfig();
   const draft = useDraftOrder(rows);
   const [publishing, setPublishing] = useState(null);
   const [savingOrder, setSavingOrder] = useState(false);
@@ -309,6 +338,7 @@ export default function AdminPagesList() {
                 moveRow={moveRow}
                 disabled={savingOrder || publishing !== null}
                 resolved={resolvedIds.has(row.id)}
+                features={features}
               />
             ))}
           </ul>

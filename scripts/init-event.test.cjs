@@ -112,6 +112,47 @@ test('init seeds config, pages, and content, and exits 0 despite unmet readiness
   assert.match(output, /Legal review/);
 });
 
+test('a fresh init seeds the recap, guidelines and city guide pages hidden, in both revisions', async () => {
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  for (const id of ['recap', 'guidelines', 'city_guide']) {
+    assert.equal(db.read('cmsPages', id).visible, false, `${id} live`);
+    assert.equal(db.read('cmsPages_drafts', id).visible, false, `${id} draft`);
+  }
+  for (const id of ['home', 'travel', 'faq', 'contact', 'privacy', 'terms']) {
+    assert.equal(db.read('cmsPages', id).visible, true, `${id} live`);
+  }
+});
+
+test('a re-run keeps the visibility an earlier release seeded on an untouched page', async () => {
+  // A deployment seeded before these pages were hidden holds them visible
+  // and still seeded. A re-run refreshes an untouched page, and the refresh
+  // must not take a page off a live site the operator never asked to hide.
+  const db = makeFakeDb();
+  await quietly(() => runInit({ db, store, bucket: noBucket, args: initArgs(), tierA: TIER_A, env: ENV, now: () => 0 }));
+  for (const id of ['recap', 'guidelines', 'city_guide']) {
+    for (const collection of ['cmsPages', 'cmsPages_drafts']) {
+      await db.collection(collection).doc(id).set({ ...db.read(collection, id), visible: true });
+    }
+  }
+  const { value } = await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  assert.equal(value, 0);
+  for (const id of ['recap', 'guidelines', 'city_guide']) {
+    assert.equal(db.read('cmsPages', id).visible, true, `${id} live`);
+    assert.equal(db.read('cmsPages_drafts', id).visible, true, `${id} draft`);
+    assert.equal(db.read('cmsPages', id).seeded, true, `${id} is still the seed's`);
+  }
+  // And a page the seed left hidden stays hidden on a re-run.
+  await db.collection('cmsPages').doc('recap').set({ ...db.read('cmsPages', 'recap'), visible: false });
+  await db.collection('cmsPages_drafts').doc('recap').set({ ...db.read('cmsPages_drafts', 'recap'), visible: false });
+  await quietly(() => runInit({
+    db, store, bucket: noBucket, args: initArgs({ force: true }), tierA: TIER_A, env: ENV, now: () => 0,
+  }));
+  assert.equal(db.read('cmsPages', 'recap').visible, false);
+});
+
 test('a fresh Stripe deployment seeds its processor disclosure and prints its exact setup path', async () => {
   const db = makeFakeDb();
   const env = { ...ENV, EVENT_TICKETING_PROVIDER: 'stripe', EVENT_TICKETING_EVENT_ID: 'conference-1',

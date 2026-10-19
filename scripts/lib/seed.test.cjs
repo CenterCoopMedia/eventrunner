@@ -276,6 +276,18 @@ test('the recap and guidelines pages seed no default blocks (issue: seed a recap
   }
 });
 
+test('a fresh site seeds the recap, guidelines and city guide pages hidden', () => {
+  // A launch rehearsal found all three in the navigation of a site that
+  // had written none of them: two empty pages and a recap of an event that
+  // had not happened. The operator turns each one on when it has content.
+  const pages = defaultPages();
+  const hidden = pages.filter((page) => page.visible === false).map((page) => page.id);
+  assert.deepEqual(hidden.sort(), ['city_guide', 'guidelines', 'recap']);
+  for (const page of pages) {
+    assert.equal(typeof page.visible, 'boolean', `${page.id} states its visibility`);
+  }
+});
+
 test('the sponsors page seeds an empty Sponsorship packages section (issue 193)', () => {
   // The gap table asks for a package section on the sponsors page. It seeds
   // empty, like recap and guidelines, so the page draws nothing extra until
