@@ -338,12 +338,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With the Stripe provider, the header and the home lead show **Get tickets** only after an
   operator publishes the catalog. Before that, the action led to "Ticket sales are not
   configured". A published catalog keeps the action while sales are paused or closed, so a
-  visitor can read when sales open. Eventbrite, manual and none are unchanged.
+  visitor can read when sales open. The header checks again on a page change and when the tab
+  becomes visible, at most every 30 seconds. Eventbrite, manual and none are unchanged.
 - After **Reopen new sales** or a sales pause, an unedited catalog editor loads the new saved
   catalog. It no longer warns about unsaved edits that do not exist, and its next save keeps
-  the new sales state. Real unsaved edits still keep the warning and the reload.
+  the new sales state. A status line says the editor now shows the current saved catalog.
+  Real unsaved edits still keep the warning and the reload.
 - With no tickets chosen, `/tickets` asks for a ticket choice and its submit reads
   **Continue**. It no longer says "No payment is required" or offers **Reserve tickets**.
+  Choosing a ticket clears the empty-cart error.
 - The client onboarding guide lists the native Stripe provider. Its ticketing step points at
   the Stripe operator runbook and the setup checklist.
 - Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
