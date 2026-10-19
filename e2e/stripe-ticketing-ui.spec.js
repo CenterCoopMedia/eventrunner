@@ -174,6 +174,7 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('alert')).toBeFocused();
     await page.getByLabel('Quantity — General admission').selectOption('1');
     await expect(page.getByText('Choose at least one ticket to continue.')).toHaveCount(0);
+    await expect(page.getByText('Choose at least one ticket.', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeVisible();
   });
 

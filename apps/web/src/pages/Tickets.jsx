@@ -16,6 +16,7 @@ import {
 } from '../lib/ticketingCommerce.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMPTY_CART = 'Choose at least one ticket.';
 
 export default function Tickets() {
   useDocumentTitle('Get tickets');
@@ -156,7 +157,7 @@ export default function Tickets() {
     event.preventDefault();
     if (submittingRef.current) return;
     // An empty cart has one thing to fix. Its message takes focus alone.
-    if (!count) { setErrors({ cart: 'Choose at least one ticket.' }); return; }
+    if (!count) { setErrors({ cart: EMPTY_CART }); return; }
     const nextErrors = {};
     if (count > Math.min(catalog.maxPerOrder || 20, 20)) nextErrors.cart = `Choose no more than ${Math.min(catalog.maxPerOrder || 20, 20)} tickets per order.`;
     for (const line of lines) {
@@ -273,7 +274,11 @@ export default function Tickets() {
                       {salesEndAt ? <p className="text-caption">Sales close {formatTicketTime(salesEndAt, eventConfig.timezone)}.</p> : null}
                     </div>
                     <SelectField label={`Quantity — ${type.name}`} value={quantities[type.id] || '0'} error={errors[`${type.id}.quantity`]}
-                      onChange={(value) => setQuantities((previous) => ({ ...previous, [type.id]: value }))}
+                      onChange={(value) => {
+                        setQuantities((previous) => ({ ...previous, [type.id]: value }));
+                        // A chosen ticket answers the empty-cart error at once.
+                        if (Number(value) > 0) setErrors((previous) => (previous.cart === EMPTY_CART ? {} : previous));
+                      }}
                       options={[{ value: '0', label: 'No tickets' }, ...(type.available ? Array.from({ length: maximum }, (_, index) => ({ value: String(index + 1), label: String(index + 1) })).filter((option) => Number(option.value) >= (type.minPerOrder || 1)) : [])]} />
                   </div>
                 </fieldset>

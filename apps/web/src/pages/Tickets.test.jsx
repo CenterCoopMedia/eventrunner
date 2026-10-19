@@ -109,9 +109,11 @@ describe('attendee ticket selection', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Choose at least one ticket.');
     expect(screen.getByRole('alert')).toHaveFocus();
     expect(ticketingRequest).not.toHaveBeenCalledWith('ticketingCheckout', expect.anything());
-    // A chosen paid ticket replaces the prompt with the payment step.
+    // A chosen paid ticket replaces the prompt with the payment step and
+    // clears the empty-cart error.
     fireEvent.change(screen.getByLabelText('Quantity — General admission'), { target: { value: '1' } });
     expect(screen.queryByText('Choose at least one ticket to continue.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose at least one ticket.')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeInTheDocument();
   });
 
