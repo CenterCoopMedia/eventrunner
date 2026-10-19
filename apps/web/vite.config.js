@@ -8,7 +8,7 @@
 //
 // Every source import of snapshot data goes through the `@generated` alias
 // so the override applies to the whole app, theme.css included.
-import { defineConfig } from 'vite';
+import { defineConfig, normalizePath } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,30 @@ import { resolveGeneratedDir } from './generatedDir.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const generatedDir = resolveGeneratedDir(process.env, path.resolve(here, 'src/generated'));
+const entryModule = normalizePath(path.resolve(here, 'src/main.jsx'));
+
+// Vite 8 bundles with Rolldown. Rollup put every module the entry imports
+// statically into the entry chunk. Rolldown splits the same modules into one
+// small common chunk per set of importers: about 40 files on first paint, and
+// about 8 kB more gzip, because small files compress worse. This group puts
+// the static import graph of src/main.jsx back into one chunk, so first paint
+// loads the entry, the Rolldown runtime and this chunk. Lazy routes still
+// split as before. CSS stays with Vite's CSS plugin.
+const initialModules = new WeakMap();
+function staticImportGraph(context) {
+  if (initialModules.has(context)) return initialModules.get(context);
+  const seen = new Set();
+  const queue = [entryModule];
+  while (queue.length) {
+    const id = queue.pop();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const info = context.getModuleInfo(id);
+    if (info) queue.push(...info.importedIds);
+  }
+  initialModules.set(context, seen);
+  return seen;
+}
 
 export default defineConfig({
   plugins: [react()],
@@ -45,6 +69,21 @@ export default defineConfig({
       'shared/email',
       'shared/readiness',
     ],
+  },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              debugName: 'initial',
+              name: (id, context) =>
+                !/\.css(\?|$)/.test(id) && staticImportGraph(context).has(id) ? 'initial' : null,
+            },
+          ],
+        },
+      },
+    },
   },
   resolve: {
     alias: {

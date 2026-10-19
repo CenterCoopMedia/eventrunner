@@ -402,6 +402,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The admin guide's early launch steps now say how to take a home section off the site (hide or
   delete its blocks, or remove the section in Pages), that "[Replace]" text and seeded statistics
   show until edited, and that **Pitch a session** appears in the home page lead only.
+- The web toolchain moves to Vite 8, `@vitejs/plugin-react` 6 and Vitest 5 (from Vite 5,
+  plugin-react 4 and Vitest 3). This clears the Dependabot alerts for `vitest` and `tinypool`
+  (critical), `vite` (high), and `@vitest/mocker` and `esbuild` (moderate). The repository now
+  needs Node 22.12 or later on Node 22, Node 24, or Node 26 and later, the range Vitest 5
+  supports. Vite 8 bundles with Rolldown, so `vite.config.js` keeps the first
+  paint in one chunk, and the specimen route reads its build switches beside its dynamic import
+  so a client build still emits no specimen chunk.
+
 - **Breaking:** `submitSessionPitch` now requires `consent: true`. Callers must record agreement
   to organizer review before submitting; requests without it return 400. Stored proposals
   record the consent version and time (#323).
