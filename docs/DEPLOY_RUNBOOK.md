@@ -389,6 +389,21 @@ unchanged, and rerun the same `bootstrap: true` dispatch. The rerun sees a nonem
 it does not force the full deploy. Case 2 creates the absent retry handlers first, and the full
 deploy then runs without `--force`.
 
+**Check after the full deploy.** After the full deploy exits 0, the script discovers the local
+Functions, if it has not yet, and reads the complete inventory again. Each local Function must be
+there, with the same id, in each of its regions. If a Function is not there, or its region is not a
+literal value, the step fails and names the Function. `firebase-tools` 15.22.4 can exit 0 when a
+create gets a quota error, before the create is done, and it then prints no summary. Run
+39329645906 did this to `downloadEventPackage`. This check makes such a run fail.
+
+**Quota errors (HTTP 429).** A large deploy can exceed the Cloud Functions limit "Per project
+mutation requests per minute per region". The log then shows `Quota Exceeded` and
+`failed to update function` or `failed to create function` lines. Firebase CLI retries these, and
+most later show `Successful update operation` or `Successful create operation`. If the step fails,
+or it names a Function that is not deployed, wait a minute and run the same deploy again. Do not
+change the commit. The rerun skips each Function that is active and unchanged, so it sends fewer
+requests and creates the Functions that are not there. Then run the smoke test again.
+
 To read the complete inventory from an operator's machine, use a clean checkout with Node 22 and
 `npm ci` complete:
 
