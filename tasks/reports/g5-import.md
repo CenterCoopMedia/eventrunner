@@ -105,3 +105,93 @@ regenerate on the stack tip clears it.
 ## Left undone
 
 - Nothing in scope. Parent sessions, logos and headshots stay editor-only (above).
+
+## Review round
+
+The adversarial review (three must-fix, six optional findings) is answered in commit
+`fe87b3e` ("Keep record imports off published speakers and out of personal data"). The
+findings touch the same planRow functions, so they are one commit.
+
+### Must fix
+
+1. **A re-import published changes to an approved speaker at once.** Fixed (`fe87b3e`).
+   Design: a change to a speaker that `isPubliclyVisibleSpeaker` says is public goes into
+   `pendingEdits`, the existing queue that `applySpeakerPendingEdits` and
+   `discardSpeakerPendingEdits` serve and that the Speakers list shows as "Changes pending
+   review". The live fields do not move, so `onSpeakerWritten` writes nothing. The merge
+   reads a queued value as the current one, so a change the speaker queued is kept (as a
+   conflict) and not replaced. An approved speaker's slug is not changed (applying the queue
+   does not move `speaker_slugs`); the row says to change it in the editor. A not-yet-public
+   speaker (draft, invited, accepted) is still written in place. Proof:
+   - `speakerImport.test.cjs` "a re-import never changes what a published speaker shows"
+     runs the projection core (`createSyncSpeakerPublic`) after each write: `speakers_public`
+     is unchanged after the import and changes only after `applyApplySpeakerPendingEdits`.
+     It failed before the fix (no pending-review note, live field written).
+   - `speakerImport.test.cjs` "keeps the slug of a published speaker, and a pending edit by
+     the speaker".
+   - `e2e/record-import.spec.js` "the change waits as pending edits, and speakers_public
+     moves only when staff apply it": the deployed function and the real trigger in the
+     emulator.
+   - Copy: the guide's draft rules, the page's preview and result notes (per type), the
+     CHANGELOG and `functions/README.md` now say a speaker change waits for review.
+2. **`record_imports` kept raw personal data.** Fixed (`fe87b3e`). A key keeps
+   `values` as a 32-hex sha256 digest per field, and no `externalId` field (the id is only
+   hashed into the key's document id). `reconcileFields` compares digests. The guide's "keeps
+   no copy" sentence now says what is kept. Test: `recordImport.test.cjs` "an import key
+   keeps no personal data". A digest of a known address can still be checked by someone who
+   guesses the address; the key's existence after a delete is still needed so a deleted
+   record is not made again.
+3. **No reconciliation with records made before the import.** Fixed (`fe87b3e`). A row
+   with no key whose slug (speaker), address (organization) or session ID belongs to a
+   record no import key points at is matched to it: verdict `update`, `matched: true`, a
+   note naming the record, and the commit writes the key with no "last" values, so the merge
+   fills only empty fields and keeps every stored value (with a note per difference). The
+   page shows "Matches existing". Guards: a record linked to another external ID is a row
+   error; a speaker with a different email address is a row error (another person); a
+   session matches by title only on the same day (so "Lunch" on day 2 does not match day
+   1), otherwise it gets a suffix and a note that names the other session and how to match
+   it. Duplicates inside one file get their own error. Tests: the "matched" tests in all
+   three importer files, and the web test "names a matched record".
+
+### Optional
+
+1. **Over-long cell cut silently.** Real; fixed. A mapped cell over 5000 characters is a
+   row error naming the field and column, before any importer reads it. Test:
+   `recordImport.test.cjs` "a mapped cell over the limit is a row error".
+2. **A reverted staff edit is not re-applied.** Real; documented (the smallest correct
+   answer). Keeping the previous last value until resolution would make the conflict note
+   repeat on every run. The guide's external ID list and the module doc now say it.
+3. **A removed speaker can be linked to a session.** Real; fixed. Row error by external ID
+   or slug. Test: `sessionImport.test.cjs` "a removed speaker is a row error".
+4. **"Publish them from the Speakers page."** Real; fixed. Per-type copy in
+   `apps/web/src/admin/recordImport.js` (`previewNote`, `doneNote`); speakers say "Invite or
+   approve them on the Speakers page".
+5. **Audit row after the writes.** Real; fixed. The commit writes the `admin_logs` row,
+   awaited, before the first record write, and a failure returns 500 with nothing imported
+   (the exportAttendees rule). The counts are merged into that row at the end
+   (`finished: true`). Tests: `recordImport.test.cjs` audit tests, including "a commit whose
+   audit row cannot be written imports nothing".
+6. **No file-size check before reading.** Real; fixed. Files over 5 MB are refused before
+   `file.text()`. Test: `AdminRecordImport.test.jsx` "refuses a file over the size limit
+   without reading it".
+
+### Review round checks (last run, after the last code and docs edit)
+
+Run on commit `fe87b3e`; only this report changed after it.
+
+- `npm run lint`: exit 0.
+- `npm test`: 3203 tests, 3202 pass, 1 fail: "the committed site matches a fresh render",
+  because `docs/ADMIN_GUIDE.md` and `CHANGELOG.md` changed. After a local
+  `node scripts/build-pages.cjs` that test file passed (63 of 63); the regenerated
+  `docs/docs` was then discarded, as instructed.
+- `npm run test -w apps/web` (lock): 293 files, 3453 tests passed.
+- `npm run test:rules` (lock): 3 files, 373 tests passed.
+- `npm run build -w apps/web` (lock): exit 0.
+- `npm run check:copy`: 535 files, no blocked patterns.
+- E2E (untracked no-sandbox Playwright config, deleted after; lock):
+  `e2e/record-import.spec.js` 3 passed (the two organization tests and the new published
+  speaker test).
+- Import server tests alone: recordImport 24, speakerImport 15, sessionImport 15,
+  organizationImport 9, all pass.
+- Not run: `build-demo --check` and `generate-content --demo --check`. The web page changed,
+  so `docs/demo` needs the director's regeneration on the stack tip, as before.
