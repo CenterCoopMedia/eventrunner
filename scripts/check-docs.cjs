@@ -265,6 +265,7 @@ module.exports = {
   checkRepository,
   extractTargets,
   extractMarkdownTargets,
+  isUnbuiltDeployTarget,
   localTargetPath,
   main,
 };
