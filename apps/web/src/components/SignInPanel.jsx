@@ -40,8 +40,7 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
 } from './controlClasses.js';
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { EMAIL_ADDRESS_RE as EMAIL_RE } from 'shared/email';
 
 /** Seconds remaining until `deadline` (ms epoch), ticking once per second. */
 function useCountdown(deadline) {

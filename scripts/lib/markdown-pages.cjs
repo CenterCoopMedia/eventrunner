@@ -27,7 +27,6 @@
  * must work from a bare checkout.
  */
 
-const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 const PUNCTUATION_RE = /[!-/:-@[-`{-~]/;
 const AUTOLINK_RE = /^<((?:https?|mailto):[^\s<>]+)>/;
 const EMAIL_AUTOLINK_RE = /^<([^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)>/;
@@ -49,6 +48,59 @@ const SETEXT_UNDERLINE_RE = /^ {0,3}(=+|-+)[ \t]*$/;
  * @param {string} text
  * @returns {string}
  */
+/** The entities escapeHtml writes, and the character each one stands for. */
+const HTML_ENTITIES = Object.freeze({ '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" });
+
+/**
+ * Decode the five entities escapeHtml writes, each once, in one pass. Two
+ * passes would read "&amp;lt;" as "<" instead of the "&lt;" the page shows.
+ */
+function unescapeHtml(text) {
+  return String(text).replace(/&(?:amp|lt|gt|quot|#39);/g, (entity) => HTML_ENTITIES[entity]);
+}
+
+/**
+ * Remove HTML comments until none is left. Removing one comment can join
+ * the text around it into a new one (`<!<!-- -->-- note -->`), and that
+ * one must not reach the page as escaped text either.
+ *
+ * One pass: characters go to the output, and when the output ends a
+ * comment that the earliest open `<!--` starts, the output drops back to
+ * that `<!--`. A join then shows up as the next characters arrive, so
+ * nested comments cost no extra pass over the text.
+ */
+function removeHtmlComments(text) {
+  const out = [];
+  let open = -1;
+  const endsWith = (token) =>
+    out.length >= token.length && out.slice(out.length - token.length).join('') === token;
+  for (const char of String(text)) {
+    out.push(char);
+    if (open === -1) {
+      if (endsWith('<!--')) open = out.length - 4;
+    } else if (out.length - 3 >= open + 4 && endsWith('-->')) {
+      out.length = open;
+      open = -1;
+    }
+  }
+  return out.join('');
+}
+
+/**
+ * Text of rendered markup: every tag removed, repeated until none is left.
+ * The renderer escapes every `<` in the source, so in practice one pass is
+ * enough; the loop makes the result hold no tag whatever the input.
+ */
+function removeTags(html) {
+  let previous;
+  let current = html;
+  do {
+    previous = current;
+    current = current.replace(/<[^>]+>/g, '');
+  } while (current !== previous);
+  return current;
+}
+
 function escapeHtml(text) {
   return String(text)
     .replaceAll('&', '&amp;')
@@ -654,7 +706,7 @@ function collectList(lines, start, context) {
  * @returns {{ html: string, title: string|null, headings: Array<{level:number,text:string,slug:string}>, description: string }}
  */
 function renderMarkdown(source, options = {}) {
-  const text = String(source).replace(/\r\n/g, '\n').replace(HTML_COMMENT_RE, '');
+  const text = removeHtmlComments(String(source).replace(/\r\n/g, '\n'));
   const headings = [];
   const used = new Map();
   const context = {
@@ -692,12 +744,7 @@ function renderMarkdown(source, options = {}) {
   const html = renderBlocks(bodyLines, context);
   const firstParagraph = /<p>([\s\S]*?)<\/p>/.exec(html);
   const description = firstParagraph
-    ? plainText(firstParagraph[1].replace(/<[^>]+>/g, ''))
-      .replaceAll('&amp;', '&')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
+    ? unescapeHtml(plainText(removeTags(firstParagraph[1])))
     : '';
 
   return { html, title, headings, description };

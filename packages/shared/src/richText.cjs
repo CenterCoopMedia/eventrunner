@@ -79,15 +79,38 @@ function isSafeRichTextHref(value) {
 }
 
 /**
+ * The value with every `<...>` run removed, scanned once from left to right.
+ * A `<` with no `>` after it stays as text. The result is only measured,
+ * never rendered, so it does not need to be safe markup.
+ */
+function textOutsideTags(value) {
+  let text = '';
+  let cursor = 0;
+  for (;;) {
+    const open = value.indexOf('<', cursor);
+    if (open === -1) break;
+    const close = value.indexOf('>', open + 1);
+    if (close === -1) break;
+    text += value.slice(cursor, open);
+    cursor = close + 1;
+  }
+  return text + value.slice(cursor);
+}
+
+/**
  * Whether sanitized rich text contains readable text or a visible divider.
  * Markup and whitespace alone do not satisfy a required rich-text field.
+ *
+ * The value comes from an editor's browser, so every step here is linear.
+ * The earlier tag patterns scanned to the end of the value from each
+ * unclosed `<hr` or `<`, which took most of a second on 50,000 characters.
  */
 function hasRichTextContent(value) {
   if (typeof value !== 'string' || value === '') return false;
-  if (/<hr(?:\s[^>]*)?>/i.test(value)) return true;
-  const text = value
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<[^>]*>/g, '')
+  // A divider is `<hr>` or `<hr` and a space, closed by any later `>`.
+  const divider = value.search(/<hr[\s>]/i);
+  if (divider !== -1 && value.indexOf('>', divider + 3) !== -1) return true;
+  const text = textOutsideTags(value.replace(/<br\s*\/?>/gi, ' '))
     .replace(/&(?:nbsp|#0*160|#x0*a0);/gi, ' ')
     // The sanitizer encodes text delimiters. Any remaining entity is one
     // text character for the required-field decision.

@@ -27,6 +27,7 @@
  */
 
 const { generateSpeakerSlug } = require('./slug.cjs');
+const { EMAIL_ADDRESS_RE, isEmailAddress } = require('./email.cjs');
 
 /**
  * Pipeline state (§4.3). `draft` is an admin-created record that has not
@@ -157,7 +158,6 @@ const MAX_SOCIAL_HANDLES = 12;
 const MAX_SOCIAL_LABEL_LENGTH = 40;
 const MAX_SOCIAL_HANDLE_LENGTH = 200;
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isPlainObject(v) {
   return Boolean(v) && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date);
@@ -312,7 +312,7 @@ function validateSpeaker(payload, { partial = false, fieldsAllowed = EDITABLE_SP
     const value = payload.email;
     if (value === null || value === '') {
       fields.email = null;
-    } else if (typeof value !== 'string' || !EMAIL_RE.test(value.trim())) {
+    } else if (typeof value !== 'string' || !isEmailAddress(value.trim())) {
       errors.push('email: must be an email address');
     } else {
       fields.email = value.trim().toLowerCase();
@@ -409,6 +409,6 @@ module.exports = {
     MAX_SOCIAL_LABEL_LENGTH,
     MAX_SOCIAL_HANDLE_LENGTH,
     SLUG_RE,
-    EMAIL_RE,
+    EMAIL_RE: EMAIL_ADDRESS_RE,
   },
 };
