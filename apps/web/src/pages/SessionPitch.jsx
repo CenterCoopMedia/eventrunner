@@ -1,11 +1,12 @@
-import { readClosesAt } from 'shared/pitch';
+import { readClosesAt, readPitchFormUrl } from 'shared/pitch';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import SignInPanel, { FormError } from '../components/SignInPanel.jsx';
 import { Checkbox } from '../components/forms/Choice.jsx';
 import { TextField, TextAreaField, focusFirstError } from '../components/forms/publicForm.jsx';
-import { primaryButtonClass, secondaryButtonClass } from '../components/controlClasses.js';
+import { primaryActionClass, primaryButtonClass, secondaryButtonClass } from '../components/controlClasses.js';
+import ExternalLink from '../components/ExternalLink.jsx';
 import { useAdminApi } from '../admin/adminApi.js';
 import { subscribePitchCall } from '../lib/pitchSource.js';
 import { newSubmissionKey } from '../lib/submissionKey.js';
@@ -63,6 +64,8 @@ export default function SessionPitch() {
 
   const deadline = Date.parse(readClosesAt(settings?.closesAt));
   const open = !configError && settings?.enabled === true && Number.isFinite(deadline) && deadline > now;
+  // An external form (for example, Airtable) replaces this site's form for the whole call.
+  const externalForm = configError ? null : readPitchFormUrl(settings?.externalFormUrl);
   function edit(field, value) {
     setPitch((previous) => ({ ...previous, [field]: value, submissionKey: newSubmissionKey() }));
     setErrors((previous) => ({ ...previous, [field]: null }));
@@ -100,10 +103,18 @@ export default function SessionPitch() {
               <h2 id="pitch-call-heading" className="sr-only">Call for sessions</h2>
               <p role="status" className="font-semibold">{IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Cannot check submissions. Reconnecting…' : !settings ? 'Checking submissions…' : open ? 'Submissions are open' : 'Submissions are closed'}</p>
               {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZoneName: undefined })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p> : null}
-              <p className="text-caption text-text-secondary">A verified email address is required. You do not need a ticket or attendee approval.</p>
+              <p className="text-caption text-text-secondary">{externalForm ? 'You do not need a ticket to pitch a session.' : 'A verified email address is required. You do not need a ticket or attendee approval.'}</p>
             </section>
       </header>
-      {saved ? (
+      {externalForm ? (
+        <section className="max-w-prose space-y-sm border-hairline border-rule-hairline bg-surface-alt p-md sm:p-lg" aria-labelledby="pitch-form-heading">
+          <h2 id="pitch-form-heading" className="font-heading text-h2 font-semibold">Pitch form</h2>
+          {open ? <>
+            <p className="text-text-secondary">The organizers collect pitches with a separate form. Its own privacy terms apply.</p>
+            <ExternalLink href={externalForm} className={primaryActionClass}>Open the pitch form</ExternalLink>
+          </> : <p className="text-text-secondary">The pitch form is not available now.</p>}
+        </section>
+      ) : saved ? (
         <section ref={savedRef} tabIndex={-1} className="space-y-sm border-hairline border-rule-hairline bg-surface-alt p-lg">
           <h2 className="font-heading text-h2 font-semibold">Your pitch is saved</h2>
           <p role="status">The organizers can now review it. Submission does not confirm a place on the schedule.</p>

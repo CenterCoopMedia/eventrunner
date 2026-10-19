@@ -40,7 +40,7 @@ test('a signed-in account submits a private pitch and staff reviews it without a
     const submitterToken = await idTokenFor(submitterUid);
 
     const opened = await callFunction('updatePitchCall', { enabled: true, closesAt: CLOSES_AT }, operatorToken);
-    expect(opened).toEqual({ status: 200, body: { enabled: true, closesAt: CLOSES_AT } });
+    expect(opened).toEqual({ status: 200, body: { enabled: true, closesAt: CLOSES_AT, externalFormUrl: null } });
 
     const payload = {
       title: 'Building durable local reporting partnerships',

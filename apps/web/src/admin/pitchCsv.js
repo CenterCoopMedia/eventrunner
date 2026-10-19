@@ -4,18 +4,20 @@ export const PITCH_COLUMNS = ['externalId', 'email', 'title', 'description', 'or
 export function readPitchCsv(text) {
   const [rawHeaders, ...table] = parseCsv(text);
   const headers = rawHeaders?.map((header) => header.trim());
-  if (!headers || headers.length !== PITCH_COLUMNS.length || !PITCH_COLUMNS.every((name) => headers.includes(name))) throw new Error(`Use these exact headers: ${PITCH_COLUMNS.join(', ')}.`);
+  // Other columns (an Airtable view's Created or Status) are ignored. A repeated name is ambiguous.
+  if (!headers || new Set(headers).size !== headers.length || !PITCH_COLUMNS.every((name) => headers.includes(name))) throw new Error(`Use these exact headers: ${PITCH_COLUMNS.join(', ')}. Other columns are ignored.`);
   const rows = table.filter((cells) => cells.some((cell) => cell.trim()));
   if (!rows.length || rows.length > 50) throw new Error('Import 1-50 proposals at a time.');
   const ids = new Set();
   return rows.map((cells, index) => {
     if (cells.length !== headers.length) throw new Error(`Row ${index + 1}: The column count does not match the headers.`);
-    const row = Object.fromEntries(headers.map((key, i) => [key, cells[i].trim()]));
+    const row = Object.fromEntries(PITCH_COLUMNS.map((key) => [key, cells[headers.indexOf(key)].trim()]));
     if (!row.externalId || row.externalId.length > 128 || ids.has(row.externalId)) throw new Error(`Row ${index + 1}: A unique source ID is required.`);
     ids.add(row.externalId);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) throw new Error(`Row ${index + 1}: A valid email is required.`);
     if (!row.title || row.title.length > 160 || !row.description || row.description.length > 5000 || row.organization.length > 200 || row.format.length > 120) throw new Error(`Row ${index + 1}: Check required text and field lengths.`);
-    if (row.consent !== 'true') throw new Error(`Row ${index + 1}: Consent must be true and evidenced in the source form.`);
+    // Airtable exports a ticked checkbox as "checked".
+    if (row.consent !== 'true' && row.consent !== 'checked') throw new Error(`Row ${index + 1}: Consent must be true or checked and evidenced in the source form.`);
     return { ...row, consent: true };
   });
 }

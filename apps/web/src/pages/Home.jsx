@@ -1,10 +1,13 @@
 // Home owns the visible hero heading, CMS actions, and optional artwork.
 // Other CMS sections stay in their authored order through SystemPage.
+import { Link } from 'react-router-dom';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import CtaBlock from '../components/blocks/CtaBlock.jsx';
+import { secondaryActionClass } from '../components/controlClasses.js';
+import { usePitchCallOpen } from '../lib/usePitchCallOpen.js';
 import EventCountdown, { countdownDraws } from '../components/EventCountdown.jsx';
 import InfoCards, { groupIntoCards } from '../components/InfoCards.jsx';
 import EventHero from '../components/EventHero.jsx';
@@ -131,6 +134,7 @@ export default function Home() {
   const { eventConfig, features, theme } = useEventConfig();
   const { getPage, getSectionBlocks, getBlock, source, contentSource } = useContent();
   const registrationAction = useRegistrationLink();
+  const pitchOpen = usePitchCallOpen();
 
   const page = getPage('home') ?? getPage('/');
   const title = getBlock('hero', 'title');
@@ -283,10 +287,11 @@ export default function Home() {
           image={demoHero(theme) ?? lead}
         >
           {subtitle?.value ? <p className="mt-sm max-w-prose text-body text-text-secondary text-pretty">{subtitle.value}</p> : null}
-          {registrationAction || heroCtas.length ? (
+          {registrationAction || heroCtas.length || pitchOpen ? (
             <div className="no-print mt-lg flex flex-wrap gap-sm">
               <RegistrationLink action={registrationAction} placement="lead" />
               {heroCtas.map((block) => <CtaBlock key={`${block.section}__${block.field}`} block={block} />)}
+              {pitchOpen ? <Link to="/pitch" className={secondaryActionClass}>Pitch a session</Link> : null}
             </div>
           ) : null}
           {heroSection ? (

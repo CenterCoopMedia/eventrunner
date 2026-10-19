@@ -8,7 +8,7 @@
 // defensively, independent of the write-boundary fix in
 // packages/shared/src/config/schema.cjs.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render as testingRender, screen, within } from '@testing-library/react';
+import { act, cleanup, render as testingRender, screen, within } from '@testing-library/react';
 
 import { MemoryRouter } from 'react-router-dom';
 const render = (ui) => testingRender(<MemoryRouter>{ui}</MemoryRouter>);
@@ -32,6 +32,11 @@ let sectionBlocks;
 // The History section (issue #194) reads the past editions as
 // ContentContext serves them: prepared, oldest first.
 let timeline;
+// The live call for sessions. Null means the document never arrived.
+let pitchCall;
+vi.mock('../lib/pitchSource.js', () => ({
+  subscribePitchCall: (onNext) => { if (pitchCall) onNext(pitchCall); return () => {}; },
+}));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({
   useEventConfig: () => ({ eventConfig, theme, features }),
 }));
@@ -109,6 +114,7 @@ beforeEach(() => {
   organizationsData = [];
   sectionBlocks = {};
   timeline = [];
+  pitchCall = null;
 });
 
 describe('Home', () => {
@@ -168,6 +174,48 @@ describe('Home', () => {
       ).not.toContain('sr-only');
       unmount();
     }
+  });
+});
+
+describe('Home pitch action', () => {
+  beforeEach(() => {
+    eventConfig = { name: 'Demo Event', days: [] };
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('links to the pitch page while the call for sessions is open', () => {
+    pitchCall = { enabled: true, closesAt: '2999-01-31T23:59:59-05:00', externalFormUrl: null };
+    render(<Home />);
+    expect(screen.getByRole('link', { name: 'Pitch a session' })).toHaveAttribute('href', '/pitch');
+  });
+
+  it('links to the same page when the call uses an external form', () => {
+    pitchCall = { enabled: true, closesAt: '2999-01-31T23:59:59Z', externalFormUrl: 'https://airtable.com/shrExample' };
+    render(<Home />);
+    expect(screen.getByRole('link', { name: 'Pitch a session' })).toHaveAttribute('href', '/pitch');
+  });
+
+  it('shows no pitch action when the call is missing, disabled, malformed, or past its deadline', () => {
+    for (const value of [
+      null,
+      { enabled: false, closesAt: '2999-01-31T23:59:59Z' },
+      { enabled: true, closesAt: 'next week' },
+      { enabled: true, closesAt: '2000-01-01T00:00:00Z' },
+    ]) {
+      pitchCall = value;
+      render(<Home />);
+      expect(screen.queryByRole('link', { name: 'Pitch a session' })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it('removes the pitch action at the deadline without a reload', async () => {
+    vi.useFakeTimers({ now: Date.parse('2027-01-31T23:59:00Z') });
+    pitchCall = { enabled: true, closesAt: '2027-01-31T23:59:30Z' };
+    render(<Home />);
+    expect(screen.getByRole('link', { name: 'Pitch a session' })).toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(31_000); });
+    expect(screen.queryByRole('link', { name: 'Pitch a session' })).toBeNull();
   });
 });
 

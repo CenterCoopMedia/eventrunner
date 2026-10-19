@@ -10,9 +10,11 @@
  * reject stale status and private-note edits.
  *
  * Pitch rows are private and server-written. The public config/pitch_call
- * document contains only `{ enabled, closesAt }`. Rate-limit rows are
- * server-only. This module does not publish a session, change an account,
- * or send mail.
+ * document contains only `{ enabled, closesAt, externalFormUrl }`. A set
+ * `externalFormUrl` sends people to another form (for example, Airtable),
+ * and this API then refuses native submissions so one call never has two
+ * intake queues. Rate-limit rows are server-only. This module does not
+ * publish a session, change an account, or send mail.
  */
 
 const crypto = require('node:crypto');
@@ -29,7 +31,7 @@ const PITCH_CALL_PATH = 'config/pitch_call';
 
 const STATUSES = Object.freeze(['new', 'in_review', 'accepted', 'rejected']);
 const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
-const { readClosesAt } = require('shared/pitch');
+const { readClosesAt, readPitchFormUrl } = require('shared/pitch');
 
 const MAX_TITLE_LENGTH = 160;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -190,7 +192,8 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
     const nowMs = now();
     const call = callSnap.exists ? callSnap.data() : null;
     const closesAt = readClosesAt(call?.closesAt);
-    if (call?.enabled !== true || !closesAt || Date.parse(closesAt) <= nowMs) {
+    if (call?.enabled !== true || !closesAt || Date.parse(closesAt) <= nowMs
+        || readPitchFormUrl(call?.externalFormUrl)) {
       return { outcome: 'closed' };
     }
 
@@ -273,24 +276,31 @@ function createUpdatePitchCallHandler({ db, auth, getConfig, now = Date.now, log
     const closesAt = readClosesAt(req.body?.closesAt);
     if (!closesAt) return badRequest(res, 'closesAt: must be an RFC3339 date and time.');
 
+    const rawFormUrl = req.body?.externalFormUrl;
+    const blankFormUrl = rawFormUrl == null || (typeof rawFormUrl === 'string' && !rawFormUrl.trim());
+    const externalFormUrl = blankFormUrl ? null : readPitchFormUrl(rawFormUrl);
+    if (!blankFormUrl && !externalFormUrl) {
+      return badRequest(res, 'externalFormUrl: must be empty or an https:// address of 2,048 characters or fewer.');
+    }
+
     const enabled = req.body.enabled;
     try {
       await db.runTransaction(async (tx) => {
         const at = new Date(now());
-        tx.set(db.collection('config').doc('pitch_call'), { enabled, closesAt });
+        tx.set(db.collection('config').doc('pitch_call'), { enabled, closesAt, externalFormUrl });
         tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
           action: 'updatePitchCall',
           docPath: PITCH_CALL_PATH,
           actor: gate,
           at,
-          details: { enabled, closesAt },
+          details: { enabled, closesAt, externalFormUrl },
         }));
       });
     } catch (err) {
       log.error('updatePitchCall failed', err);
       return internal(res, 'The session pitch call could not be saved.');
     }
-    return res.status(200).json({ enabled, closesAt });
+    return res.status(200).json({ enabled, closesAt, externalFormUrl });
   };
 }
 

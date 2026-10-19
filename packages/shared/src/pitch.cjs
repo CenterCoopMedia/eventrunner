@@ -1,5 +1,7 @@
 'use strict';
 
+const { httpsUrlHref } = require('./config/schema.cjs');
+
 const RFC3339_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|([+-])(\d{2}):(\d{2}))$/;
 
 function isValidCalendarDate(year, month, day) {
@@ -24,4 +26,17 @@ function readClosesAt(value) {
   return Number.isFinite(millis) ? new Date(millis).toISOString() : null;
 }
 
-module.exports = { readClosesAt };
+const MAX_FORM_URL_LENGTH = 2048;
+
+/**
+ * The canonical https address of an external pitch form (for example, an
+ * Airtable form), or null. Null means the site's own form takes pitches.
+ * The same reader gates the operator's write and the public link, so the
+ * page never links to a value the server would refuse.
+ */
+function readPitchFormUrl(value) {
+  const href = httpsUrlHref(value);
+  return href && href.length <= MAX_FORM_URL_LENGTH ? href : null;
+}
+
+module.exports = { readClosesAt, readPitchFormUrl, MAX_FORM_URL_LENGTH };

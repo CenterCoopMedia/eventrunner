@@ -190,11 +190,11 @@ describe('pitch call configuration', () => {
       updatedBy: 'forged@example.test',
     });
     expect(response.statusCode).toBe(200);
-    expect(response.body).toEqual({ enabled: true, closesAt: CLOSES_AT });
+    expect(response.body).toEqual({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: null });
 
     const stored = (await db.collection('config').doc('pitch_call').get()).data();
-    expect(stored).toEqual({ enabled: true, closesAt: CLOSES_AT });
-    expect(Object.keys(stored).sort()).toEqual(['closesAt', 'enabled']);
+    expect(stored).toEqual({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: null });
+    expect(Object.keys(stored).sort()).toEqual(['closesAt', 'enabled', 'externalFormUrl']);
 
     const logs = await db.collection('admin_logs').where('action', '==', 'updatePitchCall').get();
     expect(logs.size).toBe(1);
@@ -202,6 +202,41 @@ describe('pitch call configuration', () => {
 
     await assertSucceeds(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'config/pitch_call')));
     await assertFails(setDoc(doc(operatorClient(), 'config/pitch_call'), { enabled: false, closesAt: CLOSES_AT }));
+  });
+});
+
+describe('external pitch form', () => {
+  const FORM = 'https://airtable.com/appExample/shrExample';
+
+  it('stores only a canonical https form address and audits it', async () => {
+    for (const externalFormUrl of ['http://airtable.com/shr', 'javascript:alert(1)', '/pitch', 7, `https://airtable.com/${'a'.repeat(2048)}`]) {
+      const refused = await updateCall({ enabled: true, closesAt: CLOSES_AT, externalFormUrl });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.body.error.message).toMatch(/^externalFormUrl:/);
+    }
+    expect((await db.collection('config').doc('pitch_call').get()).exists).toBe(false);
+
+    const saved = await updateCall({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: ` ${FORM} ` });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.body).toEqual({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: FORM });
+    expect((await db.collection('config').doc('pitch_call').get()).data().externalFormUrl).toBe(FORM);
+    const logs = await db.collection('admin_logs').where('action', '==', 'updatePitchCall').get();
+    expect(logs.docs[0].data().details.externalFormUrl).toBe(FORM);
+
+    for (const externalFormUrl of ['', null, undefined]) {
+      const cleared = await updateCall({ enabled: true, closesAt: CLOSES_AT, externalFormUrl });
+      expect(cleared.body.externalFormUrl).toBeNull();
+    }
+  });
+
+  it('refuses a native pitch while the call sends people to an external form', async () => {
+    await db.collection('config').doc('pitch_call').set({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: FORM });
+    const response = await submit();
+    expect(response.statusCode).toBe(404);
+    expect((await db.collection('session_pitches').get()).empty).toBe(true);
+
+    await db.collection('config').doc('pitch_call').set({ enabled: true, closesAt: CLOSES_AT, externalFormUrl: null });
+    expect((await submit()).statusCode).toBe(201);
   });
 });
 

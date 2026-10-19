@@ -1,5 +1,30 @@
 # Session task list
 
+## 2026-10-19: NC Local pilot launch site (session pitches, native or Airtable)
+
+Goal: close Catherine Komp's October 12 asks for a mid-November launch site
+with early bird tickets and a session pitch call to action. The pitch form must
+work as this site's own form or as a link to an external form (Airtable).
+Stripe ticketing (#484-#486) and multiple events (one deployment per event)
+are already done. #476 (deadline controls) belongs to the #407 loop and stays
+out of this change. #324 (receipts) was not asked for.
+
+Design: `config/pitch_call` gets one optional field, `externalFormUrl`
+(https URL or null). No Airtable API key and no sync: the site links to the
+Airtable form, and staff bring answers back with the existing CSV import.
+
+- [ ] Shared: `readPitchFormUrl` (https only) in `packages/shared/src/pitch.cjs`.
+- [ ] Functions: `updatePitchCall` validates, stores and audits `externalFormUrl`.
+- [ ] Functions: `submitSessionPitch` refuses native intake while an external form is set.
+- [ ] Admin: call settings choose "This site's form" or "An external form" with a URL field.
+- [ ] Public `/pitch`: external mode shows status, deadline and one link to the form.
+- [ ] Home: a "Pitch a session" action in the lead while the call is open.
+- [ ] CSV import: accept Airtable's checkbox export (`checked`) and ignore extra columns.
+- [ ] Tests: shared unit, rules/handler, web unit, E2E where the flow changes.
+- [ ] Docs: admin guide launch-site recipe and Airtable steps; changelog; generated docs/demo.
+- [ ] Run every check last; independent review; PR; draft email to Catherine.
+
+
 ## 2026-10-13: Stripe ticket commerce epic #483
 
 Goal: open the complete MVP implementation as a reviewable stack, address connector
