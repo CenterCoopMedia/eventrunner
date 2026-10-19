@@ -158,6 +158,24 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     expect(writes[0].catalog.salesPaused).toBe(false);
   });
 
+  test('an empty cart asks for a ticket choice instead of offering a free reservation', async ({ page }) => {
+    await mockEndpoint(page, 'ticketingCatalog', async () => PUBLIC);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/tickets');
+    await expect(page.getByLabel('Quantity — General admission')).toBeVisible();
+    await expect(page.getByText('Choose at least one ticket to continue.')).toBeVisible();
+    await expect(page.getByText(/No payment is required/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Reserve tickets|Continue to Stripe/ })).toHaveCount(0);
+    await screenshot(page, 'stripe-empty-cart-mobile', page.locator('section').filter({ hasText: 'Review your total' }));
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText('Choose at least one ticket.');
+    await expect(page.getByRole('alert')).toBeFocused();
+    await page.getByLabel('Quantity — General admission').selectOption('1');
+    await expect(page.getByText('Choose at least one ticket to continue.')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeVisible();
+  });
+
   test('organizer review dialog traps focus, preserves cancellation meaning, and fits desktop/mobile', async ({ page }) => {
     test.setTimeout(180_000);
     const actions = [];

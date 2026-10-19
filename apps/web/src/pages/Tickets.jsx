@@ -155,8 +155,9 @@ export default function Tickets() {
   function submit(event) {
     event.preventDefault();
     if (submittingRef.current) return;
+    // An empty cart has one thing to fix. Its message takes focus alone.
+    if (!count) { setErrors({ cart: 'Choose at least one ticket.' }); return; }
     const nextErrors = {};
-    if (!count) nextErrors.cart = 'Choose at least one ticket.';
     if (count > Math.min(catalog.maxPerOrder || 20, 20)) nextErrors.cart = `Choose no more than ${Math.min(catalog.maxPerOrder || 20, 20)} tickets per order.`;
     for (const line of lines) {
       const type = types.find((candidate) => candidate.id === line.ticketTypeId);
@@ -316,8 +317,8 @@ export default function Tickets() {
               setAcceptedCatalogRevision(event.target.checked && validCatalogRevision ? catalog.catalogRevision : null);
               setAcceptedByUid(event.target.checked ? user.uid : null);
             }} error={errors.terms} />
-            {total > 0 ? <p>Stripe securely collects your payment on the next page. Your tickets are issued only after payment is confirmed. Returning to this site does not confirm a purchase.</p> : <p>No payment is required. The server will confirm available seats before issuing your tickets.</p>}
-            <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Preparing your order…' : total > 0 ? `Continue to Stripe — ${formatTicketMoney(total, catalog.currency)}` : 'Reserve tickets'}</button>
+            {!count ? <p>Choose at least one ticket to continue.</p> : total > 0 ? <p>Stripe securely collects your payment on the next page. Your tickets are issued only after payment is confirmed. Returning to this site does not confirm a purchase.</p> : <p>No payment is required. The server will confirm available seats before issuing your tickets.</p>}
+            <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Preparing your order…' : !count ? 'Continue' : total > 0 ? `Continue to Stripe — ${formatTicketMoney(total, catalog.currency)}` : 'Reserve tickets'}</button>
           </section>
         </form>
       ) : null}
