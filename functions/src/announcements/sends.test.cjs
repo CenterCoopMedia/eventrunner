@@ -556,13 +556,44 @@ for (const backend of backends) {
     assert.equal((await docsOf(h.db, 'email_suppressions')).length, 0);
   });
 
-  t('the unsubscribe endpoint is rate limited per client address', async () => {
-    const h = await harness({ backend });
-    for (let n = 0; n < suppressionInternals.RATE_LIMIT_MAX; n += 1) {
-      await call(h.unsubscribe, { method: 'GET', token: null, query: { s: 'send-1-abcdef', r: 'a'.repeat(64), t: 'b'.repeat(43) } });
+  t('signed one-click unsubscribes from one shared address are never rate limited', async () => {
+    // Mail providers post one-click opt-outs from their own servers, and
+    // link scanners fetch every link: many readers share one client address.
+    const people = Array.from({ length: 50 }, (_, n) => ({
+      uid: `p${n}`, email: `reader${String(n).padStart(2, '0')}@example.org`, registrationStatus: 'approved', speakerId: null,
+    }));
+    const h = await harness({ backend, seedOptions: { people } });
+    const { sent } = await previewAndSend(h, { audience: 'approved' });
+    assert.equal(sent.body.send.status, 'sent');
+    assert.equal(h.mail.length, 50);
+    for (const message of h.mail) {
+      const query = unsubscribeQuery(message);
+      const scan = await call(h.unsubscribe, { method: 'GET', token: null, query, ip: '198.51.100.7' });
+      assert.equal(scan.status, 200);
+      const res = await call(h.unsubscribe, { method: 'POST', token: null, query, body: { 'List-Unsubscribe': 'One-Click' }, ip: '198.51.100.7' });
+      assert.equal(res.status, 200, `${message.to}: ${res.status}`);
     }
-    const limited = await call(h.unsubscribe, { method: 'GET', token: null, query: { s: 'send-1-abcdef', r: 'a'.repeat(64), t: 'b'.repeat(43) } });
+    assert.equal((await docsOf(h.db, 'email_suppressions')).length, 50);
+    assert.equal((await docsOf(h.db, suppressionInternals.RATE_LIMIT_COLLECTION)).length, 0, 'a signed request takes no rate-limit slot');
+  });
+
+  t('requests with a bad signature are rate limited per client address, and a signed one still passes', async () => {
+    const h = await harness({ backend });
+    await previewAndSend(h);
+    const forged = { s: 'send-1-abcdef', r: 'a'.repeat(64), t: 'b'.repeat(43) };
+    for (let n = 0; n < suppressionInternals.RATE_LIMIT_MAX; n += 1) {
+      assert.equal((await call(h.unsubscribe, { method: 'POST', token: null, query: forged })).status, 400);
+    }
+    const limited = await call(h.unsubscribe, { method: 'GET', token: null, query: forged });
     assert.equal(limited.status, 429);
+    const elsewhere = await call(h.unsubscribe, { method: 'GET', token: null, query: forged, ip: '192.0.2.44' });
+    assert.equal(elsewhere.status, 400);
+
+    // The same address is over its limit, and a correctly signed opt-out from it is still recorded.
+    const signed = unsubscribeQuery(h.mail[0]);
+    const res = await call(h.unsubscribe, { method: 'POST', token: null, query: signed, body: { 'List-Unsubscribe': 'One-Click' } });
+    assert.equal(res.status, 200);
+    assert.equal((await docsOf(h.db, 'email_suppressions')).length, 1);
   });
 
   // --- Historical demo ---------------------------------------------------------

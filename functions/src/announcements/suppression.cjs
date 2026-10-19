@@ -27,8 +27,10 @@
  * carries an inert link (`?test=1`) that changes nothing.
  *
  * A GET never records an opt-out: mail scanners fetch links, and a scanner
- * must not unsubscribe a reader. Both methods are rate limited per client
- * IP, and each recorded opt-out writes an admin_logs row with no address.
+ * must not unsubscribe a reader. A request whose signature fails is rate
+ * limited per client IP; a correctly signed one never is, because mail
+ * providers and link scanners send many readers' requests from one
+ * address. Each recorded opt-out writes an admin_logs row with no address.
  */
 
 const crypto = require('node:crypto');
@@ -246,13 +248,19 @@ function createEmailUnsubscribeHandler({ db, getConfig, now = Date.now, log = co
     }
 
     try {
-      const limit = await takeRateLimitSlot({ db, ipHash: hashIp(extractClientIp(req)), now });
-      if (limit.limited) {
-        return sendPage(res, 429, page({ title: 'Try again later', body: 'Too many requests came from this network. Try again in 15 minutes.' }));
-      }
+      // The signature is checked first, and a correctly signed request is
+      // never rate limited. Mail providers post one-click opt-outs from
+      // their own servers and link scanners fetch every link, so many
+      // readers share one client address; a per-address limit on them
+      // would drop real opt-outs that no mail client retries. Only a
+      // request that fails the check takes a slot.
       const sendSnap = await db.collection(SENDS).doc(sendId).get();
       const key = sendSnap.exists ? sendSnap.data()?.unsubscribeKey : null;
       if (typeof key !== 'string' || !signaturesMatch(signUnsubscribe(key, sendId, rid), signature)) {
+        const limit = await takeRateLimitSlot({ db, ipHash: hashIp(extractClientIp(req)), now });
+        if (limit.limited) {
+          return sendPage(res, 429, page({ title: 'Try again later', body: 'Too many requests came from this network. Try again in 15 minutes.' }));
+        }
         return invalid();
       }
 
