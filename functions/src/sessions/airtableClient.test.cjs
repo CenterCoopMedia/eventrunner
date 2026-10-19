@@ -4,7 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   AirtableError, readAirtableSource, listAirtableRecords, airtableOrigin, redact,
-  internals: { MIN_REQUEST_GAP_MS, RATE_LIMIT_WAIT_MS, MAX_PAGES },
+  internals: { MIN_REQUEST_GAP_MS, RATE_LIMIT_WAIT_MS, MAX_PAGES, LIST_BUDGET_MS },
 } = require('./airtableClient.cjs');
 
 const TOKEN = 'pat' + 'FAKEfake000000.' + '0'.repeat(64);
@@ -139,6 +139,20 @@ test('reports a lasting 429 and other refusals with a safe code and message', as
   }
   const { fetchImpl } = fakeFetch([response(422, { error: { type: 'UNKNOWN_FIELD_NAME' } })]);
   await assert.rejects(listAirtableRecords({ fetchImpl, token: TOKEN, source, env: {}, ...clock() }), /UNKNOWN_FIELD_NAME/);
+});
+
+test('stops with a stated reason before rate-limit waits pass the run budget', async () => {
+  // Each page meets two 429s before it succeeds: 60 seconds of waiting.
+  const answers = Array.from({ length: MAX_PAGES }, (_, i) => [response(429, {}), response(429, {}), response(200, { records: [rec(i)], offset: `itr${i}` })]).flat();
+  const { fetchImpl } = fakeFetch(answers);
+  const time = clock();
+  const start = time.now();
+  await assert.rejects(listAirtableRecords({ fetchImpl, token: TOKEN, source, env: {}, ...time }), (err) => {
+    assert.ok(err instanceof AirtableError);
+    assert.equal(err.code, 'timed-out');
+    return true;
+  });
+  assert.ok(time.now() - start <= LIST_BUDGET_MS, `waited ${time.now() - start} ms`);
 });
 
 test('refuses to run without a token', async () => {

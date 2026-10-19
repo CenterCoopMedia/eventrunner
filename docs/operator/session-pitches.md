@@ -63,7 +63,7 @@ The names must match the Airtable field names exactly, including capitals and sp
 - **By hand.** Staff or an operator choose **Refresh from Airtable**. A refresh can start once a minute. A second refresh while one runs is refused.
 - **Automatic.** An operator picks **Every 15 minutes** or **Every hour** in the settings. The default is off. `scheduledAirtablePitchRefresh` runs every 15 minutes. It returns at once unless a timing is set and that much time has passed since the last run. It does the same work as the button. It is not a queue: nothing waits in Firestore for a later run.
 
-Each refresh reads up to 1,000 records (10 pages of 100). It sends at most four requests a second, below Airtable's limit of five per base. After a rate-limit answer (429) it waits 30 seconds and tries again, two times at most. A view with more than 1,000 records ends as **Completed in part**. Use a smaller view, for example one that hides declined records.
+Each refresh reads up to 1,000 records (10 pages of 100). It sends at most four requests a second, below Airtable's limit of five per base. After a rate-limit answer (429) it waits 30 seconds and tries again, two times at most. The read stops after 4 minutes, so the run always records its result inside the function's 5-minute limit. A view with more than 1,000 records ends as **Completed in part**. Use a smaller view, for example one that hides declined records.
 
 ### What a refresh changes
 
@@ -93,6 +93,7 @@ The **Refresh pitches from Airtable** panel shows the last run: when it ran, who
 | Airtable cannot find this base, table or view | Compare the IDs in the settings with the Airtable address. |
 | Airtable refused the request (`UNKNOWN_FIELD_NAME`) | A mapped field name does not match Airtable. Check capitals, spaces and renamed fields. |
 | Airtable asked Event Runner to slow down | Another tool uses the same base. Wait one minute and refresh again. |
+| Airtable answered too slowly or asked Event Runner to slow down too often | The read reached its 4-minute limit and no pitch changed. Wait a few minutes and refresh again. If it repeats, use a smaller view. |
 | A refresh is already running | Wait for it to finish. A run that stops without finishing releases its lock after 10 minutes. |
 
 The token never appears in the status, the audit log, an error message or the function logs. To rotate it, add a new secret version and deploy the refresh functions again. To stop the connection, clear **Use this Airtable connection**. Pitches already in the queue stay.

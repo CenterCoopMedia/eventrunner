@@ -37,6 +37,9 @@ const MIN_REQUEST_GAP_MS = 250;
 const RATE_LIMIT_WAIT_MS = 30_000;
 const SERVER_ERROR_WAIT_MS = 2_000;
 const MAX_ATTEMPTS = 3;
+// The refresh function has 300 seconds. The read stops at 240, so the run
+// still has time to save what it read and to release its lease.
+const LIST_BUDGET_MS = 240_000;
 
 class AirtableError extends Error {
   constructor(code, message, status = null) {
@@ -152,7 +155,14 @@ async function readJson(response) {
  */
 async function listAirtableRecords({ fetchImpl, token, source, env = process.env, sleep, now = Date.now, maxPages = MAX_PAGES }) {
   if (typeof token !== 'string' || !token.trim()) throw new AirtableError('no-token', 'The AIRTABLE_API_TOKEN secret is not set for this deployment.');
-  const wait = sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const deadline = now() + LIST_BUDGET_MS;
+  const sleepFor = sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const wait = async (ms) => {
+    if (now() + ms >= deadline) {
+      throw new AirtableError('timed-out', 'Airtable answered too slowly or asked Event Runner to slow down too often. The refresh stopped before its time limit and changed no pitch. Try again in a few minutes.');
+    }
+    await sleepFor(ms);
+  };
   const origin = airtableOrigin(env);
   const records = [];
   let offset = null;
@@ -173,6 +183,8 @@ async function listAirtableRecords({ fetchImpl, token, source, env = process.env
           method: 'GET',
           headers: { Authorization: `Bearer ${token.trim()}`, Accept: 'application/json' },
           redirect: 'error',
+          // A request that hangs ends at the deadline, not at the function timeout.
+          signal: AbortSignal.timeout(Math.max(1, deadline - now())),
         });
       } catch (err) {
         if (err instanceof AirtableError) throw err;
@@ -209,6 +221,6 @@ module.exports = {
   redact,
   internals: {
     AIRTABLE_ORIGIN, BASE_ID_RE, TABLE_ID_RE, VIEW_ID_RE, RECORD_ID_RE, FIELD_KEYS, REQUIRED_FIELD_KEYS,
-    SCHEDULE_MINUTES, PAGE_SIZE, MAX_PAGES, MIN_REQUEST_GAP_MS, RATE_LIMIT_WAIT_MS, MAX_ATTEMPTS, listUrl,
+    SCHEDULE_MINUTES, PAGE_SIZE, MAX_PAGES, MIN_REQUEST_GAP_MS, RATE_LIMIT_WAIT_MS, MAX_ATTEMPTS, LIST_BUDGET_MS, listUrl,
   },
 };
