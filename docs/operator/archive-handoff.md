@@ -20,9 +20,9 @@ A portable export is not a backup of the project. A managed export (below) is a 
 
 Open **Data export** in the admin panel (System group). Staff and operators can export:
 
-- **Sessions**: title, state, day, times, location, speakers and description.
+- **Sessions**: title, state, whether it is hidden, day, times, location, speakers and description.
 - **Speakers**: name, email address, organization, status and published sessions.
-- **Organizations and sponsors**: name, state, tier, website and description.
+- **Organizations and sponsors**: name, state, whether it is hidden, tier, website and description.
 
 Operators can also export **Ticket orders** and **Admissions**. Those files name purchasers and amounts.
 
@@ -40,6 +40,8 @@ An operator selects **Download event data package** on the **Data export** page.
 - `README.md`: what each file holds, the formats, the relationships, and the rules for personal data.
 
 **Choose the parts.** Every part is selected at the start. Clear the parts the client does not need. **Include staff notes on session pitches** is off at the start. Turn it on only when the client asks for the reviewers' notes.
+
+**Live records only.** Every file in the package, CSV files included, holds the live version of each record. A draft that was never published, and a newer draft of a live record, are not in it. A hidden live record is in it: `visible` is `false` in its JSON record, and **Hidden** is `yes` in its CSV row. Before you send the package to a third party, check the hidden records. The staff spreadsheets differ: they show drafts, with their state.
 
 **What the package never holds.** `config/bootstrap` (the admin allowlist), `config/providers`, drafts and version history, the admin log, sign-in codes, rate limits, the sent mail log, invite tokens, webhook deliveries, the ticket sync queue, payment attempts, raw provider payloads, and every credential. Credentials live in Secret Manager, not in Firestore. The manifest lists each excluded collection with its reason.
 

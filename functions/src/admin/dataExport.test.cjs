@@ -148,6 +148,9 @@ test('sessions: the current revision with its state, speaker names, the day, and
   assert.equal(byId['session-panel'].Speakers, 'Ada Quill; Bo Reyes');
   assert.equal(byId['session-panel']['Part of'], '\'=HYPERLINK("http://example.test","Keynote")');
   assert.equal(byId['session-draft'].State, 'Draft');
+  assert.equal(byId['session-panel'].Hidden, 'no');
+  assert.equal(byId['pitch-pitch-1'].State, 'Live');
+  assert.equal(byId['pitch-pitch-1'].Hidden, 'yes');
   assertNoSecrets(res.body.csv);
 });
 
@@ -162,18 +165,26 @@ test('speakers: contact and pipeline fields only, never the account id, invite t
   assert.equal(ada['Published sessions'], '\'=HYPERLINK("http://example.test","Keynote"); Data panel');
   assert.equal(ada['Social handles'], 'mastodon: @ada@example.social');
   assert.ok(!res.body.csv.includes('uid-ada'), 'no account id');
+  // A hidden session is not published: the site does not show it.
+  const cy = rows.find((row) => row['Speaker ID'] === 'pitch-pitch-1');
+  assert.equal(cy['Published sessions'], '');
   assert.ok(!res.body.csv.includes('PRIVATE-pending-bio'), 'no staged edits');
   assertNoSecrets(res.body.csv);
 });
 
-test('organizations: the escaped name, tier and website', async () => {
+test('organizations: the escaped name, tier and website, the state, and whether the site hides it', async () => {
   const { handler } = setup();
   const res = await run(handler, 'staff', { dataset: 'organizations' });
-  const [org] = asObjects(parseCsv(res.body.csv));
+  const byId = Object.fromEntries(asObjects(parseCsv(res.body.csv)).map((row) => [row['Organization ID'], row]));
+  const org = byId['org-ledger'];
   assert.equal(org.Name, '\'+SUM(1,2)');
   assert.equal(org.Tier, 'Sponsor');
   assert.equal(org.Website, 'https://example.org/');
   assert.equal(org.State, 'Live');
+  assert.equal(org.Hidden, 'no');
+  assert.deepEqual([byId['org-gazette'].State, byId['org-gazette'].Hidden], ['Live', 'yes']);
+  // The staff spreadsheet is the admin list: a draft is in it, with its state.
+  assert.equal(byId['org-embargo'].State, 'Draft');
   assertNoSecrets(res.body.csv);
 });
 

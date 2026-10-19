@@ -74,15 +74,21 @@ function stateWord(live, draft) {
 /**
  * The current revision of every record in a publishable collection: the
  * draft where one exists, else the live document, the same record the admin
- * list shows. Each carries its state word.
+ * list shows. Each carries its state word, and `hidden` when that revision
+ * has visible: false (the admin list's Hidden badge).
+ *
+ * `liveOnly` reads the live documents only, with no draft: the event data
+ * package holds no draft (eventPackage.cjs EXCLUDED).
  *
  * A draft never holds `materialCount`: materials/store.cjs keeps it on the
  * live session only (cms/store.cjs RESERVED_FIELDS). The record takes it
  * from the live document.
  */
-async function readCurrent({ db, collection, counter, maxDocs }, toRecord) {
+async function readCurrent({ db, collection, counter, maxDocs, liveOnly = false }, toRecord) {
   const live = await readRecords({ db, collection, counter, maxDocs }, (id, data) => ({ id, data }));
-  const drafts = await readRecords({ db, collection: `${collection}_drafts`, counter, maxDocs }, (id, data) => ({ id, data }));
+  const drafts = liveOnly
+    ? []
+    : await readRecords({ db, collection: `${collection}_drafts`, counter, maxDocs }, (id, data) => ({ id, data }));
   const liveById = new Map(live.map((entry) => [entry.id, entry.data]));
   const draftById = new Map(drafts.map((entry) => [entry.id, entry.data]));
   const ids = [...new Set([...liveById.keys(), ...draftById.keys()])].sort();
@@ -92,7 +98,7 @@ async function readCurrent({ db, collection, counter, maxDocs }, toRecord) {
     const current = draftDoc && typeof liveDoc?.materialCount === 'number'
       ? { ...draftDoc, materialCount: liveDoc.materialCount }
       : draftDoc ?? liveDoc;
-    return { ...toRecord(id, current), state: stateWord(liveDoc, draftDoc) };
+    return { ...toRecord(id, current), state: stateWord(liveDoc, draftDoc), hidden: current.visible === false };
   });
 }
 
@@ -118,8 +124,8 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'sessions',
     docPath: 'cmsSchedule',
-    async read({ db, counter, maxDocs, config }) {
-      const sessions = await readCurrent({ db, collection: 'cmsSchedule', counter, maxDocs }, sessionRecord);
+    async read({ db, counter, maxDocs, config, liveOnly }) {
+      const sessions = await readCurrent({ db, collection: 'cmsSchedule', counter, maxDocs, liveOnly }, sessionRecord);
       const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs }, speakerRecord);
       const names = new Map(speakers.map((speaker) => [speaker.id, speakerName(speaker)]));
       const titles = new Map(sessions.map((session) => [session.id, session.title]));
@@ -136,6 +142,7 @@ const DATASETS = Object.freeze({
       { header: 'Session ID', value: (row) => row.id },
       { header: 'Title', value: (row) => row.title },
       { header: 'State', value: (row) => row.state },
+      { header: 'Hidden', value: (row) => (row.hidden ? 'yes' : 'no') },
       { header: 'Day', value: (row) => row.day.label },
       { header: 'Date', value: (row) => row.day.date },
       { header: 'Start time', value: (row) => row.startTime },
@@ -157,7 +164,9 @@ const DATASETS = Object.freeze({
     docPath: 'speakers',
     async read({ db, counter, maxDocs }) {
       const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs }, speakerRecord);
-      const sessions = await readRecords({ db, collection: 'cmsSchedule', counter, maxDocs }, sessionRecord);
+      // Published: a live session the site shows, not a hidden one.
+      const sessions = (await readRecords({ db, collection: 'cmsSchedule', counter, maxDocs }, sessionRecord))
+        .filter((session) => session.visible !== false);
       return speakers.map((speaker) => ({
         ...speaker,
         sessionTitles: sessions.filter((session) => session.speakerIds.includes(speaker.id)).map((session) => session.title),
@@ -183,11 +192,12 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'organizations',
     docPath: 'cmsOrganizations',
-    read: ({ db, counter, maxDocs }) => readCurrent({ db, collection: 'cmsOrganizations', counter, maxDocs }, organizationRecord),
+    read: ({ db, counter, maxDocs, liveOnly }) => readCurrent({ db, collection: 'cmsOrganizations', counter, maxDocs, liveOnly }, organizationRecord),
     columns: [
       { header: 'Organization ID', value: (row) => row.id },
       { header: 'Name', value: (row) => row.name },
       { header: 'State', value: (row) => row.state },
+      { header: 'Hidden', value: (row) => (row.hidden ? 'yes' : 'no') },
       { header: 'Tier', value: (row) => row.tier },
       { header: 'Website', value: (row) => row.url },
       { header: 'Description', value: (row) => row.description },

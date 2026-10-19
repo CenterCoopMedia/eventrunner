@@ -113,6 +113,9 @@ describe('AdminDataExport', () => {
     }
     expect(screen.getByRole('checkbox', { name: 'Include staff notes on session pitches' })).not.toBeChecked();
     expect(screen.queryByText(/An operator exports/)).toBeNull();
+    // The server builds every package file from live records (eventPackage.cjs datasetFile).
+    expect(screen.getByText(/It holds live records only: no drafts\. A hidden record is in it and marked hidden\./)).toBeInTheDocument();
+    expect(screen.getByText(/drafts included, with its state/)).toBeInTheDocument();
   });
 
   it('downloads the package with the parts and the staff-note choice the operator made', async () => {

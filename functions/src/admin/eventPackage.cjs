@@ -16,7 +16,8 @@
  *
  * WHAT NEVER GOES. config/bootstrap (the admin allowlist) and
  * config/providers (provider wiring), every draft and version-history
- * collection, the audit log, sign-in challenges, rate-limit windows, the
+ * collection (the CSV files too read the live documents only; a hidden
+ * live record goes, with visible: false), the audit log, sign-in challenges, rate-limit windows, the
  * sent-mail log, invite tokens, webhook deliveries, the ticket sync queue,
  * payment attempts and raw provider payloads, and every secret. EXCLUDED
  * below is that list with the reason for each, and the manifest carries it,
@@ -90,7 +91,10 @@ function jsonFile(path, source, toRecord, description) {
   };
 }
 
-/** One of the spreadsheets from dataExport.cjs, as a CSV file in the package. */
+/**
+ * One of the spreadsheets from dataExport.cjs, as a CSV file in the
+ * package. It reads the live documents only: the package holds no draft.
+ */
 function datasetFile(path, name, description) {
   const dataset = DATASETS[name];
   return {
@@ -98,7 +102,7 @@ function datasetFile(path, name, description) {
     source: dataset.docPath,
     format: 'csv',
     description,
-    build: (ctx) => dataset.read(ctx),
+    build: (ctx) => dataset.read({ ...ctx, liveOnly: true }),
     toCsv: (rows) => buildDatasetCsv(dataset, rows, Infinity),
   };
 }
@@ -127,10 +131,10 @@ const SECTIONS = Object.freeze([
           return out;
         },
       },
-      jsonFile('content/content.json', 'cmsContent', publicRecord, 'Published content blocks: one record per section and field.'),
-      jsonFile('content/pages.json', 'cmsPages', publicRecord, 'Published pages with their blocks.'),
-      jsonFile('content/updates.json', 'cmsUpdates', publicRecord, 'Published updates (news posts).'),
-      jsonFile('content/timeline.json', 'cmsTimeline', publicRecord, 'Published timeline entries.'),
+      jsonFile('content/content.json', 'cmsContent', publicRecord, 'Live content blocks: one record per section and field. visible is false for a block the site hides.'),
+      jsonFile('content/pages.json', 'cmsPages', publicRecord, 'Live pages with their sections. visible is false for a page the site hides.'),
+      jsonFile('content/updates.json', 'cmsUpdates', publicRecord, 'Live updates (news posts). visible is false for an update the site hides.'),
+      jsonFile('content/timeline.json', 'cmsTimeline', publicRecord, 'Live timeline entries. visible is false for an entry the site hides.'),
       jsonFile('content/announcements.json', 'announcements', publicRecord, 'Announcements with their display windows.'),
       jsonFile('content/live-updates.json', 'live_updates', publicRecord, 'Live updates posted during the event.'),
       jsonFile('content/media.json', 'media_assets', mediaRecord, 'The media library index: each uploaded file\'s Storage path, type, size, alt text and title. The files themselves stay in Storage.'),
@@ -140,8 +144,8 @@ const SECTIONS = Object.freeze([
     id: 'program',
     label: 'Program',
     files: [
-      jsonFile('program/sessions.json', 'cmsSchedule', sessionRecord, 'Published sessions. speakerIds lists speakers/speakers.json ids; parentId names another session.'),
-      datasetFile('program/sessions.csv', 'sessions', 'Every session as a spreadsheet: the current revision, its state, day, times and speaker names.'),
+      jsonFile('program/sessions.json', 'cmsSchedule', sessionRecord, 'Live sessions. visible is false for a session the site hides, such as one converted from a pitch and not yet shown. speakerIds lists speakers/speakers.json ids; parentId names another session.'),
+      datasetFile('program/sessions.csv', 'sessions', 'Live sessions as a spreadsheet: day, times, speaker names, and Hidden for a session the site hides. No drafts.'),
     ],
   },
   {
@@ -149,15 +153,15 @@ const SECTIONS = Object.freeze([
     label: 'Speakers',
     files: [
       jsonFile('speakers/speakers.json', 'speakers', speakerRecord, 'Every speaker record with contact address and pipeline status. No account ids or invite tokens.'),
-      datasetFile('speakers/speakers.csv', 'speakers', 'Speakers as a spreadsheet, with the titles of their published sessions.'),
+      datasetFile('speakers/speakers.csv', 'speakers', 'Speakers as a spreadsheet, with the titles of their published sessions (live and shown).'),
     ],
   },
   {
     id: 'organizations',
     label: 'Organizations and sponsors',
     files: [
-      jsonFile('organizations/organizations.json', 'cmsOrganizations', organizationRecord, 'Published organizations and sponsors with tier, website and logo path.'),
-      datasetFile('organizations/organizations.csv', 'organizations', 'Organizations as a spreadsheet: the current revision and its state.'),
+      jsonFile('organizations/organizations.json', 'cmsOrganizations', organizationRecord, 'Live organizations and sponsors with tier, website and logo path. visible is false for one the site hides.'),
+      datasetFile('organizations/organizations.csv', 'organizations', 'Live organizations as a spreadsheet, with Hidden for one the site hides. No drafts.'),
     ],
   },
   {
@@ -223,7 +227,7 @@ const SECTION_IDS = Object.freeze(SECTIONS.map((section) => section.id));
 const EXCLUDED = Object.freeze([
   { source: 'config/bootstrap', reason: 'The admin allowlist. It controls access to this deployment.' },
   { source: 'config/providers', reason: 'Provider wiring for this deployment. Secrets live in Secret Manager and never in Firestore.' },
-  { source: '*_drafts, cmsVersionHistory, cmsPublishQueue, cmsMeta', reason: 'Editing state. The package holds published records; the CSV files show the current revision.' },
+  { source: '*_drafts, cmsVersionHistory, cmsPublishQueue, cmsMeta', reason: 'Editing state. Every file holds live records only: a draft that was never published is not in the package. A hidden live record is, with visible: false (Hidden: yes in a CSV file).' },
   { source: 'admin_logs', reason: 'The audit log stays with the deployment. Request it separately.' },
   { source: 'auth_challenges, auth_rate_limits, auth_send_ceiling', reason: 'Sign-in codes and limits. Credentials.' },
   { source: '*_rate_limits', reason: 'Rate-limit windows. Operational only.' },

@@ -14,9 +14,12 @@
  *      field added to one of these documents later stays private until it is
  *      added here, the same rule users/export.cjs applies to attendees.
  *   2. Public-by-design collections (the live CMS documents and the public
- *      config documents). Anybody can read them already, so the record is
- *      the stored document, with timestamps as ISO strings and the
- *      bookkeeping keys (`updatedBy`, `publishedBy` and the like) removed.
+ *      config documents). Anybody can read a shown one already, so the
+ *      record is the stored document, with timestamps as ISO strings and
+ *      the bookkeeping keys (`updatedBy`, `publishedBy` and the like)
+ *      removed. A hidden live document (visible: false) is admin-only; its
+ *      record keeps `visible`, so a reader can tell. Drafts are never read
+ *      into a package.
  *
  * Both kinds then pass through `scrub`, which removes any key that names a
  * credential (a token, a secret, a password, a key, a signature) or a raw

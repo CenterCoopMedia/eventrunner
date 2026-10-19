@@ -213,16 +213,27 @@ test('no file holds a secret, a credential, a private note, a staff address or a
   assert.equal(catalog[0].ticketTypes[0].unitAmount, 2500);
 });
 
-test('records: published sessions only in JSON, the draft in the CSV with its state', async () => {
+test('records: no file holds a draft; a hidden live record is in, and marked hidden', async () => {
   const { files } = readEventPackage((await packageFor()).body);
   const sessions = json(files, 'program/sessions.json');
   assert.deepEqual(sessions.map((s) => s.id), ['pitch-pitch-1', 'session-keynote', 'session-panel']);
   assert.equal(sessions[2].title, 'Data panel');
+  assert.deepEqual(sessions.map((s) => s.visible), [false, true, true]);
   assert.equal(Object.hasOwn(sessions[1], 'publishedBy'), false);
   const csv = files.get('program/sessions.csv').toString('utf8');
   assert.ok(csv.startsWith('\uFEFF'));
-  assert.match(csv, /"session-draft","Unpublished workshop","Draft"/);
   assert.match(csv, /"'=HYPERLINK\(""http:\/\/example.test"",""Keynote""\)"/);
+  assert.match(csv, /"session-panel","Data panel","Live","no"/);
+  assert.match(csv, /"pitch-pitch-1","Local data desks","Live","yes"/);
+  const organizations = json(files, 'organizations/organizations.json');
+  assert.deepEqual(organizations.map((o) => [o.id, o.visible]), [['org-gazette', false], ['org-ledger', true]]);
+  assert.match(files.get('organizations/organizations.csv').toString('utf8'), /"org-gazette","Gazette","Live","yes"/);
+  for (const [path, data] of files) {
+    const text = data.toString('utf8');
+    for (const draft of ['Unpublished workshop', 'Data panel (revised)', 'Embargoed sponsor', 'Draft"']) {
+      assert.ok(!text.includes(draft), `${path} holds no draft (${draft})`);
+    }
+  }
 });
 
 test('records: attendees, orders, admissions and pitches keep their joins and their review state', async () => {
@@ -278,7 +289,7 @@ test('every package writes an admin_logs row before it is sent; no row, no packa
     action: 'downloadEventPackage', docPath: 'event-package', uid: 'admin-1', email: ADMIN, at: T0,
     details: {
       sections: ['program'], includeStaffNotes: false,
-      files: [{ path: 'program/sessions.json', records: 3 }, { path: 'program/sessions.csv', records: 4 }],
+      files: [{ path: 'program/sessions.json', records: 3 }, { path: 'program/sessions.csv', records: 3 }],
       bytes: res.body.length,
     },
   });

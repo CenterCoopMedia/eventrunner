@@ -86,6 +86,12 @@ const LEDGER = {
   slug: 'ledger', name: '+SUM(1,2)', tier: 'Sponsor', url: 'https://example.org/', description: 'A sponsor.',
   logoPath: 'cms-images/asset-2/ledger.png', order: 1,
 };
+const GAZETTE = {
+  slug: 'gazette', name: 'Gazette', tier: 'Partner', url: 'https://example.net/', description: 'A partner.', order: 2,
+};
+const EMBARGO = {
+  slug: 'embargoed-sponsor', name: 'Embargoed sponsor', tier: 'Sponsor', url: 'https://example.com/', description: 'Not announced.', order: 3,
+};
 
 function exportSeed() {
   return {
@@ -143,9 +149,14 @@ function exportSeed() {
       approvedAt: null, createdAt: AT, updatedAt: AT, updatedBy: STAFF,
     },
 
-    // cmsOrganizations: the same two-revision store.
+    // cmsOrganizations: the same two-revision store. Gazette is published
+    // and hidden (visible: false). The embargoed sponsor is a draft only:
+    // no package file may hold it.
     'cmsOrganizations/org-ledger': { ...LEDGER, visible: true, ...published(1) },
     'cmsOrganizations_drafts/org-ledger': cleanDraft(LEDGER, true, 1),
+    'cmsOrganizations/org-gazette': { ...GAZETTE, visible: false, ...published(1) },
+    'cmsOrganizations_drafts/org-gazette': cleanDraft(GAZETTE, false, 1),
+    'cmsOrganizations_drafts/org-embargo': dirtyDraft(EMBARGO, true, null),
 
     // The other CMS collections: content blocks keyed <section>__<field>
     // (cms/content.cjs), pages (cms/pages.cjs), updates (cms/updates.cjs)

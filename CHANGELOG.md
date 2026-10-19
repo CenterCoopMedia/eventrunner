@@ -98,8 +98,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   speakers, and organizations as CSV files; operators also export ticket orders and
   admissions, and download the event data package: one zip with a JSON file per record
   type, CSV files, a versioned `manifest.json` with record counts and checksums, and a
-  README on formats, links between files, and personal data. The package leaves out
-  the admin allowlist, credentials, drafts, the audit log, and raw provider records,
+  README on formats, links between files, and personal data. The package holds live
+  records only, with hidden ones marked, and leaves out the admin allowlist,
+  credentials, drafts, the audit log, and raw provider records,
   and staff notes on pitches go only when the operator includes them. Every export
   writes its admin log entry before the file is sent. `scripts/export-event-package.cjs`
   builds the same package for a large event and checks a saved one with `--verify`.

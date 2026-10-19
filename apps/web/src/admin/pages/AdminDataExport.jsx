@@ -45,7 +45,7 @@ export const SPREADSHEETS = Object.freeze([
     label: 'Sessions',
     tier: 'staff',
     noun: ['session', 'sessions'],
-    description: 'Title, state, day, times, location, speakers, and description of every session.',
+    description: 'Title, state, whether it is hidden, day, times, location, speakers, and description of every session.',
   },
   {
     dataset: 'speakers',
@@ -59,7 +59,7 @@ export const SPREADSHEETS = Object.freeze([
     label: 'Organizations and sponsors',
     tier: 'staff',
     noun: ['organization', 'organizations'],
-    description: 'Name, state, tier, website, and description of every organization.',
+    description: 'Name, state, whether it is hidden, tier, website, and description of every organization.',
   },
   {
     dataset: 'orders',
@@ -202,7 +202,7 @@ export default function AdminDataExport() {
       <Panel
         flush
         title="Spreadsheets"
-        description="One CSV file for each list. Each file shows the current version of every record and its state. A cell that starts with =, +, - or @ gains a leading apostrophe, so a spreadsheet shows it as text and does not run it."
+        description="One CSV file for each list. Each file shows the current version of every record, drafts included, with its state. A cell that starts with =, +, - or @ gains a leading apostrophe, so a spreadsheet shows it as text and does not run it."
       >
         <ul>
           {sheets.map((sheet) => (
@@ -230,7 +230,7 @@ export default function AdminDataExport() {
       {isOperator ? (
         <Panel
           title="Event data package"
-          description="One zip file for the handoff. It holds a JSON file for each record type, CSV files for the main lists, a manifest with record counts and checksums, and a README that describes each file. It leaves out credentials, the admin allowlist, drafts, and raw payment provider records. Uploaded files stay in Storage; the package lists their paths."
+          description="One zip file for the handoff. It holds a JSON file for each record type, CSV files for the main lists, a manifest with record counts and checksums, and a README that describes each file. It holds live records only: no drafts. A hidden record is in it and marked hidden. It leaves out credentials, the admin allowlist, and raw payment provider records. Uploaded files stay in Storage; the package lists their paths."
         >
           <div className="flex flex-col gap-md">
             <fieldset className="flex flex-col gap-sm">
