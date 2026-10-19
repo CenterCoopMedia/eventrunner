@@ -86,11 +86,12 @@ describe('Airtable refresh status and action', () => {
     expect(call).toHaveBeenCalledTimes(1);
     expect(call).toHaveBeenCalledWith('refreshAirtablePitches', {});
     resolve({ outcome: 'completed', counts: { created: 2, updated: 1, unchanged: 4, restored: 0, skipped: 1, removed: 1 } });
-    expect(await screen.findByText(/Refresh complete: created 2, updated 1, unchanged 4, back in airtable 0, skipped 1, flagged as removed 1\. No decision was changed and no email was sent\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Refresh complete: created 2, updated 1, unchanged 4, back in Airtable 0, skipped 1, flagged as removed 1\. No decision was changed and no email was sent\./)).toBeInTheDocument();
   });
 
   it('moves focus to the refusal when a refresh fails', async () => {
     call.mockRejectedValue(Object.assign(new Error('Airtable cannot find this base, table or view.'), { code: 'not-found' }));
+    collections.session_pitch_sync = [{ id: 'airtable', running: null, lastRun }];
     open();
     fireEvent.click(screen.getByRole('button', { name: 'Refresh from Airtable' }));
     const alert = await screen.findByRole('alert');

@@ -61,7 +61,7 @@ test('an operator connects Airtable, refreshes, and sees a changed record marked
   // Keyboard path: the refresh control takes focus and Enter runs it.
   await page.getByRole('button', { name: 'Refresh from Airtable' }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByText(/Refresh complete: created 2, updated 0, unchanged 0, back in airtable 0, skipped 1, flagged as removed 0\./)).toBeVisible();
+  await expect(page.getByText(/Refresh complete: created 2, updated 0, unchanged 0, back in Airtable 0, skipped 1, flagged as removed 0\./)).toBeVisible();
   await expect(page.getByLabel('Airtable refresh status').getByText('Completed', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Airtable pitch 1', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Airtable pitch 3', exact: true })).toHaveCount(0);
@@ -81,7 +81,7 @@ test('an operator connects Airtable, refreshes, and sees a changed record marked
   const status = (await db.doc('session_pitch_sync/airtable').get()).data();
   await db.doc('session_pitch_sync/airtable').update({ running: null, lastRun: { ...status.lastRun, startedAt: new Date(Date.now() - 2 * 60 * 1000) } });
   await page.getByRole('button', { name: 'Refresh from Airtable' }).click();
-  await expect(page.getByText(/Refresh complete: created 0, updated 1, unchanged 0, back in airtable 0, skipped 1, flagged as removed 1\./)).toBeVisible();
+  await expect(page.getByText(/Refresh complete: created 0, updated 1, unchanged 0, back in Airtable 0, skipped 1, flagged as removed 1\./)).toBeVisible();
   const revised = page.getByRole('button', { name: 'Airtable pitch 1, revised', exact: true }).locator('xpath=ancestor::li[1]');
   await expect(revised.getByText('Updated in Airtable')).toBeVisible();
   const removed = page.getByRole('button', { name: 'Airtable pitch 2', exact: true }).locator('xpath=ancestor::li[1]');

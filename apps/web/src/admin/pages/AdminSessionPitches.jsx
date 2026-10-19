@@ -92,7 +92,7 @@ function PitchCallSettings({ settings, call, timeZone }) {
       <fieldset disabled={busy} className="space-y-sm">
         <CheckboxField label="Accept session pitches" checked={enabled} onChange={setEnabled} />
         <EventDateTimeField label="Deadline" value={closesAt} timeZone={timeZone} onChange={(value) => setClosesAt(value || '')} onProblemChange={setDeadlineProblem} required showError={showDeadlineError} summaryPrefix="Intake closes" emptySummary="No deadline is set. Enter one to save." hint="Intake closes at this date and time." />
-        <SelectField label="Where people pitch" value={intake} onChange={setIntake} options={intakeOptions} hint="With an external form, the site links to it and this queue receives pitches only through CSV import." />
+        <SelectField label="Where people pitch" value={intake} onChange={setIntake} options={intakeOptions} hint="With an external form, the site links to it. Pitches reach this queue through a refresh from Airtable or a CSV import." />
         {intake === 'external' ? <TextField name="externalFormUrl" label="External form address" type="url" value={formUrl} onChange={(v) => { setFormUrl(v); setFormUrlError(''); }} required maxLength={2048} error={formUrlError} hint="Use the form’s public https:// share link." /> : null}
       </fieldset>
       <button className={primaryButtonClass} aria-disabled={busy} aria-busy={busy}>{busy ? 'Saving…' : 'Save call settings'}</button>

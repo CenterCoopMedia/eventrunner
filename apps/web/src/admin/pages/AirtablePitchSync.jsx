@@ -52,8 +52,9 @@ function useDoc(collection, id, enabled = true) {
   return [value, failed];
 }
 
+// Lowercase only the first letter, so "Back in Airtable" keeps its capital.
 function summary(counts = {}) {
-  return COUNTS.map(([key, label]) => `${label.toLowerCase()} ${counts[key] ?? 0}`).join(', ');
+  return COUNTS.map(([key, label]) => `${label[0].toLowerCase()}${label.slice(1)} ${counts[key] ?? 0}`).join(', ');
 }
 
 function RunStatus({ status, timeZone }) {
