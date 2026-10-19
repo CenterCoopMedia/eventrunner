@@ -25,8 +25,16 @@ function readAsset(file) {
   return readFileSync(resolve(ASSET_DIR, file), 'utf8');
 }
 
+// Comments are removed until none is left: removing one can join the text
+// around it into another, and paint hidden there must not slip past.
 function markupOnly(svg) {
-  return svg.replace(/<!--[\s\S]*?-->/g, '');
+  let previous;
+  let markup = svg;
+  do {
+    previous = markup;
+    markup = markup.replace(/<!--[\s\S]*?-->/g, '');
+  } while (markup !== previous);
+  return markup;
 }
 
 function parseViewBox(svg) {

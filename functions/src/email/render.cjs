@@ -49,21 +49,45 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
+/** The entities escapeHtml writes, and the character each one stands for. */
+const TEXT_ENTITIES = Object.freeze({ '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" });
+
+/**
+ * Drop every `<...>` run with at least one character inside, in one left to
+ * right scan. A `<` with no `>` after it, and an empty `<>`, stay as text.
+ * The kept text holds no `<` that a later `>` closes, so nothing in it can
+ * form a tag.
+ * @param {string} html
+ */
+function removeTags(html) {
+  let text = '';
+  let cursor = 0;
+  let from = 0;
+  for (;;) {
+    const open = html.indexOf('<', from);
+    if (open === -1) break;
+    const close = html.indexOf('>', open + 1);
+    if (close === -1) break;
+    from = close + 1;
+    if (close === open + 1) continue;
+    text += html.slice(cursor, open);
+    cursor = close + 1;
+  }
+  return text + html.slice(cursor);
+}
+
 /**
  * Strip trusted markup down to text: <br> and block closers become
- * newlines, remaining tags drop, basic entities decode.
+ * newlines, remaining tags drop, basic entities decode. Each entity decodes
+ * once, in one pass, so "&amp;lt;" reads "&lt;" and not "<".
  * @param {string} html
  */
 function stripHtmlToText(html) {
-  return String(html)
+  const lines = String(html)
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n');
+  return removeTags(lines)
+    .replace(/&(?:amp|lt|gt|quot|#39);/g, (entity) => TEXT_ENTITIES[entity])
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

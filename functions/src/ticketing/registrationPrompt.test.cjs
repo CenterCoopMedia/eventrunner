@@ -153,8 +153,9 @@ test('eventbrite: a brand-new signup gets ticket.get_ticket pointed at the confi
   assert.equal(result.templateId, 'ticket.get_ticket');
   assert.equal(calls.length, 1);
   assert.equal(calls[0].onceKey, 'get-ticket:uid-ada');
-  assert.ok(calls[0].html.includes('https://eventbrite.example/e/1'));
-  assert.ok(calls[0].html.includes('Get your ticket'));
+  const cta = calls[0].html.match(/<a href="([^"]+)"[^>]*>Get your ticket<\/a>/);
+  assert.ok(cta, 'the provider CTA is rendered');
+  assert.equal(cta[1], 'https://eventbrite.example/e/1');
 });
 
 test('manual: a brand-new signup with a client external URL gets ticket.get_ticket, action purchase', async () => {
@@ -166,8 +167,9 @@ test('manual: a brand-new signup with a client external URL gets ticket.get_tick
     uid: 'uid-ada', now: () => T0, log: QUIET,
   });
   assert.equal(result.sent, true);
-  assert.ok(calls[0].html.includes('https://client.example/register'));
-  assert.ok(calls[0].html.includes('Register for the event'));
+  const cta = calls[0].html.match(/<a href="([^"]+)"[^>]*>Register for the event<\/a>/);
+  assert.ok(cta, 'the provider CTA is rendered');
+  assert.equal(cta[1], 'https://client.example/register');
 });
 
 test('manual: a brand-new signup with NO external URL gets the await_approval copy, no CTA button', async () => {

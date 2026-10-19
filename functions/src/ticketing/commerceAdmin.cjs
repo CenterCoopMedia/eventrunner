@@ -18,7 +18,7 @@ const MAX_SCAN = 250;
 const OPERATOR_ACTIONS = new Set(['saveCatalog', 'pauseSales', 'issueComp', 'allocateRefund']);
 const READ_ACTIONS = new Set(['catalog', 'orders', 'order', 'tickets']);
 const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'updateAttendee', 'cancelTickets', 'resend', 'reconcile']);
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
 
 class CommerceError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }

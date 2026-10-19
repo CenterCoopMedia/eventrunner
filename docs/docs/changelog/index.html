@@ -428,6 +428,29 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The documentation site&#39;s page description decodes each entity once, so a
+          paragraph that shows &quot;&amp;lt;b&amp;gt;&quot; no longer gets &quot;&lt;b&gt;&quot; in its description.
+          An HTML comment that forms again when an inner comment is removed is also
+          removed, instead of showing on the page as text.</li>
+          </ul>
+          <ul>
+          <li>The plain-text body of an email decodes each entity in the postal address
+          once. Before, &quot;&amp;amp;lt;&quot; became &quot;&lt;&quot; instead of &quot;&amp;lt;&quot;. Tag removal is now
+          one linear scan, so a long run of unclosed <code>&lt;</code> no longer takes seconds.</li>
+          </ul>
+          <ul>
+          <li>The required rich-text check now scans a value once. An unclosed <code>&lt;hr</code>
+          or <code>&lt;</code> repeated through a long value made the old tag patterns rescan to
+          the end from every bracket; 50,000 characters took most of a second in
+          the editor and in the CMS publish check.</li>
+          </ul>
+          <ul>
+          <li>Every email address check now uses one shared pattern that does not
+          backtrack. The old pattern took seconds on a long, dot-heavy value, and the
+          OTP sign-in endpoint accepts that value from anyone. Config, speaker,
+          ticket, and admin checks accept the same addresses as before.</li>
+          </ul>
+          <ul>
           <li>Eventbrite deliveries are no longer refused for a missing HMAC header. Eventbrite does not
           sign webhooks, so every real delivery got a 401. The webhook URL now carries the shared secret
           (<code>?token=</code>), compared in constant time; a missing or wrong secret still gets a 401.

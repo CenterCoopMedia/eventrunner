@@ -855,7 +855,12 @@ test('routeMeta: an uploaded card is used as it is, with no size invented for it
     routeHandler({ theme: { logos: { ogDefault: 'branding/abc123/card.png' } } }),
     '/travel',
   );
-  assert.ok(res.sent.includes('firebasestorage.googleapis.com'));
+  const image = res.sent.match(/<meta property="og:image" content="([^"]+)">/);
+  assert.ok(image, 'the card is offered');
+  const url = new URL(image[1]);
+  assert.equal(url.origin, 'https://firebasestorage.googleapis.com');
+  assert.equal(url.pathname, '/v0/b/fixture-bucket.appspot.com/o/branding%2Fabc123%2Fcard.png');
+  assert.equal(url.searchParams.get('alt'), 'media');
   assert.ok(res.sent.includes('<meta property="og:image:type" content="image/png">'));
   assert.ok(!res.sent.includes('og:image:width'));
 });
