@@ -385,6 +385,34 @@ test('the template file refuses an empty source date list and a malformed invent
   }
 });
 
+test('a hand-edited template meets the content editor\'s block rules before anything is seeded', async () => {
+  const source = await pastEvent();
+  const { template } = await exportFrom(source);
+
+  const noText = structuredClone(template);
+  delete noText.content.find((block) => block.id === 'details__quote').text;
+  assert.match(parseTemplateFile(JSON.stringify(noText)).errors.join('\n'),
+    /template\.content\[\d+\] \(details__quote\): text: is required for block type "quote"/);
+
+  const badLimit = structuredClone(template);
+  badLimit.content.push({
+    id: 'details__gold', section: 'details', field: 'gold', blockType: 'sponsor_package',
+    name: 'Gold', benefits: '<p>A booth.</p>', limit: 0, visible: true, order: 5,
+  });
+  assert.match(parseTemplateFile(JSON.stringify(badLimit)).errors.join('\n'),
+    /\(details__gold\): limit: must be a whole number of 1 or more/);
+
+  // Rich text is cleaned as the editor cleans it, on the stored page too.
+  const script = structuredClone(template);
+  script.content.find((block) => block.id === 'faq_items__what_is_this').value =
+    '<p>Doors open at nine.</p><script>alert(1)</script><img src="x" onerror="alert(1)">';
+  const out = tmpFile('script.json', script);
+  const target = makeFakeDb();
+  const { value, output } = await applyTo(target, { template: out });
+  assert.equal(value, 0, output);
+  assert.equal(target.read('cmsContent', 'faq_items__what_is_this').value, '<p>Doors open at nine.</p>');
+});
+
 test('a target that holds speakers, orders, logs, email rows or Auth users is refused', async () => {
   const source = await pastEvent();
   const { out } = await exportFrom(source);

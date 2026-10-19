@@ -284,6 +284,12 @@ A page in the template must keep the safety rules of a page saved in the admin. 
 system pages may be system pages, each at its own route. Other pages cannot use a reserved route,
 such as `/admin` or `/pitch`. No two pages may share an id, a path or a section.
 
+A content block in the template must keep the rules of a block saved in the content editor. Each
+required field has a value, and a sponsor package limit is a whole number of 1 or more. Rich text
+is cleaned by the editor's sanitizer before it is stored, so a script or an event handler in a
+hand-edited file never reaches the site. A block that breaks a rule is named, and nothing is
+written.
+
 ### Steps
 
 1. Provision a new project for the new event (§1). Never point a template at the past project.

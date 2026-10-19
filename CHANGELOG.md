@@ -21,8 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `init-event.cjs --template` applies the file only to a new, empty project. It needs dates
   later than the past event and a named owner who is an operator. An apply that stops part way
   resumes when the same command runs again. Accounts, tickets, pitches, credentials, the admin
-  allowlist, email logs and other records stay in the past project. `--check` adds a
-  **Template reuse** row (#328).
+  allowlist, email logs and other records stay in the past project. Each content block in the
+  file must meet the content editor's rules, and its rich text is cleaned the same way.
+  `--check` adds a **Template reuse** row (#328).
 
 - Session pitch emails (#324). A person who pitches through this site's form gets a
   receipt after the pitch is stored; a failed receipt does not fail the submission.

@@ -588,7 +588,14 @@ function parseTemplateFile(text) {
     for (const section of Array.isArray(page.sections) ? page.sections : []) sectionOwner.set(section?.id, page.id);
   }
   errors.push(...pageSetErrors(pages.filter(isPlainObject)).map((e) => `template.pages: ${e}`));
-  const content = Array.isArray(t.content) ? t.content : [];
+  // The content editor's own write rules (cms/content.cjs): rich text is
+  // cleaned by the same sanitizer, then the block must meet its type's
+  // required fields and the sponsor package limit. A hand-edited file gets
+  // no shortcut past them.
+  const { sanitizeRichTextFields } = require('../../functions/src/cms/richText.cjs');
+  const { internals: { checkBlockContract } } = require('../../functions/src/cms/content.cjs');
+  const content = (Array.isArray(t.content) ? t.content : [])
+    .map((block) => (isPlainObject(block) ? sanitizeRichTextFields(block) : block));
   for (const [i, block] of content.entries()) {
     const at = `template.content[${i}] (${block?.id})`;
     const picked = isPlainObject(block) ? pickContent(block) : null;
@@ -597,6 +604,8 @@ function parseTemplateFile(text) {
       continue;
     }
     for (const key of picked.dropped) errors.push(`${at}.${key}: not on the template allowlist`);
+    const contract = checkBlockContract({ collection: 'cmsContent', fields: block });
+    if (!contract.ok) errors.push(...contract.message.split('; ').map((e) => `${at}: ${e}`));
     if (typeof block.id !== 'string' || block.id !== `${block.section}__${block.field}`) {
       errors.push(`${at}: id must be <section>__<field>`);
     }
