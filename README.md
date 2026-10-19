@@ -22,7 +22,7 @@ The preview is read-only, needs no account, and has no admin panel. Sign-in, reg
 
 [Open the hosted client demo](https://eventrunner-demo.web.app/) or its [admin panel](https://eventrunner-demo.web.app/admin). This separate Firebase-hosted deployment demonstrates client and admin workflows. Admin screens require an authorized account; opening the link does not grant access. The [admin guide](docs/ADMIN_GUIDE.md) explains the staff editing screens.
 
-Checked October 8, 2026: The hosted demo still shows the fictional Harborlight event. Its content and release can differ from the static preview. The NC Local content refresh is tracked separately in [#346](https://github.com/CenterCoopMedia/eventrunner/issues/346); hosted-demo verification remains tracked in [#35](https://github.com/CenterCoopMedia/eventrunner/issues/35).
+The hosted demo was reseeded with the NC Local historical content on October 9, 2026 ([#346](https://github.com/CenterCoopMedia/eventrunner/issues/346)). Its content and release can differ from the static preview. Hosted-demo verification remains tracked in [#35](https://github.com/CenterCoopMedia/eventrunner/issues/35).
 
 ## Who it is for
 
