@@ -94,6 +94,12 @@ test.describe.serial('links to a switched-off section, page visibility, and the 
 
   test('a hero button to an address no page has is saved with a warning and not drawn', async ({ page, browser }) => {
     test.setTimeout(120_000);
+    // The hero section holds four blocks at most; free the one the test
+    // above added.
+    if (ctaField) {
+      await callFunction('cmsDeleteContent', { section: 'hero', field: ctaField }, await adminIdToken());
+      ctaField = null;
+    }
     await page.setViewportSize({ width: 1280, height: 900 });
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/content/home/hero/_new');
