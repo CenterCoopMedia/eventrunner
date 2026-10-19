@@ -8,8 +8,9 @@
 //   2. Preview renders, on the server, the exact message each chosen
 //      speaker gets, and names who gets none and why.
 //   3. Send opens a dialog that states the recipient count. The request
-//      carries that count and the preview's batch id, so the server sends
-//      what the preview showed, once per speaker.
+//      carries that count, the preview's batch id and its wording version,
+//      so the server sends what the preview showed, once per speaker, and
+//      refuses when another staff member saved new wording in between.
 // A change to the selection or the items clears the preview, so a send
 // never reaches a speaker or an item the preview did not show.
 //
@@ -312,7 +313,7 @@ export default function AdminSpeakerReminders() {
   const [list, setList] = useState({ status: 'loading', rows: [], error: null });
   const [selected, setSelected] = useState(() => new Set(requestedSpeaker ? [requestedSpeaker] : []));
   const [topics, setTopics] = useState(() => new Set(READINESS_ITEMS));
-  const [preview, setPreview] = useState(null); // { batchId, topics, recipients, skipped, usedFallback }
+  const [preview, setPreview] = useState(null); // { batchId, topics, recipients, skipped, usedFallback, wordingVersion }
   const [busy, setBusy] = useState(null); // 'preview' | 'send' | 'export'
   const [notice, setNotice] = useState(null);
   const [confirming, setConfirming] = useState(false);
@@ -408,6 +409,7 @@ export default function AdminSpeakerReminders() {
         topics: preview.topics,
         batchId: preview.batchId,
         confirmCount: preview.recipients.length,
+        wordingVersion: preview.wordingVersion,
       });
       setConfirming(false);
       setPreview(null);

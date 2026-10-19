@@ -15,9 +15,9 @@ import { doc, getDoc } from 'firebase/firestore';
 const require = createRequire(import.meta.url);
 const {
   createSpeakerRemindersHandler,
-  internals: { REMINDER_COOLDOWN_MS },
+  internals: { REMINDER_COOLDOWN_MS, SENDING_STALE_MS, SHIPPED_WORDING },
 } = require('../functions/src/speakers/reminders.cjs');
-const { createEmailCore } = require('../functions/src/email/send.cjs');
+const { createEmailCore, internals: { claimIdForOnceKey } } = require('../functions/src/email/send.cjs');
 const { resetTemplateCacheForTest } = require('../functions/src/email/templates.cjs');
 
 const PROJECT_ID = 'demo-run-of-show';
@@ -77,14 +77,35 @@ function makeRes() {
   return res;
 }
 
-async function call(body, { token = 'staff', now = T0, method = 'POST' } = {}) {
+async function call(body, { token = 'staff', now = T0, method = 'POST', handlerDb = db } = {}) {
   const getConfig = async () => CONFIG;
   const core = createEmailCore({ db, provider, getConfig, sleep: async () => {}, log: QUIET });
   const res = makeRes();
+  // A send carries the wording version its preview showed; the shipped
+  // wording unless a test says otherwise.
+  const sent = body?.action === 'send' && !('wordingVersion' in body) ? { ...body, wordingVersion: SHIPPED_WORDING } : body;
   await createSpeakerRemindersHandler({
-    db, auth, getConfig, sendEmail: core.send, now: () => now, log: QUIET,
-  })({ method, headers: token ? { authorization: `Bearer ${token}` } : {}, body }, res);
+    db: handlerDb, auth, getConfig, sendEmail: core.send, now: () => now, log: QUIET,
+  })({ method, headers: token ? { authorization: `Bearer ${token}` } : {}, body: sent }, res);
   return res;
+}
+
+/** The real database, except that the nth transaction and later ones throw. */
+function dbFailingFromTransaction(n) {
+  let count = 0;
+  return new Proxy(db, {
+    get(target, prop) {
+      if (prop === 'runTransaction') {
+        return (...args) => {
+          count += 1;
+          if (count >= n) return Promise.reject(new Error('transaction aborted'));
+          return target.runTransaction(...args);
+        };
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
 }
 
 async function seed({ historicalDemo = false } = {}) {
@@ -241,6 +262,75 @@ describe('send', () => {
     expect((await db.collection('speaker_reminders').doc('ada').get()).data().sentCount).toBe(2);
   });
 
+  it('records the speakers already emailed when a send stops part way', async () => {
+    const res = await call(
+      { action: 'send', speakerIds: ['ada', 'ben'], batchId: BATCH, confirmCount: 2 },
+      { handlerDb: dbFailingFromTransaction(2) },
+    );
+    expect(res.statusCode).toBe(500);
+    expect(outbox.map((m) => m.to)).toEqual(['ada@example.test']);
+    const logs = await adminLogs('sendSpeakerReminders');
+    expect(logs).toHaveLength(1);
+    expect(logs[0].details).toMatchObject({ batchId: BATCH, sent: ['ada'], incomplete: true });
+
+    // The retry's row names who had the mail already, not only a count.
+    const retry = await call({ action: 'send', speakerIds: ['ada', 'ben'], batchId: BATCH, confirmCount: 2 }, { now: T0 + 5000 });
+    expect(retry.body.sent.map((r) => r.speakerId)).toEqual(['ben']);
+    const after = await adminLogs('sendSpeakerReminders');
+    const retryRow = after.find((row) => !row.details.incomplete);
+    expect(retryRow.details).toMatchObject({ sent: ['ben'], alreadySent: ['ada'] });
+  });
+
+  it('a send left "sending" whose mail reached the email core counts as a reminder', async () => {
+    const old = 'batch-old-0000001';
+    await db.collection('speaker_reminders').doc('ada').set({
+      speakerId: 'ada', lastBatchId: old, lastStatus: 'sending', lastAttemptAt: new Date(T0), lastAttemptItems: ['headshot'],
+    });
+    await db.collection('email_claims').doc(claimIdForOnceKey(`speaker-reminder:ada:${old}`)).set({ onceKey: 'x' });
+    const later = T0 + SENDING_STALE_MS + 1;
+    const res = await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1 }, { now: later });
+    expect(res.body.skipped).toEqual([expect.objectContaining({ speakerId: 'ada', reason: 'recent' })]);
+    expect(outbox).toHaveLength(0);
+    const state = (await db.collection('speaker_reminders').doc('ada').get()).data();
+    expect(state).toMatchObject({ lastStatus: 'sent', lastBatchId: old, lastItems: ['headshot'] });
+    const list = await call({ action: 'list' }, { now: later });
+    expect(list.body.speakers.find((r) => r.id === 'ada').lastRemindedAt).toBe(new Date(T0).toISOString());
+    // A replay of the old batch reports the mail as sent.
+    const replay = await call({ action: 'send', speakerIds: ['ada'], batchId: old, confirmCount: 1 }, { now: later });
+    expect(replay.body.alreadySent.map((r) => r.speakerId)).toEqual(['ada']);
+    expect(outbox).toHaveLength(0);
+  });
+
+  it('a send left "sending" whose mail never reached the email core does not block a new batch', async () => {
+    const old = 'batch-old-0000001';
+    await db.collection('speaker_reminders').doc('ada').set({
+      speakerId: 'ada', lastBatchId: old, lastStatus: 'sending', lastAttemptAt: new Date(T0),
+    });
+    const later = T0 + SENDING_STALE_MS + 1;
+    const replay = await call({ action: 'send', speakerIds: ['ada'], batchId: old, confirmCount: 1 }, { now: later });
+    expect(replay.body.failed.map((r) => r.speakerId)).toEqual(['ada']);
+    expect(replay.body.alreadySent).toEqual([]);
+    const res = await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1 }, { now: later });
+    expect(res.body.sent.map((r) => r.speakerId)).toEqual(['ada']);
+    expect(outbox).toHaveLength(1);
+  });
+
+  it('refuses a send when the wording changed after the preview', async () => {
+    const preview = await call({ action: 'preview', speakerIds: ['ada'] });
+    expect(preview.body.wordingVersion).toBe(SHIPPED_WORDING);
+    await call({ action: 'saveTemplate', subject: 'New wording for {{event_name}}' });
+    const res = await call({
+      action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1, wordingVersion: preview.body.wordingVersion,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error.code).toBe('stale-preview');
+    expect(res.body.error.message).toMatch(/Preview again/);
+    expect(outbox).toHaveLength(0);
+    expect((await db.collection('speaker_reminders').get()).size).toBe(0);
+    const missing = await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1, wordingVersion: undefined });
+    expect(missing.statusCode).toBe(400);
+  });
+
   it('needs the confirmed recipient count and a batch id', async () => {
     const wrong = await call({ action: 'send', speakerIds: ['ada', 'ben'], batchId: BATCH, confirmCount: 1 });
     expect(wrong.statusCode).toBe(400);
@@ -287,7 +377,7 @@ describe('wording', () => {
     const preview = await call({ action: 'preview', speakerIds: ['ada'] });
     expect(preview.body.recipients[0].subject).toBe('Please finish your page for Example Event');
     expect(preview.body.recipients[0].text.startsWith('Dear Ada Lee: https://site.example.test/speaker/dashboard')).toBe(true);
-    await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1 });
+    await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1, wordingVersion: preview.body.wordingVersion });
     expect(outbox[0].subject).toBe('Please finish your page for Example Event');
 
     const reset = await call({ action: 'resetTemplate' });

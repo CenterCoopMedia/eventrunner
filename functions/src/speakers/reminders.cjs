@@ -33,6 +33,15 @@
  * is refused for that speaker: this is a control on the speaker's inbox, the
  * same reasoning as the invite send budget in invites.cjs.
  *
+ * A record left at "sending" for SENDING_STALE_MS (the instance died, or the
+ * stamp after the send failed) is settled by the email core's claim for its
+ * batch: a claim means the mail may have gone, so it counts as a reminder
+ * sent at the attempt; no claim means it never reached the provider.
+ *
+ * THE WORDING THE PREVIEW SHOWED. Preview returns `wordingVersion`, a digest
+ * of the saved wording. Send needs it, and refuses when the wording changed
+ * in between, so no speaker gets wording staff did not read.
+ *
  * Historical demos refuse every write here (send, saveTemplate,
  * resetTemplate) before anything is stored; core/demoWrites.cjs.
  */
@@ -40,6 +49,7 @@
 const { requireAdmin } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
+const crypto = require('node:crypto');
 const { logAdminAction, isValidDocId } = require('../cms/store.cjs');
 const { speakerDisplayName } = require('shared/speaker');
 const {
@@ -68,6 +78,8 @@ const SENDING_STALE_MS = 10 * 60 * 1000;
 /** Longest saved subject, html or text body, in characters. */
 const MAX_TEMPLATE_FIELD_LENGTH = 100 * 1024;
 const BATCH_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+/** The wording version when no wording is saved. */
+const SHIPPED_WORDING = 'shipped';
 
 /** Export groups: which speakers a file holds. */
 const EXPORT_GROUPS = Object.freeze(['any', 'all', ...READINESS_ITEMS]);
@@ -110,6 +122,20 @@ function timestampMs(value) {
 function isoOrNull(value) {
   const ms = timestampMs(value);
   return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
+function onceKeyFor(speakerId, batchId) {
+  return `speaker-reminder:${speakerId}:${batchId}`;
+}
+
+/**
+ * Which wording a preview showed: 'shipped', or a digest of the saved
+ * subject, html and text. A send must carry the same value.
+ */
+function wordingVersion(override) {
+  if (!override) return SHIPPED_WORDING;
+  const fields = ['subject', 'html', 'text'].map((key) => (typeof override[key] === 'string' ? override[key] : null));
+  return crypto.createHash('sha256').update(JSON.stringify(fields), 'utf8').digest('hex').slice(0, 32);
 }
 
 function siteUrl(config) {
@@ -319,24 +345,44 @@ async function previewAction({ db, getConfig, now, actor, body }) {
       ...out.delivered,
     };
   });
-  return { topics: selection.topics, recipients: messages, skipped, usedFallback };
+  return {
+    topics: selection.topics, recipients: messages, skipped, usedFallback, wordingVersion: wordingVersion(loaded.override),
+  };
 }
 
 /**
  * Reserve one speaker for one batch, or say why not.
  * @returns {Promise<{ ok: true, sentCount: number } | { ok: false, outcome: string, reason?: string }>}
  */
-async function reserve({ db, speakerId, batchId, actor, nowMs }) {
+async function reserve({ db, speakerId, batchId, items, actor, nowMs }) {
   const ref = db.collection(REMINDERS).doc(speakerId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    const state = snap.exists ? snap.data() : {};
+    let state = snap.exists ? snap.data() : {};
+    const attempt = timestampMs(state.lastAttemptAt);
+    if (state.lastStatus === 'sending' && Number.isFinite(attempt) && nowMs - attempt >= SENDING_STALE_MS
+      && typeof state.lastBatchId === 'string') {
+      // An abandoned send. The email core's claim for its batch says
+      // whether the mail may have gone; settle the record by it.
+      const { claimIdForOnceKey } = require('../email/send.cjs').internals;
+      const claim = await tx.get(db.collection('email_claims').doc(claimIdForOnceKey(onceKeyFor(speakerId, state.lastBatchId))));
+      const settled = claim.exists
+        ? {
+          lastStatus: 'sent',
+          lastSentAt: new Date(attempt),
+          lastSentBy: state.lastAttemptBy ?? null,
+          lastItems: Array.isArray(state.lastAttemptItems) ? state.lastAttemptItems : [],
+          sentCount: (Number.isInteger(state.sentCount) ? state.sentCount : 0) + 1,
+        }
+        : { lastStatus: 'failed' };
+      state = { ...state, ...settled };
+      tx.set(ref, settled, { merge: true });
+    }
     if (state.lastBatchId === batchId) {
       // Replays never send. What the first request did is the answer.
       if (state.lastStatus === 'failed') return { ok: false, outcome: 'failed' };
       return { ok: false, outcome: 'already-sent' };
     }
-    const attempt = timestampMs(state.lastAttemptAt);
     if (state.lastStatus === 'sending' && Number.isFinite(attempt) && nowMs - attempt < SENDING_STALE_MS) {
       return { ok: false, outcome: 'skipped', reason: 'in-progress' };
     }
@@ -347,6 +393,7 @@ async function reserve({ db, speakerId, batchId, actor, nowMs }) {
       lastStatus: 'sending',
       lastAttemptAt: new Date(nowMs),
       lastAttemptBy: actor.email,
+      lastAttemptItems: items,
     }, { merge: true });
     return { ok: true, sentCount: Number.isInteger(state.sentCount) ? state.sentCount : 0 };
   });
@@ -361,11 +408,17 @@ async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
   if (!Number.isInteger(body?.confirmCount) || body.confirmCount !== selection.speakerIds.length) {
     fail(400, 'bad-request', 'confirmCount: Confirm the number of recipients the preview showed.');
   }
+  if (typeof body?.wordingVersion !== 'string' || body.wordingVersion === '') {
+    fail(400, 'bad-request', 'wordingVersion: Preview the reminders again, then send.');
+  }
   await requireWritable(db);
 
   const [stores, config, loaded] = await Promise.all([
     loadReadinessStores(db), getConfig(), loadReminderTemplate(db, now),
   ]);
+  if (wordingVersion(loaded.override) !== body.wordingVersion) {
+    fail(409, 'stale-preview', 'The reminder wording changed after the preview. Preview again, then send.');
+  }
   // The cooldown is decided in each reservation, so a replay of this batch
   // reports what happened instead of "reminded less than 24 hours ago".
   const { recipients, skipped } = sortSelection({ ...selection, stores, nowMs: now(), checkCooldown: false });
@@ -380,60 +433,74 @@ async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
   const sent = [];
   const alreadySent = [];
   const failed = [];
-  for (const { recipient, rendered } of prepared) {
-    const { speakerId, name, items } = recipient;
-    const nowMs = now();
-    const reservation = await reserve({ db, speakerId, batchId, actor, nowMs });
-    if (!reservation.ok) {
-      if (reservation.outcome === 'already-sent') alreadySent.push({ speakerId, name });
-      else if (reservation.outcome === 'failed') failed.push({ speakerId, name });
-      else skipped.push({ speakerId, name, reason: reservation.reason, message: SKIP_REASONS[reservation.reason] });
-      continue;
+  let finished = false;
+  try {
+    for (const { recipient, rendered } of prepared) {
+      const { speakerId, name } = recipient;
+      const { outcome, reason } = await sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs: now() });
+      if (outcome === 'sent') sent.push({ speakerId, name });
+      else if (outcome === 'already-sent') alreadySent.push({ speakerId, name });
+      else if (outcome === 'failed') failed.push({ speakerId, name });
+      else skipped.push({ speakerId, name, reason, message: SKIP_REASONS[reason] });
     }
-    let result;
-    try {
-      result = await sendEmail({ ...rendered.message, onceKey: `speaker-reminder:${speakerId}:${batchId}` });
-    } catch (err) {
-      log.error('speaker.reminder send threw', err);
-      result = { status: 'failed' };
-    }
-    const ok = result?.status === 'sent';
-    const ref = db.collection(REMINDERS).doc(speakerId);
-    try {
-      await ref.set(ok
-        ? {
-          lastStatus: 'sent',
-          lastSentAt: new Date(nowMs),
-          lastSentBy: actor.email,
-          lastItems: items,
-          sentCount: reservation.sentCount + 1,
-        }
-        : { lastStatus: 'failed' }, { merge: true });
-    } catch (err) {
-      log.warn('speaker_reminders stamp failed', err);
-    }
-    (ok ? sent : failed).push({ speakerId, name });
+    finished = true;
+  } finally {
+    // Written even when the loop stops part way (a transaction fault), so
+    // every speaker this request emailed is named in the log.
+    await logAdminAction({
+      db,
+      action: 'sendSpeakerReminders',
+      docPath: REMINDERS,
+      actor,
+      now,
+      log,
+      details: {
+        batchId,
+        topics: selection.topics,
+        requested: selection.speakerIds.length,
+        sent: sent.map((row) => row.speakerId),
+        alreadySent: alreadySent.map((row) => row.speakerId),
+        skipped: skipped.length,
+        failed: failed.map((row) => row.speakerId),
+        ...(finished ? {} : { incomplete: true }),
+      },
+    });
   }
 
-  await logAdminAction({
-    db,
-    action: 'sendSpeakerReminders',
-    docPath: REMINDERS,
-    actor,
-    now,
-    log,
-    details: {
-      batchId,
-      topics: selection.topics,
-      requested: selection.speakerIds.length,
-      sent: sent.map((row) => row.speakerId),
-      alreadySent: alreadySent.length,
-      skipped: skipped.length,
-      failed: failed.map((row) => row.speakerId),
-    },
-  });
-
   return { batchId, sent, alreadySent, skipped, failed };
+}
+
+/**
+ * Reserve, send and stamp one speaker's reminder.
+ * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'skipped', reason?: string }>}
+ */
+async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs }) {
+  const { speakerId, items } = recipient;
+  const reservation = await reserve({ db, speakerId, batchId, items, actor, nowMs });
+  if (!reservation.ok) return reservation;
+  let result;
+  try {
+    result = await sendEmail({ ...rendered.message, onceKey: onceKeyFor(speakerId, batchId) });
+  } catch (err) {
+    log.error('speaker.reminder send threw', err);
+    result = { status: 'failed' };
+  }
+  const ok = result?.status === 'sent';
+  try {
+    await db.collection(REMINDERS).doc(speakerId).set(ok
+      ? {
+        lastStatus: 'sent',
+        lastSentAt: new Date(nowMs),
+        lastSentBy: actor.email,
+        lastItems: items,
+        sentCount: reservation.sentCount + 1,
+      }
+      : { lastStatus: 'failed' }, { merge: true });
+  } catch (err) {
+    // The record stays at "sending"; reserve() settles it by the claim.
+    log.warn('speaker_reminders stamp failed', err);
+  }
+  return { outcome: ok ? 'sent' : 'failed' };
 }
 
 const CSV_HEADERS = Object.freeze([
@@ -635,6 +702,7 @@ module.exports = {
     MAX_RECIPIENTS,
     REMINDER_COOLDOWN_MS,
     SENDING_STALE_MS,
+    SHIPPED_WORDING,
     EXPORT_GROUPS,
     SKIP_REASONS,
     CSV_HEADERS,
@@ -643,5 +711,6 @@ module.exports = {
     readSelection,
     sortSelection,
     csvForRows,
+    wordingVersion,
   },
 };
