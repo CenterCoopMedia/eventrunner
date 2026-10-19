@@ -117,6 +117,10 @@ function mapRecord(record, fieldMap) {
   };
 }
 
+function sameAirtable(stored, current) {
+  return Boolean(stored) && stored.baseId === current.baseId && stored.table === current.table && stored.recordId === current.recordId;
+}
+
 function emptyCounts() {
   return { fetched: 0, created: 0, updated: 0, unchanged: 0, restored: 0, skipped: 0, removed: 0 };
 }
@@ -138,10 +142,17 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
     snaps.forEach((snap, i) => {
       const entry = entries[i];
       const stored = snap.exists ? snap.data() : null;
+      const airtable = { baseId: source.baseId, table: source.table, recordId: entry.recordId };
+      // A row from an earlier CSV import under the source name "airtable"
+      // has the same id, and the refresh adopts it. A seen record also takes
+      // the current table, so a switch from a table name to its ID keeps
+      // the record in removal tracking.
+      const track = stored && !sameAirtable(stored.airtable, airtable) ? { airtable } : {};
       if (!entry.mapped.ok) {
         // A pitch that exists and lost its consent tick is flagged for staff.
-        if (stored && entry.mapped.reason === 'no-consent' && !stored.sourceConsentMissingAt) {
-          tx.update(refs[i], { sourceConsentMissingAt: at });
+        // The record is in the view, so a removed flag no longer holds.
+        if (stored && entry.mapped.reason === 'no-consent' && (!stored.sourceConsentMissingAt || stored.sourceRemovedAt || track.airtable)) {
+          tx.update(refs[i], { ...track, sourceConsentMissingAt: stored.sourceConsentMissingAt || at, sourceRemovedAt: null });
         }
         return;
       }
@@ -152,7 +163,7 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
           ...row,
           source: SOURCE_NAME,
           externalId: entry.externalId,
-          airtable: { baseId: source.baseId, table: source.table, recordId: entry.recordId },
+          airtable,
           uid: null,
           status: 'new',
           reviewRevision: 0,
@@ -169,15 +180,12 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
       }
       const changed = CONTENT_KEYS.filter((key) => (stored[key] ?? null) !== row[key]);
       const flagged = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);
-      // A row from an earlier CSV import under the source name "airtable"
-      // has the same id. The refresh adopts it, so removals are tracked too.
-      const adopt = stored.airtable ? {} : { airtable: { baseId: source.baseId, table: source.table, recordId: entry.recordId } };
       if (changed.length) {
         local.updated += 1;
         const revision = Number.isSafeInteger(stored.reviewRevision) ? stored.reviewRevision : 0;
         tx.update(refs[i], {
           ...row,
-          ...adopt,
+          ...track,
           reviewRevision: revision + 1,
           sourceUpdatedAt: at,
           sourceChangedFields: changed,
@@ -186,10 +194,10 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
         });
       } else if (flagged) {
         local.restored += 1;
-        tx.update(refs[i], { ...adopt, sourceRemovedAt: null, sourceConsentMissingAt: null });
+        tx.update(refs[i], { ...track, sourceRemovedAt: null, sourceConsentMissingAt: null });
       } else {
         local.unchanged += 1;
-        if (!stored.airtable) tx.update(refs[i], adopt);
+        if (track.airtable) tx.update(refs[i], track);
       }
     });
     return local;
@@ -198,13 +206,16 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
   });
 }
 
-/** Flag Airtable pitches from this table that a complete run did not see. */
+/**
+ * Flag Airtable pitches from this base that a complete run did not see.
+ * There is one approved source, so the base is the match: a pitch stored
+ * under a table name still matches after the operator saves the table ID.
+ */
 async function flagRemoved({ db, source, seen, at, counts }) {
   const snap = await db.collection(PITCHES).where('source', '==', SOURCE_NAME).get();
   const missing = snap.docs.filter((doc) => {
     const data = doc.data();
-    return data.airtable?.baseId === source.baseId && data.airtable?.table === source.table
-      && !seen.has(data.externalId) && !data.sourceRemovedAt;
+    return data.airtable?.baseId === source.baseId && !seen.has(data.externalId) && !data.sourceRemovedAt;
   });
   for (let i = 0; i < missing.length; i += CHUNK) {
     const batch = db.batch();

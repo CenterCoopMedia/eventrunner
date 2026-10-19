@@ -181,6 +181,39 @@ test('a record that leaves the view is flagged, never deleted, and a return clea
   assert.equal(pitch(db, 2).sourceRemovedAt, null);
 });
 
+test('a switch from the table name to the table ID keeps removal tracking', async () => {
+  const db = makeDb({ 'session_pitch_sources/airtable': { ...sourceDoc, table: 'Pitches' } });
+  const api = fakeAirtable([record(1), record(2), record(3)]);
+  tick = later();
+  await run(db, api);
+  assert.equal(pitch(db, 2).airtable.table, 'Pitches');
+  // The operator follows the hint and saves the table ID instead.
+  await db.collection('session_pitch_sources').doc('airtable').set(sourceDoc);
+  api.rows = [record(1), record(3)];
+  tick = later();
+  const gone = await run(db, api);
+  assert.equal(gone.counts.removed, 1);
+  assert.equal(pitch(db, 2).sourceRemovedAt.getTime(), tick);
+  assert.equal(pitch(db, 1).airtable.table, TABLE, 'a seen record takes the current table');
+  assert.equal(pitch(db, 1).sourceRemovedAt, null);
+});
+
+test('a record that comes back without consent loses its removed flag', async () => {
+  const db = makeDb();
+  const api = fakeAirtable([record(1), record(2)]);
+  tick = later();
+  await run(db, api);
+  api.rows = [record(1)];
+  tick = later();
+  await run(db, api);
+  assert.ok(pitch(db, 2).sourceRemovedAt);
+  api.rows = [record(1), record(2, { Consent: false })];
+  tick = later();
+  await run(db, api);
+  assert.equal(pitch(db, 2).sourceRemovedAt, null, 'back in the view');
+  assert.equal(pitch(db, 2).sourceConsentMissingAt.getTime(), tick);
+});
+
 test('a partial read never flags removals', async () => {
   const db = makeDb();
   const rows = [record(1), record(2), record(3)];
