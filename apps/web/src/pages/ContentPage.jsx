@@ -23,6 +23,7 @@ import { pageHeading } from 'shared/page';
 import { VENUE_MAP_PAGE_ID, VENUE_MAP_SECTION_ID, resolveVenueMap } from 'shared/venue';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import EmptyState from '../components/EmptyState.jsx';
 import NotFound from './NotFound.jsx';
 import VenueMap, { useVenueMapImage } from '../components/VenueMap.jsx';
@@ -217,7 +218,10 @@ export default function ContentPage() {
   const baseSections = (page.sections ?? [])
     .map((section) => ({
       section,
-      blocks: getSectionBlocks(section.id),
+      // A cta or link_group that leads to a section that is off is not
+      // drawn (lib/linkTargets.js). Filtered before the emptiness test
+      // below, so a section left with nothing draws no heading.
+      blocks: withoutSwitchedOffLinks(getSectionBlocks(section.id), features),
       map: section.id === VENUE_MAP_SECTION_ID ? map : null,
       areaMap: section.id === AREA_MAP_SECTION_ID ? areaMap : null,
     }))

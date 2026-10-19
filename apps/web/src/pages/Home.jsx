@@ -22,6 +22,7 @@ import SectionEditLink from '../components/SectionEditLink.jsx';
 import { SponsorStrip } from '../components/SponsorWall.jsx';
 import HistorySection from '../components/HistorySection.jsx';
 import { resolvePageLayout } from '../lib/pageLayout.js';
+import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import { eventDateRangeLabel, formatDayDate } from '../lib/eventTime.js';
 import { SEED_WHEN_PLACEHOLDER } from 'shared/seed';
 
@@ -164,7 +165,10 @@ export default function Home() {
       ? eventConfig.tagline
       : null;
   const heroBlocks = getSectionBlocks('hero');
-  const heroCtas = heroBlocks.filter((block) => block.blockType === 'cta');
+  // An action that leads to a section that is off is not drawn, and is not
+  // counted either, so a lead whose only action leads there draws no empty
+  // action row (lib/linkTargets.js).
+  const heroCtas = withoutSwitchedOffLinks(heroBlocks, features).filter((block) => block.blockType === 'cta');
   // config/event is runtime data, so `days` may arrive as anything.
   const days = Array.isArray(eventConfig.days) ? eventConfig.days : [];
   // Where the summary row is drawn. The row belongs to the key facts

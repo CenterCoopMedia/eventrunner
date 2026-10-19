@@ -12,7 +12,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
+// A live config/features document, when a test sets one. Null leaves the
+// build snapshot's flags in place.
+let liveFeatures = null;
+vi.mock('../../lib/configSource.js', () => ({
+  subscribeConfigDoc: (docId, onNext) => {
+    if (docId === 'features' && liveFeatures) onNext(liveFeatures);
+    return () => {};
+  },
+}));
 vi.mock('../../lib/contentSource.js', () => ({
   subscribeContentCollection: () => () => {},
   subscribeSpeakersPublic: () => () => {},
@@ -125,6 +133,7 @@ async function pasteHtml(editor, html, text) {
 }
 
 beforeEach(() => {
+  liveFeatures = null;
   pagesLive = [HOME_PAGE];
   pagesDrafts = [];
   contentLive = [];
@@ -185,6 +194,48 @@ describe('AdminContentBlockEditor value fields', () => {
     expect(urlInput).toHaveAttribute('type', 'url');
     fireEvent.change(urlInput, { target: { value: 'https://example.org/resources' } });
     expect(urlInput).toHaveValue('https://example.org/resources');
+  });
+
+  // Launch rehearsal: "Explore the program → /schedule" saved with the
+  // schedule off and no word from the editor (admin-09b-cta-saved.png).
+  it('warns when a cta leads to a section that is off, and still saves it', async () => {
+    liveFeatures = { schedule: false, speakers: true };
+    await renderAt('/admin/content/home/hero/_new');
+    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
+      target: { value: 'cta' },
+    });
+    fireEvent.change(screen.getByLabelText('Button text'), { target: { value: 'Explore the program' } });
+    const urlInput = screen.getByLabelText('Destination');
+    fireEvent.change(urlInput, { target: { value: '/speakers' } });
+    expect(screen.queryByText(/is off in Features/)).toBeNull();
+
+    fireEvent.change(urlInput, { target: { value: '/schedule' } });
+    const warning = screen.getByText(
+      'Public schedule is off in Features. The public site does not show this link until you turn it on.',
+    );
+    expect(warning).toHaveAttribute('id');
+    expect(urlInput.getAttribute('aria-describedby')).toContain(warning.id);
+
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('cmsCreateContent'))).toBe(true));
+    const call = fetch.mock.calls.find(([url]) => String(url).includes('cmsCreateContent'));
+    expect(JSON.parse(call[1].body).fields).toMatchObject({ label: 'Explore the program', url: '/schedule' });
+    expect(await screen.findByText('Draft saved. It is not public until you publish.')).toBeInTheDocument();
+  });
+
+  it('warns on a link group item too, and says nothing while the section is on', async () => {
+    liveFeatures = { schedule: true, speakers: false };
+    await renderAt('/admin/content/home/hero/_new');
+    fireEvent.change(await screen.findByRole('combobox', { name: /block type/i }), {
+      target: { value: 'link_group' },
+    });
+    const urlInput = screen.getByLabelText('Destination');
+    fireEvent.change(urlInput, { target: { value: '/schedule' } });
+    expect(screen.queryByText(/is off in Features/)).toBeNull();
+    fireEvent.change(urlInput, { target: { value: '/speakers/a-speaker' } });
+    expect(screen.getByText(
+      'Speaker directory is off in Features. The public site does not show this link until you turn it on.',
+    )).toBeInTheDocument();
   });
 
   // Issue 193: the sponsors page's package section takes the new block, and

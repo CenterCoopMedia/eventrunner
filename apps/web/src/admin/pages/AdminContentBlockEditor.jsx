@@ -19,6 +19,9 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext.jsx';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { switchedOffSectionFor } from '../../lib/linkTargets.js';
+import { featureLabel } from '../featureChoices.js';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminPages } from '../useAdminPages.js';
 import { useAdminContent } from '../useAdminContent.js';
@@ -92,8 +95,24 @@ function hintFor(blockTypeId, fieldId) {
   return FIELD_HINTS[blockTypeId]?.[fieldId];
 }
 
+/**
+ * What the public site does with a link to a section that is off: it does
+ * not draw it (lib/linkTargets.js). The launch rehearsal saved "Explore the
+ * program → /schedule" with the schedule off and the editor said nothing.
+ * The save still goes through: the operator may be about to switch the
+ * section on, and the link then appears with no further edit.
+ *
+ * @returns {string|undefined}
+ */
+function linkTargetWarning(blockTypeId, fieldId, value, features) {
+  if (fieldId !== 'url' || (blockTypeId !== 'cta' && blockTypeId !== 'link_group')) return undefined;
+  const gate = switchedOffSectionFor(typeof value === 'string' ? value.trim() : value, features);
+  if (!gate) return undefined;
+  return `${featureLabel(gate)} is off in Features. The public site does not show this link until you turn it on.`;
+}
+
 /** One control per registry field, chosen by the field's declared type. */
-function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
+function BlockValueFields({ blockTypeId, values, onChange, errorFor, features }) {
   const fields = valueFieldsOf(blockTypeId);
   if (!blockTypeFor(blockTypeId)) {
     return (
@@ -181,6 +200,7 @@ function BlockValueFields({ blockTypeId, values, onChange, errorFor }) {
               value={value}
               onChange={(next) => onChange(field.id, next)}
               error={error}
+              warning={linkTargetWarning(blockTypeId, field.id, value, features)}
             />
           );
         }
@@ -204,6 +224,7 @@ export default function AdminContentBlockEditor({ mode }) {
   const navigate = useNavigate();
   const call = useAdminApi();
   const { showToast } = useToast();
+  const { features } = useEventConfig();
   const { findRow: findPage, loading: pagesLoading } = useAdminPages();
   const {
     rows: contentRows,
@@ -586,6 +607,7 @@ export default function AdminContentBlockEditor({ mode }) {
         values={content.values}
         onChange={changeValue}
         errorFor={errorFor}
+        features={features}
       />
     </Panel>
   );

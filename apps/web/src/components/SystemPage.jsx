@@ -26,6 +26,8 @@
 // keeps full block composition (ContentPage.jsx). Nothing here reaches it.
 import { Fragment } from 'react';
 import { useContent } from '../contexts/ContentContext.jsx';
+import { useEventConfig } from '../contexts/EventConfigContext.jsx';
+import { withoutSwitchedOffLinks } from '../lib/linkTargets.js';
 import SectionBlocks from './blocks/SectionBlocks.jsx';
 import { PullQuoteBudget } from './blocks/pullQuoteBudget.jsx';
 import SectionHead from './editorial/SectionHead.jsx';
@@ -132,7 +134,12 @@ export default function SystemPage({
   children,
   ...articleProps
 }) {
-  const { getPage, getSectionBlocks } = useContent();
+  const { getPage, getSectionBlocks: storedSectionBlocks } = useContent();
+  const { features } = useEventConfig();
+  // A cta or link_group that leads to a section that is off is not drawn
+  // (lib/linkTargets.js). Filtered here, before any section decides whether
+  // it is empty, so a section left with nothing draws no heading.
+  const getSectionBlocks = (sectionId) => withoutSwitchedOffLinks(storedSectionBlocks(sectionId), features);
   // Every system route now seeds a cmsPages document (scripts/lib/seed.cjs,
   // held by a test that reads every <SystemPage pageId="…"> in this app).
   // A route can still find nothing — an operator deleted the page, or the

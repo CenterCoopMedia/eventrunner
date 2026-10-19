@@ -120,6 +120,7 @@ export function TextField({
   onChange,
   error,
   hint,
+  warning,
   type = 'text',
   className = '',
   ...rest
@@ -127,7 +128,8 @@ export function TextField({
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
-  const describedBy = [hint ? hintId : null, error ? errorId : null]
+  const warningId = `${id}-warning`;
+  const describedBy = [hint ? hintId : null, warning ? warningId : null, error ? errorId : null]
     .filter(Boolean)
     .join(' ');
   return (
@@ -150,6 +152,13 @@ export function TextField({
         aria-describedby={describedBy || undefined}
         {...rest}
       />
+      {/* A warning does not block the save. It states a consequence of the
+          value in words, under the field, and the field names it. */}
+      {warning ? (
+        <p id={warningId} className="text-admin-sm font-medium text-admin-state-caution">
+          {warning}
+        </p>
+      ) : null}
       {error ? <FieldError id={errorId} message={error} /> : null}
     </div>
   );
