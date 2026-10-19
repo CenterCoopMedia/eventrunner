@@ -331,6 +331,10 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
         };
         break;
       case 'SubscriptionChange':
+        // A resubscribe (SuppressSending false) is a recognized record with
+        // nothing to patch: an empty list answers 200, so the broadcast
+        // stream's webhook can carry SubscriptionChange (issue #490).
+        if (record.SuppressSending === false) return [];
         if (record.SuppressSending !== true) return null;
         event = {
           type: 'suppressed',
