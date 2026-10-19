@@ -79,21 +79,32 @@ The limit is five new pitches per account in 15 minutes. The pitch and its rate-
   "expectedStatus": "accepted",
   "expectedRevision": 2,
   "feedback": "Plan for a 45-minute session.",
-  "preview": true
+  "expectedSettingsRevision": 3
 }
 ```
 
-`kind` is `receipt` or `decision`. A decision email needs the saved status `accepted` or `rejected`. `feedback` is an optional note to the submitter of 2,000 characters or fewer. A receipt takes no note. With `preview: true`, the server returns `{ preview: { to, templateId, subject, text } }` and writes nothing. Without it, the server sends the email and returns `{ state: "sent", templateId, attempt }`.
+`kind` is `receipt` or `decision`. A decision email needs the saved status `accepted` or `rejected`. `feedback` is an optional note to the submitter of 2,000 characters or fewer. A receipt takes no note.
+
+With `preview: true`, the server writes nothing. It returns `{ preview: { to, addressVerified, templateId, subject, text, settingsRevision, mayHaveBeenSent, otherDecisionSent } }`:
+
+- `addressVerified` is false for an imported pitch. Its address came from the CSV, and nobody verified it.
+- `settingsRevision` is the revision of the email settings that the preview used.
+- `mayHaveBeenSent` is true when an earlier attempt may have reached the provider.
+- `otherDecisionSent` is `accepted` or `rejected` when the other decision email was already sent to this person, or `null`.
+
+Without `preview`, the request must carry `expectedSettingsRevision` from the preview. The server sends the email and returns `{ state: "sent", templateId, attempt }`. A retry of an email that may have been sent must also carry `confirmUnknown: true`.
 
 The server compares `expectedStatus` and `expectedRevision` with the stored pitch, so staff send the email for the decision they see. It refuses:
 
 - A stale status or revision: `409 status-conflict`.
 - An email that was already sent for this pitch and decision: `409 already-sent`.
-- An email that another request is sending now: `409 in-progress`. A send that stops before it records a result can be retried after 10 minutes.
+- An email that another request is sending now: `409 in-progress`.
+- An email that may have been sent, without `confirmUnknown: true`: `409 delivery-unknown`. This covers an attempt where the email service did not answer, and a send that stopped more than 10 minutes ago before it recorded a result.
+- A send whose `expectedSettingsRevision` is not the current one, because an operator changed the wording after the preview: `409 settings-changed`. Preview the email again.
 - A receipt for an imported pitch: `400`.
 - Any send in a historical demo: `403 read-only-demo`.
 
-A failed delivery returns `502 delivery-failed`. The decision stays saved, and the email can be retried.
+The decision stays saved whatever happens to the email. When the provider refuses the email, the server returns `502 delivery-failed`, and the email can be retried. When the email service does not answer, the server returns `502 delivery-unknown`: the provider may have accepted the email. A retry uses a new send-once key and can deliver a second copy. Check the **Email log** before you retry.
 
 ### Change the pitch emails
 
@@ -101,6 +112,7 @@ A failed delivery returns `502 delivery-failed`. The decision stays saved, and t
 
 ```json
 {
+  "expectedRevision": 3,
   "receiptMode": "automatic",
   "templates": {
     "pitch.receipt": { "subject": "We received your pitch", "wording": "Hello,\n\nWe received “{{pitch_title}}”." }
@@ -108,7 +120,7 @@ A failed delivery returns `502 delivery-failed`. The decision stays saved, and t
 }
 ```
 
-`receiptMode` is `automatic` or `manual`. `templates` can hold `pitch.receipt`, `pitch.accepted` and `pitch.declined`. A missing or `null` email uses the shipped wording. A subject is one line of 200 characters or fewer. The wording is 5,000 characters or fewer. The server checks every `{{token}}` before it saves and refuses an unknown or malformed one. It writes the settings and an `admin_logs` row together and returns the effective settings.
+`receiptMode` is `automatic` or `manual`. `templates` can hold `pitch.receipt`, `pitch.accepted` and `pitch.declined`. A missing or `null` email uses the shipped wording. A subject is one line of 200 characters or fewer. The wording is 5,000 characters or fewer. The server checks every `{{token}}` before it saves and refuses an unknown or malformed one. `expectedRevision` is the `revision` of the settings that the operator edited (0 before the first save). When another operator saved first, the server refuses with `409 settings-conflict` and saves nothing. It writes the settings, the next revision and an `admin_logs` row together, and returns the effective settings with the new `revision`.
 
 ### Review a pitch
 
@@ -139,6 +151,8 @@ The site sends three pitch emails through the central email sender:
 
 With **Send automatically** (the default), the server queues the receipt in the transaction that stores the pitch. It sends the receipt after the pitch is stored. A retried submission does not send a second receipt. A failed receipt does not fail the submission. With **Staff send each receipt**, no receipt goes until staff send it from the pitch.
 
+**Upgrade note.** Automatic receipts are on by default. A deployment that upgrades to this version sends a receipt for each new pitch from this site's form, with no further step. If you do not want automatic receipts, choose **Staff send each receipt** under **Manage pitch emails** and save before you deploy this version, or before you open the call.
+
 ### Send a decision email
 
 1. Save an **Accepted** or **Declined** decision.
@@ -147,17 +161,31 @@ With **Send automatically** (the default), the server queues the receipt in the 
 4. Choose **Preview the acceptance email** (or the decline email). Read the address, the subject and the text.
 5. Select **I reviewed this email** and choose **Send the acceptance email** (or the decline email).
 
+The preview warns you in two cases:
+
+- **This address came from an imported CSV. Nobody verified it.** An imported pitch's decision email goes to the address in the CSV. Nobody signed in with it. Check it against the source form before you send.
+- **An acceptance (or a decline) was already sent to this person.** Staff changed the decision after one decision email went. Send the second email only if you mean to correct the first.
+
+If an operator changes the wording after your preview, the send is refused. Preview the email again.
+
 Each email is sent once for each pitch and decision. If staff decline a pitch, then accept it again, the acceptance email that was already sent does not go again. A changed note clears the preview, so you confirm the email that is sent.
 
 ### Delivery records
 
-Each pitch shows the state of its emails: **Sending**, **Sent** or **Not sent**, with the time, who sent it and the attempt number. A record that is **Not sent** shows the reason. Choose **Retry the receipt** or prepare the decision email again to retry. Each attempt has its own send-once key (`pitch-notice:{id}:{receipt|accepted|rejected}:{attempt}`), so a repeated request cannot send one attempt twice. The records sit on the private pitch row in `notices`. The **Email log** keeps each sent message.
+Each pitch shows the state of its emails, with the time, who sent it and the attempt number:
+
+- **Sending**: a send is in progress. No retry is offered.
+- **Sent**: the provider accepted the email. It is never sent again.
+- **Not sent**: the provider refused the email. The reason shows. Choose **Retry the receipt** or prepare the decision email again to retry.
+- **May have been sent**: the email service did not answer, or a send stopped before it recorded a result. The provider may have delivered the email. Check the **Email log** before you retry. The retry asks you to confirm **I checked the Email log. The earlier email was not delivered.**
+
+Each attempt has its own send-once key (`pitch-notice:{id}:{receipt|accepted|rejected}:{attempt}`), so a repeated request cannot send one attempt twice. A retry is a new attempt. After a refusal it is safe. After an unknown result it can deliver a second copy. The records sit on the private pitch row in `notices`. The **Email log** keeps each sent message.
 
 A decision is stored apart from its email. A failed email never changes the decision.
 
 ### Change the wording
 
-Operators expand **Manage pitch emails**. Choose the receipt mode, then edit the subject and the wording of each email. The wording is plain text. A blank line starts a new paragraph. You can use `{{pitch_title}}`, `{{event_name}}`, `{{site_url}}`, `{{support_email}}` and the other global email tokens. The note to the submitter appears after the wording of a decision email. Choose **Use the shipped receipt wording** (or the acceptance or decline email wording) to restore the default text. The event branding and footer wrap every email.
+Operators expand **Manage pitch emails**. Choose the receipt mode, then edit the subject and the wording of each email. The wording is plain text. A blank line starts a new paragraph. You can use `{{pitch_title}}`, `{{event_name}}`, `{{site_url}}`, `{{support_email}}` and the other global email tokens. The note to the submitter appears after the wording of a decision email. A line break in a pitch title becomes a space in the subject. Choose **Use the shipped receipt wording** (or the acceptance or decline email wording) to restore the default text. The event branding and footer wrap every email. If another operator saves first, your edits stay on the page and a notice offers **Load current settings**. Copy your edits before you load them.
 
 In a historical demo, the site sends no pitch email and records none.
 
@@ -194,7 +222,7 @@ externalId,email,title,description,organization,format,consent
 example-1,presenter@example.test,Reporting together,A practical workshop.,Example newsroom,Workshop,true
 ```
 
-Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form; never infer it from a nonempty field. `consent` must be `true` or `checked` (Airtable's export of a ticked checkbox). Review every displayed row, check the consent acknowledgement, then choose **Import reviewed proposals**. The server validates every row before storing any. A repeated source and external ID with identical content is unchanged. Changed content under the same source ID blocks the complete batch; reconcile it before retrying. Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail, and an imported pitch never gets a receipt.
+Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form; never infer it from a nonempty field. `consent` must be `true` or `checked` (Airtable's export of a ticked checkbox). Review every displayed row, check the consent acknowledgement, then choose **Import reviewed proposals**. The server validates every row before storing any. A repeated source and external ID with identical content is unchanged. Changed content under the same source ID blocks the complete batch; reconcile it before retrying. Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail, and an imported pitch never gets a receipt. Staff can send an imported pitch's decision email. It goes to the address in the CSV, which nobody verified, so the preview says so (see [Pitch emails](#pitch-emails)).
 
 **Export filtered queue** downloads only the current filtered proposals. It includes contact emails; keep the file private. It excludes private review notes, auth UIDs, and reviewer identities. Spreadsheet formulas are escaped. No CSV is stored on a public URL.
 

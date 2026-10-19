@@ -13,12 +13,20 @@
  *   nothing.
  *
  * Each email has a private delivery record on its pitch,
- * `notices.{receipt|accepted|rejected}`, with the state `queued`, `sent` or
- * `failed`. Each send attempt has its own send-once key, so a retried request
- * or a repeated decision cannot send the same email twice. A sent email is
- * never sent again. A failed or stale queued email can be retried with a new
- * attempt number. The decision itself is stored apart from all of this, so a
- * delivery failure never changes it.
+ * `notices.{receipt|accepted|rejected}`, with the state `queued`, `sent`,
+ * `failed` or `unknown`. Each send attempt has its own send-once key, so a
+ * retried request or a repeated decision cannot send the same attempt twice.
+ * A sent email is never sent again. A failed email (the provider refused it)
+ * can be retried with a new attempt number. An `unknown` email (the provider
+ * threw, so it may have accepted the message) and a stale queued email can
+ * be retried only when staff confirm that they checked the Email log, because
+ * the new attempt can deliver a second copy. The decision itself is stored
+ * apart from all of this, so a delivery failure never changes it.
+ *
+ * The settings document carries a `revision`. A preview returns it and a
+ * send must return it, so staff send the wording they previewed. A settings
+ * save must name the revision it edited, so two operators cannot silently
+ * overwrite each other.
  *
  * Mail goes through the central sender (functions/src/email/send.cjs), which
  * applies the historical-demo guard, the send-once claim and the sent_emails
@@ -119,12 +127,19 @@ function renderNotice({ config, settings, templateId, pitch, feedback }) {
   const override = entry.custom ? pitchNoticeOverride(templateId, entry) : null;
   const tokenValues = { pitch_title: pitch.title || '' };
   if (templateId !== 'pitch.receipt') tokenValues.submitter_feedback = feedback || '';
-  return render({ template, override, tokenValues, config });
+  const rendered = render({ template, override, tokenValues, config });
+  // A subject is one line. A pitch title or note with a line break must not
+  // break it, so every run of whitespace becomes one space.
+  return { ...rendered, subject: rendered.subject.replace(/\s+/g, ' ').trim() };
 }
 
-async function readSettings(db) {
-  const snap = await settingsRef(db).get();
-  return readPitchNoticeSettings(snap.exists ? snap.data() : null);
+function settingsRevisionOf(data) {
+  return Number.isSafeInteger(data?.revision) && data.revision >= 0 ? data.revision : 0;
+}
+
+function settingsFromSnap(snap) {
+  const data = snap.exists ? snap.data() : null;
+  return { settings: readPitchNoticeSettings(data), revision: settingsRevisionOf(data) };
 }
 
 /**
@@ -156,10 +171,12 @@ async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = c
       hasLegalFooterText: rendered.hasLegalFooterText,
     });
   } catch (err) {
+    // The central sender throws only before it contacts the provider.
     outcome = { status: 'failed', error: String(err?.message || err) };
   }
-  const state = outcome?.status === 'sent' ? 'sent' : 'failed';
-  const error = state === 'failed' ? String(outcome?.error || 'The email could not be sent.').slice(0, MAX_ERROR_LENGTH) : null;
+  // A provider throw is ambiguous: the message may have been accepted.
+  const state = outcome?.status === 'sent' ? 'sent' : outcome?.ambiguous ? 'unknown' : 'failed';
+  const error = state === 'sent' ? null : String(outcome?.error || 'The email could not be sent.').slice(0, MAX_ERROR_LENGTH);
   const ref = db.collection(PITCHES).doc(pitchId);
   try {
     await db.runTransaction(async (tx) => {
@@ -178,7 +195,7 @@ async function deliverNotice({ db, sendEmail, getConfig, now = Date.now, log = c
     // The record stays queued and becomes retryable once it is stale.
     log.error('session pitch email record update failed', err);
   }
-  if (state === 'failed') log.warn(`${record.templateId} for ${pitchId} failed: ${error}`);
+  if (state !== 'sent') log.warn(`${record.templateId} for ${pitchId} ${state}: ${error}`);
   return { state, error };
 }
 
@@ -216,6 +233,13 @@ function readSendRequest(body) {
   if (source.preview !== undefined && typeof source.preview !== 'boolean') {
     return { ok: false, message: 'preview: must be true or false.' };
   }
+  if (source.confirmUnknown !== undefined && typeof source.confirmUnknown !== 'boolean') {
+    return { ok: false, message: 'confirmUnknown: must be true or false.' };
+  }
+  const settingsRevision = source.expectedSettingsRevision;
+  if (source.preview !== true && (!Number.isSafeInteger(settingsRevision) || settingsRevision < 0)) {
+    return { ok: false, message: 'expectedSettingsRevision: Preview the email first, then send it with the preview’s settingsRevision.' };
+  }
   const raw = source.feedback;
   if (raw !== undefined && raw !== null && typeof raw !== 'string') return { ok: false, message: 'feedback: must be text.' };
   const feedback = typeof raw === 'string' && raw.trim() ? raw.replace(/\r\n?/g, '\n').trim() : null;
@@ -230,6 +254,8 @@ function readSendRequest(body) {
     expectedStatus: source.expectedStatus,
     expectedRevision: source.expectedRevision,
     preview: source.preview === true,
+    confirmUnknown: source.confirmUnknown === true,
+    expectedSettingsRevision: settingsRevision,
     feedback,
   };
 }
@@ -255,13 +281,24 @@ function evaluate(stored, request, nowMs) {
   if (previous?.state === 'sent') {
     return { status: 409, code: 'already-sent', message: 'This email was already sent. It is not sent again.' };
   }
+  let mayHaveBeenSent = previous?.state === 'unknown';
   if (previous?.state === 'queued') {
     const queuedAt = toMillis(previous.queuedAt);
     if (queuedAt === null || nowMs - queuedAt < QUEUED_STALE_MS) {
       return { status: 409, code: 'in-progress', message: 'This email is being sent. Check its state again in a few minutes.' };
     }
+    mayHaveBeenSent = true;
   }
-  return { ...target, previous, revision };
+  if (mayHaveBeenSent && !request.preview && !request.confirmUnknown) {
+    return {
+      status: 409,
+      code: 'delivery-unknown',
+      message: 'This email may have been sent. Check the Email log, then confirm before you retry.',
+    };
+  }
+  const otherSlot = request.kind === 'decision' ? (stored.status === 'accepted' ? 'rejected' : 'accepted') : null;
+  const otherDecisionSent = otherSlot && stored.notices?.[otherSlot]?.state === 'sent' ? otherSlot : null;
+  return { ...target, previous, revision, mayHaveBeenSent, otherDecisionSent };
 }
 
 function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }) {
@@ -278,13 +315,24 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
 
     if (request.preview) {
       try {
-        const [snap, settings, config] = await Promise.all([ref.get(), readSettings(db), getConfig()]);
+        const [snap, settingsSnap, config] = await Promise.all([ref.get(), settingsRef(db).get(), getConfig()]);
         const stored = snap.exists ? snap.data() : null;
         const target = evaluate(stored, request, now());
         if (target.status) return sendError(res, target.status, target.code, target.message);
+        const { settings, revision: settingsRevision } = settingsFromSnap(settingsSnap);
         const rendered = renderNotice({ config, settings, templateId: target.templateId, pitch: stored, feedback: request.feedback });
         return res.status(200).json({
-          preview: { to: stored.email, templateId: target.templateId, subject: rendered.subject, text: rendered.text },
+          preview: {
+            to: stored.email,
+            // Imported pitches carry the address from the CSV; nobody verified it.
+            addressVerified: Boolean(stored.uid),
+            templateId: target.templateId,
+            subject: rendered.subject,
+            text: rendered.text,
+            settingsRevision,
+            mayHaveBeenSent: target.mayHaveBeenSent,
+            otherDecisionSent: target.otherDecisionSent,
+          },
         });
       } catch (err) {
         log.error('sendSessionPitchNotice preview failed', err);
@@ -295,11 +343,17 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
     let claimed;
     try {
       claimed = await db.runTransaction(async (tx) => {
-        const [snap, policy] = await Promise.all([tx.get(ref), checkDemoWrites({ db, transaction: tx })]);
+        const [snap, settingsSnap, policy] = await Promise.all([
+          tx.get(ref), tx.get(settingsRef(db)), checkDemoWrites({ db, transaction: tx }),
+        ]);
         if (!policy.ok) return { refusal: policy };
         const stored = snap.exists ? snap.data() : null;
         const target = evaluate(stored, request, now());
         if (target.status) return { refusal: target };
+        const { settings, revision: settingsRevision } = settingsFromSnap(settingsSnap);
+        if (settingsRevision !== request.expectedSettingsRevision) {
+          return { refusal: { status: 409, code: 'settings-changed', message: 'An operator changed the email wording. Preview the email again.' } };
+        }
         const at = new Date(now());
         const record = queuedRecord({
           pitchId: request.id, slot: target.slot, templateId: target.templateId, previous: target.previous,
@@ -314,7 +368,7 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
           at,
           details: { templateId: target.templateId, attempt: record.attempt, status: stored.status, reviewRevision: target.revision },
         });
-        return { slot: target.slot, record, pitch: { title: stored.title } };
+        return { slot: target.slot, record, pitch: { title: stored.title }, settings };
       });
     } catch (err) {
       log.error('sendSessionPitchNotice failed', err);
@@ -325,16 +379,13 @@ function createSendSessionPitchNoticeHandler({ db, auth, getConfig, sendEmail, n
       return sendError(res, status, code, message);
     }
 
-    let settings;
-    try {
-      settings = await readSettings(db);
-    } catch {
-      settings = readPitchNoticeSettings(null);
-    }
     const result = await deliverNotice({
       db, sendEmail, getConfig, now, log, pitchId: request.id, slot: claimed.slot,
-      record: claimed.record, pitch: claimed.pitch, settings,
+      record: claimed.record, pitch: claimed.pitch, settings: claimed.settings,
     });
+    if (result.state === 'unknown') {
+      return sendError(res, 502, 'delivery-unknown', 'The email service did not answer. The email may have been sent. Check the Email log before you retry. The decision is still saved.');
+    }
     if (result.state !== 'sent') {
       return sendError(res, 502, 'delivery-failed', 'The email was not sent. The decision is still saved. Retry the email later.');
     }
@@ -352,6 +403,9 @@ function readSettingsRequest(body) {
   const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   if (!RECEIPT_MODES.includes(source.receiptMode)) {
     return { ok: false, message: `receiptMode: must be one of ${RECEIPT_MODES.join(', ')}.` };
+  }
+  if (!Number.isSafeInteger(source.expectedRevision) || source.expectedRevision < 0) {
+    return { ok: false, message: 'expectedRevision: must be the revision of the settings you edited.' };
   }
   const input = source.templates ?? {};
   if (typeof input !== 'object' || Array.isArray(input)) return { ok: false, message: 'templates: must be an object.' };
@@ -374,7 +428,7 @@ function readSettingsRequest(body) {
     // The shipped wording is stored as no override, so a later release can improve it.
     if (subject !== shipped.subject || wording !== shipped.wording) templates[id] = { subject, wording };
   }
-  return { ok: true, receiptMode: source.receiptMode, templates };
+  return { ok: true, receiptMode: source.receiptMode, templates, expectedRevision: source.expectedRevision };
 }
 
 function createSavePitchNoticeSettingsHandler({ db, auth, getConfig, now = Date.now, log = console }) {
@@ -387,25 +441,33 @@ function createSavePitchNoticeSettingsHandler({ db, auth, getConfig, now = Date.
     }
     const parsed = readSettingsRequest(req.body);
     if (!parsed.ok) return badRequest(res, parsed.message);
-    const stored = { receiptMode: parsed.receiptMode, templates: parsed.templates };
+    let stored;
     try {
-      const at = new Date(now());
-      const batch = db.batch();
-      batch.set(settingsRef(db), { ...stored, updatedAt: at, updatedBy: gate.email });
-      batch.set(db.collection('admin_logs').doc(), {
-        action: 'savePitchNoticeSettings',
-        docPath: `${SETTINGS_COLLECTION}/${SETTINGS_DOC}`,
-        uid: gate.uid,
-        email: gate.email,
-        at,
-        details: { receiptMode: parsed.receiptMode, editedTemplates: Object.keys(parsed.templates) },
+      stored = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(settingsRef(db));
+        const current = settingsRevisionOf(snap.exists ? snap.data() : null);
+        if (current !== parsed.expectedRevision) return null;
+        const at = new Date(now());
+        const next = { receiptMode: parsed.receiptMode, templates: parsed.templates, revision: current + 1 };
+        tx.set(settingsRef(db), { ...next, updatedAt: at, updatedBy: gate.email });
+        tx.set(db.collection('admin_logs').doc(), {
+          action: 'savePitchNoticeSettings',
+          docPath: `${SETTINGS_COLLECTION}/${SETTINGS_DOC}`,
+          uid: gate.uid,
+          email: gate.email,
+          at,
+          details: { receiptMode: parsed.receiptMode, editedTemplates: Object.keys(parsed.templates), revision: next.revision },
+        });
+        return next;
       });
-      await batch.commit();
     } catch (err) {
       log.error('savePitchNoticeSettings failed', err);
       return internal(res, 'The email settings could not be saved.');
     }
-    return res.status(200).json(readPitchNoticeSettings(stored));
+    if (!stored) {
+      return sendError(res, 409, 'settings-conflict', 'Another operator changed the email settings. Load the current settings and try again.');
+    }
+    return res.status(200).json({ ...readPitchNoticeSettings(stored), revision: stored.revision });
   };
 }
 
