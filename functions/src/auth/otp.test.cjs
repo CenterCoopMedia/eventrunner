@@ -148,8 +148,9 @@ test('sendOtpCode rejects invalid email and non-POST', async () => {
 
 test('the OTP endpoints refuse a long hostile email in linear time', async () => {
   // Anyone can post this value. The previous address pattern backtracked
-  // over every dot in the domain and held the instance for seconds.
-  const email = `a@b${'.a'.repeat(25000)}@`;
+  // over every dot in the domain and held the instance for over 30 s at this
+  // size, so the 500 ms ceiling leaves room for a slow CI worker.
+  const email = `a@b${'.a'.repeat(100000)}@`;
   const { handler: send } = sendDeps({});
   const verify = createVerifyOtpHandler({ db: fakeDb(), auth: fakeAuth() });
   for (const [handler, body] of [
@@ -161,7 +162,7 @@ test('the OTP endpoints refuse a long hostile email in linear time', async () =>
     await handler({ method: 'POST', body }, res);
     const elapsed = performance.now() - started;
     assert.equal(res.statusCode, 400);
-    assert.ok(elapsed < 50, `the request took ${elapsed.toFixed(1)} ms`);
+    assert.ok(elapsed < 500, `the request took ${elapsed.toFixed(1)} ms`);
   }
 });
 

@@ -559,8 +559,9 @@ test('validateEventConfig requires a usable sender (the OTP From address)', () =
 
 test('validateEventConfig refuses a long hostile address in linear time', () => {
   // A dot-heavy domain that fails at its last character. The previous
-  // address pattern backtracked over every dot and took seconds here.
-  const hostile = `!@!.${'!.'.repeat(25000)} `;
+  // address pattern backtracked over every dot and took over a minute at
+  // this size, so the 500 ms ceiling leaves room for a slow CI worker.
+  const hostile = `!@!.${'!.'.repeat(100000)} `;
   const started = performance.now();
   const result = validateEventConfig({
     ...VALID_EVENT,
@@ -568,7 +569,7 @@ test('validateEventConfig refuses a long hostile address in linear time', () => 
     legal: { supportEmail: hostile, conductEmail: hostile },
   });
   const elapsed = performance.now() - started;
-  assert.ok(elapsed < 50, `validation took ${elapsed.toFixed(1)} ms`);
+  assert.ok(elapsed < 500, `validation took ${elapsed.toFixed(1)} ms`);
   for (const prefix of ['sender.email:', 'sender.replyTo:', 'legal.supportEmail:', 'legal.conductEmail:']) {
     assert.ok(result.errors.some((e) => e.startsWith(prefix)), prefix);
   }

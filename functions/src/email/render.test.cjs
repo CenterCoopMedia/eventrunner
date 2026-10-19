@@ -88,11 +88,13 @@ test('an _html token leaves no tag in the text body, however it is nested', () =
 });
 
 test('stripHtmlToText is linear on unclosed and nested brackets', () => {
-  for (const html of ['<'.repeat(50000), '<a'.repeat(25000), '<>'.repeat(25000), '&amp;'.repeat(10000)]) {
+  // The earlier tag pattern took seconds on unclosed brackets at a quarter of
+  // this size, so the 500 ms ceiling leaves room for a slow CI worker.
+  for (const html of ['<'.repeat(200000), '<a'.repeat(100000), '<>'.repeat(100000), '&amp;'.repeat(40000)]) {
     const started = performance.now();
     internals.stripHtmlToText(html);
     const elapsed = performance.now() - started;
-    assert.ok(elapsed < 50, `${html.slice(0, 4)}... took ${elapsed.toFixed(1)} ms`);
+    assert.ok(elapsed < 500,`${html.slice(0, 4)}... took ${elapsed.toFixed(1)} ms`);
   }
 });
 

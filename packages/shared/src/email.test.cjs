@@ -37,16 +37,17 @@ test('the linear spelling accepts exactly what the previous spelling accepted', 
 test('a long hostile value is refused in linear time', () => {
   // The previous spelling took seconds on this input: every dot in the
   // domain was tried against every later position before the final space
-  // made the match fail.
+  // made the match fail. At this size it would take over 30 s, so a 500 ms
+  // ceiling leaves room for a slow CI worker and still catches the old cost.
   for (const value of [
-    `!@!.${'!.'.repeat(25000)} `,
-    `a@${'.'.repeat(50000)} `,
-    `${'a'.repeat(50000)}@`,
-    `a@b${'.a'.repeat(25000)}@`,
+    `!@!.${'!.'.repeat(100000)} `,
+    `a@${'.'.repeat(200000)} `,
+    `${'a'.repeat(200000)}@`,
+    `a@b${'.a'.repeat(100000)}@`,
   ]) {
     const started = performance.now();
     assert.equal(isEmailAddress(value), false);
     const elapsed = performance.now() - started;
-    assert.ok(elapsed < 50, `${value.length} characters took ${elapsed.toFixed(1)} ms`);
+    assert.ok(elapsed < 500,`${value.length} characters took ${elapsed.toFixed(1)} ms`);
   }
 });

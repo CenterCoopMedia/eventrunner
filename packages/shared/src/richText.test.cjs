@@ -51,11 +51,12 @@ test('required rich text treats tags, dividers, and stray brackets as before', (
 test('required rich text is decided in linear time on hostile markup', () => {
   // Each of these took hundreds of milliseconds or more with the earlier
   // patterns: an unclosed divider or tag made the engine scan to the end
-  // of the value from every opening bracket.
-  for (const value of ['<hr\t'.repeat(12500), '<'.repeat(50000), `<p>${'<b'.repeat(25000)}`]) {
+  // of the value from every opening bracket. At this size that is over 10 s,
+  // so the 500 ms ceiling leaves room for a slow CI worker.
+  for (const value of ['<hr\t'.repeat(50000), '<'.repeat(200000), `<p>${'<b'.repeat(100000)}`]) {
     const started = performance.now();
     hasRichTextContent(value);
     const elapsed = performance.now() - started;
-    assert.ok(elapsed < 50, `${value.slice(0, 4)}... took ${elapsed.toFixed(1)} ms`);
+    assert.ok(elapsed < 500,`${value.slice(0, 4)}... took ${elapsed.toFixed(1)} ms`);
   }
 });
