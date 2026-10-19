@@ -354,6 +354,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   complete subscription when none exists, and names every other subscription at the endpoint so
   the operator can delete it (#357).
 
+- With the Stripe provider, the header and the home lead show **Get tickets** only after an
+  operator publishes the catalog. Before that, the action led to "Ticket sales are not
+  configured". A published catalog keeps the action while sales are paused or closed, so a
+  visitor can read when sales open. The header checks again on a page change and when the tab
+  becomes visible, at most every 30 seconds. Eventbrite, manual and none are unchanged.
+- After **Reopen new sales** or a sales pause, an unedited catalog editor loads the new saved
+  catalog. It no longer warns about unsaved edits that do not exist, and its next save keeps
+  the new sales state. A status line says the editor now shows the current saved catalog.
+  Real unsaved edits still keep the warning and the reload.
+- With no tickets chosen, `/tickets` asks for a ticket choice and its submit reads
+  **Continue**. It no longer says "No payment is required" or offers **Reserve tickets**.
+  Choosing a ticket clears the empty-cart error.
+- The client onboarding guide lists the native Stripe provider. Its ticketing step points at
+  the Stripe operator runbook and the setup checklist.
 - Sent-email audit rows now expire 90 days after they were sent. The existing scheduled maintenance
   function deletes older `sent_emails` rows in bounded batches, and the Email log and onboarding
   guide state the period before an operator or client relies on the log (#268).
@@ -394,6 +408,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   findings stay on every 15.x release. All are logged in `scripts/ci/audit-exceptions.json`. The
   hosting rollback command in `docs/DEPLOY_RUNBOOK.md` now uses the `<SITE_ID>@<VERSION_ID>` form
   that `hosting:clone` accepts.
+
+- The web app uses React Router 7 (`react-router` 7.18) in place of `react-router-dom` 6. It
+  stays a plain single-page app in declarative mode: `BrowserRouter` on a deployment and
+  `HashRouter` in the demo, with no framework mode. Every import now names `react-router`. The
+  v7 future flags were already on, so routing behaves as before, and the `future` props are
+  gone. The upgrade clears two moderate advisories (GHSA-wrjc-x8rr-h8h6, GHSA-337j-9hxr-rhxg),
+  and their audit exception is gone. The initial demo bundle grows by about 5 kB gzip, inside
+  its budget.
+
+- Cloud Functions run on firebase-admin 14 and firebase-functions 7. firebase-functions 6
+  does not accept firebase-admin 14, so both moved together. Both need Node 22, which the
+  functions already declare. The upgrade clears the moderate uuid advisory chain
+  (GHSA-w5hq-g745-h8pq) from `functions/package-lock.json`, and its audit exception is gone.
+  firebase-admin 14 no longer exposes `errorInfo` on its errors, so the attendee delete reads
+  only `err.code`.
 
 - The web toolchain moves to Vite 8, `@vitejs/plugin-react` 6 and Vitest 5 (from Vite 5,
   plugin-react 4 and Vitest 3). This clears the Dependabot alerts for `vitest` and `tinypool`

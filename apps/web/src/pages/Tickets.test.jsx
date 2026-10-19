@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 const state = vi.hoisted(() => ({ consentCommits: [], auth: { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false }, event: { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} } }));
 vi.mock('../contexts/AuthContext.jsx', () => ({ useAuth: () => state.auth, functionsOrigin: () => 'https://functions.example.test' }));
@@ -98,6 +98,35 @@ describe('attendee ticket selection', () => {
     expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
     expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(0);
   });
+  it('asks for a ticket choice instead of offering a free reservation when no tickets are chosen', async () => {
+    mount();
+    await screen.findByLabelText('Quantity — General admission');
+    expect(screen.queryByText(/No payment is required/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reserve tickets|Continue to Stripe/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Choose at least one ticket to continue.')).toBeInTheDocument();
+    // The submit stays usable and explains itself rather than going silent.
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose at least one ticket.');
+    expect(screen.getByRole('alert')).toHaveFocus();
+    expect(ticketingRequest).not.toHaveBeenCalledWith('ticketingCheckout', expect.anything());
+    // A chosen paid ticket replaces the prompt with the payment step and
+    // clears the empty-cart error.
+    fireEvent.change(screen.getByLabelText('Quantity — General admission'), { target: { value: '1' } });
+    expect(screen.queryByText('Choose at least one ticket to continue.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Choose at least one ticket.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeInTheDocument();
+  });
+
+  it('keeps the free-order copy for a chosen free ticket', async () => {
+    ticketingRequest.mockImplementation(async () => ({ ...CATALOG, ticketTypes: CATALOG.ticketTypes.map((type) => ({ ...type, unitAmount: 0 })) }));
+    mount();
+    await screen.findByLabelText('Quantity — General admission');
+    expect(screen.queryByText(/No payment is required/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Quantity — General admission'), { target: { value: '1' } });
+    expect(screen.getByText(/No payment is required/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reserve tickets' })).toBeInTheDocument();
+  });
+
   it('accepts revision zero as a valid displayed catalog revision', async () => {
     ticketingRequest.mockImplementation(async (name) => name === 'ticketingCatalog'
       ? { ...CATALOG, catalogRevision: 0 }

@@ -34,7 +34,7 @@
 // never lost when the pager leaves. Clear and "Clear search" move focus to
 // the search field. Opening a preview leaves focus on its button.
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { zoneLabel } from '../../lib/eventTime.js';
 import { useAdminApi } from '../adminApi.js';

@@ -4,7 +4,7 @@
 // page carries no data of its own.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import AuthContext from '../contexts/AuthContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
@@ -60,7 +60,7 @@ function renderDashboard({
 } = {}) {
   holder.bookmarkedIds = bookmarkedIds;
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
         <EventConfigContext.Provider
           value={{
             eventConfig: {
@@ -221,7 +221,7 @@ describe('the dashboard cards', () => {
     expect(nav.querySelectorAll('a')).toHaveLength(1);
 
     rerender(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <EventConfigContext.Provider
           value={{ eventConfig: {}, features: { liveUpdates: true, sessionBookmarks: true }, theme: {}, badges: null, source: 'snapshot' }}
         >

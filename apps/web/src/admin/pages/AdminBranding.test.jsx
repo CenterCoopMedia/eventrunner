@@ -20,7 +20,7 @@
 //     ratio, and the frame keeps rendering.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import scheduleData from '@generated/scheduleData.js';
 
 // This file mounts the full branding editor, whose preview frame renders
@@ -142,7 +142,6 @@ async function renderBranding(themeDoc = LEGACY_THEME) {
   const result = render(
     <MemoryRouter
       initialEntries={['/admin/branding']}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,

@@ -3,7 +3,7 @@
 // navigation bypasses the nav, so the route itself must gate too, matching
 // the Speakers.jsx pattern). A session id that does not resolve to a
 // visible cmsSchedule doc 404s here rather than rendering a blank page.
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
 import { useEventClock } from '../hooks/useEventClock.js';

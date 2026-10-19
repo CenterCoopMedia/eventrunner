@@ -6,7 +6,7 @@ import {
   Route,
   Routes,
   useLocation,
-} from 'react-router-dom';
+} from 'react-router';
 
 let contentValue;
 let configValue;
@@ -96,7 +96,7 @@ describe('SpeakerResourceCard', () => {
   it('omits an uploaded map whose image URL cannot be resolved', () => {
     assetUrl.mockReturnValue(null);
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -115,7 +115,7 @@ describe('SpeakerResourceCard', () => {
       { ...TRAVEL, sections: [...TRAVEL.sections, { id: 'travel_local', label: 'Around the venue' }] },
     ]);
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -132,7 +132,7 @@ describe('SpeakerResourceCard', () => {
   it('shows an uploaded map only after that image loads and ignores a stale load', () => {
     deferImages = true;
     const card = (
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>
     );
@@ -145,7 +145,7 @@ describe('SpeakerResourceCard', () => {
       eventConfig: { venue: { map: { ...VENUE_MAP.venue.map, image: 'cms-images/new-map.png' } } },
     };
     rerender(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -159,7 +159,7 @@ describe('SpeakerResourceCard', () => {
 
   it('renders visible page, venue-map, and canonical slide links with native focus access', () => {
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -199,7 +199,7 @@ describe('SpeakerResourceCard', () => {
       },
     };
     const { container } = render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -210,7 +210,6 @@ describe('SpeakerResourceCard', () => {
     render(
       <MemoryRouter
         initialEntries={['/speaker/dashboard']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <Routes>
           <Route path="*" element={<ResourceRoute />} />
@@ -229,7 +228,7 @@ describe('SpeakerResourceCard', () => {
       getPublicPage: publicPage([{ ...TRAVEL, sections: [] }]),
     };
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -258,7 +257,7 @@ describe('SpeakerResourceCard', () => {
       },
     };
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -283,7 +282,7 @@ describe('SpeakerResourceCard', () => {
       eventConfig: { venue: { mapUrl: 'https://example.org/map' } },
     };
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter>
         <SpeakerResourceCard />
       </MemoryRouter>,
     );
@@ -294,7 +293,7 @@ describe('SpeakerResourceCard', () => {
   it('routes the venue map to the page anchor with HashRouter', async () => {
     window.history.replaceState(null, '', '/#/speaker/dashboard');
     render(
-      <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <HashRouter>
         <Routes>
           <Route path="*" element={<ResourceRoute />} />
         </Routes>

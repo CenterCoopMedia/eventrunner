@@ -3,7 +3,7 @@
 // what it counts.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const configSubscriptions = new Map();
 vi.mock('../../lib/configSource.js', () => ({
@@ -107,7 +107,7 @@ function heldResponse() {
 
 async function renderAt(path) {
   const result = render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   );

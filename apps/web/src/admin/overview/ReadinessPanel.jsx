@@ -12,7 +12,7 @@
 // endpoint answered it, zero as "0". When nothing at all is on the site the
 // panel says so in a sentence as well, so an empty deployment reads as one
 // rather than as a table of zeros to add up.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Panel, secondaryButtonClass } from '../components/formControls.jsx';
 import RuledTable from '../components/RuledTable.jsx';
 import { Figure } from './figures.jsx';

@@ -112,3 +112,13 @@ Rules written after user corrections. Read at session start.
   AskUserQuestion tool, never as plain text in the chat. Plain-text questions
   get lost among status lines. Ask with the tool, with the recommended option
   first, and keep status messages free of questions.
+
+## 2026-10-19: close every Codex review thread three ways
+
+- On #499 and #501 the Codex connector comments got a reply and a resolve,
+  but no reaction. Joe asked for all three on every connector comment:
+  address it (fix and push, or say why not), reply on the thread, resolve
+  the thread, and react 👍 when the finding was useful or 👎 when it was
+  wrong. The reaction is how Codex learns which findings to keep making.
+- Before ending any PR event, list the review threads and check each
+  Codex comment has a reply, a resolved thread, and a reaction.

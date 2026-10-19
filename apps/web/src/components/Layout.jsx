@@ -54,7 +54,7 @@
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config';
 import { useAuth } from '../contexts/AuthContext.jsx';

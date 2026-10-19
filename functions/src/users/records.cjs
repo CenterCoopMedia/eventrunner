@@ -285,9 +285,12 @@ function normalizedEmail(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
-/** True when `code` is Firebase Auth's "no such user". */
+/**
+ * True when `code` is Firebase Auth's "no such user". firebase-admin 14
+ * dropped the public `errorInfo` field, so `code` is the only place to read.
+ */
 function isUserNotFound(err) {
-  return err?.code === 'auth/user-not-found' || err?.errorInfo?.code === 'auth/user-not-found';
+  return err?.code === 'auth/user-not-found';
 }
 
 /**

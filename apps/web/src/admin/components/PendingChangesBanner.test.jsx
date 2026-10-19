@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { subscribeDirtyDrafts } from '../pendingChangesSource.js';
 import { subscribePendingCounts } from '../pendingCountsSource.js';
 import { PendingChangesProvider, usePendingChanges } from '../PendingChangesContext.jsx';
@@ -31,7 +31,7 @@ function deliver(values = {}) {
 
 function renderBanner(path = '/admin/pages') {
   return render(
-    <MemoryRouter initialEntries={[path]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter initialEntries={[path]}>
       <PendingChangesProvider><PendingChangesBanner /></PendingChangesProvider>
     </MemoryRouter>,
   );

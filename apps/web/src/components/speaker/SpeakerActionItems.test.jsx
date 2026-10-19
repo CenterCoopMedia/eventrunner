@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const listMaterials = vi.fn();
 vi.mock('../../lib/speakerMaterialsApi.js', () => ({
@@ -22,7 +22,7 @@ const scheduleData = [
 
 function view(overrides = {}) {
   return (
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <SpeakerActionItems
         speaker={speaker}
         scheduleData={scheduleData}

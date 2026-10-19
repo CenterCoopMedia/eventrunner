@@ -10,7 +10,7 @@
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 vi.mock('../../lib/configSource.js', () => ({ subscribeConfigDoc: () => () => {} }));
 vi.mock('../../lib/contentSource.js', () => ({
@@ -89,7 +89,6 @@ async function renderAt(path, { strict = false } = {}) {
   const routed = (
     <MemoryRouter
       initialEntries={[path]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>

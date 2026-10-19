@@ -15,7 +15,7 @@
 // feed is empty or the flag is off, so an event that says nothing live
 // shows no dead frame. Beneath them: the personal schedule card and the
 // event's own resource cards (issue #169).
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router';
 import AdminEntryLink from '../components/AdminEntryLink.jsx';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

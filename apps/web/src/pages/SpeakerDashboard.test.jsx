@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
 let authValue;
 let configValue;
@@ -67,7 +67,6 @@ function PageFixture({ initialEntry = '/speaker/dashboard' }) {
   return (
     <MemoryRouter
       initialEntries={[initialEntry]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <LocationProbe />
       <Routes>

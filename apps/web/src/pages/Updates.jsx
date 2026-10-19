@@ -31,7 +31,7 @@
 // it draws only when it passes the rule the server stored it under
 // (shared/update validUpdateCategory), so a stray stored value draws
 // nothing.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { validUpdateCategory } from 'shared/update';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

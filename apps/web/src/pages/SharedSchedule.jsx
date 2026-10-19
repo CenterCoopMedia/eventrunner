@@ -17,7 +17,7 @@
 // lands on the same denial path as a private schedule: the reason, never
 // the sessions.
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

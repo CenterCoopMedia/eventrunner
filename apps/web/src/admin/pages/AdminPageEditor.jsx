@@ -27,7 +27,7 @@
 // registry describes.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { RESERVED_PATH_SEGMENTS } from 'shared/routing';
 import { DEFAULT_NAV_PLACEMENT, resolveNavPlacement } from 'shared/theme';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';

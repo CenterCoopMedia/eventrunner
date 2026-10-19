@@ -35,7 +35,7 @@
 // choice. The traced line is the same interaction with Atlas's tokens on
 // (--schedule-trace-width): the column's cells connect down the sheet.
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 import RouteMark from './editorial/RouteMark.jsx';
 import SpecimenLabel from './editorial/SpecimenLabel.jsx';
 import CallingPoints from './CallingPoints.jsx';

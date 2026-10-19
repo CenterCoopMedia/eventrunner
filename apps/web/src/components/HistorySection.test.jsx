@@ -3,7 +3,7 @@
 // is neither.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 let timeline;
 vi.mock('../contexts/ContentContext.jsx', () => ({
@@ -21,7 +21,7 @@ const EDITIONS = [
 
 function draw(blocks, action) {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <HistorySection id="section-history" title="History" blocks={blocks} arrangement="grid" action={action} />
     </MemoryRouter>,
   );

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { Suspense } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { FOCUS_RING_ATTRIBUTE } from '../lib/scrollToTop.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -128,7 +128,6 @@ function renderShell(
   return render(
     <MemoryRouter
       initialEntries={[path]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <Layout />
     </MemoryRouter>,
@@ -501,7 +500,6 @@ describe('Layout account control', () => {
     view.rerender(
       <MemoryRouter
         initialEntries={['/']}
-        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
       >
         <Layout />
       </MemoryRouter>,

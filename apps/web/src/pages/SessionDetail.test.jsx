@@ -3,7 +3,7 @@
 // as Schedule.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 import EventConfigContext from '../contexts/EventConfigContext.jsx';
 import ContentContext from '../contexts/ContentContext.jsx';
@@ -95,7 +95,6 @@ function detailElement(
   return (
     <MemoryRouter
       initialEntries={[`/schedule/${sessionId}${search}`]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <EventConfigContext.Provider
         value={{ eventConfig, features, theme: {}, badges: null, source: 'snapshot' }}

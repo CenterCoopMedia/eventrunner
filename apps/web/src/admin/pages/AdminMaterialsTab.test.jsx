@@ -5,7 +5,7 @@
 // does it.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 const subscriptions = new Map();
 const seeded = { cmsSchedule: [], cmsSchedule_drafts: [], speakers: [] };
@@ -84,7 +84,7 @@ let originalRevoke;
 
 function renderTab() {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <AuthContext.Provider value={AUTH}>
         <ToastProvider>
           <AdminMaterialsTab />

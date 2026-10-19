@@ -44,6 +44,30 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
   });
   test.afterAll(async () => { if (originalEvent) await adminDb().doc('config/event').set(originalEvent); });
 
+  test('the header and home lead offer tickets only once a catalog is published', async ({ page }) => {
+    // The shape the public catalog read answers before staff publish a catalog.
+    const UNPUBLISHED = { provider: 'stripe', mode: 'test', salesEnabled: false, catalogRevision: null, currency: null, ticketTypes: [], closedReason: 'Ticket sales are not configured.' };
+    let response = UNPUBLISHED;
+    let reads = 0;
+    await mockEndpoint(page, 'ticketingCatalog', async () => { reads += 1; return response; });
+    await page.goto('/');
+    await expect.poll(() => reads).toBeGreaterThan(0);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Get tickets' })).toHaveCount(0);
+    await expect(page.locator('a[href="/tickets"]')).toHaveCount(0);
+    await screenshot(page, 'stripe-action-before-catalog', page.locator('header').first());
+
+    // Paused sales keep the action, so a visitor can read when sales open.
+    response = { ...PUBLIC, salesEnabled: false, closedReason: 'Ticket sales are paused.' };
+    await page.reload();
+    await expect(page.getByRole('link', { name: 'Get tickets' }).first()).toBeVisible();
+    for (const link of await page.getByRole('link', { name: 'Get tickets' }).all()) await expect(link).toHaveAttribute('href', '/tickets');
+    await screenshot(page, 'stripe-action-after-catalog', page.locator('header').first());
+    await page.getByRole('link', { name: 'Get tickets' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Ticket sales are closed' })).toBeVisible();
+    await expect(page.getByText('Ticket sales are paused.')).toBeVisible();
+  });
+
   test('selection, lost handoff recovery, authoritative status, and printable ticket reflow', async ({ page }) => {
     test.setTimeout(180_000);
     let status = 'pending';
@@ -97,6 +121,61 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('button', { name: 'Print tickets' })).toBeHidden();
     await expect(page.getByText(TICKET.externalId, { exact: true })).toBeVisible();
     await screenshot(page, 'stripe-ticket-print', page.locator('.ticket-document'));
+  });
+
+  test('reopening sales updates an unedited catalog editor without an unsaved-edits warning', async ({ page }) => {
+    test.setTimeout(120_000);
+    let saved = { ...CATALOG, salesPaused: true };
+    const writes = [];
+    await mockEndpoint(page, 'getTicketingStatus', async () => ({ provider: 'stripe', webhookSupported: true, webhookRegisteredAt: null, lastDeliveryAt: null, queue: { pending: 0, exhausted: 0 } }));
+    await mockEndpoint(page, 'ticketingCommerceAdmin', async (body) => {
+      if (body.action === 'pauseSales') saved = { ...saved, revision: saved.revision + 1, salesPaused: body.paused };
+      if (body.action === 'saveCatalog') { writes.push(body); saved = { ...body.catalog, revision: saved.revision + 1 }; }
+      if (body.action === 'orders') return { orders: [], nextCursor: null };
+      if (body.action === 'tickets') return { tickets: [], nextCursor: null };
+      return { provider: 'stripe', mode: 'test', catalog: saved, inventory: { held: 0, sold: 0 } };
+    });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/ticketing');
+    await expect(page.getByRole('heading', { name: 'Stripe sales', exact: true })).toBeVisible();
+    const endTour = page.getByRole('button', { name: 'End tour', exact: true });
+    if (await endTour.isVisible()) await endTour.click();
+    await page.getByText('Configure ticket catalog').click();
+    await expect(page.getByRole('checkbox', { name: 'Pause new sales' })).toBeChecked();
+    await page.getByRole('button', { name: 'Review reopening sales' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Reopen new ticket sales?' });
+    await dialog.getByLabel('Reason for changing sales').fill('Launch approved.');
+    await dialog.getByRole('button', { name: 'Reopen new sales' }).click();
+    await expect(page.getByText('New sales enabled')).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked();
+    await expect(page.getByText(/The saved catalog has changed/)).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'The editor now shows the current saved catalog.' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Discard unsaved edits and reload catalog' })).toHaveCount(0);
+    await screenshot(page, 'stripe-catalog-after-reopen', page.locator('form').filter({ hasText: 'Ticket types' }));
+    await page.getByRole('button', { name: 'Save catalog' }).click();
+    await expect(page.getByText('Catalog saved. Existing orders keep the prices they were issued with.')).toBeVisible();
+    expect(writes).toHaveLength(1);
+    expect(writes[0].expectedRevision).toBe(CATALOG.revision + 1);
+    expect(writes[0].catalog.salesPaused).toBe(false);
+  });
+
+  test('an empty cart asks for a ticket choice instead of offering a free reservation', async ({ page }) => {
+    await mockEndpoint(page, 'ticketingCatalog', async () => PUBLIC);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/tickets');
+    await expect(page.getByLabel('Quantity — General admission')).toBeVisible();
+    await expect(page.getByText('Choose at least one ticket to continue.')).toBeVisible();
+    await expect(page.getByText(/No payment is required/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Reserve tickets|Continue to Stripe/ })).toHaveCount(0);
+    await screenshot(page, 'stripe-empty-cart-mobile', page.locator('section').filter({ hasText: 'Review your total' }));
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText('Choose at least one ticket.');
+    await expect(page.getByRole('alert')).toBeFocused();
+    await page.getByLabel('Quantity — General admission').selectOption('1');
+    await expect(page.getByText('Choose at least one ticket to continue.')).toHaveCount(0);
+    await expect(page.getByText('Choose at least one ticket.', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeVisible();
   });
 
   test('organizer review dialog traps focus, preserves cancellation meaning, and fits desktop/mobile', async ({ page }) => {

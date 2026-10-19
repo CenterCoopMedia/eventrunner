@@ -83,4 +83,24 @@ describe('catalog save reconciliation', () => {
     expect(screen.getByLabelText('Price (USD)')).toHaveValue('40');
     expect(screen.queryByRole('button', { name: 'Discard unsaved edits and reload catalog' })).not.toBeInTheDocument();
   });
+
+  it('follows a revision that lands while a reload is in flight once the reload ends', async () => {
+    let resolveReload;
+    const call = vi.fn(async (_name, body) => {
+      if (body.action === 'catalog') return new Promise((resolve) => { resolveReload = resolve; });
+      throw new Error(`Unexpected action: ${body.action}`);
+    });
+    const props = { call, isOperator: true, timezone: 'UTC', onSaved: vi.fn() };
+    const { rerender } = render(<StripeCatalogPanel {...props} data={{ catalog: CATALOG }} />);
+    fireEvent.change(screen.getByLabelText('Ticket name'), { target: { value: 'Local unsaved change' } });
+    rerender(<StripeCatalogPanel {...props} data={{ catalog: { ...CATALOG, revision: 2 } }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard unsaved edits and reload catalog' }));
+    // A sales change saves revision 3 while the reload still reads revision 2.
+    rerender(<StripeCatalogPanel {...props} data={{ catalog: { ...CATALOG, revision: 3, salesPaused: false } }} />);
+    await act(async () => resolveReload({ catalog: { ...CATALOG, revision: 2 } }));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Pause new sales' })).not.toBeChecked());
+    expect(screen.getByText('The editor now shows the current saved catalog.')).toBeInTheDocument();
+    expect(screen.queryByText(/The saved catalog has changed/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save catalog' })).toHaveAttribute('aria-disabled', 'false');
+  });
 });

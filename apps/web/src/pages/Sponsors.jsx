@@ -8,7 +8,7 @@
 // composition, the tier rules, and why the operator's own order sets the
 // mark size are all documented there. This page is now what it always was
 // around it: the route, the feature gate, the heading, and the empty state.
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { pageHeading } from 'shared/page';
 import { useContent } from '../contexts/ContentContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';

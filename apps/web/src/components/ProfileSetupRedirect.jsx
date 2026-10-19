@@ -15,7 +15,7 @@
 //
 // ProfileSidebar carries the standing invitation for everyone this skips.
 import { useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { useProfile } from '../contexts/ProfileContext.jsx';
 
 const LANDING_PATHS = ['/', '/signin'];

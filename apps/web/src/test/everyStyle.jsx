@@ -10,7 +10,7 @@
 // The style ids come from the shared resolver rather than a list here, so a
 // seventh style reaches this helper the day it joins the catalog.
 import { render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { THEME_MODES, THEME_PRESET_IDS } from 'shared/theme';
 
 export const STYLE_IDS = Object.freeze([...THEME_PRESET_IDS]);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { resolveRegistrationAction } from 'shared/registration';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -15,6 +15,8 @@ import {
   rememberCheckoutAttempt, safeCheckoutUrl, ticketingRequest,
 } from '../lib/ticketingCommerce.js';
 import { EMAIL_ADDRESS_RE as EMAIL_RE } from 'shared/email';
+
+const EMPTY_CART = 'Choose at least one ticket.';
 
 export default function Tickets() {
   useDocumentTitle('Get tickets');
@@ -154,8 +156,9 @@ export default function Tickets() {
   function submit(event) {
     event.preventDefault();
     if (submittingRef.current) return;
+    // An empty cart has one thing to fix. Its message takes focus alone.
+    if (!count) { setErrors({ cart: EMPTY_CART }); return; }
     const nextErrors = {};
-    if (!count) nextErrors.cart = 'Choose at least one ticket.';
     if (count > Math.min(catalog.maxPerOrder || 20, 20)) nextErrors.cart = `Choose no more than ${Math.min(catalog.maxPerOrder || 20, 20)} tickets per order.`;
     for (const line of lines) {
       const type = types.find((candidate) => candidate.id === line.ticketTypeId);
@@ -271,7 +274,11 @@ export default function Tickets() {
                       {salesEndAt ? <p className="text-caption">Sales close {formatTicketTime(salesEndAt, eventConfig.timezone)}.</p> : null}
                     </div>
                     <SelectField label={`Quantity — ${type.name}`} value={quantities[type.id] || '0'} error={errors[`${type.id}.quantity`]}
-                      onChange={(value) => setQuantities((previous) => ({ ...previous, [type.id]: value }))}
+                      onChange={(value) => {
+                        setQuantities((previous) => ({ ...previous, [type.id]: value }));
+                        // A chosen ticket answers the empty-cart error at once.
+                        if (Number(value) > 0) setErrors((previous) => (previous.cart === EMPTY_CART ? {} : previous));
+                      }}
                       options={[{ value: '0', label: 'No tickets' }, ...(type.available ? Array.from({ length: maximum }, (_, index) => ({ value: String(index + 1), label: String(index + 1) })).filter((option) => Number(option.value) >= (type.minPerOrder || 1)) : [])]} />
                   </div>
                 </fieldset>
@@ -315,8 +322,8 @@ export default function Tickets() {
               setAcceptedCatalogRevision(event.target.checked && validCatalogRevision ? catalog.catalogRevision : null);
               setAcceptedByUid(event.target.checked ? user.uid : null);
             }} error={errors.terms} />
-            {total > 0 ? <p>Stripe securely collects your payment on the next page. Your tickets are issued only after payment is confirmed. Returning to this site does not confirm a purchase.</p> : <p>No payment is required. The server will confirm available seats before issuing your tickets.</p>}
-            <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Preparing your order…' : total > 0 ? `Continue to Stripe — ${formatTicketMoney(total, catalog.currency)}` : 'Reserve tickets'}</button>
+            {!count ? <p>Choose at least one ticket to continue.</p> : total > 0 ? <p>Stripe securely collects your payment on the next page. Your tickets are issued only after payment is confirmed. Returning to this site does not confirm a purchase.</p> : <p>No payment is required. The server will confirm available seats before issuing your tickets.</p>}
+            <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Preparing your order…' : !count ? 'Continue' : total > 0 ? `Continue to Stripe — ${formatTicketMoney(total, catalog.currency)}` : 'Reserve tickets'}</button>
           </section>
         </form>
       ) : null}

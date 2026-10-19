@@ -5,7 +5,7 @@
 // over an image.
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { THEME_HEADERS } from 'shared/theme';
 import Header from './Header.jsx';
 
@@ -17,7 +17,7 @@ const PROPS = {
 
 function renderHeader(props = {}) {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter>
       <Header {...PROPS} {...props}>
         <nav aria-label="Main">
           <a href="/schedule">Schedule</a>

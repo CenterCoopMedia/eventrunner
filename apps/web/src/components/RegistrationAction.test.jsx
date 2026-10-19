@@ -10,6 +10,7 @@
 // written before that rule existed is still unvalidated data at read time.
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 let eventConfig;
 
@@ -23,7 +24,13 @@ const { default: RegistrationAction, resolveRegistrationLink } = await import(
 
 function renderAction(config, placement) {
   eventConfig = config;
-  return render(<RegistrationAction placement={placement} />);
+  // The action rechecks the ticket catalog when the route changes, so it
+  // reads the location and must render inside a router, as it does in the app.
+  return render(
+    <MemoryRouter>
+      <RegistrationAction placement={placement} />
+    </MemoryRouter>,
+  );
 }
 
 const CONFIGURED = {

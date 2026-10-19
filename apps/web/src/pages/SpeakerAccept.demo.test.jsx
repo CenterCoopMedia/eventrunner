@@ -11,7 +11,7 @@
 // the demo branch needs its own file because IS_DEMO is a module constant.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 vi.mock('../lib/demoMode.js', () => ({ IS_DEMO: true, default: true }));
 
@@ -39,7 +39,6 @@ function renderAccept(query) {
   return render(
     <MemoryRouter
       initialEntries={[`/speaker/accept${query}`]}
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <App />
     </MemoryRouter>,
