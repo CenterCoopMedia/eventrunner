@@ -1,5 +1,24 @@
 # Session task list
 
+## 2026-10-19 (wave 3): deliver every promise in the NC Local proposals
+
+Joe set the three October 19 proposal PDFs (self-serve, supported, full
+service) as the spec: anything they promise must exist in the product.
+A gap check found five promises the code does not deliver:
+
+| Id | Promise | State |
+| --- | --- | --- |
+| g1-airtable | Airtable connection: pull pitch records, refresh without duplicates, keep review decisions | workflow wf_e62b5d98-1d3, building |
+| g2-announce | Event announcement email (#490, #201, #202, #203) | workflow, building |
+| g3-remind | Speaker reminder email (#204, #332) | workflow, building |
+| g4-export | Full data export and archive handoff (#329) | workflow, building |
+| g5-import | Initial imports for speakers, sessions, sponsors | workflow, building |
+| docs | Handoff docs: communications, exports, Airtable, stale Stripe omissions | director, after g1-g5 |
+
+Sponsorship invoicing (#208, #209) stays out: the proposals say it needs a
+separate discussion. Each build gets an adversarial review in the workflow;
+the director integrates onto the stack tip, regenerates, and opens stacked PRs.
+
 ## 2026-10-19 (wave 2): burn down issues toward the NC Local launch
 
 Goal: a ready-to-start NC Local site in mid-November (early bird tickets and a
