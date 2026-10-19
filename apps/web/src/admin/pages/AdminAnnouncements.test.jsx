@@ -8,6 +8,8 @@ vi.mock('../adminSource.js', () => ({
 const call = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
 vi.mock('../../contexts/ToastContext.jsx', () => ({ useToast: () => ({ showToast: vi.fn() }) }));
+// The email composer has its own tests and its own endpoint calls.
+vi.mock('../components/AnnouncementEmailComposer.jsx', () => ({ default: () => <h2>Email an announcement</h2> }));
 
 import AdminAnnouncements from './AdminAnnouncements.jsx';
 
@@ -65,6 +67,12 @@ describe('AdminAnnouncements', () => {
     expect(screen.getByLabelText('Message')).toHaveValue('Old message');
     expect(screen.getByLabelText('Level')).toHaveValue('urgent');
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+  });
+
+  it('shows the email composer under the banners', () => {
+    render(<AdminAnnouncements />);
+    act(() => report([]));
+    expect(screen.getByRole('heading', { name: 'Email an announcement' })).toBeInTheDocument();
   });
 
   it('requires confirmation before deletion', async () => {
