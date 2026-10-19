@@ -103,3 +103,12 @@ Rules written after user corrections. Read at session start.
 - `pkill -f "checks.sh /home/user/wt-int8"` matched the shell that ran it,
   and killed the command. Stop a background run through its task, then
   confirm with `pgrep -af` that nothing of it is left.
+
+## 2026-10-19: ask the owner through the question tool
+
+- A decision for Joe went out as a plain sentence at the end of a status
+  message ("Should I build #476 here, or leave it to the #407 loop?"). Joe
+  answered, then said every question for him must come through the
+  AskUserQuestion tool, never as plain text in the chat. Plain-text questions
+  get lost among status lines. Ask with the tool, with the recommended option
+  first, and keep status messages free of questions.

@@ -706,6 +706,13 @@
           <li>The venue editor&#39;s payload helper sent a blank walking-minutes field as <code>0</code>, a real distance an
           operator can mean, instead of failing to save. It now sends <code>null</code> (#227).</li>
           </ul>
+          <h3 id="security">Security<a class="heading-anchor" href="#security" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>The CI gate and DCO jobs now load their verifier scripts from the pull request&#39;s
+          base commit, as the path classifier already did, so a pull request cannot replace
+          the scripts that decide those required checks. A pull request can still edit the
+          workflow file itself; an independent check producer remains #259 (#354).</li>
+          </ul>
           <p>The feature set itself is specified in <a href="/eventrunner/docs/decisions/0001-event-platform-v1/">docs/adr/0001-event-platform-v1.md</a>. Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.</p>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/CHANGELOG.md"><code>CHANGELOG.md</code></a>. Edit the Markdown, not the HTML.</p>
