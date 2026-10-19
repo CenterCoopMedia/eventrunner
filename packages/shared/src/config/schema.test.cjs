@@ -557,6 +557,23 @@ test('validateEventConfig requires a usable sender (the OTP From address)', () =
   assert.deepEqual(minimal, { ok: true, errors: [] });
 });
 
+test('validateEventConfig refuses a long hostile address in linear time', () => {
+  // A dot-heavy domain that fails at its last character. The previous
+  // address pattern backtracked over every dot and took seconds here.
+  const hostile = `!@!.${'!.'.repeat(25000)} `;
+  const started = performance.now();
+  const result = validateEventConfig({
+    ...VALID_EVENT,
+    sender: { email: hostile, replyTo: hostile },
+    legal: { supportEmail: hostile, conductEmail: hostile },
+  });
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 50, `validation took ${elapsed.toFixed(1)} ms`);
+  for (const prefix of ['sender.email:', 'sender.replyTo:', 'legal.supportEmail:', 'legal.conductEmail:']) {
+    assert.ok(result.errors.some((e) => e.startsWith(prefix)), prefix);
+  }
+});
+
 // THE LEGAL BLOCK (ADR 0001 §2.2). The shapes a deployment arrives in: the
 // block init seeds, the block the admin form sends (nulls for blanks), and
 // no block at all.

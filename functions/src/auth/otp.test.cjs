@@ -146,6 +146,25 @@ test('sendOtpCode rejects invalid email and non-POST', async () => {
   assert.equal(get.statusCode, 405);
 });
 
+test('the OTP endpoints refuse a long hostile email in linear time', async () => {
+  // Anyone can post this value. The previous address pattern backtracked
+  // over every dot in the domain and held the instance for seconds.
+  const email = `a@b${'.a'.repeat(25000)}@`;
+  const { handler: send } = sendDeps({});
+  const verify = createVerifyOtpHandler({ db: fakeDb(), auth: fakeAuth() });
+  for (const [handler, body] of [
+    [send, { email }],
+    [verify, { email, code: '123456', challengeId: 'challenge' }],
+  ]) {
+    const res = fakeRes();
+    const started = performance.now();
+    await handler({ method: 'POST', body }, res);
+    const elapsed = performance.now() - started;
+    assert.equal(res.statusCode, 400);
+    assert.ok(elapsed < 50, `the request took ${elapsed.toFixed(1)} ms`);
+  }
+});
+
 test('sendOtpCode rate-limits the 6th request with Retry-After and sends no mail', async () => {
   const { db, sent, handler } = sendDeps({});
   for (let i = 0; i < challengeInternals.RATE_LIMIT_MAX; i += 1) {

@@ -34,7 +34,7 @@ const { render } = require('../email/render.cjs');
 const { getDefaultTemplate, loadTemplate } = require('../email/templates.cjs');
 
 const EXPIRY_MINUTES = Math.floor(challengeInternals.CHALLENGE_TTL_MS / 60000);
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const { EMAIL_ADDRESS_RE: EMAIL_RE } = require('shared/email');
 
 /** Six digits, cryptographically random, leading zeros kept. */
 function generateOtpCode() {

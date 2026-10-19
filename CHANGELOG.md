@@ -316,6 +316,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Every email address check now uses one shared pattern that does not
+  backtrack. The old pattern took seconds on a long, dot-heavy value, and the
+  OTP sign-in endpoint accepts that value from anyone. Config, speaker,
+  ticket, and admin checks accept the same addresses as before.
+
 - Eventbrite deliveries are no longer refused for a missing HMAC header. Eventbrite does not
   sign webhooks, so every real delivery got a 401. The webhook URL now carries the shared secret
   (`?token=`), compared in constant time; a missing or wrong secret still gets a 401.
