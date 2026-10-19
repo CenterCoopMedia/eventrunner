@@ -166,6 +166,26 @@ describe('page list', () => {
     });
   });
 
+  // Launch rehearsal (admin-03-pages.png): every row read "Live" and none
+  // said whether a reader could open the page. A word says it, in each row.
+  it('states in words whether each page is visible or hidden on the public site', async () => {
+    liveDocs = [
+      { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [] },
+      { id: 'recap', label: 'Recap', path: '/recap', order: 1, visible: false, sections: [] },
+      // The build snapshot's flags have the attendee directory off.
+      { id: 'attendees', label: 'Attendees', path: '/attendees', order: 2, visible: true, systemPage: true, sections: [] },
+    ];
+    await renderAt('/admin/pages');
+    const row = async (name) => (await within(screen.getByRole('main')).findByRole('link', { name })).closest('li');
+    expect(within(await row('FAQ')).getByText('Visible')).toBeInTheDocument();
+    expect(within(await row('FAQ')).queryByText('Hidden')).toBeNull();
+    expect(within(await row('Recap')).getByText('Hidden')).toBeInTheDocument();
+    expect(within(await row('Recap')).queryByText('Visible')).toBeNull();
+    const attendees = await row('Attendees');
+    expect(within(attendees).getByText('Hidden')).toBeInTheDocument();
+    expect(within(attendees).getByText(/Attendee directory is off in Features/)).toBeInTheDocument();
+  });
+
   it('saves a moved page order as drafts and does not publish', async () => {
     liveDocs = [
       { id: 'faq', label: 'FAQ', path: '/faq', order: 0, visible: true, sections: [] },

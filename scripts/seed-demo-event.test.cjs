@@ -16,6 +16,15 @@ test('the enabled historical updates retain their visible navigation page and re
   assert.equal(demo.updates[0].links, undefined);
 });
 
+test('the demo keeps every page it lists visible, the ones a fresh site seeds hidden included', () => {
+  // A fresh site seeds recap, guidelines and city guide hidden. The demo
+  // writes all three and must not change visibly.
+  const pages = new Map(demoEvent().pages.map((page) => [page.id, page]));
+  for (const id of ['recap', 'guidelines', 'city_guide', 'home', 'travel']) {
+    assert.equal(pages.get(id)?.visible, true, id);
+  }
+});
+
 /** Run seedDemo with its progress output swallowed. */
 async function runSeed(db, args = {}, now = () => Date.parse('2026-01-01T00:00:00Z'), output = []) {
   const store = require('../functions/src/cms/store.cjs');

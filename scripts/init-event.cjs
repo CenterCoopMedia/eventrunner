@@ -411,7 +411,12 @@ async function runInit({ db, store, bucket, args, tierA, env = process.env, now 
   // nobody seeded. A page left out of the seed is left out of it whole.
   const content = buildSeedContent({ pages: seedablePages, docs: effective, tierA, seededAt });
 
-  const pageResult = await seedCollection({ db, store, collection: 'cmsPages', docs: seedablePages, dryRun, now, force });
+  // A refresh keeps each page's stored visibility (seedCollection
+  // keepStored): pages this release seeds hidden stay visible on a site an
+  // earlier release seeded them visible on.
+  const pageResult = await seedCollection({
+    db, store, collection: 'cmsPages', docs: seedablePages, dryRun, now, force, keepStored: ['visible'],
+  });
   pageResult.skipped = [...collisionSkips, ...pageResult.skipped];
   console.log(
     `  cmsPages          ${pageResult.created.length} created, ${pageResult.refreshed.length} refreshed, ` +

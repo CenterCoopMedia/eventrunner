@@ -405,7 +405,12 @@ function defaultPages() {
       path: '/recap',
       icon: null,
       order: 12,
-      visible: true,
+      // Hidden on a fresh site (launch rehearsal): a recap belongs after
+      // the event, and an empty page in the navigation before then is a
+      // dead end. The operator shows it from Pages when it has content. A
+      // re-run keeps the visibility a site already has (seedCollection
+      // keepStored), so a deployment seeded earlier does not lose the page.
+      visible: false,
       systemPage: false,
       sections: [
         section('recap_summary', 'Summary', 'A short look back at how the event went.',
@@ -428,7 +433,8 @@ function defaultPages() {
       path: '/guidelines',
       icon: null,
       order: 13,
-      visible: true,
+      // Hidden on a fresh site, like recap above: it seeds empty.
+      visible: false,
       systemPage: false,
       sections: [
         section('guidelines_intro', 'Introduction', 'One paragraph welcoming speakers to this page.',
@@ -462,7 +468,8 @@ function defaultPages() {
       path: '/city-guide',
       icon: null,
       order: 14,
-      visible: true,
+      // Hidden on a fresh site, like recap above: it seeds empty.
+      visible: false,
       systemPage: false,
       sections: [
         // Every generic page's first section renders its heading offscreen

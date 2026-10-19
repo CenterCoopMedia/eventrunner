@@ -148,7 +148,9 @@ function demoEvent() {
   const visiblePages = new Set(['home', 'schedule', 'speakers', 'sponsors', 'updates', 'travel', 'recap', 'faq', 'privacy', 'terms', 'contact', 'city_guide', 'conduct', 'guidelines']);
   const labels = { schedule: 'Program', sponsors: 'Partners', travel: 'Locations', city_guide: 'Raleigh', recap: 'Recap' };
   const pages = defaultPages().filter((page) => visiblePages.has(page.id)).map((page) => ({
-    ...page, label: labels[page.id] ?? page.label, seeded: true,
+    // Every page this demo lists is shown, including the ones a fresh site
+    // seeds hidden (recap, guidelines, city guide): the demo fills them.
+    ...page, label: labels[page.id] ?? page.label, visible: true, seeded: true,
     sections: page.sections.filter((section) => !['stats', 'history', 'sponsor_packages'].includes(section.id)).map((section) => {
       if (section.id === 'sponsors') return { ...section, label: 'Historical partners' };
       if (section.id === 'recap_media') return { ...section, allowedBlocks: [...section.allowedBlocks, 'image'] };
