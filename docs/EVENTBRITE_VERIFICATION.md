@@ -97,9 +97,12 @@ sandbox:
   fixtures), `/v3/orders/{orderId}/` (`webhook-order-placed-order-path.json`, the shape
   Eventbrite's documentation shows for `order.*`), and `/v3/events/{eventId}/attendees/{attendeeId}/`
   (`webhook-attendee-updated-attendee-path.json`, the documented `attendee.*` shape, mapped to its
-  order through `GET /events/{id}/attendees/{id}/`). An authenticated delivery in any other shape
-  gets 200 and is ignored, so a shape the adapter does not know loses the update without an
-  error. Record which shape each action really uses. This is the single most load-bearing
+  order through `GET /events/{id}/attendees/{id}/`). If that read returns 404 or no `order_id`,
+  the function answers 500 so Eventbrite retries: the attendee may not have propagated yet. An
+  attendee that is gone for good is retried until Eventbrite stops, so record in the sandbox how
+  soon after `attendee.updated` the attendee read succeeds, and how long Eventbrite keeps
+  retrying a 500. An authenticated delivery in any other shape gets 200 and is ignored, so a
+  shape the adapter does not know loses the update without an error. Record which shape each action really uses. This is the single most load-bearing
   assumption — verify it carefully.
 
 ### 4. `order.refunded` folding

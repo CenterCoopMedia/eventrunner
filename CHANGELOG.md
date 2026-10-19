@@ -323,7 +323,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuses every delivery and stops registration; claim, verify, sync, and status keep working. The
   function reads only an order id from an `api_url` on Eventbrite's own API host, in the order,
   event-order, or attendee form, and fetches the order from the API, so a delivery body cannot
-  supply ticket data. An authenticated delivery it cannot read gets 200 and is ignored. Errors and script output never print the secret. Run
+  supply ticket data. An authenticated delivery it cannot read gets 200 and is ignored. An attendee
+  delivery whose attendee the API cannot return yet gets 500, so Eventbrite retries it. Errors and script output never print the secret. Run
   `scripts/register-ticketing-webhook.cjs` again after deploy and delete the old webhook it names.
   Sandbox confirmation is still open under #79 (#356).
 

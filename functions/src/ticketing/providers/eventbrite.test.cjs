@@ -332,10 +332,24 @@ test('verifyWebhook: the attendee form maps to its order through the API host, n
   assert.equal(calls[0].url, `${internals.API_BASE}/events/evt-1/attendees/att-5001/`);
 });
 
-test('verifyWebhook: an attendee that no longer exists is acknowledged and ignored', async () => {
-  const fetchImpl = fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': { status: 404, body: {} } });
-  const p = provider({ fetchImpl });
-  assertIgnored(await verify(p, 'webhook-attendee-updated-attendee-path.json'), 'attendee 404');
+test('verifyWebhook: an attendee not readable yet (404 or no order_id) throws, so Eventbrite retries (Codex 5)', async () => {
+  for (const entry of [{ status: 404, body: {} }, { id: 'att-5001', event_id: 'evt-1' }]) {
+    const fetchImpl = fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': entry });
+    const p = provider({ fetchImpl });
+    await assert.rejects(() => verify(p, 'webhook-attendee-updated-attendee-path.json'), /not readable yet/);
+  }
+});
+
+test('verifyWebhook: an unhandled action is ignored before any attendee read (Codex 4)', async () => {
+  let called = false;
+  const p = provider({ fetchImpl: async () => { called = true; throw new Error('no fetch'); } });
+  const result = await verifyBody(p, {
+    config: { action: 'attendee.checked_in' },
+    api_url: 'https://www.eventbriteapi.com/v3/events/evt-1/attendees/att-5001/',
+  });
+  assertIgnored(result, 'unhandled action');
+  assert.equal(result.eventType, 'unknown');
+  assert.equal(called, false);
 });
 
 test('verifyWebhook: an attendee for another event is wrong_event, with no API call', async () => {
@@ -597,6 +611,35 @@ test('registerWebhook: an API error that echoes the endpoint never carries the s
   );
 });
 
+test('registerWebhook: a secret with ~, ! and a space never leaks through an echoed endpoint URL (Codex 1)', async () => {
+  const odd = 'abc~def!ghi jkl-0123456789abcdef0123';
+  assert.ok(odd.length >= internals.MIN_WEBHOOK_SECRET_LENGTH);
+  const fetchImpl = async (url, opts = {}) => {
+    if (opts.method === 'POST') {
+      const sent = JSON.parse(opts.body).endpoint_url;
+      // Echo the URL as sent (URLSearchParams form: %7E, %21, +), decoded,
+      // and re-encoded, the way an API error message might.
+      const description = [
+        `rejected ${sent}`,
+        `decoded ${decodeURIComponent(sent)}`,
+        `as ${encodeURI(decodeURIComponent(sent))}.`,
+        `field token=${new URL(sent).searchParams.get('token')}`,
+      ].join(' | ');
+      return { status: 400, json: async () => ({ error: 'BAD', error_description: description }) };
+    }
+    const path_ = url.replace(internals.API_BASE, '');
+    return { status: 200, json: async () => (path_.startsWith('/users') ? fixture('organizations.json') : { webhooks: [] }) };
+  };
+  const p = provider({ env: { TICKETING_WEBHOOK_SECRET: odd }, fetchImpl });
+  let message = '';
+  await assert.rejects(() => p.registerWebhook({ callbackUrl: CALLBACK }), (err) => { message = err.message; return true; });
+  const serialized = new URLSearchParams({ token: odd }).toString().slice('token='.length);
+  for (const form of [odd, encodeURIComponent(odd), serialized, encodeURI(odd), 'ghi jkl', 'ghi+jkl', 'ghi%20jkl']) {
+    assert.equal(message.includes(form), false, `message must not contain ${form}`);
+  }
+  assert.match(message, /redacted/);
+});
+
 test('registerWebhook: a subscription at the bare endpoint (no URL secret) is stale, not reused (issue 356)', async () => {
   const calls = [];
   const fetchImpl = fakeFetch({
@@ -631,24 +674,54 @@ test('registerWebhook: staleWebhookIds lists every other same-endpoint id, even 
   assert.deepEqual(result.staleWebhookIds, ['hook-bare', 'hook-dup']);
 });
 
-test('registerWebhook: a stored URL Eventbrite normalized (host case, extra params) is still reused (review fix 4)', async () => {
+test('registerWebhook: a stored URL Eventbrite normalized (host case, param order, encoding) is still reused (review fix 4)', async () => {
   const calls = [];
   const fetchImpl = fakeFetch({
     'GET /users/me/organizations/': fixture('organizations.json'),
     'GET /organizations/org-8001/webhooks/': {
       webhooks: [{
         id: 'hook-norm',
-        endpoint_url: `https://US-Central1-Demo-Event.cloudfunctions.net/ticketingWebhook?src=eb&${internals.URL_SECRET_PARAM}=${encodeURIComponent(SECRET)}`,
+        endpoint_url: `https://US-Central1-Demo-Event.cloudfunctions.net/ticketingWebhook?${internals.URL_SECRET_PARAM}=${encodeURIComponent(SECRET)}&tenant=a%20b`,
         actions: internals.WEBHOOK_ACTIONS.join(','),
         event_id: 'evt-1',
       }],
     },
   }, { calls });
   const p = provider({ fetchImpl });
-  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  const result = await p.registerWebhook({ callbackUrl: `${CALLBACK}?tenant=a+b` });
   assert.equal(result.webhookId, 'hook-norm');
   assert.deepEqual(result.staleWebhookIds, []);
   assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
+});
+
+test('registerWebhook: a changed non-secret query parameter is a different endpoint, not a reuse (Codex 3)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': {
+      webhooks: [{
+        id: 'hook-tenant-old',
+        endpoint_url: `${CALLBACK}?tenant=old&${internals.URL_SECRET_PARAM}=${SECRET}`,
+        actions: internals.WEBHOOK_ACTIONS.join(','),
+        event_id: 'evt-1',
+      }],
+    },
+    'POST /organizations/org-8001/webhooks/': fixture('webhook-create-response.json'),
+  }, { calls });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: `${CALLBACK}?tenant=new` });
+  assert.equal(result.webhookId, 'hook-6666');
+  assert.deepEqual(result.staleWebhookIds, [], 'another endpoint is not ours to call stale');
+  const post = calls.find((c) => c.method === 'POST');
+  assert.equal(new URL(post.body.endpoint_url).searchParams.get('tenant'), 'new');
+});
+
+test('internals.endpointKey ignores the token and param order, and keeps every other param', () => {
+  const key = internals.endpointKey;
+  assert.equal(key(`${CALLBACK}?a=1&b=2&token=x`), key(`${CALLBACK.toUpperCase().replace('TICKETINGWEBHOOK', 'ticketingWebhook')}?b=2&a=1`));
+  assert.notEqual(key(`${CALLBACK}?a=1`), key(`${CALLBACK}?a=2`));
+  assert.notEqual(key(`${CALLBACK}?a=1`), key(CALLBACK));
+  assert.equal(key('not a url'), '');
 });
 
 test('registerWebhook: a same-endpoint subscription with another secret is stale', async () => {
@@ -683,6 +756,41 @@ test('registerWebhook: follows pagination.continuation through the webhook list 
   assert.equal(result.webhookId, 'hook-7777');
   assert.equal(calls.filter((c) => c.method === 'POST').length, 0);
   assert.equal(calls.filter((c) => c.path.startsWith('/organizations/org-8001/webhooks/')).length, 2);
+});
+
+test('registerWebhook: an org-wide subscription (no event_id) is stale when the deployment is scoped to an event (Codex 2)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': {
+      webhooks: [
+        { id: 'hook-unscoped', endpoint_url: `${CALLBACK}?token=${SECRET}`, actions: internals.WEBHOOK_ACTIONS.join(',') },
+        { id: 'hook-empty-event', endpoint_url: `${CALLBACK}?token=${SECRET}`, actions: internals.WEBHOOK_ACTIONS.join(','), event_id: '' },
+      ],
+    },
+    'POST /organizations/org-8001/webhooks/': fixture('webhook-create-response.json'),
+  }, { calls });
+  const p = provider({ fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  assert.equal(result.webhookId, 'hook-6666');
+  assert.deepEqual(result.staleWebhookIds, ['hook-unscoped', 'hook-empty-event']);
+  assert.equal(calls.find((c) => c.method === 'POST').body.event_id, 'evt-1');
+});
+
+test('registerWebhook: an unscoped deployment reuses only an unscoped subscription (Codex 2)', async () => {
+  const fetchImpl = fakeFetch({
+    'GET /users/me/organizations/': fixture('organizations.json'),
+    'GET /organizations/org-8001/webhooks/': {
+      webhooks: [
+        { id: 'hook-scoped', endpoint_url: `${CALLBACK}?token=${SECRET}`, actions: internals.WEBHOOK_ACTIONS.join(','), event_id: 'evt-1' },
+        { id: 'hook-unscoped', endpoint_url: `${CALLBACK}?token=${SECRET}`, actions: internals.WEBHOOK_ACTIONS.join(',') },
+      ],
+    },
+  });
+  const p = provider({ env: { EVENT_TICKETING_EVENT_ID: '' }, fetchImpl });
+  const result = await p.registerWebhook({ callbackUrl: CALLBACK });
+  assert.equal(result.webhookId, 'hook-unscoped');
+  assert.deepEqual(result.staleWebhookIds, ['hook-scoped']);
 });
 
 test('registerWebhook: a subscription bound to another event is not reused (review note 8)', async () => {

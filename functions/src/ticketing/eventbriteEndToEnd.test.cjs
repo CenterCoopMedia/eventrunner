@@ -322,3 +322,17 @@ test('the attendee form enqueues the attendee\'s order (review fix 6)', async ()
   assert.equal(res.body.enqueued, true);
   assert.equal(db.read('ticket_sync_queue', 'ord-2001').lastEventType, 'attendee.updated');
 });
+
+test('an attendee delivery whose attendee is not readable yet answers 500 and writes nothing, so Eventbrite retries (Codex 5)', async () => {
+  const db = makeFakeDb();
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: fakeFetch({ 'GET /events/evt-1/attendees/att-5001/': { status: 404, body: {} } }),
+  });
+  const req = signedWebhookRequest('webhook-attendee-updated-attendee-path.json');
+  const res = makeRes();
+  await createTicketingWebhookHandler({ db, provider, log: QUIET })(req, res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(req.rawBody)), undefined);
+  assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
+});

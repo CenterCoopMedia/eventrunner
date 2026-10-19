@@ -59,7 +59,9 @@
  *    step 2), so all three are accepted (API_PATH_SHAPES). The order form
  *    with no event id defers the event check to the sync re-fetch. The
  *    attendee form is mapped to its order by reading the attendee from
- *    API_BASE. Any other shape is acknowledged and ignored. This is the
+ *    API_BASE; an attendee the API cannot return yet is a 500, so
+ *    Eventbrite retries. An action the adapter does not handle, or any
+ *    other shape, is acknowledged and ignored. This is the
  *    single most load-bearing synthetic-fixture assumption; #79 must
  *    confirm which shapes real deliveries carry.
  * 4. `order.refunded` FOLDING. The ADR's `WebhookVerification.eventType`
@@ -205,11 +207,21 @@ function tokenOf(value) {
   }
 }
 
-/** `origin + pathname` of a URL, or '' when it does not parse. @param {unknown} value */
-function baseOf(value) {
+/**
+ * What makes two webhook URLs the same endpoint: origin, path, and every
+ * query parameter except the secret, in sorted order. Parsing normalizes
+ * host case and encoding, so a URL Eventbrite stores in another form still
+ * matches; a changed non-secret parameter (`?tenant=new`) does not. The
+ * token is compared separately, in constant time. '' when it does not parse.
+ * @param {unknown} value
+ */
+function endpointKey(value) {
   try {
     const url = new URL(String(value));
-    return `${url.origin}${url.pathname}`;
+    const params = new URLSearchParams(url.search);
+    params.delete(URL_SECRET_PARAM);
+    params.sort();
+    return `${url.origin}${url.pathname}?${params.toString()}`;
   } catch {
     return '';
   }
@@ -270,10 +282,27 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
    */
   function redact(text) {
     let out = String(text);
-    for (const form of new Set([webhookSecret, encodeURIComponent(webhookSecret)])) {
+    // Exact forms first, while each is still whole: the raw value, its
+    // component and URI encodings, and the form URLSearchParams writes
+    // into the registered URL (endpointUrlFor), which encodes `~` and `!`
+    // and writes a space as `+`.
+    const serialized = new URLSearchParams({ [URL_SECRET_PARAM]: webhookSecret }).toString()
+      .slice(URL_SECRET_PARAM.length + 1);
+    for (const form of new Set([webhookSecret, encodeURIComponent(webhookSecret), encodeURI(webhookSecret), serialized])) {
       if (form) out = out.split(form).join('[redacted]');
     }
-    return out;
+    // Then structurally: any URL left in the text has its token blanked,
+    // whatever encoding the echo used.
+    return out.replace(/https?:\/\/[^\s"'<>|]+/gi, (match) => {
+      try {
+        const url = new URL(match);
+        if (!url.searchParams.has(URL_SECRET_PARAM)) return match;
+        url.searchParams.set(URL_SECRET_PARAM, 'redacted');
+        return url.toString();
+      } catch {
+        return match;
+      }
+    });
   }
   const externalEventId = typeof env.EVENT_TICKETING_EVENT_ID === 'string' &&
     env.EVENT_TICKETING_EVENT_ID.trim().length > 0
@@ -401,8 +430,10 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       }
 
       const action = typeof body?.config?.action === 'string' ? body.config.action : null;
-      if (!action) return ignored();
-      const eventType = ACTION_TO_EVENT_TYPE[action] || 'unknown';
+      // An action this adapter does not handle needs no order: stop before
+      // any API read the attendee form would cost.
+      const eventType = action ? ACTION_TO_EVENT_TYPE[action] : undefined;
+      if (!eventType) return ignored();
       const resource = parseApiUrl(body?.api_url);
       if (!resource) return ignored(eventType);
 
@@ -419,12 +450,17 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       if (resource.kind === 'attendee') {
         // The queue is keyed by order. The attendee resource names its
         // order; read it from API_BASE, never from the delivered URL. A
-        // throw here is a 500, which Eventbrite retries.
+        // throw here is a 500, which Eventbrite retries. That includes an
+        // attendee the API cannot return yet (404, or no order_id): the
+        // API is eventually consistent, and acknowledging would lose the
+        // update (judgment call 5's reasoning, applied to the webhook).
         const attendee = await apiCall(
           `/events/${encodeURIComponent(resource.eventId)}/attendees/${encodeURIComponent(resource.attendeeId)}/`,
         );
-        orderId = attendee?.order_id != null ? String(attendee.order_id) : null;
-        if (!orderId) return ignored(eventType);
+        orderId = attendee?.order_id != null && String(attendee.order_id) !== '' ? String(attendee.order_id) : null;
+        if (!orderId) {
+          throw new Error('eventbrite attendee is not readable yet; the delivery will be retried');
+        }
       }
 
       return { valid: true, deliveryId, eventType, resourceId: orderId };
@@ -506,8 +542,9 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
     /**
      * Create (or find) the org-level webhook subscription (§3.3, §5.6
      * item 5). Idempotent: an existing subscription at the same endpoint
-     * (origin and path), carrying this secret, every handled action, and
-     * this event, is reused rather than duplicated (judgment call 6 covers
+     * (endpointKey: origin, path, and every query parameter but the token),
+     * carrying this secret, every handled action, and exactly this
+     * deployment's event scope, is reused rather than duplicated (judgment call 6 covers
      * organization discovery). Every page of the webhook list is read.
      *
      * The subscription always carries every action in WEBHOOK_ACTIONS
@@ -553,18 +590,24 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
         continuation = next;
       }
 
-      // Same endpoint = same origin and path, whatever its query, so a URL
-      // Eventbrite normalized still matches. One that carries this secret
-      // (compared in constant time), every action, and this event is kept;
-      // every other one at the endpoint is stale (#356, #357).
+      // Same endpoint = same endpointKey (origin, path, and every query
+      // parameter but the token). One that carries this secret (compared in
+      // constant time), every action, and this deployment's event scope is
+      // kept; every other one at the endpoint is stale (#356, #357).
+      const key = endpointKey(endpointUrl);
       const sameEndpoint = existing
-        .filter((w) => w?.id != null && baseOf(w.endpoint_url) === baseOf(endpointUrl));
+        .filter((w) => w?.id != null && endpointKey(w.endpoint_url) === key);
+      // The subscription's scope must equal the deployment's: an org-wide
+      // one (no event_id) on a scoped deployment delivers every event's
+      // activity, and each delivery costs a claim, a queue row and an API
+      // read before sync drops it.
+      const storedEventId = (w) => (w.event_id == null ? '' : String(w.event_id));
       const complete = (w) => {
         const have = actionList(w.actions);
         const token = tokenOf(w.endpoint_url);
         return token !== '' && safeEqual(token, webhookSecret) &&
           WEBHOOK_ACTIONS.every((a) => have.includes(a)) &&
-          (!externalEventId || w.event_id == null || String(w.event_id) === externalEventId);
+          storedEventId(w) === (externalEventId || '');
       };
       const already = sameEndpoint.find(complete);
       const staleWebhookIds = sameEndpoint.filter((w) => w !== already).map((w) => String(w.id));
@@ -648,6 +691,7 @@ module.exports = {
     API_PATH_SHAPES,
     parseApiUrl,
     endpointUrlFor,
+    endpointKey,
     safeEqual,
     deliveryIdFor,
     claimUrl,

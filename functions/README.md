@@ -69,14 +69,18 @@ The body is not trusted for ticket data. The adapter reads only the action and a
 id from an `api_url` that is https on `www.eventbriteapi.com`, with no port or
 credentials. It accepts `/v3/events/{e}/orders/{o}/`, `/v3/orders/{o}/`, and
 `/v3/events/{e}/attendees/{a}/`; the attendee form is mapped to its order by reading
-the attendee from the API base. An authenticated delivery in any other shape gets 200
-and is ignored, so Eventbrite does not retry it. Nothing fetches the delivered URL. The sync drain fetches the order from
+the attendee from the API base. If that read finds no attendee or no order yet, the
+handler answers 500 and Eventbrite retries. An authenticated delivery for an action the
+adapter does not handle, or in any other shape, gets 200 and is ignored, so Eventbrite
+does not retry it. Nothing fetches the delivered URL. The sync drain fetches the order from
 the fixed API base with this deployment's token and drops an order for another event.
 
 Registration sends every action the adapter handles (`webhookEventTypes`), so
 `order.refunded` arrives (#357). The script reads every page of the webhook list. It
-reuses a subscription at the same endpoint (origin and path) that carries the current
-secret, every action, and this event. Otherwise it creates one. It names every other
+reuses a subscription at the same endpoint (origin, path, and every query parameter
+but the secret) that carries the current secret, every action, and the same event scope
+as the deployment. An org-wide subscription is not reused by a deployment scoped to an
+event. Otherwise it creates one. It names every other
 subscription at the endpoint for the operator to delete.
 
 The secret never appears in Event Runner logs, error messages, or script output.
