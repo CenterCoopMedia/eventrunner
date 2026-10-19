@@ -115,7 +115,8 @@ function speakerName(record) {
 const list = (values) => values.filter(Boolean).join(LIST_SEPARATOR);
 
 /**
- * The spreadsheets. Each names its tier, its file name, how it reads its
+ * The spreadsheets. Each names its tier, its file name, the package file
+ * that holds its live records (packagePath, packageHolds), how it reads its
  * rows, and its columns in file order. A column reads one field.
  */
 const DATASETS = Object.freeze({
@@ -123,6 +124,8 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'sessions',
     docPath: 'cmsSchedule',
+    packagePath: 'program/sessions.csv',
+    packageHolds: 'the live sessions',
     async read({ db, counter, maxDocs, cache, config, liveOnly }) {
       const sessions = await readCurrent({ db, collection: 'cmsSchedule', counter, maxDocs, cache, liveOnly }, sessionRecord);
       const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs, cache }, speakerRecord);
@@ -161,6 +164,8 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'speakers',
     docPath: 'speakers',
+    packagePath: 'speakers/speakers.csv',
+    packageHolds: 'the speakers',
     async read({ db, counter, maxDocs, cache }) {
       const speakers = await readRecords({ db, collection: 'speakers', counter, maxDocs, cache }, speakerRecord);
       // Published: a live session the site shows, not a hidden one.
@@ -191,6 +196,8 @@ const DATASETS = Object.freeze({
     tier: 'staff',
     filename: 'organizations',
     docPath: 'cmsOrganizations',
+    packagePath: 'organizations/organizations.csv',
+    packageHolds: 'the live organizations',
     read: ({ db, counter, maxDocs, cache, liveOnly }) => readCurrent({ db, collection: 'cmsOrganizations', counter, maxDocs, cache, liveOnly }, organizationRecord),
     columns: [
       { header: 'Organization ID', value: (row) => row.id },
@@ -209,6 +216,8 @@ const DATASETS = Object.freeze({
     tier: 'operator',
     filename: 'ticket-orders',
     docPath: 'ticket_orders',
+    packagePath: 'orders/orders.csv',
+    packageHolds: 'the ticket orders',
     read: ({ db, counter, maxDocs, cache }) => readRecords({ db, collection: 'ticket_orders', counter, maxDocs, cache }, orderRecord),
     columns: [
       { header: 'Order ID', value: (row) => row.id },
@@ -233,6 +242,8 @@ const DATASETS = Object.freeze({
     tier: 'operator',
     filename: 'admissions',
     docPath: 'tickets',
+    packagePath: 'orders/admissions.csv',
+    packageHolds: 'the admissions',
     read: ({ db, counter, maxDocs, cache }) => readRecords({ db, collection: 'tickets', counter, maxDocs, cache }, admissionRecord),
     columns: [
       { header: 'Ticket ID', value: (row) => row.id },
@@ -338,9 +349,13 @@ function createExportEventDataHandler({
       rowCount = rows.length;
     } catch (err) {
       if (err instanceof LimitError || err instanceof TooLargeError) {
+        // Only an operator can run the script or download the package.
+        const where = tierSatisfies(verdict.tier, 'operator')
+          ? 'Run scripts/export-event-package.cjs from a terminal (docs/operator/archive-handoff.md)'
+          : 'Ask an operator for the event data package';
         return sendError(
           res, 413, 'too-large',
-          'This spreadsheet is too large to build here. An operator can download the event data package with the export script instead.',
+          `This spreadsheet is too large to build here. ${where}: its file ${dataset.packagePath} holds ${dataset.packageHolds}.`,
         );
       }
       log.error(`exportEventData: the ${request.name} records could not be read`, err);

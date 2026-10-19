@@ -243,11 +243,19 @@ test('no audit row, no file: a failed audit write refuses the export', async () 
   assert.match(res.body.error.message, /could not be recorded, so no file was made/);
 });
 
-test('a read past the document cap answers 413 and points at the package script', async () => {
+test('a read past the document cap answers 413 with a path the caller can take', async () => {
   const { handler } = setup({ maxDocs: 2 });
-  const res = await run(handler, 'staff', { dataset: 'sessions' });
-  assert.equal(res.statusCode, 413);
-  assert.match(res.body.error.message, /export script/);
+  const staff = await run(handler, 'staff', { dataset: 'sessions' });
+  assert.equal(staff.statusCode, 413);
+  // Staff cannot run the script or download the package: they ask an operator.
+  assert.equal(staff.body.error.message, 'This spreadsheet is too large to build here. Ask an operator for the event data package: its file program/sessions.csv holds the live sessions.');
+  const operator = await run(handler, 'admin', { dataset: 'organizations' });
+  assert.equal(operator.statusCode, 413);
+  assert.equal(operator.body.error.message, 'This spreadsheet is too large to build here. Run scripts/export-event-package.cjs from a terminal (docs/operator/archive-handoff.md): its file organizations/organizations.csv holds the live organizations.');
+  // The package paths named here are the package's own.
+  const { internals: { SECTIONS } } = require('./eventPackage.cjs');
+  const paths = SECTIONS.flatMap((section) => section.files.map((file) => file.path));
+  for (const name of DATASET_NAMES) assert.ok(paths.includes(DATASETS[name].packagePath), name);
 });
 
 test('a page larger than one read page is read in id order, every document once', async () => {
