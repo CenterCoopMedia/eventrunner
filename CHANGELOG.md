@@ -92,8 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rule as the speaker's own next steps list. A double click or a retry sends nothing more,
   a speaker gets at most one reminder in 24 hours, each row shows when the speaker was
   last reminded, and each send is in the admin log. Staff can edit the reminder wording,
-  and the server refuses an unknown token at save and a send whose wording changed after
-  the preview. The readiness list exports as CSV for an organizer's own mailing tool
+  and the server refuses an unknown token at save and a send whose wording, recipients or
+  messages changed after the preview. A reminder the provider may have accepted counts for
+  the 24-hour limit and is reported as unconfirmed. The readiness list exports as CSV for an organizer's own mailing tool
   (#332). A historical demo refuses the send.
 
 - A **Data export** page in the admin panel (System group). Staff export sessions,

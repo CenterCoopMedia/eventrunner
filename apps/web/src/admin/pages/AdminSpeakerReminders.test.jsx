@@ -60,6 +60,7 @@ const PREVIEW = {
   skipped: [{ speakerId: 'ben', name: 'Ben Ode', reason: 'recent', message: 'This speaker was reminded less than 24 hours ago.' }],
   usedFallback: false,
   wordingVersion: 'wording-v1',
+  receipt: 'a'.repeat(64),
 };
 
 const TEMPLATE = {
@@ -201,6 +202,7 @@ describe('preview and send', () => {
       topics: ['headshot', 'description', 'materials'],
       confirmCount: 1,
       wordingVersion: 'wording-v1',
+      receipt: 'a'.repeat(64),
     });
     expect(typeof sendCall.batchId).toBe('string');
     expect(sendCall.batchId.length).toBeGreaterThanOrEqual(8);

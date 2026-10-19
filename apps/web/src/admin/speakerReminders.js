@@ -70,6 +70,11 @@ export function sendSummary(result) {
   if (skipped) lines.push(`${speakerCount(skipped)} got no reminder.`);
   const failed = result?.failed?.length ?? 0;
   if (failed) lines.push(`${speakerCount(failed)} could not be emailed. Preview again to retry.`);
+  const uncertain = result?.uncertain?.length ?? 0;
+  if (uncertain) {
+    lines.push(`${speakerCount(uncertain)} may have the reminder: the email provider did not confirm it.`);
+    lines.push(`${uncertain === 1 ? 'The speaker gets' : 'These speakers get'} no other reminder for 24 hours. Check the Email log.`);
+  }
   return lines.join(' ');
 }
 

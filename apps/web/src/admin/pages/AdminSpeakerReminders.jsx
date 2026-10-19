@@ -313,7 +313,7 @@ export default function AdminSpeakerReminders() {
   const [list, setList] = useState({ status: 'loading', rows: [], error: null });
   const [selected, setSelected] = useState(() => new Set(requestedSpeaker ? [requestedSpeaker] : []));
   const [topics, setTopics] = useState(() => new Set(READINESS_ITEMS));
-  const [preview, setPreview] = useState(null); // { batchId, topics, recipients, skipped, usedFallback, wordingVersion }
+  const [preview, setPreview] = useState(null); // { batchId, topics, recipients, skipped, usedFallback, wordingVersion, receipt }
   const [busy, setBusy] = useState(null); // 'preview' | 'send' | 'export'
   const [notice, setNotice] = useState(null);
   const [confirming, setConfirming] = useState(false);
@@ -410,11 +410,12 @@ export default function AdminSpeakerReminders() {
         batchId: preview.batchId,
         confirmCount: preview.recipients.length,
         wordingVersion: preview.wordingVersion,
+        receipt: preview.receipt,
       });
       setConfirming(false);
       setPreview(null);
       setSelected(new Set());
-      setNotice({ tone: result.failed?.length ? 'caution' : 'ok', message: sendSummary(result) });
+      setNotice({ tone: result.failed?.length || result.uncertain?.length ? 'caution' : 'ok', message: sendSummary(result) });
       await refresh();
     } catch (err) {
       setSendError(err.message);

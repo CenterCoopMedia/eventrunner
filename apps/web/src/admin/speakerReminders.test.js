@@ -42,6 +42,10 @@ describe('speaker reminder helpers', () => {
     expect(sendSummary({ sent: [1, 2], alreadySent: [1], skipped: [], failed: [] })).toBe(
       'Sent 2 reminders. 1 speaker already had this reminder, so nothing more was sent.',
     );
+    expect(sendSummary({ sent: [], alreadySent: [], skipped: [], failed: [], uncertain: [1] })).toBe(
+      'Sent 0 reminders. 1 speaker may have the reminder: the email provider did not confirm it. '
+        + 'The speaker gets no other reminder for 24 hours. Check the Email log.',
+    );
   });
 
   it('makes a batch id the server accepts, and formats a time on the event clock', () => {

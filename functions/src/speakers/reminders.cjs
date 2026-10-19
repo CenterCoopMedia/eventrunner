@@ -12,7 +12,8 @@
  *   preview        the exact subject, html and text each chosen speaker
  *                  would get, footer included, plus who is left out and why
  *   send           the same messages, sent; needs the recipient count the
- *                  preview showed (`confirmCount`) and a `batchId`
+ *                  preview showed (`confirmCount`), its `receipt` and a
+ *                  `batchId`
  *   export         the readiness list as CSV for the organizer's own mail
  *                  tool (issue #332); written to admin_logs before it leaves
  *   template       the shipped and the saved reminder wording
@@ -41,6 +42,20 @@
  * THE WORDING THE PREVIEW SHOWED. Preview returns `wordingVersion`, a digest
  * of the saved wording. Send needs it, and refuses when the wording changed
  * in between, so no speaker gets wording staff did not read.
+ *
+ * THE MESSAGES THE PREVIEW SHOWED. Preview also returns `receipt`, a SHA-256
+ * over every recipient's speaker id, address, items, subject and bodies
+ * (footer included), the same idea as the announcement receipt
+ * (announcements/compose.cjs). Send renders the batch again from the live
+ * stores and refuses it whole, before any reservation, when the receipt
+ * differs: a changed address, a speaker who supplied an item, a renamed
+ * session or a changed site address all need a new preview.
+ *
+ * A PROVIDER THAT MAY HAVE ACCEPTED. When the provider throws after the
+ * request left (the email core's `ambiguous`), the speaker may have the
+ * mail. The record says `uncertain`, with `lastSentAt` set, so the 24-hour
+ * window applies and a new batch cannot send a second copy. The response
+ * lists the speaker under `uncertain`, not `failed`.
  *
  * Historical demos refuse every write here (send, saveTemplate,
  * resetTemplate) before anything is stored; core/demoWrites.cjs.
@@ -78,6 +93,7 @@ const SENDING_STALE_MS = 10 * 60 * 1000;
 /** Longest saved subject, html or text body, in characters. */
 const MAX_TEMPLATE_FIELD_LENGTH = 100 * 1024;
 const BATCH_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+const RECEIPT_RE = /^[0-9a-f]{64}$/;
 /** The wording version when no wording is saved. */
 const SHIPPED_WORDING = 'shipped';
 
@@ -136,6 +152,19 @@ function wordingVersion(override) {
   if (!override) return SHIPPED_WORDING;
   const fields = ['subject', 'html', 'text'].map((key) => (typeof override[key] === 'string' ? override[key] : null));
   return crypto.createHash('sha256').update(JSON.stringify(fields), 'utf8').digest('hex').slice(0, 32);
+}
+
+/**
+ * The digest a send must match: every message the preview showed, in order.
+ * @param {{ speakerId: string, to: string, items: string[], subject: string,
+ *   html: string, text: string }[]} messages
+ */
+function reminderReceipt(messages) {
+  const canonical = JSON.stringify({
+    v: 1,
+    messages: messages.map((m) => [m.speakerId, m.to, m.items, m.subject, m.html ?? null, m.text ?? null]),
+  });
+  return crypto.createHash('sha256').update(canonical, 'utf8').digest('hex');
 }
 
 function siteUrl(config) {
@@ -346,8 +375,38 @@ async function previewAction({ db, getConfig, now, actor, body }) {
     };
   });
   return {
-    topics: selection.topics, recipients: messages, skipped, usedFallback, wordingVersion: wordingVersion(loaded.override),
+    topics: selection.topics,
+    recipients: messages,
+    skipped,
+    usedFallback,
+    wordingVersion: wordingVersion(loaded.override),
+    receipt: reminderReceipt(messages),
   };
+}
+
+/**
+ * What a send would deliver now, rendered from the live stores, and its
+ * receipt. The cooldown is left to each reservation, so a replay of a batch
+ * reports what happened instead of "reminded less than 24 hours ago".
+ */
+async function prepareBatch({ db, getConfig, now, actor, selection }) {
+  const [stores, config, loaded] = await Promise.all([
+    loadReadinessStores(db), getConfig(), loadReminderTemplate(db, now),
+  ]);
+  const { recipients, skipped } = sortSelection({ ...selection, stores, nowMs: now(), checkCooldown: false });
+  // Every message is rendered before the first one goes: a template or
+  // configuration fault refuses the batch whole, not half way through.
+  const prepared = recipients.map((recipient) => ({
+    recipient,
+    rendered: renderReminder({ ...loaded, config, ...recipient, actor }),
+  }));
+  const receipt = reminderReceipt(prepared.map(({ recipient, rendered }) => ({
+    speakerId: recipient.speakerId,
+    to: rendered.message.to,
+    items: recipient.items,
+    ...rendered.delivered,
+  })));
+  return { loaded, prepared, skipped, receipt };
 }
 
 /**
@@ -381,6 +440,7 @@ async function reserve({ db, speakerId, batchId, items, actor, nowMs }) {
     if (state.lastBatchId === batchId) {
       // Replays never send. What the first request did is the answer.
       if (state.lastStatus === 'failed') return { ok: false, outcome: 'failed' };
+      if (state.lastStatus === 'uncertain') return { ok: false, outcome: 'uncertain' };
       return { ok: false, outcome: 'already-sent' };
     }
     if (state.lastStatus === 'sending' && Number.isFinite(attempt) && nowMs - attempt < SENDING_STALE_MS) {
@@ -411,28 +471,23 @@ async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
   if (typeof body?.wordingVersion !== 'string' || body.wordingVersion === '') {
     fail(400, 'bad-request', 'wordingVersion: Preview the reminders again, then send.');
   }
+  if (typeof body?.receipt !== 'string' || !RECEIPT_RE.test(body.receipt)) {
+    fail(400, 'bad-request', 'receipt: Preview the reminders again, then send.');
+  }
   await requireWritable(db);
 
-  const [stores, config, loaded] = await Promise.all([
-    loadReadinessStores(db), getConfig(), loadReminderTemplate(db, now),
-  ]);
+  const { loaded, prepared, skipped, receipt } = await prepareBatch({ db, getConfig, now, actor, selection });
   if (wordingVersion(loaded.override) !== body.wordingVersion) {
     fail(409, 'stale-preview', 'The reminder wording changed after the preview. Preview again, then send.');
   }
-  // The cooldown is decided in each reservation, so a replay of this batch
-  // reports what happened instead of "reminded less than 24 hours ago".
-  const { recipients, skipped } = sortSelection({ ...selection, stores, nowMs: now(), checkCooldown: false });
-
-  // Every message is rendered before the first one goes: a template or
-  // configuration fault refuses the batch whole, not half way through.
-  const prepared = recipients.map((recipient) => ({
-    recipient,
-    rendered: renderReminder({ ...loaded, config, ...recipient, actor }),
-  }));
+  if (receipt !== body.receipt) {
+    fail(409, 'stale-preview', 'A recipient or a message changed after the preview. Preview again, then send.');
+  }
 
   const sent = [];
   const alreadySent = [];
   const failed = [];
+  const uncertain = [];
   let finished = false;
   try {
     for (const { recipient, rendered } of prepared) {
@@ -441,6 +496,7 @@ async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
       if (outcome === 'sent') sent.push({ speakerId, name });
       else if (outcome === 'already-sent') alreadySent.push({ speakerId, name });
       else if (outcome === 'failed') failed.push({ speakerId, name });
+      else if (outcome === 'uncertain') uncertain.push({ speakerId, name });
       else skipped.push({ speakerId, name, reason, message: SKIP_REASONS[reason] });
     }
     finished = true;
@@ -462,17 +518,18 @@ async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
         alreadySent: alreadySent.map((row) => row.speakerId),
         skipped: skipped.length,
         failed: failed.map((row) => row.speakerId),
+        uncertain: uncertain.map((row) => row.speakerId),
         ...(finished ? {} : { incomplete: true }),
       },
     });
   }
 
-  return { batchId, sent, alreadySent, skipped, failed };
+  return { batchId, sent, alreadySent, skipped, failed, uncertain };
 }
 
 /**
  * Reserve, send and stamp one speaker's reminder.
- * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'skipped', reason?: string }>}
+ * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'uncertain' | 'skipped', reason?: string }>}
  */
 async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs }) {
   const { speakerId, items } = recipient;
@@ -485,22 +542,26 @@ async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered
     log.error('speaker.reminder send threw', err);
     result = { status: 'failed' };
   }
-  const ok = result?.status === 'sent';
+  // A throw after the request left may still have delivered the mail: it
+  // counts as a reminder for the window, so no new batch sends a second one.
+  let outcome = 'failed';
+  if (result?.status === 'sent') outcome = 'sent';
+  else if (result?.ambiguous) outcome = 'uncertain';
   try {
-    await db.collection(REMINDERS).doc(speakerId).set(ok
-      ? {
-        lastStatus: 'sent',
+    await db.collection(REMINDERS).doc(speakerId).set(outcome === 'failed'
+      ? { lastStatus: 'failed' }
+      : {
+        lastStatus: outcome,
         lastSentAt: new Date(nowMs),
         lastSentBy: actor.email,
         lastItems: items,
         sentCount: reservation.sentCount + 1,
-      }
-      : { lastStatus: 'failed' }, { merge: true });
+      }, { merge: true });
   } catch (err) {
     // The record stays at "sending"; reserve() settles it by the claim.
     log.warn('speaker_reminders stamp failed', err);
   }
-  return { outcome: ok ? 'sent' : 'failed' };
+  return { outcome };
 }
 
 const CSV_HEADERS = Object.freeze([
@@ -712,5 +773,7 @@ module.exports = {
     sortSelection,
     csvForRows,
     wordingVersion,
+    reminderReceipt,
+    prepareBatch,
   },
 };

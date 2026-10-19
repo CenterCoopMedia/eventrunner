@@ -15,7 +15,7 @@ import { doc, getDoc } from 'firebase/firestore';
 const require = createRequire(import.meta.url);
 const {
   createSpeakerRemindersHandler,
-  internals: { REMINDER_COOLDOWN_MS, SENDING_STALE_MS, SHIPPED_WORDING },
+  internals: { REMINDER_COOLDOWN_MS, SENDING_STALE_MS, SHIPPED_WORDING, prepareBatch, readSelection },
 } = require('../functions/src/speakers/reminders.cjs');
 const { createEmailCore, internals: { claimIdForOnceKey } } = require('../functions/src/email/send.cjs');
 const { resetTemplateCacheForTest } = require('../functions/src/email/templates.cjs');
@@ -56,11 +56,15 @@ let testEnv;
 let adminApp;
 let db;
 let outbox;
+// When set, the provider takes the message and then throws, as a timeout
+// after acceptance does.
+let throwAfterAccept;
 
 const provider = {
   name: 'capture',
   async send(message) {
     outbox.push(message);
+    if (throwAfterAccept) throw new Error('socket hang up');
     return { providerMessageId: `m-${outbox.length}`, status: 'sent' };
   },
 };
@@ -81,9 +85,20 @@ async function call(body, { token = 'staff', now = T0, method = 'POST', handlerD
   const getConfig = async () => CONFIG;
   const core = createEmailCore({ db, provider, getConfig, sleep: async () => {}, log: QUIET });
   const res = makeRes();
-  // A send carries the wording version its preview showed; the shipped
-  // wording unless a test says otherwise.
-  const sent = body?.action === 'send' && !('wordingVersion' in body) ? { ...body, wordingVersion: SHIPPED_WORDING } : body;
+  // A send carries the wording version and the receipt its preview showed:
+  // the shipped wording, and the receipt of what the send would deliver,
+  // unless a test says otherwise.
+  let sent = body;
+  if (body?.action === 'send' && !('wordingVersion' in body)) sent = { ...sent, wordingVersion: SHIPPED_WORDING };
+  if (body?.action === 'send' && !('receipt' in body)) {
+    let selection = null;
+    try { selection = readSelection(body); } catch { /* the handler refuses it */ }
+    if (selection) {
+      const actor = { uid: TOKENS[token]?.uid, email: TOKENS[token]?.email };
+      const { receipt } = await prepareBatch({ db: handlerDb, getConfig, now: () => now, actor, selection });
+      sent = { ...sent, receipt };
+    }
+  }
   await createSpeakerRemindersHandler({
     db: handlerDb, auth, getConfig, sendEmail: core.send, now: () => now, log: QUIET,
   })({ method, headers: token ? { authorization: `Bearer ${token}` } : {}, body: sent }, res);
@@ -155,6 +170,7 @@ beforeEach(async () => {
   await testEnv.clearFirestore();
   resetTemplateCacheForTest();
   outbox = [];
+  throwAfterAccept = false;
   await seed();
 });
 
@@ -214,7 +230,10 @@ describe('list and preview', () => {
 describe('send', () => {
   it('sends what the preview showed, once per speaker per batch, and records it', async () => {
     const preview = await call({ action: 'preview', speakerIds: ['ada', 'ben'], topics: ['materials'] });
-    const sent = await call({ action: 'send', speakerIds: ['ada', 'ben'], topics: ['materials'], batchId: BATCH, confirmCount: 2 });
+    expect(preview.body.receipt).toMatch(/^[0-9a-f]{64}$/);
+    const sent = await call({
+      action: 'send', speakerIds: ['ada', 'ben'], topics: ['materials'], batchId: BATCH, confirmCount: 2, receipt: preview.body.receipt,
+    });
     expect(sent.statusCode).toBe(200);
     expect(sent.body.sent.map((r) => r.speakerId)).toEqual(['ada', 'ben']);
     expect(outbox.map((m) => m.to)).toEqual(['ada@example.test', 'ben@example.test']);
@@ -329,6 +348,51 @@ describe('send', () => {
     expect((await db.collection('speaker_reminders').get()).size).toBe(0);
     const missing = await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1, wordingVersion: undefined });
     expect(missing.statusCode).toBe(400);
+  });
+
+  it('refuses a send when an address, a readiness item or a session title changed after the preview', async () => {
+    const changes = [
+      () => db.collection('speakers').doc('ada').update({ email: 'ada.new@example.test' }),
+      () => db.collection('session_materials').doc('m3').set({ sessionId: 's1', reviewStatus: 'pending' }),
+      () => db.collection('cmsSchedule').doc('s1').update({ title: 'Panel two' }),
+    ];
+    for (const change of changes) {
+      await testEnv.clearFirestore();
+      await seed();
+      const preview = await call({ action: 'preview', speakerIds: ['ada'], topics: ['materials'] });
+      await change();
+      const res = await call({
+        action: 'send', speakerIds: ['ada'], topics: ['materials'], batchId: BATCH, confirmCount: 1, receipt: preview.body.receipt,
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.body.error.code).toBe('stale-preview');
+      expect(res.body.error.message).toMatch(/Preview again/);
+      expect(outbox).toHaveLength(0);
+      expect((await db.collection('speaker_reminders').get()).size).toBe(0);
+    }
+    const missing = await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1, receipt: undefined });
+    expect(missing.statusCode).toBe(400);
+  });
+
+  it('a reminder the provider may have accepted counts as sent for the 24-hour window', async () => {
+    throwAfterAccept = true;
+    const res = await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1 });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.failed).toEqual([]);
+    expect(res.body.uncertain.map((r) => r.speakerId)).toEqual(['ada']);
+    expect(outbox).toHaveLength(1);
+    const state = (await db.collection('speaker_reminders').doc('ada').get()).data();
+    expect(state).toMatchObject({ lastStatus: 'uncertain', lastSentAt: expect.anything(), lastItems: ['headshot', 'materials'] });
+
+    throwAfterAccept = false;
+    const again = await call({ action: 'send', speakerIds: ['ada'], batchId: 'batch-0000000002', confirmCount: 1 }, { now: T0 + 60_000 });
+    expect(again.body.skipped).toEqual([expect.objectContaining({ speakerId: 'ada', reason: 'recent' })]);
+    expect(outbox).toHaveLength(1);
+    const replay = await call({ action: 'send', speakerIds: ['ada'], batchId: BATCH, confirmCount: 1 }, { now: T0 + 5000 });
+    expect(replay.body.uncertain.map((r) => r.speakerId)).toEqual(['ada']);
+    expect(outbox).toHaveLength(1);
+    const list = await call({ action: 'list' }, { now: T0 + 1000 });
+    expect(list.body.speakers.find((r) => r.id === 'ada').lastRemindedAt).toBe(new Date(T0).toISOString());
   });
 
   it('needs the confirmed recipient count and a batch id', async () => {

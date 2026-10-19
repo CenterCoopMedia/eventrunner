@@ -310,7 +310,9 @@ Only published sessions that are not hidden count. Only speakers who accepted an
 - **One reminder per click.** Each preview has its own id. The server records it for each speaker before the email goes. If you press **Send** twice, or the connection drops and the browser tries again, nothing more is sent.
 - **At most one reminder per speaker in 24 hours.** A speaker reminded less than 24 hours ago is left out, and the row says when the next reminder is possible.
 - **The wording the preview showed.** If someone saves new reminder wording after your preview, the server refuses the send. Preview again, then send.
+- **The messages the preview showed.** If a speaker's address, a missing item, a session title, or the site address changes after your preview, the server refuses the whole send. Preview again, then send.
 - **A message that could not be emailed** is reported after the send. Preview again to retry it.
+- **A message the provider may have accepted.** If the email provider stops answering after it took the message, the send reports that the speaker may have the reminder. The site does not send that speaker another reminder for 24 hours. Check the Email log.
 
 Every reminder goes through the event's email provider and appears in the Email log with its body. Each send writes one admin log entry with your account, the items, and the speakers who got a reminder. If a send stops part way, the entry is still written, names the speakers emailed so far, and is marked incomplete. A historical demo refuses the send.
 
