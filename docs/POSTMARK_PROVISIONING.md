@@ -93,14 +93,16 @@ or an unsubscribe on an announcement cannot hold back a sign-in code.
 
 1. In the deployment's Server → **Message Streams** → **Create message stream**. Type:
    **Broadcasts**. Name and ID: `announcements` (any ID works; the deployment config names it).
-2. In the new stream → **Settings** → **Unsubscribe handling**, pick one:
-   - **Postmark** (the default path): Postmark adds an unsubscribe link at the end of every
-     message and suppresses the address on this stream. The application adds no link of its own.
-     A staff restore on the Announcements page removes only the site's record: reactivate the
-     address on this stream's suppression list as well, or Postmark keeps refusing it.
+2. In the new stream → **Settings** → **Unsubscribe handling**, choose one of the two modes.
+   Postmark-managed is the default; choose it for every client whose mail goes through Postmark.
+   - **Postmark** (Postmark-managed, the default): Postmark adds an unsubscribe link at the end
+     of every message and suppresses the address on this stream. The application adds no link of
+     its own. A staff restore on the Announcements page removes only the site's record:
+     reactivate the address on this stream's suppression list as well, or Postmark keeps
+     refusing it.
    - **Custom**: The application adds a signed per-recipient link and the `List-Unsubscribe` and
-     `List-Unsubscribe-Post` headers. Postmark adds nothing. Use this only if the client wants the
-     site's own unsubscribe page.
+     `List-Unsubscribe-Post` headers, and records the opt-out itself. Postmark adds nothing.
+     Custom is for clients on another email provider, where the site must supply the link.
 
    **None** is refused: the composer will not send on a stream with no unsubscribe handling.
 3. Set the stream ID in the deployment's Tier B config: `config/providers.email.announcementStream`
@@ -316,7 +318,8 @@ Before calling a deployment's Postmark setup done:
       Bounce, and SpamComplaint triggers.
 - [ ] A test send (`init-event.cjs`'s welcome mail, or an OTP sign-in) shows up in this
       deployment's Server **Activity** tab, not some other deployment's.
-- [ ] The **announcements** Broadcasts stream exists with Postmark or Custom unsubscribe handling,
+- [ ] The **announcements** Broadcasts stream exists with Postmark-managed unsubscribe handling
+      (the default; Custom only for a client on another email provider),
       `config/providers.email.announcementStream` names it, and the Announcements page shows no
       setup notice. **Send a test to me** arrives from the broadcast stream in **Activity**.
 - [ ] With an authorized synthetic recipient, a real announcement's unsubscribe link suppresses
