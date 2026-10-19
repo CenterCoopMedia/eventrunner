@@ -192,6 +192,10 @@ export default function AirtablePitchSync({ call, isOperator }) {
   const timeZone = eventConfig?.timezone;
   const [status, statusFailed] = useDoc('session_pitch_sync', 'airtable');
   const [settings, settingsFailed] = useDoc('session_pitch_sources', 'airtable', isOperator);
+  // Staff see the panel once an operator has run a first refresh, so a
+  // deployment without Airtable shows them no Airtable controls. Operators
+  // always see it, because they set the connection up.
+  if (!isOperator && !status && !statusFailed) return null;
   return <details className="border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md">
     <summary className="min-h-admin-control cursor-pointer font-semibold">Refresh pitches from Airtable</summary>
     <div className="mt-sm space-y-md">

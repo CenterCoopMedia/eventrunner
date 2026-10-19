@@ -70,7 +70,12 @@ describe('Airtable refresh status and action', () => {
     expect(screen.getByText(/more records than one refresh reads/)).toBeInTheDocument();
   });
 
-  it('says when no refresh has run', () => {
+  it('says when no refresh has run, and hides the panel from staff until one has', () => {
+    render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
+    expect(screen.queryByText('Refresh pitches from Airtable')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Refresh from Airtable' })).toBeNull();
+    cleanup();
+    operator = true;
     open();
     expect(screen.getByText('No refresh has run yet.')).toBeInTheDocument();
   });
@@ -78,6 +83,7 @@ describe('Airtable refresh status and action', () => {
   it('refreshes once per press, reports the counts, and ignores a second press while busy', async () => {
     let resolve;
     call.mockImplementation(() => new Promise((r) => { resolve = r; }));
+    collections.session_pitch_sync = [{ id: 'airtable', running: null, lastRun }];
     open();
     const button = screen.getByRole('button', { name: 'Refresh from Airtable' });
     fireEvent.click(button);
