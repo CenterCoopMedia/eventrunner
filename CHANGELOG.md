@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The admin rail groups its sections into Content, Program, Registration and tickets,
+  Communications, Operations and Settings. Each group opens and closes from a button on its
+  name. The group of the current page opens by itself, and a closed one names the current page.
+  On a wide screen **Hide menu** narrows the rail, and **Show menu** brings it back. On
+  Branding, a bar between the controls and the preview, and one between the light and dark
+  frames, changes how much room each side has, by pointer or by the arrow keys. The frame still
+  renders at the width picked. The browser remembers each choice, and the admin works without
+  browser storage (#477).
+
 - Staff set the pitch call deadline and the ticket catalog's sale windows as a date and a
   time on the event's clock. The fields name the event's time zone and state the result in
   words, with the UTC offset for the chosen date. A time that daylight saving time skips is

@@ -57,13 +57,15 @@ describe('tourSteps', () => {
       // The lead group has no label, so it takes its first item's.
       'Overview',
       'Content',
-      'People',
+      'Program',
+      'Registration and tickets',
+      'Communications',
       'Operations',
-      'System',
+      'Settings',
       'Edit from the site',
     ]);
-    expect(steps.find((step) => step.id === 'system').items).toEqual(
-      DOCKET.find((group) => group.id === 'system').items.map((item) => item.label),
+    expect(steps.find((step) => step.id === 'settings').items).toEqual(
+      DOCKET.find((group) => group.id === 'settings').items.map((item) => item.label),
     );
   });
 
@@ -73,7 +75,7 @@ describe('tourSteps', () => {
     for (const operatorOnly of ['Features', 'Branding', 'Access', 'System errors']) {
       expect(named).not.toContain(operatorOnly);
     }
-    expect(steps.find((step) => step.id === 'system').items).toEqual(['Event', 'Data export']);
+    expect(steps.find((step) => step.id === 'settings').items).toEqual(['Event']);
   });
 
   it('has one copy line for every docket group, and none of them names a page', () => {
@@ -138,7 +140,7 @@ describe('AdminTour', () => {
   it('sets the step line under the heading, never above it', () => {
     renderTour();
     const heading = screen.getByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
-    const stepLine = screen.getByText('Step 1 of 7');
+    const stepLine = screen.getByText(`Step 1 of ${tourSteps(docketForTier('operator')).length}`);
     expect(heading.getAttribute('aria-describedby')).toBe(stepLine.id);
     expect(heading.compareDocumentPosition(stepLine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -159,7 +161,7 @@ describe('AdminTour', () => {
     // the sentence. The rail's first two Content pages open it.
     const content = docketForTier('staff').find((group) => group.label === 'Content');
     const labels = content.items.map((item) => item.label);
-    expect(labels.slice(0, 2)).toEqual(['Pages', 'Sessions']);
+    expect(labels.slice(0, 2)).toEqual(['Pages', 'Content']);
     expect(screen.getByText(`In this group: ${listWords(labels)}.`)).toBeInTheDocument();
   });
 
