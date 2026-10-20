@@ -51,3 +51,14 @@ test('a long hostile value is refused in linear time', () => {
     assert.ok(elapsed < 500,`${value.length} characters took ${elapsed.toFixed(1)} ms`);
   }
 });
+
+test('isBareEmailAddress takes one plain address and nothing that could name another or add a header', () => {
+  const { isBareEmailAddress } = require('./email.cjs');
+  for (const value of ['ada@example.org', 'a.b+tag@mail.example.co']) {
+    assert.equal(isBareEmailAddress(value), true, value);
+  }
+  for (const value of ['Ada <ada@example.org>', 'a<b@example.org', 'ada@example.org>', '"a"@example.org', 'a(b)@example.org',
+    'a;b@example.org', 'a:b@example.org', 'a\\b@example.org', 'a,b@example.org', 'ada@example.org\r\nBcc: x@example.org', 'ada@example', 42]) {
+    assert.equal(isBareEmailAddress(value), false, String(value));
+  }
+});

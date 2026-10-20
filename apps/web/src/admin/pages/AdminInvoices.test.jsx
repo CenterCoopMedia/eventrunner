@@ -593,6 +593,25 @@ describe('emailing an invoice', () => {
     expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
   });
 
+  it('drops a preview answer that arrives after the note changed, so Send cannot use old input', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    let release;
+    const answer = previewAnswer();
+    answers.previewSend = (body) => new Promise((resolve) => { release = () => resolve(answer(body)); });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
+    const form = await screen.findByRole('region', { name: 'Email INV-0004' });
+    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'First.' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    await waitFor(() => expect(typeof release).toBe('function'));
+    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Second.' } });
+    await act(async () => { release(); });
+    expect(within(form).queryByRole('region', { name: 'Email preview' })).toBeNull();
+    expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
+    expect(invoiceCalls().some((body) => body.action === 'send')).toBe(false);
+  });
+
   it('needs a confirmation to send again to an address emailed a few minutes ago', async () => {
     answers.get = { invoice: ISSUED, canVoid: false };
     answers.previewSend = previewAnswer({ recentSend: { at: '2026-10-20T12:00:00.000Z', to: 'billing@example.org' } });

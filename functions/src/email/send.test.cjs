@@ -584,3 +584,16 @@ test('a malformed or oversized attachment is refused before any claim or request
     assert.equal(db.state.sentRows[0].error, error);
   }
 });
+
+test('a copy address with characters the shared rule refuses is refused before any claim', async () => {
+  const { isBareEmailAddress } = require('shared/email');
+  for (const cc of ['a<b@example.org', '"a"@example.org', 'a(b)@example.org', 'a;b@example.org', 'finance@example']) {
+    assert.equal(isBareEmailAddress(cc), false, cc);
+    const { db, core: c } = core({
+      provider: { name: 'console', capabilities: { attachments: true, cc: true }, send: async () => { throw new Error('must not send'); } },
+    });
+    const result = await c.send({ to: 'billing@example.org', cc, subject: 's', text: 'x', onceKey: 'k-cc' });
+    assert.equal(result.error, 'invalid-cc', cc);
+    assert.equal(db.state.claims.size, 0);
+  }
+});

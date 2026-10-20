@@ -94,6 +94,15 @@ async function previewAndSend(db, mailer, extra = {}, previewExtra = {}) {
   return { preview, sent };
 }
 
+/**
+ * Every email address anywhere in a value, as exact strings. Tests compare
+ * these with ===, never by substring.
+ */
+function addressesIn(value) {
+  const found = JSON.stringify(value ?? null).match(/[^\s"',<>:;()[\]\\]+@[^\s"',<>:;()[\]\\]+/g) ?? [];
+  return [...new Set(found)].sort();
+}
+
 function audits(db) {
   return db.ids('admin_logs').map((id) => db.read('admin_logs', id));
 }
@@ -160,7 +169,7 @@ test('staff preview the email, then send it with the PDF attached to the billing
   assert.deepEqual(rows[0].details, {
     sendId: SEND_ID, number: 'INV-0001', status: 'sent', providerMessageId: stored.sends[0].providerMessageId, copy: true, note: true, resend: false,
   });
-  assert.equal(JSON.stringify(rows[0]).includes('example.org'), false);
+  assert.deepEqual(addressesIn(rows[0]), []);
 
   // The email log keeps the file's name and size, never its content.
   const logged = db.ids('sent_emails').map((id) => db.read('sent_emails', id));
@@ -238,7 +247,10 @@ test('a request cannot choose the recipient: a "to" or "bcc" in the body is igno
   const { sent } = await previewAndSend(db, mailer, { to: 'someone@example.net', bcc: 'other@example.net' }, { to: 'someone@example.net' });
   assert.equal(sent.statusCode, 200);
   assert.equal(mailer.mail[0].to, 'billing@example.org');
-  assert.equal(JSON.stringify(mailer.mail[0]).includes('example.net'), false);
+  const reached = addressesIn(mailer.mail[0]);
+  assert.equal(reached.some((address) => address === 'someone@example.net' || address === 'other@example.net'), false);
+  // Only the recipient, the sender and the reply-to address (the issuer).
+  assert.deepEqual(reached, ['accounts@example.org', 'billing@example.org', 'events@example.org']);
 });
 
 test('a read-only demo refuses the send and writes nothing', async () => {
@@ -369,7 +381,7 @@ test('after the window a send goes without a confirmation', async () => {
 
 test('a send in progress blocks another, even a confirmed one; a stale one is settled by the email claim', async () => {
   const db = dbFor(issued({
-    sends: [{ sendId: 'send-old-000001', status: 'sending', to: 'billing@example.org', cc: null, by: 'staff', at: NOW, note: false, resend: false }],
+    sends: [{ sendId: 'send-old-000001', status: 'sending', to: 'billing@example.org', cc: null, by: 'earlier-staff', at: NOW, note: false, resend: false }],
   }));
   const mailer = mailerFor(db);
   fixedNow = new Date(NOW.getTime() + 1000);
@@ -386,6 +398,36 @@ test('a send in progress blocks another, even a confirmed one; a stale one is se
   assert.equal(sent.statusCode, 200, JSON.stringify(sent.body));
   const sends = db.read('invoices', ID).sends;
   assert.deepEqual(sends.map((row) => [row.sendId, row.status]), [['send-old-000001', 'failed'], [SEND_ID, 'sent']]);
+  // The settled send stays the act of the person who started it; the
+  // requester whose send settled it is named separately.
+  const settled = audits(db).find((row) => row.details.sendId === 'send-old-000001');
+  assert.equal(settled.uid, 'earlier-staff');
+  assert.equal(settled.actorUid, 'earlier-staff');
+  assert.equal(settled.details.settled, true);
+  assert.equal(settled.details.settledBy, 'staff');
+});
+
+test('a reserved send blocks mark paid, void and reopen until it ends or goes stale', async () => {
+  const sending = { sendId: 'send-busy-00001', status: 'sending', to: 'billing@example.org', cc: null, by: 'staff', at: NOW, note: false, resend: false };
+  const payment = { paidOn: '2026-10-19', method: 'check', note: '' };
+  fixedNow = new Date(NOW.getTime() + 1000);
+  const db = dbFor(issued({ sends: [sending] }));
+  const paid = await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment });
+  assert.equal(paid.statusCode, 409);
+  assert.match(paid.body.error.message, /being emailed now/);
+  const voided = await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: 'Wrong' }, { user: 'operator' });
+  assert.equal(voided.statusCode, 409);
+  assert.match(voided.body.error.message, /being emailed now/);
+  const paidDb = dbFor(issued({ status: 'paid', payment: { ...payment, recordedAt: NOW, recordedBy: 'staff' }, sends: [sending] }));
+  const reopened = await call(paidDb, { action: 'reopen', invoiceId: ID, expectedRevision: 2, reason: 'Bounced' }, { user: 'operator' });
+  assert.equal(reopened.statusCode, 409);
+  assert.match(reopened.body.error.message, /being emailed now/);
+  assert.equal(db.read('invoices', ID).status, 'issued');
+
+  // A reservation past the stale limit no longer blocks.
+  fixedNow = new Date(NOW.getTime() + SENDING_STALE_MS + 1000);
+  const later = await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment });
+  assert.equal(later.statusCode, 200, JSON.stringify(later.body));
 });
 
 test('a provider refusal is recorded as failed and does not count as a send', async () => {
@@ -411,7 +453,7 @@ test('a provider refusal is recorded as failed and does not count as a send', as
   // The provider's words can hold the address; they stay out of the invoice and the audit row.
   assert.equal(JSON.stringify(stored).includes('Invalid'), false);
   const row = audits(db).find((entry) => entry.action === 'invoices.email-failed');
-  assert.equal(JSON.stringify(row).includes('example.org'), false);
+  assert.deepEqual(addressesIn(row), []);
   // A failed send leaves no window: the next one goes without a confirmation.
   const again = await call(db, { action: 'send', invoiceId: ID, sendId: 'send-0002-abcdef', receipt: preview.body.receipt }, { mailer });
   assert.equal(again.statusCode, 200);

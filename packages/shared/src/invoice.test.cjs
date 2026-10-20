@@ -258,7 +258,10 @@ test('an invoice send refuses a bad copy address, a copy to the billing email, a
   assert.equal(bad.ok, false);
   assert.deepEqual(bad.issues, [{ path: 'cc', message: 'Enter a valid email for the copy, or leave it empty.' }]);
   // Two addresses, or a line break that would start a new header, are one bad address.
-  for (const cc of ['a@example.org, b@example.org', 'a@example.org\r\nBcc: b@example.org', 'a@example.org\nb@example.org']) {
+  // So are angle brackets, quotes and the other characters the email core
+  // refuses at its own boundary (shared/email isBareEmailAddress).
+  for (const cc of ['a@example.org, b@example.org', 'a@example.org\r\nBcc: b@example.org', 'a@example.org\nb@example.org',
+    'a<b@example.org', 'a@example.org>', '"a"@example.org', 'a(b)@example.org', 'a;b@example.org', 'a\\b@example.org']) {
     assert.equal(validateInvoiceSend({ cc }, { to: 'billing@example.org' }).ok, false, JSON.stringify(cc));
   }
   const same = validateInvoiceSend({ cc: 'BILLING@example.org' }, { to: 'billing@example.org' });
