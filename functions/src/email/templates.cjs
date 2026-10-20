@@ -20,6 +20,11 @@ const DEFAULTS = {
   'auth.otp': require('./templates/auth.otp.cjs'),
   'account.welcome': require('./templates/account.welcome.cjs'),
   'feedback.confirmation': require('./templates/feedback.confirmation.cjs'),
+  // Issue #330: fixed wording, rendered without an override
+  // (admin/changeRequestNotices.cjs).
+  'changeRequest.received': require('./templates/changeRequest.received.cjs'),
+  'changeRequest.done': require('./templates/changeRequest.done.cjs'),
+  'changeRequest.declined': require('./templates/changeRequest.declined.cjs'),
   'invoice.send': require('./templates/invoice.send.cjs'),
   'speaker.invite': require('./templates/speaker.invite.cjs'),
   'speaker.accepted': require('./templates/speaker.accepted.cjs'),

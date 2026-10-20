@@ -544,8 +544,19 @@ service cloud.firestore {
     // admin page's listener; never client-written. submitChangeRequest,
     // updateChangeRequestStatus and deleteChangeRequest write it through
     // the Admin SDK, each with its admin_logs row. A requester cannot read
-    // their own request: only the event team reads the text.
+    // their own request document: it holds staff addresses and email
+    // delivery records. listMyChangeRequests answers the requester a
+    // requester-safe copy instead (issue #330).
     match /change_requests/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Change request email settings (issue #330): whether the
+    // acknowledgement and the outcome email go. Either tier reads them, so
+    // staff see what a status change sends; only
+    // saveChangeRequestNoticeSettings (operator tier) writes them.
+    match /change_request_settings/{docId} {
       allow read: if isAdmin();
       allow write: if false;
     }

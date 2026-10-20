@@ -336,6 +336,10 @@ test('an accepted request stores the token’s identity, never the body’s, and
     createdAt: new Date(T0),
     updatedAt: null,
     updatedBy: null,
+    // Issue #330: the requester-safe history starts with the receipt, and
+    // there is no outcome yet.
+    history: [{ status: 'new', at: new Date(T0) }],
+    outcome: null,
   });
   assert.deepEqual(adminLogs(db), [{
     action: 'submitChangeRequest',
@@ -495,9 +499,15 @@ test('status: staff and operator both change a status, and each change writes it
 
   const staff = await setStatus(db, { id: 'cr1', status: 'in_progress' });
   assert.equal(staff.statusCode, 200);
-  assert.deepEqual(staff.body, { id: 'cr1', status: 'in_progress' });
+  assert.deepEqual(staff.body, { id: 'cr1', status: 'in_progress', notice: null });
   assert.deepEqual(db.read('change_requests', 'cr1'), storedRequest({
-    status: 'in_progress', updatedAt: new Date(T0 + 1000), updatedBy: STAFF,
+    status: 'in_progress',
+    updatedAt: new Date(T0 + 1000),
+    updatedBy: STAFF,
+    // A request stored before issue #330 has no history: it is rebuilt from
+    // createdAt, then the change is added. Who made it is not in it.
+    history: [{ status: 'new', at: new Date(T0) }, { status: 'in_progress', at: new Date(T0 + 1000) }],
+    outcome: null,
   }));
 
   const operator = await setStatus(db, { id: 'cr1', status: 'done' }, 'operator');

@@ -59,6 +59,9 @@ const ADMIN_READABLE = [
   { path: "speakers/spk-tier", tier: "admin" },
   { path: "feedback/f-tier", tier: "admin" },
   { path: "change_requests/cr-tier", tier: "admin" },
+  // Change request email settings (issue #330): staff see whether the
+  // notices are on; only an operator changes them, through the endpoint.
+  { path: "change_request_settings/notices", tier: "admin" },
   { path: "session_pitches/pitch-tier", tier: "admin" },
   // Pitch email settings (issue #324): the receipt mode and edited wording.
   { path: "session_pitch_settings/notices", tier: "admin" },
@@ -225,6 +228,11 @@ beforeAll(async () => {
     await setDoc(doc(db, "session_pitch_settings/notices"), {
       receiptMode: "automatic",
       templates: {},
+    });
+    await setDoc(doc(db, "change_request_settings/notices"), {
+      acknowledgement: "automatic",
+      outcome: "off",
+      revision: 1,
     });
     // publicAttendeeProfiles starts OFF: the rules gate a move to `public`
     // profile visibility on it, and setPublicProfilesFeature() flips it.
@@ -1837,7 +1845,10 @@ describe("change requests", () => {
   });
 
   it("a non-admin, the requester included, and an anonymous client cannot get or list them", async () => {
-    // nonAdmin() is attendee-1, the uid on the request.
+    // nonAdmin() is attendee-1, the uid on the request. Issue #330 keeps
+    // this: the requester reads progress through listMyChangeRequests,
+    // which answers a requester-safe copy, never the document itself
+    // (it holds staff addresses and email delivery records).
     for (const db of [nonAdmin(), attendee("approved-1"), anon()]) {
       await assertFails(getDoc(doc(db, "change_requests/cr1")));
       await assertFails(getDocs(collection(db, "change_requests")));
