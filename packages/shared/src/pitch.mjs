@@ -1,6 +1,8 @@
 import pitch from './pitch.cjs';
 export const {
   readClosesAt,
+  readPitchDeadline,
+  isPitchCallOpen,
   readPitchFormUrl,
   MAX_FORM_URL_LENGTH,
   PITCH_NOTICE_TEMPLATE_IDS,

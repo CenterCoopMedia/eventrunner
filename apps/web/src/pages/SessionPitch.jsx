@@ -1,4 +1,4 @@
-import { readClosesAt, readPitchFormUrl } from 'shared/pitch';
+import { isPitchCallOpen, readClosesAt, readPitchFormUrl } from 'shared/pitch';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useEventConfig } from '../contexts/EventConfigContext.jsx';
@@ -63,7 +63,9 @@ export default function SessionPitch() {
   useEffect(() => { if (newPitchAttempt) formRef.current?.querySelector('input')?.focus(); }, [newPitchAttempt]);
 
   const deadline = Date.parse(readClosesAt(settings?.closesAt));
-  const open = !configError && settings?.enabled === true && Number.isFinite(deadline) && deadline > now;
+  // A call with no deadline (closesAt: null) stays open until staff close it,
+  // and the page shows no deadline for it (issue #476).
+  const open = !configError && isPitchCallOpen(settings, now);
   // An external form (for example, Airtable) replaces this site's form for the whole call.
   // The last known mode holds through a read error; an unknown mode shows neither form.
   const externalForm = readPitchFormUrl(settings?.externalFormUrl);
@@ -104,7 +106,8 @@ export default function SessionPitch() {
             <section className="space-y-xs border-t-hairline border-rule-hairline pt-sm" aria-labelledby="pitch-call-heading">
               <h2 id="pitch-call-heading" className="sr-only">Call for sessions</h2>
               <p role="status" className="font-semibold">{IS_DEMO ? 'Submissions are disabled in this demo.' : configError ? 'Cannot check submissions. Reconnecting…' : !settings ? 'Checking submissions…' : open ? 'Submissions are open' : 'Submissions are closed'}</p>
-              {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZoneName: undefined })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p> : null}
+              {Number.isFinite(deadline) ? <p className="text-caption text-text-secondary">Deadline: <time dateTime={settings.closesAt}>{new Date(deadline).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZoneName: undefined })}</time> ({Intl.DateTimeFormat().resolvedOptions().timeZone})</p>
+                : open ? <p className="text-caption text-text-secondary">There is no set deadline. The organizers close submissions when they are ready.</p> : null}
               <p className="text-caption text-text-secondary">{externalForm ? 'You do not need a ticket to pitch a session.' : 'A verified email address is required. You do not need a ticket or attendee approval.'}</p>
             </section>
       </header>

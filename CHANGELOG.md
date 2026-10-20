@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused, and a time it repeats asks which one is meant. The stored RFC3339 values do not
   change (#476).
 
+- A pitch call can have no deadline. Under **When intake closes**, an operator chooses
+  **Open until I close it**. The call stays open until an operator clears **Accept session
+  pitches** and saves. `updatePitchCall` takes `"closesAt": null` for this; a missing or
+  blank value is still refused. `/pitch` shows no deadline and no countdown for such a
+  call. The same rule applies with an external form, such as Airtable (#476).
+
 - A new event can start from a past event's template. `scripts/export-event-template.cjs`
   reads an allowlist from the past project: branding, page templates, their content blocks and
   selected static settings. A dry run prints the inventory, with every excluded collection.

@@ -205,6 +205,52 @@ describe('pitch call configuration', () => {
   });
 });
 
+describe('pitch call with no deadline', () => {
+  it('saves and reads back "open until I close it" as a null deadline, and audits it', async () => {
+    const response = await updateCall({ enabled: true, closesAt: null, externalFormUrl: null });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toEqual({ enabled: true, closesAt: null, externalFormUrl: null });
+    const stored = (await db.collection('config').doc('pitch_call').get()).data();
+    expect(stored).toEqual({ enabled: true, closesAt: null, externalFormUrl: null });
+    const logs = await db.collection('admin_logs').where('action', '==', 'updatePitchCall').get();
+    expect(logs.size).toBe(1);
+    expect(logs.docs[0].data().details).toEqual({ enabled: true, closesAt: null, externalFormUrl: null });
+    await assertSucceeds(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'config/pitch_call')));
+  });
+
+  it('refuses a missing or blank deadline: only an explicit null means no deadline', async () => {
+    for (const body of [{ enabled: true }, { enabled: true, closesAt: '' }, { enabled: true, closesAt: '  ' }, { enabled: true, closesAt: 0 }]) {
+      const refused = await updateCall(body);
+      expect(refused.statusCode).toBe(400);
+      expect(refused.body.error.message).toMatch(/^closesAt:/);
+    }
+    expect((await db.collection('config').doc('pitch_call').get()).exists).toBe(false);
+  });
+
+  it('accepts pitches while open with no deadline and refuses them after staff close the call', async () => {
+    await updateCall({ enabled: true, closesAt: null, externalFormUrl: null });
+    // Years later, with no deadline, the call is still open.
+    expect((await submit(pitch(), 'submitter', () => T0 + 10 * 365 * 24 * 60 * 60 * 1000)).statusCode).toBe(201);
+
+    const closed = await updateCall({ enabled: false, closesAt: null, externalFormUrl: null });
+    expect(closed.body).toEqual({ enabled: false, closesAt: null, externalFormUrl: null });
+    const refused = await submit(pitch({ submissionKey: 'pitch-key-000002' }));
+    expect(refused.statusCode).toBe(404);
+    expect((await db.collection('session_pitches').get()).size).toBe(1);
+  });
+
+  it('treats an open call with no closesAt field at all as closed', async () => {
+    await db.collection('config').doc('pitch_call').set({ enabled: true, externalFormUrl: null });
+    expect((await submit()).statusCode).toBe(404);
+  });
+
+  it('keeps native intake closed when an external form takes pitches with no deadline', async () => {
+    const saved = await updateCall({ enabled: true, closesAt: null, externalFormUrl: 'https://airtable.com/appExample/shrExample' });
+    expect(saved.body).toEqual({ enabled: true, closesAt: null, externalFormUrl: 'https://airtable.com/appExample/shrExample' });
+    expect((await submit()).statusCode).toBe(404);
+  });
+});
+
 describe('external pitch form', () => {
   const FORM = 'https://airtable.com/appExample/shrExample';
 

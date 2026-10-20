@@ -26,6 +26,35 @@ function readClosesAt(value) {
   return Number.isFinite(millis) ? new Date(millis).toISOString() : null;
 }
 
+/**
+ * A requested pitch call deadline (issue #476): an RFC3339 instant, or an
+ * explicit null for a call with no deadline ("Open until I close it").
+ * A missing, blank, or malformed value is refused, so a typo or an old
+ * client that drops the field never opens a call with no end.
+ *
+ * @returns {{ ok: true, closesAt: string|null } | { ok: false }}
+ */
+function readPitchDeadline(value) {
+  if (value === null) return { ok: true, closesAt: null };
+  const closesAt = readClosesAt(value);
+  return closesAt ? { ok: true, closesAt } : { ok: false };
+}
+
+/**
+ * Whether a stored config/pitch_call document takes pitches at nowMs. It
+ * must be enabled. A stored null deadline stays open until staff turn the
+ * call off by hand; any other deadline must be a valid instant still ahead.
+ * A missing or malformed deadline reads as closed. The server, /pitch and
+ * the home page all use this one rule. An external form does not change
+ * it: the form's link shows only while this is true.
+ */
+function isPitchCallOpen(call, nowMs) {
+  if (!call || typeof call !== 'object' || call.enabled !== true) return false;
+  if (call.closesAt === null) return true;
+  const closesAt = readClosesAt(call.closesAt);
+  return Boolean(closesAt) && Date.parse(closesAt) > nowMs;
+}
+
 const MAX_FORM_URL_LENGTH = 2048;
 
 /**
@@ -109,6 +138,8 @@ function readPitchNoticeSettings(raw) {
 
 module.exports = {
   readClosesAt,
+  readPitchDeadline,
+  isPitchCallOpen,
   readPitchFormUrl,
   MAX_FORM_URL_LENGTH,
   PITCH_NOTICE_TEMPLATE_IDS,
