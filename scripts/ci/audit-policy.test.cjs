@@ -259,7 +259,7 @@ test('the committed exceptions file is well-formed and matches the current audit
   for (const entry of exceptions) {
     assert.equal(typeof entry.package, 'string');
     assert.ok(['production', 'build', 'devTooling'].includes(entry.exposure), `unexpected exposure on ${entry.package}`);
-    assert.ok(['moderate', 'high', 'critical'].includes(entry.severity), `unexpected severity on ${entry.package}`);
+    assert.ok(['low', 'moderate', 'high', 'critical'].includes(entry.severity), `unexpected severity on ${entry.package}`);
     assert.ok(entry.advisories.length > 0, `${entry.package} needs at least one advisory`);
     assert.equal(typeof entry.rationale, 'string');
     assert.match(entry.reviewDate, /^\d{4}-\d{2}-\d{2}$/);

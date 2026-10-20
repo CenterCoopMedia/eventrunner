@@ -867,5 +867,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   base commit, as the path classifier already did, so a pull request cannot replace
   the scripts that decide those required checks. A pull request can still edit the
   workflow file itself; an independent check producer remains #259 (#354).
+- The build now uses postcss-selector-parser 7.1.6, through a root `overrides` entry, which
+  fixes GHSA-rj75-hqrm-r3gf. Tailwind CSS 3 asks for version 6, which has no fixed release.
+  The generated CSS is byte-identical. The other open audit findings have no fix we can take
+  now, so `scripts/ci/audit-exceptions.json` records each one with its reason: three
+  stream-json advisories under the pinned Firebase CLI, braces under Tailwind CSS 3 (no
+  fixed release), and Quill 2.0.3's HTML export advisory (no fixed release; the editor does
+  not load the affected blots and sanitizes every export).
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.
