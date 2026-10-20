@@ -116,6 +116,36 @@ export function formatEndTime(iso) {
   return new Intl.DateTimeFormat(undefined, END_TIME_FORMAT).format(new Date(ms));
 }
 
+/** The longest delay setTimeout honours; a longer one fires at once. */
+const MAX_TIMER_DELAY = 2_147_483_647;
+/** How long after an end time the page asks the server again. */
+const END_RELOAD_GRACE_MS = 1000;
+/** How long to wait before asking again when the server still says active. */
+const STALE_END_RETRY_MS = 30_000;
+
+/**
+ * The delay until the page should reload for the nearest end time that has
+ * not passed yet, or null when no grant has one. Capped at the timer's
+ * maximum: a capped timer reloads early, and the reload arms the next one.
+ *
+ * @param {Array<{ expiryState?: string, expiresAt?: string|null }>|null} accounts
+ * @param {number} nowMs
+ * @returns {number|null}
+ */
+export function nextEndReloadDelay(accounts, nowMs) {
+  let nearest = null;
+  for (const account of accounts ?? []) {
+    if (account?.expiryState !== 'active') continue;
+    const ms = typeof account.expiresAt === 'string' ? Date.parse(account.expiresAt) : Number.NaN;
+    if (Number.isFinite(ms) && (nearest === null || ms < nearest)) nearest = ms;
+  }
+  if (nearest === null) return null;
+  // The server still called a passed end time active (its clock is a little
+  // behind this one): ask again, but not every second.
+  if (nearest <= nowMs) return STALE_END_RETRY_MS;
+  return Math.min(nearest - nowMs + END_RELOAD_GRACE_MS, MAX_TIMER_DELAY);
+}
+
 /** Whether an account row holds a staff grant with an end time (readable or not). */
 function isTemporary(account) {
   return Boolean(account) && account.tier === 'staff' && typeof account.expiryState === 'string';
@@ -359,6 +389,17 @@ export default function AdminAccess() {
     if (trigger && trigger.isConnected) trigger.focus();
     else formRef.current?.querySelector('input')?.focus();
   }, [pending]);
+
+  // An end time passing while the page is open: ask the server again just
+  // after it, so the row says Ended without a manual reload. The server's
+  // clock decides; the timer only picks the moment to ask. Re-armed by every
+  // list that lands, and cleared when the list changes or the page goes.
+  useEffect(() => {
+    const delay = nextEndReloadDelay(accounts, Date.now());
+    if (delay === null) return undefined;
+    const timer = window.setTimeout(() => { load(); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [accounts, load]);
 
   // The list "Try again" asked for has landed: the keyboard was on that
   // control, which is gone now, so it goes to what was asked for.

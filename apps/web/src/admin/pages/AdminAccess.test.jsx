@@ -28,7 +28,7 @@ vi.mock('../../contexts/AuthContext.jsx', () => ({
   }),
 }));
 
-import AdminAccess, { describeChange, describeResult, formatEndTime } from './AdminAccess.jsx';
+import AdminAccess, { describeChange, describeResult, formatEndTime, nextEndReloadDelay } from './AdminAccess.jsx';
 import { TIER_SCOPE } from '../AdminLayout.jsx';
 
 const LIST = {
@@ -564,5 +564,83 @@ describe('an ended grant the sweep removed', () => {
     fireEvent.click(within(screen.getByRole('region', { name: 'Grant staff access to new@example.org' })).getByRole('button', { name: 'Grant staff access' }));
     await waitFor(() => expect(screen.queryByText('ended@example.org')).toBeNull());
     expect(screen.getByText('1 account, 1 operator')).toBeInTheDocument();
+  });
+});
+
+// Codex review on #541: an open page must show "Ended" when an end time
+// passes, without a manual reload. The page reloads the list from the
+// server just after the nearest active end time.
+describe('an end time passing while the page is open', () => {
+  const MAX_DELAY = 2_147_483_647;
+  const at = (ms) => new Date(ms).toISOString();
+
+  it('reloads the list just after the nearest end time, so the row shows Ended', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const ends = Date.now() + 10 * 60_000;
+      const later = Date.now() + 60 * 60_000;
+      const ops = { email: 'ops@example.org', tier: 'operator' };
+      await renderPage({
+        lists: [
+          { accounts: [ops, { email: 'demo@example.org', tier: 'staff', expiresAt: at(ends), expiryState: 'active' }, { email: 'later@example.org', tier: 'staff', expiresAt: at(later), expiryState: 'active' }], callerEmail: 'ops@example.org' },
+          { accounts: [ops, { email: 'demo@example.org', tier: 'staff', expiresAt: at(ends), expiryState: 'expired' }, { email: 'later@example.org', tier: 'staff', expiresAt: at(later), expiryState: 'active' }], callerEmail: 'ops@example.org' },
+        ],
+      });
+      expect(rowFor('demo@example.org').textContent).not.toContain('Ended');
+      expect(listCalls()).toHaveLength(1);
+      // A second before the end: nothing yet.
+      await act(async () => { vi.advanceTimersByTime(ends - Date.now() - 1000); });
+      expect(listCalls()).toHaveLength(1);
+      await act(async () => { vi.advanceTimersByTime(5000); });
+      await waitFor(() => expect(listCalls()).toHaveLength(2));
+      await waitFor(() => expect(rowFor('demo@example.org').textContent).toContain('Ended'));
+      expect(rowFor('later@example.org').textContent).not.toContain('Ended');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never asks setTimeout for more than its maximum delay, and stops when the page goes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const spy = vi.spyOn(window, 'setTimeout');
+    try {
+      const far = Date.now() + 60 * 24 * 3_600_000;
+      const { unmount } = await renderPage({
+        list: { accounts: [{ email: 'ops@example.org', tier: 'operator' }, { email: 'demo@example.org', tier: 'staff', expiresAt: at(far), expiryState: 'active' }], callerEmail: 'ops@example.org' },
+      });
+      const delays = spy.mock.calls.map(([, delay]) => delay).filter((delay) => typeof delay === 'number');
+      expect(Math.max(...delays)).toBeLessThanOrEqual(MAX_DELAY);
+      expect(delays).toContain(MAX_DELAY);
+      unmount();
+      const before = listCalls().length;
+      await act(async () => { vi.advanceTimersByTime(MAX_DELAY + 1000); });
+      expect(listCalls()).toHaveLength(before);
+    } finally {
+      spy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('sets no timer when no grant has an active end time', async () => {
+    const spy = vi.spyOn(window, 'setTimeout');
+    try {
+      await renderPage();
+      const long = spy.mock.calls.filter(([, delay]) => typeof delay === 'number' && delay > 60_000);
+      expect(long).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('nextEndReloadDelay', () => {
+  it('picks the nearest active end time plus a second, caps at the timer maximum, and backs off when the server lags', () => {
+    const now = Date.parse('2026-10-20T12:00:00Z');
+    const row = (offsetMs, expiryState = 'active') => ({ tier: 'staff', expiresAt: new Date(now + offsetMs).toISOString(), expiryState });
+    expect(nextEndReloadDelay(null, now)).toBeNull();
+    expect(nextEndReloadDelay([{ tier: 'operator' }, row(-5000, 'expired'), { tier: 'staff', expiresAt: null, expiryState: 'invalid' }], now)).toBeNull();
+    expect(nextEndReloadDelay([row(60_000), row(5000)], now)).toBe(6000);
+    expect(nextEndReloadDelay([row(80 * 24 * 3_600_000)], now)).toBe(2_147_483_647);
+    expect(nextEndReloadDelay([row(-1000)], now)).toBe(30_000);
   });
 });

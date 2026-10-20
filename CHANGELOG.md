@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within a minute. A sign-in token from before the end gives
   no access after it. Operator access never ends, so the last operator cannot lose access
   this way. An end time that cannot be read refuses the account. The table shows each end
-  time and marks an ended grant. The admin log records the old and the new end time.
+  time and marks an ended grant when the time passes, without a reload. The admin log records the old and the new end time.
   Until the end time, the account is a full staff account and can edit and publish
   content; an end time does not make it read-only.
 - Invoices, part 5 (#519): pay an issued invoice by card through a Stripe link. When the
