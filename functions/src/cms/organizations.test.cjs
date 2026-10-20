@@ -6,7 +6,9 @@ const assert = require('node:assert/strict');
 const {
   ORGANIZATION_LIMITS,
   ORGANIZATION_SLUG_RE,
+  REPRESENTATIVE_FIELDS,
   organizationSlugError,
+  validateRepresentativeFields,
   slugTakenMessage,
   validateOrganizationFields,
 } = require('./organizations.cjs');
@@ -183,4 +185,54 @@ test('the logo check is the path shape only, never a file lookup', () => {
   for (const path of ['https://example.org/logo.png', '/cms-images/a.png', 'cms-images/../a.png']) {
     assert.deepEqual(refused({ ...VALID, logoPath: path }), ['logoPath: choose an image from the media library']);
   }
+});
+
+// Issue #334: what an organization's representative may change. Only the
+// profile text and the website; every placement field, the name, the logo
+// and the sponsor relationship stay with staff.
+test('a representative may change the description, the biography and the website, and nothing else', () => {
+  assert.deepEqual([...REPRESENTATIVE_FIELDS], ['description', 'bio', 'url']);
+  assert.ok(Object.isFrozen(REPRESENTATIVE_FIELDS));
+  for (const field of ['name', 'tier', 'order', 'logoPath', 'visible', 'supportDescription', 'readMorePath', 'packages', 'status']) {
+    const verdict = validateRepresentativeFields({ [field]: 'x' });
+    assert.equal(verdict.ok, false, field);
+    assert.deepEqual(verdict.errors, [`${field}: representatives cannot change this field`]);
+  }
+});
+
+test('a representative edit is checked, trimmed and made canonical like a staff edit', () => {
+  const verdict = validateRepresentativeFields({
+    description: '  Funds the travel grants.  ',
+    bio: 'First paragraph.\n\nSecond paragraph.',
+    url: 'HTTPS://Example.org/fund',
+  });
+  assert.equal(verdict.ok, true, JSON.stringify(verdict.errors));
+  assert.deepEqual(verdict.fields, {
+    description: 'Funds the travel grants.',
+    bio: 'First paragraph.\n\nSecond paragraph.',
+    url: 'https://example.org/fund',
+  });
+  // Blank clears the field.
+  assert.deepEqual(validateRepresentativeFields({ description: '   ', url: null }).fields, { description: null, url: null });
+});
+
+test('a representative edit refuses a script link, wrong types, long text and control characters', () => {
+  const errorsOf = (fields) => validateRepresentativeFields(fields).errors;
+  assert.deepEqual(errorsOf({ url: 'javascript:alert(1)' }), ['url: must start with http:// or https://']);
+  assert.deepEqual(errorsOf({ url: 'data:text/html,<b>x</b>' }), ['url: must start with http:// or https://']);
+  assert.deepEqual(errorsOf({ description: 42 }), ['description: must be text']);
+  assert.deepEqual(errorsOf({ bio: { html: '<script>' } }), ['bio: must be text']);
+  assert.deepEqual(errorsOf({ description: 'd'.repeat(501) }), ['description: use 500 characters or fewer']);
+  assert.deepEqual(errorsOf({ bio: 'b'.repeat(5001) }), ['bio: use 5000 characters or fewer']);
+  assert.deepEqual(errorsOf({ bio: 'Bell\u0007 here' }), ['bio: remove control characters']);
+  assert.deepEqual(errorsOf({ description: 'Line\u0000break' }), ['description: remove control characters']);
+  // Line breaks and tabs are text, not control characters, in a profile.
+  assert.equal(validateRepresentativeFields({ bio: 'a\n\tb\r\nc' }).ok, true);
+});
+
+test('a representative edit must be an object with at least one field', () => {
+  for (const bad of [null, undefined, 'text', ['description'], 42]) {
+    assert.deepEqual(validateRepresentativeFields(bad).errors, ['fields: send the fields to change'], String(bad));
+  }
+  assert.deepEqual(validateRepresentativeFields({}).errors, ['fields: send the fields to change']);
 });

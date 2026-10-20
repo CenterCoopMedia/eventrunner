@@ -176,7 +176,8 @@ test('only routes with their own subtree of further pages carry hasChildren', ()
   assert.equal(byPath['/admin'].hasChildren, true);
   assert.equal(byPath['/updates'].hasChildren, true);
   assert.equal(byPath['/attendees'].hasChildren, true);
-  assert.equal(byPath['/profile'].hasChildren, false);
+  // Account pages live under /profile, such as /profile/organization (#334).
+  assert.equal(byPath['/profile'].hasChildren, true);
   assert.equal(byPath['/dashboard'].hasChildren, false);
   assert.equal(byPath['/signin'].hasChildren, false);
 });
@@ -281,6 +282,12 @@ test('robots.txt names every non-token static private route, exact-path anchored
   for (const path of ['/signin', '/profile', '/schedule/mine', '/speaker/profile']) {
     assert.ok(robots.split('\n').includes(`Disallow: ${path}$`), path);
   }
+});
+
+test('robots.txt disallows the account pages under /profile as well as /profile itself', () => {
+  const robots = buildRobotsTxt({ publicUrl: PUBLIC_URL, pages: PAGES, features: FEATURES }).split('\n');
+  assert.ok(robots.includes('Disallow: /profile$'));
+  assert.ok(robots.includes('Disallow: /profile/*'));
 });
 
 test('a token-bearing route is disallowed as an unanchored prefix, not an anchored exact path', () => {

@@ -92,6 +92,8 @@ const EXCLUDED_REASONS = Object.freeze({
   schedule_shares: 'accounts and profiles',
   sessionBookmarks: 'accounts and profiles',
   sessionReactions: 'accounts and profiles',
+  organization_representatives: 'accounts and profiles',
+  organization_edit_requests: 'accounts and profiles',
   speakers: 'speaker records',
   speakers_public: 'speaker records',
   speaker_slugs: 'speaker records',

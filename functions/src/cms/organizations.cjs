@@ -186,11 +186,66 @@ function validateOrganizationFields(fields, sent = {}) {
   return errors.length > 0 ? { ok: false, errors } : { ok: true, fields: out };
 }
 
+/**
+ * The fields an organization's representative may change (issue #334):
+ * the introduction, the biography and the website. Everything else stays
+ * with staff: the name, the logo, the tier, the order, visibility, the
+ * sponsor relationship (`supportDescription`, `readMorePath`), and any
+ * other organization.
+ */
+const REPRESENTATIVE_FIELDS = Object.freeze(['description', 'bio', 'url']);
+
+// Every control character except tab, line feed and carriage return.
+// eslint-disable-next-line no-control-regex -- the point is to find control characters
+const CONTROL_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f]/;
+
+/**
+ * Check a representative's edit (issue #334). Stricter than the staff seam:
+ * a key outside REPRESENTATIVE_FIELDS is refused by name, never dropped,
+ * and text may not hold control characters. The values come back trimmed,
+ * blank as null, and the website in the canonical form safeUrlHref
+ * approved, which is what the review queue stores.
+ *
+ * @param {unknown} sent
+ * @returns {{ ok: true, fields: object } | { ok: false, errors: string[] }}
+ */
+function validateRepresentativeFields(sent) {
+  if (!sent || typeof sent !== 'object' || Array.isArray(sent) || Object.keys(sent).length === 0) {
+    return { ok: false, errors: ['fields: send the fields to change'] };
+  }
+  const errors = [];
+  const out = {};
+  for (const [field, value] of Object.entries(sent)) {
+    if (!REPRESENTATIVE_FIELDS.includes(field)) {
+      errors.push(`${field.slice(0, 60)}: representatives cannot change this field`);
+      continue;
+    }
+    if (field === 'url') {
+      const verdict = optionalText('url', value, MESSAGES.url);
+      if (!verdict.ok) { errors.push(verdict.message); continue; }
+      if (verdict.value === null) { out.url = null; continue; }
+      const href = safeUrlHref(verdict.value);
+      if (!href) errors.push(MESSAGES.url);
+      else if (href.length > ORGANIZATION_LIMITS.url) errors.push(tooLong('url'));
+      else out.url = href;
+      continue;
+    }
+    const verdict = optionalText(field, value);
+    if (!verdict.ok) errors.push(verdict.message);
+    else if (verdict.value !== null && CONTROL_CHARACTERS.test(verdict.value)) {
+      errors.push(`${field}: remove control characters`);
+    } else out[field] = verdict.value;
+  }
+  return errors.length > 0 ? { ok: false, errors } : { ok: true, fields: out };
+}
+
 module.exports = {
   ORGANIZATIONS_COLLECTION: COLLECTION,
   ORGANIZATION_SLUG_RE,
   ORGANIZATION_LIMITS,
+  REPRESENTATIVE_FIELDS,
   organizationSlugError,
   slugTakenMessage,
   validateOrganizationFields,
+  validateRepresentativeFields,
 };

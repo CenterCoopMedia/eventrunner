@@ -6,6 +6,11 @@
 //   Save and publish  → the same save, then cmsPublish for this record
 //   Delete            → cmsDeleteContent, removing live and draft together
 //
+// Below the form, a saved organization lists its representatives and any
+// edit one of them sent for review (issue #334,
+// components/OrganizationRepresentatives.jsx). It sits outside the form, so
+// adding a representative never saves the organization.
+//
 // The page address is the document id, set once from the name. A form
 // creates at most once: as soon as the create succeeds the page moves to
 // the record's own address, and every later save from it is an update, so a
@@ -24,6 +29,8 @@ import {
   validateOrganizationForm,
 } from '../organizationDoc.js';
 import { useAdminOrganizations } from '../useAdminOrganizations.js';
+import { useOrganizationRepresentatives } from '../useOrganizationRepresentatives.js';
+import OrganizationRepresentatives from '../components/OrganizationRepresentatives.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { NewTabNote } from '../../components/ExternalLink.jsx';
 import ImagePicker from '../components/media/ImagePicker.jsx';
@@ -82,6 +89,7 @@ export default function AdminOrganizationEditor({ mode }) {
   const call = useAdminApi();
   const { showToast } = useToast();
   const { rows, loading, ready, error: listenerError, findRow } = useAdminOrganizations();
+  const representatives = useOrganizationRepresentatives();
   const [form, setForm] = useState(EMPTY);
   const [slugTouched, setSlugTouched] = useState(false);
   // The id this form created, once it has. From then on it only updates.
@@ -238,167 +246,196 @@ export default function AdminOrganizationEditor({ mode }) {
   const tiers = tiersInUse(rows);
   const address = creating ? form.slug : docId;
 
+  // A representative's edit (issue #334) may not land on a field the form
+  // holds unsaved text for: the next save would put the typed text back.
+  const isUnsaved = (field) => field in form && form[field] !== textOf(row?.current?.[field]);
+  // Applied text is in the draft now. The form takes it, so the next save
+  // keeps it rather than writing back what the form loaded.
+  const adoptApplied = (fields) => {
+    setForm((current) => {
+      const next = { ...current };
+      for (const [field, value] of Object.entries(fields)) {
+        if (field in next) next[field] = textOf(value);
+      }
+      return next;
+    });
+  };
+
   return (
-    <form
-      ref={formRef}
-      className="flex flex-col gap-md"
-      noValidate
-      onSubmit={(event) => { event.preventDefault(); save(); }}
-    >
-      <AdminPageHeader
-        title={creating ? 'New organization' : form.name || docId}
-        state={!creating && row ? <RecordState state={row.state} /> : null}
-        identifiers={address ? `/sponsors/${address}` : null}
-        description="Save builds a draft. Preview reads that draft, and publish sends it to the sponsors page. Everything here is public once published."
-        actions={
-          <>
-            {!creating ? (
-              <a
-                href={`/sponsors/${encodeURIComponent(docId)}?preview=1`}
-                target="_blank"
-                rel="noreferrer"
-                className={linkButtonClass}
+    <div className="flex flex-col gap-md">
+      <form
+        ref={formRef}
+        className="flex flex-col gap-md"
+        noValidate
+        onSubmit={(event) => { event.preventDefault(); save(); }}
+      >
+        <AdminPageHeader
+          title={creating ? 'New organization' : form.name || docId}
+          state={!creating && row ? <RecordState state={row.state} /> : null}
+          identifiers={address ? `/sponsors/${address}` : null}
+          description="Save builds a draft. Preview reads that draft, and publish sends it to the sponsors page. Everything here is public once published."
+          actions={
+            <>
+              {!creating ? (
+                <a
+                  href={`/sponsors/${encodeURIComponent(docId)}?preview=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={linkButtonClass}
+                >
+                  Preview draft
+                  <NewTabNote />
+                </a>
+              ) : null}
+              <button
+                type="submit"
+                className={secondaryButtonClass}
+                disabled={saving}
+                aria-busy={saving || undefined}
               >
-                Preview draft
-                <NewTabNote />
-              </a>
-            ) : null}
-            <button
-              type="submit"
-              className={secondaryButtonClass}
-              disabled={saving}
-              aria-busy={saving || undefined}
-            >
-              {saving ? 'Saving…' : 'Save draft'}
-            </button>
-            <button
-              type="button"
-              className={primaryButtonClass}
-              disabled={saving}
-              aria-busy={saving || undefined}
-              onClick={() => save({ publish: true })}
-            >
-              {saving ? 'Working…' : 'Save and publish'}
-            </button>
-          </>
-        }
-      />
+                {saving ? 'Saving…' : 'Save draft'}
+              </button>
+              <button
+                type="button"
+                className={primaryButtonClass}
+                disabled={saving}
+                aria-busy={saving || undefined}
+                onClick={() => save({ publish: true })}
+              >
+                {saving ? 'Working…' : 'Save and publish'}
+              </button>
+            </>
+          }
+        />
 
-      <ServerErrorSummary error={error} errorRef={errorRef} />
-      {status ? <SaveStatus message={status} /> : null}
+        <ServerErrorSummary error={error} errorRef={errorRef} />
+        {status ? <SaveStatus message={status} /> : null}
 
-      <div className="admin-editor-layout admin-editor-layout--organization">
-        <Panel
-          title="Public details"
-          description="The name, introduction, and website shown to attendees."
-          className="admin-editor-card--primary"
-        >
-          <div className="flex flex-col gap-sm">
-            <TextField
-              label="Name"
-              value={form.name}
-              onChange={(value) => {
-                set('name', value);
-                if (creating && !slugTouched) {
-                  setForm((current) => ({ ...current, slug: organizationSlugFromName(value) }));
-                }
-              }}
-              error={errorFor('name')}
-              required
-            />
-            {creating ? (
+        <div className="admin-editor-layout admin-editor-layout--organization">
+          <Panel
+            title="Public details"
+            description="The name, introduction, and website shown to attendees."
+            className="admin-editor-card--primary"
+          >
+            <div className="flex flex-col gap-sm">
               <TextField
-                label="Page address"
-                hint="The end of this organization’s page address. Lowercase letters, digits, and hyphens. It cannot change after the first save."
-                value={form.slug}
+                label="Name"
+                value={form.name}
                 onChange={(value) => {
-                  setSlugTouched(true);
-                  set('slug', value);
+                  set('name', value);
+                  if (creating && !slugTouched) {
+                    setForm((current) => ({ ...current, slug: organizationSlugFromName(value) }));
+                  }
                 }}
-                error={errorFor('slug')}
-                autoCapitalize="none"
-                spellCheck={false}
-                className="font-admin-data"
+                error={errorFor('name')}
                 required
               />
-            ) : null}
-            <TextAreaField
-              label="Description"
-              hint="One or two sentences on what this organization supports."
-              rows={3}
-              value={form.description}
-              onChange={(value) => set('description', value)}
-              error={errorFor('description')}
-            />
-            <TextField
-              label="Website"
-              type="url"
-              value={form.url}
-              onChange={(value) => set('url', value)}
-              error={errorFor('url')}
-            />
-          </div>
-        </Panel>
-
-        <div className="admin-editor-stack">
-          <Panel title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
-            <div className="admin-editor-fields grid gap-sm sm:grid-cols-2">
-              <div>
+              {creating ? (
                 <TextField
-                  label="Tier"
-                  hint="Organizations with the same tier text form one group. Gold and gold are two groups."
-                  value={form.tier}
-                  onChange={(value) => set('tier', value)}
-                  error={errorFor('tier')}
-                  list={tiers.length > 0 ? tierListId : undefined}
+                  label="Page address"
+                  hint="The end of this organization’s page address. Lowercase letters, digits, and hyphens. It cannot change after the first save."
+                  value={form.slug}
+                  onChange={(value) => {
+                    setSlugTouched(true);
+                    set('slug', value);
+                  }}
+                  error={errorFor('slug')}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  className="font-admin-data"
+                  required
                 />
-                {tiers.length > 0 ? (
-                  <datalist id={tierListId}>
-                    {tiers.map((tier) => <option key={tier} value={tier} />)}
-                  </datalist>
-                ) : null}
-              </div>
-              <div className="sm:col-span-2">
-                <CheckboxField
-                  label="Show this organization when it is published"
-                  checked={form.visible}
-                  onChange={(value) => set('visible', value)}
-                />
-              </div>
+              ) : null}
+              <TextAreaField
+                label="Description"
+                hint="One or two sentences on what this organization supports."
+                rows={3}
+                value={form.description}
+                onChange={(value) => set('description', value)}
+                error={errorFor('description')}
+              />
+              <TextField
+                label="Website"
+                type="url"
+                value={form.url}
+                onChange={(value) => set('url', value)}
+                error={errorFor('url')}
+              />
             </div>
           </Panel>
 
-          <Panel title="Logo" description="The organization’s mark on its page and the sponsor wall.">
-            <ImagePicker
-              label="Logo"
-              hint="Choose the logo from the media library, or upload it there. The sponsors page shows it whole."
-              folder="cms-images"
-              value={form.logoPath}
-              onChange={(value) => set('logoPath', value)}
-              error={errorFor('logoPath')}
-            />
-          </Panel>
-        </div>
-      </div>
+          <div className="admin-editor-stack">
+            <Panel title="Placement" description="Set the group and visibility here. The sponsors list sets the order.">
+              <div className="admin-editor-fields grid gap-sm sm:grid-cols-2">
+                <div>
+                  <TextField
+                    label="Tier"
+                    hint="Organizations with the same tier text form one group. Gold and gold are two groups."
+                    value={form.tier}
+                    onChange={(value) => set('tier', value)}
+                    error={errorFor('tier')}
+                    list={tiers.length > 0 ? tierListId : undefined}
+                  />
+                  {tiers.length > 0 ? (
+                    <datalist id={tierListId}>
+                      {tiers.map((tier) => <option key={tier} value={tier} />)}
+                    </datalist>
+                  ) : null}
+                </div>
+                <div className="sm:col-span-2">
+                  <CheckboxField
+                    label="Show this organization when it is published"
+                    checked={form.visible}
+                    onChange={(value) => set('visible', value)}
+                  />
+                </div>
+              </div>
+            </Panel>
 
-      <div className="flex flex-wrap items-center gap-xs">
-        <button type="button" className={secondaryButtonClass} onClick={() => navigate(ORGANIZATIONS_LIST)}>
-          Cancel
-        </button>
-        {!creating ? (
-          <DestructiveConfirm
-            className="ms-auto"
-            trigger="Delete this organization"
-            title={`Delete ${form.name || docId}`}
-            confirmLabel="Delete this organization"
-            busyLabel="Deleting…"
-            busy={saving}
-            consequence="The live organization and its draft are removed. Its page address is free again. The logo stays in the media library."
-            permanence="This cannot be undone."
-            onConfirm={remove}
-          />
-        ) : null}
-      </div>
-    </form>
+            <Panel title="Logo" description="The organization’s mark on its page and the sponsor wall.">
+              <ImagePicker
+                label="Logo"
+                hint="Choose the logo from the media library, or upload it there. The sponsors page shows it whole."
+                folder="cms-images"
+                value={form.logoPath}
+                onChange={(value) => set('logoPath', value)}
+                error={errorFor('logoPath')}
+              />
+            </Panel>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-xs">
+          <button type="button" className={secondaryButtonClass} onClick={() => navigate(ORGANIZATIONS_LIST)}>
+            Cancel
+          </button>
+          {!creating ? (
+            <DestructiveConfirm
+              className="ms-auto"
+              trigger="Delete this organization"
+              title={`Delete ${form.name || docId}`}
+              confirmLabel="Delete this organization"
+              busyLabel="Deleting…"
+              busy={saving}
+              consequence="The live organization and its draft are removed. Its page address is free again. The logo stays in the media library. Its representatives lose access, and an edit waiting for review is removed."
+              permanence="This cannot be undone."
+              onConfirm={remove}
+            />
+          ) : null}
+        </div>
+      </form>
+      {!creating && docId && (representatives.ready || representatives.error) ? (
+        <OrganizationRepresentatives
+          key={docId}
+          organizationId={docId}
+          current={row?.current ?? null}
+          grants={representatives.grantsFor(docId)}
+          request={representatives.requestFor(docId)}
+          listenerError={representatives.error}
+          isUnsaved={isUnsaved}
+          onApplied={adoptApplied}
+        />
+      ) : null}
+    </div>
   );
 }

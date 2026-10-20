@@ -41,8 +41,10 @@ EventConfigProvider          — subscribes to config/{event,features,theme,badg
           <Routes>             — Home, Schedule (/schedule, /schedule/mine,
                                  /schedule/:sessionId), Speakers, Sponsors
                                  (/sponsors, /sponsors/:slug),
-                                 /signin, /profile, /attendees,
-                                 /attendees/:uid, catch-all (cmsPages)
+                                 /signin, /profile, /profile/organization
+                                 (a representative's own organization),
+                                 /attendees, /attendees/:uid,
+                                 catch-all (cmsPages)
 ```
 
 `EventConfigProvider` also writes a runtime `<style id="event-theme-runtime">`

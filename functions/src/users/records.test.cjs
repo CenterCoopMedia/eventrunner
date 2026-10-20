@@ -280,6 +280,11 @@ async function fullySeeded(overrides = {}) {
     'change_requests/cr-bo-1': { message: 'Keep me.', status: 'new', uid: 'uid-bo', email: 'bo@example.com' },
     'change_request_rate_limits/uid-ada': { requests: [T0.getTime()], updatedAt: T0 },
     'change_request_rate_limits/uid-bo': { requests: [T0.getTime()], updatedAt: T0 },
+    // Organization representative access and a queued edit each (issue #334).
+    'organization_representatives/uid-ada': { uid: 'uid-ada', organizationId: 'beacon-fund' },
+    'organization_representatives/uid-bo': { uid: 'uid-bo', organizationId: 'tide-media' },
+    'organization_edit_requests/beacon-fund': { organizationId: 'beacon-fund', fields: { bio: 'x' }, submittedByUid: 'uid-ada' },
+    'organization_edit_requests/tide-media': { organizationId: 'tide-media', fields: { bio: 'y' }, submittedByUid: 'uid-bo' },
   });
   await db.collection('users/uid-ada/bookmarks').doc('s1').set({ bookmarkedAt: T0 });
   await db.collection('users/uid-ada/bookmarks').doc('s2').set({ bookmarkedAt: T0 });
@@ -318,6 +323,8 @@ function assertUntouched(d) {
   assert.ok(bucket.files.has('profile-photos/uid-ada/photo.jpg'));
   assert.ok(db.read('change_requests', 'cr-ada-1'));
   assert.ok(db.read('change_request_rate_limits', 'uid-ada'));
+  assert.ok(db.read('organization_representatives', 'uid-ada'));
+  assert.ok(db.read('organization_edit_requests', 'beacon-fund'));
   assert.deepEqual(adminLogs(db), []);
 }
 
@@ -332,19 +339,22 @@ function assertNeighbourKept({ db, auth, bucket }) {
   assert.ok(bucket.files.has('profile-photos/uid-bo/photo.jpg'));
   assert.ok(db.read('change_requests', 'cr-bo-1'));
   assert.ok(db.read('change_request_rate_limits', 'uid-bo'));
+  assert.ok(db.read('organization_representatives', 'uid-bo'));
+  assert.ok(db.read('organization_edit_requests', 'tide-media'));
 }
 
 test('the per-account store list is one named constant the delete reads', () => {
   assert.deepEqual(
     PER_ACCOUNT_STORES.map((store) => store.collection ?? store.subcollection ?? store.prefix),
     [
-      'users_public', 'schedule_shares', 'tickets', 'bookmarks', 'sessionNotes', 'profile-photos',
-      'change_requests', 'change_request_rate_limits',
+      'users_public', 'schedule_shares', 'organization_representatives', 'tickets', 'bookmarks',
+      'sessionNotes', 'profile-photos', 'change_requests', 'change_request_rate_limits',
+      'organization_edit_requests',
     ],
   );
   assert.ok(Object.isFrozen(PER_ACCOUNT_STORES));
-  // The account itself, the audit row, and the two directory documents.
-  assert.equal(MAX_RELEASED_CLAIMS, 496);
+  // The account itself, the audit row, and the three directory documents.
+  assert.equal(MAX_RELEASED_CLAIMS, 495);
 });
 
 test('a delete removes every per-account store, lowers counts to no less than 0, and releases tickets', async () => {
@@ -357,10 +367,14 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
   assert.deepEqual(res.body, {
     ok: true,
     uid: 'uid-ada',
-    removed: { tickets: 1, bookmarks: 2, notes: 1, photos: 2, changeRequests: 2, changeRequestLimits: 1 },
+    removed: {
+      tickets: 1, bookmarks: 2, notes: 1, photos: 2, changeRequests: 2, changeRequestLimits: 1, organizationEdits: 1,
+    },
   });
-  // Out of the directory.
+  // Out of the directory, and no longer a representative.
   assert.equal(db.read('users', 'uid-ada'), undefined);
+  assert.equal(db.read('organization_representatives', 'uid-ada'), undefined);
+  assert.equal(db.read('organization_edit_requests', 'beacon-fund'), undefined);
   assert.equal(db.read('users_public', 'uid-ada'), undefined);
   assert.equal(db.read('schedule_shares', 'uid-ada'), undefined);
   // The sweep.
@@ -528,19 +542,19 @@ test('refuses more claimed tickets than one transaction can release, naming the 
   for (let i = 0; i < MAX_RELEASED_CLAIMS; i += 1) {
     await db.collection('tickets').doc(`bulk-${i}`).set({ claimedByUid: 'uid-ada', claimedAt: T0 });
   }
-  // 1 seeded + 496 = 497 claims.
+  // 1 seeded + 495 = 496 claims.
   const d = deps(db);
   const res = await remove(d);
   assert.equal(res.statusCode, 409);
   assert.equal(res.body.error.code, 'too-many-claims');
-  assert.equal(res.body.error.message, 'This account holds 497 claimed tickets. One delete can release at most 496.');
+  assert.equal(res.body.error.message, 'This account holds 496 claimed tickets. One delete can release at most 495.');
   assertUntouched(d);
 
   // At the limit, it goes through.
   await db.collection('tickets').doc('bulk-0').delete();
   const ok = await remove(d);
   assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
-  assert.equal(ok.body.removed.tickets, 496);
+  assert.equal(ok.body.removed.tickets, 495);
 });
 
 test('a sign-in that is already gone counts as removed', async () => {
@@ -678,6 +692,7 @@ test('the sweep clears more than one page of every store, a page at a time', asy
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.removed, {
     tickets: 0, bookmarks: 250, notes: 450, photos: 501, changeRequests: 450, changeRequestLimits: 0,
+    organizationEdits: 0,
   });
   assert.deepEqual(db.ids('change_requests'), []);
   assert.deepEqual(db.ids('users/uid-ada/bookmarks'), []);

@@ -69,6 +69,7 @@ const Tickets = lazyPage(() => import('./pages/Tickets.jsx'));
 const TicketStatus = lazyPage(() => import('./pages/TicketStatus.jsx'));
 const MyTickets = lazyPage(() => import('./pages/MyTickets.jsx'));
 const Profile = lazyPage(() => import('./pages/Profile.jsx'));
+const OrganizationProfile = lazyPage(() => import('./pages/OrganizationProfile.jsx'));
 const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
 const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
 const Dashboard = lazyPage(() => import('./pages/Dashboard.jsx'));
@@ -142,6 +143,9 @@ export function AppRoutes() {
         <Route path="tickets/status" element={<DeferredPage component={TicketStatus} label="order status" />} />
         <Route path="tickets/mine" element={<DeferredPage component={MyTickets} label="your tickets" />} />
         <Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />
+        {/* A representative's own organization (issue #334), under the
+            reserved `profile` segment beside the account's own profile. */}
+        <Route path="profile/organization" element={<DeferredPage component={OrganizationProfile} label="your organization" />} />
         {/* The signed-in attendee's home (issue #168): one place that shows
             their status, their sessions, and the event's resources. `dashboard`
             is reserved in shared/routing, so a generic cmsPages path can never
