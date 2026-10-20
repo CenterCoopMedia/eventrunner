@@ -1,7 +1,7 @@
 // ESLint flat config for the workspace (spec §7.6, §8.1).
 //
 // Two repo-specific enforcement points, both from the CJS2026 postmortem:
-//   1. The hex sweep — no hex color literals outside the three allowlisted
+//   1. The hex sweep — no hex color literals outside the allowlisted
 //      paths. Ported code converts hex to theme tokens; a new literal fails CI.
 //   2. react-hooks/rules-of-hooks — the incident class the frontend port
 //      must not reintroduce.
@@ -117,10 +117,16 @@ export default [
     rules: { ...noHexLiterals },
   },
 
-  // Spec §7.6 allowlist: mail clients need literal hex, and the schedule PDF
-  // builds numeric RGB (values still come from config).
+  // Spec §7.6 allowlist: mail clients need literal hex, and the PDF helpers
+  // build numeric RGB (values still come from config). The schedule PDF's
+  // fallback palette moved into functions/src/pdf/kit.cjs so the invoice PDF
+  // can share it (#209).
   {
-    files: ["functions/src/email/templates/**", "functions/src/schedule/pdf.cjs"],
+    files: [
+      "functions/src/email/templates/**",
+      "functions/src/schedule/pdf.cjs",
+      "functions/src/pdf/kit.cjs",
+    ],
     rules: { "no-restricted-syntax": "off" },
   },
 ];

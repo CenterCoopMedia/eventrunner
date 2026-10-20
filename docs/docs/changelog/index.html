@@ -680,6 +680,13 @@
           paths.</li>
           </ul>
           <ul>
+          <li>The PDF helpers for theme colors, header text, text fitting and font-safe text moved from
+          <code>functions/src/schedule/pdf.cjs</code> into <code>functions/src/pdf/kit.cjs</code>, so the invoice PDF can
+          use them (#209). The schedule PDF does not change. A parity test compares its output with a
+          snapshot made before the move. <code>functions/src/pdf/kit.cjs</code> joins the hex-literal allowlist
+          because the fallback palette moved with the helpers.</li>
+          </ul>
+          <ul>
           <li>The public address of the Pages site is one value, in <code>scripts/lib/pages-site.cjs</code>. The
           documentation generator, the demo build, and the link checker read it, so the canonical and
           social card URLs, the root-relative links, the demo&#39;s base, and the link checker&#39;s path mapping

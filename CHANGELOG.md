@@ -548,6 +548,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moved to `functions/src/announcements/sendRunner.cjs`, so a schedule can use the same send
   paths.
 
+- The PDF helpers for theme colors, header text, text fitting and font-safe text moved from
+  `functions/src/schedule/pdf.cjs` into `functions/src/pdf/kit.cjs`, so the invoice PDF can
+  use them (#209). The schedule PDF does not change. A parity test compares its output with a
+  snapshot made before the move. `functions/src/pdf/kit.cjs` joins the hex-literal allowlist
+  because the fallback palette moved with the helpers.
+
 - The public address of the Pages site is one value, in `scripts/lib/pages-site.cjs`. The
   documentation generator, the demo build, and the link checker read it, so the canonical and
   social card URLs, the root-relative links, the demo's base, and the link checker's path mapping
