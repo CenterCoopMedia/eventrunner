@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   time and marks an ended grant when the time passes, without a reload. The admin log records the old and the new end time.
   Until the end time, the account is a full staff account and can edit and publish
   content; an end time does not make it read-only.
+- Display sizes for uploaded images (#333). When an image lands in `cms-images/`,
+  `branding/` or `speaker-photos/`, the new storage trigger `mediaImageSizes` writes WebP
+  copies at each of 320, 640, 1280 and 1920 pixels that is narrower than the original, in
+  a `_sizes/{generation}/` folder beside it. A `manifest.json` records the generation, each
+  copy's real width, or why it wrote nothing. A run checks that the name still holds its
+  generation before it writes copies and after it writes the manifest, so an overwrite
+  never leaves copies of the old picture. Copies are turned upright and carry no EXIF,
+  GPS, XMP or ICC data. The trigger reads the bytes, not the declared type, and refuses
+  non-images, SVG, GIF, animated images, files over 5 MiB and images over 40 megapixels.
+  The original is never changed. Speaker portraits, the speaker page headshot, sponsor
+  logos, the lead image and the event hero read the manifest and list each copy at its
+  real width in `srcset`, then the original at its own width, with the original as `src`.
+  With no manifest, or if a copy fails to load, the page shows the original, so older
+  uploads still show. The second trigger, `mediaImageSizesCleanup`, deletes the copies
+  when their original is deleted. A lead or hero image picked from the media library now
+  loads from Storage; it was a relative link to the site before. Sponsor logos now fill
+  their mark box. The functions gain one dependency, `sharp` 0.35.5. A deploy needs one
+  new IAM grant first (`docs/DEPLOY_RUNBOOK.md`, section 2).
 - Invoices, part 5 (#519): pay an issued invoice by card through a Stripe link. When the
   site's ticketing provider is Stripe and its account, mode and key are set, staff select
   **Make a card payment link** on an issued invoice. The server builds a Stripe-hosted,

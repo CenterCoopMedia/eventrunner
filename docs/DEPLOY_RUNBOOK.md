@@ -196,6 +196,18 @@ gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
   --condition=None
 ```
 
+**Storage triggers.** `mediaImageSizes` and `mediaImageSizesCleanup` run on Cloud Storage events (issue #333). Eventarc delivers those events through Pub/Sub, so the Cloud Storage service agent must publish to Pub/Sub. The deploy service account cannot grant that role. Grant it once per project, before the first deploy that has these triggers:
+
+```sh
+GCS_AGENT="$(gcloud storage service-agent --project=<GCP_PROJECT_ID>)"
+gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
+  --member="serviceAccount:${GCS_AGENT}" \
+  --role="roles/pubsub.publisher" \
+  --condition=None
+```
+
+Without it, the functions deploy fails to create these two triggers. The bucket in `EVENT_STORAGE_BUCKET` must be in the same location as `EVENT_FIREBASE_REGION`, or a multi-region that holds it (for example `US` for `us-central1`). Eventarc refuses a storage trigger in any other region.
+
 ## 3. GitHub Environment
 
 Create the environment (repo Settings → Environments → New environment → name it exactly
