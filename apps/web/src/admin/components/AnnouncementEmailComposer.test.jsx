@@ -308,6 +308,33 @@ describe('AnnouncementEmailComposer', () => {
     await screen.findByText(/The send is complete/);
   });
 
+  it('marks a scheduled reminder send, offers no continue for it, and names a stopped send', async () => {
+    const scheduled = {
+      ...SENT,
+      id: 'reminder-attendees-2026-12-01-7d',
+      status: 'sending',
+      audience: 'registered',
+      audienceLabel: 'Registered attendees',
+      subject: 'Your event is 7 days away',
+      total: 400,
+      processed: 200,
+      counts: { sent: 200 },
+      failures: [],
+      createdBy: null,
+      scheduled: true,
+    };
+    const stopped = { ...scheduled, id: 'reminder-attendees-2026-12-01-1d', status: 'stopped', subject: 'Your event is 1 day away' };
+    respond({ listAnnouncementSends: listResponse([scheduled, stopped]) });
+    await renderLoaded();
+    const rows = screen.getAllByRole('listitem').filter((row) => within(row).queryByText(/Your event is/));
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText(/Scheduled attendee reminder/)).toBeInTheDocument();
+    expect(within(rows[0]).getByText(/The schedule sends the rest in its next hourly run\./)).toBeInTheDocument();
+    expect(within(rows[0]).queryByRole('button', { name: 'Continue sending' })).toBeNull();
+    expect(within(rows[1]).getByText('Stopped')).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/200 addresses were not sent\./)).toBeInTheDocument();
+  });
+
   it('restores an unsubscribed address on request', async () => {
     respond({ listAnnouncementSends: listResponse([]), removeEmailSuppression: { removed: true } });
     await renderLoaded();

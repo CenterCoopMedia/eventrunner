@@ -11,36 +11,54 @@
  * A branch that is off, paused, on a historical demo, or past the end of
  * the event returns at once and writes nothing.
  *
- * Only the speaker branch exists (speakerSchedule.cjs). The attendee
- * branch (#518, the third pull request) joins BRANCHES below, through
- * announcements/sendRunner.cjs.
+ * The speaker branch (speakerSchedule.cjs) sends through the staff
+ * speaker reminder path. The attendee branch (attendeeSchedule.cjs) sends
+ * through the announcement send path (announcements/sendRunner.cjs).
  */
 
 const { runSpeakerSchedule } = require('./speakerSchedule.cjs');
+const { runAttendeeSchedule } = require('./attendeeSchedule.cjs');
 
 /** Each schedule the runner serves, in run order. */
 const BRANCHES = Object.freeze([
   { id: 'speakers', run: runSpeakerSchedule },
+  { id: 'attendees', run: runAttendeeSchedule },
 ]);
 
 /**
- * One run of every branch.
+ * How long one run may start new work: the 540-second function timeout,
+ * less a minute for the step in flight, the last-run stamps and the admin
+ * log rows.
+ */
+const RUN_BUDGET_MS = 480_000;
+
+/**
+ * One run of every branch. The branches run side by side, not one after
+ * the other, and share one deadline: a long speaker run cannot use up the
+ * time the attendee run needs, or the other way round. Each branch stops
+ * starting new work (a speaker, a chunk of 200 addresses) at the deadline;
+ * what is left has no ledger row or is still on its send record, so the
+ * next hourly run sends it. The branches touch different documents and
+ * hold different leases, so running them together is safe.
  *
- * @param {{ db, getConfig, sendEmail, notifyOperator?, now?, log? }} deps
+ * @param {{ db, getConfig, sendEmail, provider?, emailCore?, notifyOperator?, now?, log?, deadlineMs? }} deps
+ *   `sendEmail` serves the speaker branch; `provider` and `emailCore` the
+ *   attendee branch.
  * @returns {Promise<Record<string, { outcome: string, reason?: string }>>}
  */
 async function runScheduledReminders(deps, branches = BRANCHES) {
   const log = deps.log ?? console;
-  const results = {};
-  for (const branch of branches) {
+  const now = deps.now ?? Date.now;
+  const deadlineMs = deps.deadlineMs ?? now() + RUN_BUDGET_MS;
+  const entries = await Promise.all(branches.map(async (branch) => {
     try {
-      results[branch.id] = await branch.run(deps);
+      return [branch.id, await branch.run({ ...deps, deadlineMs })];
     } catch (err) {
       log.error(`scheduled reminders: the ${branch.id} branch failed`, err);
-      results[branch.id] = { outcome: 'failed', reason: 'internal' };
+      return [branch.id, { outcome: 'failed', reason: 'internal' }];
     }
-  }
-  return results;
+  }));
+  return Object.fromEntries(entries);
 }
 
 /** The secrets a run needs: the mail provider's, and the operator notifier's. */
@@ -63,7 +81,8 @@ function buildHandlers() {
   return {
     // No retryCount: a failed run is not retried. The next hourly run works
     // out the same answer from the settings and the clock (ADR 0006).
-    // 540 seconds: speaker reminders go one at a time.
+    // 540 seconds: speaker reminders go one at a time, and attendee
+    // reminders go in chunks of 200, one provider batch each.
     runScheduledReminders: onSchedule({ region, schedule: 'every 60 minutes', secrets, timeoutSeconds: 540 }, async () => {
       const { getDb } = require('../core/firestore.cjs');
       const { getEventConfig } = require('../core/config.cjs');
@@ -72,13 +91,11 @@ function buildHandlers() {
       const { createEmailCore } = require('../email/send.cjs');
       const db = getDb();
       const getConfig = () => getEventConfig({ db });
-      let core;
-      const sendEmail = async (message) => {
-        core ??= createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
-        return core.send(message);
-      };
+      const provider = getEmailProvider({ env: process.env });
+      const emailCore = createEmailCore({ db, provider, getConfig });
+      const sendEmail = (message) => emailCore.send(message);
       const notifier = createOperatorNotifier({ env: process.env, getConfig, sendEmail });
-      await runScheduledReminders({ db, getConfig, sendEmail, notifyOperator: notifier.notify });
+      await runScheduledReminders({ db, getConfig, sendEmail, provider, emailCore, notifyOperator: notifier.notify });
     }),
   };
 }
@@ -89,5 +106,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { BRANCHES },
+  internals: { BRANCHES, RUN_BUDGET_MS },
 };

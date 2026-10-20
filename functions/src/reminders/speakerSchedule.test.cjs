@@ -404,3 +404,21 @@ test('a reservation that throws part way keeps the sends already made in the las
   assert.deepEqual(row.details.sent, ['ada']);
   assert.equal(row.details.incomplete, true);
 });
+
+// Codex review on #532: the hourly run gives each branch one deadline.
+test('a run stops before its next speaker at the deadline, and the next run reaches the rest', async () => {
+  const db = seed({
+    'speakers/dee': { firstName: 'Dee', lastName: 'Example', email: 'dee@example.test', status: 'accepted', bio: '', headshotPath: '' },
+  });
+  let clock = IN_7D;
+  const mail = outbox(() => { clock = IN_7D + 9 * 60_000; return { status: 'sent' }; });
+  const first = await runSpeakerSchedule({
+    db, getConfig: async () => CONFIG, sendEmail: mail.sendEmail, now: () => clock, log: QUIET, deadlineMs: IN_7D + 8 * 60_000,
+  });
+  assert.equal(first.reason, 'time-limit');
+  assert.deepEqual(first.sent, ['ada']);
+  assert.equal(first.deferred, 1);
+  assert.equal(db.read(LEDGER, 'speakers__2026-11-20-7d__dee'), undefined);
+  const next = await run(db, IN_7D + HOUR, { sendEmail: outbox().sendEmail });
+  assert.deepEqual(next.sent, ['dee']);
+});

@@ -1,8 +1,10 @@
-// Scheduled speaker reminders (issue #518, ADR 0006) against the real
-// Firestore emulator: browsers are denied the three schedule collections,
-// a full run done twice sends one reminder per speaker, the ledger row and
-// the speaker_reminders reservation land together, and saving new wording
-// through the staff wording editor pauses the schedule. Authentication and
+// Scheduled speaker and attendee reminders (issue #518, ADR 0006) against
+// the real Firestore emulator: browsers are denied the three schedule
+// collections, a full run done twice sends one reminder per speaker and one
+// per attendee, the ledger row lands with the reservation or the send
+// record, saving new wording through the staff wording editor pauses the
+// speaker schedule, and an unsubscribe from a scheduled attendee reminder
+// records a suppression that the next reminder honours. Authentication and
 // the mail provider are the only fakes; the email core is the real one, so
 // its send-once claims are real documents.
 import { createRequire } from 'node:module';
@@ -18,6 +20,8 @@ const { createReminderSchedulesHandler } = require('../functions/src/reminders/s
 const { runScheduledReminders } = require('../functions/src/reminders/run.cjs');
 const { createSpeakerRemindersHandler } = require('../functions/src/speakers/reminders.cjs');
 const { createEmailCore } = require('../functions/src/email/send.cjs');
+const { createConsoleProvider } = require('../functions/src/email/providers/console.cjs');
+const { createEmailUnsubscribeHandler, suppressionIdFor } = require('../functions/src/announcements/suppression.cjs');
 const { resetTemplateCacheForTest } = require('../functions/src/email/templates.cjs');
 
 const PROJECT_ID = 'demo-run-of-show';
@@ -27,6 +31,10 @@ const QUIET = { error() {}, warn() {}, info() {} };
 const SETUP = Date.parse('2026-11-01T15:00:00Z');
 // Inside the 7-day window of a due date of 2026-11-20 17:00 New York time.
 const IN_7D = Date.parse('2026-11-13T15:30:00Z');
+// Inside the 7-day and the 1-day windows before the event starts, at
+// 2026-12-01 09:00 New York time.
+const ATTENDEE_7D = Date.parse('2026-11-24T15:30:00Z');
+const ATTENDEE_1D = Date.parse('2026-11-30T15:30:00Z');
 const HOUR = 3_600_000;
 
 const CONFIG = {
@@ -36,10 +44,12 @@ const CONFIG = {
     sender: { email: 'events@example.test', name: 'Example Event' },
     legal: { postalAddressHtml: 'Example Org<br>1 Main St', supportEmail: 'help@example.test' },
     days: [{ id: 'day-1', date: '2026-12-01', startTime: '09:00', endTime: '17:00' }],
+    venue: { name: 'Example Hall', city: 'Example City' },
     social: { handles: [] },
   },
   theme: { colors: {} },
-  tierA: { publicUrl: 'https://site.example.test' },
+  tierA: { publicUrl: 'https://site.example.test', ticketingProvider: 'manual' },
+  providers: { email: { provider: 'console', messageStream: null, announcementStream: 'announcements' } },
 };
 
 const auth = {
@@ -54,6 +64,7 @@ let adminApp;
 let db;
 let outbox;
 let operatorEvents;
+let announcementMail;
 
 const provider = {
   name: 'capture',
@@ -74,11 +85,18 @@ function makeRes() {
   return res;
 }
 
+// The real console provider: announcement batches land in announcementMail.
+const announcementProvider = createConsoleProvider({
+  env: { FUNCTIONS_EMULATOR: 'true', E2E_MAIL_FILE: '/tmp/unused' },
+  log: { log() {} },
+  appendFileSync: (_file, line) => announcementMail.push(JSON.parse(line)),
+});
+
 const getConfig = async () => CONFIG;
 
 async function schedules(body, now = SETUP) {
   const res = makeRes();
-  await createReminderSchedulesHandler({ db, auth, getConfig, now: () => now, log: QUIET })(
+  await createReminderSchedulesHandler({ db, auth, getConfig, provider: announcementProvider, now: () => now, log: QUIET })(
     { method: 'POST', headers: { authorization: 'Bearer staff' }, body: { schedule: 'speakers', ...body } },
     res,
   );
@@ -96,14 +114,49 @@ async function wording(body, now = SETUP) {
 
 function runAt(now) {
   const core = createEmailCore({ db, provider, getConfig, sleep: async () => {}, log: QUIET });
+  const announcementCore = createEmailCore({ db, provider: announcementProvider, getConfig, sleep: async () => {}, log: QUIET });
   return runScheduledReminders({
     db,
     getConfig,
     sendEmail: core.send,
+    provider: announcementProvider,
+    emailCore: announcementCore,
     notifyOperator: async (event) => { operatorEvents.push(event); },
     now: () => now,
     log: QUIET,
   });
+}
+
+async function approveAttendees() {
+  const saved = await schedules({
+    schedule: 'attendees',
+    action: 'save',
+    offsetsDays: [7, 1],
+    sendTime: '10:00',
+    draft: { subject: 'See you in {{days_until}}', message: 'Doors open soon.' },
+  });
+  expect(saved.statusCode).toBe(200);
+  const preview = await schedules({ schedule: 'attendees', action: 'preview' });
+  expect(preview.statusCode).toBe(200);
+  const approved = await schedules({
+    schedule: 'attendees',
+    action: 'approve',
+    wordingVersion: preview.body.wordingVersion,
+    settingsVersion: preview.body.settingsVersion,
+    factsVersion: preview.body.factsVersion,
+  });
+  expect(approved.statusCode).toBe(200);
+  expect(approved.body.state).toBe('on');
+}
+
+async function unsubscribe(query) {
+  const res = makeRes();
+  res.send = (payload) => { res.body = payload; return res; };
+  await createEmailUnsubscribeHandler({ db, getConfig, log: QUIET })(
+    { method: 'POST', headers: {}, query, body: {} },
+    res,
+  );
+  return res;
 }
 
 async function approve() {
@@ -137,12 +190,17 @@ beforeEach(async () => {
   resetTemplateCacheForTest();
   outbox = [];
   operatorEvents = [];
+  announcementMail = [];
   await db.collection('config').doc('bootstrap').set({ adminEmails: [], staffEmails: [STAFF_EMAIL] });
   await db.collection('config').doc('event').set({ name: 'Example Event', historicalDemo: false });
   await db.collection('speakers').doc('ada').set({ firstName: 'Ada', lastName: 'Lee', email: 'ada@example.test', status: 'accepted', bio: '', headshotPath: '' });
   await db.collection('speakers').doc('ben').set({ firstName: 'Ben', lastName: 'Ode', email: 'ben@example.test', status: 'approved', bio: 'Bio.', headshotPath: '' });
   // Owes nothing in the chosen items.
   await db.collection('speakers').doc('cy').set({ firstName: 'Cy', lastName: 'Done', email: 'cy@example.test', status: 'accepted', bio: 'Bio.', headshotPath: 'c.png' });
+  // Registered attendees, and one account that has not registered.
+  await db.collection('users').doc('u-ada').set({ email: 'ada@example.test', registrationStatus: 'approved' });
+  await db.collection('users').doc('u-ben').set({ email: 'ben@example.test', registrationStatus: 'ticketed' });
+  await db.collection('users').doc('u-cy').set({ email: 'cy@example.test', registrationStatus: 'pending' });
 });
 
 afterAll(async () => {
@@ -156,7 +214,13 @@ describe('rules', () => {
     await runAt(IN_7D);
     const staff = testEnv.authenticatedContext('staff-1', { email: STAFF_EMAIL, email_verified: true }).firestore();
     const anon = testEnv.unauthenticatedContext().firestore();
-    for (const path of ['reminder_schedules/speakers', 'reminder_schedule_runs/speakers', 'reminder_ledger/speakers__2026-11-20-7d__ada']) {
+    await approveAttendees();
+    await runAt(ATTENDEE_7D);
+    for (const path of [
+      'reminder_schedules/speakers', 'reminder_schedule_runs/speakers', 'reminder_ledger/speakers__2026-11-20-7d__ada',
+      'reminder_schedules/attendees', 'reminder_schedule_runs/attendees', 'reminder_ledger/attendees__2026-12-01-7d',
+      'announcement_sends/reminder-attendees-2026-12-01-7d',
+    ]) {
       await assertFails(getDoc(doc(staff, path)));
       await assertFails(getDoc(doc(anon, path)));
       await assertFails(setDoc(doc(staff, path), { enabled: true }));
@@ -232,5 +296,69 @@ describe('wording', () => {
     expect(outbox).toHaveLength(0);
     expect(operatorEvents).toHaveLength(1);
     expect((await db.collection('reminder_schedules').doc('speakers').get()).data().pausedReason).toBe('wording-changed');
+  });
+});
+
+describe('attendees', () => {
+  it('a full run done twice in one window sends one reminder to each registered attendee', async () => {
+    await approveAttendees();
+    const first = await runAt(ATTENDEE_7D);
+    expect(first.attendees.outcome).toBe('completed');
+    expect(first.attendees.counts.sent).toBe(2);
+    expect(announcementMail.map((m) => m.to).sort()).toEqual(['ada@example.test', 'ben@example.test']);
+    expect(announcementMail[0].subject).toBe('See you in 7 days');
+    expect(announcementMail[0].messageStream).toBe('announcements');
+    expect(announcementMail[0].text).toMatch(/Open your dashboard: https:\/\/site\.example\.test\/dashboard/);
+
+    const second = await runAt(ATTENDEE_7D + HOUR);
+    expect(second.attendees.counts.sent).toBe(0);
+    expect(announcementMail).toHaveLength(2);
+
+    const record = (await db.collection('announcement_sends').doc('reminder-attendees-2026-12-01-7d').get()).data();
+    expect(record.status).toBe('sent');
+    expect(record.reminder.windowKey).toBe('2026-12-01-7d');
+    const ledger = await db.collection('reminder_ledger').doc('attendees__2026-12-01-7d').get();
+    expect(ledger.data().sendId).toBe('reminder-attendees-2026-12-01-7d');
+    const claims = await db.collection('email_claims').where('source', '==', 'announcement').get();
+    expect(claims.size).toBe(2);
+    const rows = (await adminLogs('runScheduledReminders')).filter((row) => row.details.schedule === 'attendees');
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows)).not.toMatch(/@/);
+  });
+
+  it('an unsubscribe from a scheduled reminder records a suppression, and the next reminder leaves the address out', async () => {
+    await approveAttendees();
+    await runAt(ATTENDEE_7D);
+    const ada = announcementMail.find((m) => m.to === 'ada@example.test');
+    const link = new URL(ada.headers['List-Unsubscribe'].slice(1, -1));
+    const res = await unsubscribe(Object.fromEntries(link.searchParams));
+    expect(res.statusCode).toBe(200);
+    const suppression = await db.collection('email_suppressions').doc(suppressionIdFor('ada@example.test')).get();
+    expect(suppression.exists).toBe(true);
+    expect(suppression.data().sendId).toBe('reminder-attendees-2026-12-01-7d');
+
+    const next = await runAt(ATTENDEE_1D);
+    expect(next.attendees.counts.sent).toBe(1);
+    expect(announcementMail.slice(2).map((m) => m.to)).toEqual(['ben@example.test']);
+  });
+
+  it('a change to the event start pauses the schedule before anything is sent', async () => {
+    await approveAttendees();
+    const moved = { ...CONFIG, event: { ...CONFIG.event, days: [{ id: 'day-1', date: '2026-12-02', startTime: '09:00', endTime: '17:00' }] } };
+    const announcementCore = createEmailCore({ db, provider: announcementProvider, getConfig: async () => moved, sleep: async () => {}, log: QUIET });
+    const result = await runScheduledReminders({
+      db,
+      getConfig: async () => moved,
+      sendEmail: async () => ({ status: 'failed' }),
+      provider: announcementProvider,
+      emailCore: announcementCore,
+      notifyOperator: async (event) => { operatorEvents.push(event); },
+      now: () => ATTENDEE_7D,
+      log: QUIET,
+    });
+    expect(result.attendees).toEqual({ outcome: 'paused', reason: 'facts-changed' });
+    expect(announcementMail).toHaveLength(0);
+    expect(operatorEvents).toHaveLength(1);
+    expect((await db.collection('reminder_schedules').doc('attendees').get()).data().pausedReason).toBe('facts-changed');
   });
 });
