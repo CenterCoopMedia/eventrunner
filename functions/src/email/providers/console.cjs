@@ -64,20 +64,34 @@ function createConsoleProvider({
       // List-Unsubscribe pair an announcement carries.
       ...(message.headers && Object.keys(message.headers).length > 0 ? { headers: message.headers } : {}),
       ...(message.messageStream ? { messageStream: message.messageStream } : {}),
+      // A copy address and each attachment, content included, so a test can
+      // read the invoice PDF a send carried (#208, part 4).
+      ...(message.cc ? { cc: message.cc } : {}),
+      ...(Array.isArray(message.attachments) && message.attachments.length > 0 ? { attachments: message.attachments } : {}),
     };
+    // The log names each file and its size, never its content.
+    const attachmentNames = (captured.attachments ?? []).map((attachment) => ({
+      filename: attachment.filename,
+      contentType: attachment.contentType,
+      bytes: typeof attachment.content === 'string' ? Buffer.from(attachment.content, 'base64').length : 0,
+    }));
     // Local smoke reads the body from the emulator log. Everywhere else the
     // body stays out of stdout. A bearer-secret template can put the secret
     // in the subject too, and the audit row already drops that subject when
     // storeRendered is false, so the log drops it on the same sends.
     const logBody = env.FUNCTIONS_EMULATOR === 'true' && !mailFile;
+    const { attachments: _content, ...withoutContent } = captured;
+    const files = attachmentNames.length > 0 ? { attachments: attachmentNames } : {};
     const logged = logBody
-      ? captured
+      ? { ...withoutContent, ...files }
       : {
           to: captured.to,
+          ...(captured.cc ? { cc: captured.cc } : {}),
           from: captured.from,
           replyTo: captured.replyTo,
           ...(message.storeRendered === false ? {} : { subject: captured.subject }),
           tag: captured.tag,
+          ...files,
         };
     log.log('[email:console]', JSON.stringify(logged, null, 2));
     if (mailFile) {
@@ -108,7 +122,15 @@ function createConsoleProvider({
     return results;
   }
 
-  return { name: 'console', send, sendBatch, batchLimits: { maxMessages: 500 } };
+  // The console provider carries attachments and a copy address into the
+  // captured mail, so tests and local runs exercise the invoice email.
+  return {
+    name: 'console',
+    send,
+    sendBatch,
+    batchLimits: { maxMessages: 500 },
+    capabilities: { attachments: true, cc: true },
+  };
 }
 
 module.exports = { createConsoleProvider };
