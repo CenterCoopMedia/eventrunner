@@ -66,6 +66,9 @@ const WRONG_EVENT_REASON = 'wrong_event';
 /** Event types that carry order work. Anything else is acknowledged and ignored. */
 const ACTIONABLE_EVENT_TYPES = new Set(['order.placed', 'order.updated', 'attendee.updated']);
 
+/** A Stripe Checkout Session event for an invoice pay link (providers/stripe.cjs, #519). */
+const INVOICE_CHECKOUT_EVENT = 'invoice.checkout';
+
 /**
  * A create() whose document already exists. The Admin SDK reports
  * ALREADY_EXISTS (gRPC 6) for a plain create and FAILED_PRECONDITION
@@ -231,6 +234,24 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
       res.status(200).json({ ok: true, ignored: 'no_delivery_id' });
       return;
     }
+    if (eventType === INVOICE_CHECKOUT_EVENT) {
+      // An invoice pay link (#519): no ticket queue. The invoice step reads
+      // the Session again from Stripe and, in one transaction with this
+      // delivery's claim, marks the invoice paid or flags the payment.
+      let outcome = null;
+      try {
+        const { applyInvoiceCheckout } = require('../admin/invoicePayLink.cjs');
+        outcome = await applyInvoiceCheckout({
+          db, provider, deliveryId, invoiceId: verification.resourceId, sessionId: verification.sessionId, now, log,
+        });
+      } catch (err) {
+        log.error('ticketing: invoice payment could not be recorded', { code: err?.code || err?.type || 'internal' });
+        res.status(500).json({ error: { code: 'internal', message: 'Delivery could not be processed.' } });
+        return;
+      }
+      res.status(200).json({ ok: true, ...outcome });
+      return;
+    }
     if (!ACTIONABLE_EVENT_TYPES.has(eventType) || !orderId) {
       // Nothing to fetch (an unknown event type, or an event with no
       // derivable order). Acknowledged so the provider stops retrying.
@@ -293,5 +314,6 @@ module.exports = {
     MAX_BODY_BYTES,
     WRONG_EVENT_REASON,
     ACTIONABLE_EVENT_TYPES,
+    INVOICE_CHECKOUT_EVENT,
   },
 };

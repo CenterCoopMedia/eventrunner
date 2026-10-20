@@ -83,6 +83,37 @@ function metadataMatches(metadata, order) {
     metadata.eventRunnerAttemptId === order.attemptId;
 }
 
+const INVOICE_ID = /^inv_[a-z0-9]{16,40}$/;
+
+/**
+ * The invoice pay link policy (issue #519, ADR 0004 amendment): hosted
+ * Checkout, card only, one line of quantity one at a fixed amount, no
+ * tax, promotion, adaptive price, transfer or fee, and metadata that names
+ * one invoice of this event and one pay link. No ticket order id.
+ */
+function isInvoiceCheckoutRequest(params, scope) {
+  const metadata = params?.metadata;
+  const intent = params?.payment_intent_data;
+  const line = Array.isArray(params?.line_items) && params.line_items.length === 1 ? params.line_items[0] : null;
+  const price = line?.price_data;
+  return params?.mode === 'payment' && params.ui_mode === 'hosted_page'
+    && params.allowed_payment_method_types?.length === 1 && params.allowed_payment_method_types[0] === 'card'
+    && params.adaptive_pricing?.enabled === false && params.automatic_tax?.enabled === false
+    && params.allow_promotion_codes === false
+    && line?.quantity === 1 && !line.price && Number.isSafeInteger(price?.unit_amount) && price.unit_amount > 0
+    && typeof price.currency === 'string' && typeof price.product_data?.name === 'string'
+    && typeof metadata?.eventRunnerInvoiceId === 'string' && INVOICE_ID.test(metadata.eventRunnerInvoiceId)
+    && metadata.eventRunnerEventId === scope.externalEventId && Boolean(safeId(metadata.eventRunnerPayLinkId))
+    && metadata.eventRunnerOrderId === undefined && metadata.eventRunnerAttemptId === undefined
+    && params.client_reference_id === metadata.eventRunnerInvoiceId
+    && intent?.metadata?.eventRunnerInvoiceId === metadata.eventRunnerInvoiceId
+    && intent.metadata.eventRunnerEventId === metadata.eventRunnerEventId
+    && intent.metadata.eventRunnerPayLinkId === metadata.eventRunnerPayLinkId
+    && intent.metadata.eventRunnerOrderId === undefined
+    && !intent.transfer_data && !intent.on_behalf_of && !intent.application_fee_amount
+    && !params.subscription_data && !params.discounts;
+}
+
 function createStripeProvider({ env = process.env, db, getConfig, stripeClient, now = () => new Date() } = {}) {
   const scope = stripeScope(env);
   let client = null;
@@ -124,6 +155,15 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
           params.payment_intent_data?.application_fee_amount || params.allow_promotion_codes === true ||
           params.automatic_tax?.enabled === true || params.adaptive_pricing?.enabled !== false) {
         throw new Error('Checkout request does not match the configured hosted, card-only ticket policy.');
+      }
+      await assertAccount();
+      return sdk().checkout.sessions.create(params, { idempotencyKey });
+    },
+
+    /** A hosted card page for one issued invoice (#519); see isInvoiceCheckoutRequest. */
+    async createInvoiceCheckoutSession(params, { idempotencyKey } = {}) {
+      if (!idempotencyKey || !isInvoiceCheckoutRequest(params, scope)) {
+        throw new Error('Checkout request does not match the invoice pay link policy.');
       }
       await assertAccount();
       return sdk().checkout.sessions.create(params, { idempotencyKey });
@@ -193,6 +233,21 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
         return { valid: false, reason: 'wrong_event' };
       }
       const object = currentEvent.data?.object;
+      const dedupScope = `${scope.stripeAccountId}:${scope.livemode}:${scope.externalEventId}:${event.id}`;
+      const deliveryId = `stripe_${createHash('sha256').update(dedupScope).digest('hex')}`;
+      // An invoice pay link (#519). Its Session events go to the invoice;
+      // the invoice step reads the Session again before it changes anything.
+      // Its PaymentIntent, charge, refund and dispute events are
+      // acknowledged only: the Session event records the payment.
+      if (object?.metadata?.eventRunnerInvoiceId !== undefined && object.metadata.eventRunnerOrderId === undefined) {
+        const invoiceId = typeof object.metadata.eventRunnerInvoiceId === 'string' && INVOICE_ID.test(object.metadata.eventRunnerInvoiceId)
+          ? object.metadata.eventRunnerInvoiceId : null;
+        if (!invoiceId || object.metadata.eventRunnerEventId !== scope.externalEventId) return { valid: false, reason: 'wrong_event' };
+        if (!event.type.startsWith('checkout.session.')) return { valid: true, eventType: 'ignored', deliveryId };
+        const sessionId = safeId(object.id);
+        if (!sessionId) return { valid: false, reason: 'wrong_event' };
+        return { valid: true, deliveryId, eventType: 'invoice.checkout', resourceId: invoiceId, sessionId };
+      }
       let metadata = object?.metadata;
       let paymentIntentId = event.type.startsWith('payment_intent.') ? objectId(object) : objectId(object?.payment_intent);
       if (!metadata?.eventRunnerOrderId && !event.type.startsWith('checkout.session.')) {
@@ -201,6 +256,9 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
           paymentIntentId = objectId(charge?.payment_intent);
         }
         if (paymentIntentId) metadata = (await sdk().paymentIntents.retrieve(paymentIntentId))?.metadata;
+        if (metadata?.eventRunnerInvoiceId !== undefined && metadata.eventRunnerOrderId === undefined) {
+          return { valid: true, eventType: 'ignored', deliveryId };
+        }
       }
       const orderId = safeId(metadata?.eventRunnerOrderId);
       if (!orderId || !db) return { valid: false, reason: 'wrong_event' };
@@ -235,11 +293,7 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
           });
         }
       }
-      const dedupScope = `${scope.stripeAccountId}:${scope.livemode}:${scope.externalEventId}:${event.id}`;
-      return {
-        valid: true, deliveryId: `stripe_${createHash('sha256').update(dedupScope).digest('hex')}`,
-        eventType: 'order.updated', resourceId: orderId,
-      };
+      return { valid: true, deliveryId, eventType: 'order.updated', resourceId: orderId };
     },
 
     async reconcileOrder(orderId) {
@@ -311,5 +365,5 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
 
 module.exports = {
   createStripeProvider, createStripeClient, stripeScope,
-  internals: { WEBHOOK_EVENTS, scopeMatches, metadataMatches, objectId, safeId, allProviderPages },
+  internals: { WEBHOOK_EVENTS, scopeMatches, metadataMatches, objectId, safeId, allProviderPages, isInvoiceCheckoutRequest },
 };

@@ -554,3 +554,35 @@ test('the current link and its end time are read on the event clock', () => {
   assert.equal(payLinkExpiryText('2026-10-21T15:30:00.000Z', 'America/New_York'), 'October 21, 2026, 11:30 AM EDT');
   assert.equal(payLinkExpiryText('2026-10-21T15:30:00.000Z', 'Not/AZone'), 'October 21, 2026, 3:30 PM UTC');
 });
+
+test('the deployed handler offers card links only with the Stripe provider and a key for its mode', () => {
+  const { internals: { stripePayments } } = require('./invoices.cjs');
+  const db = makeFakeDb({});
+  assert.deepEqual(stripePayments({ db, env: { EVENT_TICKETING_PROVIDER: 'manual' } }), {
+    available: false, reason: 'Card payment links need Stripe. This site does not take card payments through Stripe.',
+  });
+  const noKey = stripePayments({ db, env: ENV });
+  assert.equal(noKey.available, false);
+  assert.match(noKey.reason, /not fully set up/);
+  assert.equal(stripePayments({ db, env: { ...ENV, TICKETING_API_TOKEN: 'sk_live_fixture' } }).available, false);
+  assert.equal(stripePayments({ db, env: { ...ENV, EVENT_STRIPE_ACCOUNT_ID: '', TICKETING_API_TOKEN: 'sk_test_fixture' } }).available, false);
+  const ready = stripePayments({ db, env: { ...ENV, TICKETING_API_TOKEN: 'sk_test_fixture' } });
+  assert.equal(ready.available, true);
+  assert.equal(ready.testMode, true);
+  assert.equal(ready.publicUrl, 'https://event.example');
+});
+
+test('two presses at once share one session, and neither closes the link the other opened', async () => {
+  const env = setup();
+  const [first, second] = await Promise.all([
+    env.call({ action: 'createPayLink', invoiceId: ID }),
+    env.call({ action: 'createPayLink', invoiceId: ID }),
+  ]);
+  assert.deepEqual([first.statusCode, second.statusCode], [200, 200], JSON.stringify([first.body, second.body]));
+  const stored = env.stored();
+  assert.equal(stored.payLinks.length, 1);
+  assert.equal(stored.payLinks[0].status, 'open');
+  assert.equal(env.fake.sessions.size, 1);
+  assert.deepEqual(env.fake.calls.expire, []);
+  assert.equal(env.audits().filter((row) => row.action === 'invoices.pay-link-created').length, 1);
+});
