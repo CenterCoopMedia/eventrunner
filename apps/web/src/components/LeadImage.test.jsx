@@ -1,7 +1,7 @@
 // The lead image device (design brief §2.5.2): one optional image beside the
 // opening copy, with required alt text, a stable crop, and a focal point.
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import LeadImage, { focalPosition } from './LeadImage.jsx';
 
 const BLOCK = {
@@ -41,6 +41,36 @@ describe('LeadImage', () => {
   it('crops to the stated focal point', () => {
     render(<LeadImage block={{ ...BLOCK, focalX: 20, focalY: 80 }} />);
     expect(screen.getByAltText(BLOCK.alt)).toHaveStyle({ objectPosition: '20% 80%' });
+  });
+});
+
+// Issue #333: a picture picked from the media library is a Storage path.
+// It resolves to the bucket, and it offers the display sizes the function
+// wrote, at the slot's width. Alt text, crop, and focal point stay.
+describe('LeadImage display sizes', () => {
+  const PICKED = { ...BLOCK, url: 'cms-images/a1b2c3/hall.jpg', focalX: 30, focalY: 70 };
+
+  it('resolves a picked path to the bucket and offers the sizes', () => {
+    render(<LeadImage block={PICKED} />);
+    const img = screen.getByAltText(BLOCK.alt);
+    expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
+    expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
+    expect(img.getAttribute('srcset')).toContain(encodeURIComponent('cms-images/a1b2c3/_sizes/640.webp'));
+    expect(img.getAttribute('sizes')).toBe('(min-width: 64rem) 22rem, 100vw');
+    expect(img).toHaveStyle({ objectPosition: '30% 70%' });
+  });
+
+  it('falls back to the original when a size fails to load', () => {
+    render(<LeadImage block={PICKED} />);
+    fireEvent.error(screen.getByAltText(BLOCK.alt));
+    const img = screen.getByAltText(BLOCK.alt);
+    expect(img).not.toHaveAttribute('srcset');
+    expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
+  });
+
+  it('offers no sizes for a link to another site', () => {
+    render(<LeadImage block={BLOCK} />);
+    expect(screen.getByAltText(BLOCK.alt)).not.toHaveAttribute('srcset');
   });
 });
 

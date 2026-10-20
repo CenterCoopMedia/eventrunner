@@ -1,5 +1,5 @@
 import WayfindingIcon from './editorial/WayfindingIcon.jsx';
-import { focalPosition } from './LeadImage.jsx';
+import { focalPosition, useSizedImageSources } from './LeadImage.jsx';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 
 // One live content contract; each preset composes its own artwork and marks.
@@ -20,6 +20,9 @@ export default function EventHero({
 }) {
   const alt = typeof image?.alt === 'string' ? image.alt.trim() : '';
   const src = image?.url && isSafeHref(image.url) && alt ? image.url : null;
+  // The artwork can fill the whole hero on a phone, and a style can give it
+  // the full width at any size, so the slot is stated as the viewport.
+  const art = useSizedImageSources(src);
   const caption = typeof image?.caption === 'string' ? image.caption.trim() : '';
   return (
     <div
@@ -44,7 +47,7 @@ export default function EventHero({
       </div>
       {src ? <figure className="event-hero__figure">
         <div className="event-hero__media">
-          <img className="event-hero__art" src={src} alt={alt} style={{ objectPosition: focalPosition(image) }} fetchpriority="high" />
+          <img className="event-hero__art" src={art.src} srcSet={art.srcSet} sizes={art.srcSet ? '100vw' : undefined} onError={art.onError} alt={alt} style={{ objectPosition: focalPosition(image) }} fetchpriority="high" />
       {src && image.demoTransitSign ? (
         <div className="event-hero__sign" aria-hidden="true">
           <WayfindingIcon name="transit" /><span>→</span>

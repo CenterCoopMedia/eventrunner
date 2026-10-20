@@ -20,8 +20,17 @@
 // still occupies the slot, because the layout around it — the sponsor
 // wall's mark box, for one — is what sizes that slot, so a silent miss
 // leaves an empty frame holding its place instead of collapsing the wall.
+//
+// DISPLAY SIZES (issue #333). A caller that knows how wide its slot is
+// passes `sizes`, and the image then offers the WebP sizes the function
+// writes beside an upload. The original stays the src. If a size fails to
+// load (an upload from before the feature, one still being processed, or
+// one the function refused), the image drops the srcset and loads the
+// original, and only a failure of the original is a miss. With no `sizes`
+// the image is the original alone: an editor's preview shows an upload
+// seconds old, before its sizes exist.
 import { useEffect, useState } from 'react';
-import { assetUrl } from '../../lib/mediaSource.js';
+import { assetSrcSet, assetUrl } from '../../lib/mediaSource.js';
 
 /**
  * THIS COMPONENT RESERVES NO SPACE OF ITS OWN. It renders an <img>, or one
@@ -37,11 +46,15 @@ import { assetUrl } from '../../lib/mediaSource.js';
  *   alt?: string,
  *   className?: string,
  *   decorative?: boolean,  // the image carries no information; a miss is silent
+ *   sizes?: string,        // the slot's width, for the display sizes
  * }} props
  */
-export default function AssetImage({ path, alt = '', className = '', decorative = false }) {
+export default function AssetImage({ path, alt = '', className = '', decorative = false, sizes }) {
   const url = assetUrl(path);
+  const srcSet = sizes ? assetSrcSet(path) : null;
   const [failed, setFailed] = useState(false);
+  // Keyed by path, so a new path offers its sizes from its first render.
+  const [sizesFailedFor, setSizesFailedFor] = useState(null);
 
   // A new path is a new image: clear the previous failure so one missing
   // object does not poison the slot for everything chosen after it.
@@ -63,13 +76,16 @@ export default function AssetImage({ path, alt = '', className = '', decorative 
       </span>
     );
   }
+  const offerSizes = Boolean(srcSet) && sizesFailedFor !== path;
   return (
     <img
       src={url}
+      srcSet={offerSizes ? srcSet : undefined}
+      sizes={offerSizes ? sizes : undefined}
       alt={alt}
       loading="lazy"
       className={className}
-      onError={() => setFailed(true)}
+      onError={() => (offerSizes ? setSizesFailedFor(path) : setFailed(true))}
     />
   );
 }

@@ -6,10 +6,19 @@
 // the home page's strip around it: the same wall, the same published
 // organizations, and the three ways it must render nothing at all rather
 // than a heading over an empty acknowledgement.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { render as testingRender, screen, within } from '@testing-library/react';
 
 import { MemoryRouter } from 'react-router';
+
+// jsdom applies no CSS, so the mark's fill is asserted on the stylesheet.
+const indexCss = fs.readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'index.css'),
+  'utf8',
+);
 
 const render = (ui) => testingRender(<MemoryRouter>{ui}</MemoryRouter>);
 
@@ -136,6 +145,35 @@ describe('SponsorWall', () => {
     // The name is a prefix match because the link's own name now carries
     // the new-tab sentence after it (components/ExternalLink.jsx).
     expect(screen.getByRole('link', { name: /^First Supporter\b/ })).toBeInTheDocument();
+  });
+
+  // Issue #333: a mark offers the display sizes at its tier's width, so a
+  // wall of logos does not download every original upload.
+  it('offers each mark the display sizes at its tier width', () => {
+    organizationsData = undefined;
+    const { container } = render(
+      <SponsorWall
+        organizations={[
+          org('one', 'First Supporter', 'Presenting', { logoPath: 'cms-images/a1b2c3/one.png' }),
+          org('two', 'Second Supporter', 'Partner', { logoPath: 'cms-images/d4e5f6/two.png' }),
+        ]}
+      />,
+    );
+    const [first, second] = [...container.querySelectorAll('.logo-wall__mark img')];
+    expect(first.getAttribute('srcset')).toContain(encodeURIComponent('cms-images/a1b2c3/_sizes/320.webp'));
+    expect(first).toHaveAttribute('sizes', '15rem');
+    expect(second).toHaveAttribute('sizes', '12rem');
+  });
+
+  it('fits each mark inside its box, whatever size file it loads', () => {
+    // A display size can be smaller than the srcset width it is listed at,
+    // when the upload itself was smaller. Sizing the mark by its box, not
+    // by the file, draws every logo the same way either way. A max- bound
+    // alone is not enough, so the plain properties are what is asserted.
+    expect(indexCss).not.toMatch(/\.logo-wall__mark > img \{[^}]*max-inline-size/);
+    expect(indexCss).toMatch(
+      /\.logo-wall__mark > img \{[^}]*\s\sinline-size: 100%;[^}]*\s\sblock-size: 100%;[^}]*object-fit: contain;/,
+    );
   });
 
   // The wall is the one place a reader meets a run of outbound links one

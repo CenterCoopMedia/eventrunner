@@ -38,7 +38,8 @@
 // to the rules. `allow get: if true` on the public namespaces is what makes
 // it work for anonymous visitors, `session-materials/` stays closed, and a
 // thumbnail costs no metadata round trip.
-import { storageObjectPath } from 'shared/venue';
+import { imageSizePaths } from 'shared/imageSizes';
+import { isMediaLibraryPath, storageObjectPath } from 'shared/venue';
 import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
 import { bundledDemoAssetUrl } from './bundledAssets.js';
@@ -200,6 +201,59 @@ export function assetUrl(path) {
   return `${storageDownloadOrigin}/v0/b/${encodeURIComponent(
     storageBucketName,
   )}/o/${encodeURIComponent(object)}?alt=media`;
+}
+
+/**
+ * The `srcset` for an upload's display sizes (issue #333), or null.
+ *
+ * functions/src/media/imageSizes.cjs writes a few fixed widths as WebP
+ * beside each library upload and speaker headshot. The rule for which
+ * uploads get them, and where, is shared (shared/imageSizes), so this
+ * builds the list without a lookup. The original stays the `src`: a page
+ * that fails to load a size drops the srcset and shows the original, which
+ * covers an upload from before this feature, one still being processed,
+ * and one the function refused.
+ *
+ * A size may be narrower than its listed width, when the upload itself was
+ * narrower: the function never enlarges. So only a slot whose box the CSS
+ * sizes (object-fit) should take a srcset, never one sized by its file.
+ *
+ * @param {unknown} path
+ * @returns {string|null}
+ */
+export function assetSrcSet(path) {
+  const object = storagePath(path);
+  const paths = object ? imageSizePaths(object) : null;
+  if (!paths) return null;
+  const candidates = [];
+  for (const size of paths.sizes) {
+    const url = assetUrl(size.path);
+    if (!url) return null;
+    candidates.push(`${url} ${size.width}w`);
+  }
+  return candidates.join(', ');
+}
+
+/**
+ * The `src` and `srcset` for an image block's `url` (lead and hero images).
+ *
+ * The media library picker stores an object PATH there
+ * (admin/components/media/ImagePicker.jsx). As a bare relative `src` that
+ * path named a page on the site, not the object. A path in a library
+ * folder with an asset segment now resolves to the bucket, with its sizes
+ * where the function writes them. A link to another site, a site path such
+ * as `/hero/x.webp`, and a flat seeded `branding/` file keep their value.
+ *
+ * @param {unknown} url a block's url, already through isSafeHref
+ * @returns {{ src: unknown, srcSet: string|null }}
+ */
+export function imageBlockSources(url) {
+  const object = storagePath(url);
+  if (object && isMediaLibraryPath(object) && object.split('/').length > 2) {
+    const src = assetUrl(object);
+    if (src) return { src, srcSet: assetSrcSet(object) };
+  }
+  return { src: url, srcSet: null };
 }
 
 /**

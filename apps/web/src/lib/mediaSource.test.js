@@ -22,10 +22,12 @@ vi.mock('../firebase.js', () => ({
 const {
   PROFILE_PHOTO_MAX_BYTES,
   PROFILE_PHOTO_TYPES,
+  assetSrcSet,
   assetUrl,
   brandingSrc,
   checkFile,
   formatBytes,
+  imageBlockSources,
   storagePath,
 } = await import('./mediaSource.js');
 
@@ -63,6 +65,68 @@ describe('assetUrl', () => {
       'javascript:alert(1)',
     ]) {
       expect(assetUrl(value)).toBeNull();
+    }
+  });
+});
+
+// Issue #333: the function writes display sizes beside an upload, and the
+// page offers them through srcset. The original stays the src.
+describe('assetSrcSet', () => {
+  const sizeUrl = (path) =>
+    `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(BUCKET)}/o/${encodeURIComponent(path)}?alt=media`;
+
+  it('lists the WebP sizes beside an uploaded headshot, widest last', () => {
+    expect(assetSrcSet('speaker-photos/spk-1/a1b2c3/face.jpg')).toBe(
+      [320, 640, 1280, 1920]
+        .map((width) => `${sizeUrl(`speaker-photos/spk-1/a1b2c3/_sizes/${width}.webp`)} ${width}w`)
+        .join(', '),
+    );
+  });
+
+  it('lists sizes for library uploads too', () => {
+    expect(assetSrcSet('cms-images/a1b2c3/hero.png')).toContain(
+      encodeURIComponent('cms-images/a1b2c3/_sizes/640.webp'),
+    );
+    expect(assetSrcSet('branding/a1b2c3/logo.webp')).toContain(' 1920w');
+  });
+
+  it('offers no sizes where the function writes none', () => {
+    for (const path of [
+      null,
+      'branding/logo.svg',
+      'branding/logo.png',
+      'cms-images/a1b2c3/logo.svg',
+      'cms-images/a1b2c3/loop.gif',
+      'profile-photos/uid-1/photo.jpg',
+      'speaker-photos/spk-1/photo.jpg',
+      'demo/speakers/marisol-reyes.webp',
+      'default-avatars/avatar-01.svg',
+      'https://example.org/x.jpg',
+    ]) {
+      expect(assetSrcSet(path)).toBeNull();
+    }
+  });
+});
+
+describe('imageBlockSources', () => {
+  it('resolves a picked library path to the bucket, with sizes', () => {
+    // The image block stores the object path the picker chose. As a bare
+    // relative src it named a page on the site, not the object.
+    const { src, srcSet } = imageBlockSources('cms-images/a1b2c3/hero.jpg');
+    expect(src).toBe(assetUrl('cms-images/a1b2c3/hero.jpg'));
+    expect(srcSet).toBe(assetSrcSet('cms-images/a1b2c3/hero.jpg'));
+  });
+
+  it('resolves a library GIF to the bucket, without sizes', () => {
+    expect(imageBlockSources('cms-images/a1b2c3/loop.gif')).toEqual({
+      src: assetUrl('cms-images/a1b2c3/loop.gif'),
+      srcSet: null,
+    });
+  });
+
+  it('leaves a link, a site path, and a seeded flat path as they were', () => {
+    for (const url of ['https://example.org/hall.jpg', '/hero/newsroom.webp', 'branding/logo.svg']) {
+      expect(imageBlockSources(url)).toEqual({ src: url, srcSet: null });
     }
   });
 });

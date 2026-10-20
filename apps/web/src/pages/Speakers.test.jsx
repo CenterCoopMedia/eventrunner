@@ -136,6 +136,30 @@ describe('Speakers', () => {
     expect(indexCss).not.toMatch(/\.portrait-shelf__frame \{[^}]*border-radius: 50%/);
   });
 
+  // Issue #333: a portrait offers the display sizes at the width its
+  // plate takes, so a phone does not download the full upload.
+  it('offers display sizes at the reading list width', () => {
+    speakers = [{ ...PROJECTED, headshotPath: 'speaker-photos/rae-okonkwo/a1b2c3/face.jpg' }];
+    const { container } = renderSpeakers();
+    const img = container.querySelector('.portrait-shelf__frame img');
+    expect(img).toHaveAttribute('sizes', '(min-width: 40rem) 14rem, 100vw');
+    expect(img.getAttribute('srcset')).toContain(
+      encodeURIComponent('speaker-photos/rae-okonkwo/a1b2c3/_sizes/320.webp'),
+    );
+    expect(img.getAttribute('src')).toContain(encodeURIComponent('speaker-photos/rae-okonkwo/a1b2c3/face.jpg'));
+  });
+
+  it('offers display sizes at the shelf column width', () => {
+    speakers = [{ ...PROJECTED, headshotPath: 'speaker-photos/rae-okonkwo/a1b2c3/face.jpg' }];
+    pageDoc = { id: 'speakers', layout: { arrangement: 'grid' } };
+    const { container } = renderSpeakers();
+    pageDoc = null;
+    expect(container.querySelector('.portrait-shelf__frame img')).toHaveAttribute(
+      'sizes',
+      '(min-width: 80rem) 25vw, (min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw',
+    );
+  });
+
   it('runs one entry per row by default', () => {
     speakers = [PROJECTED];
     const { container } = renderSpeakers();

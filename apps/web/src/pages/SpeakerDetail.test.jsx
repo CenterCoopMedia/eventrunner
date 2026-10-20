@@ -168,4 +168,17 @@ describe('SpeakerDetail', () => {
     const links = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.startsWith('/schedule/'));
     expect(links.map((el) => el.textContent)).toEqual(['Day 1 early', 'Day 1 late', 'Day 2 early']);
   });
+
+  // Issue #333: the headshot beside the name is 3.5rem square, so the
+  // smallest display size is enough.
+  it('offers the display sizes at the headshot width', () => {
+    speakers = [{ ...PROJECTED, headshotPath: 'speaker-photos/rae-okonkwo/a1b2c3/face.jpg' }];
+    scheduleData = [];
+    const { container } = renderAt('/speakers/rae-okonkwo');
+    const img = container.querySelector('header img');
+    expect(img).toHaveAttribute('sizes', '3.5rem');
+    expect(img.getAttribute('srcset')).toContain(
+      encodeURIComponent('speaker-photos/rae-okonkwo/a1b2c3/_sizes/320.webp'),
+    );
+  });
 });

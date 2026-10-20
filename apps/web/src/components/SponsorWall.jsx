@@ -56,6 +56,15 @@ const MARK_SIZES = Object.freeze([
   'calc(var(--space-3xl) * 1.5)',
 ]);
 
+/**
+ * The same three widths as `sizes` hints for the display sizes (issue
+ * #333). The attribute takes no custom properties, so these read the
+ * spacing scale's default (`--space-3xl` is 6rem). A style that retunes the
+ * scale moves the box, not the choice of file much: the hint only picks a
+ * width from the srcset, and the mark is always drawn to its box.
+ */
+const MARK_SIZE_HINTS = Object.freeze(['15rem', '12rem', '9rem']);
+
 /** A tier's label, or the one heading an untiered group gets. */
 function tierLabel(tier) {
   return typeof tier === 'string' && tier.trim() ? tier.trim() : 'Supporters';
@@ -193,7 +202,7 @@ export default function SponsorWall({
             {org.logoPath || !IS_DEMO ? (
               <div className="logo-wall__mark">
                 {org.logoPath ? (
-                  <AssetImage path={org.logoPath} alt="" className={IS_DEMO && org.logoPath === 'branding/nclocal-logo.png' ? 'demo-brand-artwork' : ''} decorative />
+                  <AssetImage path={org.logoPath} alt="" className={IS_DEMO && org.logoPath === 'branding/nclocal-logo.png' ? 'demo-brand-artwork' : ''} decorative sizes={MARK_SIZE_HINTS[Math.min(rank, MARK_SIZE_HINTS.length - 1)]} />
                 ) : null}
               </div>
             ) : null}
