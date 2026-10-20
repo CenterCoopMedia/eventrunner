@@ -4,7 +4,7 @@
  * The outbound email log (issue #183): two staff-tier POST endpoints over
  * `sent_emails`, the audit row email/send.cjs writes for every send() call.
  *
- *   listSentEmails { q?, source?, status?, limit?, cursor? } → { rows, nextCursor, scanned }
+ *   listSentEmails { q?, source?, status?, sendId?, limit?, cursor? } → { rows, nextCursor, scanned }
  *   getSentEmail   { id }                                    → { row }
  *
  * `sent_emails` is server-only (firestore.rules: allow read, write: if
@@ -33,7 +33,10 @@
  * memory only: it never reaches a query, a log line, or an error message.
  *
  * `source` and `status` are equality filters, so each shape has its
- * composite index in firestore.indexes.json (log.test.cjs pins them). The
+ * composite index in firestore.indexes.json (log.test.cjs pins them).
+ * `sendId` (issue #497) is one more: the exact id of one announcement send,
+ * which email/send.cjs stores on each recipient's row. Rows written before
+ * it, and every other sender's rows, have none and never match it. The
  * cursor is `{ sentAt, id }` with `__name__` as the tiebreaker, the same
  * shape listSystemErrors pages with: two sends in one millisecond on a page
  * boundary are neither skipped nor repeated.
@@ -51,6 +54,8 @@ const SCAN_CAP = 500;
 const MAX_QUERY_LENGTH = 200;
 const MAX_ID_LENGTH = 128;
 const SOURCE_RE = /^[a-z0-9-]{1,64}$/;
+/** The announcement send id shape (announcements/sends.cjs). */
+const SEND_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const STATUSES = Object.freeze(['sent', 'failed']);
 /**
  * The first and the last millisecond a Firestore Timestamp can hold
@@ -76,6 +81,7 @@ const LIST_FIELDS = Object.freeze([
   'retries',
   'bodyStored',
   'bodyTruncated',
+  'sendId',
 ]);
 
 function isPlainObject(v) {
@@ -138,6 +144,7 @@ function toRow(doc) {
     retries: Number.isInteger(data.retries) ? data.retries : null,
     bodyStored: data.bodyStored !== false,
     bodyTruncated: data.bodyTruncated === true,
+    sendId: str(data.sendId),
   };
 }
 
@@ -158,11 +165,11 @@ function toDetail(doc) {
  * the value it was given: a search value is personal data.
  *
  * @returns {{ ok: true, q: string|null, source: string|null, status: string|null,
- *             limit: number, cursor: { sentAt: number, id: string }|null } |
+ *             sendId: string|null, limit: number, cursor: { sentAt: number, id: string }|null } |
  *           { ok: false, message: string }}
  */
 function parseListRequest(body) {
-  const { q, source, status, limit, cursor } = isPlainObject(body) ? body : {};
+  const { q, source, status, sendId, limit, cursor } = isPlainObject(body) ? body : {};
   const absent = (v) => v === undefined || v === null;
 
   let query = null;
@@ -178,6 +185,9 @@ function parseListRequest(body) {
   if (!absent(status) && !STATUSES.includes(status)) {
     return { ok: false, message: 'status must be sent or failed.' };
   }
+  if (!absent(sendId) && !(typeof sendId === 'string' && SEND_ID_RE.test(sendId))) {
+    return { ok: false, message: 'sendId must be an announcement send id: 8 to 64 letters, digits, hyphens or underscores.' };
+  }
   if (!absent(limit) && !(Number.isInteger(limit) && limit >= 1 && limit <= MAX_LIMIT)) {
     return { ok: false, message: `limit must be a whole number from 1 to ${MAX_LIMIT}.` };
   }
@@ -189,6 +199,7 @@ function parseListRequest(body) {
     q: query,
     source: absent(source) ? null : source,
     status: absent(status) ? null : status,
+    sendId: absent(sendId) ? null : sendId,
     limit: absent(limit) ? DEFAULT_LIMIT : limit,
     cursor: absent(cursor) ? null : { sentAt: cursor.sentAt, id: cursor.id },
   };
@@ -212,7 +223,7 @@ function createListSentEmailsHandler({ db, auth, getConfig, log = console }) {
 
     const request = parseListRequest(req.body);
     if (!request.ok) return badRequest(res, request.message);
-    const { q, source, status, limit, cursor } = request;
+    const { q, source, status, sendId, limit, cursor } = request;
 
     // Without q, one extra row decides nextCursor without a second query.
     // With q, one query of SCAN_CAP rows is the whole budget.
@@ -224,6 +235,7 @@ function createListSentEmailsHandler({ db, auth, getConfig, log = console }) {
       // Each filter shape has its composite index (firestore.indexes.json);
       // the __name__ tiebreaker rides on every index automatically.
       let query = db.collection(COLLECTION);
+      if (sendId) query = query.where('sendId', '==', sendId);
       if (source) query = query.where('source', '==', source);
       if (status) query = query.where('status', '==', status);
       query = query.orderBy('sentAt', 'desc').orderBy('__name__', 'desc');

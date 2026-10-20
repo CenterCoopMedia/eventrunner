@@ -305,6 +305,40 @@ test('the historical demo refuses the batch with no claim, request, or audit row
   assert.equal(db.state.sentRows.length, 0);
 });
 
+// --- Send identity and audit gaps (issue #497) ------------------------------
+
+test('a message sendId reaches its audit row, and a message without one writes no sendId', async () => {
+  const { db, fetchImpl, core } = setup([fakeResponse({ jsonBody: [accepted('m-1'), accepted('m-2')] })]);
+  await core.sendBatch([message(1, { sendId: 'send-abc-123' }), message(2)]);
+  assert.equal(db.state.sentRows[0].sendId, 'send-abc-123');
+  assert.equal('sendId' in db.state.sentRows[1], false);
+  // The provider never sees it.
+  assert.equal(JSON.stringify(fetchImpl.calls[0].body).includes('send-abc-123'), false);
+});
+
+test('a failed audit write is reported on that result, and an accepted message stays sent', async () => {
+  const db = fakeDb();
+  const base = db.collection.bind(db);
+  let writes = 0;
+  db.collection = (name) => {
+    if (name !== 'sent_emails') return base(name);
+    return {
+      async add(row) {
+        writes += 1;
+        if (writes === 1) throw new Error('UNAVAILABLE: audit store down');
+        db.state.sentRows.push(row);
+        return { id: `row-${writes}` };
+      },
+    };
+  };
+  const { core, fetchImpl } = setup([fakeResponse({ jsonBody: [accepted('m-1'), accepted('m-2')] })], { db });
+  const results = await core.sendBatch([message(1), message(2)]);
+  assert.deepEqual(results.map((r) => r.status), ['sent', 'sent']);
+  assert.deepEqual(results.map((r) => r.auditFailed === true), [true, false]);
+  assert.equal(fetchImpl.calls.length, 1, 'no resend after the audit failure');
+  assert.equal(db.state.sentRows.length, 1);
+});
+
 test('single send still uses its prior stream: an OTP keeps the transactional default', async () => {
   const { core, fetchImpl } = setup([fakeResponse({ jsonBody: { MessageID: 'otp-1', ErrorCode: 0 } })]);
   await core.send({ to: 'a@example.org', subject: 'Your code', text: '123456', tag: 'auth.otp', source: 'auth-otp' });

@@ -253,3 +253,56 @@ test('sent-email retention drains in batches, stops at its bound, and is idempot
   );
   assert.equal(db.writes.length, writesAfterDrain);
 });
+
+// --- announcement send retention (issue #497) --------------------------------
+
+test('announcement send retention keeps only the unsubscribe key of a record past 90 days', async () => {
+  const { sweepExpiredAnnouncementSends } = require('./cleanup.cjs');
+  const cutoff = NOW - internals.ANNOUNCEMENT_SEND_RETENTION_MS;
+  const full = (createdAt) => ({
+    status: 'sent',
+    createdAt: new Date(createdAt),
+    subject: 'Doors open at nine',
+    message: 'Bring your badge.',
+    html: '<p>Bring your badge.</p>',
+    text: 'Bring your badge.',
+    recipients: [{ uid: 'a', email: 'ada@example.test' }],
+    failures: [{ email: 'gone@example.test', error: '406' }],
+    retryRecipients: ['busy@example.test'],
+    createdBy: { uid: 'u-staff', email: 'staff@example.test' },
+    unsubscribeKey: 'ab'.repeat(32),
+  });
+  const db = makeFakeDb({
+    'announcement_sends/older': full(cutoff - 1),
+    'announcement_sends/cutoff': full(cutoff),
+    'announcement_sends/recent': full(cutoff + 1),
+  });
+
+  assert.deepEqual(await sweepExpiredAnnouncementSends({ db, now }), { expired: 1 });
+  // The same 90 days as sent_emails, with the same strict boundary.
+  assert.equal(internals.ANNOUNCEMENT_SEND_RETENTION_MS, SENT_EMAIL_RETENTION_MS);
+  const older = db.read('announcement_sends', 'older');
+  // Old unsubscribe links keep working: the key stays, and nothing else.
+  assert.deepEqual(Object.keys(older).sort(), ['contentRemovedAt', 'status', 'unsubscribeKey']);
+  assert.equal(older.status, 'expired');
+  assert.equal(older.unsubscribeKey, 'ab'.repeat(32));
+  assert.equal(JSON.stringify(older).includes('@example.test'), false);
+  assert.equal(db.read('announcement_sends', 'cutoff').subject, 'Doors open at nine');
+  assert.equal(db.read('announcement_sends', 'recent').subject, 'Doors open at nine');
+
+  // An expired record has no createdAt, so a second sweep finds nothing.
+  const writes = db.writes.length;
+  assert.deepEqual(await sweepExpiredAnnouncementSends({ db, now }), { expired: 0 });
+  assert.equal(db.writes.length, writes);
+});
+
+test('announcement send retention drains in bounded batches', async () => {
+  const { sweepExpiredAnnouncementSends } = require('./cleanup.cjs');
+  const old = new Date(NOW - internals.ANNOUNCEMENT_SEND_RETENTION_MS - 1);
+  const db = makeFakeDb(Object.fromEntries(
+    Array.from({ length: 5 }, (_, index) => [`announcement_sends/old-${index}`, { createdAt: old, status: 'sent' }]),
+  ));
+  assert.deepEqual(await sweepExpiredAnnouncementSends({ db, now, batchLimit: 2, maxBatches: 2 }), { expired: 4 });
+  assert.deepEqual(await sweepExpiredAnnouncementSends({ db, now, batchLimit: 2, maxBatches: 2 }), { expired: 1 });
+  assert.deepEqual(await sweepExpiredAnnouncementSends({ db, now, batchLimit: 2, maxBatches: 2 }), { expired: 0 });
+});

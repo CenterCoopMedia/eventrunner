@@ -1,14 +1,15 @@
 'use strict';
 
 /**
- * Announcement email endpoints (issues #202, #203). All four are staff tier,
+ * Announcement email endpoints (issues #202, #203, #497). All five are staff tier,
  * the same tier as the website banner on the Announcements page: event
  * staff write to attendees, and an operator is not needed for routine
  * notices. The safety is in the flow, not the tier: a server-side audience,
  * a preview, a receipt the send must match, an explicit confirmation of
  * the count, send-once keys, and an admin_logs row for every send.
  *
- *   listAnnouncementSends     {}                          → history, audiences, channel state
+ *   listAnnouncementSends     { limit?, cursor? }         → one page of history, audiences, channel state
+ *   getAnnouncementSend       { id }                      → one send's frozen content and failures
  *   previewAnnouncementEmail  { draft, audience }         → rendered email, count, sendId, receipt
  *   sendAnnouncementTest      { draft }                   → one copy to the caller's own address
  *   sendAnnouncementEmail     { sendId, receipt, draft, audience } to start,
@@ -46,11 +47,24 @@
  * record the schedule made (`reminder` set) shows in the history, but
  * only the schedule moves it on: a staff "Continue sending" would skip the
  * schedule's quiet hours, its window and its approval, so it is refused.
+ *
+ * HISTORY AND DETAIL (issue #497). The list is a summary: the subject, the
+ * audience, the counts and the actor, never a recipient address or the
+ * message. It pages newest first by `createdAt`, with the document id as
+ * the tiebreaker, so two sends in one millisecond on a page boundary are
+ * neither skipped nor repeated. getAnnouncementSend returns one record's
+ * frozen composition (the draft and the rendered bodies, with the inert
+ * test link in place of each recipient's own) and its failed addresses,
+ * and writes one admin_logs row naming the actor and the record path only,
+ * as getSentEmail does. The composition is what the send started from, not
+ * proof of the bytes a provider delivered; each recipient's copy is in the
+ * email log, filtered by the send id. A record past its 90 days keeps only
+ * its unsubscribe key (maintenance/cleanup.cjs) and is in neither.
  */
 
 const crypto = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
-const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
+const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { AUDIENCES, AudienceError, isAudience, listAudiences, resolveAudience } = require('./audience.cjs');
@@ -64,6 +78,7 @@ const {
   senderOf,
   unsubscribeNote,
   validateDraft,
+  internals: composeInternals,
 } = require('./compose.cjs');
 const {
   SENDS,
@@ -80,11 +95,18 @@ const {
 } = require('./sendRunner.cjs');
 
 const HISTORY_LIMIT = 20;
+const MAX_HISTORY_LIMIT = 50;
+/** The first and the last millisecond a Firestore Timestamp can hold. */
+const MIN_TIME = -62_135_596_800_000;
+const MAX_TIME = 253_402_300_799_999;
 const SEND_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const RECEIPT_RE = /^[0-9a-f]{64}$/;
 const TEST_SOURCE = 'announcement-test';
 
-/** The history row a browser may see: never the recipient list, the bodies, or the key. */
+/**
+ * The history row a browser may see: never a recipient address, the
+ * message, the bodies, or the key. The detail endpoint has the rest.
+ */
 function summarize(id, data, nowMs) {
   const counts = { ...EMPTY_COUNTS, ...(data.counts || {}) };
   const leaseUntil = toMillis(data.lease?.until);
@@ -94,13 +116,12 @@ function summarize(id, data, nowMs) {
     audience: data.audience,
     audienceLabel: AUDIENCES[data.audience]?.label || data.audience,
     subject: data.subject,
-    message: data.message,
-    link: data.link || null,
     mode: data.mode,
     total: data.total,
     processed: data.nextIndex || 0,
     counts,
-    failures: Array.isArray(data.failures) ? data.failures : [],
+    // Recipient rows the email log could not record (issue #497).
+    auditGaps: Number.isInteger(data.auditGaps) ? data.auditGaps : 0,
     createdAt: toMillis(data.createdAt),
     createdBy: data.createdBy?.email || null,
     scheduled: Boolean(data.reminder),
@@ -161,6 +182,27 @@ function gateDeps(deps) {
  *   now?: () => number, newId?: () => string, log?: Pick<Console, 'error'|'warn'> }} Deps
  */
 
+/**
+ * A history page request: `limit` 1 to 50 (20 by default) and the
+ * `{ createdAt, id }` cursor a previous page returned.
+ */
+function parseHistoryRequest(body) {
+  const { limit, cursor } = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  const errors = [];
+  if (limit !== undefined && limit !== null && !(Number.isInteger(limit) && limit >= 1 && limit <= MAX_HISTORY_LIMIT)) {
+    errors.push(`limit: must be a whole number from 1 to ${MAX_HISTORY_LIMIT}`);
+  }
+  const goodCursor = cursor && typeof cursor === 'object' && !Array.isArray(cursor)
+    && Number.isInteger(cursor.createdAt) && cursor.createdAt >= MIN_TIME && cursor.createdAt <= MAX_TIME
+    && typeof cursor.id === 'string' && SEND_ID_RE.test(cursor.id);
+  if (cursor !== undefined && cursor !== null && !goodCursor) errors.push('cursor: must come from a previous page');
+  return {
+    errors,
+    limit: Number.isInteger(limit) ? limit : HISTORY_LIMIT,
+    cursor: goodCursor ? { createdAt: cursor.createdAt, id: cursor.id } : null,
+  };
+}
+
 /** @param {Deps} deps */
 function createListAnnouncementSendsHandler(deps) {
   const { db, getConfig, provider, now = Date.now, log = console } = deps;
@@ -168,14 +210,24 @@ function createListAnnouncementSendsHandler(deps) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const gate = await requireAdmin(gateDeps(deps), req, { tier: 'staff' });
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    const request = parseHistoryRequest(req.body);
+    if (request.errors.length > 0) return badRequest(res, `Invalid history request: ${request.errors.join('; ')}`);
     try {
-      const snap = await db.collection(SENDS).orderBy('createdAt', 'desc').limit(HISTORY_LIMIT).get();
+      // One extra record says whether an older page exists. The document id
+      // breaks ties; the createdAt index serves it with no composite index.
+      let query = db.collection(SENDS).orderBy('createdAt', 'desc').orderBy('__name__', 'desc');
+      if (request.cursor) query = query.startAfter(new Date(request.cursor.createdAt), request.cursor.id);
+      const snap = await query.limit(request.limit + 1).get();
+      const docs = snap.docs.slice(0, request.limit);
+      const last = docs[docs.length - 1];
+      const lastAt = last ? toMillis(last.data()?.createdAt) : null;
       const config = await getConfig();
       const channel = await resolveChannel({ provider, config });
       const policy = await checkDemoWrites({ db });
       const nowMs = now();
       return res.status(200).json({
-        sends: snap.docs.map((doc) => summarize(doc.id, doc.data() || {}, nowMs)),
+        sends: docs.map((doc) => summarize(doc.id, doc.data() || {}, nowMs)),
+        nextCursor: snap.docs.length > request.limit && lastAt !== null ? { createdAt: lastAt, id: last.id } : null,
         audiences: listAudiences(),
         channel: policy.ok
           ? { canSend: channel.ok, blocker: channel.ok ? null : channel.message, mode: channel.ok ? channel.mode : null }
@@ -185,6 +237,69 @@ function createListAnnouncementSendsHandler(deps) {
       log.error('listAnnouncementSends failed', err);
       return internal(res, 'The send history is temporarily unavailable.');
     }
+  };
+}
+
+/** A record's draft in the composer's field names, for "Use this message". */
+function draftOf(data) {
+  return {
+    subject: typeof data.subject === 'string' ? data.subject : '',
+    message: typeof data.message === 'string' ? data.message : '',
+    linkUrl: typeof data.link?.url === 'string' ? data.link.url : '',
+    linkLabel: typeof data.link?.label === 'string' ? data.link.label : '',
+  };
+}
+
+/** @param {Deps} deps */
+function createGetAnnouncementSendHandler(deps) {
+  const { db, getConfig, now = Date.now, log = console } = deps;
+  return async function getAnnouncementSend(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const gate = await requireAdmin(gateDeps(deps), req, { tier: 'staff' });
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    const id = req.body?.id;
+    if (typeof id !== 'string' || !SEND_ID_RE.test(id)) {
+      return badRequest(res, 'Invalid request: id: must name a send from the history');
+    }
+    let data;
+    let config;
+    try {
+      const snap = await db.collection(SENDS).doc(id).get();
+      // A record past its retention keeps no start time and no content.
+      data = snap.exists && toMillis(snap.data()?.createdAt) !== null ? snap.data() : null;
+      if (data) config = await getConfig();
+    } catch (err) {
+      log.error('getAnnouncementSend read failed', err);
+      return internal(res, 'The send history is temporarily unavailable.');
+    }
+    if (!data) return notFound(res, 'This send is not in the history. The history keeps a send for 90 days.');
+
+    // The row names who read which send, and nothing about the send.
+    await logAdminAction({
+      db,
+      action: 'view-announcement-send',
+      docPath: `${SENDS}/${id}`,
+      actor: { uid: gate.uid, email: gate.email },
+      now,
+      log,
+    });
+    const bodies = previewBodies({
+      rendered: { html: typeof data.html === 'string' ? data.html : '', text: typeof data.text === 'string' ? data.text : '' },
+      config,
+    });
+    return res.status(200).json({
+      send: {
+        ...summarize(id, data, now()),
+        draft: draftOf(data),
+        renderedSubject: typeof data.renderedSubject === 'string' ? data.renderedSubject : data.subject,
+        html: bodies.html,
+        text: bodies.text,
+        unsubscribeNote: data.mode ? unsubscribeNote(data.mode) : null,
+        failures: (Array.isArray(data.failures) ? data.failures : [])
+          .map((failure) => ({ email: String(failure?.email ?? ''), error: String(failure?.error ?? '') })),
+        failuresKept: MAX_FAILURES_KEPT,
+      },
+    });
   };
 }
 
@@ -447,6 +562,7 @@ function buildHandlers() {
 
   return {
     listAnnouncementSends: expose(createListAnnouncementSendsHandler),
+    getAnnouncementSend: expose(createGetAnnouncementSendHandler),
     previewAnnouncementEmail: expose(createPreviewAnnouncementEmailHandler),
     sendAnnouncementTest: expose(createSendAnnouncementTestHandler),
     // One chunk per call; the lease outlasts this timeout.
@@ -456,9 +572,22 @@ function buildHandlers() {
 
 module.exports = {
   createListAnnouncementSendsHandler,
+  createGetAnnouncementSendHandler,
   createPreviewAnnouncementEmailHandler,
   createSendAnnouncementTestHandler,
   createSendAnnouncementEmailHandler,
   get handlers() { return buildHandlers(); },
-  internals: { SENDS, CHUNK_SIZE, LEASE_MS, MAX_FAILURES_KEPT, summarize, tally, isTransientFailure },
+  internals: {
+    SENDS,
+    CHUNK_SIZE,
+    LEASE_MS,
+    MAX_FAILURES_KEPT,
+    HISTORY_LIMIT,
+    MAX_HISTORY_LIMIT,
+    UNSUBSCRIBE_SLOT: composeInternals.UNSUBSCRIBE_SLOT,
+    summarize,
+    tally,
+    isTransientFailure,
+    parseHistoryRequest,
+  },
 };

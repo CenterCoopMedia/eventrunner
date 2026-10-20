@@ -70,6 +70,8 @@
     "saveAnnouncement",
     "deleteAnnouncement",
     "listAnnouncementSends",
+    "getAnnouncementSend",
+    "announcementMessages",
     "previewAnnouncementEmail",
     "sendAnnouncementTest",
     "sendAnnouncementEmail",

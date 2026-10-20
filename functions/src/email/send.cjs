@@ -150,13 +150,17 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
   /**
    * @param {object} message EmailMessage (spec §3.1): { to, from?, replyTo?,
    *   subject, text?, html?, headers?, tag?, onceKey?, idempotencyKey?,
-   *   source?, storeRendered?, auditRedact? }. `auditRedact` is a list of
+   *   source?, storeRendered?, auditRedact?, sendId? }. `auditRedact` is a list of
    *   { find, replace } pairs applied to the bodies the audit row stores,
    *   never to the mail sent: a per-recipient secret such as a signed
-   *   unsubscribe link stays out of the admin-readable log.
+   *   unsubscribe link stays out of the admin-readable log. `sendId` names
+   *   the announcement send a message belongs to; only the audit row keeps it.
    * @returns {Promise<object>} EmailSendResult
    */
-  /** One sent_emails row per permitted send() call, whatever the outcome. */
+  /**
+   * One sent_emails row per permitted send() call, whatever the outcome.
+   * @returns {Promise<boolean>} whether the row was written
+   */
   async function writeAuditRow(message, fromEmail, toEmail, outcome) {
     const bodyStored = message.storeRendered !== false;
     const redact = (body) => (typeof body === 'string' && Array.isArray(message.auditRedact)
@@ -183,12 +187,15 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         text: text.value,
         bodyTruncated: html.truncated || text.truncated,
         source: message.source || null,
+        ...(typeof message.sendId === 'string' && message.sendId ? { sendId: message.sendId } : {}),
         sentAt: new Date(),
       });
+      return true;
     } catch (err) {
       // The audit row must not turn a delivered mail into a caller-visible
-      // failure; log and continue.
+      // failure; log and continue. sendBatch reports it as `auditFailed`.
       log.error('sent_emails audit write failed', err);
+      return false;
     }
   }
 
@@ -297,6 +304,9 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    * never sent again. A throw, or a response the adapter cannot match to an
    * entry, is uncertain: no retry, the claim stays, and the result carries
    * `uncertain: true`.
+   *
+   * A result whose audit row could not be written carries
+   * `auditFailed: true`. Its status is still the provider's answer.
    *
    * @param {object[]} messages EmailMessage[], one recipient each
    * @returns {Promise<object[]>} one EmailSendResult per entry, in input order
@@ -430,7 +440,11 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         ...(result.uncertain ? { uncertain: true } : {}),
       };
       const message = resolved[index];
-      await writeAuditRow(message, message.from?.email || null, recipientEmail(message), outcome);
+      // A lost audit row never changes the provider's answer; the caller
+      // reports the gap (issue #497).
+      if (!await writeAuditRow(message, message.from?.email || null, recipientEmail(message), outcome)) {
+        outcome.auditFailed = true;
+      }
       return [index, outcome];
     }));
     for (const [index, outcome] of outcomes) results[index] = outcome;

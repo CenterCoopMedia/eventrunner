@@ -7,6 +7,8 @@
  * THE DRAFT is plain text: a subject, a message, and an optional link with
  * a label. Staff never write HTML. The message becomes paragraphs in the
  * shared layout (email/templates/announcement.email.cjs), escaped.
+ * validateDraft is the one check for these fields: the composer's preview
+ * and send use it, and so does a saved message (messages.cjs, issue #496).
  *
  * THE CHANNEL (issue #490). Announcements go out on their own stream, never
  * the transactional one that carries sign-in codes and receipts:
@@ -43,6 +45,7 @@ const MAX_LINK_LABEL_LENGTH = 80;
 const DRAFT_KEYS = Object.freeze(['subject', 'message', 'linkUrl', 'linkLabel']);
 const BODY_SLOT = 'ANNOUNCEMENTBODYSLOT7f3a9c';
 const UNSUBSCRIBE_SLOT = 'ANNOUNCEMENTUNSUBSCRIBESLOT7f3a9c';
+const RESERVED_WORDS = Object.freeze([BODY_SLOT, UNSUBSCRIBE_SLOT]);
 const PARAGRAPH_STYLE = 'margin:0 0 16px 0;';
 
 /**
@@ -76,6 +79,12 @@ function validateDraft(input) {
       errors.push(`linkLabel: must be ${MAX_LINK_LABEL_LENGTH} characters or fewer`);
     }
     if (url && rawLabel) link = { url, label: rawLabel };
+  }
+  // The render puts the message and each recipient's link in place of these
+  // two words after the token engine runs. Typed braces stay as typed; a
+  // slot word in staff text would be replaced, so it is refused.
+  for (const [field, value] of [['subject', subject], ['message', message], ['linkLabel', rawLabel]]) {
+    if (RESERVED_WORDS.some((word) => value.includes(word))) errors.push(`${field}: must not contain a reserved word`);
   }
   return { ok: errors.length === 0, errors, value: { subject, message, link } };
 }

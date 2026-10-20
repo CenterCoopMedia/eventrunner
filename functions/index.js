@@ -21,6 +21,7 @@ const adminCustomBadges = require('./src/admin/customBadges.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
 const adminAnnouncements = require('./src/admin/announcements.cjs');
 const announcementSends = require('./src/announcements/sends.cjs');
+const announcementMessages = require('./src/announcements/messages.cjs');
 const announcementSuppression = require('./src/announcements/suppression.cjs');
 const adminFeedback = require('./src/admin/feedback.cjs');
 const adminChangeRequests = require('./src/admin/changeRequests.cjs');
@@ -90,6 +91,7 @@ module.exports = {
   ...adminLiveUpdates.handlers,
   ...adminAnnouncements.handlers,
   ...announcementSends.handlers,
+  ...announcementMessages.handlers,
   ...announcementSuppression.handlers,
   ...adminFeedback.handlers,
   ...adminChangeRequests.handlers,

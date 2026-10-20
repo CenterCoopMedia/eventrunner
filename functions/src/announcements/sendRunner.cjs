@@ -26,6 +26,12 @@
  *
  * The rules (bounded chunks, no queue, the lease, retries of transient
  * failures) are described in sends.cjs.
+ *
+ * RECORDING GAPS (issue #497). Each recipient's sent_emails row carries the
+ * send id. When the email core could not write a row (`auditFailed` on
+ * the result), the record counts it in `auditGaps`. The provider's answer
+ * still decides the counts, so an accepted message stays accepted and is
+ * never sent again; the history says the email log is missing rows.
  */
 
 const crypto = require('node:crypto');
@@ -98,6 +104,7 @@ async function startSendRecord({
     counts: { ...EMPTY_COUNTS, suppressed: 0 },
     failures: [],
     retryRecipients: [],
+    auditGaps: 0,
     retryOf,
     retriedBy: null,
     unsubscribeKey: newUnsubscribeKey(),
@@ -212,6 +219,7 @@ async function runChunk({ db, sendId, lease, getConfig, provider, emailCore, now
   const delta = { ...EMPTY_COUNTS };
   const failures = [];
   const retryable = [];
+  let auditGaps = 0;
   try {
     const config = await getConfig();
     // The stream is checked again before every chunk's claims (issue #490).
@@ -247,12 +255,14 @@ async function runChunk({ db, sendId, lease, getConfig, provider, emailCore, now
         source: SOURCE,
         messageStream: data.stream,
         onceKey: `announcement:${sendId}:${suppressionIdFor(recipient.email)}`,
+        sendId,
       };
     });
     const results = messages.length > 0 ? await emailCore.sendBatch(messages) : [];
     results.forEach((result, index) => {
       const bucket = tally(result);
       delta[bucket] += 1;
+      if (result.auditFailed) auditGaps += 1;
       if ((bucket === 'failed' || bucket === 'uncertain') && failures.length < MAX_FAILURES_KEPT) {
         failures.push({ email: targets[index].email, error: String(result.error || 'Not sent').slice(0, 300) });
       }
@@ -282,6 +292,7 @@ async function runChunk({ db, sendId, lease, getConfig, provider, emailCore, now
         nextIndex,
         failures: [...(current.failures || []), ...failures].slice(0, MAX_FAILURES_KEPT),
         retryRecipients: [...(current.retryRecipients || []), ...retryable],
+        auditGaps: (Number.isInteger(current.auditGaps) ? current.auditGaps : 0) + auditGaps,
         lease: null,
         updatedAt: at,
         status: done ? 'sent' : 'sending',
