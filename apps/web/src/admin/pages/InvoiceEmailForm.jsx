@@ -4,7 +4,8 @@
 // address and a short note. They preview first: the server answers the
 // subject, the bodies, the file name and a receipt, and the send must carry
 // that receipt, so the email that goes is the one staff read. Changing the
-// copy address or the note drops the preview, and a new one is needed.
+// copy address or the note drops the preview, and a new one is needed; a
+// preview answer that arrives after such a change is dropped too.
 //
 // One send id per preview: a double press or a retry after a lost answer
 // sends the same id, and the server sends nothing the second time. When the
@@ -103,6 +104,9 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
   const [confirm, setConfirm] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [focusRequest, setFocusRequest] = useState(0);
+  // Bumped on every edit. A preview answer for an older version of the copy
+  // address or the note is dropped, so Send never carries stale input.
+  const inputVersion = useRef(0);
 
   useEffect(() => {
     if (focusRequest > 0) focusFirstError(sectionRef.current);
@@ -114,6 +118,7 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
   }, []);
 
   function change(patch) {
+    inputVersion.current += 1;
     setInput((current) => ({ ...current, ...patch }));
     // What the preview showed is no longer what would be sent.
     setPreview(null);
@@ -138,12 +143,17 @@ export default function InvoiceEmailForm({ invoice, busy, onPreview, onSend, onC
     if (!value) return;
     setServerError(null);
     setPreviewing(true);
+    const version = inputVersion.current;
     try {
       const result = await onPreview(value);
+      // The copy address or the note changed while the preview was on its
+      // way: it shows an email that would not be sent. Drop it.
+      if (version !== inputVersion.current) return;
       setPreview({ ...result, input: value, sendId: mintSendId() });
       setConfirm(false);
       setConfirmError('');
     } catch (err) {
+      if (version !== inputVersion.current) return;
       setServerError(err);
       setErrors(fieldErrorsOf(err));
     } finally {

@@ -561,6 +561,8 @@ The email is refused, and the page says why, when:
 - The site is a read-only demo.
 - The site's email provider cannot send attachments. Download the PDF and attach it to your own email.
 
+While an email of the invoice is being sent, **Mark paid**, **Void** and **Reopen** are refused. Try again when the email is sent. A send that stopped part way stops blocking them after five minutes.
+
 If the page says the email may have been sent, the email provider did not confirm it. Check the **Email log** before you send it again.
 
 Invoice email is transactional mail. It never goes on the announcement stream and has no unsubscribe link.

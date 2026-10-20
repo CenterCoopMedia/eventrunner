@@ -314,13 +314,16 @@ barrier, so a repeat of a `sendId` sends nothing and answers the first outcome
 provider's message id on the invoice and writes the `admin_logs` row
 (`invoices.emailed` or `invoices.email-failed`) together; the row holds no address and
 no note. A send left `sending` for five minutes is settled by its claim (`uncertain`
-with a claim, `failed` without). A send does not change the invoice revision. A
+with a claim, `failed` without); its row names the original sender, and the requester
+whose send settled it as `settledBy`. While a send is reserved and not stale,
+`markPaid`, `void` and `reopen` answer 409, so the email never states an old status. A send does not change the invoice revision. A
 provider refusal answers 502 `send-failed` and keeps only the provider's status code.
 `invoiceAdmin` binds the send secrets of the configured provider.
 
 The email core (`src/email/send.cjs`) carries `cc` (one plain address) and
 `attachments` (`{ filename, contentType, content }`, base64, PDF only) to a provider
-that declares them in `capabilities`; otherwise it refuses the message before any
+that declares them in `capabilities` (the copy address must pass `shared/email`
+`isBareEmailAddress`, the same rule the editor and `validateInvoiceSend` apply); otherwise it refuses the message before any
 claim or request (`cc-unsupported`, `attachments-unsupported`, `invalid-attachment`,
 `attachments-too-large` over `attachmentLimits.maxBytes`), and `sendBatch` throws
 `EmailBatchError` with the same code. The `sent_emails` row keeps the copy address and
