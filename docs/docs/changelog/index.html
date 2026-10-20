@@ -118,6 +118,28 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Saved announcement messages (#496, #203). On the Announcements page, staff save a
+          subject, a message and a button under a name, then load one into a new, unsent email.
+          The audience stays as set, and any preview goes away. A draft with unsaved changes asks
+          before a load replaces it. Staff can update, rename and remove a saved message. Two
+          messages can share a name; each has its own id. The server checks a saved message with
+          the composer&#39;s own draft check, and keeps it in a new private store,
+          <code>announcement_messages</code>, through the staff endpoint <code>announcementMessages</code>. Browsers
+          cannot read or write the store. A saved message keeps no audience and no address. It
+          stays until staff remove it, at most 100. A historical demo refuses changes. Each change
+          writes an <code>admin_logs</code> row without the name or the message.</li>
+          <li>Announcement send history details (#497, #203). The history pages 20 sends at a time
+          and shows no recipient address and no message. <strong>Show details</strong> opens the message as the
+          send started it and the failed addresses, through the new staff endpoint
+          <code>getAnnouncementSend</code>, which writes an <code>admin_logs</code> row for each read. Each recipient&#39;s
+          email log row now holds the send id, and <code>listSentEmails</code> takes a <code>sendId</code> filter, so the
+          details link to that send&#39;s rows in the email log. When the email log cannot record a
+          message, <code>sendBatch</code> reports it on that result, and the history says how many messages
+          have no row. Maintenance removes the content of a send record after 90 days, as it
+          removes email log rows. It keeps the unsubscribe key, so old unsubscribe links still
+          work.</li>
+          </ul>
+          <ul>
           <li>Scheduled attendee reminders (#518). A new <strong>Attendees</strong> panel on the <strong>Scheduled
           reminders</strong> page emails registered attendees before the event starts (7 and 1 days by
           default, at a send time on the event&#39;s clock). Staff write the subject and message in plain
