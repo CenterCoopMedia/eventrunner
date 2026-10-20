@@ -16,7 +16,7 @@ const STORED = [
   { id: 'workshops', label: 'Workshops', date: '2027-06-11', startTime: '09:00', endTime: '16:00' },
 ];
 
-function Harness({ stored = STORED, usage = new Map(), errors = new Map(), onDays = () => {} }) {
+function Harness({ stored = STORED, usage = new Map(), errors = new Map(), onDays = () => {}, ready = true }) {
   const [days, setDays] = useState(() => normalizeDays(stored));
   return (
     <EventDaysEditor
@@ -24,6 +24,7 @@ function Harness({ stored = STORED, usage = new Map(), errors = new Map(), onDay
       onChange={(next) => { setDays(next); onDays(next); }}
       errorFor={(field) => errors.get(field)}
       dayUsage={usage}
+      usageReady={ready}
     />
   );
 }
@@ -108,6 +109,10 @@ describe('EventDaysEditor', () => {
     flush();
     expect(onDays).not.toHaveBeenCalled();
     const warning = within(second).getByRole('group', { name: 'Remove day 2?' });
+    // The focused warning carries its consequence as its description, so a
+    // screen reader reads it when focus lands.
+    expect(warning).toHaveFocus();
+    expect(warning).toHaveAccessibleDescription(expect.stringContaining('5 sessions use this day.'));
     expect(warning).toHaveTextContent('5 sessions use this day. They stay saved, but they leave the public schedule until you give each one another day. Nothing changes until you save.');
 
     // Keeping the day changes nothing and returns focus to its control.
@@ -120,6 +125,21 @@ describe('EventDaysEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove day 2 anyway' }));
     flush();
     expect(daysPayload(onDays.mock.calls.at(-1)[0])).toEqual([STORED[0]]);
+  });
+
+  it('holds add and remove until both session lists have loaded', () => {
+    const onDays = vi.fn();
+    render(<Harness onDays={onDays} ready={false} />);
+    expect(screen.getByText('Checking which sessions use these days. You can add and remove days when that is done.')).toBeInTheDocument();
+    const add = screen.getByRole('button', { name: 'Add day' });
+    const remove = screen.getByRole('button', { name: 'Remove day 1, Opening day' });
+    // Unavailable, not gone: each stays focusable and says so.
+    expect(add).toHaveAttribute('aria-disabled', 'true');
+    expect(remove).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(add);
+    fireEvent.click(remove);
+    expect(onDays).not.toHaveBeenCalled();
+    expect(screen.queryByRole('group', { name: /Remove day/ })).toBeNull();
   });
 
   it('shows the server’s id error on the day it belongs to', () => {

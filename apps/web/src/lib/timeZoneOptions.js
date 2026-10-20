@@ -124,6 +124,18 @@ const RENAMED_ZONES = Object.freeze({
 });
 
 const currentName = (zone) => (RENAMED_ZONES[zone] && isKnownTimeZone(RENAMED_ZONES[zone]) ? RENAMED_ZONES[zone] : zone);
+const FORMER_NAMES = Object.freeze(Object.fromEntries(Object.entries(RENAMED_ZONES).map(([old, now]) => [now, old])));
+
+/**
+ * A fallback zone under the name this engine knows: the listed name, else
+ * its former name (an engine too old for Europe/Kyiv knows Europe/Kiev),
+ * else null, so nothing later asks Intl for a zone it would refuse.
+ */
+function knownName(zone) {
+  if (isKnownTimeZone(zone)) return zone;
+  const former = FORMER_NAMES[zone];
+  return former && isKnownTimeZone(former) ? former : null;
+}
 
 /**
  * Every zone the picker offers, UTC first. `stored` is the event's current
@@ -142,7 +154,11 @@ export function supportedTimeZones(intl = globalThis.Intl, stored = '') {
   } catch {
     listed = [];
   }
-  const zones = listed.length > 0 ? listed.map(currentName) : FALLBACK_TIME_ZONES;
+  // The fallback list is fixed, and an engine without a zone list may also
+  // lack some zones in it, so each one is checked against this engine.
+  const zones = listed.length > 0
+    ? listed.map(currentName)
+    : FALLBACK_TIME_ZONES.map(knownName).filter(Boolean);
   const keep = stored && !zones.includes(stored) && isKnownTimeZone(stored) ? [stored] : [];
   return [...new Set(['UTC', ...keep, ...zones])];
 }

@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import EventTracksEditor, { nextTrackLetter, normalizeTracks, tracksPayload } from './EventTracksEditor.jsx';
+import EventTracksEditor, { markTracksSaved, nextTrackLetter, normalizeTracks, tracksPayload } from './EventTracksEditor.jsx';
 
 afterEach(() => {
   cleanup();
@@ -13,7 +13,7 @@ afterEach(() => {
 
 const STORED = [{ letter: 'A', name: 'Practice' }, { letter: 'B', name: 'Sustainability' }];
 
-function Harness({ stored = STORED, usage = new Map(), errors = new Map(), onTracks = () => {} }) {
+function Harness({ stored = STORED, usage = new Map(), errors = new Map(), onTracks = () => {}, ready = true }) {
   const [tracks, setTracks] = useState(() => normalizeTracks(stored));
   return (
     <EventTracksEditor
@@ -21,6 +21,7 @@ function Harness({ stored = STORED, usage = new Map(), errors = new Map(), onTra
       onChange={(next) => { setTracks(next); onTracks(next); }}
       errorFor={(field) => errors.get(field)}
       trackUsage={usage}
+      usageReady={ready}
     />
   );
 }
@@ -32,6 +33,19 @@ describe('nextTrackLetter', () => {
     expect(nextTrackLetter([], new Map())).toBe('A');
     expect(nextTrackLetter(normalizeTracks(STORED), new Map([['C', ['Old session']]]))).toBe('D');
     expect(nextTrackLetter(normalizeTracks(Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ', (letter) => ({ letter, name: letter }))), new Map())).toBe('');
+  });
+});
+
+describe('markTracksSaved', () => {
+  it('records the letter each row was saved with, and leaves rows the save did not carry', () => {
+    const [a, b] = normalizeTracks(STORED);
+    const added = { key: 'new-row', letter: 'Q', name: 'Added during the save', savedLetter: '' };
+    // Row a was saved as A and relettered to Z while the save ran.
+    const saved = markTracksSaved(
+      [{ ...a, letter: 'z' }, { ...b, letter: 'c' }, added],
+      new Map([[a.key, 'A'], [b.key, 'C']]),
+    );
+    expect(saved.map((track) => track.savedLetter)).toEqual(['A', 'C', '']);
   });
 });
 
@@ -95,6 +109,28 @@ describe('EventTracksEditor', () => {
     expect(screen.getByLabelText('Track 1 letter')).toHaveAccessibleDescription(
       expect.stringContaining('2 sessions use letter A. Change their track too, or they lose it when you save.'),
     );
+  });
+
+  it('warns, without blocking, when the new letter is one sessions already use', () => {
+    // Sessions still carry C from a track removed earlier; giving this
+    // track the letter C puts them in it.
+    render(<Harness usage={new Map([['C', ['Old panel']]])} />);
+    fireEvent.change(screen.getByLabelText('Track 2 letter'), { target: { value: 'c' } });
+    expect(screen.getByLabelText('Track 2 letter')).toHaveAccessibleDescription(
+      expect.stringContaining('1 session already uses letter C. It joins this track when you save.'),
+    );
+    expect(screen.getByLabelText('Track 2 letter')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('holds add and remove until both session lists have loaded', () => {
+    const onTracks = vi.fn();
+    render(<Harness onTracks={onTracks} ready={false} />);
+    expect(screen.getByText('Checking which sessions use these tracks. You can add and remove tracks when that is done.')).toBeInTheDocument();
+    const add = screen.getByRole('button', { name: 'Add track' });
+    expect(add).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(add);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove track 1, A Practice' }));
+    expect(onTracks).not.toHaveBeenCalled();
   });
 
   it('marks the offending track when the server refuses a letter', () => {

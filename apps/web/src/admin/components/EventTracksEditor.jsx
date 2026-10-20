@@ -69,8 +69,9 @@ const trackName = (track) => [capital(track.letter), track.name.trim()].filter(B
  * @param {(tracks: object[]) => void} props.onChange
  * @param {(field: string) => string|undefined} props.errorFor
  * @param {Map<string, string[]>} props.trackUsage letter → titles of the live and draft sessions on it
+ * @param {boolean} [props.usageReady] both session lists have loaded and are listening
  */
-export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsage }) {
+export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsage, usageReady = true }) {
   const [notice, setNotice] = useState('');
   const [confirming, setConfirming] = useState(null);
   const listRef = useRef(null);
@@ -78,6 +79,23 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
   const removeRefs = useRef(new Map());
 
   const usesOf = (track) => (track.savedLetter ? trackUsage.get(track.savedLetter) ?? [] : []);
+
+  /**
+   * Sessions that already carry this row's new letter and that no other
+   * track keeps (sessions left by a removed or relettered track). Giving
+   * this row that letter puts them in it on save. This warns rather than
+   * blocks: putting those sessions back in a track may be exactly what
+   * staff mean, and the letter field says so before the save.
+   */
+  const joiningSessions = (index) => {
+    const track = tracks[index];
+    const letter = capital(track.letter);
+    if (!letter || letter === track.savedLetter) return [];
+    const keptElsewhere = tracks.some((other, i) => (
+      i !== index && other.savedLetter === letter && capital(other.letter) === letter
+    ));
+    return keptElsewhere ? [] : trackUsage.get(letter) ?? [];
+  };
 
   const focusRemoveAt = (rows, index) => {
     const key = (rows[index] ?? rows[index - 1])?.key;
@@ -88,6 +106,7 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
   const setTrack = (index, patch) => onChange(tracks.map((track, i) => (i === index ? { ...track, ...patch } : track)));
 
   const add = () => {
+    if (!usageReady) return;
     const track = { key: rowKey(), letter: nextTrackLetter(tracks, trackUsage), name: '', savedLetter: '' };
     onChange([...tracks, track]);
     setNotice('');
@@ -106,6 +125,7 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
   };
 
   const requestRemove = (index) => {
+    if (!usageReady) return;
     if (usesOf(tracks[index]).length > 0) setConfirming(tracks[index].key);
     else remove(index);
   };
@@ -115,8 +135,13 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
       className="admin-settings-card"
       title="Tracks"
       description="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
-      actions={<AddItemButton ref={addRef} onClick={add}>Add track</AddItemButton>}
+      actions={<AddItemButton ref={addRef} onClick={add} unavailable={!usageReady}>Add track</AddItemButton>}
     >
+      {usageReady ? null : (
+        <p className="mb-sm text-admin-sm text-admin-ink-secondary">
+          Checking which sessions use these tracks. You can add and remove tracks when that is done.
+        </p>
+      )}
       {notice ? <p role="status" className="mb-sm text-admin-sm text-admin-ink-secondary">{notice}</p> : null}
       {tracks.length === 0 ? (
         <p className="text-admin-sm text-admin-ink-secondary">No tracks configured yet.</p>
@@ -124,8 +149,9 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
         <ol ref={listRef} className="admin-settings-row-list">
           {tracks.map((track, index) => {
             const n = index + 1;
-            const uses = usesOf(track);
+            const uses = usageReady ? usesOf(track) : [];
             const letter = capital(track.letter);
+            const joining = usageReady ? joiningSessions(index) : [];
             const headingId = `${track.key}-heading`;
             const relettered = uses.length > 0 && letter !== track.savedLetter;
             const shownLetter = track.savedLetter || letter;
@@ -143,6 +169,7 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
                     }}
                     name={`Remove track ${n}${trackName(track) ? `, ${trackName(track)}` : ''}`}
                     onClick={() => requestRemove(index)}
+                    unavailable={!usageReady}
                   />
                 </div>
                 <div className="admin-settings-fields">
@@ -153,11 +180,14 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
                     error={errorFor(`tracks[${index}].letter`)}
                     maxLength={1}
                     hint="One letter, A to Z. It is how a reader tells the lines apart."
-                    warning={uses.length > 0
-                      ? (relettered
+                    warning={[
+                      relettered
                         ? `${uses.length} session${uses.length === 1 ? ' uses' : 's use'} letter ${track.savedLetter}. Change their track too, or they lose it when you save.`
-                        : '')
-                      : undefined}
+                        : '',
+                      joining.length > 0
+                        ? `${joining.length} session${joining.length === 1 ? ' already uses' : 's already use'} letter ${letter}. ${joining.length === 1 ? 'It joins' : 'They join'} this track when you save.`
+                        : '',
+                    ].filter(Boolean).join(' ')}
                   />
                   <TextField
                     label={`Track ${n} name`}
@@ -195,7 +225,22 @@ export default function EventTracksEditor({ tracks, onChange, errorFor, trackUsa
   );
 }
 
-/** After a save lands, each row's letter is the one sessions can point at. */
-export function markTracksSaved(tracks) {
-  return tracks.map((track) => ({ ...track, savedLetter: capital(track.letter) }));
+/**
+ * After a save lands, each row the save carried is stored with the letter
+ * it was SENT with, which is what sessions can now point at. A letter typed
+ * while the save was running is not saved yet, and a row added meanwhile
+ * keeps no saved letter.
+ *
+ * @param {object[]} tracks the rows as they stand now
+ * @param {Map<string, string>} submitted row key → the letter in the saved payload
+ */
+export function markTracksSaved(tracks, submitted) {
+  return tracks.map((track) => (
+    submitted.has(track.key) ? { ...track, savedLetter: submitted.get(track.key) } : track
+  ));
+}
+
+/** Row key → the letter the payload carries, taken when a save starts. */
+export function submittedTrackLetters(tracks) {
+  return new Map(tracks.map((track) => [track.key, capital(track.letter)]));
 }

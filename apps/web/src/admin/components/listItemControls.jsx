@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useId, useRef } from 'react';
-import { dangerButtonClass, secondaryButtonClass } from './formControls.jsx';
+import { dangerButtonClass, secondaryButtonClass, unavailableButtonClass } from './formControls.jsx';
 
 // The add and remove controls of a repeated list in a settings form (issue
 // #475): one compact add control in the panel heading, and one remove
@@ -9,10 +9,27 @@ import { dangerButtonClass, secondaryButtonClass } from './formControls.jsx';
 // control keeps the full control height: compact means fewer words, not a
 // smaller target.
 
+// `unavailable` holds a control that must wait (the session lists are still
+// loading): it stays focusable with aria-disabled, takes the unavailable
+// look, and refuses every press. The panel states why in words.
+const press = (unavailable, onClick) => (event) => {
+  if (unavailable) {
+    event.preventDefault();
+    return;
+  }
+  onClick?.(event);
+};
+
 /** "+ Add day": the plus is a mark for the eye; the name is the words. */
-export const AddItemButton = forwardRef(function AddItemButton({ children, onClick }, ref) {
+export const AddItemButton = forwardRef(function AddItemButton({ children, onClick, unavailable = false }, ref) {
   return (
-    <button ref={ref} type="button" className={secondaryButtonClass} onClick={onClick}>
+    <button
+      ref={ref}
+      type="button"
+      className={`${secondaryButtonClass} ${unavailableButtonClass}`}
+      aria-disabled={unavailable ? 'true' : undefined}
+      onClick={press(unavailable, onClick)}
+    >
       <span aria-hidden="true" className="font-bold">+</span>
       {children}
     </button>
@@ -23,9 +40,16 @@ export const AddItemButton = forwardRef(function AddItemButton({ children, onCli
  * The item's own remove control. `name` is the full accessible name; it
  * starts with the visible word, so speech input can say "Remove".
  */
-export const RemoveItemButton = forwardRef(function RemoveItemButton({ name, onClick }, ref) {
+export const RemoveItemButton = forwardRef(function RemoveItemButton({ name, onClick, unavailable = false }, ref) {
   return (
-    <button ref={ref} type="button" className={`${dangerButtonClass} px-sm`} aria-label={name} onClick={onClick}>
+    <button
+      ref={ref}
+      type="button"
+      className={`${dangerButtonClass} ${unavailableButtonClass} px-sm`}
+      aria-label={name}
+      aria-disabled={unavailable ? 'true' : undefined}
+      onClick={press(unavailable, onClick)}
+    >
       <span aria-hidden="true">×</span>
       Remove
     </button>
@@ -53,11 +77,13 @@ export function usageSentence(uses) {
 /**
  * The still surface that states what a removal does before it happens: the
  * alarm ground, a question as its name, the consequence in words, and two
- * labelled answers. Focus moves onto it when it opens, so a screen reader
- * reads the consequence first.
+ * labelled answers. Focus moves onto it when it opens, and the consequence
+ * is its description, so a screen reader reads the question and the
+ * consequence together as focus lands.
  */
 export function RemovalWarning({ title, consequence, confirmLabel, keepLabel, onConfirm, onKeep }) {
   const headingId = useId();
+  const consequenceId = useId();
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
   return (
@@ -66,10 +92,11 @@ export function RemovalWarning({ title, consequence, confirmLabel, keepLabel, on
       role="group"
       tabIndex={-1}
       aria-labelledby={headingId}
+      aria-describedby={consequenceId}
       className="mt-sm flex flex-col gap-xs rounded-admin border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm"
     >
       <p id={headingId} className="text-admin-base font-bold text-admin-state-error">{title}</p>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">{consequence}</p>
+      <p id={consequenceId} className="max-w-[65ch] text-admin-sm text-admin-ink">{consequence}</p>
       <div className="flex flex-wrap items-center gap-xs">
         <button type="button" className={dangerButtonClass} onClick={onConfirm}>{confirmLabel}</button>
         <button type="button" className={secondaryButtonClass} onClick={onKeep}>{keepLabel}</button>

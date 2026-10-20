@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   FALLBACK_TIME_ZONES,
   describeEventDayOffsets,
@@ -25,6 +25,43 @@ describe('supportedTimeZones', () => {
     expect(zones[0]).toBe('UTC');
     expect(zones).toEqual(['UTC', ...FALLBACK_TIME_ZONES.filter((zone) => zone !== 'UTC')]);
     expect(zones).toContain('Europe/London');
+  });
+
+  describe('on an engine that knows fewer zones', () => {
+    const RealDateTimeFormat = Intl.DateTimeFormat;
+    afterEach(() => vi.restoreAllMocks());
+
+    // An older engine: no zone list, no Europe/Kyiv (it knows Europe/Kiev),
+    // and no Pacific/Kanton at all.
+    function olderEngine() {
+      vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function DateTimeFormat(locale, options = {}) {
+        if (options.timeZone === 'Europe/Kyiv' || options.timeZone === 'Pacific/Kanton') {
+          throw new RangeError(`Invalid time zone specified: ${options.timeZone}`);
+        }
+        return new RealDateTimeFormat(locale, options);
+      });
+    }
+
+    it('offers only fallback zones the engine knows, under the name it knows', () => {
+      olderEngine();
+      const zones = supportedTimeZones({});
+      expect(zones).not.toContain('Europe/Kyiv');
+      expect(zones).toContain('Europe/Kiev');
+      expect(zones).toContain('America/New_York');
+    });
+
+    it('builds every option without a RangeError', () => {
+      olderEngine();
+      const list = Intl.supportedValuesOf;
+      Intl.supportedValuesOf = undefined;
+      try {
+        const options = timeZoneOptions(new Date('2031-03-01T12:00:00Z'));
+        expect(options.map((option) => option.value)).toContain('Europe/Kiev');
+        expect(options.map((option) => option.value)).not.toContain('Europe/Kyiv');
+      } finally {
+        Intl.supportedValuesOf = list;
+      }
+    });
   });
 
   it('falls back when the list call throws or comes back empty', () => {

@@ -76,8 +76,10 @@ function dayName(day) {
  * @param {(days: object[]) => void} props.onChange
  * @param {(field: string) => string|undefined} props.errorFor
  * @param {Map<string, string[]>} props.dayUsage day id → titles of the live and draft sessions on it
+ * @param {boolean} [props.usageReady] both session lists have loaded and are listening;
+ *   until then a new id or a removal could be judged against sessions not yet read
  */
-export default function EventDaysEditor({ days, onChange, errorFor, dayUsage }) {
+export default function EventDaysEditor({ days, onChange, errorFor, dayUsage, usageReady = true }) {
   const [notice, setNotice] = useState('');
   const [confirming, setConfirming] = useState(null);
   const listRef = useRef(null);
@@ -95,6 +97,7 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage }) 
   const setDay = (index, patch) => onChange(days.map((day, i) => (i === index ? { ...day, ...patch } : day)));
 
   const add = () => {
+    if (!usageReady) return;
     const day = { key: rowKey(), id: nextDayId(days, dayUsage), label: '', date: '', startTime: '', endTime: '' };
     onChange([...days, day]);
     setNotice('');
@@ -111,6 +114,7 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage }) 
   };
 
   const requestRemove = (index) => {
+    if (!usageReady) return;
     if ((dayUsage.get(days[index].id) ?? []).length > 0) setConfirming(days[index].key);
     else remove(index);
   };
@@ -120,8 +124,13 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage }) 
       className="admin-settings-card"
       title="Days"
       description="Listed in date order. Each day needs a date and start and end times. Sessions are placed on a day here."
-      actions={<AddItemButton ref={addRef} onClick={add}>Add day</AddItemButton>}
+      actions={<AddItemButton ref={addRef} onClick={add} unavailable={!usageReady}>Add day</AddItemButton>}
     >
+      {usageReady ? null : (
+        <p className="mb-sm text-admin-sm text-admin-ink-secondary">
+          Checking which sessions use these days. You can add and remove days when that is done.
+        </p>
+      )}
       {notice ? <p role="status" className="mb-sm text-admin-sm text-admin-ink-secondary">{notice}</p> : null}
       {days.length === 0 ? (
         <p className="text-admin-sm text-admin-ink-secondary">No days configured yet.</p>
@@ -147,6 +156,7 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage }) 
                     }}
                     name={`Remove day ${n}${name ? `, ${name}` : ''}`}
                     onClick={() => requestRemove(index)}
+                    unavailable={!usageReady}
                   />
                 </div>
                 <div className="admin-settings-fields">
@@ -181,7 +191,7 @@ export default function EventDaysEditor({ days, onChange, errorFor, dayUsage }) 
                     />
                   </div>
                 </div>
-                {uses.length > 0 ? (
+                {usageReady && uses.length > 0 ? (
                   <p className="mt-sm text-admin-sm text-admin-ink-secondary">{usageSentence(uses)}</p>
                 ) : null}
                 {idError ? <div className="mt-sm"><FieldError message={`Day ${n}: ${idError}`} /></div> : null}

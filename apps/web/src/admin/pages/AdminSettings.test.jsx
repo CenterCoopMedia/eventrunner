@@ -35,10 +35,15 @@ vi.mock('../../lib/contentSource.js', () => ({
 }));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 const adminSubscriptions = new Map();
+const adminSubscriptionErrors = new Map();
+// A test that needs the session lists still loading turns this off; the
+// first snapshot then arrives only when the test pushes it.
+let deliverFirstAdminSnapshot = true;
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (name, onNext) => {
+  subscribeAdminCollection: (name, onNext, onError) => {
     adminSubscriptions.set(name, onNext);
-    onNext([]);
+    adminSubscriptionErrors.set(name, onError);
+    if (deliverFirstAdminSnapshot) onNext([]);
     return () => adminSubscriptions.delete(name);
   },
 }));
@@ -67,6 +72,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 afterEach(() => {
   operatorProbeShouldSucceed = true;
+  deliverFirstAdminSnapshot = true;
 });
 
 import App from '../../App.jsx';
@@ -386,6 +392,61 @@ describe('event settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(bodyOf(0).event.days).toEqual(LIVE_EVENT.days);
+  });
+
+  // Codex review on #527: a new day id and a removal are judged against the
+  // sessions, so both wait until both session lists have arrived, and wait
+  // again while a listener is failing and retrying.
+  it('holds add and remove until both session lists have arrived, and again after a listener error', async () => {
+    deliverFirstAdminSnapshot = false;
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [{ letter: 'A', name: 'Practice' }] });
+    const addDay = () => screen.getByRole('button', { name: 'Add day' });
+    const addTrack = () => screen.getByRole('button', { name: 'Add track' });
+    expect(addDay()).toHaveAttribute('aria-disabled', 'true');
+    expect(addTrack()).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(addDay());
+    expect(screen.queryByLabelText('Day 2 label')).toBeNull();
+
+    // The live list alone is not enough: a draft may still name day-2.
+    act(() => adminSubscriptions.get('cmsSchedule')([]));
+    expect(addDay()).toHaveAttribute('aria-disabled', 'true');
+    act(() => adminSubscriptions.get('cmsSchedule_drafts')([{ id: 'd1', title: 'Draft talk', dayId: 'day-2' }]));
+    expect(addDay()).not.toHaveAttribute('aria-disabled');
+
+    // A failing listener is retrying, so its last list may be stale.
+    act(() => adminSubscriptionErrors.get('cmsSchedule_drafts')(new Error('unavailable')));
+    expect(addDay()).toHaveAttribute('aria-disabled', 'true');
+    act(() => adminSubscriptions.get('cmsSchedule_drafts')([{ id: 'd1', title: 'Draft talk', dayId: 'day-2' }]));
+    fireEvent.click(addDay());
+    // day-2 is still named by the draft, so the new day skips it.
+    fireEvent.change(screen.getByLabelText('Day 2 date'), { target: { value: '2026-10-16' } });
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.days.map((day) => day.id)).toEqual(['day-1', 'day-3']);
+  });
+
+  // Codex review on #527: a letter typed while a save is running is not
+  // what the save stored, so it must not become the letter sessions point at.
+  it('keeps the saved letter as the one sent when the letter changes during the save', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', { ...LIVE_EVENT, tracks: [{ letter: 'A', name: 'Practice' }] });
+    act(() => adminSubscriptions.get('cmsSchedule')([{ id: 's1', title: 'Data desk', track: 'A' }]));
+
+    let finish;
+    fetch.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText('Track 1 letter'), { target: { value: 'Z' } });
+    await act(async () => { finish(okResponse({ docPath: 'config/event' })); });
+    await screen.findByText(/picks the change up live/i);
+
+    // The save stored A, and the session still uses A, so the field still
+    // warns that changing the letter leaves the session without a track.
+    expect(screen.getByLabelText('Track 1 letter')).toHaveAccessibleDescription(
+      expect.stringContaining('1 session uses letter A.'),
+    );
   });
 
   it('edits venue places and one-way movements', async () => {

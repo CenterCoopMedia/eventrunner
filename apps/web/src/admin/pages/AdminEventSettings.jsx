@@ -49,6 +49,7 @@ import EventDaysEditor, { daysPayload, normalizeDays } from '../components/Event
 import EventTracksEditor, {
   markTracksSaved,
   normalizeTracks,
+  submittedTrackLetters,
   tracksPayload,
 } from '../components/EventTracksEditor.jsx';
 
@@ -243,6 +244,12 @@ export default function AdminEventSettings() {
   const [status, setStatus] = useState('');
   const [liveSessions, setLiveSessions] = useState([]);
   const [draftSessions, setDraftSessions] = useState([]);
+  // Whether each session list has delivered a snapshot and is listening.
+  // Both start false and drop back to false on a listener error, because
+  // the retry may come back with rows the last list did not have. A new day
+  // id and a removal warning are judged against both lists (issue #475).
+  const [liveReady, setLiveReady] = useState(false);
+  const [draftsReady, setDraftsReady] = useState(false);
   const errorRef = useRef(null);
   // Submit reaches into the form to find the first field it marked invalid.
   const formRef = useRef(null);
@@ -266,8 +273,16 @@ export default function AdminEventSettings() {
   }, [error]);
 
   useEffect(() => {
-    const unsubscribeLive = subscribeAdminCollection('cmsSchedule', setLiveSessions);
-    const unsubscribeDrafts = subscribeAdminCollection('cmsSchedule_drafts', setDraftSessions);
+    const unsubscribeLive = subscribeAdminCollection(
+      'cmsSchedule',
+      (rows) => { setLiveSessions(rows); setLiveReady(true); },
+      () => setLiveReady(false),
+    );
+    const unsubscribeDrafts = subscribeAdminCollection(
+      'cmsSchedule_drafts',
+      (rows) => { setDraftSessions(rows); setDraftsReady(true); },
+      () => setDraftsReady(false),
+    );
     return () => {
       unsubscribeLive?.();
       unsubscribeDrafts?.();
@@ -383,16 +398,26 @@ export default function AdminEventSettings() {
     setSaving(true);
     setError(null);
     setStatus('');
+    // What this save sends, so the rows can be marked saved with these
+    // values afterwards, not with anything typed while the save runs.
+    const sentLetters = submittedTrackLetters(form.tracks);
+    const sentPlaceIds = new Set(form.venue.places.map((place) => String(place.id ?? '').trim()));
     try {
       await call('updateEventConfig', { event: toPayload(form, { includeSender: canEditSender }) });
       setForm((current) => ({
         ...current,
         venue: {
           ...current.venue,
-          places: current.venue.places.map((place) => ({ ...place, persisted: true })),
+          // A place is saved once its id went out in this save. A place
+          // added, or an id changed, while the save ran is not saved yet.
+          places: current.venue.places.map((place) => (
+            place.persisted || sentPlaceIds.has(String(place.id ?? '').trim())
+              ? { ...place, persisted: true }
+              : place
+          )),
         },
-        // The saved letters are now the ones sessions can point at.
-        tracks: markTracksSaved(current.tracks),
+        // The sent letters are now the ones sessions can point at.
+        tracks: markTracksSaved(current.tracks, sentLetters),
       }));
       setSocialChecked(false);
       setMilestonesChecked(false);
@@ -477,12 +502,14 @@ export default function AdminEventSettings() {
               onChange={(days) => setForm((c) => ({ ...c, days }))}
               errorFor={errorFor}
               dayUsage={dayUsage}
+              usageReady={liveReady && draftsReady}
             />
             <EventTracksEditor
               tracks={form.tracks}
               onChange={(tracks) => setForm((c) => ({ ...c, tracks }))}
               errorFor={errorFor}
               trackUsage={trackUsage}
+              usageReady={liveReady && draftsReady}
             />
           </div>
         </div>
