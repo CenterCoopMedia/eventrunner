@@ -169,7 +169,7 @@
           </thead>
           <tbody>
           <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package</td><td>The person who set the site up and answers for the deployment</td></tr>
-          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices)</td><td>The people who run the event day to day</td></tr>
+          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices)</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
           </div>
@@ -499,7 +499,7 @@
           <p>For complimentary seats, an operator opens <strong>Issue complimentary admission</strong>, enters each attendee and a reason, and uses <strong>Review complimentary tickets</strong> before the final issue confirmation. Comps consume real event/type capacity. At the door, staff enter or scan a human-readable code in <strong>Ticket code for check-in</strong>, then select <strong>Check in attendee</strong>. A repeat reports already checked in. Only an operator can use <strong>Review check-in correction → Undo recorded check-in</strong>, with a reason.</p>
           <p>If a payment response is lost, the purchaser uses <strong>Resume existing checkout</strong> or <strong>Recover existing checkout</strong>. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the <a href="/eventrunner/docs/stripe-ticketing/#6-support-the-payment-and-the-attendee-separately">support matrix</a> before suggesting another payment, refund, resend, or admission change.</p>
           <h2 id="invoices">Invoices<a class="heading-anchor" href="#invoices" aria-label="Link to this section">#</a></h2>
-          <p><strong>Invoices</strong> under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download its PDF, and record the payment. Sending the PDF by email and a card payment link come in later releases.</p>
+          <p><strong>Invoices</strong> under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download or email its PDF, and record the payment. A card payment link comes in a later release.</p>
           <p>Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.</p>
           <h3 id="write-a-draft">Write a draft<a class="heading-anchor" href="#write-a-draft" aria-label="Link to this section">#</a></h3>
           <ol>
@@ -528,6 +528,27 @@
           <h3 id="download-the-pdf">Download the PDF<a class="heading-anchor" href="#download-the-pdf" aria-label="Link to this section">#</a></h3>
           <p>Open an issued, paid or void invoice and select <strong>Download PDF</strong>. The browser saves it as the invoice number, such as <code>INV-0004.pdf</code>. The PDF shows both parties, the dates, every line, the discounts and tax, the total, how to pay, and the notes. A paid invoice says when and how it was paid. A void invoice says <strong>VOID</strong> and the reason, and has no payment instructions. A draft has no PDF.</p>
           <p>The PDF uses a standard font. A character it cannot draw, such as a letter in a non-Latin script, is dropped or replaced with the nearest plain letter.</p>
+          <h3 id="email-the-invoice">Email the invoice<a class="heading-anchor" href="#email-the-invoice" aria-label="Link to this section">#</a></h3>
+          <p>Staff can email an issued or paid invoice. The PDF goes as an attachment to the billing email on the invoice. You cannot send it to another address, but you can add one copy.</p>
+          <ol>
+          <li>Open the invoice and select <strong>Email invoice</strong>.</li>
+          <li>Optional: In <strong>Copy to</strong>, type one more address, such as your finance team. It cannot be the billing email.</li>
+          <li>Optional: In <strong>Note</strong>, write a short message. It appears in the email under the line that names the invoice. It can hold up to 1,000 characters.</li>
+          <li>Select <strong>Preview email</strong>. The page shows the address, the copy, where replies go, the subject, the file name and the text of the email.</li>
+          <li>Read the preview, then select <strong>Send to</strong> and the billing email.</li>
+          </ol>
+          <p>Replies go to the issuer email in the invoice settings, when it has one. If you change the copy address or the note, preview the email again. If the invoice changes after the preview, for example someone marks it paid, the send is refused. Preview it again.</p>
+          <p>The record shows each email under <strong>Emails sent</strong>: when, to which addresses, and whether it was sent. Each email is also in the <strong>Email log</strong> and the audit log. The audit log does not hold the addresses or the note.</p>
+          <p>If an address got this invoice less than 15 minutes ago, the preview says so. To send it again, tick <strong>Send it again anyway</strong>. This stops a double send by mistake. A send that failed does not count. One invoice can be emailed at most five times in an hour.</p>
+          <p>The email is refused, and the page says why, when:</p>
+          <ul>
+          <li>The invoice is a draft or void.</li>
+          <li>The invoice has no billing email. Download the PDF and send it yourself, or void the invoice and duplicate it with a billing email.</li>
+          <li>The site is a read-only demo.</li>
+          <li>The site&#39;s email provider cannot send attachments. Download the PDF and attach it to your own email.</li>
+          </ul>
+          <p>If the page says the email may have been sent, the email provider did not confirm it. Check the <strong>Email log</strong> before you send it again.</p>
+          <p>Invoice email is transactional mail. It never goes on the announcement stream and has no unsubscribe link.</p>
           <h3 id="mark-an-invoice-paid">Mark an invoice paid<a class="heading-anchor" href="#mark-an-invoice-paid" aria-label="Link to this section">#</a></h3>
           <ol>
           <li>Open the issued invoice and select <strong>Mark paid</strong>.</li>

@@ -201,6 +201,13 @@
           <code>postmark.cjs</code>) only omits <code>MessageStream</code> from the API payload — letting Postmark use the
           Server&#39;s default stream — when that value is unset. Note whatever you name or rename the stream
           to here; §5 needs it to register the webhook on the stream sends actually land on.</li>
+          <li>Invoice email (<code>invoiceAdmin</code> <code>send</code>) attaches the invoice PDF and can add one Cc address. It
+          goes on this transactional stream and needs no Postmark setting: attachments and Cc are on by
+          default. Postmark refuses a message over 10 MB, attachments included, and some file types;
+          PDF is not one of them. The code caps attachments at 7 MB of file, which base64 turns into
+          about 9.3 MB. The send is refused before it reaches Postmark when
+          <code>config/providers.email.messageStream</code> (or the default <code>outbound</code>, when unset) equals
+          <code>announcementStream</code>.</li>
           </ol>
           <h2 id="2a-per-deployment-the-broadcast-stream-for-announcements">2a. Per deployment: the broadcast stream for announcements<a class="heading-anchor" href="#2a-per-deployment-the-broadcast-stream-for-announcements" aria-label="Link to this section">#</a></h2>
           <p>Announcement email (issues #202, #490) never uses the transactional stream that carries sign-in
@@ -431,6 +438,8 @@
           <li class="task-item"><input type="checkbox" disabled> With an authorized synthetic recipient, a real announcement&#39;s unsubscribe link suppresses
           that address on the broadcast stream, and the next preview leaves it out. Local tests prove
           the mapping only; this check proves the provider&#39;s link replacement and suppression.</li>
+          <li class="task-item"><input type="checkbox" disabled> An invoice emailed from <strong>Invoices</strong> with <strong>Email invoice</strong> arrives on the transactional
+          stream in <strong>Activity</strong>, with the PDF attached and the Cc address you added.</li>
           <li class="task-item"><input type="checkbox" disabled> A test bounce (send to a Postmark-provided bounce test address, or an intentionally invalid
           recipient) produces a <code>sent_emails</code> row with <code>deliveryStatus</code> patched. This confirms the
           complete webhook round trip, including the Firestore update.</li>

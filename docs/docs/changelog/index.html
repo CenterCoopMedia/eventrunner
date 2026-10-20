@@ -118,6 +118,20 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Invoices, part 4 (#208). Staff email an issued or paid invoice with its PDF attached.
+          <strong>Email invoice</strong> on the invoice record sends it to the billing email on the invoice; staff
+          may add one copy address and a short note, and cannot choose another recipient. They
+          preview the address, the subject, the file name and the text first, and the send must
+          match the preview. The email goes on the transactional stream, never the announcement
+          stream, with replies to the issuer email. Each send is recorded on the invoice (who, when,
+          to which addresses, the outcome and the provider&#39;s message id) and in the audit log in the
+          same transaction; the audit row holds no address and no note. A repeat of the same send
+          sends nothing, and a second send to an address that got the invoice less than 15 minutes
+          ago needs <strong>Send it again anyway</strong>. One invoice goes at most five times an hour. Drafts, void invoices, an invoice with no billing
+          email, a read-only demo and an email provider that cannot send attachments are refused.
+          The email core gains a copy address and attachments for providers that declare them:
+          Postmark and the console provider do, the webhook relay does not. The event data package
+          lists each invoice&#39;s email sends without the staff account.</li>
           <li>Scheduled attendee reminders (#518). A new <strong>Attendees</strong> panel on the <strong>Scheduled
           reminders</strong> page emails registered attendees before the event starts (7 and 1 days by
           default, at a send time on the event&#39;s clock). Staff write the subject and message in plain

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Invoices, part 4 (#208). Staff email an issued or paid invoice with its PDF attached.
+  **Email invoice** on the invoice record sends it to the billing email on the invoice; staff
+  may add one copy address and a short note, and cannot choose another recipient. They
+  preview the address, the subject, the file name and the text first, and the send must
+  match the preview. The email goes on the transactional stream, never the announcement
+  stream, with replies to the issuer email. Each send is recorded on the invoice (who, when,
+  to which addresses, the outcome and the provider's message id) and in the audit log in the
+  same transaction; the audit row holds no address and no note. A repeat of the same send
+  sends nothing, and a second send to an address that got the invoice less than 15 minutes
+  ago needs **Send it again anyway**. One invoice goes at most five times an hour. Drafts, void invoices, an invoice with no billing
+  email, a read-only demo and an email provider that cannot send attachments are refused.
+  The email core gains a copy address and attachments for providers that declare them:
+  Postmark and the console provider do, the webhook relay does not. The event data package
+  lists each invoice's email sends without the staff account.
 - Scheduled attendee reminders (#518). A new **Attendees** panel on the **Scheduled
   reminders** page emails registered attendees before the event starts (7 and 1 days by
   default, at a send time on the event's clock). Staff write the subject and message in plain
