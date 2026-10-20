@@ -22,6 +22,7 @@ export const PACKAGE_SECTIONS = Object.freeze([
   { id: 'materials', label: 'Session materials', hint: 'Each material’s link or file path and its review state. The files stay in Storage.' },
   { id: 'attendees', label: 'Attendees', hint: 'Names, email addresses, profile details, and registration status.' },
   { id: 'orders', label: 'Ticket orders and admissions', hint: 'Purchasers, amounts, payment and refund state, and one row per ticket.' },
+  { id: 'billing', label: 'Invoices', hint: 'Every invoice as it was issued, with its payment or void. The invoice settings stay behind.' },
   { id: 'pitches', label: 'Session pitches', hint: 'Submissions with their review status.' },
 ]);
 

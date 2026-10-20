@@ -516,3 +516,13 @@ test('a demo switched on inside the issue transaction still refuses it', async (
   assert.equal((await db.collection('invoices').doc(ID).get()).data().status, 'draft');
   assert.equal((await db.collection('invoice_counters').doc('current').get()).exists, false);
 });
+
+test('every invoice answer says whether the caller may void it', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  assert.equal((await call(db, { action: 'get', invoiceId: ID })).body.canVoid, false);
+  assert.equal((await call(db, { action: 'get', invoiceId: ID }, 'operator')).body.canVoid, true);
+  assert.equal((await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 })).body.canVoid, false);
+  assert.equal((await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: 'x' }, 'operator')).body.canVoid, true);
+  assert.equal('canVoid' in (await call(db, { action: 'list' })).body, false);
+});

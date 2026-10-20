@@ -607,6 +607,9 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
       else if (action === 'markPaid') result = await markPaid(deps);
       else if (action === 'void') result = await voidInvoice(deps);
       else if (action === 'duplicate') result = await duplicateInvoice(deps);
+      // The page offers Void only to a caller who may use it; the action
+      // itself checks the tier again (OPERATOR_ACTIONS).
+      if (result?.invoice) result = { ...result, canVoid: actor.tier === 'operator' };
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof InvoiceError) return sendError(res, error.status, error.code, error.message);

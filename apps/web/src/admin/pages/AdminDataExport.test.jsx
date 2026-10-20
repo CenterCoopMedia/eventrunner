@@ -61,10 +61,10 @@ describe('AdminDataExport', () => {
     );
   });
 
-  it('shows staff the three staff spreadsheets, and says who exports orders and the package', () => {
+  it('shows staff the four staff spreadsheets, and says who exports orders and the package', () => {
     renderPage();
     expect(screen.getByRole('heading', { level: 1, name: 'Data export' })).toBeInTheDocument();
-    for (const name of ['Export sessions', 'Export speakers', 'Export organizations and sponsors']) {
+    for (const name of ['Export sessions', 'Export speakers', 'Export organizations and sponsors', 'Export invoices']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
     expect(screen.queryByRole('button', { name: 'Export ticket orders' })).toBeNull();
@@ -107,7 +107,7 @@ describe('AdminDataExport', () => {
     renderPage();
     expect(screen.getByRole('button', { name: 'Export ticket orders' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Export admissions' })).toBeInTheDocument();
-    const group = screen.getByRole('group', { name: `Parts to include (8 of 8 chosen)` });
+    const group = screen.getByRole('group', { name: `Parts to include (9 of 9 chosen)` });
     for (const section of PACKAGE_SECTIONS) {
       expect(within(group).getByRole('checkbox', { name: section.label })).toBeChecked();
     }
@@ -124,14 +124,14 @@ describe('AdminDataExport', () => {
     renderPage();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ticket orders and admissions' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Include staff notes on session pitches' }));
-    expect(screen.getByRole('group', { name: 'Parts to include (7 of 8 chosen)' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Parts to include (8 of 9 chosen)' })).toBeInTheDocument();
     const button = screen.getByRole('button', { name: 'Download event data package' });
     fireEvent.click(button);
     expect(button).toHaveAttribute('aria-busy', 'true');
     await settle();
     expect(downloadMock).toHaveBeenCalledTimes(1);
     const [args] = downloadMock.mock.calls[0];
-    expect(args.sections).toEqual(['content', 'program', 'speakers', 'organizations', 'materials', 'attendees', 'pitches']);
+    expect(args.sections).toEqual(['content', 'program', 'speakers', 'organizations', 'materials', 'attendees', 'billing', 'pitches']);
     expect(args.includeStaffNotes).toBe(true);
     await expect(args.getIdToken()).resolves.toBe('id-token');
     expect(screen.getByRole('status')).toHaveTextContent(

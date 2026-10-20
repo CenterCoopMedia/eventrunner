@@ -144,6 +144,7 @@ test('hostile text draws as plain text, and a script the font lacks never breaks
   assert.ok(drawn.includes('endstream endobj'));
   // Drawn text only; the document info strings are UTF-16 with a byte-order mark.
   for (const text of drawn.filter((each) => !each.startsWith('\u00fe\u00ff'))) {
+    // eslint-disable-next-line no-control-regex -- the test looks for control characters
     assert.doesNotMatch(text, /[\u0000-\u0008\u000b-\u001f\u202e]/);
   }
   // Text never reaches the PDF as a literal string, where a parenthesis could end it.

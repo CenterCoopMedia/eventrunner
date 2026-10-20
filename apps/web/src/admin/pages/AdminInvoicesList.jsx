@@ -1,4 +1,4 @@
-// Invoices (issue #208): every invoice, newest first, with a status filter
+// Invoices (issues #208, #209): every invoice, newest first, with a status filter
 // and a search. The rows come from invoiceAdmin, never from Firestore: the
 // invoice collections deny every client read (firestore.rules), because an
 // invoice names a third party's billing contact.
@@ -173,7 +173,7 @@ export default function AdminInvoicesList() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Invoices"
-        description="Bills for sponsors and partners. Staff write and save drafts here. A draft has no number. The number is given when the invoice is issued."
+        description="Bills for sponsors and partners. Write a draft, issue it, download its PDF, and record the payment. A draft has no number. The number is given when the invoice is issued."
         actions={
           <>
             <Link to={INVOICE_SETTINGS_PATH} className={secondaryButtonClass}>
