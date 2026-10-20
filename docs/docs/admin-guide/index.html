@@ -168,7 +168,7 @@
           <tr><th>Tier</th><th>Sections</th><th>For</th></tr>
           </thead>
           <tbody>
-          <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, System errors, voiding an invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package</td><td>The person who set the site up and answers for the deployment</td></tr>
+          <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package</td><td>The person who set the site up and answers for the deployment</td></tr>
           <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices)</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
@@ -511,6 +511,14 @@
           <li>Select <strong>Record payment</strong>.</li>
           </ol>
           <p>The status becomes <strong>Paid</strong>, and the record shows the payment.</p>
+          <h3 id="reopen-a-paid-invoice">Reopen a paid invoice<a class="heading-anchor" href="#reopen-a-paid-invoice" aria-label="Link to this section">#</a></h3>
+          <p>Operators only. Reopen a paid invoice when the payment did not hold, for example a check that bounced, or when it was marked paid by mistake.</p>
+          <ol>
+          <li>Open the paid invoice and select <strong>Reopen this invoice</strong>.</li>
+          <li>Enter the <strong>Reason for reopening</strong>. It is required.</li>
+          <li>Select <strong>Reopen</strong> and the number, such as <strong>Reopen INV-0004</strong>.</li>
+          </ol>
+          <p>The status goes back to <strong>Issued</strong>, with the same number, so the invoice can be paid again. The payment is not deleted: it moves to <strong>Earlier payments</strong> on the record, with your reason. A void invoice cannot be reopened.</p>
           <h3 id="void-an-invoice">Void an invoice<a class="heading-anchor" href="#void-an-invoice" aria-label="Link to this section">#</a></h3>
           <p>Operators only. Void an issued or paid invoice when it is wrong or no longer due.</p>
           <ol>
@@ -518,7 +526,7 @@
           <li>Enter the <strong>Reason</strong>. It is required.</li>
           <li>Select <strong>Void</strong> and the number, such as <strong>Void INV-0004</strong>.</li>
           </ol>
-          <p>The status becomes <strong>Void</strong>. The invoice stays in the list, and its number stays used: it is never given to another invoice. A paid invoice keeps its payment record. A void cannot be undone. Staff see who can void instead of the control.</p>
+          <p>The status becomes <strong>Void</strong>. The invoice stays in the list, and its number stays used: it is never given to another invoice. A paid invoice keeps its payment record. A void cannot be undone. Staff see who can void and reopen instead of the controls.</p>
           <h3 id="correct-an-issued-invoice">Correct an issued invoice<a class="heading-anchor" href="#correct-an-issued-invoice" aria-label="Link to this section">#</a></h3>
           <p>An issued invoice cannot change. To correct one, an operator voids it, then you select <strong>Duplicate as a new draft</strong>. The copy is a new draft with the same bill-to details, lines, discounts, tax, reference and notes, in the same currency. It has no number and no due date. It links back to the invoice it came from. Check it, save it, and issue it; it takes the next number. You can duplicate any invoice, for example to bill the same sponsor again next year.</p>
           <h3 id="find-an-invoice">Find an invoice<a class="heading-anchor" href="#find-an-invoice" aria-label="Link to this section">#</a></h3>
@@ -687,7 +695,7 @@
           <tr><td>Organizations and sponsors</td><td>Staff</td><td>Organization ID, name, state, hidden, tier, website, description, support description, logo path, order</td></tr>
           <tr><td>Ticket orders</td><td>Operator</td><td>Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs</td></tr>
           <tr><td>Admissions</td><td>Operator</td><td>Ticket ID, order ID, provider, ticket type, holder&#39;s first and last name, email, status, whether an account claimed it, checked in, purchased</td></tr>
-          <tr><td>Invoices</td><td>Staff</td><td>Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created</td></tr>
+          <tr><td>Invoices</td><td>Staff</td><td>Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created. A reopened invoice&#39;s earlier payments are in the event data package.</td></tr>
           </tbody>
           </table>
           </div>

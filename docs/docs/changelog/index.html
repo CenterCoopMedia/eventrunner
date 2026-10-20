@@ -138,7 +138,8 @@
           the invoice as <code>&lt;number&gt;.pdf</code> from the new <code>invoicePdf</code> endpoint, built with the shared PDF
           kit; a paid invoice says when and how, and a void one says VOID and why. Staff mark an
           issued invoice paid with a date, a method and a note. Only an operator voids, with a reason;
-          the number stays used. <strong>Duplicate as a new draft</strong> copies any invoice into a new draft
+          the number stays used. Only an operator reopens a paid invoice, with a reason, after a
+          payment that did not hold; the payment is kept in the invoice&#39;s payment history. <strong>Duplicate as a new draft</strong> copies any invoice into a new draft
           with no number. Data export gains an invoices spreadsheet for staff, the event data package
           a <code>billing/</code> part, and the repeat-event template leaves invoices behind so a new event
           starts at <code>0001</code>. Every write refuses on a read-only demo and records an audit row in the
