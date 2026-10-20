@@ -213,7 +213,7 @@ Organizers can announce, message, and bill, and attendees can talk to each other
 - [x] Add batch send to the email provider interface (#201)
 - [x] Add the announcement email composer (#202)
 - [ ] Add saved templates and a send history to the composer (#203). The send history and **Use this message** shipped; named saved templates did not.
-- [ ] Add an editable speaker mail template (#204)
+- [x] Add an editable speaker mail template (#204)
 - [ ] Add the social feed read surface and moderation store (#205)
 - [ ] Add the post composer and thread view (#206)
 - [ ] Add the notification inbox (#207)
