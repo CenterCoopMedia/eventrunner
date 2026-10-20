@@ -142,6 +142,10 @@ it and every `defineSecret`-backed function fails at cold start or at read, not 
 Scheduler job behind `cleanupExpiredAuthChallenges` (an `onSchedule` v2 function,
 `functions/src/auth/otp.cjs`) — every deployment has at least this one scheduled function, so the
 role is not conditional the way `secretmanager.secretAccessor` is.
+The same role creates the job behind `runScheduledReminders` (`functions/src/reminders/run.cjs`,
+every 60 minutes, issue #518). That function binds the mail provider's secrets, and the operator
+webhook's when `EVENT_OPERATOR_NOTIFIER=webhook`, so the secret bindings in §2 cover it. It sends
+nothing until staff approve a reminder schedule in the admin.
 
 Bind the deploy service account so **only** this repository, on `refs/heads/main`, may impersonate
 it — both conditions in one `principalSet`, via the combined attribute mapped in §1:
@@ -570,6 +574,19 @@ client already past step 3 never needs it again.
   `us-central1` as its placeholder, correct for that value and every client that doesn't override
   the region. The site publisher applies the same patch in code (`patchHostingRegion`,
   `scripts/publish-site.cjs`).
+- **The reminder scheduler job exists.** After the first deploy that includes
+  `runScheduledReminders`, list the Cloud Scheduler jobs and find
+  `firebase-schedule-runScheduledReminders-<EVENT_FIREBASE_REGION>`, set to `every 60 minutes`:
+
+  ```sh
+  gcloud scheduler jobs list --project=<GCP_PROJECT_ID> --location=<EVENT_FIREBASE_REGION> \
+    --format="table(name,schedule,state)"
+  ```
+
+  The job must be `ENABLED`. A paused or missing job means no scheduled reminder goes out, and
+  the admin's **Scheduled reminders** page then shows a last run older than an hour while a
+  schedule is on. The job runs every hour on every deployment; a run with no schedule turned on
+  reads one document and returns.
 - If `google-github-actions/auth` fails with `permission_denied` on a run you expected to succeed
   (dispatched from `main`), the attribute condition (§1) or the repository+ref binding (§2) is the
   first thing to re-check — copy the exact `repository` and `ref` claims GitHub sent from the failed

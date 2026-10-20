@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Scheduled speaker reminders (#518). On the new **Scheduled reminders** page, staff set a
+  due date for the speaker items, the days before it to send (14, 7 and 2 by default), a send
+  time on the event's clock, and the items to name. They preview one sample per reminder day,
+  then approve and turn the schedule on. It is off by default. Once an hour,
+  `runScheduledReminders` sends the approved wording to each accepted speaker who still owes a
+  chosen item, at most once per reminder day, through the same send path as a staff reminder.
+  The 24-hour limit applies in both directions between scheduled and staff reminders. Nothing
+  sends from 20:00 to 08:00 on the event's clock, on a historical demo, or after the event.
+  New wording, or a settings change while the schedule is on, pauses it until staff approve it
+  again. The page states whether the schedule is on, off or paused, when the next reminder
+  goes, who it would reach, who waits on the 24-hour limit, and what the last run did. The
+  reminder wording gains two optional tokens, `{{due_date}}` and `{{days_left}}`, set only by
+  the schedule. Every run that emails anyone writes one admin log entry.
+
 - Staff set the pitch call deadline and the ticket catalog's sale windows as a date and a
   time on the event's clock. The fields name the event's time zone and state the result in
   words, with the UTC offset for the chosen date. A time that daylight saving time skips is
@@ -417,6 +431,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installable (#218).
 
 ### Fixed
+
+- The speaker reminder wording version now names the wording that is actually sent. Saved
+  wording that fails its token check is sent as the shipped copy, so its version is now the
+  shipped version, not the digest of the saved text. A saved field left blank takes the
+  shipped field, and the version now covers that field too (#518).
 
 - A speaker reminder send now refuses shipped wording that changed after its preview. When no
   wording is saved, the preview's wording version is `shipped:` and a digest of the shipped

@@ -23,7 +23,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, System errors, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -318,7 +318,44 @@ Every reminder goes through the event's email provider and appears in the Email 
 
 **Reminder wording.** The **Reminder wording** panel edits the subject, the HTML body, and the plain text body. Each missing item is one line inside a condition, for example `{{#if materials_sessions}}…{{/if}}`, so a line appears only when the speaker owes that item. `{{description_sessions}}` and `{{materials_sessions}}` hold the session titles. Both bodies must keep `{{dashboard_url}}`, the link to the speaker's dashboard. The server refuses a token the template does not know and says which one. **Use the shipped wording** deletes the saved wording. Each save and each reset writes an admin log entry. Save, then preview, to read the new wording as each speaker gets it.
 
+Saving or resetting the wording pauses scheduled reminders until you approve them again (see **Scheduled reminders** below). The panel says so above **Save wording**.
+
 **Export this list as CSV** saves the speakers the current **Show** choice lists, one row per speaker, with the name, the email address, the status, the missing items, the session titles, and the last reminder. Use it with your own mailing tool. A cell that starts like a spreadsheet formula is escaped. Each export writes an admin log entry first. If that entry cannot be written, no file is made.
+
+### Scheduled reminders
+
+Send speaker reminders on a schedule, before a due date. Open **Scheduled reminders** on the rail, or **Scheduled reminders** at the top of the Speaker reminders page. Staff and operators can use this page. The schedule is off until you preview it and approve it.
+
+**Settings.** Under **Speakers**:
+
+- **Days before the due date**: One reminder for each number, from 1 to 365 days, at most six. The default is 14, 7 and 2 days.
+- **Due date**: The date and time the items are due, on the event's clock. The field names the event's time zone. Approving needs a due date.
+- **Send time**: The time of day each reminder goes, on the event's clock. The default is 10:00.
+- **Items to remind about**: Biography, Headshot, Session description, Materials. All four by default.
+
+Select **Save settings** to store them.
+
+**Who gets a reminder.** Each accepted speaker with an email address who still owes one of the chosen items. The rule is the same as on the Speaker reminders page. Each message names only the chosen items that speaker still owes, and says the due date. A speaker who finishes gets no more reminders.
+
+**When.** A reminder for 7 days goes 7 calendar days before the due date, at the send time. Across a daylight saving change it still goes at the send time on the clock people read. The site checks once an hour. If a check is missed, the next one sends the reminder, until the next reminder day starts. Then the earlier reminder is dropped, so nobody gets the 14-day reminder 3 days before. Nothing sends from 8:00 PM to 8:00 AM on the event's clock; a reminder due then waits for 8:00 AM.
+
+**At most one per reminder day, and one in 24 hours.** A speaker gets each reminder day's message once. The 24-hour limit of the Speaker reminders page applies in both directions: A speaker reminded by hand in the last 24 hours waits until the 24 hours end, and a scheduled reminder stops a reminder by hand for 24 hours. A message the email provider may have accepted counts as sent and is not sent again. Check the Email log.
+
+**Preview, then approve.** Save the settings, then select **Preview**. The page shows one sample message for each reminder day, as the first speaker who owes an item would get it. If nobody owes an item, it uses a sample speaker. Select **Approve and turn on** to turn the schedule on with that wording and those settings. If the wording or the settings changed after your preview, the server refuses. Preview again, then approve.
+
+**Paused.** The schedule pauses, and says why, in these cases:
+
+- Someone saves or resets the reminder wording on the Speaker reminders page.
+- A deploy changes the shipped wording that the schedule sends.
+- Someone saves different settings while the schedule is on.
+
+A paused schedule sends nothing. Preview, then approve to turn it on again. When a check finds wording you did not approve, it also tells the operator.
+
+**Next run.** The panel says when the next reminder goes, with the time zone named, which reminder day it is, and who it would reach. It names the speakers who wait on the 24-hour limit, and when they can get one. It also says what the last check did.
+
+**Turn off** stops the schedule. Nothing sends until you approve it again.
+
+The schedule does nothing on a historical demo, and nothing after the last event day. Every approval, settings save, pause, and turn-off writes an admin log entry. Each check that emails anyone writes one admin log entry that names the speakers.
 
 ## Attendees
 
