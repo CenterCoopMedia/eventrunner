@@ -16,6 +16,8 @@
     "cmsUpdatePublishStatus",
     "cmsSaveUpdate",
     "cmsDeleteUpdate",
+    "ownOrganizationProfile",
+    "organizationRepresentatives",
     "updateEventConfig",
     "updateFeatures",
     "updateTheme",

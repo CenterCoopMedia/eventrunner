@@ -664,6 +664,33 @@ test('cmsDeleteContent removes live and draft in one transaction and logs the ac
   assert.equal(db.ids('admin_logs').length, 1);
 });
 
+// Issue #334: a representative's access belongs to one organization. A
+// delete takes every grant and the queued edit with it, so an organization
+// added later at the same address does not inherit them.
+test('cmsDeleteContent on an organization removes its representatives and its queued edit, with audit rows', async () => {
+  const db = makeFakeDb({
+    'cmsOrganizations/beacon-fund': { name: 'Beacon Fund', visible: true, revision: 1 },
+    'organization_representatives/uid-ada': { uid: 'uid-ada', organizationId: 'beacon-fund' },
+    'organization_representatives/uid-cy': { uid: 'uid-cy', organizationId: 'beacon-fund' },
+    'organization_representatives/uid-bo': { uid: 'uid-bo', organizationId: 'tide-media' },
+    'organization_edit_requests/beacon-fund': { organizationId: 'beacon-fund', fields: { bio: 'x' }, submittedByUid: 'uid-ada' },
+    'organization_edit_requests/tide-media': { organizationId: 'tide-media', fields: { bio: 'y' }, submittedByUid: 'uid-bo' },
+  });
+  const res = fakeRes();
+  await createCmsDeleteContentHandler(deps(db))(
+    req({ body: { collection: 'cmsOrganizations', docId: 'beacon-fund' } }),
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(db.read('cmsOrganizations', 'beacon-fund'), undefined);
+  assert.deepEqual(db.ids('organization_representatives'), ['uid-bo']);
+  assert.deepEqual(db.ids('organization_edit_requests'), ['tide-media']);
+  const rows = db.ids('admin_logs').map((id) => db.read('admin_logs', id));
+  const revoked = rows.filter((row) => row.action === 'revokeOrganizationRepresentative').map((row) => row.docPath).sort();
+  assert.deepEqual(revoked, ['organization_representatives/uid-ada', 'organization_representatives/uid-cy']);
+  assert.ok(rows.some((row) => row.action === 'cms-delete-content'));
+});
+
 test('cmsDeleteContent on a cmsSchedule doc cascades: its materials and their public projections are deleted too (issue #23 follow-up)', async () => {
   const db = makeFakeDb({
     'cmsSchedule/s1': { title: 'Session', visible: true, revision: 1, materialCount: 2 },

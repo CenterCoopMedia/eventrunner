@@ -287,7 +287,9 @@ const firebaseJson = JSON.parse(
 const PRIVATE_SOURCES = [
   '/signin',
   '/profile',
-  // The reader's own change requests (#330) and any later account page.
+  // Account pages under /profile: the reader's own change requests (#330)
+  // and a representative's own organization (#334). One rule covers every
+  // nested page.
   '/profile/**',
   '/attendees',
   '/attendees/**',

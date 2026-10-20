@@ -16,6 +16,7 @@ import { useToast } from '../../contexts/ToastContext.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { summarizePublish } from '../publishResult.js';
 import { useAdminOrganizations } from '../useAdminOrganizations.js';
+import { useOrganizationRepresentatives } from '../useOrganizationRepresentatives.js';
 import { orderSaveMessage, ordersToWrite, saveOrderWrites, useDraftOrder } from '../reorder.js';
 import { useUnsavedNavigation } from '../useUnsavedNavigation.js';
 import { UnsavedChangesDialog } from '../components/UnsavedChanges.jsx';
@@ -48,6 +49,8 @@ const text = (value) => (typeof value === 'string' && value.trim() ? value.trim(
 
 export default function AdminOrganizationsList() {
   const { rows, loading, error } = useAdminOrganizations();
+  // A representative's edit waiting for review (issue #334) is named on its row.
+  const { hasRequest } = useOrganizationRepresentatives();
   const call = useAdminApi();
   const { showToast } = useToast();
   const draft = useDraftOrder(rows);
@@ -273,6 +276,7 @@ export default function AdminOrganizationsList() {
                       <span className="flex flex-wrap items-center gap-2xs">
                         <RecordState state={row.state} />
                         {organization.visible === false ? <StatusBadge tone="neutral">Hidden</StatusBadge> : null}
+                        {hasRequest(row.id) ? <StatusBadge tone="caution">Edit waiting for review</StatusBadge> : null}
                       </span>
                     </td>
                   </tr>

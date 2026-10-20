@@ -185,7 +185,23 @@ The organizations the Sponsors page draws: Add, edit, publish, and delete them h
 
 **Every save is checked.** The editor and the server refuse an empty name, an order that is not a number, and a website that does not start with `http://` or `https://`. The server also refuses a name that is not text, and it checks the logo path: The path must point inside the site's own files, so a web address, a path that starts with `/`, and a path that contains `..` are refused. The server does not check that the file exists. Each refusal names the field, and the editor shows it on that field, the logo's on the Logo field.
 
-**Delete** removes the live organization and its draft. The logo stays in the media library.
+**Delete** removes the live organization and its draft. The logo stays in the media library. The organization's representatives lose access, and an edit waiting for review is removed, so a new organization at the same address starts with no representatives.
+
+### Representatives
+
+A sponsor or partner can keep its own profile current. You give one account access to one organization, and every change that account makes waits for your review.
+
+**Add a representative.** Open the organization. Under **Representatives**, type the address the person signs in with and select **Add representative**. The person must have signed in to the site once, with a confirmed address, before you can add them. One account represents one organization at a time. Then send them the link to `/profile/organization` on your site. Each addition writes an admin log entry.
+
+**What a representative can change.** The short description, the longer text about the organization, and the website. Nothing else: the name, the logo, the tier, the order, visibility, the support text, and every other organization stay with staff. The server refuses any other field by name. The website must start with `http://` or `https://`.
+
+**Nothing they send is public until you publish it.** A representative's save does not touch the organization or its draft. It waits under **Edit waiting for review** in the organization editor, beside the text in the draft now, and the organizations list marks the row **Edit waiting for review**. Select **Apply to draft** to copy it into the draft, then publish as usual. Select **Discard this edit** to remove it; the organization does not change. Each apply and discard writes an admin log entry. One edit waits for each organization: a representative who sends again adds to their own edit, and while one representative's edit waits, another representative of the same organization is asked to wait until you review it.
+
+**Your own edits are kept.** Apply writes only the fields the representative changed. If you changed one of those fields in the draft after they sent the edit, apply stops and names the field. Check it, then select **Apply and replace staff text** to use theirs. Apply also stops while the editor holds unsaved text in the same field: save or undo it first.
+
+**Remove a representative.** Select **Remove** beside their address and confirm. The account loses access at once, and an edit it sent that you have not reviewed is discarded. The removal writes an admin log entry. Deleting the person's account also removes their access.
+
+**Who sees what.** Only staff and operators see who represents an organization. The representative's address never reaches the public page, the draft, or a published version.
 
 ## Content (Pages → Content editor)
 
@@ -466,14 +482,14 @@ A cell with more than one entry joins them with a semicolon. The file carries no
 
 **Past attendance.** Select **Edit record** on a row to open that account's record. **Past attendance** takes one edition per line, such as a year: at most 20 editions of up to 40 characters each, with no repeats. Select **Save record** to store it. Attendees cannot change this list, and it never appears in the directory. It is a column in the export, and the row shows it under the address. Each save writes an admin log entry.
 
-**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, and its shared schedule, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, and the change requests the person sent. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
+**Delete an account.** In the record, select **Delete account**, read what the delete removes, and select **Delete this account**. The delete removes the account, its directory profile, its shared schedule, and its access as an organization representative, and releases its ticket claims, in one step, so the person leaves the directory at once. It then removes the sign-in, the saved sessions (and lowers each session's saved count), the private notes, the profile photo, the change requests the person sent, and any organization edit the person sent that is still waiting for review. The ticket record stays, unclaimed. Sent email records, feedback, session reactions, and the admin log stay too. The delete writes an admin log entry with your address, and it cannot be undone. A person whose account was deleted can sign in again later; they get a new pending account with no history.
 
 The server refuses a delete in four cases, and says why:
 
 - Your own account.
 - An account with operator or staff access. An operator removes that access on the Access page first.
 - An account linked to a speaker. Delete the speaker record first, in Speakers.
-- An account that holds more than 496 claimed tickets. The refusal names the count, because one delete can release at most 496.
+- An account that holds more than 495 claimed tickets. The refusal names the count, because one delete can release at most 495.
 
 **If a delete stops part way.** When the account has left the directory but some of its data did not clear, the page keeps a notice with **Try the delete again**. The page does the same when the answer does not arrive, for example after a timeout or a dropped connection, because the delete may have started. Select it until the page says the account is deleted. Each retry clears only what is left, and records itself in the admin log. For up to an hour after the delete, the person's open session can still claim a ticket; a retry also releases a ticket claim made after the delete. A refusal made before anything was deleted, such as a speaker-linked account, shows in the record itself.
 

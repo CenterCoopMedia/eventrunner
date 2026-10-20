@@ -113,7 +113,8 @@ const STATIC_PRIVATE_ROUTES = Object.freeze([
     path: '/signin', access: 'account', hasChildren: false, tokenBearing: false,
   }),
   Object.freeze({
-    path: '/profile', access: 'authenticated', hasChildren: false, tokenBearing: false,
+    // Account pages sit under it, such as /profile/organization (issue #334).
+    path: '/profile', access: 'authenticated', hasChildren: true, tokenBearing: false,
   }),
   Object.freeze({
     path: '/dashboard', access: 'authenticated', hasChildren: false, tokenBearing: false,
