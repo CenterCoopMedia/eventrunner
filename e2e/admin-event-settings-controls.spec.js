@@ -60,6 +60,8 @@ test('event days, tracks, and the time zone use labelled compact controls that f
   // that names that day.
   await expect(page.getByLabel(/^Day \d+ id$/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Add day', exact: true })).toHaveCount(1);
+  // Add and remove wait for the live and draft session lists.
+  await expect(page.getByRole('button', { name: 'Add day', exact: true })).not.toHaveAttribute('aria-disabled', 'true');
   const dayCount = await page.getByRole('button', { name: /^Remove day \d+/ }).count();
   for (let i = 0; i < 4; i += 1) {
     await page.getByRole('button', { name: 'Add day', exact: true }).click();
