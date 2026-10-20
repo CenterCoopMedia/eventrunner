@@ -7,8 +7,8 @@
  * One POST endpoint takes action-style requests, like the ticketing
  * organizer API (ticketing/commerceAdmin.cjs): list, get, settings,
  * saveDraft, deleteDraft and saveSettings (#208), then issue, markPaid,
- * void and duplicate (#209). Each action declares its tier: only an
- * operator voids or changes the settings. The PDF of an issued invoice is
+ * void, reopen and duplicate (#209). Each action declares its tier: only
+ * an operator voids, reopens a paid invoice, or changes the settings. The PDF of an issued invoice is
  * a separate endpoint, invoicePdf (invoicePdf.cjs), because it answers a
  * file and not JSON.
  *
@@ -46,7 +46,7 @@ const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
 const {
   INVOICE_STATUSES, PAYMENT_METHODS, isInvoiceId, sanitizeInvoiceText, validateInvoiceDraft, validateInvoiceSettings,
-  resolveInvoiceCurrency, formatInvoiceNumber, invoiceDateIn, validatePayment, validateVoidReason, issueProblems,
+  resolveInvoiceCurrency, formatInvoiceNumber, invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems,
 } = require('shared/invoice');
 const { CURRENCY_EXPONENTS } = require('shared/ticketCommerce');
 
@@ -57,7 +57,7 @@ const CATALOG = 'ticket_catalog';
 const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
-const OPERATOR_ACTIONS = new Set(['saveSettings', 'void']);
+const OPERATOR_ACTIONS = new Set(['saveSettings', 'void', 'reopen']);
 const READ_ACTIONS = new Set(['list', 'get', 'settings']);
 const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'saveDraft', 'deleteDraft', 'issue', 'markPaid', 'duplicate']);
 const CURSOR_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\|inv_[a-z0-9]{16,40}$/;
@@ -146,6 +146,15 @@ function publicPayment(payment) {
     recordedBy: uidOrNull(payment.recordedBy),
   };
 }
+/** Payments a reopen undid, oldest first. Kept, never deleted. */
+function publicPaymentHistory(history) {
+  return (Array.isArray(history) ? history : []).map((entry) => ({
+    ...publicPayment(entry),
+    reopenedAt: iso(entry?.reopenedAt),
+    reopenedBy: uidOrNull(entry?.reopenedBy),
+    reason: sanitizeInvoiceText(entry?.reason),
+  }));
+}
 function publicVoided(voided) {
   if (!voided || typeof voided !== 'object') return null;
   return {
@@ -194,6 +203,7 @@ function publicInvoice(stored, id) {
     issuedAt: iso(stored.issuedAt),
     issuedBy: uidOrNull(stored.issuedBy),
     payment: publicPayment(stored.payment),
+    paymentHistory: publicPaymentHistory(stored.paymentHistory),
     voided: publicVoided(stored.voided),
     duplicatedFrom: stored.duplicatedFrom && isInvoiceId(stored.duplicatedFrom.invoiceId)
       ? {
@@ -483,6 +493,46 @@ async function voidInvoice({ db, actor, body, now }) {
 }
 
 /**
+ * Operator only (OPERATOR_ACTIONS): a paid invoice back to issued, such as
+ * after a bounced check. The payment moves to `paymentHistory` with the
+ * reason, so the record of it is kept. A void invoice stays void.
+ */
+async function reopenInvoice({ db, actor, body, now }) {
+  const id = invoiceIdOf(body.invoiceId);
+  const expectedRevision = revisionOf(body.expectedRevision);
+  const reason = validateReopenReason(body.reason);
+  if (!reason.ok) invalid('reopen', reason.issues);
+  const logRef = auditRef(db);
+  let saved;
+  await db.runTransaction(async (tx) => {
+    await requireWrites(db, tx);
+    const { ref, stored } = await lockedInvoice(tx, db, id, expectedRevision);
+    const status = statusOf(stored);
+    if (status === 'void') fail(409, 'conflict', 'A void invoice cannot be reopened. Duplicate it into a new draft instead.');
+    if (status !== 'paid' || !stored.payment || typeof stored.payment !== 'object') {
+      fail(409, 'conflict', 'Only a paid invoice can be reopened.');
+    }
+    const at = now();
+    const history = Array.isArray(stored.paymentHistory) ? stored.paymentHistory : [];
+    saved = {
+      ...stored,
+      status: 'issued',
+      payment: null,
+      paymentHistory: [...history, { ...stored.payment, reopenedAt: at, reopenedBy: actor.uid, reason: reason.value }],
+      revision: expectedRevision + 1,
+      updatedAt: at,
+      updatedBy: actor.uid,
+    };
+    tx.set(ref, saved);
+    audit(tx, logRef, {
+      action: 'reopened', actor, now, docPath: `${INVOICES}/${id}`, invoiceId: id,
+      details: { revision: saved.revision, number: stored.number, reason: reason.value, paidOn: stored.payment.paidOn ?? null, method: stored.payment.method ?? null },
+    });
+  });
+  return { invoice: publicInvoice(saved, id) };
+}
+
+/**
  * Copy an invoice of any status into a new draft: the bill-to block, the
  * lines, the tax and discount rows, the reference and the notes, in the
  * same currency. No number, no issuer, no due date. The caller mints the
@@ -618,9 +668,10 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
       else if (action === 'markPaid') result = await markPaid(deps);
       else if (action === 'void') result = await voidInvoice(deps);
       else if (action === 'duplicate') result = await duplicateInvoice(deps);
-      // The page offers Void only to a caller who may use it; the action
+      else if (action === 'reopen') result = await reopenInvoice(deps);
+      // The page offers Void and Reopen only to a caller who may use them; the action
       // itself checks the tier again (OPERATOR_ACTIONS).
-      if (result?.invoice) result = { ...result, canVoid: actor.tier === 'operator' };
+      if (result?.invoice) result = { ...result, canVoid: actor.tier === 'operator', canReopen: actor.tier === 'operator' };
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof InvoiceError) return sendError(res, error.status, error.code, error.message);

@@ -283,6 +283,11 @@ test('invoices: the frozen records go in billing/, and the settings and the coun
   assert.equal(paid.issuer.paymentInstructions, 'Pay by bank transfer to account 000000.');
   assert.deepEqual(paid.payment, { paidOn: '2026-04-02', method: 'bank-transfer', note: 'Ref 42', recordedAt: '2026-03-27T14:00:00.000Z' });
   assert.deepEqual(voided.voided, { reason: 'Wrong amount', from: 'issued', at: '2026-03-27T14:00:00.000Z' });
+  assert.deepEqual(paid.paymentHistory, [{
+    paidOn: '2026-03-30', method: 'check', note: 'Check 1042', recordedAt: '2026-03-27T14:00:00.000Z',
+    reopenedAt: '2026-03-27T14:00:00.000Z', reason: 'Check bounced',
+  }]);
+  assert.deepEqual(voided.paymentHistory, []);
   for (const key of ['createdBy', 'updatedBy', 'issuedBy', 'listKey']) assert.equal(Object.hasOwn(paid, key), false, key);
   assert.match(files.get('billing/invoices.csv').toString('utf8'), /"inv_fixture0000000000000001","INV-0001","Paid"/);
   const sources = EXCLUDED.map((entry) => entry.source).join(' ');

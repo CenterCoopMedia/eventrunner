@@ -41,6 +41,7 @@ const INVOICE_LIMITS = Object.freeze({
   paymentInstructions: 2000,
   paymentNote: 500,
   voidReason: 500,
+  reopenReason: 500,
 });
 const INVOICE_STATUSES = Object.freeze(['draft', 'issued', 'paid', 'void']);
 const ADJUSTMENT_KINDS = Object.freeze(['discount', 'tax']);
@@ -426,6 +427,17 @@ function validateVoidReason(input) {
 }
 
 /**
+ * Why an operator reopens a paid invoice, such as a bounced check.
+ * Required, one line, cleaned. The payment it undoes is kept in the
+ * invoice's payment history, never deleted.
+ */
+function validateReopenReason(input) {
+  const issues = [];
+  const value = textField(issues, 'reason', input, INVOICE_LIMITS.reopenReason, { required: true, label: 'the reason for reopening' });
+  return issues.length ? { ok: false, value: null, issues } : { ok: true, issues: [], value };
+}
+
+/**
  * What stops a valid draft from being issued: no line, a due date before
  * the issue date, or invoice settings with no issuer name. An empty list
  * means it is ready.
@@ -452,5 +464,5 @@ module.exports = {
   PAYMENT_METHODS, PAYMENT_METHOD_WORDS, DEFAULT_INVOICE_PREFIX, DEFAULT_INVOICE_CURRENCY,
   isInvoiceId, sanitizeInvoiceText, computeInvoiceTotals, parseMoneyInput, minorToInput, formatMoney,
   resolveInvoiceCurrency, formatInvoiceNumber, validateInvoiceDraft, validateInvoiceSettings,
-  invoiceDateIn, validatePayment, validateVoidReason, issueProblems,
+  invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems,
 };

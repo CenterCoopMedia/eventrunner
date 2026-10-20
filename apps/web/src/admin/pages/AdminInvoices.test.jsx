@@ -327,7 +327,7 @@ describe('invoice settings', () => {
 const ISSUED = {
   ...STORED, status: 'issued', number: 'INV-0004', revision: 4, issueDate: '2026-10-20',
   issuer: { name: 'Example Events', address: '2 High Street', email: 'events@example.org', taxId: 'TAX-1', paymentInstructions: 'Account 000000.' },
-  payment: null, voided: null, duplicatedFrom: null,
+  payment: null, paymentHistory: [], voided: null, duplicatedFrom: null,
 };
 
 describe('issuing an invoice', () => {
@@ -437,7 +437,7 @@ describe('an issued invoice', () => {
     await renderAt(`/admin/invoices/${ISSUED.id}`);
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     expect(screen.queryByRole('button', { name: 'Void this invoice' })).toBeNull();
-    expect(screen.getByText(/Only an operator can void an invoice\./)).toBeInTheDocument();
+    expect(screen.getByText(/Only an operator can void an invoice or reopen a paid one\./)).toBeInTheDocument();
   });
 
   it('voids with the reason an operator gives, and the number stays used', async () => {
@@ -461,6 +461,43 @@ describe('an issued invoice', () => {
     expect(await screen.findByText('Void', { selector: '[data-invoice-status]' })).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Invoice record' })).getByText('Wrong amount')).toBeInTheDocument();
     expect(screen.getByText(/INV-0004 stays used/)).toBeInTheDocument();
+  });
+
+  it('lets an operator reopen a paid invoice with a reason, and keeps the payment in the history', async () => {
+    const payment = { paidOn: '2026-10-19', method: 'check', note: 'Check 1042', recordedAt: '2026-10-19T12:00:00.000Z', recordedBy: 'admin-1' };
+    answers.get = { invoice: { ...ISSUED, status: 'paid', revision: 5, payment }, canVoid: true, canReopen: true };
+    answers.reopen = (body) => response({
+      invoice: {
+        ...ISSUED, status: 'issued', revision: 6, payment: null,
+        paymentHistory: [{ ...payment, reopenedAt: '2026-10-20T12:00:00.000Z', reopenedBy: 'admin-1', reason: body.reason }],
+      },
+      canVoid: true, canReopen: true,
+    });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen this invoice' }));
+    const reason = await screen.findByLabelText('Reason for reopening', { exact: false });
+    await waitFor(() => expect(reason).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen INV-0004' }));
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
+    expect(invoiceCalls().some((body) => body.action === 'reopen')).toBe(false);
+    fireEvent.change(reason, { target: { value: 'Check bounced' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen INV-0004' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({ action: 'reopen', invoiceId: ISSUED.id, expectedRevision: 5, reason: 'Check bounced' }));
+    expect(await screen.findByText('Issued', { selector: '[data-invoice-status]' })).toBeInTheDocument();
+    const history = screen.getByRole('list', { name: 'Earlier payments' });
+    expect(history).toHaveTextContent('2026-10-19');
+    expect(history).toHaveTextContent('Check 1042');
+    expect(history).toHaveTextContent('Reopened: Check bounced');
+    expect(screen.getByRole('button', { name: 'Mark paid' })).toBeInTheDocument();
+  });
+
+  it('does not offer Reopen to staff', async () => {
+    answers.get = { invoice: { ...ISSUED, status: 'paid', payment: { paidOn: '2026-10-19', method: 'cash', note: '' } }, canVoid: false, canReopen: false };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    expect(screen.queryByRole('button', { name: 'Reopen this invoice' })).toBeNull();
+    expect(screen.getByText(/Only an operator can void an invoice or reopen a paid one\./)).toBeInTheDocument();
   });
 
   it('duplicates into a new draft and opens it', async () => {

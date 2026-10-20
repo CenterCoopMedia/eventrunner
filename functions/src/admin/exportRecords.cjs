@@ -316,7 +316,8 @@ function orderRecord(id, data) {
 
 /**
  * An invoices document as invoiceAdmin answers it (publicInvoice: stored
- * text cleaned again on read), without the staff account ids, the
+ * text cleaned again on read), with its payment history, without the
+ * staff account ids (also in the payment and its history), the
  * revision and the list key. An issued invoice keeps its frozen issuer
  * block, payment instructions included: that is what its reader was sent.
  * The live settings (invoice_settings) never go.
@@ -334,6 +335,10 @@ function invoiceRecord(id, data) {
       paidOn: invoice.payment.paidOn, method: invoice.payment.method, note: invoice.payment.note, recordedAt: invoice.payment.recordedAt,
     },
     voided: invoice.voided && { reason: invoice.voided.reason, from: invoice.voided.from, at: invoice.voided.at },
+    paymentHistory: invoice.paymentHistory.map((entry) => ({
+      paidOn: entry.paidOn, method: entry.method, note: entry.note, recordedAt: entry.recordedAt,
+      reopenedAt: entry.reopenedAt, reason: entry.reason,
+    })),
   });
 }
 

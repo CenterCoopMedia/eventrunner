@@ -61,7 +61,7 @@ test('only verified admins reach invoices, and settings changes need an operator
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Cache-Control'], 'private, no-store');
   assert.equal((await call(db, { action: 'list' }, 'staff', 'GET')).statusCode, 405);
-  assert.equal((await call(db, { action: 'reopen', invoiceId: ID })).statusCode, 400);
+  assert.equal((await call(db, { action: 'refund', invoiceId: ID })).statusCode, 400);
 });
 
 test('a draft is saved with server totals, reopened, and its totals recomputed', async () => {
@@ -540,4 +540,66 @@ test('issue refuses invoice settings that no longer validate, and a draft whose 
   assert.equal(res.statusCode, 409);
   assert.match(res.body.error.message, /currency/);
   assert.equal((await odd.collection('invoices').doc(ID).get()).data().status, 'draft');
+});
+
+test('only an operator reopens a paid invoice, with a reason, and the payment moves to the history', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  // An issued invoice has no payment to reopen.
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 2, reason: 'x' }, 'operator')).statusCode, 409);
+  await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment: { paidOn: '2026-10-19', method: 'check', note: 'Check 1042' } });
+
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 3, reason: 'Check bounced' })).statusCode, 403);
+  const blank = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 3, reason: ' ' }, 'operator');
+  assert.equal(blank.statusCode, 400);
+  assert.match(blank.body.error.message, /^Invalid reopen: reason: /);
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 2, reason: 'Check bounced' }, 'operator')).statusCode, 409);
+
+  const res = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 3, reason: 'Check bounced' }, 'operator');
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const { invoice } = res.body;
+  assert.equal(invoice.status, 'issued');
+  assert.equal(invoice.number, 'INV-0001');
+  assert.equal(invoice.payment, null);
+  assert.equal(invoice.revision, 4);
+  assert.equal(res.body.canReopen, true);
+  assert.equal(invoice.paymentHistory.length, 1);
+  assert.deepEqual(
+    { ...invoice.paymentHistory[0], recordedAt: null, reopenedAt: null },
+    { paidOn: '2026-10-19', method: 'check', note: 'Check 1042', recordedAt: null, recordedBy: 'staff', reopenedAt: null, reopenedBy: 'operator', reason: 'Check bounced' },
+  );
+
+  // It can be paid again, and a second reopen keeps both payments.
+  await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 4, payment: { paidOn: '2026-10-20', method: 'bank-transfer' } });
+  const again = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 5, reason: 'Wrong invoice' }, 'operator');
+  assert.deepEqual(again.body.invoice.paymentHistory.map((entry) => entry.method), ['check', 'bank-transfer']);
+  assert.equal((await db.collection('invoice_counters').doc('current').get()).data().lastNumber, 1);
+
+  const rows = (await audits(db)).filter((row) => row.action === 'invoices.reopened');
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0].details, { revision: 4, number: 'INV-0001', reason: 'Check bounced', paidOn: '2026-10-19', method: 'check' });
+  assert.equal(rows[0].actorUid, 'operator');
+  assert.equal((await call(db, { action: 'get', invoiceId: ID })).body.canReopen, false);
+});
+
+test('reopen refuses a void invoice, a draft and a read-only demo', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 1, reason: 'x' }, 'operator')).statusCode, 409);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment: { paidOn: '2026-10-19', method: 'cash' } });
+  await call(db, { action: 'void', invoiceId: ID, expectedRevision: 3, reason: 'Refunded' }, 'operator');
+  const voided = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 4, reason: 'x' }, 'operator');
+  assert.equal(voided.statusCode, 409);
+  assert.match(voided.body.error.message, /void/);
+  assert.equal((await db.collection('invoices').doc(ID).get()).data().payment.method, 'cash');
+
+  const demo = issuedDb({ [`invoices/${OTHER_ID}`]: { ...draft(), status: 'paid', number: 'INV-0009', currency: 'usd', revision: 3, payment: { paidOn: '2026-10-19', method: 'cash', note: '' } } });
+  await demo.collection('config').doc('event').set({ historicalDemo: true });
+  const res = await call(demo, { action: 'reopen', invoiceId: OTHER_ID, expectedRevision: 3, reason: 'x' }, 'operator');
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'read-only-demo');
+  assert.equal((await demo.collection('invoices').doc(OTHER_ID).get()).data().status, 'paid');
+  assert.equal((await audits(demo)).length, 0);
 });

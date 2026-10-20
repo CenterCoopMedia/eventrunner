@@ -7,7 +7,7 @@ const {
   isInvoiceId, computeInvoiceTotals, parseMoneyInput, formatMoney, minorToInput,
   validateInvoiceDraft, validateInvoiceSettings, sanitizeInvoiceText,
   resolveInvoiceCurrency, formatInvoiceNumber,
-  PAYMENT_METHODS, PAYMENT_METHOD_WORDS, invoiceDateIn, validatePayment, validateVoidReason, issueProblems,
+  PAYMENT_METHODS, PAYMENT_METHOD_WORDS, invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems,
 } = require('./invoice.cjs');
 const { CURRENCY_EXPONENTS } = require('./ticketCommerce.cjs');
 
@@ -232,4 +232,12 @@ test('an invoice is ready to issue with a line, an issuer and a due date on or a
     issueProblems({ ...value, lines: [], dueDate: '2026-10-19' }, { settings: { issuerName: '' }, issueDate: '2026-10-20' }).map((issue) => issue.path),
     ['lines', 'dueDate', 'settings.issuerName'],
   );
+});
+
+test('a reopen needs a reason, cleaned and capped, named for the reopen', () => {
+  assert.deepEqual(validateReopenReason(' Check bounced '), { ok: true, issues: [], value: 'Check bounced' });
+  const empty = validateReopenReason('');
+  assert.equal(empty.ok, false);
+  assert.deepEqual(empty.issues, [{ path: 'reason', message: 'Enter the reason for reopening.' }]);
+  assert.equal(validateReopenReason('x'.repeat(INVOICE_LIMITS.reopenReason + 1)).ok, false);
 });

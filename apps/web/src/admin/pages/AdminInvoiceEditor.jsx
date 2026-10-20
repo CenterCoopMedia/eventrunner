@@ -16,7 +16,7 @@
 // issues the saved draft and never the unsaved form: with changes on the
 // form, the page asks for a save first. After issue the fields sit in a
 // disabled fieldset, and InvoiceRecord shows the frozen record with Mark
-// paid, Duplicate and, for an operator, Void. Download PDF is in the
+// paid, Duplicate and, for an operator, Void and Reopen (a paid invoice). Download PDF is in the
 // header of every issued invoice.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -114,6 +114,7 @@ export default function AdminInvoiceEditor({ mode }) {
   const [status, setStatus] = useState('');
   const [prefillStatus, setPrefillStatus] = useState('');
   const [canVoid, setCanVoid] = useState(false);
+  const [canReopen, setCanReopen] = useState(false);
   // The issue confirmation: null when closed, else { nextNumber, unsaved }.
   const [issueConfirm, setIssueConfirm] = useState(null);
   // A duplicate's new id, minted once per source so a retry after a lost
@@ -301,6 +302,7 @@ export default function AdminInvoiceEditor({ mode }) {
     setSaved(formSnapshot(filled));
     setRevision(result.invoice.revision);
     setCanVoid(result.canVoid === true);
+    setCanReopen(result.canReopen === true);
   }
 
   function clearError() {
@@ -376,6 +378,21 @@ export default function AdminInvoiceEditor({ mode }) {
       const result = await call('invoiceAdmin', { action: 'void', invoiceId, expectedRevision: revision, reason });
       applyInvoice(result);
       const message = `Voided ${result.invoice.number}.`;
+      setStatus(message);
+      showToast(message, { announce: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function reopenInvoice(reason) {
+    setBusy('reopen');
+    clearError();
+    setStatus('');
+    try {
+      const result = await call('invoiceAdmin', { action: 'reopen', invoiceId, expectedRevision: revision, reason });
+      applyInvoice(result);
+      const message = `Reopened ${result.invoice.number}. The payment is kept under Earlier payments.`;
       setStatus(message);
       showToast(message, { announce: false });
     } finally {
@@ -562,10 +579,12 @@ export default function AdminInvoiceEditor({ mode }) {
         <InvoiceRecord
           invoice={invoice}
           canVoid={canVoid}
+          canReopen={canReopen}
           timeZone={timeZone}
           busy={busy}
           onMarkPaid={markPaid}
           onVoid={voidInvoice}
+          onReopen={reopenInvoice}
           onDuplicate={duplicate}
         />
       ) : null}

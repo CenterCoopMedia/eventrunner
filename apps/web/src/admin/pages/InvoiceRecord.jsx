@@ -1,6 +1,6 @@
 // The record of an issued invoice (issue #209), and what staff can do with
 // it: mark it paid, duplicate it into a new draft, and, for an operator,
-// void it.
+// void it or reopen a paid one.
 //
 // Everything here is the server's frozen copy: the number, the issue date
 // and the issuer block were fixed at issue, so later settings edits do not
@@ -17,6 +17,7 @@ import {
   PAYMENT_METHOD_WORDS,
   invoiceDateIn,
   validatePayment,
+  validateReopenReason,
   validateVoidReason,
 } from 'shared/invoice';
 import {
@@ -137,8 +138,12 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
   );
 }
 
-/** Void: an operator's reason, on the alarm ground. The number stays used. */
-function VoidForm({ number, busy, onSubmit, onCancel }) {
+/**
+ * An operator's action that needs a reason: Void (on the alarm ground; the
+ * number stays used) and Reopen (a paid invoice back to issued; the payment
+ * is kept in the history). A press with no reason moves focus to the field.
+ */
+function ReasonForm({ title, explanation, label, hint, maxLength, validate, confirmLabel, busyLabel, errorTitle, alarm, busy, onSubmit, onCancel }) {
   const headingId = useId();
   const sectionRef = useRef(null);
   const [reason, setReason] = useState('');
@@ -150,13 +155,14 @@ function VoidForm({ number, busy, onSubmit, onCancel }) {
     if (focusRequest > 0) focusFirstError(sectionRef.current);
   }, [focusRequest]);
 
+  // The button that opened the form is gone, so the keyboard starts here.
   useEffect(() => {
     sectionRef.current?.querySelector('input')?.focus();
   }, []);
 
   async function submit() {
     if (busy) return;
-    const verdict = validateVoidReason(reason);
+    const verdict = validate(reason);
     if (!verdict.ok) {
       setError(verdict.issues[0].message);
       setFocusRequest((count) => count + 1);
@@ -175,25 +181,25 @@ function VoidForm({ number, busy, onSubmit, onCancel }) {
     <section
       ref={sectionRef}
       aria-labelledby={headingId}
-      className="flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm"
+      className={alarm
+        ? 'flex flex-col gap-xs rounded-admin-panel border-admin-alarm border-admin-rule-alarm bg-admin-ground-alarm px-md py-sm'
+        : 'flex flex-col gap-xs rounded-admin-panel border-admin-hairline border-admin-rule-strong bg-admin-ground-raised px-md py-sm'}
     >
-      <h3 id={headingId} className="text-admin-base font-bold text-admin-state-error">Void {number}?</h3>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">
-        The invoice stays in the list as Void, and its number is never given to another invoice. A void cannot be undone. To bill again, duplicate it as a new draft.
-      </p>
-      <ServerErrorSummary error={serverError} title="The invoice was not voided" />
+      <h3 id={headingId} className={`text-admin-base font-bold ${alarm ? 'text-admin-state-error' : 'text-admin-ink'}`}>{title}</h3>
+      <p className="max-w-[65ch] text-admin-sm text-admin-ink">{explanation}</p>
+      <ServerErrorSummary error={serverError} title={errorTitle} />
       <TextField
-        label="Reason"
-        hint="Required. Kept with the invoice and in the audit log."
+        label={label}
+        hint={hint}
         value={reason}
         onChange={setReason}
         error={error}
-        maxLength={INVOICE_LIMITS.voidReason}
+        maxLength={maxLength}
         className="sm:max-w-[28rem]"
       />
       <div className="flex flex-wrap items-center gap-xs">
-        <button type="button" className={dangerButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={submit}>
-          {busy ? 'Voiding…' : `Void ${number}`}
+        <button type="button" className={alarm ? dangerButtonClass : primaryButtonClass} disabled={busy} aria-busy={busy || undefined} onClick={submit}>
+          {busy ? busyLabel : confirmLabel}
         </button>
         <button type="button" className={secondaryButtonClass} disabled={busy} onClick={onCancel}>
           Keep it
@@ -203,12 +209,33 @@ function VoidForm({ number, busy, onSubmit, onCancel }) {
   );
 }
 
+/** The payments a reopen undid, oldest first. */
+function PaymentHistory({ history }) {
+  const headingId = useId();
+  if (!history?.length) return null;
+  return (
+    <div className="flex flex-col gap-3xs">
+      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Earlier payments</h3>
+      <ul aria-labelledby={headingId} className="flex list-disc flex-col gap-3xs ps-5 text-admin-sm text-admin-ink">
+        {history.map((entry, index) => (
+          <li key={`${entry.paidOn}-${index}`}>
+            <span className="font-admin-data tabular-nums">{entry.paidOn}</span>
+            {`, ${PAYMENT_METHOD_WORDS[entry.method] ?? 'Other'}`}
+            {entry.note ? `, ${entry.note}` : ''}
+            {`. Reopened: ${entry.reason || 'no reason given'}`}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
- * @param {{ invoice: object, canVoid: boolean, timeZone?: string, busy: string|null,
+ * @param {{ invoice: object, canVoid: boolean, canReopen: boolean, timeZone?: string, busy: string|null,
  *           onMarkPaid: (payment: object) => Promise<void>, onVoid: (reason: string) => Promise<void>,
- *           onDuplicate: () => void }} props
+ *           onReopen: (reason: string) => Promise<void>, onDuplicate: () => void }} props
  */
-export default function InvoiceRecord({ invoice, canVoid, timeZone, busy, onMarkPaid, onVoid, onDuplicate }) {
+export default function InvoiceRecord({ invoice, canVoid, canReopen, timeZone, busy, onMarkPaid, onVoid, onReopen, onDuplicate }) {
   const headingId = useId();
   const [open, setOpen] = useState(null);
   const issuer = invoice.issuer ?? {};
@@ -241,6 +268,7 @@ export default function InvoiceRecord({ invoice, canVoid, timeZone, busy, onMark
           ) : null}
           {invoice.voided ? <Row term="Void reason">{invoice.voided.reason}</Row> : null}
         </dl>
+        <PaymentHistory history={invoice.paymentHistory} />
         {status === 'void' ? (
           <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
             {invoice.number} stays used. It is never given to another invoice. To bill again, duplicate this invoice as a new draft.
@@ -262,6 +290,11 @@ export default function InvoiceRecord({ invoice, canVoid, timeZone, busy, onMark
           >
             {busy === 'duplicate' ? 'Copying…' : 'Duplicate as a new draft'}
           </button>
+          {status === 'paid' && canReopen && open !== 'reopen' ? (
+            <button type="button" className={secondaryButtonClass} disabled={busy !== null} onClick={() => setOpen('reopen')}>
+              Reopen this invoice
+            </button>
+          ) : null}
           {status !== 'void' && canVoid && open !== 'void' ? (
             <button type="button" className={`${dangerButtonClass} ms-auto`} disabled={busy !== null} onClick={() => setOpen('void')}>
               Void this invoice
@@ -270,7 +303,7 @@ export default function InvoiceRecord({ invoice, canVoid, timeZone, busy, onMark
         </div>
         {status !== 'void' && !canVoid ? (
           <p className="text-admin-sm text-admin-ink-secondary">
-            Only an operator can void an invoice. To correct this one, ask an operator to void it, then duplicate it.
+            Only an operator can void an invoice or reopen a paid one. To correct this one, ask an operator to void it, then duplicate it.
           </p>
         ) : null}
 
@@ -286,12 +319,40 @@ export default function InvoiceRecord({ invoice, canVoid, timeZone, busy, onMark
           />
         ) : null}
         {open === 'void' && status !== 'void' ? (
-          <VoidForm
-            number={invoice.number}
+          <ReasonForm
+            alarm
+            title={`Void ${invoice.number}?`}
+            explanation="The invoice stays in the list as Void, and its number is never given to another invoice. A void cannot be undone. To bill again, duplicate it as a new draft."
+            label="Reason"
+            hint="Required. Kept with the invoice and in the audit log."
+            maxLength={INVOICE_LIMITS.voidReason}
+            validate={validateVoidReason}
+            confirmLabel={`Void ${invoice.number}`}
+            busyLabel="Voiding…"
+            errorTitle="The invoice was not voided"
             busy={busy === 'void'}
             onCancel={() => setOpen(null)}
             onSubmit={async (reason) => {
               await onVoid(reason);
+              setOpen(null);
+            }}
+          />
+        ) : null}
+        {open === 'reopen' && status === 'paid' ? (
+          <ReasonForm
+            title={`Reopen ${invoice.number}?`}
+            explanation="The invoice goes back to Issued, so it can be paid again. The payment is not deleted: it moves to Earlier payments with your reason."
+            label="Reason for reopening"
+            hint="Required. Such as a bounced check. Kept with the payment and in the audit log."
+            maxLength={INVOICE_LIMITS.reopenReason}
+            validate={validateReopenReason}
+            confirmLabel={`Reopen ${invoice.number}`}
+            busyLabel="Reopening…"
+            errorTitle="The invoice was not reopened"
+            busy={busy === 'reopen'}
+            onCancel={() => setOpen(null)}
+            onSubmit={async (reason) => {
+              await onReopen(reason);
               setOpen(null);
             }}
           />

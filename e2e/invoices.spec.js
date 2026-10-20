@@ -12,8 +12,9 @@
 // totals the server computed, and staff cannot change the invoice settings.
 //
 // Issue and after (#209), in the second block: the operator issues a draft
-// from its page and it takes INV-0001, downloads its PDF, marks it paid and
-// voids it. The number stays used: a copy of the void invoice is issued as
+// from its page and it takes INV-0001, downloads its PDF, marks it paid,
+// reopens it after a bounced check (the payment kept), marks it paid again
+// and voids it. The number stays used: a copy of the void invoice is issued as
 // INV-0002, and two drafts issued at the same moment take the next two
 // numbers. The records, the counter and admin_logs are read back.
 import { readFileSync } from 'node:fs';
@@ -210,7 +211,7 @@ test.describe.serial('issued invoices', () => {
     if (seededBootstrap) await db.collection('config').doc('bootstrap').set(seededBootstrap);
   });
 
-  test('a draft is issued as INV-0001, downloaded, marked paid and voided', async () => {
+  test('a draft is issued as INV-0001, downloaded, marked paid, reopened, paid again and voided', async () => {
     await page.goto(`/admin/invoices/${FIRST}`);
     await expect(page.getByRole('heading', { level: 1, name: 'Draft for Example Invoice Sponsor' })).toBeVisible();
     await page.getByRole('button', { name: 'Issue invoice' }).click();
@@ -252,8 +253,28 @@ test.describe.serial('issued invoices', () => {
     expect(paid.payment).toMatchObject({ method: 'check', note: 'Check 1042' });
     expect(paid.payment.paidOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
+    // The check bounces. Only an operator reopens, and the payment is kept.
+    const staffReopen = await callFunction('invoiceAdmin', { action: 'reopen', invoiceId: FIRST, expectedRevision: paid.revision, reason: 'x' }, staffToken);
+    expect(staffReopen.status).toBe(403);
+    await page.getByRole('button', { name: 'Reopen this invoice' }).click();
+    await page.getByLabel('Reason for reopening').fill('Check bounced');
+    await page.getByRole('button', { name: 'Reopen INV-0001' }).click();
+    await expect(page.locator('[data-invoice-status="issued"]')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Earlier payments' })).toContainText('Reopened: Check bounced');
+    const reopened = (await adminDb().collection('invoices').doc(FIRST).get()).data();
+    expect(reopened.status).toBe('issued');
+    expect(reopened.payment).toBeNull();
+    expect(reopened.paymentHistory).toHaveLength(1);
+    expect(reopened.paymentHistory[0]).toMatchObject({ method: 'check', note: 'Check 1042', reason: 'Check bounced' });
+
+    await page.getByRole('button', { name: 'Mark paid' }).click();
+    await page.getByLabel('Method').selectOption('bank-transfer');
+    await page.getByRole('button', { name: 'Record payment' }).click();
+    await expect(page.locator('[data-invoice-status="paid"]')).toBeVisible();
+    const repaid = (await adminDb().collection('invoices').doc(FIRST).get()).data();
+
     // Only an operator voids: staff are refused by the server.
-    const refused = await callFunction('invoiceAdmin', { action: 'void', invoiceId: FIRST, expectedRevision: paid.revision, reason: 'x' }, staffToken);
+    const refused = await callFunction('invoiceAdmin', { action: 'void', invoiceId: FIRST, expectedRevision: repaid.revision, reason: 'x' }, staffToken);
     expect(refused.status).toBe(403);
 
     await page.getByRole('button', { name: 'Void this invoice' }).click();
@@ -265,11 +286,12 @@ test.describe.serial('issued invoices', () => {
     expect(voided.status).toBe('void');
     expect(voided.number).toBe('INV-0001');
     expect(voided.voided.reason).toBe('Wrong amount');
-    expect(voided.payment.method).toBe('check');
+    expect(voided.payment.method).toBe('bank-transfer');
+    expect(voided.paymentHistory).toHaveLength(1);
 
     const logs = await adminDb().collection('admin_logs').where('invoiceId', '==', FIRST).get();
     expect(logs.docs.map((doc) => doc.data().action).sort()).toEqual(
-      ['invoices.draft-created', 'invoices.issued', 'invoices.paid', 'invoices.voided'],
+      ['invoices.draft-created', 'invoices.issued', 'invoices.paid', 'invoices.paid', 'invoices.reopened', 'invoices.voided'],
     );
   });
 

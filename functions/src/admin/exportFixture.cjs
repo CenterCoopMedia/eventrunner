@@ -286,7 +286,9 @@ function exportSeed() {
       issuer: { name: 'Example Events', address: '2 High Street', email: 'events@example.com', taxId: 'TAX-1', paymentInstructions: 'Pay by bank transfer to account 000000.' },
       issuedAt: AT, issuedBy: STAFF_UID,
       payment: { paidOn: '2026-04-02', method: 'bank-transfer', note: 'Ref 42', recordedAt: AT, recordedBy: STAFF_UID },
-      revision: 3, createdAt: AT, createdBy: STAFF_UID, updatedAt: AT, updatedBy: STAFF_UID,
+      // reopen (operator) moved a bounced check here before the transfer came.
+      paymentHistory: [{ paidOn: '2026-03-30', method: 'check', note: 'Check 1042', recordedAt: AT, recordedBy: STAFF_UID, reopenedAt: AT, reopenedBy: OPERATOR_UID, reason: 'Check bounced' }],
+      revision: 5, createdAt: AT, createdBy: STAFF_UID, updatedAt: AT, updatedBy: STAFF_UID,
       listKey: '2026-03-27T14:00:00.000Z|inv_fixture0000000000000001',
     },
     'invoices/inv_fixture0000000000000002': {
