@@ -183,7 +183,23 @@ The organizations the Sponsors page draws: Add, edit, publish, and delete them h
 
 **Every save is checked.** The editor and the server refuse an empty name, an order that is not a number, and a website that does not start with `http://` or `https://`. The server also refuses a name that is not text, and it checks the logo path: The path must point inside the site's own files, so a web address, a path that starts with `/`, and a path that contains `..` are refused. The server does not check that the file exists. Each refusal names the field, and the editor shows it on that field, the logo's on the Logo field.
 
-**Delete** removes the live organization and its draft. The logo stays in the media library.
+**Delete** removes the live organization and its draft. The logo stays in the media library. The organization's representatives lose access, and an edit waiting for review is removed, so a new organization at the same address starts with no representatives.
+
+### Representatives
+
+A sponsor or partner can keep its own profile current. You give one account access to one organization, and every change that account makes waits for your review.
+
+**Add a representative.** Open the organization. Under **Representatives**, type the address the person signs in with and select **Add representative**. The person must have signed in to the site once, with a confirmed address, before you can add them. One account represents one organization at a time. Then send them the link to `/profile/organization` on your site. Each addition writes an admin log entry.
+
+**What a representative can change.** The short description, the longer text about the organization, and the website. Nothing else: the name, the logo, the tier, the order, visibility, the support text, and every other organization stay with staff. The server refuses any other field by name. The website must start with `http://` or `https://`.
+
+**Nothing they send is public until you publish it.** A representative's save does not touch the organization or its draft. It waits under **Edit waiting for review** in the organization editor, beside the text in the draft now, and the organizations list marks the row **Edit waiting for review**. Select **Apply to draft** to copy it into the draft, then publish as usual. Select **Discard this edit** to remove it; the organization does not change. Each apply and discard writes an admin log entry.
+
+**Your own edits are kept.** Apply writes only the fields the representative changed. If you changed one of those fields in the draft after they sent the edit, apply stops and names the field. Check it, then select **Apply and replace staff text** to use theirs. Apply also stops while the editor holds unsaved text in the same field: save or undo it first.
+
+**Remove a representative.** Select **Remove** beside their address and confirm. The account loses access at once, and an edit it sent that you have not reviewed is discarded. The removal writes an admin log entry. Deleting the person's account also removes their access.
+
+**Who sees what.** Only staff and operators see who represents an organization. The representative's address never reaches the public page, the draft, or a published version.
 
 ## Content (Pages → Content editor)
 

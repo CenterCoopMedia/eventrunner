@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Organization representatives (#334). Staff give one account access to one
+  organization from the organization editor, and remove it there. The
+  representative edits the short description, the about text and the website
+  at `/profile/organization`. Each edit waits for staff review: staff apply it
+  to the draft and publish as usual, so the public page changes only after
+  that. Apply keeps every staff edit to other fields and stops on a field
+  staff changed since. The name, logo, tier, order, visibility and every
+  other organization stay with staff. Only staff read who represents an
+  organization. Each grant, removal, edit, apply and discard writes an admin
+  log entry. Deleting the organization or the account removes the access.
+  New staff-tier endpoint `organizationRepresentatives`, new account
+  endpoint `ownOrganizationProfile`, and two staff-readable collections,
+  `organization_representatives` and `organization_edit_requests`.
 - Saved announcement messages (#496, #203). On the Announcements page, staff save a
   subject, a message and a button under a name, then load one into a new, unsent email.
   The audience stays as set, and any preview goes away. A draft with unsaved changes asks
