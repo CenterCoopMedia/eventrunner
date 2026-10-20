@@ -33,6 +33,8 @@ Event settings are staff work because dates, venue, places, tracks, the register
 
 An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.
 
+Staff access can end at a set time, for example for a demo account. Until that time, the account is a full staff account. It can edit and publish content like any staff account. An end time does not make an account read-only. There is no read-only tier.
+
 ## Set the site up: Six steps
 
 This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.
@@ -972,9 +974,17 @@ Operators only. One ruled table of every admin account with its tier word, and a
 
 **Change a tier or remove access.** Each row carries two quiet actions: **Change to staff** or **Change to operator**, and **Remove access**. Each one opens a confirmation under the grant form, above the table, that names the account and the consequence. Removal sits on the alarm ground; a tier change does not, because it narrows or widens access without deleting anything. Cancel returns you to the control you pressed.
 
+**Set an end time for staff access.** When the tier is staff, the form shows **Access ends (optional)**. Pick a date and time in your own time zone, at most 90 days from now. Leave it empty for access with no end time. The confirmation states the end time. It also says that the account can edit and publish content until then, because an end time does not make the account read-only. Operator access has no end time.
+
+**When the end time comes.** The access stops at that moment. The server and the database rules check the end time on every request, so nothing has to run to remove it. A sign-in that started before the end time does not keep access after it. The account stays in the table with **Ended** and the time it ended, until you remove it or set a new end time. An end time that cannot be read counts as ended: the row says **No access** and the server and the rules refuse the account.
+
+**Change or remove an end time.** Enter the address again with the staff tier. Pick a new end time to move it, or leave the field empty to make the access permanent. **Change to operator** removes the end time. **Remove access** removes it too.
+
+**An open browser tab.** The server checks the end time on every request. A browser tab that was open before the end time may still read admin pages through its open database connection until the tab reloads or reconnects. It cannot save a change, because every change goes through the server. To stop an account at once on every open tab too, remove its access. A removal changes the access list, and every connection is checked against the new list.
+
 **At least one operator stays.** The server refuses a change that would leave the deployment with no operator: Demoting or removing the last operator, your own grant included. Grant a second operator first. The refusal is stated in place, in the server's words.
 
-**What is recorded.** Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. A change that changes nothing writes no row.
+**What is recorded.** Every grant, change, and removal writes a row to the admin log with your address, the account, and the tier it moved from and to. When an end time is set, moved, or removed, the row also holds the old and the new end time. A change that changes nothing writes no row. Only operators can read the access lists, the end times, and the admin log.
 
 **When it takes effect.** At once. The database rules, the server, and the admin rail all read the access lists live: A granted account is admitted on its next request, a removed account is refused on its next request, and the rail shows the right sections the next time the person signs in or reloads.
 

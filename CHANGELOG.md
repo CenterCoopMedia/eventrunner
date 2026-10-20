@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Staff access with an end time (#331). On the Access page, an operator can set a time
+  when a staff grant ends, at most 90 days ahead, for a demo or a short engagement. The
+  server and the database rules check the end time on every request and refuse the
+  account from that moment, with no cleanup job. A sign-in token from before the end gives
+  no access after it. Operator access never ends, so the last operator cannot lose access
+  this way. An end time that cannot be read refuses the account. The table shows each end
+  time and marks an ended grant. The admin log records the old and the new end time.
+  Until the end time, the account is a full staff account and can edit and publish
+  content; an end time does not make it read-only.
+
 - Saved announcement messages (#496, #203). On the Announcements page, staff save a
   subject, a message and a button under a name, then load one into a new, unsent email.
   The audience stays as set, and any preview goes away. A draft with unsaved changes asks
