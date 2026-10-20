@@ -145,6 +145,9 @@ function sessionRecord(id, data) {
   record.speakerIds = textList(data?.speakerIds);
   record.parentId = textOrNull(data?.parentId);
   record.dayId = textOrNull(data?.dayId);
+  // Stated on every session, so a reader of the file need not know that a
+  // missing key means "materials are needed" (issue #332).
+  record.materialsNotNeeded = data?.materialsNotNeeded === true;
   return record;
 }
 

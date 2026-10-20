@@ -1,4 +1,4 @@
-import { materialCounts, speakerHasBio, speakerHasHeadshot } from 'shared/speakerReadiness';
+import { materialCounts, sessionNeedsMaterials, speakerHasBio, speakerHasHeadshot } from 'shared/speakerReadiness';
 
 /**
  * One set of requirements supplies both the outstanding list and the meter.
@@ -27,6 +27,8 @@ export function speakerCompletion({ speaker, sessions, materialsBySession }) {
   for (const session of sessions) {
     if (seenSessions.has(session.id)) continue;
     seenSessions.add(session.id);
+    // A session staff marked as needing no materials asks for none.
+    if (!sessionNeedsMaterials(session)) continue;
     requirements.push({
       id: `materials:${session.id}`,
       label: `Send materials for ${session.title || 'your session'}`,

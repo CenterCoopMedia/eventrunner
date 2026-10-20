@@ -149,6 +149,9 @@ test('sessions: the current revision with its state, speaker names, the day, and
   assert.equal(byId['session-panel']['Part of'], '\'=HYPERLINK("http://example.test","Keynote")');
   assert.equal(byId['session-draft'].State, 'Draft');
   assert.equal(byId['session-panel'].Hidden, 'no');
+  // The staff mark for a session whose speakers send no materials (#332).
+  assert.equal(byId['session-panel']['No materials needed'], 'yes');
+  assert.equal(byId['session-keynote']['No materials needed'], 'no');
   assert.equal(byId['pitch-pitch-1'].State, 'Live');
   assert.equal(byId['pitch-pitch-1'].Hidden, 'yes');
   assertNoSecrets(res.body.csv);

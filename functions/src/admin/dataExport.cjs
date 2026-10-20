@@ -168,6 +168,7 @@ const DATASETS = Object.freeze({
       { header: 'Part of', value: (row) => row.parentTitle },
       { header: 'Description', value: (row) => row.description },
       { header: 'Materials', value: (row) => (typeof row.materialCount === 'number' ? String(row.materialCount) : '0') },
+      { header: 'No materials needed', value: (row) => (row.materialsNotNeeded ? 'yes' : 'no') },
     ],
   },
   speakers: {

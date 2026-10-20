@@ -47,6 +47,7 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
       { id: 'place', label: 'Place (ID or name)', header: 'place', example: '' },
       { id: 'location', label: 'Public location text', header: 'location', example: '' },
       { id: 'recordingUrl', label: 'Recording link', header: 'recording_url', example: '' },
+      { id: 'materialsNotNeeded', label: 'Needs no slides or other materials (yes or no)', header: 'materials_not_needed', example: 'no' },
       { id: 'speakers', label: 'Speakers (external IDs or slugs, separated by ;)', header: 'speakers', example: 'SPK-001' },
       { id: 'slug', label: 'Session ID (new sessions only)', header: 'session_id', example: '' },
     ],

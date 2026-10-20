@@ -137,6 +137,10 @@ export function sessionFields(form) {
     location: optional(form.location),
     parentId: optional(form.parentId),
     recordingUrl: optional(form.recordingUrl),
+    // Stored as true or not at all (null), like the other optional fields,
+    // so a cleared box and a session that never had the mark read the same,
+    // and a re-import with an empty cell finds nothing to change (#332).
+    materialsNotNeeded: form.materialsNotNeeded === true ? true : null,
   };
 }
 

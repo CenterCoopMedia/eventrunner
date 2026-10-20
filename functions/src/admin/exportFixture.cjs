@@ -72,7 +72,8 @@ const PANEL = {
   dayId: 'day-1', startTime: '10:15', endTime: '11:00', type: 'panel', track: 'A',
   speakerIds: ['speaker-ada', 'speaker-bo'], parentId: 'session-keynote',
 };
-const PANEL_REVISED = { ...PANEL, title: 'Data panel (revised)' };
+// Revised to say the panel needs no slides: the export must carry the mark.
+const PANEL_REVISED = { ...PANEL, title: 'Data panel (revised)', materialsNotNeeded: true };
 const WORKSHOP = {
   title: 'Unpublished workshop', description: 'Hands-on records requests.',
   dayId: 'day-1', startTime: '13:00', endTime: '14:00', type: 'workshop',

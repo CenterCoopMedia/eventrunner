@@ -23,7 +23,7 @@ test('admin workspaces fill desktop width and group readable cards without narro
   const tasks = [
     { name: 'page-editor', route: '/admin/pages/home', ready: '.admin-page-basics', cards: '.admin-page-basics > .admin-panel', count: 2 },
     { name: 'content-editor', route: '/admin/content/home/hero/title', ready: '.admin-content-editor-layout', cards: '.admin-content-editor-layout > .admin-panel', count: 2 },
-    { name: 'session-editor', route: `/admin/sessions/${encodeURIComponent(sessionId)}`, ready: '.admin-editor-layout--session', cards: '.admin-editor-layout--session .admin-panel', count: 4 },
+    { name: 'session-editor', route: `/admin/sessions/${encodeURIComponent(sessionId)}`, ready: '.admin-editor-layout--session', cards: '.admin-editor-layout--session .admin-panel', count: 5 },
     { name: 'speaker-editor', route: `/admin/speakers/${encodeURIComponent(speakerId)}`, ready: '.admin-editor-layout--speaker', cards: '.admin-editor-layout--speaker > .admin-panel', count: 3 },
     { name: 'organization-editor', route: `/admin/organizations/${encodeURIComponent(organizationId)}`, ready: '.admin-editor-layout--organization', cards: '.admin-editor-layout--organization .admin-panel', count: 3 },
     { name: 'event-settings', route: '/admin/settings', ready: '.admin-settings-groups' },

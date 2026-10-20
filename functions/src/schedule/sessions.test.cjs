@@ -271,6 +271,31 @@ test('the place is read fresh from config/event, not from a cached config', asyn
   assert.equal((await checkSessionPlace({ db, fields: session({ placeId: 'room-a' }) })).ok, true);
 });
 
+// --- materialsNotNeeded: a session whose speakers send no materials ---------
+
+test('a session may say nothing about materials, or say yes or no', () => {
+  for (const materialsNotNeeded of [undefined, null, true, false]) {
+    assert.equal(validateSessionShape(session({ materialsNotNeeded }), 'session-1').ok, true, String(materialsNotNeeded));
+  }
+});
+
+test('anything but true or false for materialsNotNeeded is refused by name', async () => {
+  for (const value of ['yes', 'true', 1, 0, '', {}, []]) {
+    const { ok, errors } = validateSessionShape(session({ materialsNotNeeded: value }), 'session-1');
+    assert.equal(ok, false, `accepted ${JSON.stringify(value)}`);
+    assert.match(errors[0], /^materialsNotNeeded: /);
+  }
+  // The same check guards every writer that goes through the structure
+  // check: the editor save, the session import and a pitch conversion.
+  const verdict = await validateSessionStructure({
+    db: dbWithTracks(['A']),
+    docId: 'session-1',
+    fields: session({ materialsNotNeeded: 'yes' }),
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^materialsNotNeeded: /);
+});
+
 // --- recordingUrl: where a finished session can be watched ------------------
 
 test('a session may carry no recording link at all', () => {

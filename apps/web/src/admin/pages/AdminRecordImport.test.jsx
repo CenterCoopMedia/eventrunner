@@ -69,7 +69,7 @@ describe('AdminRecordImport', () => {
     expect(saveMock).toHaveBeenCalledTimes(1);
     const [name, text] = saveMock.mock.calls[0];
     expect(name).toBe('sessions-import-template.csv');
-    expect(text.split('\n')[0]).toBe('external_id,title,description,day,start_time,end_time,track,place,location,recording_url,speakers,session_id');
+    expect(text.split('\n')[0]).toBe('external_id,title,description,day,start_time,end_time,track,place,location,recording_url,materials_not_needed,speakers,session_id');
   });
 
   it('maps the template headers, previews with dryRun, and sends only the mapped columns', async () => {

@@ -9,6 +9,7 @@ export const REMINDER_GROUPS = Object.freeze([
   { value: 'headshot', label: 'Headshot missing' },
   { value: 'description', label: 'Session description missing' },
   { value: 'materials', label: 'Materials missing' },
+  { value: 'materialsPending', label: 'Materials waiting for review' },
   { value: 'all', label: 'Every accepted speaker' },
 ]);
 
@@ -25,6 +26,7 @@ export function rowsInGroup(rows, group) {
     if (group === 'all') return true;
     const missing = row?.readiness?.missing ?? [];
     if (group === 'any') return missing.length > 0;
+    if (group === 'materialsPending') return (row?.readiness?.pendingMaterialsSessions ?? []).length > 0;
     return missing.includes(group);
   });
 }
@@ -40,6 +42,16 @@ export function describeMissing(readiness) {
     if (item === 'materials') return `${label} (${titles(readiness.materialsSessions ?? [])})`;
     return label;
   }).join(', ');
+}
+
+/**
+ * The sessions whose materials wait for staff review, or '' when none do.
+ * Sent but not approved: not missing, so it is shown apart.
+ */
+export function describePending(readiness) {
+  const sessions = readiness?.pendingMaterialsSessions ?? [];
+  if (sessions.length === 0) return '';
+  return `${READINESS_ITEM_LABELS.materials} (${sessions.map((session) => session.title).join('; ')})`;
 }
 
 /** Item labels for a list of item ids, in the fixed order. */
