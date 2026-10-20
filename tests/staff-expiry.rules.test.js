@@ -18,7 +18,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { Timestamp, collection, doc, getDoc, getDocs, limit, query, setDoc } from 'firebase/firestore';
 
 const require = createRequire(import.meta.url);
-const { createSetAdminAccessHandler } = require('../functions/src/admin/access.cjs');
+const { createSetAdminAccessHandler, endExpiredStaffAccess } = require('../functions/src/admin/access.cjs');
 const { requireAdmin } = require('../functions/src/core/auth.cjs');
 
 const PROJECT_ID = 'demo-run-of-show';
@@ -213,5 +213,42 @@ describe('the server and the rules agree on one stored grant', () => {
     // The same token string the server admitted a moment ago.
     expect((await gate()).status).toBe(403);
     await assertFails(draftRead(client(DEMO, 'demo-1')));
+  });
+});
+
+// The end-time sweep (PR #541). The emulator keeps request.time for a
+// connection that is already open, so the open client above still reads
+// after the end time. The sweep changes the access list, and the same open
+// client is refused at once, as after a revocation.
+describe('the end-time sweep cuts a connection that was open before the end', () => {
+  it('the same client reads past the end time until the sweep runs, and not after', async () => {
+    const ends = Date.now() + MARGIN_MS;
+    await adminDb.collection('config').doc('bootstrap').set({
+      adminEmails: [OPERATOR], staffEmails: [DEMO, PERMANENT], staffExpiry: { [DEMO]: new Date(ends) },
+    });
+    const open = client(DEMO, 'demo-open');
+    const permanent = client(PERMANENT, 'desk-open');
+    await assertSucceeds(draftRead(open));
+    await assertSucceeds(draftRead(permanent));
+
+    await sleep(Math.max(0, ends - Date.now()) + 250);
+    // What the sweep is for: this connection was admitted before the end.
+    await assertSucceeds(draftRead(open));
+
+    const result = await endExpiredStaffAccess({ db: adminDb });
+    expect(result).toEqual({ removed: [DEMO] });
+    await assertFails(draftRead(open));
+    await assertFails(probeAdmin(open));
+    // The permanent grant on its own open connection is untouched.
+    await assertSucceeds(draftRead(permanent));
+
+    const stored = (await adminDb.collection('config').doc('bootstrap').get()).data();
+    expect(stored.staffEmails).toEqual([PERMANENT]);
+    expect(stored.staffExpiry).toBeUndefined();
+    const logs = (await adminDb.collection('admin_logs').where('action', '==', 'endExpiredStaffAccess').get()).docs.map((d) => d.data());
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toMatchObject({ uid: 'system', email: null, details: { email: DEMO } });
+    // A second run finds nothing.
+    expect(await endExpiredStaffAccess({ db: adminDb })).toEqual({ removed: [] });
   });
 });

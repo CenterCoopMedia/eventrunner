@@ -31,8 +31,8 @@
  * `staffExpiry` on the same document maps a lowercased address to a
  * Firestore Timestamp. The grant works while the time of the check is
  * before that instant, and stops at it. The check runs on every request
- * against the current time, so nothing has to sweep an ended grant away,
- * and an ID token issued before the end carries nothing past it (admin
+ * against the current time, so the refusal does not wait for the
+ * once-a-minute sweep (admin/access.cjs endExpiredStaffAccess), and an ID token issued before the end carries nothing past it (admin
  * access is never a custom claim). Operators never expire: an end time is
  * read for the staff list only, so the last operator cannot lose access
  * this way. A temporary grant whose end time is missing or not a

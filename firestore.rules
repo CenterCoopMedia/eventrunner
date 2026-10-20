@@ -23,7 +23,8 @@ service cloud.firestore {
     //
     // EXPIRING STAFF ACCESS (issue #331). `staffExpiry` maps a lowercased
     // staff address to a timestamp. The grant works while request.time is
-    // before it and stops at it, on every read, with no sweep and no token
+    // before it and stops at it, on every read, without waiting for the
+    // once-a-minute sweep (endExpiredStaffAccess) and with no token
     // round trip (admin access is never a custom claim, so a token issued
     // before the end carries nothing past it). An address with no key is a
     // permanent grant. A key whose value is not a timestamp is refused, and

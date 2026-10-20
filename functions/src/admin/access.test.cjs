@@ -608,3 +608,145 @@ test('two temporary grants end on their own times; an ended one is refused while
   assert.equal((await grant(deps, { email: 'demo2@example.org', tier: 'none' })).statusCode, 200);
   assert.equal((await gate('demo2', oneHour)).ok, false);
 });
+
+// ------------------------------------------- the end-time sweep (#331, PR #541)
+//
+// endExpiredStaffAccess runs every minute. In one transaction on
+// config/bootstrap it takes each staff address whose end time is at or
+// before now off staffEmails, drops its staffExpiry key, and writes one
+// admin_logs row per address, by the "system" actor. The request-time
+// checks already refuse an ended grant; the sweep changes the document so
+// a connection the rules admitted before the end is checked again.
+
+const { endExpiredStaffAccess } = require('./access.cjs');
+
+const sweepLogs = (db) => adminLogs(db).filter((row) => row.action === 'endExpiredStaffAccess');
+
+test('endExpiredStaffAccess: removes a grant at its end time exactly, not a millisecond before', async () => {
+  const ends = inHours(1);
+  const seed = { adminEmails: [OPS], staffEmails: [STAFF, DEMO], staffExpiry: { [DEMO]: ends }, createdAt: 'seeded' };
+  const early = makeFakeDb({ 'config/bootstrap': seed });
+  assert.deepEqual(await endExpiredStaffAccess({ db: early, now: () => ends.getTime() - 1, log: QUIET }), { removed: [] });
+  assert.equal(early.writes.length, 0);
+
+  const db = makeFakeDb({ 'config/bootstrap': seed });
+  assert.deepEqual(await endExpiredStaffAccess({ db, now: () => ends.getTime(), log: QUIET }), { removed: [DEMO] });
+  assert.deepEqual(bootstrapOf(db), { adminEmails: [OPS], staffEmails: [STAFF], createdAt: 'seeded' });
+  assert.deepEqual(sweepLogs(db), [{
+    action: 'endExpiredStaffAccess',
+    docPath: 'config/bootstrap',
+    uid: 'system',
+    email: null,
+    at: ends,
+    details: { email: DEMO, expiresAt: iso(ends) },
+  }]);
+});
+
+test('endExpiredStaffAccess: keeps grants that have not ended, permanent grants, and every operator', async () => {
+  const db = makeFakeDb({
+    'config/bootstrap': {
+      // An operator with a stale staff entry and an ended key: never touched.
+      adminEmails: [OPS, SECOND_OPS],
+      staffEmails: [STAFF, DEMO, 'later@example.org', SECOND_OPS],
+      staffExpiry: { [DEMO]: inHours(-1), 'later@example.org': inHours(5), [SECOND_OPS]: inHours(-3) },
+    },
+  });
+  const result = await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET });
+  assert.deepEqual(result, { removed: [DEMO] });
+  const stored = bootstrapOf(db);
+  assert.deepEqual(stored.adminEmails, [OPS, SECOND_OPS]);
+  assert.deepEqual(stored.staffEmails, [STAFF, 'later@example.org', SECOND_OPS]);
+  assert.deepEqual(stored.staffExpiry, { 'later@example.org': inHours(5), [SECOND_OPS]: inHours(-3) });
+});
+
+test('endExpiredStaffAccess: leaves malformed end times alone, still refused, and a broken map untouched', async () => {
+  const malformed = { adminEmails: [OPS], staffEmails: [DEMO, 'nul@example.org'], staffExpiry: { [DEMO]: 'last week', 'nul@example.org': null } };
+  const db = makeFakeDb({ 'config/bootstrap': malformed });
+  assert.deepEqual(await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET }), { removed: [] });
+  assert.equal(db.writes.length, 0);
+  const { resolveAdminTier } = require('../core/auth.cjs');
+  assert.equal(resolveAdminTier(bootstrapOf(db), DEMO, T0.getTime()), null);
+
+  const broken = makeFakeDb({ 'config/bootstrap': { adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: 'broken' } });
+  assert.deepEqual(await endExpiredStaffAccess({ db: broken, now: () => T0.getTime(), log: QUIET }), { removed: [] });
+  assert.equal(broken.writes.length, 0);
+});
+
+test('endExpiredStaffAccess: does nothing when nothing has ended, or there is no document', async () => {
+  const db = makeFakeDb({ 'config/bootstrap': { adminEmails: [OPS], staffEmails: [STAFF] } });
+  assert.deepEqual(await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET }), { removed: [] });
+  assert.equal(db.writes.length, 0);
+  const empty = makeFakeDb({});
+  assert.deepEqual(await endExpiredStaffAccess({ db: empty, now: () => T0.getTime(), log: QUIET }), { removed: [] });
+  assert.equal(empty.writes.length, 0);
+});
+
+test('endExpiredStaffAccess: removes every ended grant in one write, one audit row each, and a second run does nothing', async () => {
+  const db = makeFakeDb({
+    'config/bootstrap': {
+      adminEmails: [OPS],
+      staffEmails: [DEMO, 'demo2@example.org', STAFF],
+      staffExpiry: { [DEMO]: inHours(-2), 'demo2@example.org': inHours(-1) },
+    },
+  });
+  const before = db.writes.length;
+  const first = await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET });
+  assert.deepEqual(first, { removed: [DEMO, 'demo2@example.org'] });
+  assert.equal(db.writes.slice(before).filter((w) => w.path === 'config/bootstrap').length, 1);
+  assert.deepEqual(bootstrapOf(db), { adminEmails: [OPS], staffEmails: [STAFF] });
+  assert.equal(sweepLogs(db).length, 2);
+  const again = await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET });
+  assert.deepEqual(again, { removed: [] });
+  assert.equal(sweepLogs(db).length, 2);
+});
+
+test('endExpiredStaffAccess: two runs at once remove the grant once and write one audit row', async () => {
+  const db = makeFakeDb({
+    'config/bootstrap': { adminEmails: [OPS], staffEmails: [DEMO, STAFF], staffExpiry: { [DEMO]: inHours(-1) } },
+  });
+  // The second run lands while the first is about to commit: the first
+  // then sees a changed document, retries, and finds nothing to do.
+  let raced = false;
+  let inner = null;
+  db.beforeCommit = async () => {
+    raced = true;
+    inner = await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET });
+  };
+  const results = await Promise.all([
+    endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET }),
+    endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET }),
+  ]);
+  assert.ok(raced);
+  assert.deepEqual(bootstrapOf(db), { adminEmails: [OPS], staffEmails: [STAFF] });
+  assert.equal(sweepLogs(db).length, 1);
+  // Three runs in all; exactly one of them removed the address.
+  assert.deepEqual([...results, inner].flatMap((r) => r.removed), [DEMO]);
+});
+
+test('endExpiredStaffAccess: a renewal that lands first is not undone, and nothing is brought back', async () => {
+  const db = makeFakeDb({
+    'config/bootstrap': { adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: inHours(-1) } },
+  });
+  // The operator renews while the sweep is about to commit.
+  db.beforeCommit = async () => {
+    db.beforeCommit = null;
+    await db.collection('config').doc('bootstrap').set({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: inHours(4) } });
+  };
+  const result = await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET });
+  assert.deepEqual(result, { removed: [] });
+  assert.deepEqual(bootstrapOf(db).staffExpiry, { [DEMO]: inHours(4) });
+  assert.deepEqual(bootstrapOf(db).staffEmails, [DEMO]);
+  assert.equal(sweepLogs(db).length, 0);
+
+  // And a sweep never adds an address or a key that is not there.
+  const removed = makeFakeDb({ 'config/bootstrap': { adminEmails: [OPS], staffEmails: [], staffExpiry: { [DEMO]: inHours(-1) } } });
+  await endExpiredStaffAccess({ db: removed, now: () => T0.getTime(), log: QUIET });
+  assert.deepEqual(bootstrapOf(removed).staffEmails, []);
+});
+
+test('endExpiredStaffAccess: an address the sweep removed leaves the Access list', async () => {
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: inHours(-1) } });
+  assert.equal((await list(deps)).body.accounts[1].expiryState, 'expired');
+  await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET });
+  assert.deepEqual((await list(deps)).body.accounts, [{ email: OPS, tier: 'operator' }]);
+});

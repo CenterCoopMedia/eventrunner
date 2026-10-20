@@ -36,8 +36,9 @@
  * `staffExpiry` map on the same document, keyed by the lowercased address,
  * as a Timestamp. core/auth.cjs resolveAdminTier and firestore.rules
  * isStaff() both refuse the grant from that instant on, at request time;
- * nothing sweeps it, and the address stays listed (with `expiryState:
- * 'expired'`) until an operator removes or renews it. Only staff access can
+ * the refusal never waits for a sweep. The address stays listed (with
+ * `expiryState: 'expired'`) until endExpiredStaffAccess below takes it off
+ * the list, within a minute, or an operator removes or renews it first. Only staff access can
  * end: `expiresAt` with `operator` or `none` is refused, and making an
  * account an operator or removing it drops its end time, so the last
  * operator can never expire. A staff grant without `expiresAt` is
@@ -393,7 +394,76 @@ function createSetAdminAccessHandler({ db, auth, getConfig, refreshConfig, now =
   };
 }
 
-/** Deployable exports (spec §1.3 admin/): listAdminAccess, setAdminAccess. */
+/**
+ * The end-time sweep (issue #331). Every minute, in one transaction on
+ * config/bootstrap, each staff address whose end time is at or before now
+ * comes off `staffEmails` and loses its `staffExpiry` key, and one
+ * admin_logs row per address is written by the "system" actor, in the same
+ * transaction.
+ *
+ * The request-time checks in core/auth.cjs and firestore.rules already
+ * refuse an ended grant. The sweep exists for the connection the rules
+ * admitted before the end: the Firestore emulator showed such a connection
+ * keeps reading after the end time, but a change to the access list is
+ * checked against at once, as a revocation is. So an open tab loses access
+ * within about a minute of the end time.
+ *
+ * It only removes. An operator is never touched (an address on adminEmails
+ * is an operator, whatever the map says). A malformed end time is left as
+ * it is: it is refused already, and only an operator should decide what
+ * it was meant to be. A staffExpiry field that is not a map is left alone
+ * for the same reason. The transaction re-reads the document on a
+ * conflict, so two runs at once remove an address once, and a renewal
+ * that lands first is not undone. A run that finds nothing writes nothing.
+ *
+ * @param {{ db: object, now?: () => number, log?: Pick<Console, 'error'|'warn'|'info'> }} deps
+ * @returns {Promise<{ removed: string[] }>}
+ */
+async function endExpiredStaffAccess({ db, now = Date.now }) {
+  const ref = db.collection(BOOTSTRAP.collection).doc(BOOTSTRAP.doc);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return { removed: [] };
+    const stored = snap.data() || {};
+    const map = stored[STAFF_EXPIRY_FIELD];
+    if (!isPlainMap(map)) return { removed: [] };
+    const nowMs = now();
+    if (typeof nowMs !== 'number' || !Number.isFinite(nowMs)) return { removed: [] };
+    const operators = normalizeList(stored.adminEmails);
+    const ended = new Map();
+    for (const email of normalizeList(stored.staffEmails)) {
+      if (operators.includes(email) || !hasOwn(map, email)) continue;
+      const ms = expiryMillis(map[email]);
+      if (ms !== null && ms <= nowMs) ended.set(email, ms);
+    }
+    if (ended.size === 0) return { removed: [] };
+
+    const staffEmails = (Array.isArray(stored.staffEmails) ? stored.staffEmails : [])
+      .filter((entry) => !(typeof entry === 'string' && ended.has(entry.trim().toLowerCase())));
+    const nextMap = {};
+    for (const [key, value] of Object.entries(map)) {
+      if (!ended.has(key)) nextMap[key] = value;
+    }
+    const next = { ...stored, staffEmails };
+    if (Object.keys(nextMap).length > 0) next[STAFF_EXPIRY_FIELD] = nextMap;
+    else delete next[STAFF_EXPIRY_FIELD];
+    tx.set(ref, next);
+    const at = new Date(nowMs);
+    for (const [email, ms] of ended) {
+      tx.set(db.collection('admin_logs').doc(), {
+        action: 'endExpiredStaffAccess',
+        docPath: `${BOOTSTRAP.collection}/${BOOTSTRAP.doc}`,
+        uid: 'system',
+        email: null,
+        at,
+        details: { email, expiresAt: isoOf(ms) },
+      });
+    }
+    return { removed: [...ended.keys()] };
+  });
+}
+
+/** Deployable exports (spec §1.3 admin/): listAdminAccess, setAdminAccess, endExpiredStaffAccess. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
@@ -425,13 +495,29 @@ function buildHandlers() {
       await create(buildDeps())(req, res);
     }));
 
+  const { onSchedule } = require('firebase-functions/v2/scheduler');
   return {
     listAdminAccess: expose(createListAdminAccessHandler),
     setAdminAccess: expose(createSetAdminAccessHandler),
+    // Takes ended staff grants off the list (see endExpiredStaffAccess).
+    endExpiredStaffAccess: onSchedule({ region, schedule: 'every 1 minutes' }, async () => {
+      const { getDb } = require('../core/firestore.cjs');
+      const { getEventConfig } = require('../core/config.cjs');
+      const db = getDb();
+      const { removed } = await endExpiredStaffAccess({ db });
+      if (removed.length > 0) {
+        try {
+          await getEventConfig({ db, forceRefresh: true });
+        } catch (err) {
+          console.warn('config cache refresh after endExpiredStaffAccess failed', err);
+        }
+      }
+    }),
   };
 }
 
 module.exports = {
+  endExpiredStaffAccess,
   createListAdminAccessHandler,
   createSetAdminAccessHandler,
   get handlers() {
