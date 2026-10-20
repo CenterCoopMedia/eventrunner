@@ -124,6 +124,10 @@ test('the dry run prints the inventory and writes no file', async () => {
   assert.match(output, /- admin_logs \(1\): operational records/);
   assert.match(output, /- cmsSchedule \(1\): prior event records/);
   assert.match(output, /- ticket_sync_queue \(1\): tickets and orders/);
+  // A new event starts its invoice numbers again at 0001.
+  assert.match(output, /- invoices \(1\): invoices and billing/);
+  assert.match(output, /- invoice_counters \(1\): invoices and billing/);
+  assert.match(output, /- invoice_settings \(1\): invoices and billing/);
   assert.match(output, /\* config\/theme\.logos\.primary: branding\/client-logo\.svg/);
   assert.match(output, /\* cmsContent\/hero__image: cms-images\/asset-1\/crowd\.jpg\n/);
   assert.equal(output.includes('secret-download-token'), false, 'a download token is never printed');
@@ -142,7 +146,7 @@ test('the template carries branding, pages and selected settings, and nothing el
   const text = JSON.stringify(template);
   for (const secret of ['past-ops@example.test', 'attendee@example.test', 'pitch-secret', 'tok_fixture',
     'sent-subject', 'audit-entry', 'acct_fixture', 'Past Session', 'secret-download-token',
-    'Attendee One', 'speaker@example.test']) {
+    'Attendee One', 'speaker@example.test', 'Billed Sponsor', 'bank-account-secret']) {
     assert.equal(text.includes(secret), false, `${secret} must stay in the source project`);
   }
   assert.deepEqual(Object.keys(template.answers).sort(), ['badges', 'event', 'features', 'theme']);

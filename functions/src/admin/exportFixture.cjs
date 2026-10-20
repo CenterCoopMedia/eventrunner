@@ -273,6 +273,45 @@ function exportSeed() {
       updatedAt: AT, updatedBy: OPERATOR_UID,
     },
 
+    // invoiceAdmin (admin/invoices.cjs): saveDraft, then issue, which
+    // assigns the number and copies the issuer block, then markPaid. The
+    // second was issued and then voided by an operator.
+    'invoices/inv_fixture0000000000000001': {
+      billTo: { organizationId: 'org-ledger', name: '=Ledger Press', contactName: 'Ada Quill', email: 'billing@example.com', address: '1 Main Street\nExample Town' },
+      reference: 'PO-1', dueDate: '2026-04-30', notes: 'Thank you.',
+      lines: [{ description: 'Presenting package', quantity: 1, unitAmount: 500000, amount: 500000 }],
+      adjustments: [{ kind: 'tax', label: 'Sales tax', amount: 25000 }],
+      totals: { subtotal: 500000, discountTotal: 0, taxTotal: 25000, total: 525000 },
+      status: 'paid', number: 'INV-0001', sequence: 1, currency: 'usd', issueDate: '2026-03-27',
+      issuer: { name: 'Example Events', address: '2 High Street', email: 'events@example.com', taxId: 'TAX-1', paymentInstructions: 'Pay by bank transfer to account 000000.' },
+      issuedAt: AT, issuedBy: STAFF_UID,
+      payment: { paidOn: '2026-04-02', method: 'bank-transfer', note: 'Ref 42', recordedAt: AT, recordedBy: STAFF_UID },
+      // reopen (operator) moved a bounced check here before the transfer came.
+      paymentHistory: [{ paidOn: '2026-03-30', method: 'check', note: 'Check 1042', recordedAt: AT, recordedBy: STAFF_UID, reopenedAt: AT, reopenedBy: OPERATOR_UID, reason: 'Check bounced' }],
+      revision: 5, createdAt: AT, createdBy: STAFF_UID, updatedAt: AT, updatedBy: STAFF_UID,
+      listKey: '2026-03-27T14:00:00.000Z|inv_fixture0000000000000001',
+    },
+    'invoices/inv_fixture0000000000000002': {
+      billTo: { organizationId: null, name: 'Gazette', contactName: '', email: '', address: '' },
+      reference: '', dueDate: null, notes: '',
+      lines: [{ description: 'Exhibit table', quantity: 2, unitAmount: 15000, amount: 30000 }],
+      adjustments: [],
+      totals: { subtotal: 30000, discountTotal: 0, taxTotal: 0, total: 30000 },
+      status: 'void', number: 'INV-0002', sequence: 2, currency: 'usd', issueDate: '2026-03-27',
+      issuer: { name: 'Example Events', address: '2 High Street', email: 'events@example.com', taxId: 'TAX-1', paymentInstructions: 'Pay by bank transfer to account 000000.' },
+      issuedAt: AT, issuedBy: STAFF_UID,
+      voided: { reason: 'Wrong amount', from: 'issued', at: AT, by: OPERATOR_UID },
+      revision: 3, createdAt: AT, createdBy: STAFF_UID, updatedAt: AT, updatedBy: OPERATOR_UID,
+      listKey: '2026-03-27T14:00:00.000Z|inv_fixture0000000000000002',
+    },
+    // The counter issue moves on, and the settings saveSettings writes. The
+    // settings hold the live bank details and never leave the deployment.
+    'invoice_counters/current': { lastNumber: 2, lastInvoiceId: 'inv_fixture0000000000000002', updatedAt: AT },
+    'invoice_settings/current': {
+      prefix: 'INV', currency: '', issuerName: 'Example Events', issuerAddress: '2 High Street', issuerEmail: 'events@example.com',
+      taxId: 'TAX-1', paymentInstructions: 'SECRET-bank-details', revision: 1, updatedAt: AT, updatedBy: OPERATOR_UID,
+    },
+
     // The shape submitSessionPitch creates, reviewSessionPitch updates, and
     // convertSessionPitch (sessions/pitchQueue.cjs) completes: the stored
     // `conversion` names the draft session and speaker it created.

@@ -1,4 +1,5 @@
-// Invoices (issue #208), on the real surface: the draft flow.
+// Invoices (issues #208, #209), on the real surface: the draft flow, then
+// issue and what follows.
 //
 // The done line is "an invoice is saved, reopened, and its totals
 // recomputed correctly". It crosses the form, the shared arithmetic, the
@@ -9,6 +10,15 @@
 // same figures. The stored record and its admin_logs row are read back with
 // the Admin SDK. A request that sends its own totals is answered with the
 // totals the server computed, and staff cannot change the invoice settings.
+//
+// Issue and after (#209), in the second block: the operator issues a draft
+// from its page and it takes INV-0001, downloads its PDF, marks it paid,
+// reopens it after a bounced check (the payment kept), marks it paid again
+// and voids it. The number stays used: a copy of the void invoice is issued as
+// INV-0002, and two drafts issued at the same moment take the next two
+// numbers. The records, the counter and admin_logs are read back.
+import { readFileSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 import { test, expect } from '@playwright/test';
 import {
   ADMIN_EMAIL, adminDb, callFunction, ensureUser, idTokenFor, signIn,
@@ -22,6 +32,27 @@ async function clearInvoices() {
   const db = adminDb();
   const left = await db.collection('invoices').get();
   await Promise.all(left.docs.map((doc) => doc.ref.delete()));
+  await db.collection('invoice_counters').doc('current').delete();
+}
+
+/** The text a pdf-lib PDF draws: hex strings inside Flate streams. */
+function pdfText(bytes) {
+  const raw = Buffer.from(bytes).toString('latin1');
+  const chunks = [raw];
+  const re = /stream\r?\n/g;
+  let match;
+  while ((match = re.exec(raw)) !== null) {
+    const start = match.index + match[0].length;
+    const end = raw.indexOf('endstream', start);
+    try {
+      chunks.push(inflateSync(Buffer.from(raw.slice(start, end).replace(/\r?\n$/, ''), 'latin1')).toString('latin1'));
+    } catch {
+      // Not a zlib stream.
+    }
+  }
+  return [...chunks.join('\n').matchAll(/<([0-9A-Fa-f]+)>/g)]
+    .map(([, digits]) => Buffer.from(digits, 'hex').toString('latin1'))
+    .join('\n');
 }
 
 test.describe.serial('invoice drafts', () => {
@@ -134,5 +165,157 @@ test.describe.serial('invoice drafts', () => {
     await page.getByRole('button', { name: 'Delete this draft' }).click();
     await expect(page).toHaveURL(/\/admin\/invoices$/);
     expect((await adminDb().collection('invoices').doc(invoiceId).get()).exists).toBe(false);
+  });
+});
+
+test.describe.serial('issued invoices', () => {
+  const SETTINGS = {
+    prefix: 'INV', currency: '', issuerName: 'Example Invoice Issuer', issuerAddress: '2 High Street',
+    issuerEmail: 'billing@example.test', taxId: 'TAX-1', paymentInstructions: 'Pay to account 000000.', revision: 1,
+  };
+  const DRAFT = {
+    billTo: { name: 'Example Invoice Sponsor', email: 'sponsor@example.test' },
+    lines: [{ description: 'Presenting package', quantity: 2, unitAmount: 250000 }],
+    adjustments: [{ kind: 'discount', label: 'Early commitment', amount: 50000 }],
+    dueDate: '2099-12-31',
+  };
+  const FIRST = 'inv_e2eissue00000000000001';
+  let page;
+  let seededBootstrap;
+  let operatorToken;
+  let staffToken;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(120_000);
+    const db = adminDb();
+    await clearInvoices();
+    seededBootstrap = (await db.collection('config').doc('bootstrap').get()).data();
+    await db.collection('config').doc('bootstrap').set({
+      ...seededBootstrap,
+      staffEmails: [...(seededBootstrap.staffEmails ?? []), STAFF_EMAIL],
+    });
+    await db.collection('invoice_settings').doc('current').set(SETTINGS);
+    operatorToken = await idTokenFor(await ensureUser(ADMIN_EMAIL));
+    staffToken = await idTokenFor(await ensureUser(STAFF_EMAIL));
+    const saved = await callFunction('invoiceAdmin', { action: 'saveDraft', invoiceId: FIRST, expectedRevision: 0, invoice: DRAFT }, staffToken);
+    expect(saved.status).toBe(200);
+    page = await (await browser.newContext({ acceptDownloads: true })).newPage();
+    await signIn(page, ADMIN_EMAIL);
+  });
+
+  test.afterAll(async () => {
+    await page?.context().close();
+    const db = adminDb();
+    await clearInvoices();
+    await db.collection('invoice_settings').doc('current').delete();
+    if (seededBootstrap) await db.collection('config').doc('bootstrap').set(seededBootstrap);
+  });
+
+  test('a draft is issued as INV-0001, downloaded, marked paid, reopened, paid again and voided', async () => {
+    await page.goto(`/admin/invoices/${FIRST}`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Draft for Example Invoice Sponsor' })).toBeVisible();
+    await page.getByRole('button', { name: 'Issue invoice' }).click();
+    await expect(page.getByText(/The next number is INV-0001\./)).toBeVisible();
+    await page.getByRole('button', { name: 'Issue this invoice' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'INV-0001' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Issued as INV-0001.' })).toBeVisible();
+    await expect(page.getByLabel('Name to bill')).toBeDisabled();
+
+    const issued = (await adminDb().collection('invoices').doc(FIRST).get()).data();
+    expect(issued.status).toBe('issued');
+    expect(issued.number).toBe('INV-0001');
+    expect(issued.totals.total).toBe(450000);
+    expect(issued.issuer.name).toBe('Example Invoice Issuer');
+    expect((await adminDb().collection('invoice_counters').doc('current').get()).data().lastNumber).toBe(1);
+
+    // Later settings edits do not reach the issued invoice or its PDF.
+    await adminDb().collection('invoice_settings').doc('current').set({ ...SETTINGS, issuerName: 'Renamed Issuer', revision: 2 });
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Download PDF' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBe('INV-0001.pdf');
+    const bytes = readFileSync(await download.path());
+    expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    const drawn = pdfText(bytes);
+    for (const text of ['INV-0001', 'Example Invoice Issuer', 'Example Invoice Sponsor', 'Presenting package', '$4,500.00', 'Pay to account 000000.']) {
+      expect(drawn).toContain(text);
+    }
+    expect(drawn).not.toContain('Renamed Issuer');
+
+    await page.getByRole('button', { name: 'Mark paid' }).click();
+    await page.getByLabel('Method').selectOption('check');
+    await page.getByLabel('Payment note').fill('Check 1042');
+    await page.getByRole('button', { name: 'Record payment' }).click();
+    await expect(page.locator('[data-invoice-status="paid"]')).toBeVisible();
+    const paid = (await adminDb().collection('invoices').doc(FIRST).get()).data();
+    expect(paid.status).toBe('paid');
+    expect(paid.payment).toMatchObject({ method: 'check', note: 'Check 1042' });
+    expect(paid.payment.paidOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // The check bounces. Only an operator reopens, and the payment is kept.
+    const staffReopen = await callFunction('invoiceAdmin', { action: 'reopen', invoiceId: FIRST, expectedRevision: paid.revision, reason: 'x' }, staffToken);
+    expect(staffReopen.status).toBe(403);
+    await page.getByRole('button', { name: 'Reopen this invoice' }).click();
+    await page.getByLabel('Reason for reopening').fill('Check bounced');
+    await page.getByRole('button', { name: 'Reopen INV-0001' }).click();
+    await expect(page.locator('[data-invoice-status="issued"]')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Earlier payments' })).toContainText('Reopened: Check bounced');
+    const reopened = (await adminDb().collection('invoices').doc(FIRST).get()).data();
+    expect(reopened.status).toBe('issued');
+    expect(reopened.payment).toBeNull();
+    expect(reopened.paymentHistory).toHaveLength(1);
+    expect(reopened.paymentHistory[0]).toMatchObject({ method: 'check', note: 'Check 1042', reason: 'Check bounced' });
+
+    await page.getByRole('button', { name: 'Mark paid' }).click();
+    await page.getByLabel('Method').selectOption('bank-transfer');
+    await page.getByRole('button', { name: 'Record payment' }).click();
+    await expect(page.locator('[data-invoice-status="paid"]')).toBeVisible();
+    const repaid = (await adminDb().collection('invoices').doc(FIRST).get()).data();
+
+    // Only an operator voids: staff are refused by the server.
+    const refused = await callFunction('invoiceAdmin', { action: 'void', invoiceId: FIRST, expectedRevision: repaid.revision, reason: 'x' }, staffToken);
+    expect(refused.status).toBe(403);
+
+    await page.getByRole('button', { name: 'Void this invoice' }).click();
+    await page.getByLabel('Reason').fill('Wrong amount');
+    await page.getByRole('button', { name: 'Void INV-0001' }).click();
+    await expect(page.locator('[data-invoice-status="void"]')).toBeVisible();
+    await expect(page.getByText(/INV-0001 stays used/)).toBeVisible();
+    const voided = (await adminDb().collection('invoices').doc(FIRST).get()).data();
+    expect(voided.status).toBe('void');
+    expect(voided.number).toBe('INV-0001');
+    expect(voided.voided.reason).toBe('Wrong amount');
+    expect(voided.payment.method).toBe('bank-transfer');
+    expect(voided.paymentHistory).toHaveLength(1);
+
+    const logs = await adminDb().collection('admin_logs').where('invoiceId', '==', FIRST).get();
+    expect(logs.docs.map((doc) => doc.data().action).sort()).toEqual(
+      ['invoices.draft-created', 'invoices.issued', 'invoices.paid', 'invoices.paid', 'invoices.reopened', 'invoices.voided'],
+    );
+  });
+
+  test('a copy of the void invoice takes the next number, and drafts issued together never share one', async () => {
+    await page.getByRole('button', { name: 'Duplicate as a new draft' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Draft for Example Invoice Sponsor' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'INV-0001' })).toBeVisible();
+    const copyId = page.url().split('/').pop();
+    expect(copyId).not.toBe(FIRST);
+    const copied = await callFunction('invoiceAdmin', { action: 'issue', invoiceId: copyId, expectedRevision: 1 }, staffToken);
+    expect(copied.status).toBe(200);
+    expect(copied.body.invoice.number).toBe('INV-0002');
+
+    const ids = ['inv_e2eissue00000000000003', 'inv_e2eissue00000000000004'];
+    for (const id of ids) {
+      expect((await callFunction('invoiceAdmin', { action: 'saveDraft', invoiceId: id, expectedRevision: 0, invoice: DRAFT }, staffToken)).status).toBe(200);
+    }
+    const results = await Promise.all([
+      ...ids.map((id) => callFunction('invoiceAdmin', { action: 'issue', invoiceId: id, expectedRevision: 1 }, staffToken)),
+      callFunction('invoiceAdmin', { action: 'issue', invoiceId: ids[0], expectedRevision: 1 }, operatorToken),
+    ]);
+    const numbers = results.filter((res) => res.status === 200).map((res) => res.body.invoice.number).sort();
+    expect(numbers).toEqual(['INV-0003', 'INV-0004']);
+    expect(results.filter((res) => res.status !== 200).map((res) => res.status)).toEqual([409]);
+    expect((await adminDb().collection('invoice_counters').doc('current').get()).data().lastNumber).toBe(4);
   });
 });

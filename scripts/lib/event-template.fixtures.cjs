@@ -86,6 +86,9 @@ function operationalRecords() {
     'auth_rate_limits/limit-1': { count: 3 },
     'speakers/speaker-1': { name: 'Speaker One', email: 'speaker@example.test' },
     'cmsSchedule/session-1': { title: 'Past Session' },
+    'invoices/inv_fixture0000000000000001': { number: 'INV-0001', status: 'paid', billTo: { name: 'Billed Sponsor' } },
+    'invoice_counters/current': { lastNumber: 1 },
+    'invoice_settings/current': { prefix: 'INV', paymentInstructions: 'bank-account-secret' },
   };
 }
 

@@ -271,6 +271,30 @@ test('records: attendees, orders, admissions and pitches keep their joins and th
   assert.equal(link.url, 'https://example.org/data');
 });
 
+test('invoices: the frozen records go in billing/, and the settings and the counter stay behind', async () => {
+  const { files } = readEventPackage((await packageFor()).body);
+  const invoices = json(files, 'billing/invoices.json');
+  assert.deepEqual(invoices.map((invoice) => [invoice.id, invoice.number, invoice.status]), [
+    ['inv_fixture0000000000000001', 'INV-0001', 'paid'],
+    ['inv_fixture0000000000000002', 'INV-0002', 'void'],
+  ]);
+  const [paid, voided] = invoices;
+  assert.deepEqual(paid.totals, { subtotal: 500000, discountTotal: 0, taxTotal: 25000, total: 525000 });
+  assert.equal(paid.issuer.paymentInstructions, 'Pay by bank transfer to account 000000.');
+  assert.deepEqual(paid.payment, { paidOn: '2026-04-02', method: 'bank-transfer', note: 'Ref 42', recordedAt: '2026-03-27T14:00:00.000Z' });
+  assert.deepEqual(voided.voided, { reason: 'Wrong amount', from: 'issued', at: '2026-03-27T14:00:00.000Z' });
+  assert.deepEqual(paid.paymentHistory, [{
+    paidOn: '2026-03-30', method: 'check', note: 'Check 1042', recordedAt: '2026-03-27T14:00:00.000Z',
+    reopenedAt: '2026-03-27T14:00:00.000Z', reason: 'Check bounced',
+  }]);
+  assert.deepEqual(voided.paymentHistory, []);
+  for (const key of ['createdBy', 'updatedBy', 'issuedBy', 'listKey']) assert.equal(Object.hasOwn(paid, key), false, key);
+  assert.match(files.get('billing/invoices.csv').toString('utf8'), /"inv_fixture0000000000000001","INV-0001","Paid"/);
+  const sources = EXCLUDED.map((entry) => entry.source).join(' ');
+  assert.match(sources, /invoice_settings/);
+  assert.match(sources, /invoice_counters/);
+});
+
 test('staff notes go only when the operator includes them, and the README says so', async () => {
   const { handler } = setup();
   const res = await run(handler, 'admin', { sections: ['pitches'], includeStaffNotes: true });

@@ -111,3 +111,20 @@ test('admissions carry the fields the Stripe and sync writers store, keyed by ex
   }
   assert.deepEqual(order.ticketIds, order.seats.map((seat) => seat.externalId));
 });
+
+test('invoices hold the fields invoiceAdmin stores, and their drafts still validate', () => {
+  const { validateInvoiceDraft, INVOICE_STATUSES, isInvoiceId } = require('shared/invoice');
+  const invoices = docsOf('invoices');
+  assert.equal(invoices.length, 2);
+  for (const { id, data } of invoices) {
+    assert.ok(isInvoiceId(id), id);
+    assert.ok(INVOICE_STATUSES.includes(data.status), id);
+    const verdict = validateInvoiceDraft({
+      billTo: data.billTo, reference: data.reference, dueDate: data.dueDate, notes: data.notes,
+      lines: data.lines.map(({ description, quantity, unitAmount }) => ({ description, quantity, unitAmount })),
+      adjustments: data.adjustments,
+    });
+    assert.deepEqual(verdict.issues, [], id);
+    assert.deepEqual(verdict.value.totals, data.totals, id);
+  }
+});

@@ -97,7 +97,7 @@ test('readRequest names a missing dataset, an unknown one, and an extra key', ()
 test('each dataset states its tier: orders and admissions are operator only', () => {
   assert.deepEqual(
     Object.fromEntries(DATASET_NAMES.map((name) => [name, DATASETS[name].tier])),
-    { sessions: 'staff', speakers: 'staff', organizations: 'staff', orders: 'operator', admissions: 'operator' },
+    { sessions: 'staff', speakers: 'staff', organizations: 'staff', orders: 'operator', admissions: 'operator', invoices: 'staff' },
   );
 });
 
@@ -218,6 +218,35 @@ test('admissions: holder, status and check-in, an escaped name, and no raw provi
   const synced = rows.find((row) => row['Ticket ID'] === 'eb-ticket-7');
   assert.equal(synced.Provider, 'eventbrite');
   assert.equal(synced['Order ID'], 'eb-order-3');
+  assertNoSecrets(res.body.csv);
+});
+
+test('invoices: staff get the number, status, parties, dates and totals in major units, and no account ids or bank details', async () => {
+  const { handler } = setup();
+  const res = await run(handler, 'staff', { dataset: 'invoices' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.filename, 'invoices-2026-10-01.csv');
+  const rows = parseCsv(res.body.csv);
+  assert.deepEqual(rows[0], DATASETS.invoices.columns.map((c) => c.header));
+  const [paid, voided] = asObjects(rows);
+  assert.equal(paid['Invoice ID'], 'inv_fixture0000000000000001');
+  assert.equal(paid.Number, 'INV-0001');
+  assert.equal(paid.Status, 'Paid');
+  assert.equal(paid['Bill to'], '\'=Ledger Press');
+  assert.equal(paid['Billing email'], 'billing@example.com');
+  assert.equal(paid['Issue date'], '2026-03-27');
+  assert.equal(paid['Due date'], '2026-04-30');
+  assert.equal(paid.Currency, 'USD');
+  assert.equal(paid.Subtotal, '5000.00');
+  assert.equal(paid.Tax, '250.00');
+  assert.equal(paid.Total, '5250.00');
+  assert.equal(paid['Paid on'], '2026-04-02');
+  assert.equal(paid['Payment method'], 'Bank transfer');
+  assert.equal(voided.Status, 'Void');
+  assert.equal(voided['Void reason'], 'Wrong amount');
+  assert.equal(voided['Copied from'], '');
+  assert.equal(res.body.rowCount, 2);
+  assert.ok(!res.body.csv.includes('account 000000'));
   assertNoSecrets(res.body.csv);
 });
 

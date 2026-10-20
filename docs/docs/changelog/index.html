@@ -145,6 +145,19 @@
           goes, who it would reach, who waits on the 24-hour limit, and what the last run did. The
           reminder wording gains two optional tokens, <code>{{due_date}}</code> and <code>{{days_left}}</code>, set only by
           the schedule. Every run that emails anyone writes one admin log entry.</li>
+          <li>Invoices, part 3 (#209). Staff issue a saved draft after a confirmation that names the
+          next number. Issue gives it the next number (<code>INV-0001</code>, with no gaps, in one transaction
+          with the counter), the issue date on the event&#39;s clock, and a copy of the issuer block from
+          the settings, and freezes the totals; later edits do not reach it. <strong>Download PDF</strong> saves
+          the invoice as <code>&lt;number&gt;.pdf</code> from the new <code>invoicePdf</code> endpoint, built with the shared PDF
+          kit; a paid invoice says when and how, and a void one says VOID and why. Staff mark an
+          issued invoice paid with a date, a method and a note. Only an operator voids, with a reason;
+          the number stays used. Only an operator reopens a paid invoice, with a reason, after a
+          payment that did not hold; the payment is kept in the invoice&#39;s payment history. <strong>Duplicate as a new draft</strong> copies any invoice into a new draft
+          with no number. Data export gains an invoices spreadsheet for staff, the event data package
+          a <code>billing/</code> part, and the repeat-event template leaves invoices behind so a new event
+          starts at <code>0001</code>. Every write refuses on a read-only demo and records an audit row in the
+          same transaction.</li>
           <li>Invoices, part 1 (#208). Staff write and save sponsor invoice drafts under
           <strong>Invoices</strong>. Choosing an organization fills the name to bill and, when its tier names a
           sponsor package, the first line. The totals change as staff type, in a live region, and

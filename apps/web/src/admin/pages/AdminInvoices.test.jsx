@@ -23,6 +23,11 @@ vi.mock('../../lib/contentSource.js', () => ({
   subscribeSpeakersPublic: () => () => {},
 }));
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
+const savedFiles = [];
+vi.mock('../../lib/materialsSource.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  saveBlobAs: (blob, filename) => savedFiles.push({ blob, filename }),
+}));
 vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: class {},
   onAuthStateChanged: (_auth, next) => {
@@ -95,7 +100,11 @@ beforeEach(() => {
   adminRows.clear();
   currentPath = null;
   answers = { settings: SETTINGS, list: { invoices: [], nextCursor: null } };
+  savedFiles.length = 0;
   globalThis.fetch = vi.fn(async (url, init) => {
+    if (String(url).endsWith('/invoicePdf')) {
+      return { ok: true, status: 200, json: async () => ({}), blob: async () => new Blob(['%PDF-'], { type: 'application/pdf' }) };
+    }
     if (!String(url).endsWith('/invoiceAdmin')) return response({});
     const body = JSON.parse(init.body);
     const answer = answers[body.action];
@@ -312,5 +321,206 @@ describe('invoice settings', () => {
     expect(sent.settings).toMatchObject({ prefix: 'SPONSOR', paymentInstructions: 'Account 000000.' });
     expect(await screen.findByText('Next number SPONSOR-0001')).toBeInTheDocument();
     await act(async () => {});
+  });
+});
+
+const ISSUED = {
+  ...STORED, status: 'issued', number: 'INV-0004', revision: 4, issueDate: '2026-10-20',
+  issuer: { name: 'Example Events', address: '2 High Street', email: 'events@example.org', taxId: 'TAX-1', paymentInstructions: 'Account 000000.' },
+  payment: null, paymentHistory: [], voided: null, duplicatedFrom: null,
+};
+
+describe('issuing an invoice', () => {
+  it('issues a saved draft after a confirmation that names the next number', async () => {
+    answers.get = { invoice: STORED, canVoid: false };
+    answers.settings = { ...SETTINGS, nextNumber: 'INV-0004' };
+    answers.issue = (body) => response({ invoice: { ...ISSUED, id: body.invoiceId }, canVoid: false });
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
+    expect(await screen.findByRole('heading', { name: 'Issue this invoice?' })).toBeInTheDocument();
+    expect(await screen.findByText(/The next number is INV-0004\./)).toBeInTheDocument();
+    expect(invoiceCalls().some((body) => body.action === 'issue')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Issue this invoice' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({ action: 'issue', invoiceId: STORED.id, expectedRevision: 3 }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'INV-0004' })).toBeInTheDocument();
+    expect((await screen.findAllByText('Issued as INV-0004. Its details are now locked.'))[0]).toHaveAttribute('role', 'status');
+    expect(screen.getByLabelText('Name to bill')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+  });
+
+  it('asks for a save first when the form has changes, and sends nothing', async () => {
+    answers.get = { invoice: STORED, canVoid: false };
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Changed.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
+    expect(await screen.findByText('Save the draft first. Issue uses the saved draft, not the form.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Issue this invoice' })).toBeNull();
+    expect(invoiceCalls().some((body) => body.action === 'issue')).toBe(false);
+  });
+
+  it('does not issue when the form changed after the confirmation opened', async () => {
+    answers.get = { invoice: STORED, canVoid: false };
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
+    const confirm = await screen.findByRole('button', { name: 'Issue this invoice' });
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Changed after.' } });
+    fireEvent.click(confirm);
+    expect(await screen.findByText('Save the draft first. Issue uses the saved draft, not the form.')).toBeInTheDocument();
+    expect(invoiceCalls().some((body) => body.action === 'issue')).toBe(false);
+  });
+
+  it('states a refused issue and marks the field it names', async () => {
+    answers.get = { invoice: { ...STORED, dueDate: '2026-10-01' }, canVoid: false };
+    answers.issue = () => response({ error: { code: 'bad-request', message: 'Invalid invoice: dueDate: The due date is before the issue date (2026-10-20). Change the due date.; settings.issuerName: The invoice settings have no issuer name. Ask an operator to fill in the invoice settings.' } }, 400);
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue this invoice' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('The invoice was not issued');
+    expect(alert).toHaveTextContent('Ask an operator to fill in the invoice settings.');
+    expect(screen.getByLabelText('Due date', { exact: false })).toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+describe('an issued invoice', () => {
+  it('shows the frozen record and downloads its PDF', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const record = screen.getByRole('region', { name: 'Invoice record' });
+    expect(within(record).getByText('2026-10-20')).toBeInTheDocument();
+    expect(within(record).getByText('Example Events')).toBeInTheDocument();
+    expect(within(record).getByText('Account 000000.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Download PDF' }));
+    await waitFor(() => expect(savedFiles).toHaveLength(1));
+    expect(savedFiles[0].filename).toBe('INV-0004.pdf');
+    const [url, init] = fetch.mock.calls.find(([target]) => String(target).endsWith('/invoicePdf'));
+    expect(String(url)).toMatch(/\/invoicePdf$/);
+    expect(JSON.parse(init.body)).toEqual({ invoiceId: ISSUED.id });
+    expect(init.headers.Authorization).toBe('Bearer id-token');
+  });
+
+  it('marks the invoice paid with a date, a method and a note', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    answers.markPaid = (body) => response({
+      invoice: { ...ISSUED, status: 'paid', revision: 5, payment: { ...body.payment, recordedAt: '2026-10-20T12:00:00.000Z', recordedBy: 'admin-1' } },
+      canVoid: false,
+    });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
+    const date = await screen.findByLabelText('Date paid', { exact: false });
+    await waitFor(() => expect(date).toHaveFocus());
+    expect(date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    fireEvent.change(date, { target: { value: '2026-10-19' } });
+    fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'check' } });
+    fireEvent.change(screen.getByLabelText('Payment note', { exact: false }), { target: { value: 'Check 1042' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Record payment' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({
+      action: 'markPaid', invoiceId: ISSUED.id, expectedRevision: 4, payment: { paidOn: '2026-10-19', method: 'check', note: 'Check 1042' },
+    }));
+    expect(await screen.findByText('Paid', { selector: '[data-invoice-status]' })).toBeInTheDocument();
+    const record = screen.getByRole('region', { name: 'Invoice record' });
+    expect(within(record).getByText('2026-10-19')).toBeInTheDocument();
+    expect(within(record).getByText('Check')).toBeInTheDocument();
+    expect(within(record).getByText('Check 1042')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mark paid' })).toBeNull();
+  });
+
+  it('offers Void to an operator only, and a void needs a reason', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    expect(screen.queryByRole('button', { name: 'Void this invoice' })).toBeNull();
+    expect(screen.getByText(/Only an operator can void an invoice or reopen a paid one\./)).toBeInTheDocument();
+  });
+
+  it('voids with the reason an operator gives, and the number stays used', async () => {
+    answers.get = { invoice: ISSUED, canVoid: true };
+    answers.void = (body) => response({
+      invoice: { ...ISSUED, status: 'void', revision: 5, voided: { reason: body.reason, from: 'issued', at: '2026-10-20T12:00:00.000Z', by: 'admin-1' } },
+      canVoid: true,
+    });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Void this invoice' }));
+    await waitFor(() => expect(screen.getByLabelText('Reason')).toHaveFocus());
+    fireEvent.click(await screen.findByRole('button', { name: 'Void INV-0004' }));
+    const reason = screen.getByLabelText('Reason');
+    await waitFor(() => expect(reason).toHaveFocus());
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
+    expect(invoiceCalls().some((body) => body.action === 'void')).toBe(false);
+    fireEvent.change(reason, { target: { value: 'Wrong amount' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Void INV-0004' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({ action: 'void', invoiceId: ISSUED.id, expectedRevision: 4, reason: 'Wrong amount' }));
+    expect(await screen.findByText('Void', { selector: '[data-invoice-status]' })).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Invoice record' })).getByText('Wrong amount')).toBeInTheDocument();
+    expect(screen.getByText(/INV-0004 stays used/)).toBeInTheDocument();
+  });
+
+  it('lets an operator reopen a paid invoice with a reason, and keeps the payment in the history', async () => {
+    const payment = { paidOn: '2026-10-19', method: 'check', note: 'Check 1042', recordedAt: '2026-10-19T12:00:00.000Z', recordedBy: 'admin-1' };
+    answers.get = { invoice: { ...ISSUED, status: 'paid', revision: 5, payment }, canVoid: true, canReopen: true };
+    answers.reopen = (body) => response({
+      invoice: {
+        ...ISSUED, status: 'issued', revision: 6, payment: null,
+        paymentHistory: [{ ...payment, reopenedAt: '2026-10-20T12:00:00.000Z', reopenedBy: 'admin-1', reason: body.reason }],
+      },
+      canVoid: true, canReopen: true,
+    });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen this invoice' }));
+    const reason = await screen.findByLabelText('Reason for reopening', { exact: false });
+    await waitFor(() => expect(reason).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen INV-0004' }));
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
+    expect(invoiceCalls().some((body) => body.action === 'reopen')).toBe(false);
+    fireEvent.change(reason, { target: { value: 'Check bounced' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen INV-0004' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({ action: 'reopen', invoiceId: ISSUED.id, expectedRevision: 5, reason: 'Check bounced' }));
+    expect(await screen.findByText('Issued', { selector: '[data-invoice-status]' })).toBeInTheDocument();
+    const history = screen.getByRole('list', { name: 'Earlier payments' });
+    expect(history).toHaveTextContent('2026-10-19');
+    expect(history).toHaveTextContent('Check 1042');
+    expect(history).toHaveTextContent('Reopened: Check bounced');
+    expect(screen.getByRole('button', { name: 'Mark paid' })).toBeInTheDocument();
+  });
+
+  it('does not offer Reopen to staff', async () => {
+    answers.get = { invoice: { ...ISSUED, status: 'paid', payment: { paidOn: '2026-10-19', method: 'cash', note: '' } }, canVoid: false, canReopen: false };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    expect(screen.queryByRole('button', { name: 'Reopen this invoice' })).toBeNull();
+    expect(screen.getByText(/Only an operator can void an invoice or reopen a paid one\./)).toBeInTheDocument();
+  });
+
+  it('duplicates into a new draft and opens it', async () => {
+    answers.get = (body) => response({
+      invoice: body.invoiceId === ISSUED.id
+        ? { ...ISSUED, status: 'void', voided: { reason: 'Wrong amount', from: 'issued', at: null, by: null } }
+        : { ...STORED, id: body.invoiceId, revision: 1, duplicatedFrom: { invoiceId: ISSUED.id, number: 'INV-0004' } },
+      canVoid: false,
+    });
+    answers.duplicate = (body) => response({
+      invoice: { ...STORED, id: body.newInvoiceId, revision: 1, duplicatedFrom: { invoiceId: ISSUED.id, number: 'INV-0004' } },
+      canVoid: false,
+    });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate as a new draft' }));
+    await waitFor(() => expect(invoiceCalls().some((body) => body.action === 'duplicate')).toBe(true));
+    const sent = invoiceCalls().find((body) => body.action === 'duplicate');
+    expect(sent.invoiceId).toBe(ISSUED.id);
+    expect(sent.newInvoiceId).toMatch(/^inv_[a-z0-9]{16,40}$/);
+    await waitFor(() => expect(currentPath).toBe(`/admin/invoices/${sent.newInvoiceId}`));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'INV-0004' })).toHaveAttribute('href', `/admin/invoices/${ISSUED.id}`);
+    expect(screen.getByLabelText('Name to bill')).not.toBeDisabled();
   });
 });

@@ -217,8 +217,8 @@ Organizers can announce, message, and bill, and attendees can talk to each other
 - [ ] Add the social feed read surface and moderation store (#205)
 - [ ] Add the post composer and thread view (#206)
 - [ ] Add the notification inbox (#207)
-- [ ] Add the invoice record and the admin invoice form (#208)
-- [ ] Add invoice output and the invoice list (#209)
+- [x] Add the invoice record and the admin invoice form (#208)
+- [x] Add invoice output and the invoice list (#209). Issue, the PDF, mark paid, void, duplicate and the export shipped; emailing the PDF (part 4) and the Stripe pay link (#519) follow.
 
 ### M12: Speaker experience
 

@@ -70,6 +70,7 @@ const recordImport = require('./src/imports/recordImport.cjs');
 const adminDataExport = require('./src/admin/dataExport.cjs');
 const adminEventPackage = require('./src/admin/eventPackage.cjs');
 const adminInvoices = require('./src/admin/invoices.cjs');
+const adminInvoicePdf = require('./src/admin/invoicePdf.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -140,4 +141,5 @@ module.exports = {
   ...adminDataExport.handlers,
   ...adminEventPackage.handlers,
   ...adminInvoices.handlers,
+  ...adminInvoicePdf.handlers,
 };

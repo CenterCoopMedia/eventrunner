@@ -61,7 +61,7 @@ test('only verified admins reach invoices, and settings changes need an operator
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Cache-Control'], 'private, no-store');
   assert.equal((await call(db, { action: 'list' }, 'staff', 'GET')).statusCode, 405);
-  assert.equal((await call(db, { action: 'issue', invoiceId: ID })).statusCode, 400);
+  assert.equal((await call(db, { action: 'refund', invoiceId: ID })).statusCode, 400);
 });
 
 test('a draft is saved with server totals, reopened, and its totals recomputed', async () => {
@@ -254,4 +254,352 @@ test('settings default for a new deployment and an operator save keeps values ou
   assert.equal(row.docPath, 'invoice_settings/current');
   assert.deepEqual(row.details.fields.sort(), ['currency', 'issuerAddress', 'issuerName', 'paymentInstructions', 'prefix', 'taxId']);
   assert.doesNotMatch(JSON.stringify(row), /000000|High Street/);
+});
+
+// ------------------------------------------------------------ part 3: issue, paid, void, duplicate (#209)
+
+const SETTINGS = {
+  prefix: 'INV', currency: '', issuerName: 'Example Events', issuerAddress: '2 High Street\nExample Town',
+  issuerEmail: 'billing@example.org', taxId: 'TAX-1', paymentInstructions: 'Account 000000.', revision: 1,
+};
+function issuedDb(extra = {}) {
+  return dbFor({ 'config/event': { historicalDemo: false, timezone: 'America/New_York' }, 'invoice_settings/current': SETTINGS, ...extra });
+}
+async function saveNew(db, id = ID, patch = {}) {
+  const res = await call(db, { action: 'saveDraft', invoiceId: id, expectedRevision: 0, invoice: draft(patch) });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  return res.body.invoice;
+}
+
+test('issue assigns the next number, freezes the totals and copies the issuer', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  const res = await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const { invoice } = res.body;
+  assert.equal(invoice.status, 'issued');
+  assert.equal(invoice.number, 'INV-0001');
+  assert.equal(invoice.revision, 2);
+  // The clock reads 2026-10-20 in New York.
+  assert.equal(invoice.issueDate, '2026-10-20');
+  assert.deepEqual(invoice.issuer, {
+    name: 'Example Events', address: '2 High Street\nExample Town', email: 'billing@example.org',
+    taxId: 'TAX-1', paymentInstructions: 'Account 000000.',
+  });
+  assert.deepEqual(invoice.totals, { subtotal: 500000, discountTotal: 50000, taxTotal: 31500, total: 481500 });
+  assert.equal((await db.collection('invoice_counters').doc('current').get()).data().lastNumber, 1);
+
+  // Later settings edits do not reach an issued invoice.
+  await db.collection('invoice_settings').doc('current').set({ ...SETTINGS, issuerName: 'Renamed', revision: 2 });
+  const reopened = (await call(db, { action: 'get', invoiceId: ID })).body.invoice;
+  assert.equal(reopened.issuer.name, 'Example Events');
+
+  // An issued invoice cannot change, be deleted or be issued again.
+  assert.equal((await call(db, { action: 'saveDraft', invoiceId: ID, expectedRevision: 2, invoice: draft() })).statusCode, 409);
+  assert.equal((await call(db, { action: 'deleteDraft', invoiceId: ID, expectedRevision: 2 })).statusCode, 409);
+  const again = await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 2 });
+  assert.equal(again.statusCode, 409);
+  assert.equal((await db.collection('invoice_counters').doc('current').get()).data().lastNumber, 1);
+
+  const rows = await audits(db);
+  assert.deepEqual(rows.map((row) => row.action), ['invoices.draft-created', 'invoices.issued']);
+  assert.deepEqual(rows[1].details, { revision: 2, number: 'INV-0001', sequence: 1, total: 481500, currency: 'usd' });
+});
+
+test('issue refuses a stale revision, a draft with no line, a due date before the issue date, and no issuer', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  assert.equal((await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 0 })).statusCode, 409);
+  assert.equal((await call(db, { action: 'issue', invoiceId: ID })).statusCode, 400);
+  assert.equal((await call(db, { action: 'issue', invoiceId: OTHER_ID, expectedRevision: 1 })).statusCode, 404);
+
+  await saveNew(db, OTHER_ID, { lines: [], adjustments: [], dueDate: '2026-10-01' });
+  const empty = await call(db, { action: 'issue', invoiceId: OTHER_ID, expectedRevision: 1 });
+  assert.equal(empty.statusCode, 400);
+  assert.match(empty.body.error.message, /^Invalid invoice: lines: Add at least one line before issuing\.; dueDate: The due date is before the issue date/);
+
+  const noIssuer = issuedDb({ 'invoice_settings/current': { prefix: 'INV', revision: 1 } });
+  await saveNew(noIssuer);
+  const refused = await call(noIssuer, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(refused.statusCode, 400);
+  assert.match(refused.body.error.message, /settings\.issuerName: /);
+
+  for (const target of [db, noIssuer]) {
+    assert.equal((await target.collection('invoice_counters').doc('current').get()).exists, false);
+    assert.deepEqual((await audits(target)).map((row) => row.action).filter((action) => action !== 'invoices.draft-created'), []);
+  }
+});
+
+test('numbers have no gaps when drafts are issued at the same time, and one draft never takes two numbers', async () => {
+  const db = issuedDb({ 'invoice_counters/current': { lastNumber: 6 } });
+  const ids = [];
+  for (let index = 0; index < 4; index += 1) {
+    const id = `inv_${String(index).padStart(20, '0')}`;
+    ids.push(id);
+    await saveNew(db, id);
+  }
+  // Four drafts at once, and the first one twice more.
+  const results = await Promise.all([
+    ...ids.map((id) => call(db, { action: 'issue', invoiceId: id, expectedRevision: 1 })),
+    call(db, { action: 'issue', invoiceId: ids[0], expectedRevision: 1 }),
+    call(db, { action: 'issue', invoiceId: ids[0], expectedRevision: 1 }),
+  ]);
+  const ok = results.filter((res) => res.statusCode === 200);
+  assert.equal(ok.length, 4);
+  assert.deepEqual(results.filter((res) => res.statusCode !== 200).map((res) => res.statusCode), [409, 409]);
+  assert.deepEqual(ok.map((res) => res.body.invoice.number).sort(), ['INV-0007', 'INV-0008', 'INV-0009', 'INV-0010']);
+  assert.equal((await db.collection('invoice_counters').doc('current').get()).data().lastNumber, 10);
+  const stored = await Promise.all(ids.map(async (id) => (await db.collection('invoices').doc(id).get()).data()));
+  assert.deepEqual(stored.map((row) => row.sequence).sort((a, b) => a - b), [7, 8, 9, 10]);
+  assert.equal((await audits(db)).filter((row) => row.action === 'invoices.issued').length, 4);
+});
+
+test('issue refuses a damaged counter and a number another invoice already holds', async () => {
+  const damaged = issuedDb({ 'invoice_counters/current': { lastNumber: 'seven' } });
+  await saveNew(damaged);
+  const res = await call(damaged, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(res.statusCode, 409);
+  assert.match(res.body.error.message, /counter/);
+
+  const behind = issuedDb({ [`invoices/${OTHER_ID}`]: { status: 'issued', number: 'INV-0001', sequence: 1, revision: 2 } });
+  await saveNew(behind);
+  const taken = await call(behind, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(taken.statusCode, 409);
+  assert.match(taken.body.error.message, /INV-0001 is already used/);
+  assert.equal((await behind.collection('invoices').doc(ID).get()).data().status, 'draft');
+});
+
+test('the prefix in the settings at issue time names the number', async () => {
+  const db = issuedDb({ 'invoice_settings/current': { ...SETTINGS, prefix: 'SPONSOR' }, 'invoice_counters/current': { lastNumber: 41 } });
+  await saveNew(db);
+  assert.equal((await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 })).body.invoice.number, 'SPONSOR-0042');
+});
+
+test('mark paid records the date, method and note on an issued invoice only', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  const payment = { paidOn: '2026-10-19', method: 'bank-transfer', note: 'Ref 42' };
+  assert.equal((await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 1, payment })).statusCode, 409);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+
+  const future = await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment: { ...payment, paidOn: '2026-10-21' } });
+  assert.equal(future.statusCode, 400);
+  assert.match(future.body.error.message, /^Invalid payment: paidOn: /);
+  assert.equal((await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 1, payment })).statusCode, 409);
+
+  const res = await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(res.body.invoice.status, 'paid');
+  assert.deepEqual(res.body.invoice.payment, { paidOn: '2026-10-19', method: 'bank-transfer', note: 'Ref 42', recordedBy: 'staff', recordedAt: res.body.invoice.payment.recordedAt });
+  assert.equal(res.body.invoice.number, 'INV-0001');
+  assert.equal((await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 3, payment })).statusCode, 409);
+  const row = (await audits(db)).at(-1);
+  assert.equal(row.action, 'invoices.paid');
+  assert.deepEqual(row.details, { revision: 3, number: 'INV-0001', paidOn: '2026-10-19', method: 'bank-transfer' });
+});
+
+test('only an operator voids, with a reason; the number stays used and the invoice stays locked', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  const staff = await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: 'Wrong amount' });
+  assert.equal(staff.statusCode, 403);
+  assert.equal((await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: ' ' }, 'operator')).statusCode, 400);
+  assert.equal((await call(db, { action: 'void', invoiceId: ID, expectedRevision: 1, reason: 'Wrong amount' }, 'operator')).statusCode, 409);
+
+  const res = await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: 'Wrong amount' }, 'operator');
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(res.body.invoice.status, 'void');
+  assert.equal(res.body.invoice.number, 'INV-0001');
+  assert.equal(res.body.invoice.voided.reason, 'Wrong amount');
+  assert.equal(res.body.invoice.voided.from, 'issued');
+  assert.equal(res.body.invoice.voided.by, 'operator');
+
+  // Nothing moves a void invoice, and its number is never handed out again.
+  for (const body of [
+    { action: 'void', invoiceId: ID, expectedRevision: 3, reason: 'Again' },
+    { action: 'markPaid', invoiceId: ID, expectedRevision: 3, payment: { paidOn: '2026-10-19', method: 'cash' } },
+    { action: 'issue', invoiceId: ID, expectedRevision: 3 },
+    { action: 'saveDraft', invoiceId: ID, expectedRevision: 3, invoice: draft() },
+    { action: 'deleteDraft', invoiceId: ID, expectedRevision: 3 },
+  ]) {
+    assert.equal((await call(db, body, 'operator')).statusCode, 409, body.action);
+  }
+  await saveNew(db, OTHER_ID);
+  assert.equal((await call(db, { action: 'issue', invoiceId: OTHER_ID, expectedRevision: 1 })).body.invoice.number, 'INV-0002');
+  const voided = (await audits(db)).find((row) => row.action === 'invoices.voided');
+  assert.deepEqual(voided.details, { revision: 3, number: 'INV-0001', from: 'issued', reason: 'Wrong amount' });
+  assert.equal(voided.actorUid, 'operator');
+});
+
+test('a paid invoice can be voided by an operator and keeps its payment record', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment: { paidOn: '2026-10-20', method: 'card' } });
+  const res = await call(db, { action: 'void', invoiceId: ID, expectedRevision: 3, reason: 'Refunded' }, 'operator');
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.invoice.voided.from, 'paid');
+  assert.equal(res.body.invoice.payment.method, 'card');
+  // A draft is deleted, not voided.
+  await saveNew(db, OTHER_ID);
+  assert.equal((await call(db, { action: 'void', invoiceId: OTHER_ID, expectedRevision: 1, reason: 'x' }, 'operator')).statusCode, 409);
+});
+
+test('duplicate copies an invoice into a new draft with no number, once per new id', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: 'Wrong amount' }, 'operator');
+
+  const res = await call(db, { action: 'duplicate', invoiceId: ID, newInvoiceId: OTHER_ID });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const copy = res.body.invoice;
+  assert.equal(copy.id, OTHER_ID);
+  assert.equal(copy.status, 'draft');
+  assert.equal(copy.number, null);
+  assert.equal(copy.revision, 1);
+  assert.equal(copy.issuer, null);
+  assert.equal(copy.issueDate, null);
+  assert.equal(copy.voided, null);
+  assert.equal(copy.dueDate, null);
+  assert.equal(copy.currency, 'usd');
+  assert.deepEqual(copy.duplicatedFrom, { invoiceId: ID, number: 'INV-0001' });
+  const source = (await call(db, { action: 'get', invoiceId: ID })).body.invoice;
+  assert.deepEqual(copy.lines, source.lines);
+  assert.deepEqual(copy.adjustments, source.adjustments);
+  assert.deepEqual(copy.billTo, source.billTo);
+  assert.deepEqual(copy.totals, source.totals);
+
+  // A retry with the same new id answers the same draft; another source or a used id is refused.
+  const retry = await call(db, { action: 'duplicate', invoiceId: ID, newInvoiceId: OTHER_ID });
+  assert.equal(retry.statusCode, 200);
+  assert.equal(retry.body.invoice.revision, 1);
+  assert.equal((await call(db, { action: 'duplicate', invoiceId: OTHER_ID, newInvoiceId: ID })).statusCode, 409);
+  assert.equal((await call(db, { action: 'duplicate', invoiceId: ID, newInvoiceId: ID })).statusCode, 400);
+  assert.equal((await call(db, { action: 'duplicate', invoiceId: ID, newInvoiceId: 'bad' })).statusCode, 400);
+  assert.equal((await call(db, { action: 'duplicate', invoiceId: 'inv_99999999999999999999', newInvoiceId: 'inv_88888888888888888888' })).statusCode, 404);
+
+  // The copy is an ordinary draft: it saves and takes the next number.
+  assert.equal((await call(db, { action: 'issue', invoiceId: OTHER_ID, expectedRevision: 1 })).body.invoice.number, 'INV-0002');
+  const rows = (await audits(db)).filter((row) => row.action === 'invoices.duplicated');
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0].details, { from: ID, fromNumber: 'INV-0001', revision: 1 });
+  assert.equal(rows[0].invoiceId, OTHER_ID);
+});
+
+test('a read-only demo refuses issue, paid, void and duplicate', async () => {
+  const db = issuedDb({ [`invoices/${ID}`]: { status: 'draft', revision: 1, currency: 'usd', ...draft() } });
+  await db.collection('config').doc('event').set({ historicalDemo: true });
+  for (const [body, user] of [
+    [{ action: 'issue', invoiceId: ID, expectedRevision: 1 }, 'staff'],
+    [{ action: 'markPaid', invoiceId: ID, expectedRevision: 1, payment: { paidOn: '2026-10-19', method: 'cash' } }, 'staff'],
+    [{ action: 'void', invoiceId: ID, expectedRevision: 1, reason: 'x' }, 'operator'],
+    [{ action: 'duplicate', invoiceId: ID, newInvoiceId: OTHER_ID }, 'staff'],
+  ]) {
+    const res = await call(db, body, user);
+    assert.equal(res.statusCode, 403, body.action);
+    assert.equal(res.body.error.code, 'read-only-demo');
+  }
+  assert.equal((await db.collection('invoice_counters').doc('current').get()).exists, false);
+  assert.equal((await audits(db)).length, 0);
+});
+
+test('a demo switched on inside the issue transaction still refuses it', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  // The write policy is part of the transaction's read set: a switch
+  // between the first read and the commit retries and is refused.
+  db.beforeCommit = async () => { await db.collection('config').doc('event').set({ historicalDemo: true, timezone: 'America/New_York' }); };
+  const res = await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(res.statusCode, 403);
+  assert.equal((await db.collection('invoices').doc(ID).get()).data().status, 'draft');
+  assert.equal((await db.collection('invoice_counters').doc('current').get()).exists, false);
+});
+
+test('every invoice answer says whether the caller may void it', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  assert.equal((await call(db, { action: 'get', invoiceId: ID })).body.canVoid, false);
+  assert.equal((await call(db, { action: 'get', invoiceId: ID }, 'operator')).body.canVoid, true);
+  assert.equal((await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 })).body.canVoid, false);
+  assert.equal((await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: 'x' }, 'operator')).body.canVoid, true);
+  assert.equal('canVoid' in (await call(db, { action: 'list' })).body, false);
+});
+
+test('issue refuses invoice settings that no longer validate, and a draft whose currency is not supported', async () => {
+  const badPrefix = issuedDb({ 'invoice_settings/current': { ...SETTINGS, prefix: 'bad prefix "x"' } });
+  await saveNew(badPrefix);
+  const refused = await call(badPrefix, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(refused.statusCode, 409);
+  assert.match(refused.body.error.message, /invoice settings/);
+  assert.equal((await badPrefix.collection('invoice_counters').doc('current').get()).exists, false);
+
+  const odd = issuedDb({ [`invoices/${ID}`]: { ...draft(), status: 'draft', number: null, currency: 'xyz', revision: 1, totals: {} } });
+  const res = await call(odd, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(res.statusCode, 409);
+  assert.match(res.body.error.message, /currency/);
+  assert.equal((await odd.collection('invoices').doc(ID).get()).data().status, 'draft');
+});
+
+test('only an operator reopens a paid invoice, with a reason, and the payment moves to the history', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  // An issued invoice has no payment to reopen.
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 2, reason: 'x' }, 'operator')).statusCode, 409);
+  await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment: { paidOn: '2026-10-19', method: 'check', note: 'Check 1042' } });
+
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 3, reason: 'Check bounced' })).statusCode, 403);
+  const blank = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 3, reason: ' ' }, 'operator');
+  assert.equal(blank.statusCode, 400);
+  assert.match(blank.body.error.message, /^Invalid reopen: reason: /);
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 2, reason: 'Check bounced' }, 'operator')).statusCode, 409);
+
+  const res = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 3, reason: 'Check bounced' }, 'operator');
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const { invoice } = res.body;
+  assert.equal(invoice.status, 'issued');
+  assert.equal(invoice.number, 'INV-0001');
+  assert.equal(invoice.payment, null);
+  assert.equal(invoice.revision, 4);
+  assert.equal(res.body.canReopen, true);
+  assert.equal(invoice.paymentHistory.length, 1);
+  assert.deepEqual(
+    { ...invoice.paymentHistory[0], recordedAt: null, reopenedAt: null },
+    { paidOn: '2026-10-19', method: 'check', note: 'Check 1042', recordedAt: null, recordedBy: 'staff', reopenedAt: null, reopenedBy: 'operator', reason: 'Check bounced' },
+  );
+
+  // It can be paid again, and a second reopen keeps both payments.
+  await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 4, payment: { paidOn: '2026-10-20', method: 'bank-transfer' } });
+  const again = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 5, reason: 'Wrong invoice' }, 'operator');
+  assert.deepEqual(again.body.invoice.paymentHistory.map((entry) => entry.method), ['check', 'bank-transfer']);
+  assert.equal((await db.collection('invoice_counters').doc('current').get()).data().lastNumber, 1);
+
+  const rows = (await audits(db)).filter((row) => row.action === 'invoices.reopened');
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0].details, { revision: 4, number: 'INV-0001', reason: 'Check bounced', paidOn: '2026-10-19', method: 'check' });
+  assert.equal(rows[0].actorUid, 'operator');
+  assert.equal((await call(db, { action: 'get', invoiceId: ID })).body.canReopen, false);
+});
+
+test('reopen refuses a void invoice, a draft and a read-only demo', async () => {
+  const db = issuedDb();
+  await saveNew(db);
+  assert.equal((await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 1, reason: 'x' }, 'operator')).statusCode, 409);
+  await call(db, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment: { paidOn: '2026-10-19', method: 'cash' } });
+  await call(db, { action: 'void', invoiceId: ID, expectedRevision: 3, reason: 'Refunded' }, 'operator');
+  const voided = await call(db, { action: 'reopen', invoiceId: ID, expectedRevision: 4, reason: 'x' }, 'operator');
+  assert.equal(voided.statusCode, 409);
+  assert.match(voided.body.error.message, /void/);
+  assert.equal((await db.collection('invoices').doc(ID).get()).data().payment.method, 'cash');
+
+  const demo = issuedDb({ [`invoices/${OTHER_ID}`]: { ...draft(), status: 'paid', number: 'INV-0009', currency: 'usd', revision: 3, payment: { paidOn: '2026-10-19', method: 'cash', note: '' } } });
+  await demo.collection('config').doc('event').set({ historicalDemo: true });
+  const res = await call(demo, { action: 'reopen', invoiceId: OTHER_ID, expectedRevision: 3, reason: 'x' }, 'operator');
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body.error.code, 'read-only-demo');
+  assert.equal((await demo.collection('invoices').doc(OTHER_ID).get()).data().status, 'paid');
+  assert.equal((await audits(demo)).length, 0);
 });
