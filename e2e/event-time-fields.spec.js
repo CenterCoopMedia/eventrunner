@@ -6,7 +6,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, APP_BASE_URL, adminDb, signIn } from './helpers.mjs';
+import { createHash } from 'node:crypto';
+import { ADMIN_EMAIL, APP_BASE_URL, adminDb, callFunction, ensureUser, idTokenFor, signIn } from './helpers.mjs';
 
 const EVIDENCE = process.env.EVENT_TIME_EVIDENCE_DIR;
 const HEADERS = { 'access-control-allow-origin': APP_BASE_URL, 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type, x-firebase-appcheck' };
@@ -31,6 +32,32 @@ async function mock(page, name, handler) {
     const body = route.request().method() === 'POST' ? route.request().postDataJSON() : {};
     await route.fulfill({ status: 200, headers: HEADERS, json: await handler(body) });
   });
+}
+
+// What a screen reader is handed for the focused element: its role, its
+// accessible name from aria-labelledby or its label, and its checked state.
+async function focusedControl(page) {
+  return page.evaluate(() => {
+    const el = document.activeElement;
+    const text = (id) => document.getElementById(id)?.textContent.trim() ?? '';
+    const name = el.getAttribute('aria-labelledby')?.split(' ').map(text).join(' ')
+      || (el.id && document.querySelector(`label[for="${el.id}"]`)?.textContent.trim())
+      || el.textContent.trim();
+    const role = el.tagName === 'INPUT' ? `${el.type}` : el.tagName.toLowerCase();
+    return `${role}: ${name}${el.type === 'radio' || el.type === 'checkbox' ? (el.checked ? ' (checked)' : ' (not checked)') : ''}`;
+  });
+}
+
+// Tab until the focus leaves the current control; a date input's day, month
+// and year are stops inside one control, so they count once.
+async function tabPath(page, stops) {
+  const path = [await focusedControl(page)];
+  for (let i = 0; i < 20 && path.length < stops; i += 1) {
+    await page.keyboard.press('Tab');
+    const now = await focusedControl(page);
+    if (now !== path[path.length - 1]) path.push(now);
+  }
+  return path;
 }
 
 async function endTour(page) {
@@ -178,5 +205,97 @@ test.describe.serial('event-time fields', () => {
     expect(saves).toHaveLength(1);
     expect(saves[0]).toMatchObject({ salesStartAt: '2026-11-16T14:00:00.000Z', salesEndAt: '2027-11-07T06:30:00.000Z' });
     expect(saves[0].ticketTypes[0].salesEndAt).toBe('2027-01-16T03:00:00.000Z');
+  });
+  test('a call with no deadline is chosen and closed by keyboard alone, and /pitch shows no deadline', async ({ page }) => {
+    test.setTimeout(180_000);
+    page.on('pageerror', (err) => console.error('Browser error:', err.message));
+    const ref = adminDb().doc('config/pitch_call');
+    await ref.set({ enabled: true, closesAt: '2027-02-01T04:59:59.000Z', externalFormUrl: null });
+    await signIn(page, ADMIN_EMAIL);
+    await page.setViewportSize(VIEWPORTS[0][1]);
+    await page.goto('/admin/pitches');
+    await expect(page.getByRole('heading', { name: 'Session pitches', exact: true })).toBeVisible();
+    await endTour(page);
+
+    // Keyboard only from here: open the panel and walk its controls with Tab.
+    await page.getByText('Manage the call for sessions', { exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    expect(await tabPath(page, 6)).toEqual([
+      'checkbox: Accept session pitches (checked)',
+      'radio: At a set date and time (checked)',
+      'date: Deadline Date',
+      'time: Deadline Time',
+      'select: Where people pitch',
+      'button: Save call settings',
+    ]);
+
+    // What a screen reader is told about each date-time control.
+    const deadline = page.getByRole('group', { name: 'Deadline', exact: true });
+    const date = deadline.getByLabel('Date', { exact: true });
+    await expect(date).toHaveAccessibleName('Deadline Date');
+    await expect(date).toHaveAccessibleDescription('Intake closes at this date and time. Event time zone: Eastern Time (America/New_York). Intake closes Sunday, January 31, 2027 at 11:59:59 PM Eastern Standard Time (UTC−05:00).');
+    await expect(deadline.getByLabel('Time', { exact: true })).toHaveAccessibleName('Deadline Time');
+    await expect(deadline.getByRole('status')).toHaveText('Intake closes Sunday, January 31, 2027 at 11:59:59 PM Eastern Standard Time (UTC−05:00).');
+    await expect(page.getByRole('group', { name: 'When intake closes' })).toBeVisible();
+
+    // Arrow keys move the choice inside the radio group, as the platform does.
+    await page.getByRole('radio', { name: 'At a set date and time' }).focus();
+    await page.keyboard.press('ArrowDown');
+    const openChoice = page.getByRole('radio', { name: 'Open until I close it' });
+    await expect(openChoice).toBeChecked();
+    await expect(openChoice).toBeFocused();
+    await expect(openChoice).toHaveAccessibleDescription('Intake stays open until an operator clears “Accept session pitches” and saves. The public page shows no deadline.');
+    await expect(page.getByRole('group', { name: 'Deadline', exact: true })).toHaveCount(0);
+    expect(await tabPath(page, 3)).toEqual([
+      'radio: Open until I close it (checked)',
+      'select: Where people pitch',
+      'button: Save call settings',
+    ]);
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Call settings saved.', { exact: true })).toBeVisible();
+    await expect.poll(async () => (await ref.get()).data()).toEqual({ enabled: true, closesAt: null, externalFormUrl: null });
+    await expect(page.getByRole('button', { name: 'Save call settings' })).toBeFocused();
+    expect(await fits(page), 'pitches page fits at 1280px with no deadline').toBe(true);
+    await capture(page.locator('main'), 'pitch-call-no-deadline-desktop');
+    for (const [name, viewport] of [['phone', VIEWPORTS[1][1]], ['zoom-200', { width: 640, height: 450 }]]) {
+      await page.setViewportSize(viewport);
+      expect(await fits(page), `pitches page fits at ${viewport.width}px with no deadline`).toBe(true);
+      await capture(page.locator('main'), `pitch-call-no-deadline-${name}`);
+    }
+    await page.setViewportSize(VIEWPORTS[0][1]);
+
+    // The public page: open, with no deadline line and no countdown.
+    const visitor = await page.context().browser().newPage();
+    await visitor.goto(`${APP_BASE_URL}/pitch`);
+    await expect(visitor.getByText('Submissions are open', { exact: true })).toBeVisible();
+    await expect(visitor.getByText('There is no set deadline. The organizers close submissions when they are ready.')).toBeVisible();
+    await expect(visitor.getByText(/Deadline:/)).toHaveCount(0);
+    await expect(visitor.locator('time')).toHaveCount(0);
+
+    // The server takes a pitch while the call is open.
+    const submitterUid = await ensureUser('e2e-no-deadline-submitter@example.test');
+    const token = await idTokenFor(submitterUid);
+    const keys = [`no-deadline-${Date.now()}-a`, `no-deadline-${Date.now()}-b`];
+    const body = (submissionKey) => ({ title: 'A session with no deadline', description: 'Synthetic pitch for the no-deadline check.', organization: null, format: null, submissionKey, consent: true });
+    try {
+      expect((await callFunction('submitSessionPitch', body(keys[0]), token)).status).toBe(201);
+
+      // Staff close the call by hand: clear the checkbox with Space, then save with Enter.
+      const accept = page.getByLabel('Accept session pitches');
+      await accept.focus();
+      await page.keyboard.press('Space');
+      await expect(accept).not.toBeChecked();
+      await page.getByRole('button', { name: 'Save call settings' }).focus();
+      await page.keyboard.press('Enter');
+      await expect.poll(async () => (await ref.get()).data()).toEqual({ enabled: false, closesAt: null, externalFormUrl: null });
+      await expect(visitor.getByText('Submissions are closed', { exact: true })).toBeVisible();
+      await expect(visitor.getByRole('button', { name: 'Submit pitch' })).toBeDisabled();
+      expect((await callFunction('submitSessionPitch', body(keys[1]), token)).status).toBe(404);
+    } finally {
+      await visitor.close();
+      for (const key of keys) await adminDb().collection('session_pitches').doc(createHash('sha256').update(`${submitterUid}\0${key}`).digest('hex')).delete();
+      await adminDb().collection('session_pitch_rate_limits').doc(createHash('sha256').update(submitterUid).digest('hex')).delete();
+    }
   });
 });
