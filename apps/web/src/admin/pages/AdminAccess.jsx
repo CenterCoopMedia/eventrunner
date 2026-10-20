@@ -44,6 +44,17 @@
 // Each tier's sections are named in TIER_SCOPE, in the rail's own words,
 // so the description, the confirmation sentences and the shell's refusal
 // cannot drift apart.
+//
+// AN END TIME (issue #331). A staff grant may end at a set time, for a demo
+// or a short engagement. The field shows for staff only, because operator
+// access never ends. The browser reads the field in its own time zone and
+// sends an ISO instant; the server checks it again and decides, by its own
+// clock, whether each grant still works (`expiryState`). A sweep on the
+// server takes an ended grant off the list within a minute, so an ended
+// row says so and is simply absent from the next load. The page shows
+// that answer in words and never works it out from the browser's clock. An
+// end time does not make the account read-only: until it comes, staff
+// edit and publish like any staff account, and the confirmation says so.
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useToast } from '../../contexts/ToastContext.jsx';
@@ -78,6 +89,68 @@ const GRANT_TIERS = [
   { value: 'operator', label: 'Operator' },
 ];
 
+/** The longest a staff grant may run. The server holds the same limit. */
+const MAX_STAFF_ACCESS_DAYS = 90;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const END_TIME_FORMAT = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZoneName: 'short',
+};
+
+/**
+ * An end time as people read it, in the browser's own time zone and with
+ * the zone named, so an operator in one zone and a reader in another do
+ * not read the same words as two times.
+ *
+ * @param {string|null|undefined} iso
+ * @returns {string}
+ */
+export function formatEndTime(iso) {
+  const ms = typeof iso === 'string' ? Date.parse(iso) : Number.NaN;
+  if (!Number.isFinite(ms)) return 'an unreadable time';
+  return new Intl.DateTimeFormat(undefined, END_TIME_FORMAT).format(new Date(ms));
+}
+
+/** The longest delay setTimeout honours; a longer one fires at once. */
+const MAX_TIMER_DELAY = 2_147_483_647;
+/** How long after an end time the page asks the server again. */
+const END_RELOAD_GRACE_MS = 1000;
+/** How long to wait before asking again when the server still says active. */
+const STALE_END_RETRY_MS = 30_000;
+
+/**
+ * The delay until the page should reload for the nearest end time that has
+ * not passed yet, or null when no grant has one. Capped at the timer's
+ * maximum: a capped timer reloads early, and the reload arms the next one.
+ *
+ * @param {Array<{ expiryState?: string, expiresAt?: string|null }>|null} accounts
+ * @param {number} nowMs
+ * @returns {number|null}
+ */
+export function nextEndReloadDelay(accounts, nowMs) {
+  let nearest = null;
+  for (const account of accounts ?? []) {
+    if (account?.expiryState !== 'active') continue;
+    const ms = typeof account.expiresAt === 'string' ? Date.parse(account.expiresAt) : Number.NaN;
+    if (Number.isFinite(ms) && (nearest === null || ms < nearest)) nearest = ms;
+  }
+  if (nearest === null) return null;
+  // The server still called a passed end time active (its clock is a little
+  // behind this one): ask again, but not every second.
+  if (nearest <= nowMs) return STALE_END_RETRY_MS;
+  return Math.min(nearest - nowMs + END_RELOAD_GRACE_MS, MAX_TIMER_DELAY);
+}
+
+/** Whether an account row holds a staff grant with an end time (readable or not). */
+function isTemporary(account) {
+  return Boolean(account) && account.tier === 'staff' && typeof account.expiryState === 'string';
+}
+
 /**
  * The words a pending change is stated in: the heading, the sentence
  * naming the consequence, and the confirm label that repeats it.
@@ -87,10 +160,14 @@ const GRANT_TIERS = [
  * and the standing is unknown — then the sentence says only what will be
  * true afterwards, and claims nothing about what is lost.
  *
+ * `expiresAt` is the end time a staff grant will have (an ISO string), or
+ * null for none. `previousTemporary` says the account has an end time now.
+ *
  * @param {{ email: string, tier: 'operator'|'staff'|'none',
- *           previousTier: 'operator'|'staff'|null|undefined }} change
+ *           previousTier: 'operator'|'staff'|null|undefined,
+ *           expiresAt?: string|null, previousTemporary?: boolean }} change
  */
-export function describeChange({ email, tier, previousTier }) {
+export function describeChange({ email, tier, previousTier, expiresAt = null, previousTemporary = false }) {
   if (tier === 'none') {
     return {
       title: `Remove access for ${email}`,
@@ -100,12 +177,32 @@ export function describeChange({ email, tier, previousTier }) {
     };
   }
   const word = TIER_WORDS[tier].label.toLowerCase();
+  const ends = tier === 'staff' && expiresAt ? formatEndTime(expiresAt) : null;
+  // Said whenever a grant will end: when, and what it does not mean.
+  const endSentence = ends
+    ? ` Access ends ${ends}. Until then, staff can edit and publish content. An end time does not make the account read-only.`
+    : '';
+  if (tier === 'staff' && previousTier === 'staff') {
+    return ends
+      ? {
+        title: `Change when access ends for ${email}`,
+        consequence: `${email} keeps staff access until ${ends}, then loses it. Until then, staff can edit and publish content.`,
+        confirmLabel: 'Set the end time',
+        destructive: false,
+      }
+      : {
+        title: `Change when access ends for ${email}`,
+        consequence: `${email} keeps staff access with no end time.`,
+        confirmLabel: 'Remove the end time',
+        destructive: false,
+      };
+  }
   if (previousTier === undefined) {
     return {
       title: `Set ${word} access for ${email}`,
       consequence: tier === 'operator'
         ? `${email} will have operator access to the admin panel at once and can open every section, including ${TIER_SCOPE.operatorOnly}.`
-        : `${email} will have staff access to the admin panel at once and can run ${TIER_SCOPE.staff}.`,
+        : `${email} will have staff access to the admin panel at once and can run ${TIER_SCOPE.staff}.${endSentence}`,
       confirmLabel: `Set ${word} access`,
       destructive: false,
     };
@@ -119,8 +216,8 @@ export function describeChange({ email, tier, previousTier }) {
         destructive: false,
       }
       : {
-        title: `Grant staff access to ${email}`,
-        consequence: `${email} can sign in to the admin panel at once and run ${TIER_SCOPE.staff}. Staff cannot open ${TIER_SCOPE.operatorOnly}.`,
+        title: ends ? `Grant staff access to ${email} until ${ends}` : `Grant staff access to ${email}`,
+        consequence: `${email} can sign in to the admin panel at once and run ${TIER_SCOPE.staff}.${endSentence} Staff cannot open ${TIER_SCOPE.operatorOnly}.`,
         confirmLabel: 'Grant staff access',
         destructive: false,
       };
@@ -128,23 +225,43 @@ export function describeChange({ email, tier, previousTier }) {
   return tier === 'operator'
     ? {
       title: `Change ${email} to operator`,
-      consequence: `${email} gains ${TIER_SCOPE.operatorOnly}. An operator can change who has access, including yours.`,
+      consequence: `${email} gains ${TIER_SCOPE.operatorOnly}. An operator can change who has access, including yours.${
+        previousTemporary ? ' Operator access has no end time, so the end time is removed.' : ''
+      }`,
       confirmLabel: 'Change to operator',
       destructive: false,
     }
     : {
       title: `Change ${email} to staff`,
-      consequence: `${email} loses ${TIER_SCOPE.operatorOnly} and keeps ${TIER_SCOPE.staff}.`,
+      consequence: `${email} loses ${TIER_SCOPE.operatorOnly} and keeps ${TIER_SCOPE.staff}.${endSentence}`,
       confirmLabel: 'Change to staff',
       destructive: false,
     };
 }
 
 /** The sentence a completed change is reported in. */
-export function describeResult({ email, tier, previousTier }) {
+export function describeResult({ email, tier, previousTier, expiresAt = null }) {
   if (tier === null || tier === 'none') return `Access removed for ${email}.`;
-  if (previousTier === null) return `${TIER_WORDS[tier].label} access granted to ${email}.`;
-  return `${email} is now ${TIER_WORDS[tier].label.toLowerCase()}.`;
+  const until = tier === 'staff' && expiresAt ? ` until ${formatEndTime(expiresAt)}` : '';
+  if (tier === 'staff' && previousTier === 'staff') {
+    return until ? `${email} keeps staff access${until}.` : `${email} keeps staff access with no end time.`;
+  }
+  if (previousTier === null) return `${TIER_WORDS[tier].label} access granted to ${email}${until}.`;
+  return `${email} is now ${TIER_WORDS[tier].label.toLowerCase()}${until}.`;
+}
+
+/**
+ * The words under the tier badge for a staff grant with an end time. The
+ * server decided the state by its own clock.
+ */
+function EndTimeLine({ account }) {
+  if (!isTemporary(account)) return null;
+  const text = account.expiryState === 'active'
+    ? `Access ends ${formatEndTime(account.expiresAt)}.`
+    : account.expiryState === 'expired'
+      ? `Access ended ${formatEndTime(account.expiresAt)}. No access now. The account leaves this list within a minute.`
+      : 'The end time cannot be read. No access now.';
+  return <p className="mt-3xs text-admin-xs text-admin-ink-secondary">{text}</p>;
 }
 
 /**
@@ -216,8 +333,9 @@ export default function AdminAccess() {
   const [callerEmail, setCallerEmail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-  const [form, setForm] = useState({ email: '', tier: 'staff' });
+  const [form, setForm] = useState({ email: '', tier: 'staff', endsAt: '' });
   const [formError, setFormError] = useState(null);
+  const [endsError, setEndsError] = useState(null);
   // The one change awaiting confirmation, or null.
   const [pending, setPending] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -272,6 +390,17 @@ export default function AdminAccess() {
     else formRef.current?.querySelector('input')?.focus();
   }, [pending]);
 
+  // An end time passing while the page is open: ask the server again just
+  // after it, so the row says Ended without a manual reload. The server's
+  // clock decides; the timer only picks the moment to ask. Re-armed by every
+  // list that lands, and cleared when the list changes or the page goes.
+  useEffect(() => {
+    const delay = nextEndReloadDelay(accounts, Date.now());
+    if (delay === null) return undefined;
+    const timer = window.setTimeout(() => { load(); }, delay);
+    return () => window.clearTimeout(timer);
+  }, [accounts, load]);
+
   // The list "Try again" asked for has landed: the keyboard was on that
   // control, which is gone now, so it goes to what was asked for.
   useEffect(() => {
@@ -299,27 +428,61 @@ export default function AdminAccess() {
     setPending(null);
   }
 
+  /**
+   * The end time in the field as an ISO instant, null when the field is
+   * empty or the tier is not staff, or an error sentence. The browser's
+   * clock only gives an early, friendly refusal; the server checks again.
+   */
+  function readEndsAt() {
+    if (form.tier !== 'staff' || form.endsAt.trim() === '') return { expiresAt: null };
+    const ms = new Date(form.endsAt).getTime();
+    if (!Number.isFinite(ms)) return { error: 'Enter a date and time.' };
+    const now = Date.now();
+    if (ms <= now) return { error: 'Pick a time later than now.' };
+    if (ms > now + MAX_STAFF_ACCESS_DAYS * DAY_MS) {
+      return { error: `Pick a time at most ${MAX_STAFF_ACCESS_DAYS} days from now.` };
+    }
+    return { expiresAt: new Date(ms).toISOString() };
+  }
+
   function submitGrant(event) {
     event.preventDefault();
     const email = form.email.trim().toLowerCase();
-    if (!EMAIL_RE.test(email)) {
-      setFormError('Enter an email address.');
+    const emailBad = !EMAIL_RE.test(email);
+    const ends = readEndsAt();
+    setFormError(emailBad ? 'Enter an email address.' : null);
+    setEndsError(ends.error ?? null);
+    if (emailBad || ends.error) {
       // After the render that marks the field, not before it.
       window.setTimeout(() => focusFirstError(formRef.current), 0);
       return;
     }
-    setFormError(null);
+    const { expiresAt } = ends;
     const existing = accounts ? accounts.find((account) => account.email === email) : undefined;
     if (existing && existing.tier === form.tier) {
-      // Nothing would change, so nothing is asked.
-      setResult({
-        tone: 'info',
-        message: `${email} already has ${TIER_WORDS[form.tier].label.toLowerCase()} access.`,
-      });
-      return;
+      const sameEnd = form.tier !== 'staff'
+        || (expiresAt === null
+          ? !isTemporary(existing)
+          : isTemporary(existing) && Date.parse(existing.expiresAt) === Date.parse(expiresAt));
+      if (sameEnd) {
+        // Nothing would change, so nothing is asked.
+        setResult({
+          tone: 'info',
+          message: expiresAt
+            ? `${email} already has staff access until ${formatEndTime(expiresAt)}.`
+            : `${email} already has ${TIER_WORDS[form.tier].label.toLowerCase()} access.`,
+        });
+        return;
+      }
     }
     open(
-      { email, tier: form.tier, previousTier: accounts ? existing?.tier ?? null : undefined },
+      {
+        email,
+        tier: form.tier,
+        previousTier: accounts ? existing?.tier ?? null : undefined,
+        expiresAt,
+        previousTemporary: isTemporary(existing),
+      },
       event.currentTarget.querySelector('button[type="submit"]'),
     );
   }
@@ -328,9 +491,11 @@ export default function AdminAccess() {
     if (!pending) return;
     setBusy(true);
     setChangeError(null);
-    const { email, tier, previousTier } = pending;
+    const { email, tier, previousTier, expiresAt = null } = pending;
     try {
-      const response = await call('setAdminAccess', { email, tier });
+      // An end time is sent only when there is one, so a permanent grant
+      // asks exactly what it asked before #331.
+      const response = await call('setAdminAccess', expiresAt ? { email, tier, expiresAt } : { email, tier });
       const nextTier = response?.tier ?? (tier === 'none' ? null : tier);
       // The server read the stored standing inside its transaction; it wins
       // over what this page remembered when the two differ.
@@ -338,15 +503,23 @@ export default function AdminAccess() {
         ? response.previousTier
         : previousTier === undefined ? null : previousTier;
       // A write that only tidied the stored lists answers changed:true with
-      // the tier standing; that is not a new tier and is not said as one.
-      const sentence = response?.changed === false || nextTier === standing
+      // the tier standing and no end time stated; that is not a new tier and
+      // is not said as one. A moved end time is stated (`expiresAt` in the
+      // answer), and is said.
+      const endStated = Boolean(response) && Object.prototype.hasOwnProperty.call(response, 'expiresAt');
+      const sentence = response?.changed === false || (nextTier === standing && !endStated)
         ? `${email} already had this access.`
-        : describeResult({ email, tier: nextTier, previousTier: standing });
+        : describeResult({
+          email,
+          tier: nextTier,
+          previousTier: standing,
+          expiresAt: endStated ? response.expiresAt : expiresAt,
+        });
       // The line on the page is the record and it announces; the bar
       // repeats it silently.
       setResult({ tone: 'ok', message: sentence });
       showToast(sentence, { announce: false });
-      if (standing === null && tier !== 'none') setForm({ email: '', tier: 'staff' });
+      if (standing === null && tier !== 'none') setForm({ email: '', tier: 'staff', endsAt: '' });
       // The operator's OWN standing changed: read the tier again so the
       // rail and the route refusal follow now (a demotion refuses this
       // page; a revocation shows the not-an-admin state), not on the next
@@ -376,12 +549,12 @@ export default function AdminAccess() {
             ? `${accounts.length} account${accounts.length === 1 ? '' : 's'}, ${operatorCount} operator${operatorCount === 1 ? '' : 's'}`
             : undefined
         }
-        description={`Who can sign in to the admin panel, and at which tier. Operators open every section, including ${TIER_SCOPE.operatorOnly}. Staff run ${TIER_SCOPE.staff}. Every change here asks you to confirm it first and is recorded in the admin log.`}
+        description={`Who can sign in to the admin panel, and at which tier. Operators open every section, including ${TIER_SCOPE.operatorOnly}. Staff run ${TIER_SCOPE.staff}. Staff access can end at a set time. Every change here asks you to confirm it first and is recorded in the admin log.`}
       />
 
       <Panel
         title="Grant access"
-        description="Enter an address and pick a tier. The person signs in with that address the way every admin does: Google, or the emailed code."
+        description={`Enter an address and pick a tier. The person signs in with that address the way every admin does: Google, or the emailed code. For staff, you can set a time when access ends, at most ${MAX_STAFF_ACCESS_DAYS} days from now. Leave it empty for access with no end time. The time is in your time zone.`}
       >
         <form ref={formRef} onSubmit={submitGrant} className="flex flex-col gap-sm" noValidate>
           <div className="flex flex-wrap items-end gap-sm">
@@ -399,10 +572,24 @@ export default function AdminAccess() {
               <SelectField
                 label="Tier"
                 value={form.tier}
-                onChange={(value) => setForm((f) => ({ ...f, tier: value }))}
+                onChange={(value) => {
+                  setEndsError(null);
+                  setForm((f) => ({ ...f, tier: value }));
+                }}
                 options={GRANT_TIERS}
               />
             </div>
+            {form.tier === 'staff' ? (
+              <div className="w-full max-w-xs sm:w-auto">
+                <TextField
+                  label="Access ends (optional)"
+                  type="datetime-local"
+                  value={form.endsAt}
+                  onChange={(value) => setForm((f) => ({ ...f, endsAt: value }))}
+                  error={endsError}
+                />
+              </div>
+            ) : null}
             <button type="submit" className={primaryButtonClass} disabled={busy}>
               Grant access
             </button>
@@ -491,6 +678,12 @@ export default function AdminAccess() {
                         </td>
                         <td className="px-md py-sm align-top">
                           <StatusBadge tone={word.tone}>{word.label}</StatusBadge>
+                          {isTemporary(account) && account.expiryState !== 'active' ? (
+                            <StatusBadge tone="caution" className="ms-xs">
+                              {account.expiryState === 'expired' ? 'Ended' : 'No access'}
+                            </StatusBadge>
+                          ) : null}
+                          <EndTimeLine account={account} />
                         </td>
                         <td className="px-md py-sm text-end align-top">
                           <div className="flex flex-wrap items-center justify-end gap-xs">
@@ -499,7 +692,12 @@ export default function AdminAccess() {
                               className={linkButtonClass}
                               disabled={busy}
                               onClick={(event) => open(
-                                { email: account.email, tier: otherTier, previousTier: account.tier },
+                                {
+                                  email: account.email,
+                                  tier: otherTier,
+                                  previousTier: account.tier,
+                                  previousTemporary: isTemporary(account),
+                                },
                                 event.currentTarget,
                               )}
                             >
