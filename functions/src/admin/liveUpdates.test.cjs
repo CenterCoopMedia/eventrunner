@@ -109,6 +109,28 @@ test('validateLiveUpdateDoc rejects a message over the length cap', () => {
   assert.ok(errors.some((e) => e.startsWith('message:')));
 });
 
+test('validateLiveUpdateDoc accepts a category and each audience (issue 200)', () => {
+  for (const audience of ['everyone', 'attendees', 'speakers']) {
+    assert.deepEqual(validateLiveUpdateDoc({ message: 'Hi', audience }), { ok: true, errors: [] });
+  }
+  for (const category of ['Travel', null, '  Rooms  ']) {
+    assert.deepEqual(validateLiveUpdateDoc({ message: 'Hi', category }), { ok: true, errors: [] });
+  }
+});
+
+test('validateLiveUpdateDoc refuses an unknown audience and a bad category, by name', () => {
+  for (const audience of ['staff', '', null, 'Speakers', 7]) {
+    const { ok, errors } = validateLiveUpdateDoc({ message: 'Hi', audience });
+    assert.equal(ok, false, `audience ${JSON.stringify(audience)}`);
+    assert.ok(errors.some((e) => e.startsWith('audience:')));
+  }
+  for (const category of ['', '   ', 'x'.repeat(25), 'Two\nlines', 7]) {
+    const { ok, errors } = validateLiveUpdateDoc({ message: 'Hi', category });
+    assert.equal(ok, false, `category ${JSON.stringify(category)}`);
+    assert.ok(errors.some((e) => e.startsWith('category:')));
+  }
+});
+
 // -------------------------------------------------------------- saveLiveUpdate
 
 test('saveLiveUpdate creates a new entry, stamping postedAt', async () => {
@@ -203,6 +225,74 @@ test('saveLiveUpdate records an admin_logs entry', async () => {
   const entry = db.docs.get([...db.docs.keys()].find((k) => k.startsWith('admin_logs/')));
   assert.equal(entry.action, 'saveLiveUpdate');
   assert.equal(entry.docPath, 'live_updates/u1');
+});
+
+test('saveLiveUpdate stores the audience and the trimmed category', async () => {
+  const d = deps();
+  await createSaveLiveUpdateHandler(d)(
+    adminReq({ id: 'u1', update: { message: 'Green room moved.', audience: 'speakers', category: ' Rooms ' } }),
+    fakeRes(),
+  );
+  const stored = d.db.docs.get('live_updates/u1');
+  assert.equal(stored.audience, 'speakers');
+  assert.equal(stored.category, 'Rooms');
+});
+
+test('saveLiveUpdate stores everyone and a null category when both are omitted', async () => {
+  // Everyone is what every row meant before the field existed. The rules
+  // fail closed on a row with no audience, so the field is always written.
+  const d = deps();
+  await createSaveLiveUpdateHandler(d)(adminReq({ id: 'u1', update: { message: 'Hi' } }), fakeRes());
+  const stored = d.db.docs.get('live_updates/u1');
+  assert.equal(stored.audience, 'everyone');
+  assert.equal(stored.category, null);
+});
+
+test('saveLiveUpdate gives an old row with no audience one, and logs both audiences', async () => {
+  const db = fakeDb({ 'live_updates/u1': { message: 'old', pinned: false, postedAt: new Date(1690000000000) } });
+  await createSaveLiveUpdateHandler(deps({ db }))(
+    adminReq({ id: 'u1', update: { message: 'old', audience: 'attendees' } }),
+    fakeRes(),
+  );
+  assert.equal(db.docs.get('live_updates/u1').audience, 'attendees');
+  let entry = db.docs.get([...db.docs.keys()].find((k) => k.startsWith('admin_logs/')));
+  assert.deepEqual(entry.details, { audience: 'attendees', previousAudience: null });
+
+  // A widened row names the audience it had, so the change can be traced.
+  db.docs.set('live_updates/u2', { message: 'x', audience: 'speakers', postedAt: new Date(1690000000000) });
+  for (const key of [...db.docs.keys()].filter((k) => k.startsWith('admin_logs/'))) db.docs.delete(key);
+  await createSaveLiveUpdateHandler(deps({ db }))(
+    adminReq({ id: 'u2', update: { message: 'x', audience: 'everyone' } }),
+    fakeRes(),
+  );
+  entry = db.docs.get([...db.docs.keys()].find((k) => k.startsWith('admin_logs/')));
+  assert.equal(entry.action, 'saveLiveUpdate');
+  assert.deepEqual(entry.details, { audience: 'everyone', previousAudience: 'speakers' });
+});
+
+test('saveLiveUpdate keeps the audience and category of a row when an edit omits them', async () => {
+  // An admin tab still open on a bundle from before #200 sends neither
+  // field. It must not widen a speaker-only row to everyone.
+  const db = fakeDb({
+    'live_updates/u1': { message: 'old', audience: 'speakers', category: 'Rooms', postedAt: new Date(1690000000000) },
+  });
+  await createSaveLiveUpdateHandler(deps({ db }))(adminReq({ id: 'u1', update: { message: 'fixed' } }), fakeRes());
+  const stored = db.docs.get('live_updates/u1');
+  assert.equal(stored.audience, 'speakers');
+  assert.equal(stored.category, 'Rooms');
+  // A null category clears it; it is not the same as an omitted one.
+  await createSaveLiveUpdateHandler(deps({ db }))(adminReq({ id: 'u1', update: { message: 'fixed', category: null } }), fakeRes());
+  assert.equal(db.docs.get('live_updates/u1').category, null);
+  assert.equal(db.docs.get('live_updates/u1').audience, 'speakers');
+});
+
+test('saveLiveUpdate refuses an unknown audience with 400 and writes nothing', async () => {
+  const d = deps();
+  const res = fakeRes();
+  await createSaveLiveUpdateHandler(d)(adminReq({ id: 'u1', update: { message: 'Hi', audience: 'staff' } }), res);
+  assert.equal(res.statusCode, 400);
+  assert.ok(res.body.error.message.includes('audience:'));
+  assert.equal(d.db.docs.size, 0);
 });
 
 // ------------------------------------------------------------ deleteLiveUpdate

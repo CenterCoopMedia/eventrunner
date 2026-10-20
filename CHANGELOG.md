@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Live updates have a category and an audience: everyone, approved attendees and speakers,
+  or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
+  approved attendee cannot get or list a speaker-only entry, and the card's queries carry the
+  matching audience filter. Each save writes the new and the previous audience to
+  `admin_logs`. The card also lists the event's milestones as key dates, in date order, and
+  shows them when the feed is empty (#200).
+
 - Staff set the pitch call deadline and the ticket catalog's sale windows as a date and a
   time on the event's clock. The fields name the event's time zone and state the result in
   words, with the UTC offset for the chosen date. A time that daylight saving time skips is
@@ -533,6 +540,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section the client has already written. Both are reported by init as kept.
 
 ### Changed
+
+- `live_updates` is no longer readable by everyone. A row with no audience, which is every
+  row saved before this release, is readable by admins only, so it leaves the public card.
+  The Live updates page counts these rows and marks each one; edit and save a row to give it
+  an audience. Deploy the two new `live_updates` indexes in `firestore.indexes.json` with the
+  rules, or the card's queries fail until the indexes are built (#200).
 
 - The public address of the Pages site is one value, in `scripts/lib/pages-site.cjs`. The
   documentation generator, the demo build, and the link checker read it, so the canonical and

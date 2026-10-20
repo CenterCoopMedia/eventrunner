@@ -27,7 +27,7 @@ vi.mock('firebase/firestore', () => ({
 }));
 vi.mock('../firebase.js', () => ({ db: {} }));
 
-const { subscribeLiveUpdates } = await import('./liveUpdatesSource.js');
+const { readableAudiences, subscribeLiveUpdates } = await import('./liveUpdatesSource.js');
 
 function doc(id, fields) {
   return { id, data: () => fields };
@@ -40,14 +40,14 @@ describe('subscribeLiveUpdates', () => {
   });
 
   it('registers a pinned (where pinned == true) query and a capped recent query', () => {
-    subscribeLiveUpdates(vi.fn());
+    subscribeLiveUpdates(['everyone'], vi.fn());
     expect(whereMock).toHaveBeenCalledWith('pinned', '==', true);
     expect(calls.length).toBe(2);
   });
 
   it('does not drop an older pinned entry that falls outside the recent cap', () => {
     const onNext = vi.fn();
-    subscribeLiveUpdates(onNext);
+    subscribeLiveUpdates(['everyone'], onNext);
     const [pinned, recent] = calls;
 
     // An old pinned entry the "recent" query would never return, plus a
@@ -63,7 +63,7 @@ describe('subscribeLiveUpdates', () => {
 
   it('waits for both listeners to report before emitting', () => {
     const onNext = vi.fn();
-    subscribeLiveUpdates(onNext);
+    subscribeLiveUpdates(['everyone'], onNext);
     const [pinned] = calls;
     pinned.onSuccess({ docs: [] });
     expect(onNext).not.toHaveBeenCalled();
@@ -71,7 +71,7 @@ describe('subscribeLiveUpdates', () => {
 
   it('de-duplicates a row present in both queries and sorts newest first', () => {
     const onNext = vi.fn();
-    subscribeLiveUpdates(onNext);
+    subscribeLiveUpdates(['everyone'], onNext);
     const [pinned, recent] = calls;
 
     pinned.onSuccess({ docs: [doc('p1', { message: 'Pinned', pinned: true, postedAt: new Date(5000) })] });
@@ -86,5 +86,41 @@ describe('subscribeLiveUpdates', () => {
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe('r1'); // newest first
     expect(result[1].id).toBe('p1');
+  });
+
+  it('carries the audience predicate on both queries (issue 200)', () => {
+    queryMock.mockClear();
+    subscribeLiveUpdates(['everyone', 'attendees'], vi.fn());
+    expect(queryMock).toHaveBeenCalledTimes(2);
+    for (const [, ...constraints] of queryMock.mock.calls) {
+      expect(constraints).toContainEqual({ __kind: 'where', field: 'audience', op: 'in', value: ['everyone', 'attendees'] });
+    }
+  });
+});
+
+// The same three answers firestore.rules readableLiveUpdateAudiences()
+// gives; tests/firestore.rules.test.js proves the rules side.
+describe('readableAudiences', () => {
+  it('gives a signed-out reader everyone only', () => {
+    expect(readableAudiences({ signedIn: false })).toEqual(['everyone']);
+    expect(readableAudiences({ signedIn: false, profile: { speakerId: 'spk-1' }, isAdmin: true })).toEqual(['everyone']);
+  });
+
+  it('gives a signed-in account that is not approved everyone only', () => {
+    expect(readableAudiences({ signedIn: true, profile: null })).toEqual(['everyone']);
+    expect(readableAudiences({ signedIn: true, profile: { registrationStatus: 'pending', speakerId: null } })).toEqual(['everyone']);
+    expect(readableAudiences({ signedIn: true, profile: { registrationStatus: 'ticketed' } })).toEqual(['everyone']);
+  });
+
+  it('adds attendees for an approved attendee, and not speakers', () => {
+    expect(readableAudiences({ signedIn: true, profile: { registrationStatus: 'approved', speakerId: null } }))
+      .toEqual(['everyone', 'attendees']);
+  });
+
+  it('gives a speaker or an admin all three', () => {
+    expect(readableAudiences({ signedIn: true, profile: { registrationStatus: 'pending', speakerId: 'spk-1' } }))
+      .toEqual(['everyone', 'attendees', 'speakers']);
+    expect(readableAudiences({ signedIn: true, profile: null, isAdmin: true }))
+      .toEqual(['everyone', 'attendees', 'speakers']);
   });
 });
