@@ -156,6 +156,9 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
       'onSpeakerWritten',
       'resendSpeakerInvite',
       'sendSpeakerInvite',
+      // Staff wording of the invite and acceptance mail (issue #204,
+      // speakers/mailTemplates.cjs): read, preview, save, reset.
+      'speakerMailTemplates',
       'speakerPhotoDelete',
       'speakerPhotoUpload',
       // Staff reminders to accepted speakers about missing items

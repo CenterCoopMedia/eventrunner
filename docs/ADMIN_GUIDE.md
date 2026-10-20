@@ -295,6 +295,23 @@ The canonical speaker list, with each record's pipeline status and the entry poi
 
 One speaker record is the source of truth. If a name is wrong in three places on the public site, fix the speaker record — do not patch each place it appears.
 
+### Speaker email wording
+
+Change the words of two emails: the **Invitation** a speaker gets when you send or resend an invitation, and the **Acceptance confirmation** a speaker gets once, after they accept. Select **Edit email wording** at the top of the Speakers list. Staff and operators can use this page.
+
+Each message has its own panel with **Subject**, **HTML body**, and **Plain text body**. The panel says whether the shipped wording or saved wording is in use, and who saved it and when. It lists the tokens the message may use. Event tokens such as `{{event_name}}` also work. The links stay fixed:
+
+- The invitation's HTML body and plain text body must each keep `{{invite_url}}`, the private link that accepts the invitation.
+- The acceptance confirmation's two bodies must each keep `{{profile_wizard_url}}`, the link to the speaker's profile.
+
+**Save wording** checks the words on the server first. The server refuses a token the message does not know, a broken placeholder, an empty field, and a body without its link, and names the field. Nothing is saved, and the cursor moves to that field. The next invitation or acceptance email uses the saved wording; there is no delay.
+
+**Preview** shows the exact subject, the HTML version in a safe frame, the plain text version, and the HTML source, with the legal footer the email gets. It uses the words in the form, saved or not, and says which. Sample values fill the tokens: the name "Sample Speaker", your own address as the contact, and a sample link in place of the private one. A change to the words clears the preview. The preview says so if the event has no public site address, because the links then do not work.
+
+**Shipped wording** shows the wording that ships with the product. **Copy the shipped wording into the form** puts it in the form without saving it. **Use the shipped wording** deletes the saved wording, so every later email uses the shipped wording.
+
+If saved wording fails its check (for example, someone removed the link outside this page), speakers get the shipped wording and the panel says why. Each save and each reset writes an admin log entry. A historical demo refuses save and reset; the preview still works.
+
 ### Speaker reminders
 
 Email accepted speakers about the items they still owe. Select **Send reminders** at the top of the Speakers list, or **Remind** on the row of one accepted or approved speaker. Staff and operators can use this page.
@@ -604,9 +621,13 @@ The page sends a package of up to 9 MB built from at most 50,000 stored document
 
 ## Settings → Event settings
 
-The event's own identity fields: Name, dates, timezone, venue, sender address, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
+The event's own identity fields: Name, dates, time zone, venue, sender address, social accounts, milestones, and the rest. The venue's places, movements, and map are set here too, in the panels described below. This is a merge-then-validate write — the form only sends the keys it is actually changing, and fields it does not touch (the legal postal address, the SEO metadata) are left alone.
 
-**Tracks** live here too: The lines your event runs when sessions happen at the same time in different rooms. Each track has a letter (A to Z) and a name, and the schedule shows both — a reader tells two lines apart by the letter and the name, never by colour alone. Sessions point at a track by its letter, so renaming a track is one edit here rather than a change to every session. Leave the list empty if everything happens in one room.
+**The time zone is chosen from a list.** Type part of a city, a region, the zone's usual name, or an offset into **Time zone**, such as `Chicago`, `Eastern Time`, or `UTC+05:30`. Each match shows the city, the zone's name, and its offset today. Use the arrow keys and Enter, or select one. Escape, or leaving the field without a choice, keeps the saved zone. The saved zone is marked **Current**. The site still stores the IANA name, such as `America/Chicago`, and the field states it under the search. A line under the field gives the UTC offset on your event days. If the clocks change during the event, it names both offsets and the day the second one starts.
+
+**Days.** Select **+ Add day** to add a day, then fill in its label, date, and start and end times. List the days in date order. You do not type a day id: a new day gets one, such as `day-3`, that no other day and no session uses, and a saved day keeps its id. Sessions store that id, so changing a day's label or date never moves its sessions. Each day has its own **Remove** control. If sessions are on the day, the day says so, and **Remove** first explains what happens: the sessions stay saved but leave the public schedule until you give each one another day. Choose **Remove day … anyway** or **Keep day …**. Nothing is removed until you save.
+
+**Tracks** live here too: The lines your event runs when sessions happen at the same time in different rooms. Each track has a letter (A to Z) and a name, and the schedule shows both — a reader tells two lines apart by the letter and the name, never by colour alone. Sessions point at a track by its letter, so renaming a track is one edit here rather than a change to every session. Leave the list empty if everything happens in one room. **+ Add track** starts a new track on the first letter that no track has and no session uses. Each track has its own **Remove** control. If sessions use the track, **Remove** first explains that they lose their track and run across the whole schedule until you give them another one. Changing a used track's letter shows the same warning under the letter field. Choosing a letter that sessions already use, from a track removed earlier, says that those sessions join this track when you save. Add and **Remove** wait until the page has read every live and draft session; until then, each panel says it is checking.
 
 **What the track list changes on the public site.** Once you list tracks, the schedule draws as a grid on a wide screen: Time down the left, one column per track, in the order you listed them. On a phone — and for anyone reading with a screen reader — the same day is a time-ordered list. It contains the same sessions in the same order as the wide-screen grid. A session with no track runs across the whole width, which is what a plenary is. A session that names a parent is listed under it as a stop on the way through it rather than as a separate entry, in both views.
 

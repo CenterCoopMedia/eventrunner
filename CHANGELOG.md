@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Staff edit the wording of the speaker invitation and the acceptance confirmation
+  (#204). **Edit email wording** on the Speakers list opens one editor per message, with
+  the subject, the HTML body and the plain text body. The server checks each save: an
+  unknown token, a broken placeholder, or a body without its fixed link is refused with the
+  field named, and nothing is stored. Preview shows the exact subject, HTML and text, with
+  the legal footer and sample values, for the words in the form, saved or not. **Use the
+  shipped wording** deletes the saved wording. Saves and resets write an admin log entry
+  and are refused on a historical demo. The next invitation or acceptance email reads the
+  saved wording fresh, so an edit applies at once (#505). The new staff endpoint is
+  `speakerMailTemplates`.
+
+- Event settings has familiar controls for the time zone, the days, and the tracks. Staff
+  search for the time zone by city, region, zone name, or UTC offset and choose it from a
+  list on the WAI-ARIA combobox pattern. The list shows each zone's current offset, and
+  the field states the offset on the event days, including a clock change during the
+  event. The stored value is still the IANA name. Each day and track has its own labelled
+  remove control, and one compact add control sits in each panel heading. A new day gets a
+  `day-N` id that no day or session uses, so staff no longer type ids, and saved ids do not
+  change. Removing a day or track that sessions use first states what happens to those
+  sessions. The design guidance and the shape test now allow a listed compact chip, held
+  to a semantic contract, in place of a blanket ban (#475).
+
 - Live updates have a category and an audience: everyone, approved attendees and speakers,
   or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
   approved attendee cannot get or list a speaker-only entry, and the card's queries carry the

@@ -38,6 +38,8 @@ test('admin workspaces fill desktop width and group readable cards without narro
     if (task.name === 'event-settings') {
       await expect(page.getByLabel('Event name', { exact: true })).toHaveValue(event.data().name);
       // An additional unsaved day exercises nested row-card widths; no save occurs.
+      // Add day waits until the live and draft session lists have loaded.
+      await expect(page.getByRole('button', { name: 'Add day', exact: true })).not.toHaveAttribute('aria-disabled', 'true');
       await page.getByRole('button', { name: 'Add day', exact: true }).click();
     }
     if (task.name === 'content-editor') await page.getByRole('button', { name: 'Edit block settings', exact: true }).click();
