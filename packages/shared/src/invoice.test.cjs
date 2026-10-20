@@ -7,6 +7,7 @@ const {
   isInvoiceId, computeInvoiceTotals, parseMoneyInput, formatMoney, minorToInput,
   validateInvoiceDraft, validateInvoiceSettings, sanitizeInvoiceText,
   resolveInvoiceCurrency, formatInvoiceNumber,
+  PAYMENT_METHODS, PAYMENT_METHOD_WORDS, invoiceDateIn, validatePayment, validateVoidReason, issueProblems,
 } = require('./invoice.cjs');
 const { CURRENCY_EXPONENTS } = require('./ticketCommerce.cjs');
 
@@ -190,4 +191,45 @@ test('the browser module exports the same functions', async () => {
   const esm = await import('./invoice.mjs');
   const cjs = require('./invoice.cjs');
   for (const name of Object.keys(cjs)) assert.equal(esm[name], cjs[name], name);
+});
+
+test('an invoice date is the calendar date on the event clock', () => {
+  const lateEvening = new Date('2026-10-21T02:30:00Z');
+  assert.equal(invoiceDateIn(lateEvening, 'America/New_York'), '2026-10-20');
+  assert.equal(invoiceDateIn(lateEvening, 'Europe/London'), '2026-10-21');
+  // A missing or unknown zone reads the date in UTC rather than failing.
+  assert.equal(invoiceDateIn(lateEvening, ''), '2026-10-21');
+  assert.equal(invoiceDateIn(lateEvening, 'Not/AZone'), '2026-10-21');
+});
+
+test('a payment needs a real date that is not in the future and a known method', () => {
+  assert.deepEqual(PAYMENT_METHODS, ['bank-transfer', 'check', 'card', 'cash', 'other']);
+  for (const method of PAYMENT_METHODS) assert.equal(typeof PAYMENT_METHOD_WORDS[method], 'string');
+  const ok = validatePayment({ paidOn: '2026-10-20', method: 'check', note: ' Check 1042\u202e ', extra: 'x' }, { today: '2026-10-20' });
+  assert.deepEqual(ok, { ok: true, issues: [], value: { paidOn: '2026-10-20', method: 'check', note: 'Check 1042' } });
+  const bad = validatePayment({ paidOn: '2026-02-30', method: 'barter', note: 'x'.repeat(INVOICE_LIMITS.paymentNote + 1) }, { today: '2026-10-20' });
+  assert.equal(bad.ok, false);
+  assert.deepEqual(bad.issues.map((issue) => issue.path), ['paidOn', 'method', 'note']);
+  const future = validatePayment({ paidOn: '2026-10-21', method: 'card' }, { today: '2026-10-20' });
+  assert.deepEqual(future.issues, [{ path: 'paidOn', message: 'The payment date cannot be after today (2026-10-20).' }]);
+  assert.equal(validatePayment(null, { today: '2026-10-20' }).ok, false);
+});
+
+test('a void needs a reason, cleaned and capped', () => {
+  assert.deepEqual(validateVoidReason('  Wrong amount\n billed '), { ok: true, issues: [], value: 'Wrong amount billed' });
+  assert.equal(validateVoidReason(' ').ok, false);
+  assert.equal(validateVoidReason(undefined).issues[0].path, 'reason');
+  assert.equal(validateVoidReason('x'.repeat(INVOICE_LIMITS.voidReason + 1)).ok, false);
+});
+
+test('an invoice is ready to issue with a line, an issuer and a due date on or after the issue date', () => {
+  const settings = { issuerName: 'Example Events' };
+  const value = validateInvoiceDraft(draft()).value;
+  assert.deepEqual(issueProblems(value, { settings, issueDate: '2026-10-20' }), []);
+  assert.deepEqual(issueProblems({ ...value, dueDate: null }, { settings, issueDate: '2026-10-20' }), []);
+  assert.deepEqual(issueProblems({ ...value, dueDate: '2026-11-30' }, { settings, issueDate: '2026-11-30' }), []);
+  assert.deepEqual(
+    issueProblems({ ...value, lines: [], dueDate: '2026-10-19' }, { settings: { issuerName: '' }, issueDate: '2026-10-20' }).map((issue) => issue.path),
+    ['lines', 'dueDate', 'settings.issuerName'],
+  );
 });

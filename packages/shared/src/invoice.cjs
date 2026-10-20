@@ -19,6 +19,7 @@
  */
 const { CURRENCY_EXPONENTS } = require('./ticketCommerce.cjs');
 const { EMAIL_ADDRESS_RE } = require('./email.cjs');
+const { isKnownTimeZone, wallParts } = require('./eventDateTime.cjs');
 
 /** The largest single amount or total: 99,999,999.99 in a two-digit currency. */
 const MAX_INVOICE_AMOUNT = 9999999999;
@@ -38,9 +39,20 @@ const INVOICE_LIMITS = Object.freeze({
   issuerAddress: 1000,
   taxId: 100,
   paymentInstructions: 2000,
+  paymentNote: 500,
+  voidReason: 500,
 });
 const INVOICE_STATUSES = Object.freeze(['draft', 'issued', 'paid', 'void']);
 const ADJUSTMENT_KINDS = Object.freeze(['discount', 'tax']);
+/** How a payment arrived. `card` is the method the Stripe pay link records (#519). */
+const PAYMENT_METHODS = Object.freeze(['bank-transfer', 'check', 'card', 'cash', 'other']);
+const PAYMENT_METHOD_WORDS = Object.freeze({
+  'bank-transfer': 'Bank transfer',
+  check: 'Check',
+  card: 'Card',
+  cash: 'Cash',
+  other: 'Other',
+});
 const DEFAULT_INVOICE_PREFIX = 'INV';
 const DEFAULT_INVOICE_CURRENCY = 'usd';
 const PREFIX_RE = /^[A-Z][A-Z0-9-]{0,9}$/;
@@ -221,6 +233,20 @@ function isCalendarDate(value) {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
+/**
+ * The calendar date of one instant on the event's clock, as 'YYYY-MM-DD'.
+ * Issue dates and payment dates are event dates, like the due date. A
+ * missing or unknown zone reads the date in UTC rather than failing.
+ *
+ * @param {Date} instant
+ * @param {unknown} timeZone
+ */
+function invoiceDateIn(instant, timeZone) {
+  if (!isKnownTimeZone(timeZone)) return instant.toISOString().slice(0, 10);
+  const parts = wallParts(instant, timeZone);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 /** One validator's bookkeeping: a cleaned text field and its limit. */
 function textField(issues, path, value, max, { required = false, multiline = false, label }) {
   const clean = sanitizeInvoiceText(value, { multiline });
@@ -369,9 +395,62 @@ function validateInvoiceSettings(input) {
   return issues.length ? { ok: false, value: null, issues } : { ok: true, value, issues: [] };
 }
 
+/**
+ * A payment staff record when they mark an invoice paid: the date it
+ * arrived (an event date, not after `today`), how it arrived, and an
+ * optional note such as a check number. Unknown fields are dropped.
+ *
+ * @param {unknown} input
+ * @param {{ today: string }} context today's date on the event clock
+ */
+function validatePayment(input, { today }) {
+  if (!isRecord(input)) {
+    return { ok: false, value: null, issues: [{ path: 'payment', message: 'Enter the payment details.' }] };
+  }
+  const issues = [];
+  const paidOn = typeof input.paidOn === 'string' ? input.paidOn.trim() : '';
+  if (!paidOn) issues.push({ path: 'paidOn', message: 'Enter the date the payment arrived.' });
+  else if (!isCalendarDate(paidOn)) issues.push({ path: 'paidOn', message: 'Enter a real calendar date.' });
+  else if (paidOn > today) issues.push({ path: 'paidOn', message: `The payment date cannot be after today (${today}).` });
+  const method = typeof input.method === 'string' ? input.method : '';
+  if (!PAYMENT_METHODS.includes(method)) issues.push({ path: 'method', message: 'Choose how the payment arrived.' });
+  const note = textField(issues, 'note', input.note, INVOICE_LIMITS.paymentNote, { label: 'the payment note' });
+  return issues.length ? { ok: false, value: null, issues } : { ok: true, issues: [], value: { paidOn, method, note } };
+}
+
+/** Why an invoice is voided. Required, one line, cleaned. */
+function validateVoidReason(input) {
+  const issues = [];
+  const value = textField(issues, 'reason', input, INVOICE_LIMITS.voidReason, { required: true, label: 'the reason for the void' });
+  return issues.length ? { ok: false, value: null, issues } : { ok: true, issues: [], value };
+}
+
+/**
+ * What stops a valid draft from being issued: no line, a due date before
+ * the issue date, or invoice settings with no issuer name. An empty list
+ * means it is ready.
+ *
+ * @param {{ lines: unknown[], dueDate: string|null }} value a validateInvoiceDraft value
+ * @param {{ settings: { issuerName?: string }, issueDate: string }} context
+ */
+function issueProblems(value, { settings, issueDate }) {
+  const issues = [];
+  if (!Array.isArray(value?.lines) || value.lines.length === 0) {
+    issues.push({ path: 'lines', message: 'Add at least one line before issuing.' });
+  }
+  if (value?.dueDate && value.dueDate < issueDate) {
+    issues.push({ path: 'dueDate', message: `The due date is before the issue date (${issueDate}). Change the due date.` });
+  }
+  if (!sanitizeInvoiceText(settings?.issuerName)) {
+    issues.push({ path: 'settings.issuerName', message: 'The invoice settings have no issuer name. Ask an operator to fill in the invoice settings.' });
+  }
+  return issues;
+}
+
 module.exports = {
   MAX_INVOICE_AMOUNT, MAX_QUANTITY, INVOICE_LIMITS, INVOICE_STATUSES, ADJUSTMENT_KINDS,
-  DEFAULT_INVOICE_PREFIX, DEFAULT_INVOICE_CURRENCY,
+  PAYMENT_METHODS, PAYMENT_METHOD_WORDS, DEFAULT_INVOICE_PREFIX, DEFAULT_INVOICE_CURRENCY,
   isInvoiceId, sanitizeInvoiceText, computeInvoiceTotals, parseMoneyInput, minorToInput, formatMoney,
   resolveInvoiceCurrency, formatInvoiceNumber, validateInvoiceDraft, validateInvoiceSettings,
+  invoiceDateIn, validatePayment, validateVoidReason, issueProblems,
 };
