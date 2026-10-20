@@ -11,22 +11,26 @@
  * A branch that is off, paused, on a historical demo, or past the end of
  * the event returns at once and writes nothing.
  *
- * Only the speaker branch exists (speakerSchedule.cjs). The attendee
- * branch (#518, the third pull request) joins BRANCHES below, through
- * announcements/sendRunner.cjs.
+ * The speaker branch (speakerSchedule.cjs) sends through the staff
+ * speaker reminder path. The attendee branch (attendeeSchedule.cjs) sends
+ * through the announcement send path (announcements/sendRunner.cjs).
  */
 
 const { runSpeakerSchedule } = require('./speakerSchedule.cjs');
+const { runAttendeeSchedule } = require('./attendeeSchedule.cjs');
 
 /** Each schedule the runner serves, in run order. */
 const BRANCHES = Object.freeze([
   { id: 'speakers', run: runSpeakerSchedule },
+  { id: 'attendees', run: runAttendeeSchedule },
 ]);
 
 /**
  * One run of every branch.
  *
- * @param {{ db, getConfig, sendEmail, notifyOperator?, now?, log? }} deps
+ * @param {{ db, getConfig, sendEmail, provider?, emailCore?, notifyOperator?, now?, log? }} deps
+ *   `sendEmail` serves the speaker branch; `provider` and `emailCore` the
+ *   attendee branch.
  * @returns {Promise<Record<string, { outcome: string, reason?: string }>>}
  */
 async function runScheduledReminders(deps, branches = BRANCHES) {
@@ -63,7 +67,8 @@ function buildHandlers() {
   return {
     // No retryCount: a failed run is not retried. The next hourly run works
     // out the same answer from the settings and the clock (ADR 0006).
-    // 540 seconds: speaker reminders go one at a time.
+    // 540 seconds: speaker reminders go one at a time, and attendee
+    // reminders go in chunks of 200, one provider batch each.
     runScheduledReminders: onSchedule({ region, schedule: 'every 60 minutes', secrets, timeoutSeconds: 540 }, async () => {
       const { getDb } = require('../core/firestore.cjs');
       const { getEventConfig } = require('../core/config.cjs');
@@ -72,13 +77,11 @@ function buildHandlers() {
       const { createEmailCore } = require('../email/send.cjs');
       const db = getDb();
       const getConfig = () => getEventConfig({ db });
-      let core;
-      const sendEmail = async (message) => {
-        core ??= createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig });
-        return core.send(message);
-      };
+      const provider = getEmailProvider({ env: process.env });
+      const emailCore = createEmailCore({ db, provider, getConfig });
+      const sendEmail = (message) => emailCore.send(message);
       const notifier = createOperatorNotifier({ env: process.env, getConfig, sendEmail });
-      await runScheduledReminders({ db, getConfig, sendEmail, notifyOperator: notifier.notify });
+      await runScheduledReminders({ db, getConfig, sendEmail, provider, emailCore, notifyOperator: notifier.notify });
     }),
   };
 }

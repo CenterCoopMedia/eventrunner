@@ -3,7 +3,10 @@
 /**
  * `reminderSchedules`: the staff endpoint for the reminder schedules
  * (issue #518, ADR 0006). Staff tier, POST, with an `action` and a
- * `schedule` (only `speakers` for now):
+ * `schedule`, `speakers` or `attendees`. The speaker actions are below;
+ * the attendee actions are in attendeeActions.cjs and work the same way,
+ * with a wording draft and the event facts in place of the due date and
+ * the items:
  *
  *   get      the settings, on, off or paused, the next run (when, which
  *            offset, who it would reach, who waits on the 24-hour
@@ -17,7 +20,8 @@
  *   disable  turn the schedule off
  *
  * `reminder_schedules` is closed to every browser (firestore.rules). This
- * endpoint is the only writer apart from the pause on a wording change.
+ * endpoint is the only writer apart from the pauses a run or a wording
+ * change makes.
  * Every write checks the historical-demo policy first and writes an
  * admin_logs row.
  */
@@ -31,13 +35,14 @@ const { DEFAULT_OFFSETS, MAX_OFFSET_DAYS, QUIET_HOURS } = require('shared/remind
 const {
   ReminderError,
   fail,
-  isoOrNull,
   wordingVersion,
   loadReadinessStores,
   renderReminder,
   loadReminderTemplate,
   requireWritable,
 } = require('../speakers/reminderCore.cjs');
+const { windowOut, lastRunOut, afterCommit: commitAnswer } = require('./scheduleCore.cjs');
+const { ATTENDEE_ACTIONS } = require('./attendeeActions.cjs');
 const {
   SCHEDULES,
   RUNS,
@@ -59,7 +64,7 @@ const {
 } = require('./speakerSchedule.cjs');
 
 const REQUEST_ACTIONS = Object.freeze(['get', 'save', 'preview', 'approve', 'disable']);
-const SCHEDULE_IDS = Object.freeze([SCHEDULE_ID]);
+const SCHEDULE_IDS = Object.freeze([SCHEDULE_ID, 'attendees']);
 /** Most names the next-run panel lists; the count is always whole. */
 const MAX_NAMES = 50;
 
@@ -91,17 +96,6 @@ function sampleRecipient(topics) {
     },
     items: [...topics],
     sample: true,
-  };
-}
-
-function windowOut(window) {
-  return {
-    offsetDays: window.offsetDays,
-    windowKey: window.windowKey,
-    fireAt: window.fireAt.toISOString(),
-    opensAt: window.opensAt.toISOString(),
-    closesAt: window.closesAt.toISOString(),
-    state: window.state,
   };
 }
 
@@ -156,33 +150,15 @@ async function nextRunFor({ db, schedule, timeZone, nowMs }) {
   };
 }
 
-function lastRunOut(data) {
-  const run = data?.lastRun;
-  if (!run || typeof run !== 'object') return null;
-  return {
-    startedAt: isoOrNull(run.startedAt),
-    finishedAt: isoOrNull(run.finishedAt),
-    outcome: typeof run.outcome === 'string' ? run.outcome : null,
-    reason: typeof run.reason === 'string' ? run.reason : null,
-    windowKey: typeof run.windowKey === 'string' ? run.windowKey : null,
-    offsetDays: Number.isInteger(run.offsetDays) ? run.offsetDays : null,
-    counts: run.counts && typeof run.counts === 'object' ? run.counts : {},
-    error: run.error && typeof run.error === 'object' ? { code: run.error.code ?? null, message: run.error.message ?? null } : null,
-  };
-}
-
 /**
- * The answer to a write that has committed. The refresh is a separate read,
- * so it can fail after the change is stored; the request still succeeded.
- * The answer then carries the committed state and `refreshError`, and the
- * page reloads.
+ * The answer to a write that has committed (scheduleCore.afterCommit): the
+ * schedule read again, or the committed state and `refreshError`.
  */
-async function afterCommit(deps, committed) {
-  try {
-    return await getAction(deps);
-  } catch (err) {
-    deps.log.warn('reminderSchedules refresh after a write failed', err);
-    return {
+function afterCommit(deps, committed) {
+  return commitAnswer({
+    refresh: () => getAction(deps),
+    log: deps.log,
+    fallback: {
       schedule: SCHEDULE_ID,
       state: scheduleState(committed),
       settings: {
@@ -191,9 +167,8 @@ async function afterCommit(deps, committed) {
         dueAt: committed.dueAt,
         topics: committed.topics,
       },
-      refreshError: 'The change is saved, but the schedule could not be read again. Reload the page.',
-    };
-  }
+    },
+  });
 }
 
 // --- actions ---------------------------------------------------------------
@@ -378,15 +353,22 @@ async function disableAction({ db, getConfig, now, log, actor }) {
 }
 
 const ACTION_HANDLERS = {
-  get: getAction,
-  save: saveAction,
-  preview: previewAction,
-  approve: approveAction,
-  disable: disableAction,
+  speakers: {
+    get: getAction,
+    save: saveAction,
+    preview: previewAction,
+    approve: approveAction,
+    disable: disableAction,
+  },
+  attendees: ATTENDEE_ACTIONS,
 };
 
-/** @param {{ db, auth, getConfig, now?, log? }} deps */
-function createReminderSchedulesHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+/**
+ * @param {{ db, auth, getConfig, provider?, now?, log? }} deps `provider`
+ *   is the email provider; the attendee schedule checks the announcement
+ *   stream through it.
+ */
+function createReminderSchedulesHandler({ db, auth, getConfig, provider = null, now = Date.now, log = console }) {
   return async function reminderSchedules(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const verdict = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
@@ -397,8 +379,8 @@ function createReminderSchedulesHandler({ db, auth, getConfig, now = Date.now, l
     }
     const actor = { uid: verdict.uid, email: verdict.email };
     try {
-      readScheduleId(req.body);
-      const result = await ACTION_HANDLERS[action]({ db, getConfig, now, log, actor, body: req.body });
+      const schedule = readScheduleId(req.body);
+      const result = await ACTION_HANDLERS[schedule][action]({ db, getConfig, provider, now, log, actor, body: req.body });
       res.status(200).json(result);
     } catch (err) {
       if (err instanceof ReminderError) return sendError(res, err.status, err.code, err.message);
@@ -408,19 +390,35 @@ function createReminderSchedulesHandler({ db, auth, getConfig, now = Date.now, l
   };
 }
 
-/** Deployable export: reminderSchedules. */
+/**
+ * Deployable export: reminderSchedules. It binds the mail provider's
+ * secrets, as the announcement endpoints do: the attendee schedule reads
+ * the Postmark announcement stream before a preview or an approval.
+ */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { defineSecret } = require('firebase-functions/params');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
+  const secrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
   return {
-    reminderSchedules: onRequest({ region }, async (req, res) => {
+    reminderSchedules: onRequest({ region, secrets }, async (req, res) => {
       const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
       if (applyCors(req, res, { allowedOrigins: parseAllowedOrigins(process.env.EVENT_ALLOWED_ORIGINS), methods: ['POST'] })) return;
       const { getDb } = require('../core/firestore.cjs');
       const { getAuth } = require('firebase-admin/auth');
       const { getEventConfig } = require('../core/config.cjs');
+      const { getEmailProvider } = require('../email/providers/index.cjs');
       const db = getDb();
-      await createReminderSchedulesHandler({ db, auth: getAuth(), getConfig: () => getEventConfig({ db }) })(req, res);
+      let provider = null;
+      try {
+        provider = getEmailProvider({ env: process.env });
+      } catch (err) {
+        // The speaker schedule needs no provider here; the attendee schedule
+        // then reports that announcement email cannot be sent.
+        console.warn('reminderSchedules: the email provider could not be loaded', err);
+      }
+      await createReminderSchedulesHandler({ db, auth: getAuth(), getConfig: () => getEventConfig({ db }), provider })(req, res);
     }),
   };
 }
