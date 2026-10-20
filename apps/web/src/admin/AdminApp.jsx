@@ -41,6 +41,7 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
 const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
+const AdminSpeakerMail = lazy(() => import('./pages/AdminSpeakerMail.jsx'));
 const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
@@ -204,6 +205,10 @@ export default function AdminApp() {
           <Route
             path="speakers/reminders/send"
             element={<DeferredAdminPage label="speaker reminders"><AdminSpeakerReminders /></DeferredAdminPage>}
+          />
+          <Route
+            path="speakers/mail/wording"
+            element={<DeferredAdminPage label="speaker email wording"><AdminSpeakerMail /></DeferredAdminPage>}
           />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
           <Route

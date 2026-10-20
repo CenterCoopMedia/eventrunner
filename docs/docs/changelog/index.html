@@ -118,6 +118,18 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Staff edit the wording of the speaker invitation and the acceptance confirmation
+          (#204). <strong>Edit email wording</strong> on the Speakers list opens one editor per message, with
+          the subject, the HTML body and the plain text body. The server checks each save: an
+          unknown token, a broken placeholder, or a body without its fixed link is refused with the
+          field named, and nothing is stored. Preview shows the exact subject, HTML and text, with
+          the legal footer and sample values, for the words in the form, saved or not. <strong>Use the
+          shipped wording</strong> deletes the saved wording. Saves and resets write an admin log entry
+          and are refused on a historical demo. The next invitation or acceptance email reads the
+          saved wording fresh, so an edit applies at once (#505). The new staff endpoint is
+          <code>speakerMailTemplates</code>.</li>
+          </ul>
+          <ul>
           <li>Event settings has familiar controls for the time zone, the days, and the tracks. Staff
           search for the time zone by city, region, zone name, or UTC offset and choose it from a
           list on the WAI-ARIA combobox pattern. The list shows each zone&#39;s current offset, and

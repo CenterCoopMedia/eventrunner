@@ -50,9 +50,9 @@ function listTemplateIds() {
 }
 
 /**
- * Load a template with its Firestore override, cached 5 minutes per id.
- * An absent override doc caches as null for the same TTL — a missing doc
- * must not cost a read per send.
+ * Load a template with its Firestore override. Invite and acceptance copy
+ * is read on each send so a completed edit applies to the next email.
+ * Other templates cache for 5 minutes per id, including absent overrides.
  *
  * `fresh: true` skips the cache and refills it. A staff preview must show the
  * wording saved a moment ago on another instance, and the send that follows
@@ -68,13 +68,14 @@ async function loadTemplate({ db, id, now = Date.now, fresh = false }) {
   if (!template) {
     throw new Error(`unknown template id: ${id}`);
   }
-  const cached = overrideCache.get(id);
+  const cacheable = id !== 'speaker.invite' && id !== 'speaker.accepted';
+  const cached = cacheable ? overrideCache.get(id) : null;
   if (!fresh && cached && now() - cached.loadedAt < CACHE_TTL_MS) {
     return { template, override: cached.override };
   }
   const snap = await db.collection('email_templates').doc(id).get();
   const override = snap.exists ? snap.data() : null;
-  overrideCache.set(id, { loadedAt: now(), override });
+  if (cacheable) overrideCache.set(id, { loadedAt: now(), override });
   return { template, override };
 }
 
