@@ -133,6 +133,13 @@
           change (#476).</li>
           </ul>
           <ul>
+          <li>A pitch call can have no deadline. Under <strong>When intake closes</strong>, an operator chooses
+          <strong>Open until I close it</strong>. The call stays open until an operator clears <strong>Accept session
+          pitches</strong> and saves. <code>updatePitchCall</code> takes <code>&quot;closesAt&quot;: null</code> for this; a missing or
+          blank value is still refused. <code>/pitch</code> shows no deadline and no countdown for such a
+          call. The same rule applies with an external form, such as Airtable (#476).</li>
+          </ul>
+          <ul>
           <li>A new event can start from a past event&#39;s template. <code>scripts/export-event-template.cjs</code>
           reads an allowlist from the past project: branding, page templates, their content blocks and
           selected static settings. A dry run prints the inventory, with every excluded collection.
