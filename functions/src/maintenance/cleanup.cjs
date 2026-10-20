@@ -29,8 +29,9 @@
  * The publish sweep only ever moves a row from a non-terminal state to
  * `failed`. It never deletes, never re-invokes, and never touches a row that
  * already reached a terminal state. The same scheduled function also
- * removes sent-email audit rows after their documented retention period.
- * Both sweeps are idempotent, which matters because they run alongside
+ * removes sent-email audit rows after their documented retention period,
+ * and the content of announcement send records after the same period.
+ * Every sweep is idempotent, which matters because they run alongside
  * whatever the operator is doing by hand.
  */
 
@@ -48,6 +49,13 @@ const STRANDED_AFTER_MS = 90 * 60 * 1000;
 
 /** Sent-email audit rows carry addresses and sometimes rendered bodies. */
 const SENT_EMAIL_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+/**
+ * Announcement send records (issue #497) carry the recipient list, the
+ * failed addresses and the frozen message. They follow the recipient rows
+ * in sent_emails: the same 90 days.
+ */
+const ANNOUNCEMENT_SEND_RETENTION_MS = SENT_EMAIL_RETENTION_MS;
 
 /** Batch bound per query, matching cleanupExpiredAuthChallenges. */
 const SWEEP_LIMIT = 250;
@@ -250,6 +258,58 @@ async function sweepExpiredSentEmails({
 }
 
 /**
+ * Remove the content of announcement send records whose `createdAt` is
+ * older than 90 days, with the sent_emails rules: a strict `<` boundary, a
+ * record with no `createdAt` never matches, and bounded batches.
+ *
+ * The record is not deleted. It is replaced by one that holds only the
+ * per-send unsubscribe key (and `status: 'expired'`), because every email
+ * of that send carries an unsubscribe link signed with that key
+ * (announcements/suppression.cjs). Deleting the key would break the link in
+ * mail people still have. The key is random and names nobody. The
+ * replacement has no `createdAt`, so the history list (ordered by it) and
+ * the next sweep both pass over it. The send id also stays taken, so a
+ * scheduled reminder day never starts again under the same id.
+ *
+ * @param {{ db: object, now?: () => number, retentionMs?: number,
+ *   batchLimit?: number, maxBatches?: number }} deps
+ * @returns {Promise<{ expired: number }>}
+ */
+async function sweepExpiredAnnouncementSends({
+  db,
+  now = Date.now,
+  retentionMs = ANNOUNCEMENT_SEND_RETENTION_MS,
+  batchLimit = SWEEP_LIMIT,
+  maxBatches = MAX_SWEEP_BATCHES,
+}) {
+  const nowMs = now();
+  const cutoff = new Date(nowMs - retentionMs);
+  const query = db.collection('announcement_sends').where('createdAt', '<', cutoff).limit(batchLimit);
+  let expired = 0;
+
+  for (let i = 0; i < maxBatches; i += 1) {
+    const snapshot = await query.get();
+    if (snapshot.empty) break;
+
+    const batch = db.batch();
+    for (const doc of snapshot.docs) {
+      const key = doc.data()?.unsubscribeKey;
+      batch.set(doc.ref, {
+        status: 'expired',
+        unsubscribeKey: typeof key === 'string' ? key : null,
+        contentRemovedAt: new Date(nowMs),
+      });
+    }
+    await batch.commit();
+    expired += snapshot.docs.length;
+
+    if (snapshot.docs.length < batchLimit) break;
+  }
+
+  return { expired };
+}
+
+/**
  * Deployable exports (spec §1.3). Follows cleanupExpiredAuthChallenges's
  * conventions (auth/otp.cjs): onSchedule, region from EVENT_FIREBASE_REGION,
  * and every dependency required inside the callback so deploy analysis
@@ -295,6 +355,7 @@ function buildHandlers() {
         await Promise.all([
           sweepStrandedPublishRows({ db, notifyOperator: notifier.notify }),
           sweepExpiredSentEmails({ db }),
+          sweepExpiredAnnouncementSends({ db }),
         ]);
       },
     ),
@@ -304,6 +365,7 @@ function buildHandlers() {
 module.exports = {
   sweepStrandedPublishRows,
   sweepExpiredSentEmails,
+  sweepExpiredAnnouncementSends,
   get handlers() {
     return buildHandlers();
   },
@@ -313,6 +375,7 @@ module.exports = {
     toMillis,
     STRANDED_AFTER_MS,
     SENT_EMAIL_RETENTION_MS,
+    ANNOUNCEMENT_SEND_RETENTION_MS,
     SWEEP_LIMIT,
     MAX_SWEEP_BATCHES,
   },

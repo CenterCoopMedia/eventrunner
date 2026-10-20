@@ -631,6 +631,9 @@ service cloud.firestore {
     // recipient list and the unsubscribe signing key; the suppression
     // records and the unsubscribe rate limit are server bookkeeping.
     match /announcement_sends/{docId} { allow read, write: if false; }
+    // Saved announcement messages (issue #496): staff reach them through
+    // the announcementMessages endpoint only.
+    match /announcement_messages/{docId} { allow read, write: if false; }
     match /email_suppressions/{docId} { allow read, write: if false; }
     match /unsubscribe_rate_limits/{docId} { allow read, write: if false; }
     match /system_errors/{docId} { allow read, write: if false; }

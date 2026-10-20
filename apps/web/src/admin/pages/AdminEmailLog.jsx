@@ -13,7 +13,10 @@
 // the browser history or a client error report, which carries
 // window.location.href (lib/errorReporting.js). The field asks the browser
 // not to remember it. Source and status carry nothing personal, so they
-// live in the URL and a reload or a shared link keeps them.
+// live in the URL and a reload or a shared link keeps them. So does `send`
+// (issue #497): the id of one announcement send, set by the link in the
+// Announcements send history. It limits the rows to that send's recipients,
+// a search keeps it, and "Show every message" drops it.
 //
 // THE PREVIEW. Stored HTML renders only inside <iframe sandbox="">, from
 // admin/emailPreview.js buildPreviewDoc, under a content policy that blocks
@@ -93,23 +96,32 @@ const DELIVERY_WORDS = Object.freeze({
  */
 const known = (map, key) => typeof key === 'string' && Object.hasOwn(map, key);
 
-/** The filters the URL holds: a source and a status this page offers, or nothing. */
+/** The id shape of an announcement send, as the server checks it. */
+const SEND_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
+/**
+ * The filters the URL holds: a source and a status this page offers, and an
+ * announcement send id the server would accept, or nothing.
+ */
 function readFilters(searchParams) {
   const source = searchParams.get('source') ?? '';
   const status = searchParams.get('status') ?? '';
+  const send = searchParams.get('send') ?? '';
   return {
     source: known(SOURCE_LABELS, source) ? source : '',
     status: known(STATUS_WORDS, status) ? status : '',
+    send: SEND_ID_RE.test(send) ? send : '',
   };
 }
 
 /** The request body for one page of a search. Empty values are left out. */
-function requestBody({ q, source, status }, cursor) {
+function requestBody({ q, source, status, send }, cursor) {
   return {
     limit: PAGE_SIZE,
     ...(q ? { q } : {}),
     ...(source ? { source } : {}),
     ...(status ? { status } : {}),
+    ...(send ? { sendId: send } : {}),
     ...(cursor ? { cursor } : {}),
   };
 }
@@ -163,9 +175,10 @@ export function figureSentence({ count, scanned, searched, readAt }) {
 }
 
 /** "“alex”, the source Sign-in code and the status Failed" */
-function describeSearch({ q, source, status }) {
+function describeSearch({ q, source, status, send }) {
   const parts = [];
   if (q) parts.push(`“${q}”`);
+  if (send) parts.push('one announcement send');
   if (source) parts.push(`the source ${known(SOURCE_LABELS, source) ? SOURCE_LABELS[source] : source}`);
   if (status) parts.push(`the status ${known(STATUS_WORDS, status) ? STATUS_WORDS[status] : status}`);
   if (parts.length <= 1) return parts.join('');
@@ -301,7 +314,7 @@ export default function AdminEmailLog() {
   const timeZone = typeof eventConfig?.timezone === 'string' && eventConfig.timezone ? eventConfig.timezone : undefined;
   const [searchParams, setSearchParams] = useSearchParams();
   const urlFilters = readFilters(searchParams);
-  const urlKey = `${urlFilters.source}|${urlFilters.status}`;
+  const urlKey = `${urlFilters.source}|${urlFilters.status}|${urlFilters.send}`;
   const baseId = useId();
 
   // The form as the reader is editing it.
@@ -359,8 +372,8 @@ export default function AdminEmailLog() {
   useEffect(() => {
     if (writtenKeyRef.current === urlKey) return;
     writtenKeyRef.current = urlKey;
-    const [source, status] = urlKey.split('|');
-    const search = { q: '', source, status };
+    const [source, status, send] = urlKey.split('|');
+    const search = { q: '', source, status, send };
     setDraft(search);
     runSearch(search, 'search');
   }, [urlKey, runSearch]);
@@ -373,10 +386,10 @@ export default function AdminEmailLog() {
     setFocusTarget(null);
   }, [focusTarget]);
 
-  function writeFilters({ source, status }) {
-    writtenKeyRef.current = `${source}|${status}`;
+  function writeFilters({ source, status, send }) {
+    writtenKeyRef.current = `${source}|${status}|${send}`;
     const next = new URLSearchParams(searchParams);
-    for (const [key, value] of Object.entries({ source, status })) {
+    for (const [key, value] of Object.entries({ source, status, send })) {
       if (value) next.set(key, value);
       else next.delete(key);
     }
@@ -385,13 +398,22 @@ export default function AdminEmailLog() {
 
   function submit(event) {
     event.preventDefault();
-    const search = { q: draft.q.trim(), source: draft.source, status: draft.status };
+    const search = { q: draft.q.trim(), source: draft.source, status: draft.status, send: draft.send };
     writeFilters(search);
     runSearch(search, 'search');
   }
 
+  /** Drop the one-send limit and keep the rest of the search. */
+  function showEveryMessage() {
+    const search = { q: draft.q.trim(), source: draft.source, status: draft.status, send: '' };
+    setDraft(search);
+    writeFilters(search);
+    runSearch(search, 'search');
+    focusSearchField();
+  }
+
   function clearSearch() {
-    const search = { q: '', source: '', status: '' };
+    const search = { q: '', source: '', status: '', send: '' };
     setDraft(search);
     writeFilters(search);
     runSearch(search, 'search');
@@ -467,7 +489,7 @@ export default function AdminEmailLog() {
   const rows = result?.rows ?? [];
   const applied = result?.applied ?? null;
   const searched = Boolean(applied?.q);
-  const narrowed = Boolean(applied && (applied.q || applied.source || applied.status));
+  const narrowed = Boolean(applied && (applied.q || applied.source || applied.status || applied.send));
 
   let notice = null;
   if (error && !denied) {
@@ -678,6 +700,15 @@ export default function AdminEmailLog() {
               </button>
             </div>
           </form>
+
+          {draft.send ? (
+            <Notice tone="info" message="This list shows only the messages of one announcement send.">
+              {' '}
+              <button type="button" className="font-semibold underline underline-offset-2" onClick={showEveryMessage}>
+                Show every message
+              </button>
+            </Notice>
+          ) : null}
 
           {notice}
 

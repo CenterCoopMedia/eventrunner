@@ -226,6 +226,30 @@ describe('AdminEmailLog', () => {
     }
   });
 
+  it('limits the list to one announcement send from the URL, keeps it through a search, and Show every message drops it', async () => {
+    await renderPage('/admin/email-log?send=send-aaaa-1111&status=failed');
+    expect(listCalls()[0]).toEqual({ limit: 25, status: 'failed', sendId: 'send-aaaa-1111' });
+    expect(screen.getByText('This list shows only the messages of one announcement send.')).toBeInTheDocument();
+
+    fireEvent.change(searchField(), { target: { value: 'kim' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }));
+    await waitFor(() => expect(listCalls()).toHaveLength(2));
+    expect(listCalls()[1]).toEqual({ limit: 25, q: 'kim', status: 'failed', sendId: 'send-aaaa-1111' });
+    await waitFor(() => expect(location()).toBe('/admin/email-log?send=send-aaaa-1111&status=failed'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show every message' }));
+    await waitFor(() => expect(listCalls()).toHaveLength(3));
+    expect(listCalls()[2]).toEqual({ limit: 25, q: 'kim', status: 'failed' });
+    await waitFor(() => expect(location()).toBe('/admin/email-log?status=failed'));
+    expect(screen.queryByText(/one announcement send/)).toBeNull();
+  });
+
+  it('ignores a send id the server would refuse', async () => {
+    await renderPage('/admin/email-log?send=a%2Fb');
+    expect(listCalls()[0]).toEqual({ limit: 25 });
+    expect(screen.queryByText(/one announcement send/)).toBeNull();
+  });
+
   it('says what Complained and Suppressed mean under the word', async () => {
     await renderPage('/admin/email-log', {
       lists: [{

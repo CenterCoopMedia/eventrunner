@@ -77,3 +77,20 @@ test('a Postmark stream read that throws is refused as unavailable', async () =>
   const verdict = await resolveChannel({ provider, config: { ...CONFIG, providers: { email: { announcementStream: 'news' } } } });
   assert.equal(verdict.code, 'stream-unavailable');
 });
+
+test('validateDraft refuses the internal render slots in any field', () => {
+  // Saved messages (issue 496) and the composer share this check. Braces stay as typed
+  // (the message never reaches the token engine), but a slot word would be
+  // replaced after the render, so it is refused instead.
+  for (const slot of [internals.BODY_SLOT, internals.UNSUBSCRIBE_SLOT]) {
+    const result = validateDraft({
+      subject: `Hi ${slot}`, message: `Body ${slot}`, linkUrl: 'https://example.org', linkLabel: `Go ${slot}`,
+    });
+    assert.deepEqual(result.errors, [
+      'subject: must not contain a reserved word',
+      'message: must not contain a reserved word',
+      'linkLabel: must not contain a reserved word',
+    ]);
+  }
+  assert.equal(validateDraft({ subject: '{{event_name}}', message: '{{unsubscribe_url}}' }).ok, true);
+});
