@@ -390,7 +390,7 @@ test('mark paid records the date, method and note on an issued invoice only', as
   const res = await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 2, payment });
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.equal(res.body.invoice.status, 'paid');
-  assert.deepEqual(res.body.invoice.payment, { paidOn: '2026-10-19', method: 'bank-transfer', note: 'Ref 42', recordedBy: 'staff', recordedAt: res.body.invoice.payment.recordedAt });
+  assert.deepEqual(res.body.invoice.payment, { paidOn: '2026-10-19', method: 'bank-transfer', via: null, stripe: null, note: 'Ref 42', recordedBy: 'staff', recordedAt: res.body.invoice.payment.recordedAt });
   assert.equal(res.body.invoice.number, 'INV-0001');
   assert.equal((await call(db, { action: 'markPaid', invoiceId: ID, expectedRevision: 3, payment })).statusCode, 409);
   const row = (await audits(db)).at(-1);
@@ -567,7 +567,7 @@ test('only an operator reopens a paid invoice, with a reason, and the payment mo
   assert.equal(invoice.paymentHistory.length, 1);
   assert.deepEqual(
     { ...invoice.paymentHistory[0], recordedAt: null, reopenedAt: null },
-    { paidOn: '2026-10-19', method: 'check', note: 'Check 1042', recordedAt: null, recordedBy: 'staff', reopenedAt: null, reopenedBy: 'operator', reason: 'Check bounced' },
+    { paidOn: '2026-10-19', method: 'check', via: null, stripe: null, note: 'Check 1042', recordedAt: null, recordedBy: 'staff', reopenedAt: null, reopenedBy: 'operator', reason: 'Check bounced' },
   );
 
   // It can be paid again, and a second reopen keeps both payments.

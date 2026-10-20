@@ -322,7 +322,8 @@ function orderRecord(id, data) {
  * text cleaned again on read), with its payment history and its email
  * sends, without the staff account ids (also in the payment, its history
  * and the sends), the
- * revision and the list key. An issued invoice keeps its frozen issuer
+ * revision and the list key. Its Stripe pay links and flagged card
+ * payments (#519) go too, without Stripe ids, addresses or staff ids. An issued invoice keeps its frozen issuer
  * block, payment instructions included: that is what its reader was sent.
  * The live settings (invoice_settings) never go.
  */
@@ -336,12 +337,25 @@ function invoiceRecord(id, data) {
   return scrub({
     ...invoice,
     payment: invoice.payment && {
-      paidOn: invoice.payment.paidOn, method: invoice.payment.method, note: invoice.payment.note, recordedAt: invoice.payment.recordedAt,
+      paidOn: invoice.payment.paidOn, method: invoice.payment.method, via: invoice.payment.via,
+      note: invoice.payment.note, recordedAt: invoice.payment.recordedAt,
     },
     voided: invoice.voided && { reason: invoice.voided.reason, from: invoice.voided.from, at: invoice.voided.at },
     paymentHistory: invoice.paymentHistory.map((entry) => ({
       paidOn: entry.paidOn, method: entry.method, note: entry.note, recordedAt: entry.recordedAt,
       reopenedAt: entry.reopenedAt, reason: entry.reason,
+      ...(entry.via ? { via: entry.via } : {}),
+    })),
+    // The Stripe pay links (#519) and any card payment flagged for review.
+    // Like an order, no Stripe id, payment page address or staff account
+    // goes: the merchant's Stripe Dashboard is the record of those.
+    payLinks: invoice.payLinks.map((link) => ({
+      linkId: link.linkId, status: link.status, mode: link.livemode ? 'live' : 'test', amount: link.amount, currency: link.currency,
+      createdAt: link.createdAt, expiresAt: link.expiresAt, closedAt: link.closedAt, closedReason: link.closedReason, stripeClosed: link.stripeClosed,
+    })),
+    paymentReviews: invoice.paymentReviews.map((entry) => ({
+      code: entry.code, amount: entry.amount, currency: entry.currency, at: entry.at, invoiceStatus: entry.invoiceStatus,
+      resolved: entry.resolved, resolvedAt: entry.resolvedAt, note: entry.note,
     })),
     // Each email of the PDF, without the staff account that sent it.
     emailSends: invoice.emailSends.map((entry) => ({

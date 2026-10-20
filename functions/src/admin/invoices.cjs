@@ -47,7 +47,9 @@ const { sendError } = require('../core/errors.cjs');
 const {
   INVOICE_STATUSES, PAYMENT_METHODS, isInvoiceId, sanitizeInvoiceText, validateInvoiceDraft, validateInvoiceSettings,
   resolveInvoiceCurrency, formatInvoiceNumber, invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems,
+  PAY_LINK_STATUSES,
 } = require('shared/invoice');
+const payLinks = require('./invoicePayLink.cjs');
 const { CURRENCY_EXPONENTS } = require('shared/ticketCommerce');
 
 const INVOICES = 'invoices';
@@ -57,10 +59,10 @@ const CATALOG = 'ticket_catalog';
 const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
-const OPERATOR_ACTIONS = new Set(['saveSettings', 'void', 'reopen']);
+const OPERATOR_ACTIONS = new Set(['saveSettings', 'void', 'reopen', 'resolvePaymentReview']);
 // previewSend writes nothing, so a read-only demo shows it; send is a write.
 const READ_ACTIONS = new Set(['list', 'get', 'settings', 'previewSend']);
-const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'saveDraft', 'deleteDraft', 'issue', 'markPaid', 'duplicate', 'send']);
+const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'saveDraft', 'deleteDraft', 'issue', 'markPaid', 'duplicate', 'send', 'createPayLink']);
 const CURSOR_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\|inv_[a-z0-9]{16,40}$/;
 
 class InvoiceError extends Error {
@@ -137,11 +139,20 @@ function publicIssuer(issuer) {
     paymentInstructions: sanitizeInvoiceText(issuer.paymentInstructions, { multiline: true }),
   };
 }
+function stripeIdOrNull(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,160}$/.test(value) ? value : null;
+}
 function publicPayment(payment) {
   if (!payment || typeof payment !== 'object') return null;
+  const viaStripe = payment.via === 'stripe';
   return {
     paidOn: dateOrNull(payment.paidOn),
     method: PAYMENT_METHODS.includes(payment.method) ? payment.method : 'other',
+    // A card payment through the Stripe pay link (#519) names its Stripe ids.
+    via: viaStripe ? 'stripe' : null,
+    stripe: viaStripe && payment.stripe && typeof payment.stripe === 'object'
+      ? { sessionId: stripeIdOrNull(payment.stripe.sessionId), paymentIntentId: stripeIdOrNull(payment.stripe.paymentIntentId) }
+      : null,
     note: sanitizeInvoiceText(payment.note),
     recordedAt: iso(payment.recordedAt),
     recordedBy: uidOrNull(payment.recordedBy),
@@ -212,6 +223,49 @@ function publicSends(sends) {
   }));
 }
 
+/**
+ * The Stripe pay links of an invoice (#519), oldest first. The address shows
+ * only while a link is open; the frozen request and its key never leave the
+ * server.
+ */
+function publicPayLinks(links) {
+  return (Array.isArray(links) ? links : []).map((link) => {
+    const status = PAY_LINK_STATUSES.includes(link?.status) ? link.status : 'failed';
+    return {
+      linkId: typeof link?.linkId === 'string' ? link.linkId : null,
+      status,
+      sessionId: stripeIdOrNull(link?.sessionId),
+      url: status === 'open' ? payLinks.internals.safeUrl(link?.url) : null,
+      amount: amountOr0(link?.amount),
+      currency: typeof link?.currency === 'string' ? link.currency : null,
+      livemode: link?.livemode === true,
+      createdAt: iso(link?.createdAt),
+      createdBy: uidOrNull(link?.createdBy),
+      expiresAt: iso(link?.expiresAt),
+      closedAt: iso(link?.closedAt),
+      closedReason: typeof link?.closedReason === 'string' ? link.closedReason : null,
+      stripeClosed: typeof link?.stripeClosed === 'boolean' ? link.stripeClosed : null,
+    };
+  });
+}
+/** Card payments that were recorded but not applied, for an operator (#519). */
+function publicPaymentReviews(reviews) {
+  return (Array.isArray(reviews) ? reviews : []).map((entry) => ({
+    reviewId: typeof entry?.reviewId === 'string' ? entry.reviewId : null,
+    code: Object.hasOwn(payLinks.REVIEW_WORDS, entry?.code) ? entry.code : 'unknown-session',
+    sessionId: stripeIdOrNull(entry?.sessionId),
+    paymentIntentId: stripeIdOrNull(entry?.paymentIntentId),
+    amount: Number.isSafeInteger(entry?.amount) ? entry.amount : null,
+    currency: typeof entry?.currency === 'string' ? entry.currency : null,
+    at: iso(entry?.at),
+    invoiceStatus: INVOICE_STATUSES.includes(entry?.invoiceStatus) ? entry.invoiceStatus : null,
+    resolved: entry?.resolved === true,
+    resolvedAt: iso(entry?.resolvedAt),
+    resolvedBy: uidOrNull(entry?.resolvedBy),
+    note: sanitizeInvoiceText(entry?.note),
+  }));
+}
+
 /** A list row: what the list shows, no lines. */
 function invoiceSummary(stored, id) {
   return {
@@ -224,6 +278,8 @@ function invoiceSummary(stored, id) {
     reference: sanitizeInvoiceText(stored.reference),
     dueDate: typeof stored.dueDate === 'string' ? stored.dueDate : null,
     totals: publicTotals(stored.totals),
+    // A card payment waits for an operator's review (#519).
+    needsReview: (Array.isArray(stored.paymentReviews) ? stored.paymentReviews : []).some((entry) => entry?.resolved !== true),
     revision: amountOr0(stored.revision),
     createdAt: iso(stored.createdAt),
     updatedAt: iso(stored.updatedAt),
@@ -253,6 +309,8 @@ function publicInvoice(stored, id) {
     paymentHistory: publicPaymentHistory(stored.paymentHistory),
     voided: publicVoided(stored.voided),
     emailSends: publicSends(stored.sends),
+    payLinks: publicPayLinks(stored.payLinks),
+    paymentReviews: publicPaymentReviews(stored.paymentReviews),
     duplicatedFrom: stored.duplicatedFrom && isInvoiceId(stored.duplicatedFrom.invoiceId)
       ? {
         invoiceId: stored.duplicatedFrom.invoiceId,
@@ -479,11 +537,12 @@ async function issueInvoice({ db, actor, body, now }) {
   return { invoice: publicInvoice(saved, id) };
 }
 
-async function markPaid({ db, actor, body, now }) {
+async function markPaid({ db, actor, body, now, getPayments, log }) {
   const id = invoiceIdOf(body.invoiceId);
   const expectedRevision = revisionOf(body.expectedRevision);
   const logRef = auditRef(db);
   let saved;
+  let closed = [];
   await db.runTransaction(async (tx) => {
     await requireWrites(db, tx);
     const { ref, stored } = await lockedInvoice(tx, db, id, expectedRevision);
@@ -492,10 +551,14 @@ async function markPaid({ db, actor, body, now }) {
     refuseWhileSending(stored, at);
     const verdict = validatePayment(body.payment, { today: invoiceDateIn(at, await eventTimeZone(tx, db)) });
     if (!verdict.ok) invalid('payment', verdict.issues);
+    // A payment recorded by hand closes the card link, so the payer cannot pay twice (#519).
+    const links = payLinks.closeOpenPayLinks(stored, { at, reason: 'paid' });
+    closed = links.closed;
     saved = {
       ...stored,
       status: 'paid',
       payment: { ...verdict.value, recordedAt: at, recordedBy: actor.uid },
+      ...(stored.payLinks ? { payLinks: links.payLinks } : {}),
       revision: expectedRevision + 1,
       updatedAt: at,
       updatedBy: actor.uid,
@@ -503,20 +566,35 @@ async function markPaid({ db, actor, body, now }) {
     tx.set(ref, saved);
     audit(tx, logRef, {
       action: 'paid', actor, now, docPath: `${INVOICES}/${id}`, invoiceId: id,
-      details: { revision: saved.revision, number: stored.number, paidOn: verdict.value.paidOn, method: verdict.value.method },
+      details: {
+        revision: saved.revision, number: stored.number, paidOn: verdict.value.paidOn, method: verdict.value.method,
+        ...(closed.length ? { payLinksClosed: closed.map((link) => link.linkId) } : {}),
+      },
     });
   });
-  return { invoice: publicInvoice(saved, id) };
+  return { invoice: publicInvoice(await afterLinksClosed({ db, id, saved, closed, getPayments, now, log }), id) };
+}
+
+/**
+ * After a commit that cancelled pay links, ask Stripe to expire them, then
+ * answer the invoice as stored, with whether Stripe did.
+ */
+async function afterLinksClosed({ db, id, saved, closed, getPayments, now, log }) {
+  if (!closed.length) return saved;
+  await payLinks.expireClosedLinksAtStripe({ db, id, closed, getPayments, now, log });
+  const snap = await db.collection(INVOICES).doc(id).get();
+  return snap.exists ? snap.data() : saved;
 }
 
 /** Operator only (OPERATOR_ACTIONS). The number stays used; nothing else changes. */
-async function voidInvoice({ db, actor, body, now }) {
+async function voidInvoice({ db, actor, body, now, getPayments, log }) {
   const id = invoiceIdOf(body.invoiceId);
   const expectedRevision = revisionOf(body.expectedRevision);
   const reason = validateVoidReason(body.reason);
   if (!reason.ok) invalid('void', reason.issues);
   const logRef = auditRef(db);
   let saved;
+  let closed = [];
   await db.runTransaction(async (tx) => {
     await requireWrites(db, tx);
     const { ref, stored } = await lockedInvoice(tx, db, id, expectedRevision);
@@ -525,10 +603,14 @@ async function voidInvoice({ db, actor, body, now }) {
     if (from === 'void') fail(409, 'conflict', 'This invoice is already void.');
     const at = now();
     refuseWhileSending(stored, at);
+    // A void closes the card link (#519). A payment that lands anyway is flagged, never applied.
+    const links = payLinks.closeOpenPayLinks(stored, { at, reason: 'void' });
+    closed = links.closed;
     saved = {
       ...stored,
       status: 'void',
       voided: { reason: reason.value, from, at, by: actor.uid },
+      ...(stored.payLinks ? { payLinks: links.payLinks } : {}),
       revision: expectedRevision + 1,
       updatedAt: at,
       updatedBy: actor.uid,
@@ -536,10 +618,13 @@ async function voidInvoice({ db, actor, body, now }) {
     tx.set(ref, saved);
     audit(tx, logRef, {
       action: 'voided', actor, now, docPath: `${INVOICES}/${id}`, invoiceId: id,
-      details: { revision: saved.revision, number: stored.number, from, reason: reason.value },
+      details: {
+        revision: saved.revision, number: stored.number, from, reason: reason.value,
+        ...(closed.length ? { payLinksClosed: closed.map((link) => link.linkId) } : {}),
+      },
     });
   });
-  return { invoice: publicInvoice(saved, id) };
+  return { invoice: publicInvoice(await afterLinksClosed({ db, id, saved, closed, getPayments, now, log }), id) };
 }
 
 /**
@@ -693,6 +778,12 @@ function noMailer() {
   throw new Error('No email provider is configured for invoiceAdmin.');
 }
 
+/** The answer when this site does not take card payments through Stripe (#519). */
+const NO_STRIPE_REASON = 'Card payment links need Stripe. This site does not take card payments through Stripe.';
+function noPayments() {
+  return { available: false, reason: NO_STRIPE_REASON };
+}
+
 /**
  * @param {{ db: object, auth: object, getConfig: () => Promise<object>,
  *           now?: () => Date, log?: object,
@@ -700,7 +791,9 @@ function noMailer() {
  *   getMailer builds the email provider and the email core; it is called
  *   only by previewSend and send, so a provider fault never breaks the rest.
  */
-function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date(), log = console, getMailer = noMailer }) {
+function createInvoiceAdminHandler({
+  db, auth, getConfig, now = () => new Date(), log = console, getMailer = noMailer, getPayments = noPayments,
+}) {
   return async function invoiceAdmin(req, res) {
     res.set('Cache-Control', 'private, no-store');
     if (req.method !== 'POST') { res.set('Allow', 'POST'); return sendError(res, 405, 'method-not-allowed', 'Use POST.'); }
@@ -714,7 +807,7 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
         const policy = await checkDemoWrites({ db });
         if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
       }
-      const deps = { db, actor, body, now, getConfig, getMailer, log };
+      const deps = { db, actor, body, now, getConfig, getMailer, getPayments, log };
       let result;
       if (action === 'list') result = await listInvoices(deps);
       else if (action === 'get') result = await readInvoice(deps);
@@ -727,6 +820,8 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
       else if (action === 'void') result = await voidInvoice(deps);
       else if (action === 'duplicate') result = await duplicateInvoice(deps);
       else if (action === 'reopen') result = await reopenInvoice(deps);
+      else if (action === 'createPayLink') result = await payLinks.createPayLink(deps);
+      else if (action === 'resolvePaymentReview') result = await payLinks.resolvePaymentReview(deps);
       else if (action === 'previewSend') result = await require('./invoiceEmail.cjs').previewSend(deps);
       else if (action === 'send') {
         const sent = await require('./invoiceEmail.cjs').sendInvoice(deps);
@@ -734,7 +829,12 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
       }
       // The page offers Void and Reopen only to a caller who may use them; the action
       // itself checks the tier again (OPERATOR_ACTIONS).
-      if (result?.invoice) result = { ...result, canVoid: actor.tier === 'operator', canReopen: actor.tier === 'operator' };
+      if (result?.invoice) {
+        result = {
+          ...result, canVoid: actor.tier === 'operator', canReopen: actor.tier === 'operator',
+          cardPayments: payLinks.cardPaymentsStatus(getPayments),
+        };
+      }
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof InvoiceError) return sendError(res, error.status, error.code, error.message);
@@ -744,13 +844,36 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
   };
 }
 
+/**
+ * The Stripe provider for card pay links (#519), or why there is none.
+ * Building it reads configuration only; it makes no Stripe request.
+ */
+function stripePayments({ db, getConfig, env }) {
+  if ((env.EVENT_TICKETING_PROVIDER || '').trim() !== 'stripe') return noPayments();
+  const notReady = { available: false, reason: 'Card payment links need Stripe, and Stripe is not fully set up on this site. Ask an operator to check the Stripe settings.' };
+  try {
+    const { getTicketingProvider } = require('../ticketing/providers/index.cjs');
+    const { configuredPublicUrl } = require('../ticketing/stripeCommerce.cjs');
+    const provider = getTicketingProvider({ env, db, getConfig });
+    if (provider.hasPaymentCredentials !== true || typeof provider.createInvoiceCheckoutSession !== 'function') return notReady;
+    return { available: true, provider, publicUrl: configuredPublicUrl(null, env), testMode: provider.livemode !== true };
+  } catch {
+    return notReady;
+  }
+}
+
 /** Deployable export: invoiceAdmin. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
   const { defineSecret } = require('firebase-functions/params');
   const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
-  const secrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
+  const secrets = [
+    ...(SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []),
+    // The Stripe API key, for the card pay link (#519). The webhook secret
+    // stays with ticketingWebhook, which receives the payment.
+    ...((process.env.EVENT_TICKETING_PROVIDER || '').trim() === 'stripe' ? ['TICKETING_API_TOKEN'] : []),
+  ].map(defineSecret);
   return {
     // The send secrets are bound because send emails the PDF (part 4).
     invoiceAdmin: onRequest({ region, secrets }, async (req, res) => {
@@ -771,7 +894,9 @@ function buildHandlers() {
         }
         return mailer;
       };
-      await createInvoiceAdminHandler({ db, auth: getAuth(), getConfig, getMailer })(req, res);
+      let payments = null;
+      const getPayments = () => (payments ||= stripePayments({ db, getConfig, env: process.env }));
+      await createInvoiceAdminHandler({ db, auth: getAuth(), getConfig, getMailer, getPayments })(req, res);
     }),
   };
 }
@@ -780,5 +905,5 @@ module.exports = {
   createInvoiceAdminHandler,
   publicInvoice,
   get handlers() { return buildHandlers(); },
-  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings, InvoiceError, timeOf, SENDING_STALE_MS },
+  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings, InvoiceError, timeOf, SENDING_STALE_MS, stripePayments, refuseWhileSending },
 };
