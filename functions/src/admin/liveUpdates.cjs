@@ -28,16 +28,19 @@
  * one with none, gets `everyone`, which is what every row meant before the
  * field existed. The rules fail closed on a row with no audience, so a save
  * is also how an old row gets one. The audience goes into the admin_logs
- * row with the one it replaced, so a widened row can be traced.
+ * row with the one it replaced, so a widened row can be traced. The save
+ * reads, writes and audits in one transaction, so a concurrent change to
+ * the audience is never overwritten by an edit that omitted it.
  *
  * CATEGORY. One short line the card sets as a tag, with the same rule the
  * Updates page's category uses (shared/update validUpdateCategory), so the
  * two tags cannot disagree. Optional; omitted on an edit, the row keeps its
  * category, and omitted on a new row, it is stored null.
  *
- * Every write gets an admin_logs row (cms/store.cjs's logAdminAction, same
- * best-effort contract as elsewhere: a failed audit write never fails the
- * mutation it describes).
+ * Every write gets an admin_logs row. A delete uses cms/store.cjs's
+ * logAdminAction (best effort: a failed audit write never fails the delete).
+ * A save writes the same row shape inside its transaction instead, because
+ * its audit carries the audience it replaced, read in that transaction.
  *
  * The public doc deliberately carries no actor identity: an `everyone` row is
  * anonymously readable, and config/bootstrap is a server-only
@@ -130,43 +133,51 @@ function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log 
 
     const at = new Date(now());
     const ref = db.collection(LIVE_UPDATES_COLLECTION).doc(id);
-    let audience = DEFAULT_AUDIENCE;
-    let previousAudience = null;
     try {
-      const snap = await ref.get();
-      const prior = snap.exists ? snap.data() : null;
-      // postedAt is stamped once and never moved: an edit fixing a typo must
-      // not bump an entry back to the top of a time-ordered feed.
-      const postedAt = prior?.postedAt ? prior.postedAt : at;
-      previousAudience = typeof prior?.audience === 'string' ? prior.audience : null;
-      if (update.audience !== undefined) audience = update.audience;
-      else if (AUDIENCES.includes(previousAudience)) audience = previousAudience;
-      let category = typeof prior?.category === 'string' ? prior.category : null;
-      if (update.category !== undefined) category = typeof update.category === 'string' ? update.category.trim() : null;
-      // No updatedBy/actor field here — see the module doc comment: this
-      // doc can be anonymously readable, and admin_logs (below) is where
-      // actor identity belongs.
-      await ref.set({
-        message: update.message,
-        pinned: update.pinned === true,
-        category,
-        audience,
-        postedAt,
-        updatedAt: at,
+      // One transaction for the read, the write and the audit row. An edit
+      // that omits the audience keeps the row's, so the value it keeps and
+      // the audit's previous audience must come from the same read the
+      // write commits against: a narrowing to speakers that lands between a
+      // plain read and the write would otherwise be overwritten back to
+      // everyone. On contention Firestore runs the callback again on the
+      // newer row. The audit row is created in the same commit (the shape
+      // logAdminAction writes), so it can never name a stale audience.
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const prior = snap.exists ? snap.data() : null;
+        // postedAt is stamped once and never moved: an edit fixing a typo
+        // must not bump an entry back to the top of a time-ordered feed.
+        const postedAt = prior?.postedAt ? prior.postedAt : at;
+        const previousAudience = typeof prior?.audience === 'string' ? prior.audience : null;
+        let audience = DEFAULT_AUDIENCE;
+        if (update.audience !== undefined) audience = update.audience;
+        else if (AUDIENCES.includes(previousAudience)) audience = previousAudience;
+        let category = typeof prior?.category === 'string' ? prior.category : null;
+        if (update.category !== undefined) category = typeof update.category === 'string' ? update.category.trim() : null;
+        // No updatedBy/actor field here — see the module doc comment: this
+        // doc can be anonymously readable, and admin_logs is where actor
+        // identity belongs.
+        tx.set(ref, {
+          message: update.message,
+          pinned: update.pinned === true,
+          category,
+          audience,
+          postedAt,
+          updatedAt: at,
+        });
+        tx.create(db.collection('admin_logs').doc(), {
+          action: 'saveLiveUpdate',
+          docPath: `${LIVE_UPDATES_COLLECTION}/${id}`,
+          uid: gate.uid,
+          email: gate.email,
+          at,
+          details: { audience, previousAudience },
+        });
       });
     } catch (err) {
       log.error('saveLiveUpdate write failed', err);
       return internal(res, 'The live update could not be saved.');
     }
-    await logAdminAction({
-      db,
-      action: 'saveLiveUpdate',
-      docPath: `${LIVE_UPDATES_COLLECTION}/${id}`,
-      actor: { uid: gate.uid, email: gate.email },
-      now,
-      details: { audience, previousAudience },
-      log,
-    });
     res.status(200).json({ id });
   };
 }
