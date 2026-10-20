@@ -8,6 +8,7 @@ const {
   validateInvoiceDraft, validateInvoiceSettings, sanitizeInvoiceText,
   resolveInvoiceCurrency, formatInvoiceNumber,
   PAYMENT_METHODS, PAYMENT_METHOD_WORDS, invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems,
+  validateInvoiceSend,
 } = require('./invoice.cjs');
 const { CURRENCY_EXPONENTS } = require('./ticketCommerce.cjs');
 
@@ -240,4 +241,29 @@ test('a reopen needs a reason, cleaned and capped, named for the reopen', () => 
   assert.equal(empty.ok, false);
   assert.deepEqual(empty.issues, [{ path: 'reason', message: 'Enter the reason for reopening.' }]);
   assert.equal(validateReopenReason('x'.repeat(INVOICE_LIMITS.reopenReason + 1)).ok, false);
+});
+
+test('an invoice send takes an optional copy address and an optional note, both cleaned', () => {
+  assert.deepEqual(validateInvoiceSend({}, { to: 'billing@example.org' }), { ok: true, issues: [], value: { cc: null, note: '' } });
+  assert.deepEqual(
+    validateInvoiceSend({ cc: ' Finance@Example.org ', note: ' Thanks again.\r\n\r\n\r\nSee you soon. \u202e' }, { to: 'billing@example.org' }),
+    { ok: true, issues: [], value: { cc: 'finance@example.org', note: 'Thanks again.\n\nSee you soon.' } },
+  );
+  // Unknown fields, such as a "to" of the caller's choosing, are dropped.
+  assert.deepEqual(validateInvoiceSend({ to: 'someone@example.net', bcc: 'x@example.net' }, { to: 'billing@example.org' }).value, { cc: null, note: '' });
+});
+
+test('an invoice send refuses a bad copy address, a copy to the billing email, a header break and a long note', () => {
+  const bad = validateInvoiceSend({ cc: 'not an address' }, { to: 'billing@example.org' });
+  assert.equal(bad.ok, false);
+  assert.deepEqual(bad.issues, [{ path: 'cc', message: 'Enter a valid email for the copy, or leave it empty.' }]);
+  // Two addresses, or a line break that would start a new header, are one bad address.
+  for (const cc of ['a@example.org, b@example.org', 'a@example.org\r\nBcc: b@example.org', 'a@example.org\nb@example.org']) {
+    assert.equal(validateInvoiceSend({ cc }, { to: 'billing@example.org' }).ok, false, JSON.stringify(cc));
+  }
+  const same = validateInvoiceSend({ cc: 'BILLING@example.org' }, { to: 'billing@example.org' });
+  assert.deepEqual(same.issues, [{ path: 'cc', message: 'The billing email already gets the invoice. Enter a different address for the copy, or leave it empty.' }]);
+  const long = validateInvoiceSend({ note: 'x'.repeat(INVOICE_LIMITS.sendNote + 1) }, { to: 'billing@example.org' });
+  assert.deepEqual(long.issues, [{ path: 'note', message: `Use ${INVOICE_LIMITS.sendNote} characters or fewer for the note.` }]);
+  assert.equal(validateInvoiceSend('nope', { to: 'billing@example.org' }).ok, false);
 });

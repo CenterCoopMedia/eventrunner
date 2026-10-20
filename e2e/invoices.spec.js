@@ -17,11 +17,17 @@
 // and voids it. The number stays used: a copy of the void invoice is issued as
 // INV-0002, and two drafts issued at the same moment take the next two
 // numbers. The records, the counter and admin_logs are read back.
+//
+// Email (part 4): staff email an issued invoice from its page after a
+// preview. The console email provider writes the mail to the captured inbox,
+// and the test reads it there with its PDF attachment, then finds the send on
+// the invoice and in admin_logs. A second send to the same address minutes
+// later needs a confirmation, and a void invoice or a draft is refused.
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_EMAIL, adminDb, callFunction, ensureUser, idTokenFor, signIn,
+  ADMIN_EMAIL, adminDb, callFunction, ensureUser, idTokenFor, mailFileSize, signIn, taggedMailSince, waitForTaggedMail,
 } from './helpers.mjs';
 
 const STAFF_EMAIL = 'e2e-invoice-staff@example.test';
@@ -317,5 +323,75 @@ test.describe.serial('issued invoices', () => {
     expect(numbers).toEqual(['INV-0003', 'INV-0004']);
     expect(results.filter((res) => res.status !== 200).map((res) => res.status)).toEqual([409]);
     expect((await adminDb().collection('invoice_counters').doc('current').get()).data().lastNumber).toBe(4);
+  });
+
+  test('an issued invoice is emailed with its PDF to the billing email, once', async () => {
+    const id = 'inv_e2eissue00000000000003';
+    const stored = (await adminDb().collection('invoices').doc(id).get()).data();
+    expect(stored.status).toBe('issued');
+    const { number } = stored;
+    await page.goto(`/admin/invoices/${id}`);
+    await expect(page.getByRole('heading', { level: 1, name: number })).toBeVisible();
+    await page.getByRole('button', { name: 'Email invoice' }).click();
+    const form = page.getByRole('region', { name: `Email ${number}` });
+    await form.getByLabel('Copy to').fill('finance@example.test');
+    await form.getByLabel('Note').fill('Thank you for sponsoring.');
+    await form.getByRole('button', { name: 'Preview email' }).click();
+    const preview = form.getByRole('region', { name: 'Email preview' });
+    await expect(preview).toContainText(`Invoice ${number} from ${stored.issuer.name}`);
+    await expect(preview).toContainText(`${number}.pdf`);
+    await expect(preview).toContainText('Thank you for sponsoring.');
+
+    const since = mailFileSize();
+    await form.getByRole('button', { name: 'Send to sponsor@example.test' }).click();
+    await expect(page.getByRole('status').filter({ hasText: `Emailed ${number} to sponsor@example.test` })).toBeVisible();
+    const mail = await waitForTaggedMail(since, 'sponsor@example.test', 'invoice.send');
+    expect(mail.cc).toBe('finance@example.test');
+    expect(mail.subject).toBe(`Invoice ${number} from ${stored.issuer.name}`);
+    expect(mail.text).toContain('Thank you for sponsoring.');
+    const config = (await adminDb().collection('config').doc('providers').get()).data() ?? {};
+    const announcementStream = config.email?.announcementStream ?? 'announcements';
+    expect(mail.messageStream ?? 'outbound').not.toBe(announcementStream);
+    expect(mail.attachments).toHaveLength(1);
+    expect(mail.attachments[0]).toMatchObject({ filename: `${number}.pdf`, contentType: 'application/pdf' });
+    const pdf = Buffer.from(mail.attachments[0].content, 'base64');
+    expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    const drawn = pdfText(pdf);
+    for (const text of [number, 'Example Invoice Sponsor', 'Presenting package', '$4,500.00']) {
+      expect(drawn).toContain(text);
+    }
+
+    const after = (await adminDb().collection('invoices').doc(id).get()).data();
+    expect(after.sends).toHaveLength(1);
+    expect(after.sends[0]).toMatchObject({ status: 'sent', to: 'sponsor@example.test', cc: 'finance@example.test' });
+    expect(after.sends[0].providerMessageId).toMatch(/^console-/);
+    const logs = await adminDb().collection('admin_logs').where('invoiceId', '==', id).get();
+    const emailed = logs.docs.map((doc) => doc.data()).filter((row) => row.action === 'invoices.emailed');
+    expect(emailed).toHaveLength(1);
+    expect(emailed[0].details.providerMessageId).toBe(after.sends[0].providerMessageId);
+    expect(JSON.stringify(emailed[0])).not.toContain('sponsor@example.test');
+    await expect(page.getByRole('list', { name: 'Emails sent' })).toContainText('sponsor@example.test');
+
+    // A second send minutes later needs a confirmation; without one nothing goes.
+    await page.getByRole('button', { name: 'Email invoice' }).click();
+    await form.getByRole('button', { name: 'Preview email' }).click();
+    await expect(form).toContainText('less than 15 minutes ago');
+    await form.getByRole('button', { name: 'Send to sponsor@example.test' }).click();
+    await expect(form.getByLabel('Send it again anyway')).toBeFocused();
+    const again = await callFunction('invoiceAdmin', { action: 'previewSend', invoiceId: id }, staffToken);
+    const refused = await callFunction('invoiceAdmin', {
+      action: 'send', invoiceId: id, sendId: 'e2e-resend-0001', receipt: again.body.receipt,
+    }, staffToken);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('recent-send');
+    expect(taggedMailSince(since, 'sponsor@example.test', 'invoice.send')).toHaveLength(1);
+
+    // A void invoice and a draft are never sent.
+    const voidPreview = await callFunction('invoiceAdmin', { action: 'previewSend', invoiceId: FIRST }, staffToken);
+    expect(voidPreview.status).toBe(409);
+    const draftId = 'inv_e2eissue00000000000009';
+    expect((await callFunction('invoiceAdmin', { action: 'saveDraft', invoiceId: draftId, expectedRevision: 0, invoice: DRAFT }, staffToken)).status).toBe(200);
+    const draftSend = await callFunction('invoiceAdmin', { action: 'send', invoiceId: draftId, sendId: 'e2e-draft-0001', receipt: 'a'.repeat(64) }, staffToken);
+    expect(draftSend.status).toBe(409);
   });
 });

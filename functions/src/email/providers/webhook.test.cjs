@@ -250,3 +250,9 @@ test('internals.safeEqual compares without length throw', () => {
   assert.equal(internals.safeEqual('abc', 'abcd'), false);
   assert.equal(internals.safeEqual('', 'x'), false);
 });
+
+test('the webhook relay declares no attachment or copy support, so invoice email is refused with it', () => {
+  const provider = createWebhookProvider({ env: { EMAIL_WEBHOOK_URL: 'https://relay.example.test/send', EMAIL_WEBHOOK_SECRET: 's' }, fetchImpl: async () => ({}) });
+  assert.notEqual(provider.capabilities?.attachments, true);
+  assert.notEqual(provider.capabilities?.cc, true);
+});

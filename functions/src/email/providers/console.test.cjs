@@ -181,3 +181,28 @@ test('does not implement verifyDeliveryWebhook so ingest refuses every request',
   assert.equal(provider.verifyDeliveryWebhook, undefined);
   assert.equal(provider.parseDeliveryEvent, undefined);
 });
+
+test('the mail file keeps a copy address and each attachment; the log names the file but not its content', async () => {
+  const log = fakeLog();
+  const writes = [];
+  const provider = createConsoleProvider({
+    env: { FUNCTIONS_EMULATOR: 'true', E2E_MAIL_FILE: '/tmp/mail.jsonl' },
+    log,
+    appendFileSync: (_path, data) => writes.push(data),
+  });
+  assert.deepEqual(provider.capabilities, { attachments: true, cc: true });
+  const content = Buffer.from('%PDF-1.7 example').toString('base64');
+  await provider.send({
+    to: 'billing@example.org',
+    cc: 'finance@example.org',
+    subject: 'Invoice INV-0001',
+    tag: 'invoice.send',
+    attachments: [{ filename: 'INV-0001.pdf', contentType: 'application/pdf', content }],
+  });
+  const stored = JSON.parse(writes[0]);
+  assert.equal(stored.cc, 'finance@example.org');
+  assert.deepEqual(stored.attachments, [{ filename: 'INV-0001.pdf', contentType: 'application/pdf', content }]);
+  assert.match(log.lines[0], /INV-0001\.pdf/);
+  assert.match(log.lines[0], /finance@example\.org/);
+  assert.equal(log.lines[0].includes(content), false);
+});

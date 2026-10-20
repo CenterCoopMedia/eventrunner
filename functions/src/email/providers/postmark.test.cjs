@@ -471,3 +471,28 @@ test('internals.formatAddress and passFail', () => {
   assert.equal(internals.passFail(false), 'fail');
   assert.equal(internals.passFail(undefined), 'unknown');
 });
+
+// --- attachments and a copy address (invoice email) -------------------------
+
+test('send maps a copy address and attachments onto the Postmark payload', async () => {
+  const fetchImpl = fakeFetch([fakeResponse({ status: 200, jsonBody: { MessageID: 'pm-9', ErrorCode: 0 } })]);
+  const provider = createPostmarkProvider({ env: ENV, fetchImpl });
+  assert.deepEqual(provider.capabilities, { attachments: true, cc: true });
+  assert.equal(provider.attachmentLimits.maxBytes, internals.MAX_ATTACHMENT_BYTES);
+  const content = Buffer.from('%PDF-1.7 example').toString('base64');
+  await provider.send({
+    to: 'billing@example.org',
+    cc: 'finance@example.org',
+    from: 'sender@example.com',
+    subject: 'Invoice INV-0001',
+    text: 'Attached.',
+    attachments: [{ filename: 'INV-0001.pdf', contentType: 'application/pdf', content }],
+  });
+  const body = JSON.parse(fetchImpl.calls[0].init.body);
+  assert.equal(body.Cc, 'finance@example.org');
+  assert.deepEqual(body.Attachments, [{ Name: 'INV-0001.pdf', Content: content, ContentType: 'application/pdf' }]);
+});
+
+test('the Postmark attachment limit leaves room for the base64 growth inside the 10 MB message limit', () => {
+  assert.ok(Math.ceil(internals.MAX_ATTACHMENT_BYTES / 3) * 4 < 10 * 1024 * 1024 - 512 * 1024);
+});

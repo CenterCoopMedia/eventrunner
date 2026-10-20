@@ -351,3 +351,16 @@ test('getMessageStream reads type, archive state, and unsubscribe handling with 
   assert.equal(fetchImpl.calls[0].init.headers['X-Postmark-Server-Token'], 'server-token');
   assert.deepEqual(await provider.getMessageStream('missing'), { found: false, status: 404 });
 });
+
+test('a batch with an attachment the provider cannot carry is refused before any claim', async () => {
+  const db = fakeDb();
+  const provider = { name: 'webhook', sendBatch: async () => { throw new Error('must not send'); } };
+  const core = createEmailCore({ db, provider, getConfig: async () => CONFIG, log: { error() {}, warn() {}, info() {} } });
+  const attachments = [{ filename: 'INV-0001.pdf', contentType: 'application/pdf', content: Buffer.from('%PDF-').toString('base64') }];
+  await assert.rejects(
+    core.sendBatch([{ to: 'a@example.org', subject: 's', text: 'x', onceKey: 'k-1', attachments }]),
+    (err) => err instanceof EmailBatchError && err.code === 'attachments-unsupported',
+  );
+  assert.equal(db.state.claims.size, 0);
+  assert.equal(db.state.sentRows.length, 0);
+});
