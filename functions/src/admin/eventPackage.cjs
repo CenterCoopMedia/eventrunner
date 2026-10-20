@@ -48,6 +48,7 @@ const {
   LimitError,
   admissionRecord,
   attendeeRecord,
+  invoiceRecord,
   materialRecord,
   mediaRecord,
   orderRecord,
@@ -201,6 +202,14 @@ const SECTIONS = Object.freeze([
     ],
   },
   {
+    id: 'billing',
+    label: 'Invoices',
+    files: [
+      jsonFile('billing/invoices.json', 'invoices', invoiceRecord, 'Invoices to sponsors and partners: each one as it was issued, with its number, its bill-to and issuer blocks, its lines and totals in the currency\'s minor unit, and its payment or void record. A draft has no number.'),
+      datasetFile('billing/invoices.csv', 'invoices', 'Invoices as a spreadsheet, with amounts in major units.'),
+    ],
+  },
+  {
     id: 'pitches',
     label: 'Session pitches',
     files: [
@@ -234,6 +243,7 @@ const EXCLUDED = Object.freeze([
   { source: 'ticket_webhook_deliveries, ticket_sync_queue, ticket_payment_attempts, ticket_inventory', reason: 'Raw provider payloads, the sync queue, payment attempts and holds.' },
   { source: 'users/*/bookmarks, users/*/sessionNotes, schedule_shares', reason: 'Each attendee\'s private saved sessions and notes.' },
   { source: 'users_public, speakers_public, session_materials_public, announcements_public', reason: 'Public projections of records the package already holds.' },
+  { source: 'invoice_settings, invoice_counters', reason: 'The live invoice settings hold bank details, and the counter only numbers the next invoice. Each issued invoice keeps its own copy of the issuer block.' },
   { source: 'feedback, change_requests, system_errors', reason: 'Inbox and diagnostic records. Request them separately.' },
   { source: 'Storage files', reason: 'Uploaded images and material files. The package lists their paths; copy the bucket for the files.' },
 ]);

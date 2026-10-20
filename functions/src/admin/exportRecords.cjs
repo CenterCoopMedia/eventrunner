@@ -314,6 +314,29 @@ function orderRecord(id, data) {
   });
 }
 
+/**
+ * An invoices document as invoiceAdmin answers it (publicInvoice: stored
+ * text cleaned again on read), without the staff account ids, the
+ * revision and the list key. An issued invoice keeps its frozen issuer
+ * block, payment instructions included: that is what its reader was sent.
+ * The live settings (invoice_settings) never go.
+ */
+function invoiceRecord(id, data) {
+  // Required here: invoices.cjs is an endpoint module, and only this
+  // record needs it.
+  const { publicInvoice } = require('./invoices.cjs');
+  const {
+    createdBy: _createdBy, updatedBy: _updatedBy, issuedBy: _issuedBy, revision: _revision, ...invoice
+  } = publicInvoice(data && typeof data === 'object' ? data : {}, id);
+  return scrub({
+    ...invoice,
+    payment: invoice.payment && {
+      paidOn: invoice.payment.paidOn, method: invoice.payment.method, note: invoice.payment.note, recordedAt: invoice.payment.recordedAt,
+    },
+    voided: invoice.voided && { reason: invoice.voided.reason, from: invoice.voided.from, at: invoice.voided.at },
+  });
+}
+
 /** A tickets document: one admission. No raw provider record. */
 function admissionRecord(id, data) {
   const source = data && typeof data === 'object' ? data : {};
@@ -411,6 +434,7 @@ module.exports = {
   admissionRecord,
   attendeeRecord,
   handles,
+  invoiceRecord,
   isSecretKey,
   materialRecord,
   mediaRecord,

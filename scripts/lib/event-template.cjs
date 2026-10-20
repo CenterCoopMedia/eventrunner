@@ -110,6 +110,11 @@ const EXCLUDED_REASONS = Object.freeze({
   ticket_catalog: 'tickets and orders',
   ticket_webhook_deliveries: 'tickets and orders',
   ticket_sync_queue: 'tickets and orders',
+  // A new event starts its invoice numbers again at 0001, and the
+  // settings hold the past event's bank details.
+  invoices: 'invoices and billing',
+  invoice_counters: 'invoices and billing',
+  invoice_settings: 'invoices and billing',
   session_pitches: 'private pitches',
   sent_emails: 'email logs',
   email_claims: 'email logs',

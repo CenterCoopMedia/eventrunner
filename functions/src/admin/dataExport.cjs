@@ -7,8 +7,9 @@
  * `{ filename, csv, rowCount }`, the same shape exportAttendees answers, and
  * the admin saves it with the same download code.
  *
- * TIERS. Sessions, speakers and organizations are staff tier: a staff admin
- * already reads every one of those documents in the admin panel. Ticket
+ * TIERS. Sessions, speakers, organizations and invoices are staff tier: a
+ * staff admin already reads every one of those documents in the admin
+ * panel. Ticket
  * orders and admissions are operator tier: they name purchasers and carry
  * payment state, and the ticketing page shows them to staff one order at a
  * time only. The gate admits both tiers, then refuses an operator dataset
@@ -33,6 +34,7 @@ const {
   LIST_SEPARATOR,
   LimitError,
   admissionRecord,
+  invoiceRecord,
   orderRecord,
   organizationRecord,
   readDocs,
@@ -40,6 +42,9 @@ const {
   sessionRecord,
   speakerRecord,
 } = require('./exportRecords.cjs');
+
+const { CURRENCY_EXPONENTS } = require('shared/ticketCommerce');
+const { INVOICE_STATUSES, PAYMENT_METHOD_WORDS } = require('shared/invoice');
 
 const ADMIN_LOGS = 'admin_logs';
 const ACTION = 'exportEventData';
@@ -49,6 +54,11 @@ const MAX_EXPORT_DOCS = 20000;
 
 /** The largest file one spreadsheet may carry, in bytes (the attendee export's cap). */
 const MAX_EXPORT_BYTES = 10 * 1024 * 1024;
+
+/** The status words the invoice list shows (apps/web/src/admin/invoiceDoc.js). */
+const INVOICE_STATUS_WORDS = Object.freeze(Object.fromEntries(
+  INVOICE_STATUSES.map((status) => [status, status[0].toUpperCase() + status.slice(1)]),
+));
 
 /** The body keys this endpoint accepts. */
 const BODY_KEYS = Object.freeze(['dataset']);
@@ -258,6 +268,37 @@ const DATASETS = Object.freeze({
       { header: 'Claimed by an account', value: (row) => (row.claimedByAccountId ? 'yes' : 'no') },
       { header: 'Checked in', value: (row) => row.checkedInAt },
       { header: 'Purchased', value: (row) => row.purchasedAt },
+    ],
+  },
+  invoices: {
+    tier: 'staff',
+    filename: 'invoices',
+    docPath: 'invoices',
+    packagePath: 'billing/invoices.csv',
+    packageHolds: 'the invoices',
+    read: ({ db, counter, maxDocs, cache }) => readRecords({ db, collection: 'invoices', counter, maxDocs, cache }, invoiceRecord),
+    columns: [
+      { header: 'Invoice ID', value: (row) => row.id },
+      { header: 'Number', value: (row) => row.number },
+      { header: 'Status', value: (row) => INVOICE_STATUS_WORDS[row.status] },
+      { header: 'Bill to', value: (row) => row.billTo.name },
+      { header: 'Contact name', value: (row) => row.billTo.contactName },
+      { header: 'Billing email', value: (row) => row.billTo.email },
+      { header: 'Organization ID', value: (row) => row.billTo.organizationId },
+      { header: 'Reference', value: (row) => row.reference },
+      { header: 'Issue date', value: (row) => row.issueDate },
+      { header: 'Due date', value: (row) => row.dueDate },
+      { header: 'Currency', value: (row) => row.currency.toUpperCase() },
+      { header: 'Subtotal', value: (row) => amount(row.totals.subtotal, CURRENCY_EXPONENTS[row.currency]) },
+      { header: 'Discounts', value: (row) => amount(row.totals.discountTotal, CURRENCY_EXPONENTS[row.currency]) },
+      { header: 'Tax', value: (row) => amount(row.totals.taxTotal, CURRENCY_EXPONENTS[row.currency]) },
+      { header: 'Total', value: (row) => amount(row.totals.total, CURRENCY_EXPONENTS[row.currency]) },
+      { header: 'Paid on', value: (row) => row.payment?.paidOn },
+      { header: 'Payment method', value: (row) => (row.payment ? PAYMENT_METHOD_WORDS[row.payment.method] : '') },
+      { header: 'Payment note', value: (row) => row.payment?.note },
+      { header: 'Void reason', value: (row) => row.voided?.reason },
+      { header: 'Copied from', value: (row) => row.duplicatedFrom?.number ?? row.duplicatedFrom?.invoiceId },
+      { header: 'Created', value: (row) => row.createdAt },
     ],
   },
 });
