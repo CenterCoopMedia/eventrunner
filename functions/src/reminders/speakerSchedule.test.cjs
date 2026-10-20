@@ -315,3 +315,92 @@ test('settings: defaults, limits, and the helpers the run uses', () => {
   assert.equal(eventEnded(CONFIG, IN_7D), false);
   assert.equal(eventEnded({ event: { timezone: ZONE } }, IN_7D), false);
 });
+
+// Review findings on #528. A run reads the schedule once, then sends one
+// speaker at a time; each check below happens again before each speaker.
+
+function twoOwing(extra = {}, options = {}) {
+  return seed({
+    // Ben now owes a biography too, so the run has two recipients: Ada, Ben.
+    'speakers/ben': { firstName: 'Ben', lastName: 'Example', email: 'ben@example.test', status: 'accepted', bio: '', headshotPath: 'b.jpg' },
+    ...extra,
+  }, options);
+}
+
+test('turning the schedule off between two speakers stops the second send', async () => {
+  const db = twoOwing();
+  const sent = [];
+  const sendEmail = async (message) => {
+    sent.push(message.to);
+    // Staff turn the schedule off while the first message is in flight.
+    if (sent.length === 1) await db.collection(SCHEDULES).doc('speakers').set({ enabled: false }, { merge: true });
+    return { status: 'sent' };
+  };
+  const result = await run(db, IN_7D, { sendEmail });
+  assert.deepEqual(sent, ['ada@example.test']);
+  assert.deepEqual(result.sent, ['ada']);
+  assert.equal(result.reason, 'schedule-changed');
+  assert.equal(db.read(LEDGER, 'speakers__2026-11-20-7d__ben'), undefined, 'the stopped speaker has no ledger row');
+  assert.equal(db.read(REMINDERS, 'ben'), undefined, 'and no reservation');
+});
+
+test('a pause, new settings, or a new approval mid-run also stop the next send', async () => {
+  for (const change of [
+    { pausedReason: 'wording-changed' },
+    { sendTime: '11:00' },
+    { approvedWordingVersion: 'something-else' },
+  ]) {
+    const db = twoOwing();
+    const sent = [];
+    const sendEmail = async (message) => {
+      sent.push(message.to);
+      if (sent.length === 1) await db.collection(SCHEDULES).doc('speakers').set(change, { merge: true });
+      return { status: 'sent' };
+    };
+    await run(db, IN_7D, { sendEmail });
+    assert.deepEqual(sent, ['ada@example.test'], JSON.stringify(change));
+  }
+});
+
+test('the send loop stops when quiet hours begin, and the rest wait for the next run', async () => {
+  const db = twoOwing();
+  // 19:59 in New York on the 13th; the clock passes 20:00 after the first send.
+  let clock = Date.parse('2026-11-14T00:59:00Z');
+  const sent = [];
+  const sendEmail = async (message) => {
+    sent.push(message.to);
+    clock = Date.parse('2026-11-14T01:00:30Z');
+    return { status: 'sent' };
+  };
+  const result = await runSpeakerSchedule({ db, getConfig: async () => CONFIG, sendEmail, now: () => clock, log: QUIET });
+  assert.deepEqual(sent, ['ada@example.test']);
+  assert.equal(result.reason, 'quiet-hours');
+  assert.equal(result.deferred, 1);
+  assert.equal(db.read(LEDGER, 'speakers__2026-11-20-7d__ben'), undefined);
+  // The next morning, inside the same window, Ben gets his reminder.
+  const mail = outbox();
+  const morning = await run(db, Date.parse('2026-11-14T14:00:00Z'), mail);
+  assert.deepEqual(morning.sent, ['ben']);
+});
+
+test('a reservation that throws part way keeps the sends already made in the last run and the admin log', async () => {
+  const db = twoOwing();
+  const original = db.runTransaction.bind(db);
+  let count = 0;
+  db.runTransaction = async (fn) => {
+    count += 1;
+    // 1: the lease. 2: Ada's reservation. 3: Ben's reservation throws.
+    if (count === 3) throw new Error('transaction aborted');
+    return original(fn);
+  };
+  const mail = outbox();
+  const result = await run(db, IN_7D, mail);
+  assert.equal(result.outcome, 'failed');
+  assert.deepEqual(result.sent, ['ada']);
+  const lastRun = db.read(RUNS, 'speakers').lastRun;
+  assert.equal(lastRun.outcome, 'failed');
+  assert.equal(lastRun.counts.sent, 1);
+  const [row] = logs(db, 'runScheduledReminders');
+  assert.deepEqual(row.details.sent, ['ada']);
+  assert.equal(row.details.incomplete, true);
+});

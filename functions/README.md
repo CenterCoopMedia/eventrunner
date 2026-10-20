@@ -140,7 +140,10 @@ ADR 0006 and issue #518. `src/reminders/` holds two exports:
   most one reminder per window, and a failed or uncertain send is not sent again. The run
   holds a 15-minute lease on `reminder_schedule_runs/speakers`, and stores its last run
   there. It does nothing while off or paused, on a historical demo, or after the last event
-  day. Wording that is not the approved version pauses the schedule, writes an `admin_logs`
+  day. Before each speaker it stops when quiet hours begin or the window closes, and each
+  reservation transaction reads the schedule again (`reserve({ guard })`), so turning it off,
+  pausing it or changing it stops the run before the next speaker. Speakers not tried get no
+  ledger row. A fault part way keeps the sends already made in `lastRun` and the admin log. Wording that is not the approved version pauses the schedule, writes an `admin_logs`
   row and tells the operator. A run that emails anyone writes one `admin_logs` row. The
   attendee branch (#518, the third pull request) joins `BRANCHES` in `src/reminders/run.cjs`.
 

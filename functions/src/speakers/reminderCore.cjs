@@ -268,14 +268,26 @@ async function requireWritable(db) {
  * When it exists already, nothing is reserved (`recorded`). The schedule's
  * ledger uses it (ADR 0006); the staff endpoint does not.
  *
+ * `guard` is an optional `{ ref, check(data) }`: a document read in the
+ * same transaction, and a check that returns a reason to stop, or null.
+ * A stop reserves and writes nothing (`stopped`). The schedule uses it to
+ * read its own settings again before each speaker.
+ *
  * @returns {Promise<{ ok: true, sentCount: number } | { ok: false, outcome: string, reason?: string }>}
  */
-async function reserve({ db, speakerId, batchId, items, actor, nowMs, also = null }) {
+async function reserve({ db, speakerId, batchId, items, actor, nowMs, also = null, guard = null }) {
   const ref = db.collection(REMINDERS).doc(speakerId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     // Every read comes before the first write in a transaction.
     const alsoSnap = also ? await tx.get(also.ref) : null;
+    if (guard) {
+      // The caller's precondition, read in this transaction: when it no
+      // longer holds, nothing is reserved or written.
+      const guardSnap = await tx.get(guard.ref);
+      const stop = guard.check(guardSnap.exists ? guardSnap.data() : null);
+      if (stop) return { ok: false, outcome: 'stopped', reason: stop };
+    }
     let state = snap.exists ? snap.data() : {};
     const attempt = timestampMs(state.lastAttemptAt);
     if (state.lastStatus === 'sending' && Number.isFinite(attempt) && nowMs - attempt >= SENDING_STALE_MS
@@ -321,12 +333,13 @@ async function reserve({ db, speakerId, batchId, items, actor, nowMs, also = nul
 }
 
 /**
- * Reserve, send and stamp one speaker's reminder. `also` goes to reserve().
- * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'uncertain' | 'skipped', reason?: string }>}
+ * Reserve, send and stamp one speaker's reminder. `also` and `guard` go to
+ * reserve().
+ * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'uncertain' | 'skipped' | 'stopped', reason?: string }>}
  */
-async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs, also = null }) {
+async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs, also = null, guard = null }) {
   const { speakerId, items } = recipient;
-  const reservation = await reserve({ db, speakerId, batchId, items, actor, nowMs, also });
+  const reservation = await reserve({ db, speakerId, batchId, items, actor, nowMs, also, guard });
   if (!reservation.ok) return reservation;
   let result;
   try {

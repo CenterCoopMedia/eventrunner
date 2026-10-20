@@ -29,6 +29,14 @@
  * the same window sends once the cooldown ends. A scheduled send stops a
  * staff send for 24 hours in the same way.
  *
+ * EACH SPEAKER IS CHECKED AGAIN. Before each reservation the run stops
+ * when quiet hours have begun or the window has closed, and the
+ * reservation transaction reads the schedule again: a schedule turned off,
+ * paused, re-approved or re-configured since the run began stops the run.
+ * The speakers not tried get no ledger row, so a later run reaches them.
+ * A fault part way keeps what was already sent in the last run and the
+ * admin log.
+ *
  * APPROVED WORDING ONLY. Staff approve a wording version (reminderCore
  * wordingVersion, the version of the wording actually sent). A run whose
  * wording version differs pauses the schedule, writes an admin_logs row,
@@ -36,7 +44,7 @@
  */
 
 const { READINESS_ITEMS } = require('shared/speakerReadiness');
-const { DEFAULT_OFFSETS, MAX_OFFSET_DAYS, planReminders } = require('shared/reminderSchedule');
+const { DEFAULT_OFFSETS, MAX_OFFSET_DAYS, isQuietAt, planReminders } = require('shared/reminderSchedule');
 const { splitEventDateTime } = require('shared/eventDateTime');
 const { readClosesAt: readInstant } = require('shared/pitch');
 const { isDayPast } = require('shared/time');
@@ -371,38 +379,76 @@ async function sendDue({ db, getConfig, sendEmail, notifyOperator, now, log, sch
     waiting: ids(waiting),
     recorded: audience.recorded,
   };
-  for (const { recipient, rendered } of prepared) {
-    const nowMs = now();
-    const also = {
-      ref: db.collection(LEDGER).doc(ledgerIdFor(window.windowKey, recipient.speakerId)),
-      data: {
-        scheduleId: SCHEDULE_ID,
-        windowKey: window.windowKey,
-        offsetDays: window.offsetDays,
-        batchId,
-        speakerId: recipient.speakerId,
-        items: recipient.items,
-        wordingVersion: version,
-        createdAt: new Date(nowMs),
-      },
-    };
-    const { outcome, reason } = await sendOne({
-      db, sendEmail, log, actor: SCHEDULE_ACTOR, batchId, recipient, rendered, nowMs, also,
-    });
-    if (outcome === 'sent') result.sent.push(recipient.speakerId);
-    else if (outcome === 'already-sent') result.alreadySent.push(recipient.speakerId);
-    else if (outcome === 'failed') result.failed.push(recipient.speakerId);
-    else if (outcome === 'uncertain') result.uncertain.push(recipient.speakerId);
-    else if (reason === 'recorded') result.recorded += 1;
-    else result.waiting.push(recipient.speakerId);
-    if (['sent', 'failed', 'uncertain'].includes(outcome)) {
-      try {
-        await also.ref.set({ outcome, finishedAt: new Date(now()) }, { merge: true });
-      } catch (err) {
-        log.warn('reminder_ledger outcome stamp failed', err);
+  // Read again in each reservation: a run that staff turn off, pause,
+  // re-approve or re-configure part way stops before its next speaker.
+  const guard = {
+    ref: db.collection(SCHEDULES).doc(SCHEDULE_ID),
+    check(data) {
+      const live = normalizeSpeakerSchedule(data);
+      if (scheduleState(live) !== 'on') return 'schedule-changed';
+      if (live.approvedWordingVersion !== schedule.approvedWordingVersion) return 'schedule-changed';
+      if (settingsKey(live) !== settingsKey(schedule)) return 'schedule-changed';
+      return null;
+    },
+  };
+  let index = 0;
+  try {
+    for (; index < prepared.length; index += 1) {
+      const { recipient, rendered } = prepared[index];
+      const nowMs = now();
+      // A long run must not send into quiet hours or past its window. The
+      // rest get no ledger row, so a later run in the window reaches them.
+      if (isQuietAt(new Date(nowMs), timeZone)) {
+        result.reason = 'quiet-hours';
+        break;
+      }
+      if (nowMs >= window.closesAt.getTime()) {
+        result.reason = 'window-closed';
+        break;
+      }
+      const also = {
+        ref: db.collection(LEDGER).doc(ledgerIdFor(window.windowKey, recipient.speakerId)),
+        data: {
+          scheduleId: SCHEDULE_ID,
+          windowKey: window.windowKey,
+          offsetDays: window.offsetDays,
+          batchId,
+          speakerId: recipient.speakerId,
+          items: recipient.items,
+          wordingVersion: version,
+          createdAt: new Date(nowMs),
+        },
+      };
+      const { outcome, reason } = await sendOne({
+        db, sendEmail, log, actor: SCHEDULE_ACTOR, batchId, recipient, rendered, nowMs, also, guard,
+      });
+      if (outcome === 'stopped') {
+        result.reason = reason;
+        break;
+      }
+      if (outcome === 'sent') result.sent.push(recipient.speakerId);
+      else if (outcome === 'already-sent') result.alreadySent.push(recipient.speakerId);
+      else if (outcome === 'failed') result.failed.push(recipient.speakerId);
+      else if (outcome === 'uncertain') result.uncertain.push(recipient.speakerId);
+      else if (reason === 'recorded') result.recorded += 1;
+      else result.waiting.push(recipient.speakerId);
+      if (['sent', 'failed', 'uncertain'].includes(outcome)) {
+        try {
+          await also.ref.set({ outcome, finishedAt: new Date(now()) }, { merge: true });
+        } catch (err) {
+          log.warn('reminder_ledger outcome stamp failed', err);
+        }
       }
     }
+  } catch (err) {
+    // Keep what was already sent: the last run and the admin log name it.
+    log.error('scheduled speaker reminders stopped part way', err);
+    result.outcome = 'failed';
+    result.incomplete = true;
+    result.error = { code: 'internal', message: 'The run stopped on a server error. Reminders sent before it are recorded. Nothing more was sent.' };
   }
+  // Who this run did not try: a later run in the window can reach them.
+  result.deferred = prepared.length - index;
   return result;
 }
 
@@ -460,6 +506,7 @@ async function runSpeakerSchedule({ db, getConfig, sendEmail, notifyOperator = a
       uncertain: result.uncertain?.length ?? 0,
       waiting: result.waiting?.length ?? 0,
       recorded: result.recorded ?? 0,
+      deferred: result.deferred ?? 0,
     },
     error: result.error ?? null,
   };
@@ -487,6 +534,9 @@ async function runSpeakerSchedule({ db, getConfig, sendEmail, notifyOperator = a
         failed: result.failed,
         uncertain: result.uncertain,
         waiting: result.waiting.length,
+        deferred: result.deferred ?? 0,
+        ...(result.reason ? { stoppedFor: result.reason } : {}),
+        ...(result.incomplete ? { incomplete: true } : {}),
       },
     });
   }
