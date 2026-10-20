@@ -10,7 +10,8 @@
  * reject stale status and private-note edits.
  *
  * Pitch rows are private and server-written. The public config/pitch_call
- * document contains only `{ enabled, closesAt, externalFormUrl }`. A set
+ * document contains only `{ enabled, closesAt, externalFormUrl }`. A null
+ * `closesAt` means the call has no deadline; staff close it by hand. A set
  * `externalFormUrl` sends people to another form (for example, Airtable),
  * and this API then refuses native submissions so one call never has two
  * intake queues. Rate-limit rows are server-only. This module does not
@@ -34,7 +35,9 @@ const PITCH_CALL_PATH = 'config/pitch_call';
 
 const STATUSES = Object.freeze(['new', 'in_review', 'accepted', 'rejected']);
 const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
-const { readClosesAt, readPitchFormUrl } = require('shared/pitch');
+const {
+  readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
+} = require('shared/pitch');
 
 const MAX_TITLE_LENGTH = 160;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -194,9 +197,8 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
 
     const nowMs = now();
     const call = callSnap.exists ? callSnap.data() : null;
-    const closesAt = readClosesAt(call?.closesAt);
-    if (call?.enabled !== true || !closesAt || Date.parse(closesAt) <= nowMs
-        || readPitchFormUrl(call?.externalFormUrl)) {
+    // A null deadline stays open until an operator turns the call off.
+    if (!isPitchCallOpen(call, nowMs) || readPitchFormUrl(call?.externalFormUrl)) {
       return { outcome: 'closed' };
     }
 
@@ -292,8 +294,11 @@ function createUpdatePitchCallHandler({ db, auth, getConfig, now = Date.now, log
     if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
     if (typeof req.body?.enabled !== 'boolean') return badRequest(res, 'enabled: must be true or false.');
-    const closesAt = readClosesAt(req.body?.closesAt);
-    if (!closesAt) return badRequest(res, 'closesAt: must be an RFC3339 date and time.');
+    // An explicit null is "Open until I close it" (issue #476): the call has
+    // no deadline and stays open until an operator saves enabled: false.
+    const deadline = readPitchDeadline(req.body?.closesAt);
+    if (!deadline.ok) return badRequest(res, 'closesAt: must be an RFC3339 date and time, or null for no deadline.');
+    const { closesAt } = deadline;
 
     // Leaving the field out keeps the stored form, so an older admin tab or a
     // deadline-only script cannot silently reopen native intake. Only an
