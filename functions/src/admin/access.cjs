@@ -81,7 +81,25 @@ const MAX_STAFF_ACCESS_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 // A full date and time with an explicit offset. Without the offset the
 // server would read the time in its own zone, which nobody chose.
-const EXPIRES_AT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const EXPIRES_AT_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+
+/**
+ * Whether the date and time the pattern matched exist as written. Date.parse
+ * rolls an impossible value over ('2026-11-31' becomes December 1, hour 24
+ * becomes the next day), so each part is checked against the calendar first.
+ *
+ * @param {RegExpExecArray} match
+ * @returns {boolean}
+ */
+function componentsExist(match) {
+  const [year, month, day, hour, minute] = match.slice(1, 6).map(Number);
+  const second = match[6] === undefined ? 0 : Number(match[6]);
+  const offsetHours = match[7] === undefined ? 0 : Number(match[7]);
+  const offsetMinutes = match[8] === undefined ? 0 : Number(match[8]);
+  if (hour > 23 || minute > 59 || second > 59 || offsetHours > 23 || offsetMinutes > 59) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
 const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 
 /** A plain Firestore map, the shape the rules' `is map` accepts. */
@@ -104,8 +122,12 @@ function readExpiresAt(value, tier, nowMs) {
   if (tier !== 'staff') {
     return { ok: false, message: 'expiresAt: only staff access can end. Operator access and removal take no end time.' };
   }
-  if (typeof value !== 'string' || !EXPIRES_AT_RE.test(value)) {
+  const match = typeof value === 'string' ? EXPIRES_AT_RE.exec(value) : null;
+  if (!match) {
     return { ok: false, message: 'expiresAt: must be a date and time with a time zone offset, such as 2026-10-27T17:00:00Z.' };
+  }
+  if (!componentsExist(match)) {
+    return { ok: false, message: 'expiresAt: that date or time does not exist.' };
   }
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) {

@@ -750,3 +750,41 @@ test('endExpiredStaffAccess: an address the sweep removed leaves the Access list
   await endExpiredStaffAccess({ db, now: () => T0.getTime(), log: QUIET });
   assert.deepEqual((await list(deps)).body.accounts, [{ email: OPS, tier: 'operator' }]);
 });
+
+// Codex review on #541: Date.parse normalizes an impossible date
+// ('2026-11-31' becomes December 1), so the components are checked first.
+test('readExpiresAt: refuses calendar components that do not exist, and accepts a real leap day', () => {
+  const { internals: { readExpiresAt } } = require('./access.cjs');
+  const nowMs = Date.parse('2026-01-01T00:00:00Z');
+  for (const value of [
+    '2026-11-31T12:00:00Z',
+    '2026-02-29T12:00:00Z',
+    '2026-02-30T12:00:00Z',
+    '2026-04-31T12:00:00Z',
+    '2026-13-01T12:00:00Z',
+    '2026-00-10T12:00:00Z',
+    '2026-03-00T12:00:00Z',
+    '2026-03-10T24:00:00Z',
+    '2026-03-10T12:60:00Z',
+    '2026-03-10T12:00:60Z',
+    '2026-03-10T12:00:00+24:00',
+    '2026-03-10T12:00:00+05:60',
+  ]) {
+    const result = readExpiresAt(value, 'staff', nowMs);
+    assert.equal(result.ok, false, value);
+    assert.match(result.message, /does not exist|time zone offset/, value);
+  }
+  // 2028 is a leap year; 90 days from 2028-01-01 reaches past it.
+  const leap = readExpiresAt('2028-02-29T12:00:00Z', 'staff', Date.parse('2028-01-01T00:00:00Z'));
+  assert.deepEqual(leap, { ok: true, expiresAtMs: Date.parse('2028-02-29T12:00:00Z') });
+  const offset = readExpiresAt('2026-03-10T23:30:00-05:00', 'staff', nowMs);
+  assert.deepEqual(offset, { ok: true, expiresAtMs: Date.parse('2026-03-11T04:30:00Z') });
+});
+
+test('setAdminAccess: an impossible date is refused before anything is written', async () => {
+  const { db, deps } = world();
+  const res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: '2026-09-31T12:00:00Z' });
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /does not exist/);
+  assert.equal(db.writes.length, 0);
+});
