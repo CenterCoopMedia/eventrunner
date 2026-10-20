@@ -25,11 +25,11 @@ const {
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 
 // This test file exercises hex-color parsing directly, but pdf.test.cjs is
-// NOT on the spec §7.6 hex-literal allowlist (only pdf.cjs itself is — the
-// allowlist is exactly three paths, by design). Building fixture colors
+// NOT on the spec §7.6 hex-literal allowlist (pdf.cjs and ../pdf/kit.cjs
+// are; test files never are, by design). Building fixture colors
 // through this helper keeps every hex value config-shaped test DATA rather
 // than a source-level hex literal, so the lint rule (rightly) does not
-// need a fourth allowlisted path just for tests.
+// need another allowlisted path just for tests.
 const hex = (digits) => `#${digits}`;
 
 // -------------------------------------------------------------- fixtures

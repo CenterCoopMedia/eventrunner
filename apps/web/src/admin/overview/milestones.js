@@ -8,30 +8,13 @@
 // change between now and the milestone cannot make a day 23 or 25 hours
 // long and round the count the wrong way.
 import { nowInZone } from 'shared/time';
+import { sortMilestones, utcDay } from '../../lib/milestones.js';
 
-const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DAY_MS = 86_400_000;
 
-function utcDay(date) {
-  const match = DATE_RE.exec(date ?? '');
-  if (!match) return null;
-  return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-}
-
-/**
- * The milestones worth listing, sorted by date and then by name. An entry
- * with no name or no readable date is left out rather than drawn broken.
- *
- * @param {unknown} milestones config/event.milestones
- * @returns {Array<{ label: string, date: string }>}
- */
-export function sortMilestones(milestones) {
-  if (!Array.isArray(milestones)) return [];
-  return milestones
-    .filter((entry) => entry && typeof entry.label === 'string' && entry.label.trim() && utcDay(entry.date) !== null)
-    .map((entry) => ({ label: entry.label.trim(), date: entry.date }))
-    .sort((a, b) => a.date.localeCompare(b.date) || a.label.localeCompare(b.label));
-}
+// The ordering lives in lib/milestones.js, which the public key dates read
+// too (issue #200); it is re-exported here so the overview keeps one import.
+export { sortMilestones };
 
 /**
  * Whole calendar days from today, in the event's timezone, to `date`: 0 on

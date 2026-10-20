@@ -35,7 +35,9 @@
 //   • COMPARISON. "Compare light and dark" renders the same page twice, side
 //     by side, on both grounds. Dark mode is its own palette and it is where
 //     a brand colour usually fails; flipping a toggle and remembering is not
-//     the same as looking at both.
+//     the same as looking at both. A bar between the two frames (issue #477)
+//     gives one of them more room. Each frame is still the same CSS width;
+//     Fit scales each one to its own pane.
 //   • FALLBACKS. What the candidate asks for that will not render as asked:
 //     a colour the resolver cannot read, and a font the browser has not
 //     loaded. Both fall back silently otherwise.
@@ -48,7 +50,7 @@
 // The identification line sits BELOW each frame, on a hairline, in the data
 // face — never above it, where it would stack over the page's own nameplate
 // and become an eyebrow (brief §2.4).
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   MemoryRouter,
@@ -68,11 +70,14 @@ import {
   clearThemePreview,
   releaseThemePreviewTarget,
 } from '../themePreview.js';
+import { COMPARE_SPLIT_KEY, readSplit, writeSplit } from '../layoutPreference.js';
+import PaneSplitter, { SPLITTER_WIDTH } from './PaneSplitter.jsx';
 import {
   CheckboxField,
   Notice,
   SelectField,
   choiceButtonClass,
+  linkButtonClass,
   rowMetaClass,
   secondaryButtonClass,
 } from './formControls.jsx';
@@ -136,12 +141,15 @@ const VIEWPORT_HEIGHT = Object.freeze({ desktop: 576, mobile: 844 });
 
 /**
  * The gutter between the two frames of the light-and-dark comparison, in
- * pixels. It is `gap-xs` on the grid below, which is one --space-xs, and
- * zoom-to-fit has to subtract the same measure it draws — a number here that
- * does not match the class there scales the picture to a column that is not
- * the column.
+ * pixels. It is the bar that resizes them (PaneSplitter), a fixed-pixel
+ * track in the grid below, and zoom-to-fit has to subtract the same measure
+ * it draws — a number here that does not match the track there scales the
+ * picture to a column that is not the column.
  */
-const COMPARE_GUTTER = 8;
+export const COMPARE_GUTTER = SPLITTER_WIDTH;
+
+/** The light frame's share of the comparison, in percent. */
+export const COMPARE_SPLIT = Object.freeze({ min: 25, max: 75, defaultValue: 50 });
 
 /** How many sessions the dense-schedule fixture puts on one day. */
 const STRESS_SESSION_COUNT = 28;
@@ -377,6 +385,13 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   const [stress, setStress] = useState(false);
   const [compare, setCompare] = useState(false);
   const [columnWidth, setColumnWidth] = useState(0);
+  const [compareSplit, setCompareSplit] = useState(() => readSplit(COMPARE_SPLIT_KEY, COMPARE_SPLIT));
+  const changeCompareSplit = (next) => {
+    writeSplit(COMPARE_SPLIT_KEY, next);
+    setCompareSplit(next);
+  };
+  const lightPaneId = useId();
+  const compareBarId = useId();
   const [fontEpoch, setFontEpoch] = useState(0);
 
   const viewport =
@@ -397,10 +412,15 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
     return () => observer.disconnect();
   }, []);
 
-  const frameCount = compare ? 2 : 1;
-  const available =
-    columnWidth > 0 ? (columnWidth - (compare ? COMPARE_GUTTER : 0)) / frameCount : 0;
-  const scale = fit && available > 0 ? Math.min(1, available / viewport.width) : 1;
+  // Each frame's room: the whole column, or in a comparison its share of
+  // the column less the bar between the two.
+  const room = columnWidth > 0 ? columnWidth - (compare ? COMPARE_GUTTER : 0) : 0;
+  const firstRoom = compare ? (room * compareSplit) / 100 : room;
+  const secondRoom = room - firstRoom;
+  const scaleFor = (available) =>
+    fit && available > 0 ? Math.min(1, available / viewport.width) : 1;
+  const scale = scaleFor(firstRoom);
+  const compareScale = scaleFor(secondRoom);
 
   // The candidate lands on every frame on every change, and the overlay is
   // removed when the editor unmounts, so an abandoned edit leaves nothing
@@ -529,23 +549,43 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
   const path = proofPath(page, shownSessions);
 
   const draftLabel = isDirty ? 'unpublished draft' : 'published theme';
-  const sizeLabel = `${viewport.width}px${scale === 1 ? '' : ` at ${Math.round(scale * 100)}%`}`;
+  const sizeLabel = (frameScale) =>
+    `${viewport.width}px${frameScale === 1 ? '' : ` at ${Math.round(frameScale * 100)}%`}`;
   const stressLabel = stress ? ' · stress test' : '';
-  const identification = (frameMode) =>
-    `${page.label} · ${frameMode} · ${sizeLabel}${stressLabel} · ${draftLabel}`;
+  const identification = (frameMode, frameScale = scale) =>
+    `${page.label} · ${frameMode} · ${sizeLabel(frameScale)}${stressLabel} · ${draftLabel}`;
 
+  const compareColumns = `minmax(0, ${compareSplit}fr) ${COMPARE_GUTTER}px minmax(0, ${100 - compareSplit}fr)`;
+  // The light frame's wrapper is there in both modes, so switching to the
+  // comparison does not change the first frame's place in the tree.
   const frames = (
-    <div className={compare ? 'grid grid-cols-2 gap-xs' : ''}>
-      <PreviewFrame
-        path={path}
-        scopeId={PREVIEW_SCOPE_ID}
-        onReady={setFrameRoot}
-        width={viewport.width}
-        height={height}
-        scale={scale}
-        identification={identification(compare ? 'light' : mode)}
-        title={`${page.label} preview, ${compare ? 'light' : mode} mode, ${viewport.width}px wide`}
-      />
+    <div
+      className={compare ? 'grid' : ''}
+      style={compare ? { gridTemplateColumns: compareColumns } : undefined}
+    >
+      <div id={lightPaneId} className="min-w-0">
+        <PreviewFrame
+          path={path}
+          scopeId={PREVIEW_SCOPE_ID}
+          onReady={setFrameRoot}
+          width={viewport.width}
+          height={height}
+          scale={scale}
+          identification={identification(compare ? 'light' : mode)}
+          title={`${page.label} preview, ${compare ? 'light' : mode} mode, ${viewport.width}px wide`}
+        />
+      </div>
+      {compare ? (
+        <PaneSplitter
+          id={compareBarId}
+          label="Resize the light and dark previews"
+          valueText={`Light ${compareSplit}%, dark ${100 - compareSplit}%`}
+          value={compareSplit}
+          {...COMPARE_SPLIT}
+          onChange={changeCompareSplit}
+          controls={lightPaneId}
+        />
+      ) : null}
       {compare ? (
         <PreviewFrame
           path={path}
@@ -553,8 +593,8 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
           onReady={setCompareRoot}
           width={viewport.width}
           height={height}
-          scale={scale}
-          identification={identification('dark')}
+          scale={compareScale}
+          identification={identification('dark', compareScale)}
           title={`${page.label} preview, dark mode, ${viewport.width}px wide`}
         />
       ) : null}
@@ -616,6 +656,20 @@ export default function ThemeProof({ themeDoc, isDirty, mode, onModeChange }) {
           />
         </div>
         <CheckboxField label="Stress test" checked={stress} onChange={setStress} />
+        {compare ? (
+          <button
+            type="button"
+            className={linkButtonClass}
+            disabled={compareSplit === COMPARE_SPLIT.defaultValue}
+            onClick={() => {
+              changeCompareSplit(COMPARE_SPLIT.defaultValue);
+              // The button turns off at the default; the bar keeps the focus.
+              document.getElementById(compareBarId)?.focus();
+            }}
+          >
+            Reset frame widths
+          </button>
+        ) : null}
       </div>
 
       {stress ? (

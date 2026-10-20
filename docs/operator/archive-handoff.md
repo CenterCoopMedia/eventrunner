@@ -18,7 +18,7 @@ A portable export is not a backup of the project. A managed export (below) is a 
 
 ## 1. Spreadsheets for staff
 
-Open **Data export** in the admin panel (System group). Staff and operators can export:
+Open **Data export** in the admin panel (Operations group). Staff and operators can export:
 
 - **Sessions**: title, state, whether it is hidden, day, times, location, speakers and description.
 - **Speakers**: name, email address, organization, status and published sessions.

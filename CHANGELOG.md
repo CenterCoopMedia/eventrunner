@@ -9,11 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Live updates have a category and an audience: everyone, approved attendees and speakers,
+  or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
+  approved attendee cannot get or list a speaker-only entry, and the card's queries carry the
+  matching audience filter. Each save writes the new and the previous audience to
+  `admin_logs`. The card also lists the event's milestones as key dates, in date order, and
+  shows them when the feed is empty (#200).
+
+- The admin rail groups its sections into Content, Program, Registration and tickets,
+  Communications, Operations and Settings. Each group opens and closes from a button on its
+  name. The group of the current page opens by itself, and a closed one names the current page.
+  On a wide screen **Hide menu** narrows the rail, and **Show menu** brings it back. On
+  Branding, a bar between the controls and the preview, and one between the light and dark
+  frames, changes how much room each side has, by pointer or by the arrow keys. The frame still
+  renders at the width picked. The browser remembers each choice, and the admin works without
+  browser storage (#477).
+
 - Staff set the pitch call deadline and the ticket catalog's sale windows as a date and a
   time on the event's clock. The fields name the event's time zone and state the result in
   words, with the UTC offset for the chosen date. A time that daylight saving time skips is
   refused, and a time it repeats asks which one is meant. The stored RFC3339 values do not
   change (#476).
+
+- A pitch call can have no deadline. Under **When intake closes**, an operator chooses
+  **Open until I close it**. The call stays open until an operator clears **Accept session
+  pitches** and saves. `updatePitchCall` takes `"closesAt": null` for this; a missing or
+  blank value is still refused. `/pitch` shows no deadline and no countdown for such a
+  call. The same rule applies with an external form, such as Airtable (#476).
 
 - A new event can start from a past event's template. `scripts/export-event-template.cjs`
   reads an allowlist from the past project: branding, page templates, their content blocks and
@@ -433,6 +455,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   public pages in all six styles found no other coloured section whose text touches its
   edge (#478).
 
+- A speaker reminder send now refuses shipped wording that changed after its preview. When no
+  wording is saved, the preview's wording version is `shipped:` and a digest of the shipped
+  subject and bodies. It used to be the fixed value `shipped`, so a deploy that changed the
+  shipped copy between a preview and a send could send wording nobody read (#518).
+
 - The Functions deploy step now fails when a Function is not deployed. After a quota error
   (HTTP 429) on a create, `firebase-tools` 15.22.4 can exit 0 before the create is done, with
   no summary. Run 39329645906 reported success while `downloadEventPackage` did not exist.
@@ -548,6 +575,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section the client has already written. Both are reported by init as kept.
 
 ### Changed
+
+- `live_updates` is no longer readable by everyone. A row with no audience, which is every
+  row saved before this release, is readable by admins only, so it leaves the public card.
+  The Live updates page counts these rows and marks each one; edit and save a row to give it
+  an audience. Deploy the two new `live_updates` indexes in `firestore.indexes.json` with the
+  rules, or the card's queries fail until the indexes are built (#200).
+
+- Groundwork for scheduled reminders (#518), with no change that users see.
+  [ADR 0006](docs/adr/0006-scheduled-reminders.md) records why a reminder schedule is not a
+  queue. The event-clock conversion the admin uses moved to `shared/eventDateTime`, so the
+  server reads a local time the same way. `shared/reminderSchedule` works out which reminder
+  is due from the settings and the clock. The speaker reminder internals moved to
+  `functions/src/speakers/reminderCore.cjs`, and the announcement send record and chunks
+  moved to `functions/src/announcements/sendRunner.cjs`, so a schedule can use the same send
+  paths.
+
+- The PDF helpers for theme colors, header text, text fitting and font-safe text moved from
+  `functions/src/schedule/pdf.cjs` into `functions/src/pdf/kit.cjs`, so the invoice PDF can
+  use them (#209). The schedule PDF does not change. A parity test compares its output with a
+  snapshot made before the move. `functions/src/pdf/kit.cjs` joins the hex-literal allowlist
+  because the fallback palette moved with the helpers.
 
 - The public address of the Pages site is one value, in `scripts/lib/pages-site.cjs`. The
   documentation generator, the demo build, and the link checker read it, so the canonical and
@@ -862,5 +910,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   base commit, as the path classifier already did, so a pull request cannot replace
   the scripts that decide those required checks. A pull request can still edit the
   workflow file itself; an independent check producer remains #259 (#354).
+- `scripts/ci/audit-exceptions.json` now records each open audit finding we cannot fix
+  yet, with its reason: three stream-json advisories under the pinned Firebase CLI, braces
+  under Tailwind CSS 3 (no fixed release), Quill 2.0.3's HTML export advisory (no fixed
+  release; the editor does not load the affected blots and cleans every export), and
+  GHSA-rj75-hqrm-r3gf on postcss-selector-parser, which the installed 6.1.5 already fixes
+  but the advisory still lists. The deploy runbook now says to run `firebase auth:import`
+  only on files you exported from your own project.
+- An audit exception now covers an advisory only up to the severity recorded for it. If an
+  advisory is later raised above that severity, the audit policy check fails again.
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.

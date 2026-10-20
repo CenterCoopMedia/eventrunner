@@ -41,14 +41,14 @@ describe('AdminLiveUpdates', () => {
       await Promise.resolve();
     });
     expect(callMock).toHaveBeenCalledWith('saveLiveUpdate', {
-      update: { message: 'Doors open at 9am.', pinned: false },
+      update: { message: 'Doors open at 9am.', pinned: false, category: null, audience: 'everyone' },
     });
   });
 
   it('edits an existing entry via saveLiveUpdate with its id', async () => {
     callMock.mockResolvedValueOnce({ id: 'u1' });
     render(<AdminLiveUpdates />);
-    pushRows([{ id: 'u1', message: 'Old message', pinned: false, postedAt: new Date('2026-08-01T00:00:00Z') }]);
+    pushRows([{ id: 'u1', message: 'Old message', pinned: false, audience: 'everyone', postedAt: new Date('2026-08-01T00:00:00Z') }]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Fixed message' } });
@@ -59,7 +59,7 @@ describe('AdminLiveUpdates', () => {
     });
     expect(callMock).toHaveBeenCalledWith('saveLiveUpdate', {
       id: 'u1',
-      update: { message: 'Fixed message', pinned: false },
+      update: { message: 'Fixed message', pinned: false, category: null, audience: 'everyone' },
     });
   });
 
@@ -85,5 +85,58 @@ describe('AdminLiveUpdates', () => {
     pushRows([]);
     expect(screen.getByText(/currently off/)).toBeInTheDocument();
     features = { liveUpdates: true };
+  });
+
+  it('sends the category and the chosen audience (issue 200)', async () => {
+    callMock.mockResolvedValueOnce({ id: 'auto1' });
+    render(<AdminLiveUpdates />);
+    pushRows([]);
+
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Green room moved.' } });
+    fireEvent.change(screen.getByLabelText('Category'), { target: { value: ' Rooms ' } });
+    const audience = screen.getByLabelText('Who can read it');
+    expect(audience).toHaveValue('everyone');
+    expect(audience).toHaveAccessibleDescription(/database enforces this/);
+    fireEvent.change(audience, { target: { value: 'speakers' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Post update' }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(callMock).toHaveBeenCalledWith('saveLiveUpdate', {
+      update: { message: 'Green room moved.', pinned: false, category: 'Rooms', audience: 'speakers' },
+    });
+  });
+
+  it('opens an entry with its own category and audience', () => {
+    render(<AdminLiveUpdates />);
+    pushRows([{ id: 'u1', message: 'Badge desk', pinned: false, category: 'Venue', audience: 'attendees' }]);
+    expect(screen.getByText('For attendees')).toBeInTheDocument();
+    expect(screen.getByText('Venue')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.getByLabelText('Category')).toHaveValue('Venue');
+    expect(screen.getByLabelText('Who can read it')).toHaveValue('attendees');
+  });
+
+  it('names a row with no audience, which only admins can read, and saving gives it one', async () => {
+    callMock.mockResolvedValueOnce({ id: 'old' });
+    render(<AdminLiveUpdates />);
+    pushRows([
+      { id: 'old', message: 'From before audiences', pinned: false },
+      { id: 'new', message: 'Has one', pinned: false, audience: 'everyone' },
+    ]);
+    expect(screen.getByText('Admins only, no audience set')).toBeInTheDocument();
+    expect(screen.getByText(/1 update has no audience, so only admins can read it/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
+    expect(screen.getByLabelText('Who can read it')).toHaveValue('everyone');
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(callMock).toHaveBeenCalledWith('saveLiveUpdate', {
+      id: 'old',
+      update: { message: 'From before audiences', pinned: false, category: null, audience: 'everyone' },
+    });
   });
 });

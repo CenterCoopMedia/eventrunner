@@ -92,6 +92,8 @@ Forgot on a commit that is not pushed yet: `git commit --amend -s`. Forgot on se
 
 Everything else sends, writes, or fails in the request that asked for it. Email in particular has no queue: a managed provider owns retry and pacing (spec §3.1). A pull request that adds a second queue, a scheduled retry collection, a "pending work" document set, or a drain function needs an ADR first — say what makes the work impossible to do inline, and why a provider or a trigger cannot do it. See [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md) §3.3 and §10 question 9.
 
+Scheduled reminders are the one timed sender, and [ADR 0006](docs/adr/0006-scheduled-reminders.md) is why they are not a queue. Each run works out what is due from the schedule settings and the clock. Its ledger records only what was sent, and no run reads it to find work. It sends through the same paths as a staff send. A change that stores work for a later run, or retries a failed send in the background, needs a new ADR.
+
 ### Accessibility
 
 UI changes need a keyboard path and visible focus. If you change a flow that attendees or staff use, say how you checked it (keyboard, zoom, or a screen reader). Do not rely on color alone.
@@ -206,7 +208,7 @@ The main branch protection rule requires the stable `CI gate` check.
 
 Tags, `CHANGELOG.md` hygiene, and what a release includes are in [RELEASING.md](RELEASING.md).
 
-One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
+One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, `functions/src/pdf/kit.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
 ## Security
 

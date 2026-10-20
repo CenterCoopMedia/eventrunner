@@ -6,7 +6,7 @@
 // because jsdom does not implement iframe viewport geometry or CSS layout.
 /* global document, getComputedStyle */
 import { test, expect } from '@playwright/test';
-import { ADMIN_EMAIL, adminDb, signIn } from './helpers.mjs';
+import { ADMIN_EMAIL, adminDb, signIn, openAdminGroups } from './helpers.mjs';
 
 const THEMES = ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'];
 
@@ -340,6 +340,10 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
 
   await summary.click();
   await expect(docket).toHaveAttribute('open', '');
+  // Only the current page's group opens by itself (issue #477).
+  await expect(docket.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute('aria-expanded', 'true');
+  await expect(docket.getByRole('button', { name: 'Program', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await openAdminGroups(page);
   const links = docket.getByRole('navigation', { name: 'Admin sections' }).getByRole('link');
   // DOCKET in apps/web/src/admin/AdminLayout.jsx, operator tier. That module
   // imports CSS and JSX, so the spec cannot read it; AdminLayout.test.jsx
@@ -375,7 +379,14 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   expect(drawerEvidence.position).toBe('fixed');
   expect(drawerEvidence.top).toBe(56);
   expect(drawerEvidence.bottom).toBe(drawerEvidence.viewportHeight);
-  expect(drawerEvidence.groupLabels).toEqual(['Content', 'People', 'Operations', 'System']);
+  expect(drawerEvidence.groupLabels).toEqual([
+    'Content',
+    'Program',
+    'Registration and tickets',
+    'Communications',
+    'Operations',
+    'Settings',
+  ]);
   for (const row of drawerEvidence.rows) {
     expect(row.height, row.label).toBeGreaterThanOrEqual(44);
     expect(row.width, row.label).toBe(row.parentWidth);

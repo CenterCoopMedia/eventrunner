@@ -79,6 +79,8 @@ vi.mock('firebase/firestore', () => ({
 import App from '../../App.jsx';
 import { markTourDone } from '../tourState.js';
 import { PREVIEW_COMPARE_SCOPE_ID, PREVIEW_SCOPE_ID, PREVIEW_STYLE_ID } from '../themePreview.js';
+import { BRANDING_SPLIT_KEY, COMPARE_SPLIT_KEY, forgetLayoutMemory } from '../layoutPreference.js';
+import { BRANDING_SPLIT } from './AdminBranding.jsx';
 
 // Hex values are DATA here, never literals in source (spec §7.6 forbids hex
 // literals outside the allowlist — including in tests).
@@ -804,5 +806,135 @@ describe('color picker input', () => {
     fireEvent.change(screen.getByLabelText('Ink'), { target: { value: 'not-a-color' } });
     await waitFor(() => expect(screen.queryByLabelText('Ink color picker')).toBeNull());
     expect(screen.getByLabelText('Ink')).toHaveValue('not-a-color');
+  });
+});
+
+describe('room for the preview, issue 477', () => {
+  const wideScreen = () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn((query) => ({
+      matches: /min-width/.test(query),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    return () => {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    };
+  };
+
+  beforeEach(() => {
+    forgetLayoutMemory();
+    window.localStorage.removeItem(BRANDING_SPLIT_KEY);
+    window.localStorage.removeItem(COMPARE_SPLIT_KEY);
+  });
+
+  it('puts a keyboard bar between the editor and the preview from 1280px, and keeps the draft', async () => {
+    const restore = wideScreen();
+    try {
+      const { container } = await renderBranding(PRESET_THEME);
+      const draftColour = hex('336699');
+      fireEvent.change(screen.getByLabelText('Main brand colour'), { target: { value: draftColour } });
+      const workspace = container.querySelector('.admin-branding-workspace');
+      const bar = screen.getByRole('separator', { name: 'Resize the editor and the preview' });
+      expect(bar).toHaveAttribute('aria-orientation', 'vertical');
+      expect(bar).toHaveAttribute('aria-valuenow', String(BRANDING_SPLIT.defaultValue));
+      expect(bar).toHaveAttribute('aria-valuemin', String(BRANDING_SPLIT.min));
+      expect(bar).toHaveAttribute('aria-valuemax', String(BRANDING_SPLIT.max));
+      expect(bar).toHaveAttribute('aria-valuetext', 'Editor 50%, preview 50%');
+      expect(bar).toHaveAttribute('aria-controls', 'admin-branding-editor');
+      expect(document.getElementById('admin-branding-editor')).toContainElement(
+        screen.getByLabelText('Main brand colour'),
+      );
+      expect(workspace).toHaveAttribute('data-split', '50');
+      const reset = screen.getByRole('button', { name: 'Reset widths' });
+      expect(reset).toBeDisabled();
+      const iframe = previewIframe();
+
+      bar.focus();
+      fireEvent.keyDown(bar, { key: 'ArrowLeft' });
+      expect(bar).toHaveAttribute('aria-valuenow', '45');
+      expect(workspace.style.getPropertyValue('--admin-branding-editor-share')).toBe('45fr');
+      expect(workspace.style.getPropertyValue('--admin-branding-preview-share')).toBe('55fr');
+      expect(window.localStorage.getItem(BRANDING_SPLIT_KEY)).toBe('45');
+      fireEvent.keyDown(bar, { key: 'Home' });
+      expect(bar).toHaveAttribute('aria-valuenow', '30');
+
+      // Resizing changes the room, never the work: the same frame, the same
+      // draft, and nothing published.
+      expect(previewIframe()).toBe(iframe);
+      expect(screen.getByLabelText('Main brand colour')).toHaveValue(draftColour);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+
+      expect(reset).toBeEnabled();
+      fireEvent.click(reset);
+      expect(bar).toHaveAttribute('aria-valuenow', '50');
+      expect(bar).toHaveFocus();
+      expect(reset).toBeDisabled();
+    } finally {
+      restore();
+    }
+  });
+
+  it('opens on the split this browser remembers', async () => {
+    window.localStorage.setItem(BRANDING_SPLIT_KEY, '60');
+    const restore = wideScreen();
+    try {
+      await renderBranding(PRESET_THEME);
+      expect(screen.getByRole('separator', { name: 'Resize the editor and the preview' }))
+        .toHaveAttribute('aria-valuenow', '60');
+    } finally {
+      restore();
+    }
+  });
+
+  it('stacks the panes with no bar on a narrower screen', async () => {
+    const { container } = await renderBranding(PRESET_THEME);
+    expect(screen.queryByRole('separator', { name: 'Resize the editor and the preview' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reset widths' })).toBeNull();
+    expect(container.querySelector('.admin-branding-workspace')).not.toHaveAttribute('data-split');
+  });
+
+  it('resizes the light and dark frames without changing the CSS width they render at', async () => {
+    // A measured column, so Fit has a real width to scale to.
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(1000);
+    try {
+      await renderBranding(PRESET_THEME);
+      fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'compare' } });
+      const light = previewIframe();
+      const dark = previewIframe(PREVIEW_COMPARE_SCOPE_ID);
+      const bar = screen.getByRole('separator', { name: 'Resize the light and dark previews' });
+      expect(bar).toHaveAttribute('aria-valuetext', 'Light 50%, dark 50%');
+      expect(document.getElementById(bar.getAttribute('aria-controls'))).toContainElement(light);
+      // 1000px less the 24px bar, halved, against a 1440px page.
+      expect(screen.getAllByText(/Home · light · 1440px at 34%/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Home · dark · 1440px at 34%/).length).toBeGreaterThan(0);
+
+      bar.focus();
+      fireEvent.keyDown(bar, { key: 'ArrowRight' });
+      expect(bar).toHaveAttribute('aria-valuetext', 'Light 55%, dark 45%');
+      expect(window.localStorage.getItem(COMPARE_SPLIT_KEY)).toBe('55');
+      expect(screen.getAllByText(/Home · light · 1440px at 37%/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Home · dark · 1440px at 31%/).length).toBeGreaterThan(0);
+      // The frames are the same documents at the same CSS width; only the
+      // scale that fits them to their panes moved.
+      expect(previewIframe()).toBe(light);
+      expect(previewIframe(PREVIEW_COMPARE_SCOPE_ID)).toBe(dark);
+      expect(light).toHaveAttribute('width', '1440');
+      expect(dark).toHaveAttribute('width', '1440');
+      expect(frame(PREVIEW_COMPARE_SCOPE_ID).dataset.mode).toBe('dark');
+
+      // Actual size keeps its meaning: true scale, whatever the panes.
+      fireEvent.click(screen.getByRole('button', { name: 'Actual size' }));
+      expect(screen.getAllByText(/Home · light · 1440px · published theme/).length).toBeGreaterThan(0);
+      fireEvent.click(screen.getByRole('button', { name: 'Fit' }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reset frame widths' }));
+      expect(bar).toHaveAttribute('aria-valuenow', '50');
+      expect(bar).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Reset frame widths' })).toBeDisabled();
+    } finally {
+      width.mockRestore();
+    }
   });
 });

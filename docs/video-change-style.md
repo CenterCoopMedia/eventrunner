@@ -30,7 +30,7 @@ pass contrast. Do not teach asset uploading or app-icon deployment here.
 | Frames / time | Step and action | On-screen text |
 | --- | --- | --- |
 | 0–179 / 0–6s | Title on the sample admin Overview. | “Change your site style.” / “Start signed in as an operator.” |
-| 180–509 / 6–17s | 1. Open “Branding” under System, then “Page style”. On phone, open “Menu” first. | “Open Branding, then Page style.” |
+| 180–509 / 6–17s | 1. Open “Branding” under Settings, then “Page style”. On phone, open “Menu” first. | “Open Branding, then Page style.” |
 | 510–839 / 17–28s | 2. Choose “Newsroom” in “Site style”. | “Choose a Site style.” |
 | 840–1199 / 28–40s | 3. Review the real Home and Schedule page previews in desktop mode. | “Review Home and Schedule.” |
 | 1200–1559 / 40–52s | 4. Switch the preview to “Phone”; check its light and dark views with separate holds. | “Check Phone, Light, and Dark.” |

@@ -594,6 +594,19 @@ Keep the original provider, account, payment attempts, and inventory records thr
 recovery; deleting a hold or making a replacement order does not establish the original
 payment's outcome.
 
+### Importing users or data with the Firebase CLI
+
+The pinned `firebase-tools` 15.22.4 reads `firebase auth:import` and `firebase database:import`
+files through stream-json 1.9.1. That version has open advisories: crafted JSON can stall the CLI
+or change the prototype of a parsed object. There is no fix we can take until the CLI moves past
+15.22.4 (see `scripts/ci/audit-exceptions.json`).
+
+- Only import a file you made yourself with `firebase auth:export` (or `database:get`) from one
+  of this operator's own projects, and that has stayed on your machine or in your storage since.
+- Never import a file from a client, a vendor, an email attachment or any other third party.
+  To bring in users from outside, turn their data into a new export file with your own tools
+  first, and check it before you import it.
+
 ## 7. Rotating access
 
 There is no key to rotate. To revoke a client's deploy access, remove the IAM policy binding from
