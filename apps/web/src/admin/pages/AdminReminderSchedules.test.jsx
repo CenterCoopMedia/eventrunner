@@ -170,6 +170,20 @@ describe('AdminReminderSchedules', () => {
     expect(callMock).toHaveBeenCalledTimes(1);
   });
 
+  it('says a committed change is saved when the server could not read it back, and reloads', async () => {
+    callMock
+      .mockResolvedValueOnce(state())
+      .mockResolvedValueOnce(PREVIEW)
+      .mockResolvedValueOnce({ schedule: 'speakers', state: 'on', refreshError: 'The change is saved, but the schedule could not be read again. Reload the page.' })
+      .mockResolvedValueOnce(state({ state: 'on' }));
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve and turn on' }));
+    expect(await screen.findByText('The change is saved, but the schedule could not be read again. Reload the page.')).toHaveAttribute('role', 'status');
+    await waitFor(() => expect(screen.getByTestId('schedule-state')).toHaveTextContent('Scheduled speaker reminders are on.'));
+    expect(callMock).toHaveBeenLastCalledWith('reminderSchedules', { action: 'get', schedule: 'speakers' });
+  });
+
   it('states a server refusal in the result', async () => {
     callMock
       .mockResolvedValueOnce(state())
@@ -198,5 +212,7 @@ describe('reminderSchedules helpers', () => {
     expect(lastRunWords({ finishedAt: '2026-11-13T15:31:00.000Z', outcome: 'completed', offsetDays: 7, counts: { sent: 2, waiting: 1 } }, ZONE))
       .toMatch(/^Last run Friday, November 13, 2026 at 10:31 AM Eastern Standard Time \(UTC.05:00\), America\/New_York: the 7-day reminder: sent 2 reminders, 1 speaker waited on the 24-hour limit\.$/);
     expect(lastRunWords({ finishedAt: '2026-11-13T15:31:00.000Z', outcome: 'nothing-due', counts: {} }, ZONE)).toMatch(/nothing was due\.$/);
+    expect(lastRunWords({ finishedAt: '2026-11-14T01:00:30.000Z', outcome: 'completed', reason: 'quiet-hours', offsetDays: 7, counts: { sent: 1, deferred: 1 } }, ZONE))
+      .toMatch(/sent 1 reminder, quiet hours began, so 1 speaker waits for the next run\.$/);
   });
 });

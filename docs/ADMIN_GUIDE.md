@@ -343,7 +343,7 @@ Select **Save settings** to store them.
 
 **Who gets a reminder.** Each accepted speaker with an email address who still owes one of the chosen items. The rule is the same as on the Speaker reminders page. Each message names only the chosen items that speaker still owes, and says the due date. A speaker who finishes gets no more reminders.
 
-**When.** A reminder for 7 days goes 7 calendar days before the due date, at the send time. Across a daylight saving change it still goes at the send time on the clock people read. The site checks once an hour. If a check is missed, the next one sends the reminder, until the next reminder day starts. Then the earlier reminder is dropped, so nobody gets the 14-day reminder 3 days before. Nothing sends from 8:00 PM to 8:00 AM on the event's clock; a reminder due then waits for 8:00 AM.
+**When.** A reminder for 7 days goes 7 calendar days before the due date, at the send time. Across a daylight saving change it still goes at the send time on the clock people read. The site checks once an hour. If a check is missed, the next one sends the reminder, until the next reminder day starts. Then the earlier reminder is dropped, so nobody gets the 14-day reminder 3 days before. Nothing sends from 8:00 PM to 8:00 AM on the event's clock; a reminder due then waits for 8:00 AM. A check that reaches 8:00 PM part way stops, and the rest of the speakers get the reminder the next morning.
 
 **At most one per reminder day, and one in 24 hours.** A speaker gets each reminder day's message once. The 24-hour limit of the Speaker reminders page applies in both directions: A speaker reminded by hand in the last 24 hours waits until the 24 hours end, and a scheduled reminder stops a reminder by hand for 24 hours. A message the email provider may have accepted counts as sent and is not sent again. Check the Email log.
 
@@ -359,7 +359,7 @@ A paused schedule sends nothing. Preview, then approve to turn it on again. When
 
 **Next run.** The panel says when the next reminder goes, with the time zone named, which reminder day it is, and who it would reach. It names the speakers who wait on the 24-hour limit, and when they can get one. It also says what the last check did.
 
-**Turn off** stops the schedule. Nothing sends until you approve it again.
+**Turn off** stops the schedule. A check in progress stops before its next speaker. A pause or a settings change does the same. Nothing sends until you approve it again.
 
 The schedule does nothing on a historical demo, and nothing after the last event day. Every approval, settings save, pause, and turn-off writes an admin log entry. Each check that emails anyone writes one admin log entry that names the speakers.
 

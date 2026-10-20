@@ -188,6 +188,14 @@ function SpeakerSchedule({ call }) {
     setBusy(kind);
     try {
       const next = await call('reminderSchedules', { schedule: 'speakers', ...body });
+      if (next?.refreshError) {
+        // The change is stored; only the read after it failed. Say so, and
+        // read the schedule again.
+        setPreview(null);
+        show('caution', next.refreshError);
+        await load();
+        return;
+      }
       onDone(next);
     } catch (err) {
       show('error', err.message);

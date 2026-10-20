@@ -62,6 +62,10 @@ export function lastRunWords(lastRun, timeZone) {
       if (counts.failed) parts.push(`${counts.failed} could not be emailed`);
       if (counts.uncertain) parts.push(`${counts.uncertain} may have gone (check the Email log)`);
       if (counts.waiting) parts.push(`${speakerWord(counts.waiting)} waited on the 24-hour limit`);
+      const left = counts.deferred ?? 0;
+      if (lastRun.reason === 'quiet-hours') parts.push(`quiet hours began, so ${speakerWord(left)} ${left === 1 ? 'waits' : 'wait'} for the next run`);
+      if (lastRun.reason === 'schedule-changed') parts.push(`the schedule changed during the run, so it stopped before ${speakerWord(left)}`);
+      if (lastRun.reason === 'window-closed') parts.push(`the reminder day ended during the run, before ${speakerWord(left)}`);
       what = `${lastRun.offsetDays ? `the ${lastRun.offsetDays}-day reminder: ` : ''}${parts.join(', ')}`;
       break;
     }
