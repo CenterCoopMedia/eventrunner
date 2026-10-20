@@ -76,7 +76,7 @@ test('collectAdvisoryUrls walks string-linked via chains to the leaf advisory ob
 
 test('isExcepted requires a production-exposure entry naming the same advisory URL', () => {
   const exceptions = [
-    { package: 'pkg', exposure: 'production', advisories: ['https://github.com/advisories/GHSA-a'] },
+    { package: 'pkg', exposure: 'production', severity: 'critical', advisories: ['https://github.com/advisories/GHSA-a'] },
   ];
   assert.equal(isExcepted('pkg', ['https://github.com/advisories/GHSA-a'], exceptions), true);
   assert.equal(isExcepted('pkg', ['https://github.com/advisories/GHSA-b'], exceptions), false);
@@ -217,6 +217,36 @@ test('a moderate advisory alongside a reviewed critical one does not itself gate
     runAuditFn: () => maskingReport(),
   });
   assert.deepEqual(failures, []);
+});
+
+// An exception covers an advisory only at the severity a reviewer accepted.
+// If the advisory is later reclassified above that, the gate fails again.
+test('an exception recorded at a lower severity does not waive a reclassified advisory', () => {
+  const dir = tempDir();
+  const exceptionsPath = writeExceptions(dir, [
+    exceptionFor(['https://github.com/advisories/GHSA-high-1111-1111'], 'low'),
+  ]);
+  const { failures } = checkAuditPolicy({
+    exceptionsPath,
+    targets: ['.'],
+    runAuditFn: () => highReport(),
+  });
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].severity, 'high');
+});
+
+test('isExcepted matches only when the recorded severity is at least the reported one', () => {
+  const url = 'https://github.com/advisories/GHSA-a';
+  const at = (severity) => [{ package: 'pkg', exposure: 'production', severity, advisories: [url] }];
+  assert.equal(isExcepted('pkg', [{ url, severity: 'high' }], at('moderate')), false);
+  assert.equal(isExcepted('pkg', [{ url, severity: 'high' }], at('high')), true);
+  assert.equal(isExcepted('pkg', [{ url, severity: 'high' }], at('critical')), true);
+  assert.equal(isExcepted('pkg', [{ url, severity: 'critical' }], at('high')), false);
+  // An entry with no recorded severity covers nothing.
+  assert.equal(isExcepted('pkg', [{ url, severity: 'high' }], at(undefined)), false);
+  // An advisory with no reported severity is held to critical.
+  assert.equal(isExcepted('pkg', [url], at('high')), false);
+  assert.equal(isExcepted('pkg', [url], at('critical')), true);
 });
 
 test('a finding with no advisory to match fails closed', () => {
