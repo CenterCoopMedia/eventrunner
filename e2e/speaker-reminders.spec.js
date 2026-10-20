@@ -5,8 +5,12 @@
 // speaker's inbox must hold exactly one reminder, with the body the preview
 // showed, and the page must show when the speaker was last reminded.
 //
-// The speaker owns no session, so no public count or schedule changes; the
-// speaker, its reminder record and the staff grant are removed at the end.
+// The first test's speaker owns no session. The second test gives the
+// speaker one published session for the length of the test, marks it in the
+// session editor as needing no materials, and checks the reminder page drops
+// the speaker from the "Materials missing" group (issue #332). The speaker,
+// the session, its draft, the reminder record and the staff grant are
+// removed at the end.
 import fs from 'node:fs';
 import { test, expect } from '@playwright/test';
 import { MAIL_FILE, adminDb, mailFileSize, signIn } from './helpers.mjs';
@@ -38,6 +42,8 @@ test.describe.serial('Speaker reminders', () => {
   const speakerId = `e2e-remind-${stamp}`;
   const speakerEmail = `e2e-remind-${stamp}@example.test`;
   const speakerName = `Remi Nder${stamp}`;
+  const sessionId = `e2e-remind-session-${stamp}`;
+  const sessionTitle = `Fireside chat ${stamp}`;
   let seededBootstrap;
 
   test.beforeAll(async () => {
@@ -57,6 +63,8 @@ test.describe.serial('Speaker reminders', () => {
 
   test.afterAll(async () => {
     const db = adminDb();
+    await db.collection('cmsSchedule').doc(sessionId).delete();
+    await db.collection('cmsSchedule_drafts').doc(sessionId).delete();
     await db.collection('speakers').doc(speakerId).delete();
     await db.collection('speaker_reminders').doc(speakerId).delete();
     if (seededBootstrap) await db.collection('config').doc('bootstrap').set(seededBootstrap);
@@ -105,5 +113,46 @@ test.describe.serial('Speaker reminders', () => {
     // Nothing more reached the inbox.
     await page.waitForTimeout(1000);
     expect(remindersSince(since, speakerEmail)).toHaveLength(1);
+  });
+
+  test('a session marked in the editor as needing no materials leaves its speaker out of the materials group', async ({ page }) => {
+    await adminDb().collection('cmsSchedule').doc(sessionId).set({
+      title: sessionTitle,
+      description: 'A conversation with no slides.',
+      dayId: 'day-1',
+      startTime: '10:00',
+      endTime: '11:00',
+      visible: true,
+      speakerIds: [speakerId],
+      revision: 1,
+    });
+
+    await signIn(page, STAFF_EMAIL);
+    await page.goto('/admin/speakers/reminders/send?show=materials');
+    const box = page.getByRole('checkbox', { name: speakerName });
+    await expect(box).toBeVisible();
+    const row = page.getByRole('listitem').filter({ has: box });
+    await expect(row).toContainText(`Materials (${sessionTitle})`);
+
+    await page.goto(`/admin/sessions/${encodeURIComponent(sessionId)}`);
+    const mark = page.getByLabel('This session needs no slides or other materials');
+    await expect(page.getByLabel('Public title')).toHaveValue(sessionTitle);
+    await expect(mark).not.toBeChecked();
+    await mark.check();
+    await page.getByRole('button', { name: 'Save and publish' }).click();
+    await expect.poll(async () => (await adminDb().collection('cmsSchedule').doc(sessionId).get()).data()?.materialsNotNeeded)
+      .toBe(true);
+
+    await page.goto('/admin/speakers/reminders/send?show=materials');
+    await expect(page.getByLabel('Show')).toHaveValue('materials');
+    // The list has loaded (or is empty) before the speaker's absence counts.
+    await expect(page.getByRole('list', { name: 'Accepted speakers' })
+      .or(page.getByRole('heading', { name: 'No speaker matches' }))).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: speakerName })).toHaveCount(0);
+    // Under "Anything missing" the speaker is still listed for the profile
+    // items, and materials are no longer named.
+    await page.goto('/admin/speakers/reminders/send?show=any');
+    const again = page.getByRole('listitem').filter({ has: page.getByRole('checkbox', { name: speakerName }) });
+    await expect(again).toContainText('Missing: Biography, Headshot.');
   });
 });

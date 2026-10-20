@@ -28,6 +28,7 @@ import { saveTextFile } from '../downloadFile.js';
 import {
   REMINDER_GROUPS,
   describeMissing,
+  describePending,
   formatWhen,
   itemLabels,
   newBatchId,
@@ -153,6 +154,7 @@ function PreviewPanel({ preview, onSend }) {
 }
 
 function SpeakerRow({ row, checked, onToggle, timeZone }) {
+  const pending = describePending(row.readiness);
   const last = row.lastRemindedAt
     ? `Last reminded ${formatWhen(row.lastRemindedAt, timeZone)}${row.lastRemindedItems.length ? ` about ${itemLabels(row.lastRemindedItems)}` : ''}.`
     : 'Not reminded yet.';
@@ -172,6 +174,9 @@ function SpeakerRow({ row, checked, onToggle, timeZone }) {
           </Link>
         </div>
         <p className="wrap-anywhere ps-lg text-admin-sm text-admin-ink">Missing: {describeMissing(row.readiness)}.</p>
+        {pending ? (
+          <p className="wrap-anywhere ps-lg text-admin-sm text-admin-ink">Waiting for review: {pending}.</p>
+        ) : null}
         <p className={`ps-lg ${rowMetaClass}`} data-testid={`last-reminded-${row.id}`}>
           {last}
           {row.canRemindAfter ? ` Can be reminded again after ${formatWhen(row.canRemindAfter, timeZone)}.` : ''}
@@ -471,7 +476,7 @@ export default function AdminSpeakerReminders() {
         <Notice tone="caution" message={`The list did not refresh: ${list.error}`} />
       ) : null}
 
-      <Panel title="Choose speakers" description="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not.">
+      <Panel title="Choose speakers" description="The list shows speakers who accepted an invitation. Published sessions count. A pending or approved material counts, and a rejected one does not. A pending material also shows as waiting for review. A session marked as needing no materials never asks for them.">
         {list.status === 'loading' ? (
           <AdminLoadingState label="Loading speakers…" />
         ) : list.status === 'error' ? (

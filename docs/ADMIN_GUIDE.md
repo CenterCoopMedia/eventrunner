@@ -165,6 +165,8 @@ The schedule itself: Create, edit, publish, and delete a session. Saving writes 
 
 **Recording link.** One optional field on a session, in the **Public session** panel. Enter the address where attendees can watch the session afterwards. The link must start with `http://` or `https://`; the editor and the server both refuse anything else, so a session cannot store an address a reader's browser would treat as a script. Leave the field empty until the recording is public. A session with a recording link shows **Watch the recording** on its schedule row and on its session page, and the link opens in a new tab. A session with no link shows nothing at all, so an empty field does not promise a recording later. The link stays on the page after the event, when a past day becomes a back issue and the live controls come off.
 
+**No slides or other materials.** Some sessions need no slides, for example a conversation or a break-out. Tick **This session needs no slides or other materials** in the **Speaker materials** panel, then publish. Speakers on that session are not asked for materials. Their **Your next steps** list leaves it out, reminders do not name it, and **Materials missing** and the Materials **Coverage** panel leave it out too. A speaker whose sessions all carry the mark owes no materials. A speaker on another session that needs materials still owes materials for that session. Speakers can still send materials for a marked session. The box is clear on a new session. The mark does not change the session description: a marked session without a description is still listed under **Session description missing**.
+
 ## Organizations
 
 The organizations the Sponsors page draws: Add, edit, publish, and delete them here, without a script. Saving writes a draft, and publishing sends it to the Sponsors page and to the home page's logo wall.
@@ -320,11 +322,13 @@ Email accepted speakers about the items they still owe. Select **Send reminders*
 
 - **Biography** and **Headshot**: The field is empty. A change the speaker sent for review counts as done.
 - **Session description**: A published session the speaker is on has no description text.
-- **Materials**: A published session the speaker is on has no pending or approved material. A rejected material does not count.
+- **Materials**: A published session the speaker is on has no pending or approved material. A rejected material does not count. A session marked as needing no slides or other materials never counts (see **Sessions**).
 
 Only published sessions that are not hidden count. Only speakers who accepted an invitation are listed. A speaker who is not invited yet, or whose invitation is still open, gets the invitation instead.
 
-**Choose speakers.** **Show** narrows the list: **Anything missing** (the default), one item, or **Every accepted speaker**. The choice stays in the page address. Each row names the missing items with the session titles, and says when the speaker was last reminded and about what. Tick one speaker, or select **Select all shown**. A change to **Show** clears the selection. **Items to include** picks the items a reminder may name. Each speaker's message names only the chosen items that speaker still owes.
+**Materials waiting for review.** A pending material counts as sent, because the speaker has done their part. Staff have not approved it yet, so the page also lists it apart. A session with a pending material and no approved material shows on the speaker's row as **Waiting for review**. One approved material ends the wait. A session marked as needing no materials is never missing them, but an upload to it is still listed here until staff review it. No reminder names it.
+
+**Choose speakers.** **Show** narrows the list: **Anything missing** (the default), one item, **Materials waiting for review**, or **Every accepted speaker**. The choice stays in the page address. Each row names the missing items with the session titles, and says when the speaker was last reminded and about what. Tick one speaker, or select **Select all shown**. A change to **Show** clears the selection. **Items to include** picks the items a reminder may name. Each speaker's message names only the chosen items that speaker still owes.
 
 **Preview.** **Preview reminders** shows the message each speaker gets: the address, the subject, the HTML version in a safe frame, and the plain text version. Choose a speaker under **Recipient** to read their copy. The preview also names each selected speaker who gets no reminder and why: No email address, nothing missing in the chosen items, a reminder in the last 24 hours, or no accepted invitation. A change to the selection or the items clears the preview.
 
@@ -343,7 +347,7 @@ Every reminder goes through the event's email provider and appears in the Email 
 
 Saving or resetting the wording pauses scheduled reminders until you approve them again (see **Scheduled reminders** below). The panel says so above **Save wording**.
 
-**Export this list as CSV** saves the speakers the current **Show** choice lists, one row per speaker, with the name, the email address, the status, the missing items, the session titles, and the last reminder. Use it with your own mailing tool. A cell that starts like a spreadsheet formula is escaped. Each export writes an admin log entry first. If that entry cannot be written, no file is made.
+**Export this list as CSV** saves the speakers the current **Show** choice lists, one row per speaker, with the name, the email address, the status, the missing items, the sessions without a description, the sessions without materials, the sessions with materials waiting for review, and the last reminder. Use it with your own mailing tool. A cell that starts like a spreadsheet formula is escaped. Each export writes an admin log entry first. If that entry cannot be written, no file is made.
 
 ### Scheduled reminders
 
@@ -627,7 +631,7 @@ If the file or the mapping changes after the preview, the import is refused. Pre
 | Record type | Template header row |
 |---|---|
 | Speakers | `external_id,first_name,last_name,slug,email,organization,job_title,bio` |
-| Sessions | `external_id,title,description,day,start_time,end_time,track,place,location,recording_url,speakers,session_id` |
+| Sessions | `external_id,title,description,day,start_time,end_time,track,place,location,recording_url,materials_not_needed,speakers,session_id` |
 | Organizations | `external_id,name,slug,tier,website,description,order` |
 
 **Speaker columns.** `first_name` and `last_name` are required. If the file has one name column, map it to **Full name** instead. The first word becomes the first name. `slug` is the speaker's page address. Leave it empty and the import makes it from the name. A name change does not change the slug; change the `slug` cell to change it. A new slug that another speaker uses is an error. The import does not change the email address of a speaker who has an open invitation. Change it in the speaker editor.
@@ -638,6 +642,7 @@ If the file or the mapping changes after the preview, the import is refused. Pre
 - `start_time`, `end_time`: 24-hour (`13:30`) or 12-hour (`1:30 PM`).
 - `track`: the track letter or the track name.
 - `place`: the place ID or the place name.
+- `materials_not_needed`: `yes` when the session needs no slides or other materials. `no` or an empty cell means the session needs them. `y`, `n`, `true`, `false`, `1` and `0` also work. Any other value is an error.
 - `speakers`: speaker external IDs from a speaker import, or speaker slugs, separated by `;`. A speaker that does not exist, or that was removed, is an error.
 - `session_id`: the session's address on the site, for new sessions only. Leave it empty and the import makes it from the title. A `session_id` that an existing session uses matches that session.
 
@@ -749,7 +754,7 @@ Session materials review — upload or link files against a session, with an opt
 
 **Every archive is recorded.** The server writes one admin log entry per file in the archive, with your address, before it sends the first byte. If those entries cannot be written, the server refuses the archive. A single-file download writes no entry.
 
-**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures. The panel also counts hidden sessions and speakers who have not accepted an invitation. **Speaker reminders** counts neither, so a speaker the panel names can be absent from **Materials missing** there.
+**Coverage.** The **Coverage** panel names the sessions with no materials and the speakers with no materials on any of their sessions. A pending or approved material counts; a rejected one does not. A session marked as needing no slides or other materials is left out. A session counts only when its published record names at least one speaker who is not removed, so a session with no speaker is left out. A speaker added in an unpublished draft does not count until the session is published. The panel reads the same list as the table, before any filter, and states when it read it. When the list passes 2,000 materials, the panel says so and shows no figures. The panel also counts hidden sessions and speakers who have not accepted an invitation. **Speaker reminders** counts neither, so a speaker the panel names can be absent from **Materials missing** there.
 
 ## Version history
 
@@ -772,7 +777,7 @@ The event's records as spreadsheets, and the event data package for the handoff 
 
 | Spreadsheet | Tier | Columns |
 |---|---|---|
-| Sessions | Staff | Session ID, title, state, hidden, day, date, start and end time, time zone, type, track, location, speakers, speaker IDs, the session it is part of, description, number of materials |
+| Sessions | Staff | Session ID, title, state, hidden, day, date, start and end time, time zone, type, track, location, speakers, speaker IDs, the session it is part of, description, number of materials, no materials needed (yes or no) |
 | Speakers | Staff | Speaker ID, first and last name, email, organization, role, status, published sessions (live and not hidden), social handles, bio, headshot path in Storage |
 | Organizations and sponsors | Staff | Organization ID, name, state, hidden, tier, website, description, support description, logo path, order |
 | Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |

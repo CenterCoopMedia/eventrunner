@@ -64,4 +64,18 @@ describe('speaker completion requirements', () => {
     }]);
     expect(result.total - result.completed).toBe(result.outstanding.length);
   });
+
+  it('asks for no materials for a session that needs none, and still asks for the others', () => {
+    const result = speakerCompletion({
+      speaker,
+      sessions: [
+        { id: 'chat', title: 'Fireside chat', materialsNotNeeded: true },
+        { id: 'talk', title: 'Data talk' },
+      ],
+      materialsBySession: {},
+    });
+
+    expect(result.total).toBe(3);
+    expect(result.outstanding.map((item) => item.id)).toEqual(['materials:talk']);
+  });
 });

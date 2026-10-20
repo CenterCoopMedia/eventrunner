@@ -422,3 +422,21 @@ test('a run stops before its next speaker at the deadline, and the next run reac
   const next = await run(db, IN_7D + HOUR, { sendEmail: outbox().sendEmail });
   assert.deepEqual(next.sent, ['dee']);
 });
+
+test('a scheduled run uses the same readiness rule: a session that needs no materials asks for none', async () => {
+  const complete = { lastName: 'Example', status: 'accepted', bio: 'Bio.', headshotPath: 'speakers/x.jpg' };
+  const db = seed({
+    'speakers/ben': { ...complete, firstName: 'Ben', email: 'ben@example.test' },
+    'speakers/dee': { ...complete, firstName: 'Dee', email: 'dee@example.test' },
+    // Ben and Dee share a chat that needs no materials; Dee also gives a talk.
+    'cmsSchedule/chat': { title: 'Fireside chat', description: 'Text.', visible: true, speakerIds: ['ben', 'dee'], materialsNotNeeded: true },
+    'cmsSchedule/talk': { title: 'Data talk', description: 'Text.', visible: true, speakerIds: ['dee'] },
+  }, { scheduleOverrides: { topics: ['materials'] } });
+  const mail = outbox();
+  const result = await run(db, IN_7D, mail);
+  assert.equal(result.outcome, 'completed');
+  assert.deepEqual(result.sent, ['dee']);
+  assert.equal(mail.sent.length, 1);
+  assert.match(mail.sent[0].text, /materials for: Data talk\./);
+  assert.doesNotMatch(mail.sent[0].text, /Fireside chat/);
+});

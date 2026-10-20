@@ -37,6 +37,13 @@ describe('record import vocabulary', () => {
     }
   });
 
+  it('the sessions template carries the no-materials column with a yes or no example', () => {
+    const sessions = importTypeById('sessions');
+    const field = sessions.fields.find((f) => f.id === 'materialsNotNeeded');
+    expect(field).toMatchObject({ header: 'materials_not_needed', label: 'Needs no slides or other materials (yes or no)', example: 'no' });
+    expect(templateCsv(sessions).split('\n')[0]).toContain('materials_not_needed');
+  });
+
   it('guesses from labels and ids without case or punctuation, and uses a header once', () => {
     const type = importTypeById('speakers');
     expect(guessMapping(['External ID', 'First Name', 'LAST_NAME', 'E-mail', 'Job title'], type)).toEqual({

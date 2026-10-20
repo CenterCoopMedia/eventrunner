@@ -51,6 +51,13 @@
  *             the link when the recording is public, and a session with no
  *             link says nothing.
  *
+ *   materialsNotNeeded  true when the session's speakers send no slides or
+ *             other materials (a conversation, a break). Staff set it in the
+ *             session editor. shared/speakerReadiness then leaves the
+ *             session out of the materials a speaker owes (issue #332).
+ *             true, false or absent; nothing else, so a typed "yes" or a 1
+ *             never reads as a mark the readiness rule ignores.
+ *
  * WALKING MINUTES ARE STILL NOT HERE, and now there is somewhere they are.
  * "Transfer to Line B · Hall 2 · 6 min walk" (brief §4.6) is a fact about a
  * PAIR of rooms in a building, not about a session, and a per-session
@@ -223,6 +230,11 @@ function validateSessionShape(fields, docId) {
         `got ${JSON.stringify(recordingUrl)}`,
       );
     }
+  }
+
+  const materialsNotNeeded = fields?.materialsNotNeeded;
+  if (materialsNotNeeded !== undefined && materialsNotNeeded !== null && typeof materialsNotNeeded !== 'boolean') {
+    errors.push(`materialsNotNeeded: must be true or false, got ${JSON.stringify(materialsNotNeeded)}`);
   }
 
   const parentId = fields?.parentId;

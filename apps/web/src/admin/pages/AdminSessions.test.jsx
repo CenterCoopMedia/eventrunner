@@ -105,11 +105,12 @@ describe('admin Sessions workspace', () => {
     const form = screen.getByLabelText('Public title').closest('form');
     const layout = form.querySelector('.admin-editor-layout--session');
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
-      .toEqual(['Public session', 'Time and structure', 'Location', 'Publishing']);
+      .toEqual(['Public session', 'Time and structure', 'Location', 'Speaker materials', 'Publishing']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
       'Public title', 'Public description', 'Recording link',
       'Event day', 'Parent session', 'Start time', 'End time', 'Track',
-      'Recorded place', 'Public location text', 'Show this session when it is published',
+      'Recorded place', 'Public location text', 'This session needs no slides or other materials',
+      'Show this session when it is published',
     ]);
     const location = within(layout).getByRole('heading', { name: 'Location' }).closest('section');
     expect(within(location).getByLabelText('Recorded place')).toBeInTheDocument();
@@ -130,6 +131,7 @@ describe('admin Sessions workspace', () => {
       startTime: '09:15', endTime: '10:00', track: 'A', placeId: 'hall',
       location: 'Main hall, level 1', parentId: 'opening',
       recordingUrl: 'https://example.org/recording',
+      materialsNotNeeded: true,
     };
     pushSessions([], [
       { id: 'opening', dayId: 'day-1', title: 'Opening', status: 'dirty' },
@@ -139,6 +141,7 @@ describe('admin Sessions workspace', () => {
     expect(screen.getByLabelText('Parent session')).toHaveValue('opening');
     expect(screen.getByLabelText('Recorded place')).toHaveValue('hall');
     expect(screen.getByLabelText('Show this session when it is published')).not.toBeChecked();
+    expect(screen.getByLabelText('This session needs no slides or other materials')).toBeChecked();
     fetch.mockResolvedValueOnce(response({ docId: 'panel', status: 'dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -267,6 +270,25 @@ describe('admin Sessions workspace', () => {
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(bodyOf(1).docId).toBe('opening-session');
     expect(bodyOf(1).fields.title).toBe('Welcome remarks');
+  });
+
+  it('sends the no-materials mark the staff member sets', async () => {
+    await renderAt('/admin/sessions/new/session');
+    await screen.findByRole('heading', { name: 'New session' });
+    fireEvent.change(screen.getByLabelText('Public title'), { target: { value: 'Fireside chat' } });
+    fireEvent.change(screen.getByLabelText('Public description'), { target: { value: 'A conversation.' } });
+    fireEvent.change(screen.getByLabelText('Event day'), { target: { value: 'day-1' } });
+    fireEvent.change(screen.getByLabelText('Start time'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('End time'), { target: { value: '10:00' } });
+    const mark = screen.getByLabelText('This session needs no slides or other materials');
+    expect(mark).not.toBeChecked();
+    expect(screen.getByText(/Speakers on this session are not asked for materials/)).toBeInTheDocument();
+
+    fireEvent.click(mark);
+    fetch.mockResolvedValueOnce(response({ docId: 'fireside-chat', status: 'dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).fields.materialsNotNeeded).toBe(true);
   });
 
   it('sends the recording link, and refuses an unsafe one before it reaches the server', async () => {

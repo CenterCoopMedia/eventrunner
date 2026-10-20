@@ -91,6 +91,7 @@ describe('session document helpers', () => {
     })).toEqual({
       title: 'Session', description: '', dayId: 'day-1', startTime: '09:00', endTime: '10:00',
       track: null, placeId: null, location: null, parentId: null, recordingUrl: null,
+      materialsNotNeeded: null,
     });
   });
 
@@ -100,6 +101,14 @@ describe('session document helpers', () => {
     const renamed = lockSessionId({ ...first, title: 'Welcome remarks' }, []);
     expect(renamed.id).toBe('opening-session');
     expect(lockSessionId({ id: '', title: 'Mine' }, []).id).toBe('mine-2');
+  });
+
+  it('sends the no-materials mark as true, or null to clear it, never anything else', () => {
+    const base = { title: 'Session', description: '', dayId: 'day-1', startTime: '09:00', endTime: '10:00' };
+    expect(sessionFields({ ...base, materialsNotNeeded: true }).materialsNotNeeded).toBe(true);
+    expect(sessionFields({ ...base, materialsNotNeeded: 'yes' }).materialsNotNeeded).toBeNull();
+    expect(sessionFields({ ...base, materialsNotNeeded: false }).materialsNotNeeded).toBeNull();
+    expect(sessionFields(base).materialsNotNeeded).toBeNull();
   });
 
   it('trims a recording link and sends it as it was typed', () => {

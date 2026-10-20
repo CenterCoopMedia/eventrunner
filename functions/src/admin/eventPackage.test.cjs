@@ -220,6 +220,8 @@ test('records: no file holds a draft; a hidden live record is in, and marked hid
   assert.equal(sessions[2].title, 'Data panel');
   assert.deepEqual(sessions.map((s) => s.visible), [false, true, true]);
   assert.equal(Object.hasOwn(sessions[1], 'publishedBy'), false);
+  // Every session states the no-materials mark, set or not (#332).
+  assert.deepEqual(sessions.map((s) => s.materialsNotNeeded), [false, false, false]);
   const csv = files.get('program/sessions.csv').toString('utf8');
   assert.ok(csv.startsWith('\uFEFF'));
   assert.match(csv, /"'=HYPERLINK\(""http:\/\/example.test"",""Keynote""\)"/);

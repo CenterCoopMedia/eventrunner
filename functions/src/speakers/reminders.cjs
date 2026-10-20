@@ -15,7 +15,8 @@
  *                  preview showed (`confirmCount`), its `receipt` and a
  *                  `batchId`
  *   export         the readiness list as CSV for the organizer's own mail
- *                  tool (issue #332); written to admin_logs before it leaves
+ *                  tool (issue #332); written to admin_logs before it leaves.
+ *                  One group lists materials waiting for staff review
  *   template       the shipped and the saved reminder wording
  *   saveTemplate   save new wording, checked against the template's tokens
  *   resetTemplate  delete the saved wording; the shipped copy applies again
@@ -114,8 +115,12 @@ const MAX_TEMPLATE_FIELD_LENGTH = 100 * 1024;
 const BATCH_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const RECEIPT_RE = /^[0-9a-f]{64}$/;
 
-/** Export groups: which speakers a file holds. */
-const EXPORT_GROUPS = Object.freeze(['any', 'all', ...READINESS_ITEMS]);
+/**
+ * Export groups: which speakers a file holds. `materialsPending` is the
+ * speakers with a session whose materials wait for staff review (sent, not
+ * yet approved). It is not a readiness item: no reminder asks for it.
+ */
+const EXPORT_GROUPS = Object.freeze(['any', 'all', ...READINESS_ITEMS, 'materialsPending']);
 
 const REQUEST_ACTIONS = Object.freeze([
   'list', 'preview', 'send', 'export', 'template', 'saveTemplate', 'resetTemplate',
@@ -298,7 +303,8 @@ async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
 }
 
 const CSV_HEADERS = Object.freeze([
-  'Name', 'Email', 'Status', 'Missing', 'Sessions without a description', 'Sessions without materials', 'Last reminded',
+  'Name', 'Email', 'Status', 'Missing', 'Sessions without a description', 'Sessions without materials',
+  'Sessions with materials waiting for review', 'Last reminded',
 ]);
 
 function csvForRows(rows, stores) {
@@ -313,6 +319,7 @@ function csvForRows(rows, stores) {
       row.readiness.missing.map((item) => READINESS_ITEM_LABELS[item]).join('; '),
       row.readiness.descriptionSessions.map((session) => session.title).join('; '),
       row.readiness.materialsSessions.map((session) => session.title).join('; '),
+      (row.readiness.pendingMaterialsSessions ?? []).map((session) => session.title).join('; '),
       row.lastRemindedAt ?? '',
     ].map(escapeCell).join(','));
   }
@@ -329,6 +336,7 @@ async function exportAction({ db, now, actor, body }) {
     .filter((row) => {
       if (group === 'all') return true;
       if (group === 'any') return row.readiness.missing.length > 0;
+      if (group === 'materialsPending') return row.readiness.pendingMaterialsSessions.length > 0;
       return row.readiness.missing.includes(group);
     })
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));

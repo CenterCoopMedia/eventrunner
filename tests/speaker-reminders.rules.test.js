@@ -465,4 +465,62 @@ describe('readiness export', () => {
     expect((await call({ action: 'export', group: 'other' })).statusCode).toBe(400);
     expect((await call({ action: 'export', group: 'any' }, { token: 'stranger' })).statusCode).toBe(403);
   });
+  it('leaves co-speakers on a session that needs no materials out of the materials group, and reads every change', async () => {
+    // s1 is the shared panel (ada and ben). Ben also has s2, with a pending material.
+    await db.collection('cmsSchedule').doc('s1').update({ materialsNotNeeded: true });
+    let byId = Object.fromEntries((await call({ action: 'list' })).body.speakers.map((row) => [row.id, row]));
+    expect(byId.ada.readiness.missing).toEqual(['headshot']);
+    expect(byId.ada.readiness.materialsSessions).toEqual([]);
+    expect(byId.ben.readiness.missing).toEqual(['description']);
+    let res = await call({ action: 'export', group: 'materials' });
+    expect(res.body.rowCount).toBe(0);
+    // The schedule-wide preview agrees: nobody is reminded about materials.
+    res = await call({ action: 'preview', speakerIds: ['ada', 'ben'], topics: ['materials'] });
+    expect(res.body.recipients).toEqual([]);
+    expect(res.body.skipped.map((s) => s.reason)).toEqual(['nothing-missing', 'nothing-missing']);
+
+    // Mixed: ben's other session loses its only material, so ben owes
+    // materials for s2 alone, and the no-materials panel is never named.
+    await db.collection('session_materials').doc('m1').delete();
+    byId = Object.fromEntries((await call({ action: 'list' })).body.speakers.map((row) => [row.id, row]));
+    expect(byId.ben.readiness.materialsSessions).toEqual([{ id: 's2', title: 'Workshop' }]);
+    expect(byId.ada.readiness.materialsSessions).toEqual([]);
+    res = await call({ action: 'export', group: 'materials' });
+    expect(res.body.rowCount).toBe(1);
+    expect(res.body.csv).toContain('"Ben Ode","ben@example.test","approved","Session description; Materials","Workshop","Workshop",""');
+
+    // Staff clear the mark: both co-speakers owe materials for the panel again.
+    await db.collection('cmsSchedule').doc('s1').update({ materialsNotNeeded: false });
+    res = await call({ action: 'export', group: 'materials' });
+    expect(res.body.rowCount).toBe(2);
+  });
+
+  it('tells materials waiting for review apart from approved ones in the list and the file', async () => {
+    // Ben's s2 has one pending material; it counts as sent, but staff have not approved it.
+    let byId = Object.fromEntries((await call({ action: 'list' })).body.speakers.map((row) => [row.id, row]));
+    expect(byId.ben.readiness.pendingMaterialsSessions).toEqual([{ id: 's2', title: 'Workshop' }]);
+    expect(byId.ada.readiness.pendingMaterialsSessions).toEqual([]);
+
+    let res = await call({ action: 'export', group: 'materialsPending' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.rowCount).toBe(1);
+    expect(res.body.filename).toMatch(/^speaker-readiness-materialsPending-\d{4}-\d{2}-\d{2}\.csv$/);
+    const [header, row] = res.body.csv.trim().split('\r\n');
+    expect(header).toContain('"Sessions without materials","Sessions with materials waiting for review","Last reminded"');
+    expect(row).toContain('"Ben Ode","ben@example.test","approved","Session description; Materials","Workshop","Panel <one>","Workshop",""');
+    expect((await adminLogs('exportSpeakerReadiness'))[0].details).toEqual({ group: 'materialsPending', rowCount: 1 });
+
+    // Staff approve it: ben leaves the waiting group.
+    await db.collection('session_materials').doc('m1').update({ reviewStatus: 'approved' });
+    byId = Object.fromEntries((await call({ action: 'list' })).body.speakers.map((row) => [row.id, row]));
+    expect(byId.ben.readiness.pendingMaterialsSessions).toEqual([]);
+    res = await call({ action: 'export', group: 'materialsPending' });
+    expect(res.body.rowCount).toBe(0);
+
+    // A rejected material is neither sent nor waiting.
+    await db.collection('session_materials').doc('m1').update({ reviewStatus: 'rejected' });
+    byId = Object.fromEntries((await call({ action: 'list' })).body.speakers.map((row) => [row.id, row]));
+    expect(byId.ben.readiness.pendingMaterialsSessions).toEqual([]);
+    expect(byId.ben.readiness.materialsSessions.map((s) => s.id)).toEqual(['s1', 's2']);
+  });
 });
