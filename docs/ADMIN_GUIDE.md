@@ -295,6 +295,23 @@ The canonical speaker list, with each record's pipeline status and the entry poi
 
 One speaker record is the source of truth. If a name is wrong in three places on the public site, fix the speaker record — do not patch each place it appears.
 
+### Speaker email wording
+
+Change the words of two emails: the **Invitation** a speaker gets when you send or resend an invitation, and the **Acceptance confirmation** a speaker gets once, after they accept. Select **Edit email wording** at the top of the Speakers list. Staff and operators can use this page.
+
+Each message has its own panel with **Subject**, **HTML body**, and **Plain text body**. The panel says whether the shipped wording or saved wording is in use, and who saved it and when. It lists the tokens the message may use. Event tokens such as `{{event_name}}` also work. The links stay fixed:
+
+- The invitation's HTML body and plain text body must each keep `{{invite_url}}`, the private link that accepts the invitation.
+- The acceptance confirmation's two bodies must each keep `{{profile_wizard_url}}`, the link to the speaker's profile.
+
+**Save wording** checks the words on the server first. The server refuses a token the message does not know, a broken placeholder, an empty field, and a body without its link, and names the field. Nothing is saved, and the cursor moves to that field. The next invitation or acceptance email uses the saved wording; there is no delay.
+
+**Preview** shows the exact subject, the HTML version in a safe frame, the plain text version, and the HTML source, with the legal footer the email gets. It uses the words in the form, saved or not, and says which. Sample values fill the tokens: the name "Sample Speaker", your own address as the contact, and a sample link in place of the private one. A change to the words clears the preview. The preview says so if the event has no public site address, because the links then do not work.
+
+**Shipped wording** shows the wording that ships with the product. **Copy the shipped wording into the form** puts it in the form without saving it. **Use the shipped wording** deletes the saved wording, so every later email uses the shipped wording.
+
+If saved wording fails its check (for example, someone removed the link outside this page), speakers get the shipped wording and the panel says why. Each save and each reset writes an admin log entry. A historical demo refuses save and reset; the preview still works.
+
 ### Speaker reminders
 
 Email accepted speakers about the items they still owe. Select **Send reminders** at the top of the Speakers list, or **Remind** on the row of one accepted or approved speaker. Staff and operators can use this page.

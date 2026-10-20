@@ -47,6 +47,7 @@
     "cancelSpeakerInvite",
     "listSpeakerInvites",
     "speakerReminders",
+    "speakerMailTemplates",
     "validateSpeakerInvite",
     "acceptSpeakerInvite",
     "emailDeliveryWebhook",

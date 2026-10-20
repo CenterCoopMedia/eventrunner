@@ -157,6 +157,7 @@ describe('speakers list', () => {
     );
     expect(screen.queryByRole('link', { name: 'Remind Sam Example' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Send reminders' })).toHaveAttribute('href', '/admin/speakers/reminders/send');
+    expect(screen.getByRole('link', { name: 'Edit email wording' })).toHaveAttribute('href', '/admin/speakers/mail/wording');
   });
 
   it('offers an empty state with a way in when there are no speakers', async () => {

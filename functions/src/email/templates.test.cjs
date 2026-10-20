@@ -441,6 +441,65 @@ test('loadTemplate caches per id, not globally', async () => {
   assert.equal(db.reads['account.welcome'], 1);
 });
 
+for (const [id, requiredToken, defaultSubject, storeRendered] of [
+  ['speaker.invite', 'invite_url', 'You are invited to speak at Example Summit 2027', false],
+  ['speaker.accepted', 'profile_wizard_url', 'You are confirmed for Example Summit 2027', true],
+]) {
+  test(`${id} uses current saved copy on the next render without waiting for the cache`, async () => {
+    const db = makeFakeDb({});
+    const now = () => 5_000;
+    const tokenValues = {
+      speaker_name: 'Sample speaker',
+      [requiredToken]: 'https://example.test/next-step',
+    };
+    async function renderCurrent() {
+      const loaded = await loadTemplate({ db, id, now });
+      return render({ ...loaded, tokenValues, config: CONFIG });
+    }
+
+    assert.equal((await renderCurrent()).subject, defaultSubject);
+    for (const wording of ['Saved', 'Updated']) {
+      const override = {
+        subject: `${wording} {{event_name}}`,
+        html: `<p>${wording} {{speaker_name}}: {{${requiredToken}}}</p>`,
+        text: `${wording} {{speaker_name}}: {{${requiredToken}}}`,
+      };
+      assert.equal(validateOverridePayload(id, override).ok, true);
+      db.setDoc(id, override);
+      const out = await renderCurrent();
+      assert.equal(out.subject, `${wording} Example Summit 2027`);
+      assert.equal(out.html, `<p>${wording} Sample speaker: https://example.test/next-step</p>`);
+      assert.equal(out.text, `${wording} Sample speaker: https://example.test/next-step`);
+      assert.equal(out.usedFallback, false);
+      assert.equal(out.storeRendered, storeRendered);
+    }
+
+    db.setDoc(id, { subject: '{{unknown_token}}' });
+    const invalid = await renderCurrent();
+    assert.equal(invalid.usedFallback, true);
+    assert.equal(invalid.subject, defaultSubject);
+
+    db.setDoc(id, undefined);
+    const reset = await renderCurrent();
+    assert.equal(reset.subject, defaultSubject);
+    assert.equal(reset.usedFallback, false);
+  });
+}
+
+test('speaker.confirmation keeps its saved copy until the ordinary cache expires', async () => {
+  const id = 'speaker.confirmation';
+  const db = makeFakeDb({ [id]: { subject: 'Original confirmation' } });
+  let clock = 5_000;
+  const now = () => clock;
+  assert.equal((await loadTemplate({ db, id, now })).override.subject, 'Original confirmation');
+
+  db.setDoc(id, { subject: 'Updated confirmation' });
+  clock += internals.CACHE_TTL_MS - 1;
+  assert.equal((await loadTemplate({ db, id, now })).override.subject, 'Original confirmation');
+  clock += 1;
+  assert.equal((await loadTemplate({ db, id, now })).override.subject, 'Updated confirmation');
+});
+
 test('loadTemplate throws for an unknown id without touching the db', async () => {
   const db = makeFakeDb({});
   await assert.rejects(loadTemplate({ db, id: 'nope' }), /unknown template id/);
