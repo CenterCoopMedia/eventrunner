@@ -118,6 +118,18 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Invoices, part 1 (#208). Staff write and save sponsor invoice drafts under
+          <strong>Invoices</strong>. Choosing an organization fills the name to bill and, when its tier names a
+          sponsor package, the first line. The totals change as staff type, in a live region, and
+          the server computes them again in minor units on every save; a total below zero is
+          refused. A save over a newer revision is refused. A draft has no number. Numbers come
+          with issue in a later release. <strong>Invoice settings</strong> hold the issuer, tax ID, payment
+          instructions and number prefix; staff read them and only an operator changes them. The
+          <code>invoices</code>, <code>invoice_counters</code> and <code>invoice_settings</code> collections are server-only, every
+          write refuses on a read-only demo, and each write records an audit row. ADR 0001 §4.2 is
+          amended to restore invoicing.</li>
+          </ul>
+          <ul>
           <li>Live updates have a category and an audience: everyone, approved attendees and speakers,
           or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
           approved attendee cannot get or list a speaker-only entry, and the card&#39;s queries carry the

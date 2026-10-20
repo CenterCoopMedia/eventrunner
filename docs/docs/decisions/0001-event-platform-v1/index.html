@@ -1129,11 +1129,34 @@
           <p><code>posts</code>, <code>postReactions</code>, <code>reports</code>, <code>notifications</code>, <code>deleted_posts_audit</code> (social cut);
           <code>session_qa</code>, <code>session_qa_archive</code> and their message subcollections (chat cut);
           <code>broadcast_templates</code>, <code>broadcast_history</code>, <code>broadcast_queue</code>, <code>broadcast_drafts</code> (broadcast cut);
-          <code>invoices</code>, <code>invoiceDesignConfigs</code>, <code>sponsorPackages</code> (invoicing cut — sponsor tiers move into
-          <code>config/event</code> and <code>cmsOrganizations</code>); <code>renderedVideos</code> (video cut); <code>admin_requests</code> and its
+          <code>invoiceDesignConfigs</code>, <code>sponsorPackages</code> (sponsor tiers move into <code>config/event</code> and
+          <code>cmsOrganizations</code>; <code>invoices</code> was cut here and is restored by the amendment below);
+          <code>renderedVideos</code> (video cut); <code>admin_requests</code> and its
           <code>activity</code> subcollection (operator triage pipeline stays private); <code>session_material_urls</code>,
           <code>session_material_counts</code> (§4.4); <code>magic_links</code> as a link store (retained only as the OTP challenge
           store under a new name); <code>admin_settings</code> (split into <code>config/*</code>).</p>
+          <p><strong>Amendment, 2026-10-20: invoicing is restored.</strong> The owner reopened sponsor invoicing for v1
+          (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/208">#208</a>,
+          <a href="https://github.com/CenterCoopMedia/eventrunner/issues/209">#209</a>; the approved spec is the
+          2026-10-20 comment on #208). It comes back as three server-only collections, not as the old
+          design-config store:</p>
+          <ul>
+          <li><code>invoices/{inv_…}</code>: one invoice. A bill-to block, lines, hand-entered tax and discount rows,
+          totals in minor units, a status (<code>draft</code>, <code>issued</code>, <code>paid</code>, <code>void</code>) and a revision. The server
+          computes the totals again on every save. A draft has no number.</li>
+          <li><code>invoice_counters/current</code>: the number sequence. A number (<code>INV-0001</code>, with no gaps, per event
+          deployment) is assigned only when an invoice is issued, so a deleted draft leaves no gap.</li>
+          <li><code>invoice_settings/current</code>: the issuer address, tax ID, payment instructions, number prefix and
+          fallback currency. It is not part of <code>config/event</code>, because anyone can read that document and
+          these settings hold bank details.</li>
+          </ul>
+          <p>The rules deny every client read and write on all three, for both admin tiers. Staff create,
+          edit, issue, send and mark paid through the <code>invoiceAdmin</code> endpoint; only an operator voids,
+          reopens a paid invoice, or changes the settings. Each write refuses on a read-only demo and writes
+          its <code>admin_logs</code> row in the same transaction. <code>invoiceDesignConfigs</code> and <code>sponsorPackages</code> stay
+          cut: the sponsor package block and <code>cmsOrganizations</code> supply what an invoice starts from. A Stripe
+          pay link for an issued invoice needs its own amendment to ADR 0004
+          (<a href="https://github.com/CenterCoopMedia/eventrunner/issues/519">#519</a>).</p>
           <p><code>tickets/{externalId}</code> replaces the matched/unmatched pair with one document and a <code>claimedByUid</code>
           field. The current two-collection design forces a transactional cross-collection claim
           (<code>claimAttendeeSlot</code>, which must check the <em>other</em> collection to avoid double-creation) and a
@@ -2072,7 +2095,7 @@
           <tr><td>Travel / venue page</td><td><code>src/pages/Travel.jsx</code> (548 lines)</td><td><code>apps/web/src/pages/Travel.jsx</code> + <code>cmsPages/travel</code></td><td><strong>changed</strong> — every hardcoded Philadelphia fallback stripped (venue address <code>:29</code>, maps URL <code>:30</code>, Temple booking URL <code>:31</code>, the 4-hotel fixed array <code>:34-36</code>, the 3 SEPTA/PHL/parking transit cards <code>:260-368</code>, literal shuttle times <code>:216-238</code>, the named city-guide cross-link <code>:393</code>); fixed-arity groups become variable-length CMS lists; sections with no client content render nothing (§5.3)</td></tr>
           <tr><td><code>Local.jsx</code>, <code>CampusMap.jsx</code></td><td>~1,900 lines</td><td>—</td><td>not ported — city-guide and campus-map content is covered by the <code>travel_local</code> section of the travel page</td></tr>
           <tr><td>Video generator, Remotion, <code>imageProxy</code></td><td>~13,900 lines</td><td>—</td><td>not ported</td></tr>
-          <tr><td>Invoices</td><td>2,352 + backend</td><td>—</td><td>not ported</td></tr>
+          <tr><td>Invoices</td><td>2,352 + backend</td><td><code>apps/web/src/admin/pages/AdminInvoice*.jsx</code>, <code>functions/src/admin/invoices.cjs</code></td><td>rebuilt, not ported (§4.2 amendment)</td></tr>
           <tr><td>Airtable sync</td><td>4 exports + 6 scripts + <code>escapeAirtableFormula</code></td><td>—</td><td>not ported. <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0005-airtable-pitch-intake.md">ADR 0005</a> adds a read-only refresh for session pitch intake only</td></tr>
           <tr><td>Social layer</td><td><code>posts</code>, <code>onPostCreated</code>, <code>deletePostWithAudit</code>, notifications</td><td>—</td><td>not ported</td></tr>
           <tr><td>Speaker chat / Q&amp;A</td><td>5 exports + lifecycle hooks</td><td>—</td><td>not ported</td></tr>
