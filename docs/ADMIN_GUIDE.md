@@ -26,8 +26,8 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 
 | Tier | Sections | For |
 |---|---|---|
-| Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
+| Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, closing a flagged card payment, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, make a card payment link, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -500,7 +500,7 @@ If a payment response is lost, the purchaser uses **Resume existing checkout** o
 
 ## Invoices
 
-**Invoices** under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download or email its PDF, and record the payment. A card payment link comes in a later release.
+**Invoices** under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download or email its PDF, and record the payment. When the site takes payments through Stripe, the sponsor can also pay by card through a link.
 
 Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.
 
@@ -571,6 +571,29 @@ If the page says the email may have been sent, the email provider did not confir
 
 Invoice email is transactional mail. It never goes on the announcement stream and has no unsubscribe link.
 
+### Pay by card through a Stripe link
+
+Staff can make a card payment link for an issued invoice. This needs Stripe: the site's ticketing provider is Stripe, and the operator has set up the Stripe account, mode and key ([Stripe ticketing runbook](operator/stripe-ticketing.md)). Without Stripe, **Pay by card** on the invoice record says so, and the rest of the invoice works as before.
+
+1. Open the issued invoice. Find **Pay by card** on the record.
+2. Select **Make a card payment link**.
+
+The link opens a Stripe payment page for the invoice total, in the invoice currency. The page names the invoice number. The server takes the amount, the currency and the name from the issued invoice, never from the browser. The record shows the link and when it stops working. It works for 23 hours, because Stripe ends a payment page after at most a day. After that, select **Make a card payment link** again for a new one. While a link works, the button is not shown, so the invoice has one working link at a time.
+
+While a link works, the PDF prints it under **Pay by card**, and **Email invoice** puts it in the email. The bank details under **How to pay** still print.
+
+When the sponsor pays, Stripe tells the site. The invoice becomes **Paid** on its own, with the method **Card (Stripe)**, the Stripe payment ID and today's date on the event's clock. The audit log records it. Nobody needs to select **Mark paid**.
+
+In Stripe test mode, the record says so, and no real money moves.
+
+If Stripe does not answer when you make a link, the page says so. Select **Make a card payment link** again: the site sends the same request, so Stripe does not make a second page. If Stripe refuses the request, the page says so. Ask an operator to check the Stripe account.
+
+**Void and Mark paid close the link.** When an operator voids the invoice, or someone records a payment with **Mark paid**, the link closes on the record, and the site asks Stripe to end the payment page. If Stripe cannot be reached, the record says Stripe was not told, and the page may still work until it ends. The record lists every earlier link and how it ended.
+
+**A card payment that does not fit is never applied.** Stripe can take a payment the invoice did not expect: after a void, after the invoice was paid another way, through a closed link, for another amount or currency, or through a payment page the invoice has no record of. The invoice does not change. The payment is recorded on the invoice under **A card payment needs review**, the invoice list shows **Needs review**, the audit log records it, and the operator gets a system error alert. Check the payment in the Stripe Dashboard, then refund it there or record it another way. Then an operator selects **Mark reviewed**, writes a **Review note** and selects **Save review**. Staff see the review but cannot close it.
+
+Refunds and disputes stay in the Stripe Dashboard. A refund does not change the invoice. If the money goes back, an operator reopens the invoice.
+
 ### Mark an invoice paid
 
 1. Open the issued invoice and select **Mark paid**.
@@ -579,7 +602,7 @@ Invoice email is transactional mail. It never goes on the announcement stream an
 4. Add a **Payment note** if you want one, such as a check number.
 5. Select **Record payment**.
 
-The status becomes **Paid**, and the record shows the payment.
+The status becomes **Paid**, and the record shows the payment. An open card payment link closes (see **Pay by card through a Stripe link**).
 
 ### Reopen a paid invoice
 
@@ -589,7 +612,7 @@ Operators only. Reopen a paid invoice when the payment did not hold, for example
 2. Enter the **Reason for reopening**. It is required.
 3. Select **Reopen** and the number, such as **Reopen INV-0004**.
 
-The status goes back to **Issued**, with the same number, so the invoice can be paid again. The payment is not deleted: it moves to **Earlier payments** on the record, with your reason. A void invoice cannot be reopened.
+The status goes back to **Issued**, with the same number, so the invoice can be paid again. The payment is not deleted: it moves to **Earlier payments** on the record, with your reason. A void invoice cannot be reopened. Reopening a **Card (Stripe)** payment does not send money back; refund it in the Stripe Dashboard if needed. Staff can make a new card payment link after a reopen.
 
 ### Void an invoice
 
@@ -599,7 +622,7 @@ Operators only. Void an issued or paid invoice when it is wrong or no longer due
 2. Enter the **Reason**. It is required.
 3. Select **Void** and the number, such as **Void INV-0004**.
 
-The status becomes **Void**. The invoice stays in the list, and its number stays used: it is never given to another invoice. A paid invoice keeps its payment record. A void cannot be undone. Staff see who can void and reopen instead of the controls.
+The status becomes **Void**. The invoice stays in the list, and its number stays used: it is never given to another invoice. A paid invoice keeps its payment record. An open card payment link closes. A void cannot be undone. Staff see who can void and reopen instead of the controls.
 
 ### Correct an issued invoice
 
@@ -607,7 +630,7 @@ An issued invoice cannot change. To correct one, an operator voids it, then you 
 
 ### Find an invoice
 
-The list shows the newest invoices first, with the status as a word: **Draft**, **Issued**, **Paid** or **Void**. Use **Status** to show one status, and **Search** to find an invoice by its number, the name or email it is billed to, or its reference. **Show more invoices** continues the same search. One search reads 250 invoices at a time. When those hold no match and older invoices remain, the page says so; select **Show older invoices** to search on.
+The list shows the newest invoices first, with the status as a word: **Draft**, **Issued**, **Paid** or **Void**. **Needs review** next to the status marks a card payment an operator must check. Use **Status** to show one status, and **Search** to find an invoice by its number, the name or email it is billed to, or its reference. **Show more invoices** continues the same search. One search reads 250 invoices at a time. When those hold no match and older invoices remain, the page says so; select **Show older invoices** to search on.
 
 ### Invoice settings
 
@@ -811,11 +834,11 @@ The event's records as spreadsheets, and the event data package for the handoff 
 | Organizations and sponsors | Staff | Organization ID, name, state, hidden, tier, website, description, support description, logo path, order |
 | Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |
 | Admissions | Operator | Ticket ID, order ID, provider, ticket type, holder's first and last name, email, status, whether an account claimed it, checked in, purchased |
-| Invoices | Staff | Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created. A reopened invoice's earlier payments are in the event data package. |
+| Invoices | Staff | Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created. A reopened invoice's earlier payments are in the event data package. A payment through the Stripe pay link shows the method as **Card (Stripe)**. |
 
 No spreadsheet holds an account id, an invite token, staged speaker edits, a private note, a checkout link, bank details, or a raw payment provider record. Amounts are in the currency's major unit (`25.00`). Staff do not see the two operator rows; the page says who exports them. Attendees and session pitches export from their own pages, because those exports follow the page's filter.
 
-**The event data package.** Operators only. **Download event data package** saves one zip file named `event-data-package-<date>.zip`. It holds a JSON file for each record type, CSV files for the main lists, `manifest.json` with record counts and checksums, and `README.md`, which describes each file, the links between files, and how to handle the personal data in it. Choose the parts under **Parts to include**; all nine are chosen at the start. **Include staff notes on session pitches** is off at the start. The package holds live records only, in its CSV files too: a draft that was never published, or a newer draft of a live record, is not in it. A hidden live record is in it, with `visible: false` in JSON and **Hidden** `yes` in CSV. The package never holds the admin allowlist, credentials, the admin log, or raw provider records. It holds file paths and links for media and materials, not the files. The **Invoices** part holds every invoice, drafts too, because an invoice draft is a record and not an unpublished edit. Each issued invoice keeps its own copy of the issuer block and payment instructions. The invoice settings and the number counter stay behind.
+**The event data package.** Operators only. **Download event data package** saves one zip file named `event-data-package-<date>.zip`. It holds a JSON file for each record type, CSV files for the main lists, `manifest.json` with record counts and checksums, and `README.md`, which describes each file, the links between files, and how to handle the personal data in it. Choose the parts under **Parts to include**; all nine are chosen at the start. **Include staff notes on session pitches** is off at the start. The package holds live records only, in its CSV files too: a draft that was never published, or a newer draft of a live record, is not in it. A hidden live record is in it, with `visible: false` in JSON and **Hidden** `yes` in CSV. The package never holds the admin allowlist, credentials, the admin log, or raw provider records. It holds file paths and links for media and materials, not the files. The **Invoices** part holds every invoice, drafts too, because an invoice draft is a record and not an unpublished edit. Each issued invoice keeps its own copy of the issuer block and payment instructions. Its card payment links and any card payment flagged for review go too, with their status, amount and times. Like ticket orders, they hold no Stripe ID and no payment page address; the Stripe Dashboard is the record of those. The invoice settings and the number counter stay behind.
 
 The page sends a package of up to 9 MB built from at most 50,000 stored documents. Each document counts once, even when two files draw on it. A larger event gets a message that names `scripts/export-event-package.cjs`, which builds the same package from a terminal. [Archive and hand off a past event](operator/archive-handoff.md) covers the script, how to check a package, a full Firebase backup, the Storage files, and how to keep the past site online read-only.
 
