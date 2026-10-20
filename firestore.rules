@@ -701,6 +701,20 @@ service cloud.firestore {
     match /ticket_orders/{orderId} { allow read, write: if false; }
     match /ticket_payment_attempts/{attemptId} { allow read, write: if false; }
 
+    // Invoicing (issue #208). Server-only in BOTH directions, staff and
+    // operators included. An invoice names a third party's billing contact
+    // and address; `invoice_settings/current` holds the issuer's tax ID and
+    // bank details, which is why it is not a field of the public
+    // config/event; `invoice_counters/current` is the gapless number
+    // sequence, and a client write to it could skip or reuse a number.
+    // Admins read and write all three through invoiceAdmin
+    // (functions/src/admin/invoices.cjs), which checks the tier, refuses on
+    // a read-only demo and writes the admin_logs row in the same
+    // transaction.
+    match /invoices/{invoiceId} { allow read, write: if false; }
+    match /invoice_counters/{counterId} { allow read, write: if false; }
+    match /invoice_settings/{settingsId} { allow read, write: if false; }
+
     // Everything not matched above stays deny-all.
     match /{document=**} {
       allow read, write: if false;
