@@ -6,8 +6,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { readyManifest, stubManifests, TEST_GENERATION } from '../test/imageSizeManifests.js';
+import { resetImageSizeCacheForTest } from '../lib/mediaSource.js';
 import { MemoryRouter } from 'react-router';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -134,6 +136,42 @@ describe('Speakers', () => {
     // (design/tokens/components.json).
     expect(indexCss).toMatch(/\.portrait-shelf__frame \{[^}]*aspect-ratio: var\(--directory-portrait-aspect\);/);
     expect(indexCss).not.toMatch(/\.portrait-shelf__frame \{[^}]*border-radius: 50%/);
+  });
+
+  // Issue #333: a portrait offers the display sizes at the width its
+  // plate takes, so a phone does not download the full upload.
+  describe('display sizes', () => {
+    const SIZED = 'speaker-photos/rae-okonkwo/a1b2c3/face.jpg';
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('offers display sizes at the reading list width', async () => {
+      resetImageSizeCacheForTest();
+      stubManifests({ [SIZED]: readyManifest(SIZED, 1254) });
+      speakers = [{ ...PROJECTED, headshotPath: SIZED }];
+      const { container } = renderSpeakers();
+      const img = container.querySelector('.portrait-shelf__frame img');
+      await waitFor(() => expect(img).toHaveAttribute('srcset'));
+      expect(img).toHaveAttribute('sizes', '(min-width: 40rem) 14rem, 100vw');
+      expect(img.getAttribute('srcset')).toContain(
+        `${encodeURIComponent(`speaker-photos/rae-okonkwo/a1b2c3/_sizes/${TEST_GENERATION}/320.webp`)}?alt=media 320w`,
+      );
+      expect(img.getAttribute('src')).toContain(encodeURIComponent(SIZED));
+    });
+
+    it('offers display sizes at the shelf column width', async () => {
+      resetImageSizeCacheForTest();
+      stubManifests({ [SIZED]: readyManifest(SIZED, 1254) });
+      speakers = [{ ...PROJECTED, headshotPath: SIZED }];
+      pageDoc = { id: 'speakers', layout: { arrangement: 'grid' } };
+      const { container } = renderSpeakers();
+      pageDoc = null;
+      const img = container.querySelector('.portrait-shelf__frame img');
+      await waitFor(() => expect(img).toHaveAttribute('srcset'));
+      expect(img).toHaveAttribute(
+        'sizes',
+        '(min-width: 80rem) 25vw, (min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw',
+      );
+    });
   });
 
   it('runs one entry per row by default', () => {
