@@ -68,6 +68,7 @@ const TicketClaim = lazyPage(() => import('./pages/TicketClaim.jsx'));
 const Tickets = lazyPage(() => import('./pages/Tickets.jsx'));
 const TicketStatus = lazyPage(() => import('./pages/TicketStatus.jsx'));
 const MyTickets = lazyPage(() => import('./pages/MyTickets.jsx'));
+const MyChangeRequests = lazyPage(() => import('./pages/MyChangeRequests.jsx'));
 const Profile = lazyPage(() => import('./pages/Profile.jsx'));
 const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
 const AttendeeProfile = lazyPage(() => import('./pages/AttendeeProfile.jsx'));
@@ -142,6 +143,7 @@ export function AppRoutes() {
         <Route path="tickets/status" element={<DeferredPage component={TicketStatus} label="order status" />} />
         <Route path="tickets/mine" element={<DeferredPage component={MyTickets} label="your tickets" />} />
         <Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />
+        <Route path="profile/change-requests" element={<DeferredPage component={MyChangeRequests} label="your change requests" />} />
         {/* The signed-in attendee's home (issue #168): one place that shows
             their status, their sessions, and the event's resources. `dashboard`
             is reserved in shared/routing, so a generic cmsPages path can never

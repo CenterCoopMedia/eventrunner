@@ -646,6 +646,12 @@ export default function Layout() {
                     Request a change
                   </button>
                 ) : null}
+                {/* The reader's own requests and their progress (issue #330). */}
+                {canRequestChange ? (
+                  <Link to="/profile/change-requests" className={quietActionClass}>
+                    Your change requests
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </div>

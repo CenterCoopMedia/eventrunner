@@ -3,6 +3,7 @@
 // driven here, the same convention as FeedbackModal.test.jsx.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 
 const submitMock = vi.fn();
 vi.mock('../lib/changeRequestApi.js', () => ({
@@ -14,7 +15,11 @@ import ChangeRequestModal from './ChangeRequestModal.jsx';
 const USER = { uid: 'uid-ada', getIdToken: async () => 'id-token' };
 
 function renderModal(props = {}) {
-  return render(<ChangeRequestModal onClose={() => {}} user={USER} initialPage="/travel" {...props} />);
+  return render(
+    <MemoryRouter>
+      <ChangeRequestModal onClose={() => {}} user={USER} initialPage="/travel" {...props} />
+    </MemoryRouter>,
+  );
 }
 
 beforeEach(() => {
@@ -39,6 +44,19 @@ describe('ChangeRequestModal', () => {
     expect(deps).toEqual({ user: USER });
     // The one control left takes focus, so the keyboard is not dropped.
     expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
+  });
+
+  // Issue #330: after a send, the reader can follow the request.
+  it('links to the reader’s own change requests after a send, and closes the dialog on the way', async () => {
+    submitMock.mockResolvedValueOnce({ ok: true, id: 'k1' });
+    const onClose = vi.fn();
+    renderModal({ onClose });
+    fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: 'Fix it.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    const link = await screen.findByRole('link', { name: 'See your change requests' });
+    expect(link).toHaveAttribute('href', '/profile/change-requests');
+    fireEvent.click(link);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('prefills the page with the path the reader was on, and sends a blank page as null', async () => {

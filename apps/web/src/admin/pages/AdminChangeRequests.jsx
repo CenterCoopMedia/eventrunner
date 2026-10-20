@@ -16,8 +16,15 @@
 // action, and Remove stands at the row's end behind the destructive moment.
 // The request text is the requester's own words: it renders as text in a
 // pre-wrapped paragraph, and the page field is text, never a link.
+//
+// Issue #330: every staff member reads which requester emails are on, and
+// an operator changes that here. Each row states the delivery of its
+// emails, with a retry where the server would allow one, and a done or
+// declined row takes the reply and the result link its requester reads
+// (components/ChangeRequestEmails.jsx).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import { createSubmissionKey } from '../../lib/submissionKey.js';
@@ -37,6 +44,13 @@ import {
   rowMetaClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
+import {
+  ChangeRequestEmailSettings,
+  EmailSettingsSummary,
+  NoticeDelivery,
+  OutcomeDetails,
+  readEmailSettings,
+} from '../components/ChangeRequestEmails.jsx';
 import AdminPageHeader, {
   AdminEmptyState,
   AdminLoadingState,
@@ -206,6 +220,7 @@ function RequestForm({ call }) {
 
 export default function AdminChangeRequests() {
   const call = useAdminApi();
+  const { isOperator } = useAuth();
   const { features } = useEventConfig();
   const enabled = features?.changeRequests === true;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -242,6 +257,14 @@ export default function AdminChangeRequests() {
     (docs) => { setRows(docs); setListError(null); },
     setListError,
   ), []);
+
+  // The requester email settings (issue #330); null until the first snapshot.
+  const [emailSettings, setEmailSettings] = useState(null);
+  useEffect(() => subscribeAdminCollection(
+    'change_request_settings',
+    (docs) => setEmailSettings(readEmailSettings(docs)),
+  ), []);
+  const settingsForRows = emailSettings ?? readEmailSettings([]);
 
   // The row an action is in flight on stays on screen until the call
   // settles, even when the listener has already removed it or its new
@@ -326,6 +349,13 @@ export default function AdminChangeRequests() {
         }
       />
 
+      {emailSettings ? (
+        <div className="flex flex-col gap-2xs">
+          <EmailSettingsSummary settings={emailSettings} />
+          {isOperator ? <ChangeRequestEmailSettings settings={emailSettings} call={call} /> : null}
+        </div>
+      ) : null}
+
       {enabled ? (
         <RequestForm call={call} />
       ) : (
@@ -409,6 +439,11 @@ export default function AdminChangeRequests() {
                         <p className="mt-3xs whitespace-pre-wrap break-words text-admin-base text-admin-ink">
                           {row.message}
                         </p>
+                        <NoticeDelivery row={row} settings={settingsForRows} call={call} />
+                        {status === 'done' || status === 'declined' ? (
+                          // Keyed to the outcome, so a new outcome starts an empty form.
+                          <OutcomeDetails key={`${row.id}-${status}`} row={{ ...row, status }} call={call} />
+                        ) : null}
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-2xs">
                         {rowError?.id === row.id ? <Notice tone="error" message={rowError.message} /> : null}

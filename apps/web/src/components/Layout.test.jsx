@@ -1351,6 +1351,27 @@ describe('the footer change request control', () => {
     expect(dialog).not.toBeNull();
   });
 
+  // Issue #330: the reader's own requests, beside the control that sends one.
+  const requestsLink = (container) =>
+    within(container.querySelector('footer')).queryByRole('link', { name: 'Your change requests' });
+
+  it('links the signed-in reader to their own change requests while the flag is on', () => {
+    const { container } = renderShell({}, { featureFlags: { ...FIXTURE_FEATURES, changeRequests: true }, user: SIGNED_IN });
+    expect(requestsLink(container)).toHaveAttribute('href', '/profile/change-requests');
+    expect(requestsLink(container).parentElement).toBe(requestButton(container).parentElement);
+  });
+
+  it('offers no requests link while the flag is off or the reader is signed out', () => {
+    for (const options of [
+      { featureFlags: FIXTURE_FEATURES, user: SIGNED_IN },
+      { featureFlags: { ...FIXTURE_FEATURES, changeRequests: true } },
+    ]) {
+      const { container, unmount } = renderShell({}, options);
+      expect(requestsLink(container)).toBeNull();
+      unmount();
+    }
+  });
+
   it('sits beside Share feedback when both are on', () => {
     const { container } = renderShell({}, {
       featureFlags: { ...FIXTURE_FEATURES, feedbackInbox: true, changeRequests: true },
