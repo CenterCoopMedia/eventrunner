@@ -44,16 +44,12 @@
  */
 
 const { READINESS_ITEMS } = require('shared/speakerReadiness');
-const { DEFAULT_OFFSETS, MAX_OFFSET_DAYS, isQuietAt, planReminders } = require('shared/reminderSchedule');
+const { DEFAULT_OFFSETS, isQuietAt } = require('shared/reminderSchedule');
 const { splitEventDateTime } = require('shared/eventDateTime');
 const { readClosesAt: readInstant } = require('shared/pitch');
-const { isDayPast } = require('shared/time');
-const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const {
   SKIP_REASONS,
-  isoOrNull,
-  timestampMs,
   wordingVersion,
   loadReadinessStores,
   cooldownUntil,
@@ -63,37 +59,28 @@ const {
   loadReminderTemplate,
   sendOne,
 } = require('../speakers/reminderCore.cjs');
+const core = require('./scheduleCore.cjs');
 
-const SCHEDULES = 'reminder_schedules';
-const RUNS = 'reminder_schedule_runs';
-const LEDGER = 'reminder_ledger';
+const {
+  SCHEDULES,
+  RUNS,
+  LEDGER,
+  DEFAULT_SEND_TIME,
+  MAX_OFFSETS,
+  LEASE_MS,
+  SCHEDULE_ACTOR,
+  plainObject,
+  scheduleState,
+  eventTimeZone,
+  eventEnded,
+} = core;
 const SCHEDULE_ID = 'speakers';
-const DEFAULT_SEND_TIME = '10:00';
-/** Most offsets one schedule may name. */
-const MAX_OFFSETS = 6;
-/** A run holds the lease this long at most; longer than the function timeout. */
-const LEASE_MS = 15 * 60 * 1000;
-const DAY_MS = 86_400_000;
-const SEND_TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
-/** Who the scheduler is in admin_logs and on a speaker's reminder record. */
-const SCHEDULE_ACTOR = Object.freeze({ uid: null, email: null });
 
 /** Why a schedule is paused, in staff words. */
 const PAUSE_REASONS = Object.freeze({
   'wording-changed': 'The reminder wording changed after it was approved. Preview the wording, then approve it again.',
   'settings-changed': 'The schedule settings changed after they were approved. Preview the reminders, then approve them again.',
 });
-
-function plainObject(value) {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-}
-
-/** Offsets as whole days, largest first, without repeats; null when not valid. */
-function readOffsets(value) {
-  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OFFSETS) return null;
-  if (!value.every((n) => Number.isInteger(n) && n >= 1 && n <= MAX_OFFSET_DAYS)) return null;
-  return [...new Set(value)].sort((a, b) => b - a);
-}
 
 function readTopics(value) {
   if (!Array.isArray(value) || value.length === 0) return null;
@@ -107,26 +94,21 @@ function readTopics(value) {
  */
 function normalizeSpeakerSchedule(raw) {
   const data = plainObject(raw);
+  const common = core.normalizeCommon(data, { defaultOffsets: DEFAULT_OFFSETS.speakers, pauseReasons: PAUSE_REASONS });
   return {
-    enabled: data.enabled === true,
-    offsetsDays: readOffsets(data.offsetsDays) ?? [...DEFAULT_OFFSETS.speakers],
-    sendTime: typeof data.sendTime === 'string' && SEND_TIME_RE.test(data.sendTime) ? data.sendTime : DEFAULT_SEND_TIME,
+    enabled: common.enabled,
+    offsetsDays: common.offsetsDays,
+    sendTime: common.sendTime,
     dueAt: readInstant(data.dueAt),
     topics: readTopics(data.topics) ?? [...READINESS_ITEMS],
-    approvedWordingVersion: typeof data.approvedWordingVersion === 'string' ? data.approvedWordingVersion : null,
-    approvedAt: isoOrNull(data.approvedAt),
-    approvedBy: typeof data.approvedBy === 'string' ? data.approvedBy : null,
-    pausedReason: Object.hasOwn(PAUSE_REASONS, data.pausedReason) ? data.pausedReason : null,
-    pausedAt: isoOrNull(data.pausedAt),
-    updatedAt: isoOrNull(data.updatedAt),
-    updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : null,
+    approvedWordingVersion: common.approvedWordingVersion,
+    approvedAt: common.approvedAt,
+    approvedBy: common.approvedBy,
+    pausedReason: common.pausedReason,
+    pausedAt: common.pausedAt,
+    updatedAt: common.updatedAt,
+    updatedBy: common.updatedBy,
   };
-}
-
-/** 'off', 'on' or 'paused'. */
-function scheduleState(schedule) {
-  if (!schedule.enabled) return 'off';
-  return schedule.pausedReason ? 'paused' : 'on';
 }
 
 /**
@@ -138,12 +120,10 @@ function scheduleState(schedule) {
 function readSpeakerSettings(body) {
   const data = plainObject(body);
   const errors = [];
-  const offsetsDays = readOffsets(data.offsetsDays);
-  if (!offsetsDays) {
-    errors.push(`offsetsDays: Give 1 to ${MAX_OFFSETS} offsets, each a whole number of days from 1 to ${MAX_OFFSET_DAYS}.`);
-  }
-  const sendTime = typeof data.sendTime === 'string' && SEND_TIME_RE.test(data.sendTime) ? data.sendTime : null;
-  if (!sendTime) errors.push('sendTime: Give a time as HH:MM on the event clock.');
+  const offsetsDays = core.readOffsets(data.offsetsDays);
+  if (!offsetsDays) errors.push(core.OFFSETS_ERROR);
+  const sendTime = core.readSendTime(data.sendTime);
+  if (!sendTime) errors.push(core.SEND_TIME_ERROR);
   let dueAt = null;
   if (data.dueAt !== null && data.dueAt !== undefined && data.dueAt !== '') {
     dueAt = readInstant(data.dueAt);
@@ -160,35 +140,9 @@ function settingsKey(schedule) {
   return JSON.stringify([schedule.offsetsDays, schedule.sendTime, schedule.dueAt, schedule.topics]);
 }
 
-function eventTimeZone(config) {
-  const zone = config?.event?.timezone;
-  return typeof zone === 'string' && zone ? zone : null;
-}
-
-/**
- * Whether the event is over: the last configured day's end time has passed
- * on the event's clock. An event with no usable days is not over.
- */
-function eventEnded(config, nowMs) {
-  const event = config?.event;
-  const days = Array.isArray(event?.days) ? event.days.filter((day) => day && typeof day.date === 'string') : [];
-  if (days.length === 0) return false;
-  const last = [...days].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).at(-1);
-  if (typeof last.id !== 'string') return false;
-  return isDayPast(event, last.id, new Date(nowMs));
-}
-
 /** The planner's view of a schedule at `nowMs`. */
 function planFor(schedule, timeZone, nowMs) {
-  if (!schedule.dueAt) return { ok: false, error: 'dueAt: Set a due date first.' };
-  if (!timeZone) return { ok: false, error: 'The event has no time zone. Set it in Event settings.' };
-  return planReminders({
-    anchor: schedule.dueAt,
-    offsetsDays: schedule.offsetsDays,
-    sendTime: schedule.sendTime,
-    timeZone,
-    now: nowMs,
-  });
+  return core.planAt({ anchor: schedule.dueAt, missing: 'dueAt: Set a due date first.', schedule, timeZone, nowMs });
 }
 
 /** The fixed batch id of one window: `sched-20261120-7d`. */
@@ -216,9 +170,7 @@ function formatDue(dueAt, timeZone) {
 
 /** Whole calendar days on the event's clock from `atMs` to the due date. */
 function calendarDaysLeft(dueAt, timeZone, atMs) {
-  const today = splitEventDateTime(new Date(atMs).toISOString(), timeZone).date;
-  const due = splitEventDateTime(dueAt, timeZone).date;
-  return Math.max(0, Math.round((Date.parse(`${due}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS));
+  return core.calendarDaysUntil(splitEventDateTime(dueAt, timeZone).date, timeZone, atMs);
 }
 
 /** The `due_date` and `days_left` token values at one moment. */
@@ -227,8 +179,7 @@ function dueTokens(dueAt, timeZone, atMs) {
 }
 
 async function loadSchedule(db) {
-  const snap = await db.collection(SCHEDULES).doc(SCHEDULE_ID).get();
-  return normalizeSpeakerSchedule(snap.exists ? snap.data() : null);
+  return core.loadSchedule(db, SCHEDULE_ID, normalizeSpeakerSchedule);
 }
 
 /** The speaker ids the ledger holds for one window. */
@@ -268,14 +219,13 @@ function audienceFor({ stores, topics, recorded, atMs }) {
  * @returns {Promise<boolean>} whether this call paused it
  */
 async function pauseSchedule({ db, reason, expectVersion, nowMs }) {
-  const ref = db.collection(SCHEDULES).doc(SCHEDULE_ID);
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const current = normalizeSpeakerSchedule(snap.exists ? snap.data() : null);
-    if (!current.enabled || current.pausedReason) return false;
-    if (expectVersion !== undefined && current.approvedWordingVersion !== expectVersion) return false;
-    tx.set(ref, { pausedReason: reason, pausedAt: new Date(nowMs) }, { merge: true });
-    return true;
+  return core.pauseSchedule({
+    db,
+    id: SCHEDULE_ID,
+    normalize: normalizeSpeakerSchedule,
+    reason,
+    holds: (current) => expectVersion === undefined || current.approvedWordingVersion === expectVersion,
+    nowMs,
   });
 }
 
@@ -306,15 +256,8 @@ async function pauseIfWordingChanged({ db, now, actor, log = console }) {
 }
 
 /** Take the run lease on `reminder_schedule_runs/speakers`, or say why not. */
-async function acquireLease({ db, nowMs }) {
-  const ref = db.collection(RUNS).doc(SCHEDULE_ID);
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const since = timestampMs(snap.exists ? snap.data()?.running?.startedAt : null);
-    if (Number.isFinite(since) && nowMs - since < LEASE_MS) return { ok: false, reason: 'busy' };
-    tx.set(ref, { running: { startedAt: new Date(nowMs) } }, { merge: true });
-    return { ok: true };
-  });
+function acquireLease({ db, nowMs }) {
+  return core.acquireLease({ db, id: SCHEDULE_ID, nowMs });
 }
 
 function ids(rows) {
@@ -331,22 +274,19 @@ async function sendDue({ db, getConfig, sendEmail, notifyOperator, now, log, sch
   const loaded = await loadReminderTemplate(db, now);
   const version = wordingVersion(loaded.override);
   if (version !== schedule.approvedWordingVersion) {
-    const paused = await pauseSchedule({ db, reason: 'wording-changed', expectVersion: schedule.approvedWordingVersion, nowMs: now() });
-    if (paused) {
-      await logAdminAction({
-        db, action: 'pauseReminderSchedule', docPath: `${SCHEDULES}/${SCHEDULE_ID}`, actor: SCHEDULE_ACTOR, now, log,
-        details: { schedule: SCHEDULE_ID, reason: 'wording-changed', by: 'scheduler' },
-      });
-      await notifyOperator({
-        kind: 'warning',
-        title: 'Scheduled speaker reminders paused',
-        summary: 'The speaker reminder wording is not the wording staff approved, so the schedule sent nothing and is paused. '
-          + 'Staff preview the reminders and approve them again on the Scheduled reminders page.',
-        fields: { schedule: SCHEDULE_ID, reason: 'wording-changed' },
-        dedupeKey: `reminder-schedule-paused:${SCHEDULE_ID}`,
-      });
-    }
-    return { outcome: 'paused', reason: 'wording-changed' };
+    return core.pauseFromRun({
+      db,
+      id: SCHEDULE_ID,
+      normalize: normalizeSpeakerSchedule,
+      reason: 'wording-changed',
+      holds: (current) => current.approvedWordingVersion === schedule.approvedWordingVersion,
+      now,
+      log,
+      notifyOperator,
+      title: 'Scheduled speaker reminders paused',
+      summary: 'The speaker reminder wording is not the wording staff approved, so the schedule sent nothing and is paused. '
+        + 'Staff preview the reminders and approve them again on the Scheduled reminders page.',
+    });
   }
   const plan = planFor(schedule, timeZone, now());
   if (!plan.ok) return { outcome: 'failed', error: { code: 'bad-settings', message: plan.error } };
@@ -464,42 +404,13 @@ function reachedAnyone(result) {
  *   notifyOperator: Function, now?: () => number, log?: Console }} deps
  * @returns {Promise<{ outcome: string, reason?: string }>}
  */
-async function runSpeakerSchedule({ db, getConfig, sendEmail, notifyOperator = async () => {}, now = Date.now, log = console }) {
-  const schedule = await loadSchedule(db);
-  if (!schedule.enabled) return { outcome: 'skipped', reason: 'off' };
-  if (schedule.pausedReason) return { outcome: 'skipped', reason: 'paused' };
-  // A historical demo sends nothing and records nothing.
-  const policy = await checkDemoWrites({ db });
-  if (!policy.ok) return { outcome: 'skipped', reason: policy.code };
-  const config = await getConfig();
-  if (eventEnded(config, now())) return { outcome: 'skipped', reason: 'event-ended' };
-
-  const startedMs = now();
-  const lease = await acquireLease({ db, nowMs: startedMs });
-  if (!lease.ok) return { outcome: 'skipped', reason: lease.reason };
-
-  let result;
-  try {
-    result = await sendDue({ db, getConfig: async () => config, sendEmail, notifyOperator, now, log, schedule });
-  } catch (err) {
-    log.error('scheduled speaker reminders failed', err);
-    result = {
-      outcome: 'failed',
-      error: {
-        code: err?.code === 'not-ready' ? 'not-ready' : 'internal',
-        message: err?.code === 'not-ready' ? err.message : 'The run stopped on a server error. Nothing more was sent.',
-      },
-    };
-  }
-  const lastRun = {
-    startedAt: new Date(startedMs),
-    finishedAt: new Date(now()),
-    outcome: result.outcome,
-    reason: result.reason ?? null,
-    windowKey: result.windowKey ?? null,
-    offsetDays: result.offsetDays ?? null,
-    batchId: result.batchId ?? null,
-    counts: {
+function runSpeakerSchedule(deps) {
+  return core.runSchedule({
+    id: SCHEDULE_ID,
+    normalize: normalizeSpeakerSchedule,
+    sendDue,
+    reached: reachedAnyone,
+    countsOf: (result) => ({
       sent: result.sent?.length ?? 0,
       alreadySent: result.alreadySent?.length ?? 0,
       failed: result.failed?.length ?? 0,
@@ -507,40 +418,20 @@ async function runSpeakerSchedule({ db, getConfig, sendEmail, notifyOperator = a
       waiting: result.waiting?.length ?? 0,
       recorded: result.recorded ?? 0,
       deferred: result.deferred ?? 0,
-    },
-    error: result.error ?? null,
-  };
-  try {
-    await db.collection(RUNS).doc(SCHEDULE_ID).set({ running: null, lastRun }, { merge: true });
-  } catch (err) {
-    // The lease runs out on its own.
-    log.warn('reminder_schedule_runs stamp failed', err);
-  }
-  if (reachedAnyone(result)) {
-    await logAdminAction({
-      db,
-      action: 'runScheduledReminders',
-      docPath: `${SCHEDULES}/${SCHEDULE_ID}`,
-      actor: SCHEDULE_ACTOR,
-      now,
-      log,
-      details: {
-        schedule: SCHEDULE_ID,
-        windowKey: result.windowKey,
-        batchId: result.batchId,
-        topics: schedule.topics,
-        sent: result.sent,
-        alreadySent: result.alreadySent,
-        failed: result.failed,
-        uncertain: result.uncertain,
-        waiting: result.waiting.length,
-        deferred: result.deferred ?? 0,
-        ...(result.reason ? { stoppedFor: result.reason } : {}),
-        ...(result.incomplete ? { incomplete: true } : {}),
-      },
-    });
-  }
-  return result;
+    }),
+    logDetails: (result, schedule) => ({
+      windowKey: result.windowKey,
+      batchId: result.batchId,
+      topics: schedule.topics,
+      sent: result.sent,
+      alreadySent: result.alreadySent,
+      failed: result.failed,
+      uncertain: result.uncertain,
+      waiting: result.waiting.length,
+      deferred: result.deferred ?? 0,
+    }),
+    deps,
+  });
 }
 
 module.exports = {
