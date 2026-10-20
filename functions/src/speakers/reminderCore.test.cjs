@@ -47,3 +47,23 @@ test('without `also`, a reservation writes only the speaker_reminders record', a
   await reserve({ db, speakerId: 'sp1', batchId: 'batch-0004', items: ['bio'], actor: ACTOR, nowMs: NOW });
   assert.deepEqual(db.writes.map((w) => w.path), [`${REMINDERS}/sp1`]);
 });
+
+test('the shipped wording version is a digest of the shipped copy, so a deploy that changes it changes the version', () => {
+  const { getDefaultTemplate } = require('../email/templates.cjs');
+  const { wordingVersion } = require('./reminderCore.cjs');
+  const shipped = getDefaultTemplate('speaker.reminder');
+  const version = wordingVersion(null);
+  assert.match(version, /^shipped:[0-9a-f]{32}$/);
+  assert.equal(wordingVersion(null, shipped), version);
+  // A deploy that edits any of the three shipped fields gives a new version,
+  // so a preview made before the deploy cannot approve the new copy.
+  for (const key of ['subject', 'html', 'text']) {
+    const edited = { ...shipped, [key]: `${shipped[key]} edited` };
+    assert.notEqual(wordingVersion(null, edited), version, key);
+    assert.match(wordingVersion(null, edited), /^shipped:/);
+  }
+  // Saved wording keeps its own digest, which never looks like the shipped one.
+  const saved = wordingVersion({ subject: shipped.subject, html: shipped.html, text: shipped.text });
+  assert.match(saved, /^[0-9a-f]{32}$/);
+  assert.notEqual(saved, version);
+});

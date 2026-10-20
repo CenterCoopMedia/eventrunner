@@ -418,6 +418,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A speaker reminder send now refuses shipped wording that changed after its preview. When no
+  wording is saved, the preview's wording version is `shipped:` and a digest of the shipped
+  subject and bodies. It used to be the fixed value `shipped`, so a deploy that changed the
+  shipped copy between a preview and a send could send wording nobody read (#518).
+
 - The Functions deploy step now fails when a Function is not deployed. After a quota error
   (HTTP 429) on a create, `firebase-tools` 15.22.4 can exit 0 before the create is done, with
   no summary. Run 39329645906 reported success while `downloadEventPackage` did not exist.

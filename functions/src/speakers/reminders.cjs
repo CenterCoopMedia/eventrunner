@@ -40,8 +40,10 @@
  * sent at the attempt; no claim means it never reached the provider.
  *
  * THE WORDING THE PREVIEW SHOWED. Preview returns `wordingVersion`, a digest
- * of the saved wording. Send needs it, and refuses when the wording changed
- * in between, so no speaker gets wording staff did not read.
+ * of the saved wording, or `shipped:` and a digest of the shipped wording.
+ * Send needs it, and refuses when the wording changed in between, so no
+ * speaker gets wording staff did not read. A deploy that changes the
+ * shipped copy changes the version too.
  *
  * THE MESSAGES THE PREVIEW SHOWED. Preview also returns `receipt`, a SHA-256
  * over every recipient's speaker id, address, items, subject and bodies
@@ -81,7 +83,6 @@ const {
   TEMPLATE_ID,
   REMINDER_COOLDOWN_MS,
   SENDING_STALE_MS,
-  SHIPPED_WORDING,
   SKIP_REASONS,
   ReminderError,
   fail,
@@ -491,7 +492,10 @@ module.exports = {
     MAX_RECIPIENTS,
     REMINDER_COOLDOWN_MS,
     SENDING_STALE_MS,
-    SHIPPED_WORDING,
+    /** The wording version of the deployed shipped copy. */
+    get SHIPPED_WORDING() {
+      return wordingVersion(null);
+    },
     EXPORT_GROUPS,
     SKIP_REASONS,
     CSV_HEADERS,

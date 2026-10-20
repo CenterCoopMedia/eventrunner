@@ -30,8 +30,8 @@ const TEMPLATE_ID = 'speaker.reminder';
 const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 /** A send still marked "sending" after this long is treated as abandoned. */
 const SENDING_STALE_MS = 10 * 60 * 1000;
-/** The wording version when no wording is saved. */
-const SHIPPED_WORDING = 'shipped';
+/** The prefix of the wording version when no wording is saved. */
+const SHIPPED_WORDING_PREFIX = 'shipped:';
 
 /** Why a chosen speaker gets no reminder, in staff words. */
 const SKIP_REASONS = Object.freeze({
@@ -74,14 +74,25 @@ function onceKeyFor(speakerId, batchId) {
   return `speaker-reminder:${speakerId}:${batchId}`;
 }
 
-/**
- * Which wording a preview showed: 'shipped', or a digest of the saved
- * subject, html and text. A send must carry the same value.
- */
-function wordingVersion(override) {
-  if (!override) return SHIPPED_WORDING;
-  const fields = ['subject', 'html', 'text'].map((key) => (typeof override[key] === 'string' ? override[key] : null));
+function wordingDigest(source) {
+  const fields = ['subject', 'html', 'text'].map((key) => (typeof source[key] === 'string' ? source[key] : null));
   return crypto.createHash('sha256').update(JSON.stringify(fields), 'utf8').digest('hex').slice(0, 32);
+}
+
+/**
+ * Which wording a preview showed: a digest of the saved subject, html and
+ * text, or `shipped:` and a digest of the shipped ones. A send must carry
+ * the same value. The shipped copy has a digest too, so a deploy that
+ * changes it between a preview and a send (or an approval and a scheduled
+ * run) is a change of wording, not the same "shipped" (issue #518).
+ *
+ * @param {object|null} override the saved wording, or null
+ * @param {object} [shipped] the shipped template; the deployed one by default
+ */
+function wordingVersion(override, shipped = null) {
+  if (override) return wordingDigest(override);
+  const template = shipped ?? require('../email/templates.cjs').getDefaultTemplate(TEMPLATE_ID);
+  return `${SHIPPED_WORDING_PREFIX}${wordingDigest(template)}`;
 }
 
 function siteUrl(config) {
@@ -334,7 +345,7 @@ module.exports = {
   TEMPLATE_ID,
   REMINDER_COOLDOWN_MS,
   SENDING_STALE_MS,
-  SHIPPED_WORDING,
+  SHIPPED_WORDING_PREFIX,
   SKIP_REASONS,
   ReminderError,
   fail,
