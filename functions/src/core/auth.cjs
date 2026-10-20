@@ -406,16 +406,19 @@ async function requireAdmin({ auth, db, getConfig, now = Date.now }, req, { tier
  * This gate reads the CACHED bootstrap, not the live document: it runs on
  * every bookmark and reaction at attendee volume, the admin branch only
  * widens what an approved attendee already has, and a five-minute lag on
- * an admin's bookmark pill costs nobody anything. A staff end time is
- * still met on time here: resolveAdminTier compares it with the clock at
- * the call, not with the age of the cached copy.
+ * an admin's bookmark pill costs nobody anything. The one exception is a
+ * caller the cached copy admits as STAFF: a staff grant can gain an end
+ * time after the copy was cached (issue #331), so that decision re-reads
+ * the document live, and a failed read answers 500 and admits nobody. An
+ * end time already in the cached copy is met on time either way:
+ * resolveAdminTier compares it with the clock at the call.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           db: FirebaseFirestore.Firestore,
  *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[], staffEmails?: string[] } | null }> }} deps
  * @param {object} req
  * @returns {Promise<{ ok: true, uid: string, email: string|null } |
- *                    { ok: false, status: 401|403, code: string, message: string }>}
+ *                    { ok: false, status: 401|403|500, code: string, message: string }>}
  */
 async function requireAttendeeAccess({ auth, db, getConfig }, req) {
   const decoded = await verifyAuthToken({ auth }, req);
@@ -427,7 +430,20 @@ async function requireAttendeeAccess({ auth, db, getConfig }, req) {
   const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
   if (email && decoded.email_verified === true && typeof getConfig === 'function') {
     const config = await getConfig();
-    isBootstrapAdmin = resolveAdminTier(config?.bootstrap, email) !== null;
+    let tier = resolveAdminTier(config?.bootstrap, email);
+    // A staff grant may have gained an end time since this container cached
+    // the document (issue #331), so a decision that rests on the staff tier
+    // is made from the live document. Operators never expire, and a caller
+    // on no list gains nothing from a live read, so both keep the cache.
+    if (tier === 'staff' && db && typeof db.collection === 'function') {
+      try {
+        tier = resolveAdminTier(await loadBootstrap({ db }), email);
+      } catch (err) {
+        if (err instanceof BootstrapUnavailableError) return { ...BOOTSTRAP_UNAVAILABLE };
+        throw err;
+      }
+    }
+    isBootstrapAdmin = tier !== null;
   }
 
   const snap = await db.collection('users').doc(decoded.uid).get();

@@ -458,10 +458,29 @@ test('requireAdmin: missing bootstrap doc or malformed adminEmails → 403, no t
 
 // -------------------------------------------------------- requireAttendeeAccess
 
-/** Fake `users` collection reader: db.collection('users').doc(uid).get(). */
-function fakeUsersDb(profiles) {
-  return {
+/**
+ * Fake `users` collection reader: db.collection('users').doc(uid).get().
+ * With `live`, config/bootstrap answers that document too (the staff
+ * branch of requireAttendeeAccess reads it live); `reads` counts those.
+ */
+function fakeUsersDb(profiles, live) {
+  const db = {
+    bootstrapReads: 0,
     collection(name) {
+      if (name === 'config' && live !== undefined) {
+        return {
+          doc(id) {
+            assert.equal(id, 'bootstrap');
+            return {
+              async get() {
+                db.bootstrapReads += 1;
+                if (live instanceof Error) throw live;
+                return { exists: live !== null, data: () => live ?? undefined };
+              },
+            };
+          },
+        };
+      }
       assert.equal(name, 'users');
       return {
         doc(uid) {
@@ -475,6 +494,7 @@ function fakeUsersDb(profiles) {
       };
     },
   };
+  return db;
 }
 
 const ATTENDEE_TOKEN = { uid: 'u9', email: 'attendee@example.org', email_verified: true };
@@ -570,7 +590,10 @@ test('requireAttendeeAccess: a staff admin passes too — attendee access is the
   const verdict = await requireAttendeeAccess(
     {
       auth: fakeAuth({ good: ATTENDEE_TOKEN }),
-      db: fakeUsersDb({ u9: { registrationStatus: 'pending', speakerId: null, role: 'attendee' } }),
+      db: fakeUsersDb(
+        { u9: { registrationStatus: 'pending', speakerId: null, role: 'attendee' } },
+        { adminEmails: ['ops@example.org'], staffEmails: ['attendee@example.org'] },
+      ),
       getConfig: fakeGetConfig(['ops@example.org'], ['Attendee@Example.ORG']),
     },
     reqWithAuth('Bearer good'),
@@ -761,4 +784,43 @@ test('requireAdmin: a clock that answers a Date is read as its instant; one that
   assert.equal((await gate(() => new Date(ENDS))).ok, false);
   assert.equal((await gate(() => undefined)).ok, false);
   assert.equal((await gate(() => 'later')).ok, false);
+});
+
+// Codex review on #541: a warm container's cached bootstrap can predate a
+// newly added end time. A decision that admits the caller only as staff is
+// therefore made from the live document; operators and plain attendees
+// keep the cached path.
+test('requireAttendeeAccess: a cached permanent staff grant with a past end time in the live document is refused', async () => {
+  const live = { adminEmails: ['ops@example.org'], staffEmails: ['attendee@example.org'], staffExpiry: { 'attendee@example.org': Timestamp.fromMillis(Date.now() - 60_000) } };
+  const db = fakeUsersDb({ u9: { registrationStatus: 'pending', speakerId: null, role: 'attendee' } }, live);
+  const verdict = await requireAttendeeAccess(
+    { auth: fakeAuth({ good: ATTENDEE_TOKEN }), db, getConfig: fakeGetConfig(['ops@example.org'], ['attendee@example.org']) },
+    reqWithAuth('Bearer good'),
+  );
+  assert.deepEqual({ ok: verdict.ok, status: verdict.status }, { ok: false, status: 403 });
+  assert.equal(db.bootstrapReads, 1);
+});
+
+test('requireAttendeeAccess: a staff grant the live document still holds is admitted; a failed live read admits nobody', async () => {
+  const profile = { u9: { registrationStatus: 'pending', speakerId: null, role: 'attendee' } };
+  const cached = fakeGetConfig(['ops@example.org'], ['attendee@example.org']);
+  const live = { adminEmails: ['ops@example.org'], staffEmails: ['attendee@example.org'], staffExpiry: { 'attendee@example.org': Timestamp.fromMillis(Date.now() + 3_600_000) } };
+  const ok = await requireAttendeeAccess({ auth: fakeAuth({ good: ATTENDEE_TOKEN }), db: fakeUsersDb(profile, live), getConfig: cached }, reqWithAuth('Bearer good'));
+  assert.equal(ok.ok, true);
+  const down = await requireAttendeeAccess(
+    { auth: fakeAuth({ good: ATTENDEE_TOKEN }), db: fakeUsersDb(profile, new Error('firestore down')), getConfig: cached },
+    reqWithAuth('Bearer good'),
+  );
+  assert.equal(down.ok, false);
+  assert.equal(down.status, 500);
+});
+
+test('requireAttendeeAccess: an operator, or a caller on no list, never pays the live read', async () => {
+  const profile = { u9: { registrationStatus: 'approved', speakerId: null, role: 'attendee' } };
+  for (const cached of [fakeGetConfig(['attendee@example.org']), fakeGetConfig(['ops@example.org'])]) {
+    const db = fakeUsersDb(profile, { adminEmails: [] });
+    const verdict = await requireAttendeeAccess({ auth: fakeAuth({ good: ATTENDEE_TOKEN }), db, getConfig: cached }, reqWithAuth('Bearer good'));
+    assert.equal(verdict.ok, true);
+    assert.equal(db.bootstrapReads, 0);
+  }
 });
