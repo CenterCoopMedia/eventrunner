@@ -2,7 +2,8 @@
 
 **Date:** 2026-10-13  
 **Status:** Proposed for review with the implementation of [epic #483](https://github.com/CenterCoopMedia/eventrunner/issues/483). Merge accepts this extension; merchant setup and live sales require a separate launch decision.  
-**Extends:** [ADR 0001](0001-event-platform-v1.md), ticketing sections only.
+**Extends:** [ADR 0001](0001-event-platform-v1.md), ticketing sections only.  
+**Amended:** 2026-10-20, for a card pay link on an issued sponsor invoice ([#519](https://github.com/CenterCoopMedia/eventrunner/issues/519)). See [the amendment](#amendment-2026-10-20-invoice-pay-links).
 
 ## Decision and boundaries
 
@@ -11,7 +12,9 @@ mode, and one presentment currency. The organizer owns the account, payment rece
 refund decisions, disputes, payout destination, account access, and customer payment
 support. The deployment operator owns configuration, secrets, availability, and
 reconciliation support. Event Runner does not receive platform fees, route funds,
-or use Connect headers, destination charges, subscriptions, or invoices.
+or use Connect headers, destination charges, subscriptions, or Stripe Invoices. The
+one use of the same account outside ticket orders is the invoice pay link in the
+amendment below: a Checkout Session, not a Stripe Invoice.
 
 The first implementation uses Stripe-hosted Checkout after ticket selection on the
 event site. The original embedded requirement in [#325](https://github.com/CenterCoopMedia/eventrunner/issues/325)
@@ -211,6 +214,90 @@ demo policy, and worker races. A separately authorized Stripe sandbox rehearsal 
 cover authentication/3DS, declines, timeouts, webhook replay, expiry, refund states,
 and merchant receipt/email delivery before any live-sales decision. The PR evidence
 must distinguish those unrun external checks from local and hosted CI results.
+
+## Amendment 2026-10-20: invoice pay links
+
+**Status:** Accepted by the owner on 2026-10-20 ("Stripe pay link in v1", the approved
+invoicing spec on [#208](https://github.com/CenterCoopMedia/eventrunner/issues/208)).
+Implemented by [#519](https://github.com/CenterCoopMedia/eventrunner/issues/519).
+
+**Scope.** A deployment whose ticketing provider is Stripe may take one more kind of
+payment through the same organizer-owned account, mode and key: a fixed-amount card
+payment against one issued sponsor invoice. It is a Stripe-hosted Checkout Session in
+`payment` mode, card only, with one line of quantity one. Its amount is the invoice's
+frozen total, its currency is the invoice currency, and its name is the invoice number.
+The server builds it from the stored invoice; a request carries only the invoice id.
+Adaptive pricing, automatic tax, promotion codes, transfers, `on_behalf_of` and
+application fees are off, as for tickets. It is not a Stripe Invoice, a Payment Link, a
+subscription, or a ticket order. It reserves no inventory and grants no admission. A
+deployment on another provider has no pay links and changes nothing.
+
+**Records.** The links live on the invoice (`invoices/{id}.payLinks`), a server-only
+collection. Each link keeps its status (`creating`, `open`, `paid`, `expired`,
+`cancelled`, `failed`), the Session id, the amount, the currency, the mode, who made it,
+and when it ends and why it closed. The frozen request and its idempotency key are kept
+only while the link is `creating`, for a safe retry. The URL is shown only while the link
+is open. Card payments that were not applied go to `invoices/{id}.paymentReviews`. No
+raw provider payload is stored. The event data package carries the links and reviews
+without Stripe ids or URLs, like orders.
+
+**Lifetime.** A Checkout Session ends within 24 hours. A link is made for 23 hours, and
+staff make a new one after it ends. One link is open at a time. A press in the last 15
+minutes of a link replaces it: the old link is cancelled and its Session expired, and a
+payment that completed on it first still counts. A link is not replaced while an email of
+the invoice is being sent, since that email states the link. A payment applied through one link
+closes and expires any other open link. A lost create answer is
+retried with the same request and key for 22 hours, inside Stripe's idempotency window and
+while the frozen end time is still valid. A Stripe 4xx closes the attempt.
+
+**Reconciliation.** Payments use the existing verified webhook and its delivery
+deduplication. The Stripe adapter verifies the signature on the exact bytes, retrieves
+the event with the account's key, and checks mode, account and event id. A Checkout
+Session event whose metadata names an invoice of this event goes to the invoice step,
+never the ticket queue. The step retrieves the Session again and trusts only that copy.
+In one transaction with the delivery claim, it matches the Session to a link stored on
+the invoice (by Session id, or by the link id in its metadata when the create answer was
+lost), and checks `status=complete`, `payment_status=paid`, the amount against the link
+and the invoice total, and the currency. When all match and the invoice is issued, it
+marks the invoice paid (method `card`, via Stripe, with the Session and PaymentIntent
+ids), raises the revision, and writes the `admin_logs` row. The paid date is the day of
+Stripe's event on the event clock, so a late or retried delivery keeps the real day; the
+time the site recorded it is kept apart. A replayed or second event
+about a recorded Session changes nothing. PaymentIntent, charge, refund and dispute events
+that carry invoice metadata are acknowledged without work.
+
+**Payments that do not fit.** A paid Session for a void or already paid invoice,
+through a cancelled link, for another amount or currency, or with no stored link, is
+recorded on the invoice for review, written to `admin_logs`, and raised to the operator
+through a `system_errors` row, in the same transaction. The invoice status does not
+change. A payment through a Session the invoice has no record of also cancels every open
+link and expires it at Stripe. While any review is open, no new link is made. An operator
+closes the review with a note after acting in the Stripe Dashboard; that closes its
+`system_errors` alert in the same transaction.
+Event Runner never refunds.
+
+**Void, paid by hand, reopen.** Void and a payment recorded by hand set an open link to
+`cancelled` in their own transaction, then ask Stripe to expire the Session. When Stripe
+cannot be reached, the record says the link may still work until it ends; a payment
+through it is flagged as above. A paid invoice has no open link, so reopen needs no step;
+reopening a card payment does not move money, and staff may make a new link.
+
+**Risks.** (1) A payer on the hosted page while an invoice is voided can still complete
+the payment; it is flagged, and the merchant refunds it. (2) A link printed on a PDF or
+sent by email stops working after 23 hours; the PDF and email show the end time, and a
+fresh PDF or email carries a fresh link. (3) Refunds and disputes on an invoice payment
+are handled in the Stripe Dashboard and do not change the invoice; an operator reopens
+it if the money goes back. (4) The restricted key needs Checkout Session write and read
+for this use too; no new webhook event type is needed. (5) The invoice currency must be
+one of the MVP currencies above, and the total must be within Stripe's card minimum and
+the `MAX_AMOUNT` ceiling. (6) Historical-demo mode refuses new links and ignores payment
+events, as for tickets.
+
+**Tests.** Credential-free tests cover a test-mode Session built from the frozen invoice,
+a lost create answer, webhook replay, duplicate events, a payment after void, currency
+and amount mismatches, an unknown Session, signature and account spoofing, and the
+read-only demo. The separately authorized Stripe sandbox rehearsal must add a real
+invoice payment, a payment after void, and an expired link before live use.
 
 ## Provider references
 

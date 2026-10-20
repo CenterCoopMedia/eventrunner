@@ -160,9 +160,13 @@ export default function AdminInvoicesList() {
       ),
       billTo: invoice.billTo?.name || '—',
       status: (
-        <StatusBadge tone={INVOICE_STATUS_TONES[invoice.status] ?? 'neutral'} data-invoice-status={invoice.status}>
-          {INVOICE_STATUS_WORDS[invoice.status] ?? invoice.status}
-        </StatusBadge>
+        <span className="inline-flex flex-wrap items-center gap-3xs">
+          <StatusBadge tone={INVOICE_STATUS_TONES[invoice.status] ?? 'neutral'} data-invoice-status={invoice.status}>
+            {INVOICE_STATUS_WORDS[invoice.status] ?? invoice.status}
+          </StatusBadge>
+          {/* A card payment waits for an operator's review (#519). */}
+          {invoice.needsReview ? <StatusBadge tone="error" data-invoice-review="">Needs review</StatusBadge> : null}
+        </span>
       ),
       due: invoice.dueDate ? <span className="font-admin-data tabular-nums">{invoice.dueDate}</span> : 'No due date',
       total: formatMoney(invoice.totals?.total ?? 0, invoice.currency),

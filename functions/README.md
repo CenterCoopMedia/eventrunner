@@ -44,8 +44,8 @@ if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
 | Tier | Endpoints |
 |---|---|
-| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, `exportEventData` for `orders` and `admissions`, and `invoiceAdmin` for `saveSettings`, `void` and `reopen` |
-| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `speakerMailTemplates`, `reminderSchedules`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers`, `organizations` and `invoices`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `getAnnouncementSend`, `announcementMessages`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, `invoiceAdmin` (every action but `saveSettings`, `void` and `reopen`), `invoicePdf`, and the other five `webMcp*` diagnostics |
+| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, `exportEventData` for `orders` and `admissions`, and `invoiceAdmin` for `saveSettings`, `void`, `reopen` and `resolvePaymentReview` |
+| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `speakerMailTemplates`, `reminderSchedules`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers`, `organizations` and `invoices`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `getAnnouncementSend`, `announcementMessages`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, `invoiceAdmin` (every action but `saveSettings`, `void`, `reopen` and `resolvePaymentReview`), `invoicePdf`, and the other five `webMcp*` diagnostics |
 
 Announcement email admits staff because staff run attendee communication day to day, the same tier as the site banner on that page. The safety is in the flow, not the tier: the server picks the audience, the send must match the preview's receipt, the page confirms the count, every recipient has a send-once key, every address can unsubscribe, and every send writes `admin_logs`.
 
@@ -236,12 +236,13 @@ the native attendee read/checkout handlers do not need them.
 `invoiceAdmin` (`src/admin/invoices.cjs`, issues #208 and #209) is a POST action API
 in the shape of `ticketingCommerceAdmin`: `list`, `get`, `settings`, `saveDraft`,
 `deleteDraft`, `saveSettings`, `issue`, `markPaid`, `void`, `reopen`, `duplicate`,
-`previewSend` and `send`.
-Staff run every action but `saveSettings`, `void` and `reopen`, which need an
-operator: `invoice_settings/current` holds the issuer's tax ID and bank details, a
-void is final, and a reopen undoes a recorded payment. Every answer that carries an
-invoice also carries `canVoid` and `canReopen`, so the page offers those controls only
-to an operator. The Stripe pay link comes in a later part.
+`previewSend`, `send`, `createPayLink` and `resolvePaymentReview`.
+Staff run every action but `saveSettings`, `void`, `reopen` and
+`resolvePaymentReview`, which need an operator: `invoice_settings/current` holds the
+issuer's tax ID and bank details, a void is final, a reopen undoes a recorded payment,
+and a review closes a card payment that was not applied. Every answer that carries an
+invoice also carries `canVoid`, `canReopen` and `cardPayments` (`{ available, reason,
+testMode }`), so the page offers those controls only where they work.
 
 The three collections (`invoices`, `invoice_counters`, `invoice_settings`) deny every
 client read and write. `saveDraft` takes the client-minted `invoiceId` and the
@@ -331,9 +332,56 @@ each attachment's name, type and size, never its content. Postmark maps them to 
 and `Attachments` (7 MB of files, inside its 10 MB message limit). The console
 provider writes them to `E2E_MAIL_FILE`, content included, and logs only the names.
 
+**Stripe pay link.** `createPayLink` and `resolvePaymentReview`
+(`src/admin/invoicePayLink.cjs`, part 5, #519; scope in the
+[ADR 0004 amendment](../docs/adr/0004-stripe-ticket-commerce.md#amendment-2026-10-20-invoice-pay-links)).
+`createPayLink` takes `{ invoiceId }` only. It answers 409 `pay-links-unavailable`
+unless `EVENT_TICKETING_PROVIDER=stripe` and the provider builds with a mode-matching
+key (`getPayments`; no Stripe request). It refuses a draft, void or paid invoice, an
+unsupported currency, a total under Stripe's minimum or over `MAX_AMOUNT` (409
+`amount-out-of-range`), and a read-only demo. In one transaction it freezes a
+hosted, card-only Checkout Session request built from the stored invoice (total,
+currency, `Invoice <number>`, metadata `eventRunnerInvoiceId`, `eventRunnerEventId`,
+`eventRunnerPayLinkId`, a 23-hour `expires_at`, return to the public site root) and an
+idempotency key on the invoice's `payLinks` list (`creating`). The provider's
+`createInvoiceCheckoutSession` checks that policy again before the request. A lost
+answer (503 `stripe-unavailable`) is retried with the same request and key for 22 hours;
+a Stripe 4xx closes the attempt (502 `stripe-refused`). A second transaction checks
+Stripe's answer against the attempt (id, https URL, amount, currency, metadata, mode),
+opens the link, drops the frozen request and key, and writes `invoices.pay-link-created`.
+A press while a link has more than 15 minutes left answers it (`repeated: true`); a
+press in its last 15 minutes cancels and expires it and makes a new one, except while an
+email of the invoice is `sending` (409, `refuseWhileSending`). While any `paymentReviews`
+entry is unresolved, `createPayLink` answers 409 `payment-review-open`.
+`markPaid` and `void` set an open link to `cancelled` in their own transaction and then
+expire the Session at Stripe; `stripeClosed` records whether Stripe confirmed. The
+public link carries its address only while `open`.
+
+Payments arrive through `ticketingWebhook`. The Stripe provider routes a verified
+Checkout Session event whose metadata names an invoice of this event to
+`applyInvoiceCheckout` (event type `invoice.checkout`, never the ticket queue), and
+acknowledges the PaymentIntent, charge, refund and dispute events of an invoice
+without work. `applyInvoiceCheckout` retrieves the Session again, then in one
+transaction creates the `ticket_webhook_deliveries` claim and either marks the
+invoice paid (`payment: { method: 'card', via: 'stripe', stripe: { sessionId,
+paymentIntentId }, recordedBy: null }`, revision + 1, `invoices.paid` with `actor:
+'stripe'`) or appends to `paymentReviews` (codes `invoice-void`,
+`invoice-already-paid`, `invoice-not-issued`, `link-cancelled`, `currency-mismatch`,
+`amount-mismatch`, `unknown-session`), writes `invoices.stripe-payment-flagged`, and
+creates a `system_errors` row (`invoice-payment-review`, id `invoice_review_<hash of the
+session id>`) so the operator is alerted. An `unknown-session` payment also cancels every
+open link and expires it at Stripe. `resolvePaymentReview` marks that alert resolved in
+the same transaction. `paidOn` is the Stripe event's `created` time on the event clock
+(`eventCreated` from the provider's verification), never later than processing time;
+`recordedAt` is processing time. A
+replayed or second event about a recorded session answers `duplicate` or
+`already-recorded`. `invoiceAdmin` binds `TICKETING_API_TOKEN` when the provider is
+Stripe; the webhook secret stays with `ticketingWebhook`.
+
 **Export.** `exportEventData` has an `invoices` dataset (staff), and the event data
 package a `billing` part with `billing/invoices.json` and `billing/invoices.csv`
 (`exportRecords.cjs` `invoiceRecord`: no account ids; `emailSends` keeps each email's
-status, addresses, times and message id). `invoice_settings` and
+status, addresses, times and message id; `payLinks` and `paymentReviews` keep status,
+amounts and times, and, like orders, no Stripe id or payment page address). `invoice_settings` and
 `invoice_counters` are in the package's EXCLUDED list, and the repeat-event template
 leaves all three collections behind.

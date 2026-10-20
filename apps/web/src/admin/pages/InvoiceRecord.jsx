@@ -1,6 +1,8 @@
 // The record of an issued invoice (issue #209), and what staff can do with
-// it: email it as a PDF (part 4, InvoiceEmailForm), mark it paid, duplicate
-// it into a new draft, and, for an operator, void it or reopen a paid one.
+// it: email it as a PDF (part 4, InvoiceEmailForm), make a Stripe card
+// payment link (part 5, InvoiceCardPayment), mark it paid, duplicate it into
+// a new draft, and, for an operator, void it, reopen a paid one, or close a
+// flagged card payment.
 //
 // Everything here is the server's frozen copy: the number, the issue date
 // and the issuer block were fixed at issue, so later settings edits do not
@@ -16,6 +18,7 @@ import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_WORDS,
   invoiceDateIn,
+  paymentMethodText,
   validatePayment,
   validateReopenReason,
   validateVoidReason,
@@ -31,6 +34,7 @@ import {
 import { messageOf } from '../invoiceDoc.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
 import InvoiceEmailForm from './InvoiceEmailForm.jsx';
+import { PayByCard, PaymentReviews, openPayLink } from './InvoiceCardPayment.jsx';
 
 const panelClass = 'admin-panel min-w-0 rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md';
 const termClass = 'text-admin-ink-secondary';
@@ -221,7 +225,7 @@ function PaymentHistory({ history }) {
         {history.map((entry, index) => (
           <li key={`${entry.paidOn}-${index}`}>
             <span className="font-admin-data tabular-nums">{entry.paidOn}</span>
-            {`, ${PAYMENT_METHOD_WORDS[entry.method] ?? 'Other'}`}
+            {`, ${paymentMethodText(entry) || 'Other'}`}
             {entry.note ? `, ${entry.note}` : ''}
             {`. Reopened: ${entry.reason || 'no reason given'}`}
           </li>
@@ -270,10 +274,13 @@ function EmailHistory({ sends }) {
  * @param {{ invoice: object, canVoid: boolean, canReopen: boolean, timeZone?: string, busy: string|null,
  *           onMarkPaid: (payment: object) => Promise<void>, onVoid: (reason: string) => Promise<void>,
  *           onReopen: (reason: string) => Promise<void>, onDuplicate: () => void,
- *           onPreviewEmail: (input: object) => Promise<object>, onSendEmail: (input: object) => Promise<void> }} props
+ *           onPreviewEmail: (input: object) => Promise<object>, onSendEmail: (input: object) => Promise<void>,
+ *           cardPayments?: object, onCreatePayLink: () => Promise<void>,
+ *           onResolveReview: (reviewId: string, note: string) => Promise<void> }} props
  */
 export default function InvoiceRecord({
   invoice, canVoid, canReopen, timeZone, busy, onMarkPaid, onVoid, onReopen, onDuplicate, onPreviewEmail, onSendEmail,
+  cardPayments, onCreatePayLink, onResolveReview,
 }) {
   const headingId = useId();
   const [open, setOpen] = useState(null);
@@ -289,6 +296,7 @@ export default function InvoiceRecord({
         </p>
       </div>
       <div className="flex flex-col gap-md">
+        <PaymentReviews invoice={invoice} canResolve={canVoid} busy={busy} onResolve={onResolveReview} />
         <dl className="grid max-w-[40rem] grid-cols-[minmax(8rem,auto)_1fr] gap-x-md gap-y-3xs text-admin-base">
           <Row term="Number"><span className="font-admin-data">{invoice.number}</span></Row>
           <Row term="Issue date"><span className="font-admin-data tabular-nums">{invoice.issueDate}</span></Row>
@@ -301,13 +309,17 @@ export default function InvoiceRecord({
           {invoice.payment ? (
             <>
               <Row term="Paid on"><span className="font-admin-data tabular-nums">{invoice.payment.paidOn}</span></Row>
-              <Row term="Method">{PAYMENT_METHOD_WORDS[invoice.payment.method] ?? 'Other'}</Row>
+              <Row term="Method">{paymentMethodText(invoice.payment) || 'Other'}</Row>
+              <Row term="Stripe payment">
+                {invoice.payment.stripe?.paymentIntentId ? <span className="font-admin-data">{invoice.payment.stripe.paymentIntentId}</span> : null}
+              </Row>
               <Row term="Payment note">{invoice.payment.note}</Row>
             </>
           ) : null}
           {invoice.voided ? <Row term="Void reason">{invoice.voided.reason}</Row> : null}
         </dl>
         <PaymentHistory history={invoice.paymentHistory} />
+        <PayByCard invoice={invoice} cardPayments={cardPayments} timeZone={timeZone} busy={busy} onCreatePayLink={onCreatePayLink} />
         <EmailHistory sends={invoice.emailSends} />
         {status === 'void' ? (
           <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
@@ -379,7 +391,8 @@ export default function InvoiceRecord({
           <ReasonForm
             alarm
             title={`Void ${invoice.number}?`}
-            explanation="The invoice stays in the list as Void, and its number is never given to another invoice. A void cannot be undone. To bill again, duplicate it as a new draft."
+            explanation={`The invoice stays in the list as Void, and its number is never given to another invoice. A void cannot be undone. To bill again, duplicate it as a new draft.${
+              openPayLink(invoice) ? ' The open card payment link closes too.' : ''}`}
             label="Reason"
             hint="Required. Kept with the invoice and in the audit log."
             maxLength={INVOICE_LIMITS.voidReason}
@@ -398,7 +411,8 @@ export default function InvoiceRecord({
         {open === 'reopen' && status === 'paid' ? (
           <ReasonForm
             title={`Reopen ${invoice.number}?`}
-            explanation="The invoice goes back to Issued, so it can be paid again. The payment is not deleted: it moves to Earlier payments with your reason."
+            explanation={`The invoice goes back to Issued, so it can be paid again. The payment is not deleted: it moves to Earlier payments with your reason.${
+              invoice.payment?.via === 'stripe' ? ' The card payment stays in Stripe. Refund it in the Stripe Dashboard if the money goes back.' : ''}`}
             label="Reason for reopening"
             hint="Required. Such as a bounced check. Kept with the payment and in the audit log."
             maxLength={INVOICE_LIMITS.reopenReason}
