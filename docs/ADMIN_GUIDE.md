@@ -781,7 +781,34 @@ Requests for a change to the site, from signed-in visitors and from staff. Both 
 - **Remove** deletes the request and its text. It cannot be undone.
 - **The admin log records every request, status change, and removal**, with the account that did it and the request's record. The log never holds the text of a request.
 
-Only admins can read a request. The sender cannot read it back, and no email is sent. When an account is deleted in Attendees, the change requests it sent are deleted too, and the server refuses a new request from that account's open session.
+When an account is deleted in Attendees, the change requests it sent are deleted too, and the server refuses a new request from that account's open session.
+
+### What the sender sees
+
+The sender follows their own requests on **Your change requests** (`/profile/change-requests`). The footer links to it, and so does the dialog after a send. The page shows only the sender's own requests. For each request it shows the text and page they sent, the status, and the history of status changes with their times. It does not show who made a change.
+
+When a request is **Done** or **Declined**, the page also shows the reply and the result link you write for the sender. It shows nothing else that staff see: no staff address, no email record, and no other sender's request. The page works while the feature is off, so a sender can still read what they sent.
+
+### Reply and result link
+
+A done or declined row has **Reply and result link** (or **Reply** for a declined request). Write the reply in plain words. The sender reads it on their page. It is not emailed.
+
+The result link is optional. It must be a page on this site, and you must open it and select **I opened this link and it shows the change** before you save it. Mark a request done only when you checked the change yourself. A deploy or a publish that ran is not proof that the change is live. Nothing in this system marks a request done by itself, and nothing acts on the text of a request.
+
+### Emails to the sender
+
+Two emails can go to the sender. Both are off by default. An operator turns them on under **Manage requester emails** at the top of the page. Every staff member sees a line that says which emails are on.
+
+- **The acknowledgement** goes when a request is stored.
+- **The outcome email** goes the first time a request is marked **Done**, and the first time it is marked **Declined**. Marking a request done again, or reopening it and marking it done again, sends nothing more.
+
+The wording is fixed in the code, and no editor changes it. An email never quotes the request, the page, the reply, or the link. It says what happened and links to the sender's own page. The emails go on the transactional stream. An address that unsubscribed from announcements gets none of them. A historical demo sends none.
+
+Each row lists the emails of that request and their state: **Sent**, **Not sent**, **May have been sent**, **Sending**, or **Not sent: unsubscribed**. A failed email never undoes the request or the status. **Retry the … email** sends it again with a new attempt. For an email that may have been sent, check the Email log first and confirm, because a retry can deliver a second copy. A retry is refused when that email is off, or when the request's status changed since.
+
+### Response targets
+
+The system does not promise a reply time, and no email names one. Decide your own targets as policy, for example "acknowledge within two working days, and record an outcome within ten". Write them where your team and your visitors can read them, such as a page on the site. Use the **Open** filter to find requests that wait for a reply.
 
 ## Materials
 

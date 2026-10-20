@@ -118,6 +118,19 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Change request progress and outcome emails (#330). A signed-in sender reads their own
+          requests on <strong>Your change requests</strong> (<code>/profile/change-requests</code>): the status, the
+          history of status changes, and, once a request is done or declined, the reply and the
+          result link staff wrote for them. The new endpoint <code>listMyChangeRequests</code> answers only
+          the caller&#39;s requests and only those fields. Staff record the reply and an optional
+          result link with <code>saveChangeRequestOutcome</code>. The link must be on the site&#39;s own origin,
+          and staff must confirm they opened it. Two emails, both off by default, are turned on by
+          an operator through <code>saveChangeRequestNoticeSettings</code>: an acknowledgement when a request
+          is stored, and one outcome email the first time a request is done or declined. They have
+          fixed wording, quote nothing of the request, go on the transactional stream, use one
+          send-once key per attempt, and skip an address with a suppression record. Staff can
+          retry a failed email with <code>retryChangeRequestNotice</code>. A new admin-readable collection,
+          <code>change_request_settings</code>, holds the settings.</li>
           <li>Saved announcement messages (#496, #203). On the Announcements page, staff save a
           subject, a message and a button under a name, then load one into a new, unsent email.
           The audience stays as set, and any preview goes away. A draft with unsaved changes asks
