@@ -30,6 +30,7 @@ const {
 } = require('shared/profile');
 
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
+const { REPRESENTATIVES, EDIT_REQUESTS } = require('../cms/organizationRepresentatives.cjs');
 
 const USERS = 'users';
 const USERS_PUBLIC = 'users_public';
@@ -111,6 +112,24 @@ function createOnUserCreated({ db, now = () => new Date(), log = console }) {
 }
 
 /**
+ * Remove a deleted account's organization representative access (issue
+ * #334). deleteAttendee clears both stores itself, but an account deleted
+ * straight from Firebase Auth reaches only this trigger. The grant goes
+ * first, so no new edit can be queued under the account; then every edit
+ * this account sent and nobody has reviewed. The query runs in a
+ * transaction, so an edit another representative sent in the meantime is
+ * read as theirs and kept. Idempotent, so a retried delivery is safe.
+ */
+async function removeRepresentativeAccess({ db, uid }) {
+  const grantRef = db.collection(REPRESENTATIVES).doc(uid);
+  if ((await grantRef.get()).exists) await grantRef.delete();
+  await db.runTransaction(async (tx) => {
+    const sent = await tx.get(db.collection(EDIT_REQUESTS).where('submittedByUid', '==', uid));
+    for (const request of sent.docs) tx.delete(request.ref);
+  });
+}
+
+/**
  * Core of the auth onDelete trigger.
  *
  * A deleted Firebase Auth account whose `users/{uid}` document survives is
@@ -121,6 +140,7 @@ function createOnUserCreated({ db, now = () => new Date(), log = console }) {
  * schedule. When there is no account document to delete (a sign-in that
  * never seeded, or a document already removed), neither trigger fires, so
  * the profile and the shared schedule are removed here. Issue #350.
+ * Organization representative access goes in either case (issue #334).
  *
  * @param {{ db: object, log?: { error: Function } }} deps
  * @returns {(authUser: { uid: string }) => Promise<{ deleted: boolean }>}
@@ -132,6 +152,7 @@ function createOnUserDeleted({ db, log = console }) {
       log.error('onUserDeleted called without a uid');
       return { deleted: false };
     }
+    await removeRepresentativeAccess({ db, uid });
     const userRef = db.collection(USERS).doc(uid);
     const existing = await userRef.get();
     if (existing.exists) {

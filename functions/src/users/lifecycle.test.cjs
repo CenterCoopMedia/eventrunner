@@ -19,8 +19,27 @@ function fakeDb(seed = {}) {
   return {
     docs,
     writes,
+    // A single-field equality query and a transaction that applies its
+    // deletes at once: enough for onUserDeleted's representative cleanup.
+    async runTransaction(fn) {
+      return fn({
+        get: (target) => target.get(),
+        delete: (ref) => ref.delete(),
+      });
+    },
     collection(name) {
+      const collection = this;
       return {
+        where(field, op, value) {
+          return {
+            async get() {
+              const matches = [...docs.entries()]
+                .filter(([key, data]) => key.startsWith(`${name}/`) && op === '==' && data?.[field] === value)
+                .map(([key, data]) => ({ id: key.slice(name.length + 1), data: () => data, ref: collection.collection(name).doc(key.slice(name.length + 1)) }));
+              return { docs: matches, empty: matches.length === 0, size: matches.length };
+            },
+          };
+        },
         doc(id) {
           const key = `${name}/${id}`;
           return {
@@ -126,6 +145,38 @@ test('a deleted account with no document still has its projection and public sch
   assert.equal(result.deleted, false);
   assert.equal(db.docs.has('users_public/u1'), false);
   assert.equal(db.docs.has('schedule_shares/u1'), false);
+});
+
+// Issue #334 (Codex review on #540): an account deleted straight from
+// Firebase Auth, not through deleteAttendee, must not leave a grant that a
+// recycled uid could use, or a queued edit naming the deleted person.
+test('deleting the auth account removes its representative grant and the edit it sent, and nobody else’s', async () => {
+  const db = fakeDb({
+    'users/u1': { uid: 'u1' },
+    'organization_representatives/u1': { uid: 'u1', organizationId: 'beacon-fund' },
+    'organization_representatives/u2': { uid: 'u2', organizationId: 'tide-media' },
+    'organization_edit_requests/beacon-fund': { organizationId: 'beacon-fund', fields: { bio: 'x' }, submittedByUid: 'u1' },
+    'organization_edit_requests/tide-media': { organizationId: 'tide-media', fields: { bio: 'y' }, submittedByUid: 'u2' },
+  });
+  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  assert.equal(result.deleted, true);
+  assert.equal(db.docs.has('users/u1'), false);
+  assert.equal(db.docs.has('organization_representatives/u1'), false);
+  assert.equal(db.docs.has('organization_edit_requests/beacon-fund'), false);
+  assert.equal(db.docs.has('organization_representatives/u2'), true);
+  assert.equal(db.docs.has('organization_edit_requests/tide-media'), true);
+});
+
+test('the cleanup runs for an account with no document too, and keeps an edit another account sent', async () => {
+  const db = fakeDb({
+    'organization_representatives/u1': { uid: 'u1', organizationId: 'beacon-fund' },
+    // A second representative of the same organization sent this one.
+    'organization_edit_requests/beacon-fund': { organizationId: 'beacon-fund', fields: { bio: 'x' }, submittedByUid: 'u3' },
+  });
+  const result = await createOnUserDeleted({ db })({ uid: 'u1' });
+  assert.equal(result.deleted, false);
+  assert.equal(db.docs.has('organization_representatives/u1'), false);
+  assert.equal(db.docs.has('organization_edit_requests/beacon-fund'), true);
 });
 
 test('onUserDeleted without a uid writes nothing', async () => {
