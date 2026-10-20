@@ -326,6 +326,7 @@ test('listSentEmails: newest first, list fields only, and select names no body f
     retries: 0,
     bodyStored: true,
     bodyTruncated: false,
+    sendId: null,
   });
   assert.equal(res.body.rows[1].to, null);
   assert.equal(res.body.rows[1].error, 'no recipient');
@@ -375,6 +376,34 @@ test('source, status, and both together filter the list', async () => {
     (await list(db, { source: 'feedback', status: 'sent' })).body.rows.map((r) => r.id),
     ['feedback-ok'],
   );
+});
+
+// Issue 497: the recipient rows of one announcement send.
+test('sendId filters to the recipient rows of one announcement send, alone or with a status', async () => {
+  const db = makeFakeDb({
+    ...BOOTSTRAP,
+    'sent_emails/a1': row({ source: 'announcement', sendId: 'send-aaaa-1111', sentAt: new Date(4000) }),
+    'sent_emails/b1': row({ source: 'announcement', sendId: 'send-bbbb-2222', sentAt: new Date(3000) }),
+    'sent_emails/a2': row({ source: 'announcement', sendId: 'send-aaaa-1111', status: 'failed', sentAt: new Date(2000) }),
+    // An older row with no send id stays readable and never matches.
+    'sent_emails/old': row({ source: 'announcement', sentAt: new Date(1000) }),
+  });
+  const one = await list(db, { sendId: 'send-aaaa-1111' });
+  assert.equal(one.statusCode, 200);
+  assert.deepEqual(one.body.rows.map((r) => [r.id, r.sendId]), [['a1', 'send-aaaa-1111'], ['a2', 'send-aaaa-1111']]);
+  const failed = await list(db, { sendId: 'send-aaaa-1111', status: 'failed' });
+  assert.deepEqual(failed.body.rows.map((r) => r.id), ['a2']);
+  const withSource = await list(db, { sendId: 'send-bbbb-2222', source: 'announcement' });
+  assert.deepEqual(withSource.body.rows.map((r) => r.id), ['b1']);
+  assert.deepEqual((await list(db)).body.rows.map((r) => r.sendId), ['send-aaaa-1111', 'send-bbbb-2222', 'send-aaaa-1111', null]);
+  // getSentEmail is the recipient detail and still serves an old row.
+  assert.equal((await get(db, { id: 'old' })).body.row.sendId, null);
+
+  for (const sendId of ['', 'short', 'x'.repeat(65), 'has space!', 'a/b/c/d/e', 42, {}]) {
+    const res = await list(db, { sendId });
+    assert.equal(res.statusCode, 400, String(sendId));
+    assert.match(res.body.error.message, /^sendId /);
+  }
 });
 
 test('listSentEmails: 400 naming the field for a bad q, source, status, limit or cursor, never echoing the value', async () => {
@@ -569,6 +598,7 @@ test('getSentEmail returns the stored bodies and the provider fields', async () 
     retries: 0,
     bodyStored: true,
     bodyTruncated: true,
+    sendId: null,
     html: '<p>Hi.</p>',
     text: 'Hi.',
     providerMessageId: 'pm-1',
@@ -622,7 +652,7 @@ test('isValidDocId accepts an auto id and refuses the shapes doc() and startAfte
 
 // --- deploy surface -----------------------------------------------------------
 
-test('firestore.indexes.json declares the three sent_emails indexes the filters need', () => {
+test('firestore.indexes.json declares the sent_emails indexes the filters need', () => {
   const declared = JSON.parse(readFileSync(join(__dirname, '..', '..', '..', 'firestore.indexes.json'), 'utf8'));
   const shapes = (declared.indexes || [])
     .filter((ix) => ix.collectionGroup === 'sent_emails' && ix.queryScope === 'COLLECTION')
@@ -631,6 +661,10 @@ test('firestore.indexes.json declares the three sent_emails indexes the filters 
     'source ASCENDING, sentAt DESCENDING',
     'status ASCENDING, sentAt DESCENDING',
     'source ASCENDING, status ASCENDING, sentAt DESCENDING',
+    'sendId ASCENDING, sentAt DESCENDING',
+    'sendId ASCENDING, status ASCENDING, sentAt DESCENDING',
+    'sendId ASCENDING, source ASCENDING, sentAt DESCENDING',
+    'sendId ASCENDING, source ASCENDING, status ASCENDING, sentAt DESCENDING',
   ]) {
     assert.ok(shapes.includes(expected), `missing (${expected}) on sent_emails`);
   }

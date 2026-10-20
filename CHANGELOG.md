@@ -26,6 +26,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read-only demo refuses a link and ignores payment events. ADR 0004 gains an amendment
   for this use of Stripe. `invoiceAdmin` binds `TICKETING_API_TOKEN` when the provider is
   Stripe; no new function and no new webhook event type.
+- Saved announcement messages (#496, #203). On the Announcements page, staff save a
+  subject, a message and a button under a name, then load one into a new, unsent email.
+  The audience stays as set, and any preview goes away. A draft with unsaved changes asks
+  before a load replaces it. Staff can update, rename and remove a saved message. Two
+  messages can share a name; each has its own id. The server checks a saved message with
+  the composer's own draft check, and keeps it in a new private store,
+  `announcement_messages`, through the staff endpoint `announcementMessages`. Browsers
+  cannot read or write the store. A saved message keeps no audience and no address. It
+  stays until staff remove it, at most 100. A historical demo refuses changes. Each change
+  writes an `admin_logs` row without the name or the message.
+- Announcement send history details (#497, #203). The history pages 20 sends at a time
+  and shows no recipient address and no message. **Show details** opens the message as the
+  send started it and the failed addresses, through the new staff endpoint
+  `getAnnouncementSend`, which writes an `admin_logs` row for each read. Each recipient's
+  email log row now holds the send id, and `listSentEmails` takes a `sendId` filter, so the
+  details link to that send's rows in the email log. When the email log cannot record a
+  message, `sendBatch` reports it on that result, and the history says how many messages
+  have no row. Maintenance removes the content of a send record after 90 days, as it
+  removes email log rows. It keeps the unsubscribe key, so old unsubscribe links still
+  work.
 - Invoices, part 4 (#208). Staff email an issued or paid invoice with its PDF attached.
   **Email invoice** on the invoice record sends it to the billing email on the invoice; staff
   may add one copy address and a short note, and cannot choose another recipient. They

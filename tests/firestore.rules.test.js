@@ -571,6 +571,9 @@ describe("server-only collections stay deny-all", () => {
     // Announcement email (issues #202, #490): recipient lists, signing keys,
     // opt-outs, and the unsubscribe rate limit.
     "announcement_sends",
+    // Saved announcement messages (issue #496): staff reach them only
+    // through the announcementMessages endpoint.
+    "announcement_messages",
     "email_suppressions",
     "unsubscribe_rate_limits",
     "system_errors",
@@ -637,6 +640,40 @@ describe("server-only collections stay deny-all", () => {
     }
     for (const db of [staff(), nonAdmin()]) {
       await assertFails(getDoc(doc(db, "sent_emails/logged-1")));
+    }
+  });
+
+  // Saved announcement messages (issue #496) and the send records (#497)
+  // are read through staff endpoints only: no tier lists them, reads one,
+  // writes one, or removes one from the browser.
+  it("denies every client list, read, write and delete on saved messages and send records, admin included", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "announcement_messages/msg-1"), {
+        name: "Weekly note",
+        subject: "Doors open at nine",
+        message: "Bring your badge.",
+        linkUrl: "",
+        linkLabel: "",
+        createdAt: new Date(1000),
+        updatedAt: new Date(1000),
+      });
+      await setDoc(doc(ctx.firestore(), "announcement_sends/send-1"), {
+        status: "sent",
+        subject: "Doors open at nine",
+        recipients: [{ uid: "a", email: "reader@example.com" }],
+        createdAt: new Date(1000),
+      });
+    });
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      for (const c of ["announcement_messages", "announcement_sends"]) {
+        await assertFails(getDocs(collection(db, c)));
+        await assertFails(getDocs(query(collection(db, c), orderBy("createdAt", "desc"))));
+      }
+      await assertFails(getDoc(doc(db, "announcement_messages/msg-1")));
+      await assertFails(getDoc(doc(db, "announcement_sends/send-1")));
+      await assertFails(setDoc(doc(db, "announcement_messages/msg-2"), { name: "x", subject: "s", message: "m" }));
+      await assertFails(updateDoc(doc(db, "announcement_messages/msg-1"), { name: "y" }));
+      await assertFails(deleteDoc(doc(db, "announcement_messages/msg-1")));
     }
   });
 

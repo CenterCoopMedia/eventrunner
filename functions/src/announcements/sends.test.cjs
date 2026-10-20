@@ -21,6 +21,7 @@ const {
   createPreviewAnnouncementEmailHandler,
   createSendAnnouncementTestHandler,
   createSendAnnouncementEmailHandler,
+  createGetAnnouncementSendHandler,
   internals: sendsInternals,
 } = require('./sends.cjs');
 const {
@@ -77,7 +78,7 @@ function memoryFirestore() {
     return ref;
   }
 
-  function query(collectionName, spec = { filters: [], order: null, max: null }) {
+  function query(collectionName, spec = { filters: [], orders: [], after: null, max: null }) {
     const next = (patch) => query(collectionName, { ...spec, ...patch });
     return {
       doc: (id) => docRef(collectionName, id ?? `auto${(autoId += 1)}`),
@@ -87,7 +88,9 @@ function memoryFirestore() {
         return ref;
       },
       where: (field, op, value) => next({ filters: [...spec.filters, { field, op, value }] }),
-      orderBy: (field, dir = 'asc') => next({ order: { field, dir } }),
+      // '__name__' orders by the document id, as the Admin SDK does.
+      orderBy: (field, dir = 'asc') => next({ orders: [...spec.orders, { field, dir }] }),
+      startAfter: (...values) => next({ after: values }),
       limit: (max) => next({ max }),
       select: () => next({}),
       async get() {
@@ -105,9 +108,26 @@ function memoryFirestore() {
           });
           if (keep) docs.push(snapshot(path, docRef(collectionName, path.slice(prefix.length))));
         }
-        if (spec.order) {
-          const { field, dir } = spec.order;
-          docs.sort((a, b) => compare(a.data()[field], b.data()[field]) * (dir === 'desc' ? -1 : 1));
+        const valueOf = (doc, field) => (field === '__name__' ? doc.id : doc.data()[field]);
+        // Firestore leaves out a document that lacks an ordered field.
+        docs = docs.filter((doc) => spec.orders.every(({ field }) => valueOf(doc, field) !== undefined));
+        const order = (a, b) => {
+          for (const { field, dir } of spec.orders) {
+            const c = compare(valueOf(a, field), valueOf(b, field)) * (dir === 'desc' ? -1 : 1);
+            if (c !== 0) return c;
+          }
+          return 0;
+        };
+        docs.sort(order);
+        if (spec.after) {
+          docs = docs.filter((doc) => {
+            for (let i = 0; i < spec.orders.length; i += 1) {
+              const { field, dir } = spec.orders[i];
+              const c = compare(valueOf(doc, field), spec.after[i]);
+              if (c !== 0) return dir === 'desc' ? c < 0 : c > 0;
+            }
+            return false;
+          });
         }
         if (spec.max != null) docs = docs.slice(0, spec.max);
         return { docs, empty: docs.length === 0, size: docs.length };
@@ -270,6 +290,7 @@ async function harness({ backend, providerKind = 'console', postmarkStream, seed
     preview: createPreviewAnnouncementEmailHandler(deps),
     testSend: createSendAnnouncementTestHandler(deps),
     send: createSendAnnouncementEmailHandler(deps),
+    detail: createGetAnnouncementSendHandler(deps),
     unsubscribe: createEmailUnsubscribeHandler({ db, getConfig, log: QUIET }),
     restore: createRemoveEmailSuppressionHandler({ db, auth, getConfig, log: QUIET }),
   };
@@ -380,6 +401,8 @@ for (const backend of backends) {
     const rows = await docsOf(h.db, 'sent_emails');
     assert.equal(rows.length, 2);
     assert.ok(rows.every((row) => row.source === 'announcement' && row.status === 'sent'));
+    // Each recipient row names its send (issue #497); the source stays fixed.
+    assert.ok(rows.every((row) => row.sendId === sent.body.send.id));
 
     // A separate stream, the one-click headers, and a link per recipient.
     for (const message of h.mail) {
@@ -406,6 +429,12 @@ for (const backend of backends) {
     assert.equal(row.createdBy, STAFF);
     assert.equal(row.recipients, undefined);
     assert.equal(row.unsubscribeKey, undefined);
+    // A summary only: no address, no message body (issue #497).
+    assert.equal(row.failures, undefined);
+    assert.equal(row.message, undefined);
+    assert.equal(row.link, undefined);
+    assert.equal(row.auditGaps, 0);
+    assert.equal(history.body.nextCursor, null);
     assert.deepEqual(history.body.channel, { canSend: true, blocker: null, mode: 'app' });
     assert.deepEqual(history.body.audiences.map((a) => a.id), ['registered', 'approved', 'speakers']);
   });
@@ -885,5 +914,194 @@ for (const backend of backends) {
     const record = (await h.db.collection('announcement_sends').doc('reminder-attendees-2026-12-01-7d').get()).data();
     assert.equal(record.lease, null);
     assert.equal(record.nextIndex, 0);
+  });
+
+  // --- History pages, detail, and recording gaps (issue #497) ----------------
+
+  t('the history list carries no recipient address, even for failed sends', async () => {
+    const h = await harness({
+      backend,
+      providerKind: 'postmark',
+      postmarkStream: STREAM(),
+      batchAnswer: (body) => ({ status: 200, json: body.map(() => ({ ErrorCode: 406, Message: 'Inactive recipient' })) }),
+    });
+    const { sent } = await previewAndSend(h);
+    assert.equal(sent.body.send.counts.failed, 2);
+    const list = await call(h.list);
+    const text = JSON.stringify(list.body.sends) + JSON.stringify(sent.body.send);
+    for (const address of ['ada@example.org', 'ben@example.org', 'Ada@Example.org']) {
+      assert.equal(text.includes(address), false, `${address} is not in the list`);
+    }
+    assert.equal(text.includes('Bring your badge'), false, 'no body in the list');
+  });
+
+  t('the history pages by start time with no send missing or repeated, ties included', async () => {
+    const h = await harness({ backend });
+    const at = (n) => new Date(Date.UTC(2026, 9, 1, 12, 0, Math.floor(n / 3)));
+    const ids = [];
+    for (let n = 0; n < 25; n += 1) {
+      const id = `send-page-${String(n).padStart(2, '0')}`;
+      ids.push(id);
+      await h.db.collection('announcement_sends').doc(id).set({
+        status: 'sent', audience: 'registered', subject: `Note ${n}`, total: 1, nextIndex: 1,
+        counts: { sent: 1 }, createdAt: at(n), createdBy: { uid: 'u-staff', email: STAFF },
+      });
+    }
+    // A record past retention keeps no start time and is not listed.
+    await h.db.collection('announcement_sends').doc('send-expired-1').set({ status: 'expired', unsubscribeKey: 'ab'.repeat(32) });
+    const seen = [];
+    let cursor = null;
+    for (let pages = 0; pages < 10; pages += 1) {
+      const res = await call(h.list, { body: { limit: 10, ...(cursor ? { cursor } : {}) } });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      seen.push(...res.body.sends.map((send) => send.id));
+      cursor = res.body.nextCursor;
+      if (!cursor) break;
+    }
+    assert.equal(seen.length, 25);
+    assert.deepEqual([...seen].sort(), [...ids].sort());
+    // Newest first.
+    assert.equal(seen[0], 'send-page-24');
+    assert.equal(seen.at(-1), 'send-page-00');
+
+    for (const body of [{ limit: 0 }, { limit: 51 }, { limit: 'x' }, { cursor: { createdAt: 'x', id: 'send-page-01' } }, { cursor: { createdAt: 1, id: 'a/b' } }]) {
+      const res = await call(h.list, { body });
+      assert.equal(res.status, 400, JSON.stringify(body));
+    }
+  });
+
+  t('the detail endpoint shows the frozen content once per audited read, staff only', async () => {
+    const h = await harness({
+      backend,
+      providerKind: 'postmark',
+      postmarkStream: STREAM({ SubscriptionManagementConfiguration: { UnsubscribeHandlingType: 'Custom' } }),
+      batchAnswer: (body) => ({
+        status: 200,
+        json: body.map((entry, i) => (entry.To === 'ada@example.org'
+          ? { ErrorCode: 406, Message: 'Inactive recipient' }
+          : { ErrorCode: 0, MessageID: `pm-${i}` })),
+      }),
+    });
+    const { sent } = await previewAndSend(h);
+    const id = sent.body.send.id;
+    const before = (await docsOf(h.db, 'admin_logs')).length;
+
+    assert.equal((await call(h.detail, { token: null, body: { id } })).status, 401);
+    assert.equal((await call(h.detail, { token: 'outsider', body: { id } })).status, 403);
+    assert.equal((await call(h.detail, { body: { id: 'a/b' } })).status, 400);
+    assert.equal((await call(h.detail, { body: { id: 'send-missing-1' } })).status, 404);
+    assert.equal((await docsOf(h.db, 'admin_logs')).length, before, 'a refused read writes no row');
+
+    const res = await call(h.detail, { body: { id } });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const { send } = res.body;
+    assert.equal(send.id, id);
+    assert.deepEqual(send.draft, { subject: DRAFT.subject, message: 'Doors open at nine.\n\nBring your badge {{event_name}} <b>.', linkUrl: DRAFT.linkUrl, linkLabel: DRAFT.linkLabel });
+    assert.equal(send.subject, DRAFT.subject);
+    assert.match(send.text, /Bring your badge \{\{event_name\}\} <b>\./);
+    assert.match(send.html, /Bring your badge \{\{event_name\}\} &lt;b&gt;\./);
+    // The inert test link stands in for every recipient's own link.
+    assert.match(send.text, /\/unsubscribe\?test=1/);
+    assert.equal(send.html.includes(sendsInternals.UNSUBSCRIBE_SLOT), false);
+    assert.equal(send.text.includes(sendsInternals.UNSUBSCRIBE_SLOT), false);
+    assert.deepEqual(send.failures, [{ email: 'ada@example.org', error: '406: Inactive recipient' }]);
+    assert.equal(send.recipients, undefined);
+    assert.equal(send.unsubscribeKey, undefined);
+    assert.equal(send.receipt, undefined);
+
+    const logs = (await docsOf(h.db, 'admin_logs')).slice(before);
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].action, 'view-announcement-send');
+    assert.equal(logs[0].docPath, `announcement_sends/${id}`);
+    assert.equal(logs[0].email, STAFF);
+    assert.equal(logs[0].details, undefined, 'no subject, body, audience, or recipient in the audit row');
+
+    // A record past retention has no content to show.
+    await h.db.collection('announcement_sends').doc('send-expired-1').set({ status: 'expired', unsubscribeKey: 'ab'.repeat(32) });
+    assert.equal((await call(h.detail, { body: { id: 'send-expired-1' } })).status, 404);
+  });
+
+  t('an audit gap survives a lost progress write: the continued send still counts it once', async () => {
+    const h = await harness({ backend });
+    const realCollection = h.db.collection.bind(h.db);
+    let failNext = 1;
+    h.db.collection = (name) => {
+      const col = realCollection(name);
+      if (name !== 'sent_emails') return col;
+      return {
+        ...col,
+        async add(data) {
+          if (failNext > 0) { failNext -= 1; throw new Error('UNAVAILABLE: audit store down'); }
+          return col.add(data);
+        },
+      };
+    };
+    // The lease transaction runs, then the chunk's progress transaction fails once.
+    const realTransaction = h.db.runTransaction.bind(h.db);
+    let transactions = 0;
+    h.db.runTransaction = (fn) => {
+      transactions += 1;
+      return transactions === 2 ? Promise.reject(new Error('deadline exceeded')) : realTransaction(fn);
+    };
+    const preview = await call(h.preview, { body: { draft: DRAFT, audience: 'registered' } });
+    const { sendId, receipt } = preview.body;
+    const lost = await call(h.send, { body: { sendId, receipt, draft: DRAFT, audience: 'registered' } });
+    assert.equal(lost.status, 500);
+
+    await h.db.collection('announcement_sends').doc(sendId).update({ lease: null });
+    const resumed = await call(h.send, { body: { sendId } });
+    assert.equal(resumed.status, 200, JSON.stringify(resumed.body));
+    assert.equal(resumed.body.send.status, 'sent');
+    assert.equal(resumed.body.send.auditGaps, 1);
+    assert.equal(h.mail.length, 2, 'nobody gets a second copy');
+  });
+
+  t('a send records that its recipient rows carry its id; an older send says they do not', async () => {
+    const h = await harness({ backend });
+    const { sent } = await previewAndSend(h);
+    const record = (await h.db.collection('announcement_sends').doc(sent.body.send.id).get()).data();
+    assert.equal(record.recipientRowsCarrySendId, true);
+    assert.equal(sent.body.send.recipientRowsLinked, true);
+
+    // A send recorded before this change: no flag, so no per-send log filter.
+    await h.db.collection('announcement_sends').doc('send-legacy-1').set({
+      status: 'sent', audience: 'registered', subject: 'Older note', message: 'Old.', link: null, mode: 'app',
+      html: '<p>Old.</p>', text: 'Old.', total: 1, nextIndex: 1, counts: { sent: 1 }, failures: [],
+      createdAt: new Date('2026-01-01T00:00:00Z'), createdBy: { uid: 'u-staff', email: STAFF },
+    });
+    const list = await call(h.list);
+    assert.equal(list.body.sends.find((s) => s.id === 'send-legacy-1').recipientRowsLinked, false);
+    const detail = await call(h.detail, { body: { id: 'send-legacy-1' } });
+    assert.equal(detail.body.send.recipientRowsLinked, false);
+  });
+
+  t('a failed recipient audit write shows as a recording gap, and nobody gets a second copy', async () => {
+    const h = await harness({ backend });
+    const realCollection = h.db.collection.bind(h.db);
+    let failNext = 1;
+    h.db.collection = (name) => {
+      const col = realCollection(name);
+      if (name !== 'sent_emails') return col;
+      return {
+        ...col,
+        async add(data) {
+          if (failNext > 0) { failNext -= 1; throw new Error('UNAVAILABLE: audit store down'); }
+          return col.add(data);
+        },
+      };
+    };
+    const { preview, sent } = await previewAndSend(h);
+    assert.equal(sent.status, 200, JSON.stringify(sent.body));
+    assert.equal(sent.body.send.status, 'sent');
+    assert.equal(sent.body.send.counts.sent, 2, 'an accepted message stays accepted');
+    assert.equal(sent.body.send.auditGaps, 1);
+    assert.equal((await docsOf(h.db, 'sent_emails')).length, 1);
+
+    const list = await call(h.list);
+    assert.equal(list.body.sends[0].auditGaps, 1);
+    // A repeat of the send does not turn the gap into a second send.
+    const again = await call(h.send, { body: { sendId: preview.body.sendId } });
+    assert.equal(again.body.send.auditGaps, 1);
+    assert.equal(h.mail.length, 2);
   });
 }
