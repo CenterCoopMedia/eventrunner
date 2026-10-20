@@ -11,6 +11,10 @@
  * the organization or the settings later. A paid invoice says when it was
  * paid; a void one says VOID and why.
  *
+ * An issued invoice with an open Stripe pay link (#519) prints it under
+ * "Pay by card", with when it ends on the event clock, as a link a reader
+ * can open. A link that has ended, a void invoice and a paid one print none.
+ *
  * Reading a PDF writes nothing, so a read-only demo serves it too.
  *
  * TEXT IS DATA. Every string comes from publicInvoice, which cleans stored
@@ -24,9 +28,10 @@
  */
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError } = require('../core/errors.cjs');
-const { formatMoney, isInvoiceId, PAYMENT_METHOD_WORDS } = require('shared/invoice');
+const { formatMoney, isInvoiceId, paymentMethodText } = require('shared/invoice');
 const { resolveThemeColors, sanitizeForFont, wrapText, fitText } = require('../pdf/kit.cjs');
 const { publicInvoice } = require('./invoices.cjs');
+const { currentPayLink, payLinkExpiryText, internals: { safeUrl } } = require('./invoicePayLink.cjs');
 
 const PAGE_SIZE = [612, 792]; // US Letter, points
 const MARGIN = 48;
@@ -45,11 +50,14 @@ function longDate(value) {
 /**
  * Build the PDF. Pure apart from pdf-lib: no Firestore and no network.
  *
- * @param {{ invoice: ReturnType<typeof publicInvoice>, theme?: object|null }} args
+ * @param {{ invoice: ReturnType<typeof publicInvoice>, theme?: object|null,
+ *           now?: Date, timeZone?: string|null }} args
+ *   `now` decides whether a pay link has ended; `timeZone` is the event
+ *   clock its end time is written on.
  * @returns {Promise<Uint8Array>}
  */
-async function buildInvoicePdf({ invoice, theme = null }) {
-  const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+async function buildInvoicePdf({ invoice, theme = null, now = new Date(), timeZone = null }) {
+  const { PDFDocument, StandardFonts, rgb, PDFName, PDFString } = require('pdf-lib');
   const doc = await PDFDocument.create();
   const body = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -135,7 +143,7 @@ async function buildInvoicePdf({ invoice, theme = null }) {
     paragraph(`This invoice is void. Reason: ${invoice.voided?.reason || 'None given.'}`, { font: bold });
     y -= 6;
   } else if (invoice.status === 'paid' && invoice.payment) {
-    const method = PAYMENT_METHOD_WORDS[invoice.payment.method] ?? 'Other';
+    const method = paymentMethodText(invoice.payment) || 'Other';
     const note = invoice.payment.note ? ` ${invoice.payment.note}` : '';
     paragraph(`Paid on ${longDate(invoice.payment.paidOn)}. Method: ${method}.${note}`, { font: bold });
     y -= 6;
@@ -272,6 +280,29 @@ async function buildInvoicePdf({ invoice, theme = null }) {
     heading('How to pay');
     paragraph(invoice.issuer.paymentInstructions);
   }
+  // The Stripe pay link (#519), while it works. The address is Stripe's
+  // https address, checked again here; its text wraps by character, and a
+  // link annotation over each drawn line opens the whole address.
+  const link = currentPayLink(invoice, now);
+  const href = link ? safeUrl(link.url) : null;
+  if (href) {
+    heading('Pay by card');
+    paragraph(`Pay ${money(invoice.totals?.total ?? 0)} by card through Stripe at this link. The link works until ${payLinkExpiryText(link.expiresAt, timeZone)}.`);
+    const lines = wrapText({ font: body, text: safe(body, href), size: BODY_SIZE, maxWidth: contentWidth });
+    for (const line of lines) {
+      ensure(BODY_SIZE + LINE_GAP);
+      page.drawText(line, { x: MARGIN, y, size: BODY_SIZE, font: body, color: color('accent') });
+      const annotation = doc.context.obj({
+        Type: 'Annot', Subtype: 'Link', Border: [0, 0, 0],
+        Rect: [MARGIN, y - 2, MARGIN + body.widthOfTextAtSize(line, BODY_SIZE), y + BODY_SIZE],
+        A: { Type: 'Action', S: 'URI', URI: PDFString.of(href) },
+      });
+      const annots = page.node.lookup(PDFName.of('Annots'));
+      if (annots) annots.push(doc.context.register(annotation));
+      else page.node.set(PDFName.of('Annots'), doc.context.obj([doc.context.register(annotation)]));
+      y -= BODY_SIZE + LINE_GAP;
+    }
+  }
   if (invoice.notes) {
     heading('Notes');
     paragraph(invoice.notes);
@@ -308,7 +339,9 @@ function createInvoicePdfHandler({ db, auth, getConfig, log = console }) {
         return sendError(res, 409, 'conflict', 'Issue the invoice first. A draft has no number, so it has no PDF.');
       }
       const config = await getConfig();
-      const bytes = await buildInvoicePdf({ invoice, theme: config?.theme ?? null });
+      const bytes = await buildInvoicePdf({
+        invoice, theme: config?.theme ?? null, now: new Date(), timeZone: config?.event?.timezone ?? null,
+      });
       res.status(200);
       res.set('Content-Type', 'application/pdf');
       // The number matches the settings prefix rule (capitals, digits and

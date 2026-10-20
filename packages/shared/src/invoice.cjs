@@ -43,6 +43,7 @@ const INVOICE_LIMITS = Object.freeze({
   voidReason: 500,
   reopenReason: 500,
   sendNote: 1000,
+  reviewNote: 500,
 });
 const INVOICE_STATUSES = Object.freeze(['draft', 'issued', 'paid', 'void']);
 const ADJUSTMENT_KINDS = Object.freeze(['discount', 'tax']);
@@ -54,6 +55,21 @@ const PAYMENT_METHOD_WORDS = Object.freeze({
   card: 'Card',
   cash: 'Cash',
   other: 'Other',
+});
+/**
+ * A Stripe pay link (#519), from the server's first step to its end:
+ * `creating` (the request is saved and sent to Stripe), `open` (the payer
+ * can use it), then `paid`, `expired` (it ran out), `cancelled` (a void or
+ * a payment recorded by hand closed it) or `failed` (Stripe refused it).
+ */
+const PAY_LINK_STATUSES = Object.freeze(['creating', 'open', 'paid', 'expired', 'cancelled', 'failed']);
+const PAY_LINK_STATUS_WORDS = Object.freeze({
+  creating: 'Being made',
+  open: 'Open',
+  paid: 'Paid',
+  expired: 'Ended',
+  cancelled: 'Cancelled',
+  failed: 'Not made',
 });
 const DEFAULT_INVOICE_PREFIX = 'INV';
 const DEFAULT_INVOICE_CURRENCY = 'usd';
@@ -420,6 +436,39 @@ function validatePayment(input, { today }) {
   return issues.length ? { ok: false, value: null, issues } : { ok: true, issues: [], value: { paidOn, method, note } };
 }
 
+/**
+ * How a payment arrived, in words. A card payment through the Stripe pay
+ * link (`via: 'stripe'`, #519) reads "Card (Stripe)".
+ */
+function paymentMethodText(payment) {
+  if (!payment || typeof payment !== 'object') return '';
+  const words = PAYMENT_METHOD_WORDS[payment.method] ?? 'Other';
+  return payment.via === 'stripe' && payment.method === 'card' ? `${words} (Stripe)` : words;
+}
+
+/**
+ * When a pay link ends, on the event clock: "October 21, 2026, 11:30 AM
+ * EDT". Built from parts, so every runtime writes it the same way. An
+ * unknown zone reads the time in UTC.
+ */
+function formatPayLinkEnd(value, timeZone) {
+  const ms = value instanceof Date ? value.getTime() : Date.parse(value ?? '');
+  if (!Number.isFinite(ms)) return '';
+  const zone = isKnownTimeZone(timeZone) ? timeZone : 'UTC';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    hour12: true, timeZone: zone, timeZoneName: 'short',
+  }).formatToParts(new Date(ms)).map((part) => [part.type, part.value]));
+  return `${parts.month} ${parts.day}, ${parts.year}, ${parts.hour}:${parts.minute} ${parts.dayPeriod} ${parts.timeZoneName}`;
+}
+
+/** Why a flagged card payment is closed (#519). Required, one line, cleaned. */
+function validateReviewNote(input) {
+  const issues = [];
+  const value = textField(issues, 'note', input, INVOICE_LIMITS.reviewNote, { required: true, label: 'the review note' });
+  return issues.length ? { ok: false, value: null, issues } : { ok: true, issues: [], value };
+}
+
 /** Why an invoice is voided. Required, one line, cleaned. */
 function validateVoidReason(input) {
   const issues = [];
@@ -502,4 +551,5 @@ module.exports = {
   isInvoiceId, sanitizeInvoiceText, computeInvoiceTotals, parseMoneyInput, minorToInput, formatMoney,
   resolveInvoiceCurrency, formatInvoiceNumber, validateInvoiceDraft, validateInvoiceSettings,
   invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems, validateInvoiceSend,
+  PAY_LINK_STATUSES, PAY_LINK_STATUS_WORDS, paymentMethodText, formatPayLinkEnd, validateReviewNote,
 };

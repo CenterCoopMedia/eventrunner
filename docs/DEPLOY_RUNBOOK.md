@@ -256,7 +256,7 @@ only the rows that apply to the providers selected above:
 | `EMAIL_PROVIDER_API_KEY` | `EVENT_EMAIL_PROVIDER = postmark` (server token) |
 | `EMAIL_WEBHOOK_BASIC_AUTH` | `EVENT_EMAIL_PROVIDER = postmark` and delivery-event ingest is enabled |
 | `EMAIL_WEBHOOK_URL`, `EMAIL_WEBHOOK_SECRET` | `EVENT_EMAIL_PROVIDER = webhook` |
-| `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER = eventbrite` or `stripe`; Stripe requires a secret or restricted key matching `EVENT_STRIPE_MODE`. `manual` and `none` use no ticketing API token |
+| `TICKETING_API_TOKEN` | `EVENT_TICKETING_PROVIDER = eventbrite` or `stripe`; Stripe requires a secret or restricted key matching `EVENT_STRIPE_MODE`. With Stripe, `invoiceAdmin` binds it too, for invoice pay links. `manual` and `none` use no ticketing API token |
 | `TICKETING_WEBHOOK_SECRET` | `eventbrite` or `stripe`; for Eventbrite, generate a random value of at least 32 characters (`openssl rand -hex 32`). Eventbrite does not sign deliveries, so `register-ticketing-webhook.cjs` puts this secret in the webhook URL. For Stripe, use the signing secret generated for this deployed endpoint in the configured mode. `manual` and `none` use no webhook secret |
 | `OPERATOR_WEBHOOK_URL`, `OPERATOR_WEBHOOK_SECRET` | `EVENT_OPERATOR_NOTIFIER = webhook` |
 | `AIRTABLE_API_TOKEN` | `EVENT_AIRTABLE_ENABLED = true`. An Airtable personal access token with only the `data.records:read` scope and only the pitch base. Store it in Secret Manager only |
