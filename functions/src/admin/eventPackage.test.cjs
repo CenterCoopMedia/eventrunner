@@ -288,6 +288,11 @@ test('invoices: the frozen records go in billing/, and the settings and the coun
     reopenedAt: '2026-03-27T14:00:00.000Z', reason: 'Check bounced',
   }]);
   assert.deepEqual(voided.paymentHistory, []);
+  // Each email of the PDF, without the staff account that sent it.
+  assert.deepEqual(paid.emailSends, [{
+    status: 'sent', to: 'billing@example.com', cc: null, at: '2026-03-27T14:00:00.000Z', sentAt: '2026-03-27T14:00:00.000Z', providerMessageId: 'pm-fixture-1',
+  }]);
+  assert.deepEqual(voided.emailSends, []);
   for (const key of ['createdBy', 'updatedBy', 'issuedBy', 'listKey']) assert.equal(Object.hasOwn(paid, key), false, key);
   assert.match(files.get('billing/invoices.csv').toString('utf8'), /"inv_fixture0000000000000001","INV-0001","Paid"/);
   const sources = EXCLUDED.map((entry) => entry.source).join(' ');

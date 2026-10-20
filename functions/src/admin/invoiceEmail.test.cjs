@@ -12,7 +12,7 @@ const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const { createInvoiceAdminHandler } = require('./invoices.cjs');
 const { createEmailCore } = require('../email/send.cjs');
 const { createConsoleProvider } = require('../email/providers/console.cjs');
-const { internals: { RESEND_WINDOW_MS, SENDING_STALE_MS } } = require('./invoiceEmail.cjs');
+const { internals: { RESEND_WINDOW_MS, SENDING_STALE_MS, HOURLY_LIMIT } } = require('./invoiceEmail.cjs');
 
 const NOW = new Date('2026-10-20T12:00:00Z');
 const ID = 'inv_0123456789abcdef0123';
@@ -449,4 +449,59 @@ test('names and notes cannot add a header or markup', async () => {
   assert.equal(mail.html.includes('<b>Ada</b>'), false);
   assert.ok(mail.html.includes('&lt;script&gt;'));
   assert.equal(preview.body.preview.subject, mail.subject);
+});
+
+test('one invoice is emailed at most a few times an hour, even with a confirmation', async () => {
+  const sends = Array.from({ length: HOURLY_LIMIT }, (_, index) => ({
+    sendId: `send-hour-${String(index).padStart(4, '0')}`, status: 'sent', to: `other${index}@example.org`, cc: null, by: 'staff',
+    at: new Date(NOW.getTime() - (index + 1) * 60 * 1000), note: false, resend: false,
+  }));
+  const db = dbFor(issued({ sends }));
+  const mailer = mailerFor(db);
+  fixedNow = NOW;
+  const preview = await call(db, { action: 'previewSend', invoiceId: ID }, { mailer });
+  const refused = await call(db, { action: 'send', invoiceId: ID, sendId: SEND_ID, receipt: preview.body.receipt, confirmResend: true }, { mailer });
+  assert.equal(refused.statusCode, 429);
+  assert.equal(refused.body.error.code, 'rate-limited');
+  assert.equal(mailer.mail.length, 0);
+  // An hour after the oldest, one more may go.
+  fixedNow = new Date(NOW.getTime() + 60 * 60 * 1000 - 4 * 60 * 1000);
+  const later = await call(db, { action: 'previewSend', invoiceId: ID }, { mailer });
+  const sent = await call(db, { action: 'send', invoiceId: ID, sendId: SEND_ID, receipt: later.body.receipt }, { mailer });
+  assert.equal(sent.statusCode, 200, JSON.stringify(sent.body));
+});
+
+test('a repeat of a send the provider refused says it was not sent, and sends nothing', async () => {
+  const db = dbFor();
+  let calls = 0;
+  const provider = {
+    name: 'postmark', capabilities: { attachments: true, cc: true },
+    send: async () => { calls += 1; return { providerMessageId: null, status: 'failed', providerStatus: 422, error: 'refused' }; },
+  };
+  const mailer = mailerFor(db, { provider });
+  const { preview, sent } = await previewAndSend(db, mailer);
+  assert.equal(sent.statusCode, 502);
+  const again = await call(db, { action: 'send', invoiceId: ID, sendId: SEND_ID, receipt: preview.body.receipt }, { mailer });
+  assert.equal(again.statusCode, 502);
+  assert.equal(again.body.error.code, 'send-failed');
+  assert.equal(calls, 1);
+});
+
+test('a send whose record cannot be written still answers what the provider did', async () => {
+  const db = dbFor();
+  const mailer = mailerFor(db);
+  const preview = await call(db, { action: 'previewSend', invoiceId: ID }, { mailer });
+  const run = db.runTransaction.bind(db);
+  let count = 0;
+  db.runTransaction = async (fn, options) => {
+    count += 1;
+    if (count === 2) throw new Error('UNAVAILABLE');
+    return run(fn, options);
+  };
+  const sent = await call(db, { action: 'send', invoiceId: ID, sendId: SEND_ID, receipt: preview.body.receipt }, { mailer });
+  assert.equal(sent.statusCode, 200);
+  assert.equal(sent.body.outcome, 'sent');
+  assert.equal(mailer.mail.length, 1);
+  // The reservation stays at "sending", so no other send starts until it is settled.
+  assert.equal(db.read('invoices', ID).sends[0].status, 'sending');
 });

@@ -58,8 +58,9 @@ const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
 const OPERATOR_ACTIONS = new Set(['saveSettings', 'void', 'reopen']);
-const READ_ACTIONS = new Set(['list', 'get', 'settings']);
-const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'saveDraft', 'deleteDraft', 'issue', 'markPaid', 'duplicate']);
+// previewSend writes nothing, so a read-only demo shows it; send is a write.
+const READ_ACTIONS = new Set(['list', 'get', 'settings', 'previewSend']);
+const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'saveDraft', 'deleteDraft', 'issue', 'markPaid', 'duplicate', 'send']);
 const CURSOR_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\|inv_[a-z0-9]{16,40}$/;
 
 class InvoiceError extends Error {
@@ -165,6 +166,31 @@ function publicVoided(voided) {
   };
 }
 
+function timeOf(value) {
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string') return Date.parse(value);
+  return NaN;
+}
+const SEND_STATUSES = new Set(['sending', 'sent', 'failed', 'uncertain']);
+/**
+ * Each email of the invoice PDF (invoiceEmail.cjs), oldest first: who sent
+ * it, when, to which addresses, how it ended and the provider's message id.
+ * The addresses are cleaned on read like every invoice field.
+ */
+function publicSends(sends) {
+  return (Array.isArray(sends) ? sends : []).map((entry) => ({
+    sendId: typeof entry?.sendId === 'string' ? entry.sendId : null,
+    status: SEND_STATUSES.has(entry?.status) ? entry.status : 'uncertain',
+    to: sanitizeInvoiceText(entry?.to),
+    cc: entry?.cc ? sanitizeInvoiceText(entry.cc) : null,
+    at: iso(entry?.at),
+    sentAt: iso(entry?.sentAt),
+    by: uidOrNull(entry?.by),
+    providerMessageId: typeof entry?.providerMessageId === 'string' ? entry.providerMessageId : null,
+  }));
+}
+
 /** A list row: what the list shows, no lines. */
 function invoiceSummary(stored, id) {
   return {
@@ -205,6 +231,7 @@ function publicInvoice(stored, id) {
     payment: publicPayment(stored.payment),
     paymentHistory: publicPaymentHistory(stored.paymentHistory),
     voided: publicVoided(stored.voided),
+    emailSends: publicSends(stored.sends),
     duplicatedFrom: stored.duplicatedFrom && isInvoiceId(stored.duplicatedFrom.invoiceId)
       ? {
         invoiceId: stored.duplicatedFrom.invoiceId,
@@ -638,11 +665,18 @@ async function saveSettings({ db, actor, body, now }) {
   return readSettings({ db, actor });
 }
 
+function noMailer() {
+  throw new Error('No email provider is configured for invoiceAdmin.');
+}
+
 /**
  * @param {{ db: object, auth: object, getConfig: () => Promise<object>,
- *           now?: () => Date, log?: object }} deps
+ *           now?: () => Date, log?: object,
+ *           getMailer?: () => { provider: object, send: (message: object) => Promise<object> } }} deps
+ *   getMailer builds the email provider and the email core; it is called
+ *   only by previewSend and send, so a provider fault never breaks the rest.
  */
-function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date(), log = console }) {
+function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date(), log = console, getMailer = noMailer }) {
   return async function invoiceAdmin(req, res) {
     res.set('Cache-Control', 'private, no-store');
     if (req.method !== 'POST') { res.set('Allow', 'POST'); return sendError(res, 405, 'method-not-allowed', 'Use POST.'); }
@@ -656,7 +690,7 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
         const policy = await checkDemoWrites({ db });
         if (!policy.ok) return sendError(res, policy.status, policy.code, policy.message);
       }
-      const deps = { db, actor, body, now };
+      const deps = { db, actor, body, now, getConfig, getMailer, log };
       let result;
       if (action === 'list') result = await listInvoices(deps);
       else if (action === 'get') result = await readInvoice(deps);
@@ -669,6 +703,11 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
       else if (action === 'void') result = await voidInvoice(deps);
       else if (action === 'duplicate') result = await duplicateInvoice(deps);
       else if (action === 'reopen') result = await reopenInvoice(deps);
+      else if (action === 'previewSend') result = await require('./invoiceEmail.cjs').previewSend(deps);
+      else if (action === 'send') {
+        const sent = await require('./invoiceEmail.cjs').sendInvoice(deps);
+        result = { outcome: sent.outcome, repeated: sent.repeated, invoice: publicInvoice(sent.stored, body.invoiceId) };
+      }
       // The page offers Void and Reopen only to a caller who may use them; the action
       // itself checks the tier again (OPERATOR_ACTIONS).
       if (result?.invoice) result = { ...result, canVoid: actor.tier === 'operator', canReopen: actor.tier === 'operator' };
@@ -684,16 +723,31 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
 /** Deployable export: invoiceAdmin. */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { defineSecret } = require('firebase-functions/params');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
+  const secrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
   return {
-    invoiceAdmin: onRequest({ region }, async (req, res) => {
+    // The send secrets are bound because send emails the PDF (part 4).
+    invoiceAdmin: onRequest({ region, secrets }, async (req, res) => {
       const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
       if (applyCors(req, res, { allowedOrigins: parseAllowedOrigins(process.env.EVENT_ALLOWED_ORIGINS), methods: ['POST'] })) return;
       const { getDb } = require('../core/firestore.cjs');
       const { getEventConfig } = require('../core/config.cjs');
       const { getAuth } = require('firebase-admin/auth');
       const db = getDb();
-      await createInvoiceAdminHandler({ db, auth: getAuth(), getConfig: () => getEventConfig({ db }) })(req, res);
+      const getConfig = () => getEventConfig({ db });
+      let mailer = null;
+      const getMailer = () => {
+        if (!mailer) {
+          const { getEmailProvider } = require('../email/providers/index.cjs');
+          const { createEmailCore } = require('../email/send.cjs');
+          const provider = getEmailProvider({ env: process.env });
+          mailer = { provider, send: createEmailCore({ db, provider, getConfig }).send };
+        }
+        return mailer;
+      };
+      await createInvoiceAdminHandler({ db, auth: getAuth(), getConfig, getMailer })(req, res);
     }),
   };
 }
@@ -702,5 +756,5 @@ module.exports = {
   createInvoiceAdminHandler,
   publicInvoice,
   get handlers() { return buildHandlers(); },
-  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings },
+  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings, InvoiceError, timeOf },
 };

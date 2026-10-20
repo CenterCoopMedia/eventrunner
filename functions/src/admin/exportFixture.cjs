@@ -288,6 +288,8 @@ function exportSeed() {
       payment: { paidOn: '2026-04-02', method: 'bank-transfer', note: 'Ref 42', recordedAt: AT, recordedBy: STAFF_UID },
       // reopen (operator) moved a bounced check here before the transfer came.
       paymentHistory: [{ paidOn: '2026-03-30', method: 'check', note: 'Check 1042', recordedAt: AT, recordedBy: STAFF_UID, reopenedAt: AT, reopenedBy: OPERATOR_UID, reason: 'Check bounced' }],
+      // The record send (invoiceAdmin, part 4) keeps of each email of the PDF.
+      sends: [{ sendId: 'send-fixture-0001', status: 'sent', to: 'billing@example.com', cc: null, by: STAFF_UID, at: AT, sentAt: AT, providerMessageId: 'pm-fixture-1', note: true, resend: false }],
       revision: 5, createdAt: AT, createdBy: STAFF_UID, updatedAt: AT, updatedBy: STAFF_UID,
       listKey: '2026-03-27T14:00:00.000Z|inv_fixture0000000000000001',
     },
