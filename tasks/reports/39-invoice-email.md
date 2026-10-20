@@ -46,3 +46,12 @@ decision: the PDF goes as an attachment on the transactional stream).
 ## Left undone
 
 - The Stripe pay link (part 5, #519).
+
+## Checks (final run, after the last code commit)
+
+lint clean; `npm test` 3668/3668; web 316 files, 3787/3787; `test:rules` 471/471;
+`check-docs` passed; `build-pages --check` matched; `generate-content --demo --check`
+matched; `build-demo --check` identical builds, within budget; `check:copy` clean;
+lockfile hashes stable after a fresh `prepare:functions`; `e2e/invoices.spec.js` 6/6 and
+`e2e/data-export.spec.js` 2/2. Before the code, the new E2E test failed (no Email invoice
+button) and the new unit and web tests failed (commit d01500c).
