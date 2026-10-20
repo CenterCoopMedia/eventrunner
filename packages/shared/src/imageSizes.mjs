@@ -4,5 +4,7 @@ export {
   IMAGE_SIZE_SEGMENT,
   imageSizeSource,
   imageSizePaths,
+  imageSizeCopyPath,
   isImageSizePath,
+  readImageSizeManifest,
 } from './imageSizes.cjs';

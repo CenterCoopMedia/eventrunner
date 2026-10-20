@@ -11,8 +11,19 @@
  * also the fallback. The original is never changed or removed here.
  *
  * Which uploads, and where the sizes go, is one shared rule
- * (packages/shared/src/imageSizes.cjs): `{folder}/_sizes/{width}.webp`
- * beside an upload in cms-images/, branding/ or speaker-photos/.
+ * (packages/shared/src/imageSizes.cjs):
+ * `{folder}/_sizes/{generation}/{width}.webp` beside an upload in
+ * cms-images/, branding/ or speaker-photos/. Only widths narrower than the
+ * original are written, so the manifest lists every copy at its real width
+ * and the page can state true srcset widths (Codex review on #538).
+ *
+ * ONE GENERATION PER RUN. An event names one generation of the original.
+ * The run reads that generation's bytes, writes into that generation's
+ * folder, and checks that the name still holds that generation before it
+ * writes copies and again after it writes the manifest. If the original
+ * was overwritten meanwhile, the run removes its own folder and its
+ * manifest, and the run for the newer generation writes the real ones. A
+ * finished run removes the folders of earlier generations.
  *
  * WHAT THIS TRIGGER DOES NOT TRUST:
  *
@@ -40,8 +51,9 @@
  * handler deleted it (mediaDelete, speakerPhotoDelete, a superseded
  * headshot, a console delete). An overwrite also fires a delete event for
  * the old generation; cleanup then sees the original still there and
- * keeps the sizes. If the original is deleted while sizes are being
- * written, this trigger checks again at the end and removes what it wrote.
+ * keeps the folder, and the new generation's run clears the old copies.
+ * If the original is deleted while sizes are being written, this trigger
+ * checks again at the end and removes what it wrote.
  *
  * FAILURE. A refused or failed image gets a manifest that says why, and no
  * sizes. The page then fails to load the first size, drops the srcset,
@@ -53,6 +65,7 @@ const {
   IMAGE_SIZE_WIDTHS,
   IMAGE_SIZE_TYPE,
   imageSizePaths,
+  imageSizeCopyPath,
   isImageSizePath,
 } = require('shared/imageSizes');
 
@@ -171,7 +184,10 @@ async function renderImageSizes(buffer, { sharp = require('sharp') } = {}) {
   const height = turned ? meta.width : meta.height;
 
   const sizes = [];
-  for (const target of IMAGE_SIZE_WIDTHS) {
+  // Only widths narrower than the original. A copy at or above it would be
+  // the original re-encoded, listed at a width it does not have; the page
+  // lists the original itself at its own width instead.
+  for (const target of IMAGE_SIZE_WIDTHS.filter((candidate) => candidate < width)) {
     let output;
     try {
       // rotate() with no angle applies the EXIF orientation. sharp writes
@@ -179,7 +195,7 @@ async function renderImageSizes(buffer, { sharp = require('sharp') } = {}) {
       // carries no EXIF, GPS, XMP or ICC block.
       output = await sharp(buffer, inputOptions())
         .rotate()
-        .resize({ width: target, withoutEnlargement: true })
+        .resize({ width: target })
         .webp({ quality: WEBP_QUALITY })
         .toBuffer({ resolveWithObject: true });
     } catch (err) {
@@ -194,12 +210,21 @@ function isNotFound(err) {
   return err?.code === 404 || /no such object/i.test(String(err?.message ?? ''));
 }
 
-async function removeSizes(bucket, prefix) {
+async function removeSizes(bucket, prefix, keep = () => false) {
   const [files] = await bucket.getFiles({ prefix });
+  let removed = 0;
   for (const file of files) {
+    if (keep(file.name)) continue;
     await file.delete({ ignoreNotFound: true });
+    removed += 1;
   }
-  return files.length;
+  return removed;
+}
+
+/** A GCS generation as the event states it, or null. */
+function eventGeneration(object) {
+  const value = object?.generation == null ? '' : String(object.generation);
+  return /^[0-9]{1,24}$/.test(value) ? value : null;
 }
 
 /**
@@ -210,11 +235,31 @@ async function removeSizes(bucket, prefix) {
  *           now?: () => number, render?: typeof renderImageSizes }} deps
  */
 function createImageSizesHandler({ bucket, log = console, now = Date.now, render = renderImageSizes }) {
-  async function writeManifest(name, paths, object, fields) {
+  /** Whether the name still holds this generation: 'current', 'stale' or 'gone'. */
+  async function sourceState(name, generation) {
+    try {
+      const [meta] = await bucket.file(name).getMetadata();
+      return String(meta?.generation) === generation ? 'current' : 'stale';
+    } catch (err) {
+      if (isNotFound(err)) return 'gone';
+      throw err;
+    }
+  }
+
+  async function readManifest(paths) {
+    try {
+      const [buffer] = await bucket.file(paths.manifest).download();
+      return JSON.parse(buffer.toString('utf8'));
+    } catch {
+      return null;
+    }
+  }
+
+  async function writeManifest(name, paths, generation, fields) {
     const manifest = {
       version: MANIFEST_VERSION,
       source: name,
-      sourceGeneration: object?.generation == null ? null : String(object.generation),
+      sourceGeneration: generation,
       type: IMAGE_SIZE_TYPE,
       sizes: [],
       ...fields,
@@ -232,6 +277,33 @@ function createImageSizesHandler({ bucket, log = console, now = Date.now, render
     return manifest;
   }
 
+  /**
+   * Write the manifest, then look again. If the name moved on while it was
+   * written, take back this run's copies and its manifest; the newer
+   * generation's run writes its own.
+   */
+  async function publish(name, paths, generation, fields) {
+    await writeManifest(name, paths, generation, fields);
+    const state = await sourceState(name, generation);
+    if (state === 'current') return 'current';
+    if (state === 'gone') {
+      await removeSizes(bucket, paths.prefix);
+      return 'gone';
+    }
+    await removeSizes(bucket, `${paths.prefix}${generation}/`);
+    const stored = await readManifest(paths);
+    if (stored?.sourceGeneration === generation) {
+      await bucket.file(paths.manifest).delete({ ignoreNotFound: true });
+    }
+    return 'stale';
+  }
+
+  const outcome = (state, result) => {
+    if (state === 'stale') return { status: 'stale' };
+    if (state === 'gone') return { status: 'source-gone' };
+    return result;
+  };
+
   return async function onImageFinalized(object) {
     const name = object?.name;
     // Our own output first, so a size write costs no more than this line.
@@ -239,19 +311,27 @@ function createImageSizesHandler({ bucket, log = console, now = Date.now, render
     if (object?.metadata?.imageSizeOf) return { status: 'skipped', reason: 'own-output' };
     const paths = imageSizePaths(name);
     if (!paths) return { status: 'skipped', reason: 'out-of-scope' };
+    const generation = eventGeneration(object);
+    if (!generation) return { status: 'skipped', reason: 'no-generation' };
+
+    const initial = await sourceState(name, generation);
+    if (initial !== 'current') return outcome(initial);
+
+    const refuse = async (reason) => {
+      log.warn(`mediaImageSizes refused ${name}: ${reason}`);
+      const state = await publish(name, paths, generation, { status: 'refused', reason });
+      return outcome(state, { status: 'refused', reason });
+    };
 
     const declaredBytes = Number(object.size);
-    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_SOURCE_BYTES) {
-      log.warn(`mediaImageSizes refused ${name}: too-large`);
-      await writeManifest(name, paths, object, { status: 'refused', reason: 'too-large' });
-      return { status: 'refused', reason: 'too-large' };
-    }
+    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_SOURCE_BYTES) return refuse('too-large');
 
     let buffer;
     try {
-      [buffer] = await bucket.file(name).download();
+      // This generation's bytes, never whatever the name holds by now.
+      [buffer] = await bucket.file(name, { generation }).download();
     } catch (err) {
-      if (isNotFound(err)) return { status: 'source-gone' };
+      if (isNotFound(err)) return outcome(await sourceState(name, generation));
       throw err;
     }
 
@@ -259,20 +339,19 @@ function createImageSizesHandler({ bucket, log = console, now = Date.now, render
     try {
       rendered = await render(buffer);
     } catch (err) {
-      if (err instanceof ImageSizeRefusal) {
-        log.warn(`mediaImageSizes refused ${name}: ${err.reason}`);
-        await writeManifest(name, paths, object, { status: 'refused', reason: err.reason });
-        return { status: 'refused', reason: err.reason };
-      }
+      if (err instanceof ImageSizeRefusal) return refuse(err.reason);
       log.error(`mediaImageSizes failed for ${name}`, err);
-      await writeManifest(name, paths, object, { status: 'failed', reason: 'processing-error' });
-      return { status: 'failed', reason: 'processing-error' };
+      const state = await publish(name, paths, generation, { status: 'failed', reason: 'processing-error' });
+      return outcome(state, { status: 'failed', reason: 'processing-error' });
     }
+
+    const beforeWrite = await sourceState(name, generation);
+    if (beforeWrite !== 'current') return outcome(beforeWrite);
 
     const written = [];
     for (const size of rendered.sizes) {
-      const target = paths.sizes.find((entry) => entry.width === size.target);
-      await bucket.file(target.path).save(size.buffer, {
+      const path = imageSizeCopyPath(name, generation, size.target);
+      await bucket.file(path).save(size.buffer, {
         resumable: false,
         contentType: IMAGE_SIZE_TYPE,
         metadata: {
@@ -281,29 +360,20 @@ function createImageSizesHandler({ bucket, log = console, now = Date.now, render
           metadata: { imageSizeOf: name },
         },
       });
-      written.push({
-        target: size.target,
-        width: size.width,
-        height: size.height,
-        path: target.path,
-        bytes: size.buffer.length,
-      });
+      written.push({ target: size.target, width: size.width, height: size.height, path, bytes: size.buffer.length });
     }
-    await writeManifest(name, paths, object, {
+    const state = await publish(name, paths, generation, {
       status: 'ready',
       sourceType: rendered.type,
       width: rendered.width,
       height: rendered.height,
       sizes: written,
     });
+    if (state !== 'current') return outcome(state);
 
-    // The original may have been deleted while this ran, and its cleanup
-    // may already have found an empty folder. Look again.
-    const [stillThere] = await bucket.file(name).exists();
-    if (!stillThere) {
-      await removeSizes(bucket, paths.prefix);
-      return { status: 'source-gone' };
-    }
+    // Copies of earlier generations of this name are no longer listed.
+    const ours = `${paths.prefix}${generation}/`;
+    await removeSizes(bucket, paths.prefix, (path) => path === paths.manifest || path.startsWith(ours));
     return { status: 'ready', sizes: written.length };
   };
 }
