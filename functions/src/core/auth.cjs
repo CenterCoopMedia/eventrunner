@@ -27,6 +27,21 @@
  * lists cannot be read two ways. firestore.rules carries the same split
  * as isOperator() / isStaff() / isAdmin().
  *
+ * EXPIRING STAFF ACCESS (issue #331). A staff grant may carry an end time:
+ * `staffExpiry` on the same document maps a lowercased address to a
+ * Firestore Timestamp. The grant works while the time of the check is
+ * before that instant, and stops at it. The check runs on every request
+ * against the current time, so nothing has to sweep an ended grant away,
+ * and an ID token issued before the end carries nothing past it (admin
+ * access is never a custom claim). Operators never expire: an end time is
+ * read for the staff list only, so the last operator cannot lose access
+ * this way. A temporary grant whose end time is missing or not a
+ * timestamp is refused, and a `staffExpiry` field that is not a map
+ * refuses every staff grant: when the end times cannot be read, nobody on
+ * the staff list is assumed to be permanent. An address with no key in
+ * the map is a permanent grant, which is every grant made before #331.
+ * firestore.rules isStaff() reads the same map the same way.
+ *
  * Neither function throws on a bad token: an unverifiable token is the
  * same as no token. Only infrastructure failures (Firestore down inside
  * getConfig) propagate.
@@ -50,23 +65,120 @@ function listHasEmail(list, email) {
     && list.some((entry) => typeof entry === 'string' && entry.trim().toLowerCase() === email);
 }
 
+/** The field on `config/bootstrap` that holds staff end times (issue #331). */
+const STAFF_EXPIRY_FIELD = 'staffExpiry';
+
+/** A plain Firestore map: not null, not an array, not a class instance such as a Timestamp. */
+function isPlainMap(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 /**
- * The tier an address holds on `config/bootstrap`, or null for no admin
- * access at all. Case-insensitive on both sides. An address on both lists
- * is an operator: the wider grant wins, the same way the rules'
- * `isOperator() || isStaff()` reads it. A missing document, a missing
- * list, or a malformed list is "not an admin", never a throw.
+ * Milliseconds since the epoch for a stored end time, or null when the
+ * value is not a timestamp. A Firestore Timestamp is what the Admin SDK
+ * reads back; a Date is what the in-memory test fake keeps. Anything else
+ * — a string, a number, a map shaped like a Timestamp — is not an end
+ * time, because the rules' `is timestamp` would refuse it too.
+ *
+ * @param {unknown} value
+ * @returns {number|null}
+ */
+function expiryMillis(value) {
+  let ms = null;
+  if (value instanceof Date) {
+    ms = value.getTime();
+  } else if (
+    value !== null
+    && typeof value === 'object'
+    && !isPlainMap(value)
+    && typeof value.toMillis === 'function'
+    && typeof value.seconds === 'number'
+    && typeof value.nanoseconds === 'number'
+  ) {
+    ms = value.toMillis();
+  }
+  return typeof ms === 'number' && Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * What `config/bootstrap` says about the end of one staff grant.
+ *
+ *   { temporary: false }                      — no end time: a permanent grant
+ *   { temporary: true, expiresAtMs: number }  — ends at that instant
+ *   { temporary: true, expiresAtMs: null }    — an end time that cannot be read
+ *
+ * The address must already be lowercased; the map is read by that exact
+ * key, as the rules read it.
+ *
+ * @param {object|null|undefined} bootstrap
+ * @param {string} email lowercased
+ * @returns {{ temporary: false } | { temporary: true, expiresAtMs: number|null }}
+ */
+function staffExpiryOf(bootstrap, email) {
+  const map = bootstrap?.[STAFF_EXPIRY_FIELD];
+  if (map === undefined) return { temporary: false };
+  if (!isPlainMap(map)) return { temporary: true, expiresAtMs: null };
+  if (!Object.prototype.hasOwnProperty.call(map, email)) return { temporary: false };
+  return { temporary: true, expiresAtMs: expiryMillis(map[email]) };
+}
+
+/**
+ * Whether a listed staff grant works at `nowMs`. Fails closed on an end
+ * time that cannot be read and on a clock value that is not a number.
+ *
+ * @param {object|null|undefined} bootstrap
+ * @param {string} email lowercased
+ * @param {number} nowMs
+ * @returns {boolean}
+ */
+function staffGrantActive(bootstrap, email, nowMs) {
+  const expiry = staffExpiryOf(bootstrap, email);
+  if (!expiry.temporary) return true;
+  return expiry.expiresAtMs !== null && Number.isFinite(nowMs) && nowMs < expiry.expiresAtMs;
+}
+
+/**
+ * The tier an address is LISTED at on `config/bootstrap`, end times
+ * ignored. For a guard that must treat any listed address as an admin
+ * address (users/records.cjs: an attendee delete never removes an account
+ * an operator granted, even one whose staff grant has ended). An access
+ * decision uses resolveAdminTier, never this.
  *
  * @param {{ adminEmails?: unknown, staffEmails?: unknown }|null|undefined} bootstrap
  * @param {string|null|undefined} email
  * @returns {'operator'|'staff'|null}
  */
-function resolveAdminTier(bootstrap, email) {
+function listedAdminTier(bootstrap, email) {
   const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
   if (!normalized) return null;
   if (listHasEmail(bootstrap?.adminEmails, normalized)) return 'operator';
   if (listHasEmail(bootstrap?.staffEmails, normalized)) return 'staff';
   return null;
+}
+
+/**
+ * The tier an address holds on `config/bootstrap` at `nowMs`, or null for
+ * no admin access at all. Case-insensitive on both lists. An address on
+ * both lists is an operator: the wider grant wins, the same way the rules'
+ * `isOperator() || isStaff()` reads it. A staff grant whose end time has
+ * come, or cannot be read, is no access (see EXPIRING STAFF ACCESS above).
+ * A missing document, a missing list, or a malformed list is "not an
+ * admin", never a throw.
+ *
+ * `nowMs` defaults to the time of the call, so a caller that holds a
+ * cached copy of the document still meets the end time on time.
+ *
+ * @param {{ adminEmails?: unknown, staffEmails?: unknown, staffExpiry?: unknown }|null|undefined} bootstrap
+ * @param {string|null|undefined} email
+ * @param {number} [nowMs]
+ * @returns {'operator'|'staff'|null}
+ */
+function resolveAdminTier(bootstrap, email, nowMs = Date.now()) {
+  const listed = listedAdminTier(bootstrap, email);
+  if (listed !== 'staff') return listed;
+  return staffGrantActive(bootstrap, email.trim().toLowerCase(), nowMs) ? 'staff' : null;
 }
 
 /**
@@ -207,17 +319,19 @@ async function verifyAuthToken({ auth }, req) {
  *
  * `db` makes the decision current: with it, `config/bootstrap` is read
  * live (see loadBootstrap); without it, the injected `getConfig`
- * (core/config.cjs getEventConfig) supplies the cached copy.
+ * (core/config.cjs getEventConfig) supplies the cached copy. Either way a
+ * staff end time is compared with `now()` (default Date.now) at the moment
+ * of the decision.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           getConfig: () => Promise<{ bootstrap: { adminEmails?: string[], staffEmails?: string[] } | null }>,
- *           db?: object }} deps
+ *           db?: object, now?: () => number }} deps
  * @param {object} req
  * @param {{ tier?: 'operator'|'staff' }} [options]
  * @returns {Promise<{ ok: true, uid: string, email: string, tier: 'operator'|'staff' } |
  *                    { ok: false, status: 401|403|500, code: string, message: string }>}
  */
-async function requireAdmin({ auth, db, getConfig }, req, { tier = 'operator' } = {}) {
+async function requireAdmin({ auth, db, getConfig, now = Date.now }, req, { tier = 'operator' } = {}) {
   if (!ADMIN_TIERS.includes(tier)) {
     throw new TypeError(`requireAdmin: unknown tier "${tier}" (expected ${ADMIN_TIERS.join(' or ')})`);
   }
@@ -236,7 +350,13 @@ async function requireAdmin({ auth, db, getConfig }, req, { tier = 'operator' } 
     if (err instanceof BootstrapUnavailableError) return { ...BOOTSTRAP_UNAVAILABLE };
     throw err;
   }
-  const held = resolveAdminTier(bootstrap, email);
+  // The clock is read after the document, so the end time is compared
+  // with the moment of the decision. A clock that answers a Date is read as
+  // its instant; anything that is not a number fails closed for a
+  // temporary grant (resolveAdminTier).
+  const clock = now();
+  const nowMs = clock instanceof Date ? clock.getTime() : typeof clock === 'number' ? clock : Number.NaN;
+  const held = resolveAdminTier(bootstrap, email, nowMs);
   if (held === null) {
     return { ok: false, status: 403, code: 'forbidden', message: 'Admin access required.' };
   }
@@ -286,7 +406,9 @@ async function requireAdmin({ auth, db, getConfig }, req, { tier = 'operator' } 
  * This gate reads the CACHED bootstrap, not the live document: it runs on
  * every bookmark and reaction at attendee volume, the admin branch only
  * widens what an approved attendee already has, and a five-minute lag on
- * an admin's bookmark pill costs nobody anything.
+ * an admin's bookmark pill costs nobody anything. A staff end time is
+ * still met on time here: resolveAdminTier compares it with the clock at
+ * the call, not with the age of the cached copy.
  *
  * @param {{ auth: { verifyIdToken: (t: string) => Promise<object> },
  *           db: FirebaseFirestore.Firestore,
@@ -396,11 +518,14 @@ module.exports = {
   ADMIN_TIERS,
   BOOTSTRAP_UNAVAILABLE,
   BootstrapUnavailableError,
+  STAFF_EXPIRY_FIELD,
   resolveAdminTier,
+  listedAdminTier,
+  staffExpiryOf,
   loadBootstrap,
   verifyAuthToken,
   requireAdmin,
   requireAttendeeAccess,
   requireAppCheck,
-  internals: { extractBearerToken, extractAppCheckToken, tierSatisfies, APP_CHECK_HEADER },
+  internals: { extractBearerToken, extractAppCheckToken, tierSatisfies, expiryMillis, staffGrantActive, APP_CHECK_HEADER },
 };

@@ -624,3 +624,141 @@ test('requireAttendeeAccess: omitted getConfig degrades to the users-doc-only ch
   );
   assert.equal(verdict.ok, true);
 });
+
+// --- expiring staff access (issue #331) ------------------------------------
+//
+// A staff grant may carry an end time in `staffExpiry`, a map from the
+// lowercased address to a Firestore Timestamp. The grant works while the
+// request time is before that instant and stops at it. firestore.rules reads
+// the same map with the same comparison (`request.time < expiry`), so these
+// cases are the server half of tests/staff-expiry.rules.test.js.
+
+const { Timestamp } = require('firebase-admin/firestore');
+const { listedAdminTier } = require('./auth.cjs');
+
+const ENDS = Date.parse('2026-10-27T17:00:00.000Z');
+const temporaryStaff = (expiry) => ({
+  adminEmails: ['ops@example.org'],
+  staffEmails: ['desk@example.org', 'demo@example.org'],
+  staffExpiry: { 'demo@example.org': expiry },
+});
+
+test('resolveAdminTier: a temporary staff grant works before its end, and not at or after it', () => {
+  const bootstrap = temporaryStaff(Timestamp.fromMillis(ENDS));
+  assert.equal(resolveAdminTier(bootstrap, 'demo@example.org', ENDS - 1), 'staff');
+  assert.equal(resolveAdminTier(bootstrap, 'Demo@Example.org', ENDS - 1), 'staff');
+  assert.equal(resolveAdminTier(bootstrap, 'demo@example.org', ENDS), null);
+  assert.equal(resolveAdminTier(bootstrap, 'demo@example.org', ENDS + 1), null);
+  // The other staff grant has no end and is not touched by this one.
+  assert.equal(resolveAdminTier(bootstrap, 'desk@example.org', ENDS + 1), 'staff');
+  // Operators never expire.
+  assert.equal(resolveAdminTier(bootstrap, 'ops@example.org', ENDS + 1), 'operator');
+});
+
+test('resolveAdminTier: the end time is checked at call time, not when the document was read', () => {
+  const realNow = Date.now;
+  try {
+    const bootstrap = temporaryStaff(Timestamp.fromMillis(ENDS));
+    Date.now = () => ENDS - 1;
+    assert.equal(resolveAdminTier(bootstrap, 'demo@example.org'), 'staff');
+    Date.now = () => ENDS;
+    assert.equal(resolveAdminTier(bootstrap, 'demo@example.org'), null);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('resolveAdminTier: a Date end time (the test fake stores Dates) reads the same as a Timestamp', () => {
+  const bootstrap = temporaryStaff(new Date(ENDS));
+  assert.equal(resolveAdminTier(bootstrap, 'demo@example.org', ENDS - 1), 'staff');
+  assert.equal(resolveAdminTier(bootstrap, 'demo@example.org', ENDS), null);
+});
+
+test('resolveAdminTier: a temporary grant with a missing or malformed end time fails closed', () => {
+  for (const bad of [null, undefined, 'never', ENDS, '2026-10-27T17:00:00Z', { seconds: ENDS / 1000, nanoseconds: 0 }, new Date(Number.NaN), [], true]) {
+    const bootstrap = temporaryStaff(bad);
+    assert.equal(resolveAdminTier(bootstrap, 'demo@example.org', ENDS - 10_000), null, `end time ${String(bad)}`);
+    // A bad entry for one address takes nobody else's access.
+    assert.equal(resolveAdminTier(bootstrap, 'desk@example.org', ENDS - 10_000), 'staff');
+    assert.equal(resolveAdminTier(bootstrap, 'ops@example.org', ENDS - 10_000), 'operator');
+  }
+});
+
+test('resolveAdminTier: a staffExpiry field that is not a map refuses every staff grant, never an operator', () => {
+  for (const bad of [null, 'demo@example.org', [], 42, Timestamp.fromMillis(ENDS)]) {
+    const bootstrap = { adminEmails: ['ops@example.org'], staffEmails: ['desk@example.org'], staffExpiry: bad };
+    assert.equal(resolveAdminTier(bootstrap, 'desk@example.org', ENDS), null, `staffExpiry ${String(bad)}`);
+    assert.equal(resolveAdminTier(bootstrap, 'ops@example.org', ENDS), 'operator');
+  }
+});
+
+test('resolveAdminTier: no staffExpiry field at all — every deployment before issue 331 — keeps every staff grant', () => {
+  assert.equal(resolveAdminTier({ adminEmails: [], staffEmails: ['desk@example.org'] }, 'desk@example.org', ENDS), 'staff');
+});
+
+test('resolveAdminTier: an end time is matched on the lowercased key only, the key the rules can read', () => {
+  // The rules look up request.auth.token.email.lower() in the map and
+  // cannot lowercase its keys, so a mixed-case key is no end time there;
+  // the server must read it the same way, or the two would disagree.
+  const bootstrap = { adminEmails: [], staffEmails: ['demo@example.org'], staffExpiry: { 'Demo@Example.org': Timestamp.fromMillis(ENDS) } };
+  assert.equal(resolveAdminTier(bootstrap, 'demo@example.org', ENDS + 1), 'staff');
+});
+
+test('resolveAdminTier: an end time on an operator address changes nothing — operators never expire', () => {
+  const bootstrap = { adminEmails: ['ops@example.org'], staffEmails: ['ops@example.org'], staffExpiry: { 'ops@example.org': Timestamp.fromMillis(ENDS) } };
+  assert.equal(resolveAdminTier(bootstrap, 'ops@example.org', ENDS + 1), 'operator');
+});
+
+test('listedAdminTier: reads the lists only, so an ended grant still counts as listed', () => {
+  const bootstrap = temporaryStaff(Timestamp.fromMillis(ENDS));
+  assert.equal(listedAdminTier(bootstrap, 'demo@example.org'), 'staff');
+  assert.equal(listedAdminTier(bootstrap, 'ops@example.org'), 'operator');
+  assert.equal(listedAdminTier(bootstrap, 'nobody@example.org'), null);
+});
+
+test('requireAdmin: an ended staff grant is refused at once, with the token it held before the end', async () => {
+  const token = { uid: 'demo-1', email: 'demo@example.org', email_verified: true };
+  const live = bootstrapDb(temporaryStaff(Timestamp.fromMillis(ENDS)));
+  const deps = (nowMs) => ({ auth: fakeAuth({ demo: token }), db: live, getConfig: fakeGetConfig(['ops@example.org']), now: () => nowMs });
+  const before = await requireAdmin(deps(ENDS - 1), reqWithAuth('Bearer demo'), { tier: 'staff' });
+  assert.equal(before.ok, true);
+  assert.equal(before.tier, 'staff');
+  const after = await requireAdmin(deps(ENDS), reqWithAuth('Bearer demo'), { tier: 'staff' });
+  assert.deepEqual(
+    { ok: after.ok, status: after.status, message: after.message },
+    { ok: false, status: 403, message: 'Admin access required.' },
+  );
+});
+
+test('requireAttendeeAccess: an ended staff grant in the cached copy no longer stands in for attendee access', async () => {
+  const token = { uid: 'demo-1', email: 'demo@example.org', email_verified: true };
+  const realNow = Date.now;
+  const db = {
+    collection: () => ({ doc: () => ({ get: async () => ({ exists: false, data: () => undefined }) }) }),
+  };
+  try {
+    Date.now = () => ENDS;
+    const verdict = await requireAttendeeAccess(
+      { auth: fakeAuth({ demo: token }), db, getConfig: async () => ({ bootstrap: temporaryStaff(Timestamp.fromMillis(ENDS)) }) },
+      reqWithAuth('Bearer demo'),
+    );
+    assert.equal(verdict.ok, false);
+    assert.equal(verdict.status, 403);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test('requireAdmin: a clock that answers a Date is read as its instant; one that answers nothing fails closed', async () => {
+  const token = { uid: 'demo-1', email: 'demo@example.org', email_verified: true };
+  const live = bootstrapDb(temporaryStaff(Timestamp.fromMillis(ENDS)));
+  const gate = (now) => requireAdmin(
+    { auth: fakeAuth({ demo: token }), db: live, getConfig: fakeGetConfig(['ops@example.org']), now },
+    reqWithAuth('Bearer demo'),
+    { tier: 'staff' },
+  );
+  assert.equal((await gate(() => new Date(ENDS - 1))).ok, true);
+  assert.equal((await gate(() => new Date(ENDS))).ok, false);
+  assert.equal((await gate(() => undefined)).ok, false);
+  assert.equal((await gate(() => 'later')).ok, false);
+});

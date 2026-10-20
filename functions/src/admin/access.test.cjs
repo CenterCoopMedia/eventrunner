@@ -278,7 +278,10 @@ test('setAdminAccess: a missing bootstrap document admits nobody, even a caller 
 test('applyAccessChange: an absent bootstrap document is written as fresh lists (the seed path, not the gate)', async () => {
   const db = makeFakeDb({});
   const result = await applyAccessChange({ db, email: SECOND_OPS, tier: 'operator' });
-  assert.deepEqual(result, { ok: true, changed: true, tierChanged: true, previousTier: null });
+  assert.deepEqual(result, {
+    ok: true, changed: true, tierChanged: true, expiryChanged: false, previousTier: null,
+    previousExpiresAtMs: null, expiresAtMs: null,
+  });
   assert.deepEqual(db.read('config', 'bootstrap'), { adminEmails: [SECOND_OPS], staffEmails: [] });
 });
 
@@ -338,4 +341,270 @@ test('applyAccessChange: a concurrent grant is not lost — the transaction read
   const result = await applyAccessChange({ db, email: STAFF, tier: 'staff' });
   assert.equal(result.ok, true);
   assert.deepEqual(db.read('config', 'bootstrap').staffEmails, ['racer@example.org', STAFF]);
+});
+
+// ------------------------------------------------- expiring staff access (#331)
+//
+// T0 is the handler's clock (deps.now). An end time is an ISO 8601 string
+// with an explicit offset, later than T0 and at most MAX_STAFF_ACCESS_DAYS
+// after it. It is stored as `staffExpiry[address]`; the Admin SDK turns the
+// Date into a Firestore Timestamp, and the fake keeps the Date.
+
+const { requireAdmin } = require('../core/auth.cjs');
+const { internals: { MAX_STAFF_ACCESS_DAYS } } = require('./access.cjs');
+
+const DEMO = 'demo@example.org';
+const HOUR = 3_600_000;
+const inHours = (hours) => new Date(T0.getTime() + hours * HOUR);
+const iso = (date) => date.toISOString();
+
+const demoAuth = {
+  async verifyIdToken(token) {
+    if (token === 'demo') return { uid: 'demo-1', email: DEMO, email_verified: true };
+    if (token === 'demo2') return { uid: 'demo-2', email: 'demo2@example.org', email_verified: true };
+    return auth.verifyIdToken(token);
+  },
+};
+
+async function grant(deps, body, token = 'ops') {
+  const res = makeRes();
+  await createSetAdminAccessHandler(deps)(req(token, body), res);
+  return res;
+}
+
+async function list(deps, token = 'ops') {
+  const res = makeRes();
+  await createListAdminAccessHandler(deps)(req(token), res);
+  return res;
+}
+
+test('MAX_STAFF_ACCESS_DAYS is 90', () => {
+  assert.equal(MAX_STAFF_ACCESS_DAYS, 90);
+});
+
+test('setAdminAccess: grants staff access with an end time, stores it, answers it, and records it', async () => {
+  const { db, deps, refreshes } = world();
+  const ends = inHours(24);
+  const res = await grant(deps, { email: 'Demo@Example.org', tier: 'staff', expiresAt: iso(ends) });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body, {
+    ok: true, email: DEMO, tier: 'staff', previousTier: null, changed: true,
+    expiresAt: iso(ends), previousExpiresAt: null,
+  });
+  const stored = bootstrapOf(db);
+  assert.deepEqual(stored.staffEmails, [STAFF, DEMO]);
+  assert.deepEqual(stored.staffExpiry, { [DEMO]: ends });
+  // Every other field on the document stays.
+  assert.equal(stored.createdAt, 'seeded');
+  assert.deepEqual(adminLogs(db)[0].details, {
+    email: DEMO, tier: 'staff', previousTier: null, expiresAt: iso(ends), previousExpiresAt: null,
+  });
+  assert.equal(refreshes.length, 1);
+});
+
+test('setAdminAccess: an end time with a non-UTC offset is stored as the same instant', async () => {
+  const { db, deps } = world();
+  const res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: '2026-09-24T08:00:00-04:00' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(res.body.expiresAt, '2026-09-24T12:00:00.000Z');
+  assert.equal(bootstrapOf(db).staffExpiry[DEMO].toISOString(), '2026-09-24T12:00:00.000Z');
+});
+
+test('setAdminAccess: a bad end time is refused before anything is written', async () => {
+  const { db, deps } = world();
+  const cases = [
+    // Operator access never ends, so it cannot take an end time.
+    [{ email: DEMO, tier: 'operator', expiresAt: iso(inHours(1)) }, /only staff access can end/],
+    // Removing access takes none either.
+    [{ email: STAFF, tier: 'none', expiresAt: iso(inHours(1)) }, /only staff access can end/],
+    [{ email: DEMO, tier: 'staff', expiresAt: 'tomorrow' }, /expiresAt/],
+    // No offset: the server would read it in its own zone, so it is refused.
+    [{ email: DEMO, tier: 'staff', expiresAt: '2026-09-24T12:00' }, /expiresAt/],
+    [{ email: DEMO, tier: 'staff', expiresAt: '2026-13-40T99:00:00Z' }, /expiresAt/],
+    [{ email: DEMO, tier: 'staff', expiresAt: T0.getTime() + HOUR }, /expiresAt/],
+    [{ email: DEMO, tier: 'staff', expiresAt: { seconds: 1 } }, /expiresAt/],
+    // Now, or earlier, is not an end time.
+    [{ email: DEMO, tier: 'staff', expiresAt: iso(T0) }, /must be later than now/],
+    [{ email: DEMO, tier: 'staff', expiresAt: iso(inHours(-1)) }, /must be later than now/],
+    // At most 90 days.
+    [{ email: DEMO, tier: 'staff', expiresAt: iso(new Date(T0.getTime() + (MAX_STAFF_ACCESS_DAYS * 24 * HOUR) + 1000)) }, /90 days/],
+  ];
+  for (const [body, message] of cases) {
+    const res = await grant(deps, body);
+    assert.equal(res.statusCode, 400, JSON.stringify(body));
+    assert.match(res.body.error.message, message, JSON.stringify(body));
+  }
+  assert.equal(db.writes.length, 0);
+  assert.deepEqual(adminLogs(db), []);
+});
+
+test('setAdminAccess: exactly 90 days is allowed, and null or an absent end time is a permanent grant', async () => {
+  const { db, deps } = world();
+  const limit = new Date(T0.getTime() + MAX_STAFF_ACCESS_DAYS * 24 * HOUR);
+  let res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: iso(limit) });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  res = await grant(deps, { email: 'perm@example.org', tier: 'staff', expiresAt: null });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, { ok: true, email: 'perm@example.org', tier: 'staff', previousTier: null, changed: true });
+  assert.deepEqual(bootstrapOf(db).staffExpiry, { [DEMO]: limit });
+});
+
+test('setAdminAccess: changing the end time of a staff grant is a change, recorded with both times', async () => {
+  const first = inHours(2);
+  const later = inHours(48);
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: first } });
+  const res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: iso(later) });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true, email: DEMO, tier: 'staff', previousTier: 'staff', changed: true,
+    expiresAt: iso(later), previousExpiresAt: iso(first),
+  });
+  assert.deepEqual(bootstrapOf(db).staffExpiry, { [DEMO]: later });
+  // Not a normalization: the end time moved.
+  assert.deepEqual(adminLogs(db)[0].details, {
+    email: DEMO, tier: 'staff', previousTier: 'staff', expiresAt: iso(later), previousExpiresAt: iso(first),
+  });
+});
+
+test('setAdminAccess: the same end time again changes nothing and writes nothing', async () => {
+  const ends = inHours(2);
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: ends } });
+  const res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: iso(ends) });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.changed, false);
+  assert.equal(db.writes.length, 0);
+  assert.deepEqual(adminLogs(db), []);
+});
+
+test('setAdminAccess: a staff grant with no end time makes a temporary grant permanent, and says so in the log', async () => {
+  const ends = inHours(2);
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: ends } });
+  const res = await grant(deps, { email: DEMO, tier: 'staff' });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true, email: DEMO, tier: 'staff', previousTier: 'staff', changed: true,
+    expiresAt: null, previousExpiresAt: iso(ends),
+  });
+  assert.equal(bootstrapOf(db).staffExpiry, undefined);
+  assert.deepEqual(adminLogs(db)[0].details, {
+    email: DEMO, tier: 'staff', previousTier: 'staff', expiresAt: null, previousExpiresAt: iso(ends),
+  });
+});
+
+test('setAdminAccess: an ended grant can be renewed with a new end time', async () => {
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: inHours(-1) } });
+  const res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: iso(inHours(3)) });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.changed, true);
+  assert.deepEqual(bootstrapOf(db).staffExpiry, { [DEMO]: inHours(3) });
+});
+
+test('setAdminAccess: promoting a temporary staff account to operator removes its end time; operators never expire', async () => {
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [DEMO, STAFF], staffExpiry: { [DEMO]: inHours(2), [STAFF]: inHours(5) } });
+  const res = await grant(deps, { email: DEMO, tier: 'operator' });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body, {
+    ok: true, email: DEMO, tier: 'operator', previousTier: 'staff', changed: true,
+    expiresAt: null, previousExpiresAt: iso(inHours(2)),
+  });
+  assert.deepEqual(bootstrapOf(db).adminEmails, [OPS, DEMO]);
+  // The other temporary grant keeps its own end time.
+  assert.deepEqual(bootstrapOf(db).staffExpiry, { [STAFF]: inHours(5) });
+});
+
+test('setAdminAccess: removing a temporary grant removes its end time too', async () => {
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: inHours(2) } });
+  const res = await grant(deps, { email: DEMO, tier: 'none' });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(bootstrapOf(db).staffEmails, []);
+  assert.equal(bootstrapOf(db).staffExpiry, undefined);
+  assert.deepEqual(adminLogs(db)[0].details, {
+    email: DEMO, tier: null, previousTier: 'staff', expiresAt: null, previousExpiresAt: iso(inHours(2)),
+  });
+});
+
+test('setAdminAccess: the last operator cannot be made temporary — demoting them to staff with an end time is refused', async () => {
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [] });
+  const res = await grant(deps, { email: OPS, tier: 'staff', expiresAt: iso(inHours(1)) });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'last-operator');
+  assert.deepEqual(bootstrapOf(db), { adminEmails: [OPS], staffEmails: [] });
+});
+
+test('setAdminAccess: a change to one account never turns another temporary grant permanent, a malformed one included', async () => {
+  // An end time the rules cannot read refuses that grant. Dropping it on a
+  // rewrite would make the grant permanent, so it is carried as it is.
+  const { db, deps } = world({
+    adminEmails: [OPS],
+    staffEmails: [STAFF, 'bad@example.org', 'later@example.org'],
+    staffExpiry: { 'bad@example.org': 'next week', 'later@example.org': inHours(9), 'gone@example.org': inHours(1) },
+  });
+  const res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: iso(inHours(1)) });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(bootstrapOf(db).staffExpiry, {
+    'bad@example.org': 'next week',
+    'later@example.org': inHours(9),
+    // An end time for an address on no list does nothing, so it goes.
+    [DEMO]: inHours(1),
+  });
+});
+
+test('setAdminAccess: a staffExpiry field that is not a map keeps every other staff grant refused after a write', async () => {
+  // While the field cannot be read, the rules and the server refuse every
+  // staff grant. A write marks each other staff address with an end time
+  // that cannot be read (null), so they stay refused until an operator
+  // grants them again, and the operator can still repair the list here.
+  const { db, deps } = world({ adminEmails: [OPS], staffEmails: [STAFF, 'two@example.org'], staffExpiry: 'broken' });
+  const res = await grant(deps, { email: DEMO, tier: 'staff', expiresAt: iso(inHours(1)) });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(bootstrapOf(db).staffExpiry, { [STAFF]: null, 'two@example.org': null, [DEMO]: inHours(1) });
+  const { resolveAdminTier } = require('../core/auth.cjs');
+  assert.equal(resolveAdminTier(bootstrapOf(db), STAFF, T0.getTime()), null);
+  assert.equal(resolveAdminTier(bootstrapOf(db), DEMO, T0.getTime()), 'staff');
+});
+
+test('listAdminAccess: shows each temporary grant with its end time and whether it still works', async () => {
+  const { deps } = world({
+    adminEmails: [OPS],
+    staffEmails: [STAFF, DEMO, 'ended@example.org', 'bad@example.org'],
+    staffExpiry: { [DEMO]: inHours(2), 'ended@example.org': inHours(-2), 'bad@example.org': 'soon' },
+  });
+  const res = await list(deps);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.accounts, [
+    { email: OPS, tier: 'operator' },
+    { email: 'bad@example.org', tier: 'staff', expiresAt: null, expiryState: 'invalid' },
+    { email: DEMO, tier: 'staff', expiresAt: iso(inHours(2)), expiryState: 'active' },
+    { email: STAFF, tier: 'staff' },
+    { email: 'ended@example.org', tier: 'staff', expiresAt: iso(inHours(-2)), expiryState: 'expired' },
+  ]);
+});
+
+test('listAdminAccess: a grant is shown as ended at its end time exactly, by the server clock', async () => {
+  const { deps } = world({ adminEmails: [OPS], staffEmails: [DEMO], staffExpiry: { [DEMO]: T0 } });
+  const res = await list(deps);
+  assert.equal(res.body.accounts[1].expiryState, 'expired');
+  deps.now = () => T0.getTime() - 1;
+  const before = await list(deps);
+  assert.equal(before.body.accounts[1].expiryState, 'active');
+});
+
+test('two temporary grants end on their own times; an ended one is refused while the other still works', async () => {
+  const { deps } = world({ adminEmails: [OPS], staffEmails: [], createdAt: 'seeded' });
+  deps.auth = demoAuth;
+  assert.equal((await grant(deps, { email: DEMO, tier: 'staff', expiresAt: iso(inHours(1)) })).statusCode, 200);
+  assert.equal((await grant(deps, { email: 'demo2@example.org', tier: 'staff', expiresAt: iso(inHours(3)) })).statusCode, 200);
+  const gate = (token, nowMs) => requireAdmin(
+    { auth: demoAuth, db: deps.db, getConfig: deps.getConfig, now: () => nowMs },
+    req(token),
+    { tier: 'staff' },
+  );
+  const oneHour = inHours(1).getTime();
+  assert.equal((await gate('demo', oneHour - 1)).ok, true);
+  assert.equal((await gate('demo', oneHour)).ok, false);
+  assert.equal((await gate('demo2', oneHour)).ok, true);
+  assert.equal((await gate('demo2', inHours(3).getTime())).ok, false);
+  // Revoking the second one before its end stops it at once as well.
+  assert.equal((await grant(deps, { email: 'demo2@example.org', tier: 'none' })).statusCode, 200);
+  assert.equal((await gate('demo2', oneHour)).ok, false);
 });
