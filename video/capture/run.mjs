@@ -68,6 +68,16 @@ for(const format of requested?[requested]:['landscape','vertical']){
         if(await menu.isVisible())await press(menuName,menu);
         link=page.getByRole('link',{name:label,exact:true}).filter({visible:true}).first();
       }
+      // The admin rail folds its groups (issue #477). A link inside a closed
+      // group is hidden: open the group that holds it, then use the link.
+      if(!await link.isVisible()){
+        const folded=page.locator('.admin-docket-group[hidden] a').filter({hasText:new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}$`)}).first();
+        const list=await folded.count()?await folded.evaluate((a)=>a.closest('ul').id):null;
+        if(list){
+          await page.locator(`[aria-controls="${list}"]`).filter({visible:true}).first().click();
+          link=page.getByRole('link',{name:label,exact:true}).filter({visible:true}).first();
+        }
+      }
       return link;
     }
     return {context,page,shot,press,stable,nav};

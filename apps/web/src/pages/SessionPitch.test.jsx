@@ -107,3 +107,37 @@ describe('SessionPitch with this site’s form', () => {
     expect(screen.queryByRole('link', { name: /Open the pitch form/ })).toBeNull();
   });
 });
+
+describe('SessionPitch with no deadline', () => {
+  it('takes pitches with no deadline and shows no deadline or countdown', () => {
+    pitchCall = { enabled: true, closesAt: null, externalFormUrl: null };
+    const { container } = render(<SessionPitch />);
+    expect(screen.getByText('Submissions are open')).toBeInTheDocument();
+    expect(screen.getByText('There is no set deadline. The organizers close submissions when they are ready.')).toBeInTheDocument();
+    expect(screen.queryByText(/Deadline:/)).toBeNull();
+    expect(container.querySelector('time')).toBeNull();
+    expect(screen.getByLabelText(/Session title/)).toBeInTheDocument();
+  });
+
+  it('reads as closed after staff close the call by hand', () => {
+    pitchCall = { enabled: true, closesAt: null, externalFormUrl: null };
+    render(<SessionPitch />);
+    act(() => listener.onNext({ enabled: false, closesAt: null, externalFormUrl: null }));
+    expect(screen.getByText('Submissions are closed')).toBeInTheDocument();
+    expect(screen.queryByText(/no set deadline/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Submit pitch' })).toBeDisabled();
+  });
+
+  it('links to an external form with no deadline the same way', () => {
+    pitchCall = { enabled: true, closesAt: null, externalFormUrl: FORM };
+    render(<SessionPitch />);
+    expect(screen.getByRole('link', { name: /Open the pitch form/ })).toHaveAttribute('href', FORM);
+    expect(screen.queryByText(/Deadline:/)).toBeNull();
+  });
+
+  it('treats an open call with no closesAt field as closed', () => {
+    pitchCall = { enabled: true, externalFormUrl: null };
+    render(<SessionPitch />);
+    expect(screen.getByText('Submissions are closed')).toBeInTheDocument();
+  });
+});

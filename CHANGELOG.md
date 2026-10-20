@@ -20,11 +20,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sessions. The design guidance and the shape test now allow a listed compact chip, held
   to a semantic contract, in place of a blanket ban (#475).
 
+- The admin rail groups its sections into Content, Program, Registration and tickets,
+  Communications, Operations and Settings. Each group opens and closes from a button on its
+  name. The group of the current page opens by itself, and a closed one names the current page.
+  On a wide screen **Hide menu** narrows the rail, and **Show menu** brings it back. On
+  Branding, a bar between the controls and the preview, and one between the light and dark
+  frames, changes how much room each side has, by pointer or by the arrow keys. The frame still
+  renders at the width picked. The browser remembers each choice, and the admin works without
+  browser storage (#477).
+
 - Staff set the pitch call deadline and the ticket catalog's sale windows as a date and a
   time on the event's clock. The fields name the event's time zone and state the result in
   words, with the UTC offset for the chosen date. A time that daylight saving time skips is
   refused, and a time it repeats asks which one is meant. The stored RFC3339 values do not
   change (#476).
+
+- A pitch call can have no deadline. Under **When intake closes**, an operator chooses
+  **Open until I close it**. The call stays open until an operator clears **Accept session
+  pitches** and saves. `updatePitchCall` takes `"closesAt": null` for this; a missing or
+  blank value is still refused. `/pitch` shows no deadline and no countdown for such a
+  call. The same rule applies with an external form, such as Airtable (#476).
 
 - A new event can start from a past event's template. `scripts/export-event-template.cjs`
   reads an allowlist from the past project: branding, page templates, their content blocks and

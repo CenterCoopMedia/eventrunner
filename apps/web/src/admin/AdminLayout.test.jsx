@@ -10,7 +10,8 @@
 //   2. The docket is a grouped standing list of WORDS on the dark rail, not a
 //      tab row and not an icon rail, and the current item carries four
 //      signals rather than colour alone: the leading-edge marker, the bold
-//      weight, the filled ground, and aria-current="page".
+//      weight, the filled ground, and aria-current="page". Its groups fold,
+//      and the whole rail hides on a wide screen (issue #477).
 //   3. The client's two elements are the job mark and the accent, and
 //      nothing else on this surface belongs to the client.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,10 +64,18 @@ import {
   ADMIN_TIERS,
   DOCKET,
   TIER_SCOPE,
+  activeGroupId,
+  choicesOnArrival,
   docketForTier,
+  docketGroupOpen,
   sectionTier,
   tierReaches,
 } from './AdminLayout.jsx';
+import {
+  DOCKET_GROUPS_KEY,
+  RAIL_COLLAPSED_KEY,
+  forgetLayoutMemory,
+} from './layoutPreference.js';
 // Mocked for every file in src/test/setup.js; steered here for the banner.
 import { subscribePendingCounts } from './pendingCountsSource.js';
 import { markTourDone, readTourDone } from './tourState.js';
@@ -108,8 +117,18 @@ function shellChrome(container) {
   return room;
 }
 
+/** Open every closed docket group, so each link can be reached by role. */
+function openEveryGroup() {
+  for (const head of document.querySelectorAll('.admin-docket-group-toggle[aria-expanded="false"]')) {
+    fireEvent.click(head);
+  }
+}
+
 beforeEach(() => {
   configSubscriptions.clear();
+  window.localStorage.removeItem(RAIL_COLLAPSED_KEY);
+  window.localStorage.removeItem(DOCKET_GROUPS_KEY);
+  forgetLayoutMemory();
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -209,6 +228,8 @@ describe('the admin shell', () => {
       fireEvent.click(summary);
       await waitFor(() => expect(docket).toHaveAttribute('open'));
       await waitFor(() => expect(container.querySelector('#admin-content')).toHaveAttribute('inert'));
+      // Sessions is under Program, which a reader on Pages has not opened.
+      fireEvent.click(within(nav).getByRole('button', { name: 'Program' }));
       const sessions = within(nav).getByRole('link', { name: 'Sessions' });
       sessions.focus();
       fireEvent.keyDown(sessions, { key: 'Tab' });
@@ -276,15 +297,23 @@ describe('the admin shell', () => {
     expect(html).toMatch(/font-admin-(ui|data)/);
   });
 
-  it('sets the docket as the Overview and four named groups of words, not a tab row', async () => {
+  it('sets the docket as the Overview and six named groups of words, not a tab row', async () => {
     await renderAdmin();
     const nav = screen.getByRole('navigation', { name: 'Admin sections' });
+    openEveryGroup();
 
     // Group heads are folios on a hairline, not headings above a heading.
     // The lead group (the Overview, issue #179) has no label and no folio.
     const folios = [...nav.querySelectorAll('.admin-folio')].map((el) => el.textContent);
     expect(folios).toEqual(DOCKET.filter((group) => group.label).map((group) => group.label));
-    expect(folios).toEqual(['Content', 'People', 'Operations', 'System']);
+    expect(folios).toEqual([
+      'Content',
+      'Program',
+      'Registration and tickets',
+      'Communications',
+      'Operations',
+      'Settings',
+    ]);
     expect(DOCKET[0]).toMatchObject({ id: 'lead', label: null });
     // The Overview is the first link on the rail.
     expect(nav.querySelector('a')).toHaveTextContent('Overview');
@@ -312,6 +341,7 @@ describe('the admin shell', () => {
       '/admin/unpublished',
     );
     expect(nav.querySelector('svg')).toBeNull();
+    expect(nav.querySelector('img')).toBeNull();
     for (const link of nav.querySelectorAll('a')) {
       expect(link.textContent.trim().length).toBeGreaterThan(0);
     }
@@ -327,6 +357,7 @@ describe('the admin shell', () => {
     expect(active.className).toContain('bg-admin-rail-current');
 
     // And an inactive item carries none of them.
+    openEveryGroup();
     const inactive = screen.getByRole('link', { name: 'Media' });
     expect(inactive).not.toHaveAttribute('aria-current');
     expect(inactive.className).toContain('border-transparent');
@@ -368,17 +399,18 @@ describe('the admin shell', () => {
     expect(ADMIN_TIERS).toEqual(['operator', 'staff']);
   });
 
-  it('classifies the sections: content, people and operations are staff; features, branding, access and system errors are operator', () => {
+  it('classifies the sections: every group but Settings is staff; features, branding, access and system errors are operator', () => {
     const byTier = (tier) =>
       DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.to);
     expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
       'overview',
-      'pages', 'sessions', 'pitches', 'organizations', 'content', 'updates', 'timeline', 'media', 'materials',
-      'versions', 'unpublished',
-      'speakers', 'attendees', 'badges',
-      'announcements', 'live-updates', 'ticketing', 'import', 'feedback', 'email-log', 'change-requests',
-      'settings', 'data-export',
+      'pages', 'content', 'updates', 'timeline', 'media', 'materials', 'versions', 'unpublished',
+      'sessions', 'pitches', 'speakers', 'organizations',
+      'attendees', 'ticketing', 'badges',
+      'announcements', 'live-updates', 'email-log',
+      'import', 'feedback', 'change-requests', 'data-export',
+      'settings',
     ]);
   });
 
@@ -465,9 +497,17 @@ describe('the admin shell', () => {
 
   it('draws the staff docket without the operator sections and drops an emptied group', () => {
     const staffDocket = docketForTier('staff');
-    expect(staffDocket.map((group) => group.id)).toEqual(['lead', 'content', 'people', 'operations', 'system']);
+    expect(staffDocket.map((group) => group.id)).toEqual([
+      'lead',
+      'content',
+      'program',
+      'registration',
+      'communications',
+      'operations',
+      'settings',
+    ]);
     expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview']);
-    expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings', 'data-export']);
+    expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
     expect(docketForTier('operator')).toEqual(DOCKET);
     expect(docketForTier(null)).toEqual([]);
   });
@@ -538,8 +578,8 @@ describe('the editor tour in the shell', () => {
     // before the page: the first thing in the stone.
     expect(container.querySelector('.admin-stone').firstElementChild).toBe(tour);
     const heading = within(tour).getByRole('heading', { level: 2, name: 'Welcome to the admin panel' });
-    // An operator reaches five groups: a welcome, five steps, and the last.
-    const stepLine = within(tour).getByText('Step 1 of 7');
+    // An operator reaches seven groups: a welcome, seven steps, and the last.
+    const stepLine = within(tour).getByText('Step 1 of 9');
     expect(heading.compareDocumentPosition(stepLine) & FOLLOWING).toBeTruthy();
     const pageHeading = await screen.findByRole('heading', { level: 1, name: 'Pages' });
     expect(tour.compareDocumentPosition(pageHeading) & FOLLOWING).toBeTruthy();
@@ -616,10 +656,10 @@ describe('the editor tour in the shell', () => {
     await renderAdmin('/admin/pages');
     const tour = await tourPanel();
     fireEvent.click(within(tour).getByRole('button', { name: 'Next' }));
-    expect(within(tour).getByText('Step 2 of 7')).toBeInTheDocument();
+    expect(within(tour).getByText('Step 2 of 9')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Content' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Content' })).toBeInTheDocument();
-    expect(within(await tourPanel()).getByText('Step 2 of 7')).toBeInTheDocument();
+    expect(within(await tourPanel()).getByText('Step 2 of 9')).toBeInTheDocument();
   });
 
   it('still ends, for the life of the tab, when the browser refuses its store', async () => {
@@ -646,6 +686,224 @@ describe('the editor tour in the shell', () => {
     } finally {
       getItem.mockRestore();
       setItem.mockRestore();
+    }
+  });
+});
+
+describe('folding groups and the hiding rail, issue 477', () => {
+  /** A wide screen: every min-width query matches. */
+  const wideScreen = () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn((query) => ({
+      matches: /min-width/.test(query),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    return () => {
+      if (original) window.matchMedia = original;
+      else delete window.matchMedia;
+    };
+  };
+  const head = (name) =>
+    within(screen.getByRole('navigation', { name: 'Admin sections' })).getByRole('button', { name });
+  const storedGroups = () => JSON.parse(window.localStorage.getItem(DOCKET_GROUPS_KEY) ?? '{}');
+
+  beforeEach(() => {
+    signedInUid = 'admin-1';
+    markTourDone('admin-1');
+  });
+
+  it('names the group that holds a section, and none for a path no section owns', () => {
+    expect(activeGroupId(DOCKET, '/admin/pages/new')).toBe('content');
+    expect(activeGroupId(DOCKET, '/admin/Sessions')).toBe('program');
+    expect(activeGroupId(DOCKET, '/admin/ticketing')).toBe('registration');
+    expect(activeGroupId(DOCKET, '/admin/email-log')).toBe('communications');
+    expect(activeGroupId(DOCKET, '/admin/data-export')).toBe('operations');
+    expect(activeGroupId(DOCKET, '/admin/branding')).toBe('settings');
+    expect(activeGroupId(DOCKET, '/admin/overview')).toBe('lead');
+    expect(activeGroupId(DOCKET, '/admin/nope')).toBeNull();
+    // A staff docket has no Branding item, so the refused route opens nothing.
+    expect(activeGroupId(docketForTier('staff'), '/admin/settings')).toBe('settings');
+    expect(activeGroupId(docketForTier('staff'), '/admin/branding')).toBeNull();
+  });
+
+  it('opens a group by the reader’s choice first, then for the current page or one visited', () => {
+    const content = DOCKET.find((group) => group.id === 'content');
+    const lead = DOCKET[0];
+    const none = { choices: {}, visited: new Set(), activeId: null };
+    expect(docketGroupOpen(lead, none)).toBe(true);
+    expect(docketGroupOpen(content, none)).toBe(false);
+    expect(docketGroupOpen(content, { ...none, activeId: 'content' })).toBe(true);
+    expect(docketGroupOpen(content, { ...none, visited: new Set(['content']) })).toBe(true);
+    expect(docketGroupOpen(content, { ...none, choices: { content: true } })).toBe(true);
+    expect(docketGroupOpen(content, { ...none, choices: { content: false }, activeId: 'content' })).toBe(false);
+  });
+
+  it('drops a closed choice for the group a reader arrives in, and keeps every other choice', () => {
+    const choices = { content: false, program: true, settings: false };
+    expect(choicesOnArrival(choices, 'content')).toEqual({ program: true, settings: false });
+    expect(choicesOnArrival(choices, 'program')).toBe(choices);
+    expect(choicesOnArrival(choices, null)).toBe(choices);
+  });
+
+  it('folds each group behind a real button, with the current page’s group open', async () => {
+    await renderAdmin('/admin/branding');
+    const nav = screen.getByRole('navigation', { name: 'Admin sections' });
+    // The Overview has no head and is always there.
+    expect(within(nav).getByRole('link', { name: 'Overview' })).toBeVisible();
+    for (const group of DOCKET.filter((entry) => entry.label)) {
+      const button = head(group.label);
+      expect(button.tagName).toBe('BUTTON');
+      expect(button).toHaveAttribute('type', 'button');
+      const list = document.getElementById(button.getAttribute('aria-controls'));
+      expect(list.tagName).toBe('UL');
+      const open = group.id === 'settings';
+      expect(button).toHaveAttribute('aria-expanded', String(open));
+      if (open) expect(list).not.toHaveAttribute('hidden');
+      else expect(list).toHaveAttribute('hidden');
+    }
+    expect(within(nav).getByRole('link', { name: 'Branding' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).queryByRole('link', { name: 'Pages' })).toBeNull();
+
+    // Opening a group is a press of its head, by pointer or by keyboard.
+    const content = head('Content');
+    content.focus();
+    fireEvent.click(content);
+    expect(content).toHaveAttribute('aria-expanded', 'true');
+    expect(content).toHaveFocus();
+    expect(within(nav).getByRole('link', { name: 'Pages' })).toBeInTheDocument();
+    expect(storedGroups()).toEqual({ content: true });
+  });
+
+  it('names the current page in the head when the reader closes its group', async () => {
+    await renderAdmin('/admin/branding');
+    const settings = head('Settings');
+    fireEvent.click(settings);
+    expect(settings).toHaveAttribute('aria-expanded', 'false');
+    // jsdom spaces the hidden phrase off from the word; a browser does not.
+    expect(settings).toHaveAccessibleName(/^Settings ?, current page: Branding$/);
+    expect(screen.queryByRole('link', { name: 'Branding' })).toBeNull();
+    expect(storedGroups()).toEqual({ settings: false });
+    // Nothing about the route changed.
+    expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+  });
+
+  it('opens the group a navigation lands in, and keeps a visited group open', async () => {
+    vi.mocked(subscribePendingCounts).mockImplementation((_initialize, onNext) => {
+      onNext({ cmsContent: 1, cmsPages: 0, cmsSchedule: 0, cmsOrganizations: 0, cmsUpdates: 0, cmsTimeline: 0 });
+      return () => {};
+    });
+    window.localStorage.setItem(DOCKET_GROUPS_KEY, JSON.stringify({ content: false, program: true }));
+    try {
+      await renderAdmin('/admin/branding');
+      expect(head('Content')).toHaveAttribute('aria-expanded', 'false');
+      expect(head('Program')).toHaveAttribute('aria-expanded', 'true');
+      // The banner's link leads into Content, a group the reader closed.
+      const banner = await screen.findByRole('complementary', { name: 'Unpublished changes' });
+      fireEvent.click(within(banner).getByRole('link'));
+      await screen.findByRole('heading', { level: 1, name: 'Unpublished changes' });
+      await waitFor(() => expect(head('Content')).toHaveAttribute('aria-expanded', 'true'));
+      expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute('aria-current', 'page');
+      // Settings held the page before; it stays open rather than folding
+      // up under the pointer.
+      expect(head('Settings')).toHaveAttribute('aria-expanded', 'true');
+      expect(head('Program')).toHaveAttribute('aria-expanded', 'true');
+      expect(storedGroups()).toEqual({ program: true });
+    } finally {
+      vi.mocked(subscribePendingCounts).mockImplementation((_initialize, onNext) => {
+        onNext({ cmsContent: 0, cmsPages: 0, cmsSchedule: 0, cmsOrganizations: 0, cmsUpdates: 0, cmsTimeline: 0 });
+        return () => {};
+      });
+    }
+  });
+
+  it('remembers the open groups in this browser', async () => {
+    const first = await renderAdmin('/admin/branding');
+    fireEvent.click(head('Communications'));
+    first.unmount();
+    forgetLayoutMemory();
+    await renderAdmin('/admin/branding');
+    expect(head('Communications')).toHaveAttribute('aria-expanded', 'true');
+    expect(head('Content')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('still folds, for the life of the tab, when the browser refuses its store', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    try {
+      const first = await renderAdmin('/admin/branding');
+      fireEvent.click(head('Program'));
+      expect(head('Program')).toHaveAttribute('aria-expanded', 'true');
+      first.unmount();
+      await renderAdmin('/admin/branding');
+      expect(head('Program')).toHaveAttribute('aria-expanded', 'true');
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
+  });
+
+  it('offers no rail toggle on a phone, where Menu does that work', async () => {
+    await renderAdmin('/admin/pages');
+    expect(screen.queryByRole('button', { name: 'Hide menu' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show menu' })).toBeNull();
+  });
+
+  it('hides the rail on a wide screen from one button that keeps the focus and the route', async () => {
+    const restore = wideScreen();
+    try {
+      const { container } = await renderAdmin('/admin/branding');
+      const rail = container.querySelector('.admin-rail');
+      const toggle = screen.getByRole('button', { name: 'Hide menu' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(toggle).toHaveAttribute('aria-controls', 'admin-docket');
+      const docket = document.getElementById('admin-docket');
+      expect(docket).toContainElement(screen.getByRole('navigation', { name: 'Admin sections' }));
+      // The first control after the skip link, so the keyboard reaches it at once.
+      const focusables = [...container.querySelectorAll('a[href], button, summary')];
+      expect(focusables[0]).toHaveClass('skip-link');
+      expect(focusables[1]).toBe(toggle);
+
+      toggle.focus();
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAccessibleName('Show menu');
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle).toHaveFocus();
+      expect(docket).toHaveAttribute('hidden');
+      expect(screen.queryByRole('navigation', { name: 'Admin sections' })).toBeNull();
+      expect(rail).toHaveAttribute('data-collapsed', 'true');
+      expect(window.localStorage.getItem(RAIL_COLLAPSED_KEY)).toBe('true');
+      // The page, its route and its heading are untouched.
+      expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAccessibleName('Hide menu');
+      expect(docket).not.toHaveAttribute('hidden');
+      expect(screen.getByRole('link', { name: 'Branding' })).toHaveAttribute('aria-current', 'page');
+      expect(rail).not.toHaveAttribute('data-collapsed');
+      expect(window.localStorage.getItem(RAIL_COLLAPSED_KEY)).toBe('false');
+    } finally {
+      restore();
+    }
+  });
+
+  it('opens hidden when this browser remembers a hidden rail, and ends the tour on Show menu', async () => {
+    window.localStorage.setItem(RAIL_COLLAPSED_KEY, 'true');
+    window.localStorage.removeItem('eventrunner.adminTour.v1:admin-1');
+    const restore = wideScreen();
+    try {
+      await renderAdmin('/admin/pages');
+      const toggle = screen.getByRole('button', { name: 'Show menu' });
+      expect(document.getElementById('admin-docket')).toHaveAttribute('hidden');
+      const tour = await screen.findByRole('complementary', { name: 'Admin tour' });
+      fireEvent.click(within(tour).getByRole('button', { name: 'End tour' }));
+      expect(toggle).toHaveFocus();
+    } finally {
+      restore();
     }
   });
 });

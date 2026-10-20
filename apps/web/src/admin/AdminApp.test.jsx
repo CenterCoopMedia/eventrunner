@@ -99,6 +99,7 @@ vi.mock('./adminApi.js', async () => {
 });
 
 import App from '../App.jsx';
+import { DOCKET_GROUPS_KEY, forgetLayoutMemory } from './layoutPreference.js';
 
 // The overview asks getEventStats for its figures on mount (issue #179).
 const STATS = {
@@ -109,6 +110,13 @@ const STATS = {
   content: {},
   errors: { unresolved: 0 },
 };
+
+/** The rail folds its groups (issue 477); open each so every link shows. */
+function openEveryGroup() {
+  for (const head of document.querySelectorAll('.admin-docket-group-toggle[aria-expanded="false"]')) {
+    fireEvent.click(head);
+  }
+}
 
 async function renderAt(path) {
   const result = render(
@@ -139,6 +147,9 @@ beforeEach(() => {
   adminCall.mockReset();
   adminCall.mockImplementation((name) => Promise.resolve(name === 'getEventStats' ? STATS : {}));
   currentUser = { uid: 'admin-1', email: 'admin@example.org', getIdToken: async () => 'id-token' };
+  // Each test starts from the default rail: no group opened by hand.
+  window.localStorage.removeItem(DOCKET_GROUPS_KEY);
+  forgetLayoutMemory();
 });
 
 describe('admin route gating', () => {
@@ -170,7 +181,8 @@ describe('admin route gating', () => {
     expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
     await waitFor(() => expect(adminCall).toHaveBeenCalledWith('getEventStats', {}));
     expect(adminCall.mock.calls.filter(([name]) => name === 'getEventStats')).toHaveLength(1);
-    // Every settings surface is reachable from the shell.
+    // Every settings surface is reachable from the shell, one group head away.
+    openEveryGroup();
     for (const tab of [
       'Overview',
       'Pages',
@@ -241,7 +253,7 @@ describe('admin route gating', () => {
 
   // The two tiers (issue #186). The rules decide the tier the same way they
   // decide admin-ness, and the shell draws only what that tier may reach.
-  it('gives a staff admin the content, people and operations sections and none of the operator’s', async () => {
+  it('gives a staff admin every staff section and none of the operator’s', async () => {
     operatorProbeShouldSucceed = false;
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin');
@@ -251,6 +263,7 @@ describe('admin route gating', () => {
     // page they meet is one they may open.
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
+    openEveryGroup();
     for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Live updates', 'Ticketing', 'Import records', 'Feedback', 'Email log', 'Change requests', 'Event', 'Data export']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
@@ -409,6 +422,7 @@ describe('admin route gating', () => {
       await Promise.resolve();
     });
     expect(screen.getByRole('navigation', { name: 'Admin sections' })).toBeInTheDocument();
+    openEveryGroup();
     expect(screen.getByRole('link', { name: 'Branding' })).toBeInTheDocument();
     expect(screen.getByText('Operator')).toBeInTheDocument();
   });
@@ -510,7 +524,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Overview, Pages, Sessions, Session pitches, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event and Data export');
+    expect(refusal.textContent).toContain('Overview, Pages, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Sessions, Session pitches, Speakers, Organizations, Attendees, Ticketing, Badges, Announcements, Live updates, Email log, Import records, Feedback, Change requests, Data export and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });
