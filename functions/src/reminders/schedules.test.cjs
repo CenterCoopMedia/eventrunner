@@ -231,3 +231,51 @@ test('the next-run panel names the offset, who it reaches, and who waits on the 
   assert.equal(done.body.nextRun.at, '2026-11-13T15:00:00.000Z');
   assert.deepEqual(done.body.nextRun.reach.names, ['Ada Example', 'Ben Example']);
 });
+
+// Review findings on #528.
+
+test('a committed approval answers 200 with the approved state even when the refresh read fails', async () => {
+  const db = seed();
+  await call(db, { action: 'save', ...SETTINGS });
+  const preview = (await call(db, { action: 'preview' })).body;
+  // The refresh after the commit reads reminder_schedule_runs; make it fail.
+  const original = db.collection.bind(db);
+  db.collection = (name) => {
+    const col = original(name);
+    if (name !== 'reminder_schedule_runs') return col;
+    return { ...col, doc: () => ({ get: async () => { throw new Error('read failed'); } }) };
+  };
+  const res = await call(db, { action: 'approve', wordingVersion: preview.wordingVersion, settingsVersion: preview.settingsVersion });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.state, 'on');
+  assert.match(res.body.refreshError, /could not be read/);
+  assert.equal(db.read(SCHEDULES, 'speakers').enabled, true);
+  for (const body of [{ action: 'disable' }, { action: 'save', ...SETTINGS, sendTime: '09:00' }]) {
+    const out = await call(db, body);
+    assert.equal(out.statusCode, 200, body.action);
+    assert.ok(out.body.refreshError, body.action);
+  }
+  assert.equal(db.read(SCHEDULES, 'speakers').sendTime, '09:00');
+});
+
+test('a preview renders the days left at the moment each window opens, after quiet hours', async () => {
+  const db = seed();
+  // 21:00 is in quiet hours: each window opens at 08:00 the next morning,
+  // one calendar day closer to the due date.
+  await call(db, { action: 'save', ...SETTINGS, sendTime: '21:00' });
+  const res = await call(db, { action: 'preview' });
+  assert.deepEqual(res.body.samples.map((s) => s.daysLeft), [13, 6, 1]);
+  assert.equal(res.body.samples[1].opensAt, '2026-11-14T13:00:00.000Z');
+});
+
+test('the last window, once it has reached everyone, reads as done, the same as no window left', async () => {
+  const db = seed();
+  await call(db, { action: 'save', ...SETTINGS });
+  for (const id of ['ada', 'ben']) {
+    await db.collection(LEDGER).doc(`speakers__2026-11-20-2d__${id}`).set({ scheduleId: 'speakers', windowKey: '2026-11-20-2d', speakerId: id });
+  }
+  const res = await call(db, { action: 'get' }, { now: Date.parse('2026-11-19T15:00:00Z') });
+  assert.equal(res.body.nextRun.status, 'none');
+  assert.equal(res.body.nextRun.message, 'No reminder is left before the due date.');
+  assert.equal(res.body.nextRun.reach, undefined);
+});

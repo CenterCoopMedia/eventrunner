@@ -134,7 +134,9 @@ async function nextRunFor({ db, schedule, timeZone, nowMs }) {
   let audience = await reachAt(target);
   // A due window that has reached everyone it can is done: the panel
   // shows the next reminder day instead.
-  if (due && upcoming && audience.ready.length === 0 && audience.waiting.length === 0) {
+  if (due && audience.ready.length === 0 && audience.waiting.length === 0) {
+    // The last window has nothing left to send: the same as no window left.
+    if (!upcoming) return { status: 'none', message: 'No reminder is left before the due date.', windows };
     target = upcoming;
     audience = await reachAt(target);
   }
@@ -167,6 +169,31 @@ function lastRunOut(data) {
     counts: run.counts && typeof run.counts === 'object' ? run.counts : {},
     error: run.error && typeof run.error === 'object' ? { code: run.error.code ?? null, message: run.error.message ?? null } : null,
   };
+}
+
+/**
+ * The answer to a write that has committed. The refresh is a separate read,
+ * so it can fail after the change is stored; the request still succeeded.
+ * The answer then carries the committed state and `refreshError`, and the
+ * page reloads.
+ */
+async function afterCommit(deps, committed) {
+  try {
+    return await getAction(deps);
+  } catch (err) {
+    deps.log.warn('reminderSchedules refresh after a write failed', err);
+    return {
+      schedule: SCHEDULE_ID,
+      state: scheduleState(committed),
+      settings: {
+        offsetsDays: committed.offsetsDays,
+        sendTime: committed.sendTime,
+        dueAt: committed.dueAt,
+        topics: committed.topics,
+      },
+      refreshError: 'The change is saved, but the schedule could not be read again. Reload the page.',
+    };
+  }
 }
 
 // --- actions ---------------------------------------------------------------
@@ -229,13 +256,13 @@ async function saveAction({ db, getConfig, now, log, actor, body }) {
       updatedAt: new Date(now()),
       updatedBy: actor.email,
     }, { merge: true });
-    return pause;
+    return { pause, committed: { ...current, ...read.value, pausedReason: pause ? 'settings-changed' : current.pausedReason } };
   });
   await logAdminAction({
     db, action: 'saveReminderSchedule', docPath: `${SCHEDULES}/${SCHEDULE_ID}`, actor, now, log,
-    details: { schedule: SCHEDULE_ID, ...read.value, paused },
+    details: { schedule: SCHEDULE_ID, ...read.value, paused: paused.pause },
   });
-  return getAction({ db, getConfig, now });
+  return afterCommit({ db, getConfig, now, log }, paused.committed);
 }
 
 async function previewAction({ db, getConfig, now, actor }) {
@@ -253,7 +280,9 @@ async function previewAction({ db, getConfig, now, actor }) {
   const recipient = audience[0] ?? sampleRecipient(schedule.topics);
   let usedFallback = false;
   const samples = plan.windows.map((window) => {
-    const due = dueTokens(schedule.dueAt, timeZone, window.fireAt.getTime());
+    // The tokens a run would render when the window opens, which is after
+    // quiet hours when the send time falls in them.
+    const due = dueTokens(schedule.dueAt, timeZone, window.opensAt.getTime());
     const out = renderReminder({ ...loaded, config, ...recipient, actor: { uid: null, email: null }, due });
     usedFallback = usedFallback || out.usedFallback;
     return {
@@ -328,11 +357,12 @@ async function approveAction({ db, getConfig, now, log, actor, body }) {
       topics: approved.topics,
     },
   });
-  return getAction({ db, getConfig, now });
+  return afterCommit({ db, getConfig, now, log }, { ...approved, enabled: true, pausedReason: null });
 }
 
 async function disableAction({ db, getConfig, now, log, actor }) {
   await requireWritable(db);
+  const current = await loadSchedule(db);
   await db.collection(SCHEDULES).doc(SCHEDULE_ID).set({
     enabled: false,
     pausedReason: null,
@@ -344,7 +374,7 @@ async function disableAction({ db, getConfig, now, log, actor }) {
     db, action: 'disableReminderSchedule', docPath: `${SCHEDULES}/${SCHEDULE_ID}`, actor, now, log,
     details: { schedule: SCHEDULE_ID },
   });
-  return getAction({ db, getConfig, now });
+  return afterCommit({ db, getConfig, now, log }, { ...current, enabled: false, pausedReason: null });
 }
 
 const ACTION_HANDLERS = {
