@@ -499,6 +499,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The event hero no longer puts its title, intro or buttons on the photograph. From 640px
+  up, the copy has its own column and the photograph fills the rest, in every site style.
+  The column is at least 22rem or half the hero, so a style that asks for a wide
+  photograph gets a narrower one instead. From 640px up the title size is capped at a share
+  of the column's width, so a long word such as "Neighborhood" fits its line instead of
+  breaking at a letter. The veil now softens only the photograph's
+  leading edge. The NC Local composition keeps its half-and-half layout (#345).
+
+- The event hero's title, dateline, intro and buttons no longer start at the hero band's
+  coloured left edge. A new `--hero-inset-inline` token insets the copy from 0.75rem on
+  phones to 2.5rem on wide screens, on Home and the Program page, with or without a
+  photograph. On phones the copy also keeps that inset from the right edge. An audit of the
+  public pages in all six styles found no other coloured section whose text touches its
+  edge (#478).
+
 - The speaker reminder wording version now names the wording that is actually sent. Saved
   wording that fails its token check is sent as the shipped copy, so its version is now the
   shipped version, not the digest of the saved text. A saved field left blank takes the

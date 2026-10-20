@@ -80,7 +80,7 @@
     "--section-rule-width": "var(--rule-strong-width)",
     "--hero-art-width": "100%",
     "--hero-art-position": "center",
-    "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-rgb) / .98), rgb(var(--color-surface-rgb) / .88) 38%, rgb(var(--color-surface-rgb) / 0) 72%)",
+    "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-alt-rgb) / .98) 0%, rgb(var(--color-surface-alt-rgb) / 0) 30%)",
     "--hero-copy-pad-block-end": "6.5rem",
     "--hero-route-display": "block",
     "--hero-route-color": "rgb(255 212 59)",
