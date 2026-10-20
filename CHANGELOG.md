@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sessions. The design guidance and the shape test now allow a listed compact chip, held
   to a semantic contract, in place of a blanket ban (#475).
 
+- Live updates have a category and an audience: everyone, approved attendees and speakers,
+  or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
+  approved attendee cannot get or list a speaker-only entry, and the card's queries carry the
+  matching audience filter. Each save writes the new and the previous audience to
+  `admin_logs`. The card also lists the event's milestones as key dates, in date order, and
+  shows them when the feed is empty (#200).
+
 - The admin rail groups its sections into Content, Program, Registration and tickets,
   Communications, Operations and Settings. Each group opens and closes from a button on its
   name. The group of the current page opens by itself, and a closed one names the current page.
@@ -564,6 +571,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   section the client has already written. Both are reported by init as kept.
 
 ### Changed
+
+- `live_updates` is no longer readable by everyone. A row with no audience, which is every
+  row saved before this release, is readable by admins only, so it leaves the public card.
+  The Live updates page counts these rows and marks each one; edit and save a row to give it
+  an audience. Deploy the two new `live_updates` indexes in `firestore.indexes.json` with the
+  rules, or the card's queries fail until the indexes are built (#200).
 
 - Groundwork for scheduled reminders (#518), with no change that users see.
   [ADR 0006](docs/adr/0006-scheduled-reminders.md) records why a reminder schedule is not a
