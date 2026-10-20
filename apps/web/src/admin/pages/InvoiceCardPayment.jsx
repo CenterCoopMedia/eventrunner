@@ -103,8 +103,20 @@ export function PayByCard({ invoice, cardPayments, timeZone, busy, onCreatePayLi
   const linkRef = useRef(null);
   const [error, setError] = useState(null);
   const [focusLink, setFocusLink] = useState(false);
+  // Moves on when the open link runs out, so the panel shows it ended and
+  // offers a new link without a reload.
+  const [, setClock] = useState(0);
   const links = invoice.payLinks ?? [];
   const current = openPayLink(invoice);
+  const currentEnds = current ? Date.parse(current.expiresAt) : NaN;
+
+  useEffect(() => {
+    if (!Number.isFinite(currentEnds)) return undefined;
+    // setTimeout holds at most about 24.8 days; a link lasts 23 hours.
+    const wait = Math.min(Math.max(currentEnds - Date.now(), 0) + 50, 2 ** 31 - 1);
+    const timer = setTimeout(() => setClock((tick) => tick + 1), wait);
+    return () => clearTimeout(timer);
+  }, [currentEnds]);
   const earlier = links.filter((link) => link !== current);
   const issued = invoice.status === 'issued';
   const available = cardPayments?.available === true;
@@ -268,9 +280,14 @@ export function PaymentReviews({ invoice, canResolve, busy, onResolve }) {
   const waiting = reviews.filter((entry) => !entry.resolved);
   const done = reviews.filter((entry) => entry.resolved);
   if (!reviews.length) return null;
-  const money = (entry) => (entry.amount === null || entry.amount === undefined
-    ? 'a payment'
-    : formatMoney(entry.amount, entry.currency || invoice.currency));
+  const money = (entry) => {
+    if (entry.amount === null || entry.amount === undefined) return 'a payment';
+    const currency = entry.currency || invoice.currency;
+    // A currency the formatter does not know still shows its amount, as
+    // Stripe reported it, with its code.
+    return formatMoney(entry.amount, currency)
+      || `${entry.amount} ${(currency || 'unknown currency').toUpperCase()} (in the currency's smallest unit)`;
+  };
   return (
     <>
       {waiting.length ? (
