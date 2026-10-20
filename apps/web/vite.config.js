@@ -71,6 +71,7 @@ export default defineConfig({
       'shared/readiness',
       'shared/speakerReadiness',
       'shared/invoice',
+      'shared/imageSizes',
     ],
   },
   build: {

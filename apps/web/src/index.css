@@ -864,9 +864,13 @@
     padding: var(--space-xs);
     border-radius: var(--radius-base);
   }
+  /* The mark fills its box and keeps its proportions inside it. Sized by
+     the box, not by the file, so a display size narrower than its srcset
+     width (an upload smaller than that width) draws the same as the
+     original would (issue #333). */
   .logo-wall__mark > img {
-    max-inline-size: 100%;
-    max-block-size: 100%;
+    inline-size: 100%;
+    block-size: 100%;
     object-fit: contain;
   }
 

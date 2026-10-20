@@ -17,6 +17,7 @@ const cmsOrganizationRepresentatives = require('./src/cms/organizationRepresenta
 const mediaUpload = require('./src/media/upload.cjs');
 const mediaMetadata = require('./src/media/metadata.cjs');
 const mediaUsage = require('./src/media/usage.cjs');
+const mediaImageSizes = require('./src/media/imageSizes.cjs');
 const adminConfig = require('./src/admin/config.cjs');
 const adminCustomBadges = require('./src/admin/customBadges.cjs');
 const adminLiveUpdates = require('./src/admin/liveUpdates.cjs');
@@ -88,6 +89,7 @@ module.exports = {
   ...mediaUpload.handlers,
   ...mediaMetadata.handlers,
   ...mediaUsage.handlers,
+  ...mediaImageSizes.handlers,
   ...adminConfig.handlers,
   ...adminCustomBadges.handlers,
   ...adminLiveUpdates.handlers,

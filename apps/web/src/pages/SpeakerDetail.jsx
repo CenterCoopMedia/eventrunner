@@ -134,6 +134,7 @@ export default function SpeakerDetail() {
             <AssetImage
               path={speaker.headshotPath}
               alt=""
+              sizes="3.5rem"
               className="h-14 w-14 shrink-0 self-center rounded-brand bg-surface-alt object-cover"
             />
           ) : null}
