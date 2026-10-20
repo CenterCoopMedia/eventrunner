@@ -176,11 +176,12 @@ test('the readiness CSV has one row per speaker and escapes formula cells', () =
       missing: ['bio', 'materials'],
       descriptionSessions: [],
       materialsSessions: [{ id: 's1', title: '@Panel' }, { id: 's2', title: 'Two' }],
+      pendingMaterialsSessions: [{ id: 's3', title: '-Pending' }],
     },
     lastRemindedAt: null,
   }], stores);
   const [header, row, end] = csv.split('\r\n');
-  assert.equal(header, '"Name","Email","Status","Missing","Sessions without a description","Sessions without materials","Last reminded"');
-  assert.equal(row, `"'+Sum","'=cmd@example.test","accepted","Biography; Materials","","'@Panel; Two",""`);
+  assert.equal(header, '"Name","Email","Status","Missing","Sessions without a description","Sessions without materials","Sessions with materials waiting for review","Last reminded"');
+  assert.equal(row, `"'+Sum","'=cmd@example.test","accepted","Biography; Materials","","'@Panel; Two","'-Pending",""`);
   assert.equal(end, '');
 });

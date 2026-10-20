@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   READINESS_ITEMS,
   REMINDABLE_SPEAKER_STATUSES,
+  sessionNeedsMaterials,
   sessionsForSpeaker,
   speakerReadiness,
   normalizeReadinessTopics,
@@ -20,6 +21,7 @@ test('a complete speaker with no session owes nothing', () => {
     headshot: false,
     descriptionSessions: [],
     materialsSessions: [],
+    pendingMaterialsSessions: [],
     missing: [],
   });
 });
@@ -87,4 +89,77 @@ test('topics keep the known items in a fixed order; none means all', () => {
 
 test('only speakers who accepted an invitation can be reminded', () => {
   assert.deepEqual([...REMINDABLE_SPEAKER_STATUSES], ['accepted', 'approved']);
+});
+
+test('a session marked as needing no materials never asks for materials', () => {
+  assert.equal(sessionNeedsMaterials({ id: 'a' }), true);
+  assert.equal(sessionNeedsMaterials({ id: 'a', materialsNotNeeded: false }), true);
+  assert.equal(sessionNeedsMaterials({ id: 'a', materialsNotNeeded: 'yes' }), true);
+  assert.equal(sessionNeedsMaterials({ id: 'a', materialsNotNeeded: true }), false);
+
+  const result = speakerReadiness({
+    speaker: complete,
+    sessions: [{ id: 'talk', title: 'Fireside chat', description: '', materialsNotNeeded: true }],
+    materialsBySession: {},
+  });
+  assert.deepEqual(result.materialsSessions, []);
+  assert.deepEqual(result.pendingMaterialsSessions, []);
+  // The exception is for materials only: the description is still owed.
+  assert.deepEqual(result.descriptionSessions, [{ id: 'talk', title: 'Fireside chat' }]);
+  assert.deepEqual(result.missing, ['description']);
+});
+
+test('a speaker with one no-materials session and one other session owes materials for the other only', () => {
+  const sessions = [
+    { id: 'chat', title: 'Fireside chat', description: 'Text', materialsNotNeeded: true },
+    { id: 'talk', title: 'Data talk', description: 'Text' },
+  ];
+  const owed = speakerReadiness({ speaker: complete, sessions, materialsBySession: {} });
+  assert.deepEqual(owed.materialsSessions, [{ id: 'talk', title: 'Data talk' }]);
+  assert.deepEqual(owed.missing, ['materials']);
+
+  const sent = speakerReadiness({ speaker: complete, sessions, materialsBySession: { talk: [{ reviewStatus: 'approved' }] } });
+  assert.deepEqual(sent.materialsSessions, []);
+  assert.deepEqual(sent.missing, []);
+});
+
+test('co-speakers on a no-materials session both leave the materials group', () => {
+  const sessions = [
+    { id: 'panel', title: 'Panel', description: 'Text', visible: true, speakerIds: ['sp1', 'sp2'], materialsNotNeeded: true },
+    { id: 'demo', title: 'Demo', description: 'Text', visible: true, speakerIds: ['sp2'] },
+  ];
+  const forSpeaker = (id) => speakerReadiness({
+    speaker: complete,
+    sessions: sessionsForSpeaker(sessions, id),
+    materialsBySession: {},
+  });
+  assert.deepEqual(forSpeaker('sp1').missing, []);
+  assert.deepEqual(forSpeaker('sp2').materialsSessions, [{ id: 'demo', title: 'Demo' }]);
+});
+
+test('materials waiting for review are told apart from approved ones', () => {
+  const sessions = [
+    { id: 'p', title: 'Pending only', description: 'Text' },
+    { id: 'a', title: 'Approved', description: 'Text' },
+    { id: 'm', title: 'Pending and approved', description: 'Text' },
+    { id: 'r', title: 'Rejected only', description: 'Text' },
+    { id: 'n', title: 'No materials needed', description: 'Text', materialsNotNeeded: true },
+  ];
+  const result = speakerReadiness({
+    speaker: complete,
+    sessions,
+    materialsBySession: {
+      p: [{ reviewStatus: 'pending' }, { reviewStatus: 'rejected' }],
+      a: [{ reviewStatus: 'approved' }],
+      m: [{ reviewStatus: 'pending' }, { reviewStatus: 'approved' }],
+      r: [{ reviewStatus: 'rejected' }],
+      n: [{ reviewStatus: 'pending' }],
+    },
+  });
+  // A pending material counts as sent: the speaker has done their part.
+  assert.deepEqual(result.materialsSessions, [{ id: 'r', title: 'Rejected only' }]);
+  // Staff still have to review it, so the session is listed apart. One
+  // approved material is enough to leave this list.
+  assert.deepEqual(result.pendingMaterialsSessions, [{ id: 'p', title: 'Pending only' }]);
+  assert.deepEqual(result.missing, ['materials']);
 });

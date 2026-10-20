@@ -7,6 +7,7 @@ export {
   speakerHasBio,
   speakerHasHeadshot,
   materialCounts,
+  sessionNeedsMaterials,
   sessionHasDescription,
   sessionsForSpeaker,
   speakerReadiness,

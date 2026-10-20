@@ -103,6 +103,29 @@ test('mapRow: a day, track or place the event does not define is a row error tha
   assert.deepEqual(mapped.reasons.map((r) => r.split(':')[0]), ['day', 'track', 'place']);
 });
 
+test('mapRow: the no-materials column reads yes or no; a blank cell says nothing; anything else is a row error', () => {
+  const context = { days: EVENT_CONFIG.days, tracks: EVENT_CONFIG.tracks, places: EVENT_CONFIG.venue.places };
+  const mapping = { ...MAPPING, materialsNotNeeded: 'No materials' };
+  const read = (cell) => sessionImport.mapRow({ row: { ...ROW, 'No materials': cell }, mapping, context });
+  for (const yes of ['yes', 'Yes', 'Y', 'true', 'TRUE', '1']) assert.equal(read(yes).input.values.materialsNotNeeded, true, yes);
+  for (const no of ['no', 'No', 'n', 'false', '0']) assert.equal(read(no).input.values.materialsNotNeeded, false, no);
+  assert.equal(read('').input.values.materialsNotNeeded, null);
+  assert.equal(read('   ').input.values.materialsNotNeeded, null);
+  const bad = read('maybe');
+  assert.equal(bad.ok, false);
+  assert.match(bad.reasons[0], /^materialsNotNeeded: "maybe"/);
+  // Not mapped: the stored value is left alone.
+  assert.equal('materialsNotNeeded' in sessionImport.mapRow({ row: ROW, mapping: MAPPING, context }).input.values, false);
+});
+
+test('an imported session that needs no materials is stored with the mark', async () => {
+  const db = makeDb();
+  const mapping = { ...MAPPING, materialsNotNeeded: 'No materials' };
+  const { commit } = await previewAndCommit(db, body([{ ...ROW, 'No materials': 'yes' }], mapping));
+  assert.equal(commit.body.rows[0].verdict, 'create');
+  assert.equal(db.read('cmsSchedule_drafts', 'verification-at-speed').materialsNotNeeded, true);
+});
+
 /* ---------------------------------------------------------------- */
 /* Create                                                           */
 /* ---------------------------------------------------------------- */

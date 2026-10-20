@@ -142,6 +142,31 @@ describe('speaker reminders list', () => {
     expect(within(items[0]).getByRole('checkbox', { name: 'Ben Ode' })).toBeInTheDocument();
   });
 
+  it('shows the materials waiting for review as their own group, and exports that group', async () => {
+    serve({
+      list: {
+        speakers: [
+          ...ROWS.slice(0, 2),
+          row('cal', 'Cal Done', [], {
+            readiness: { ...row('cal', 'Cal Done', []).readiness, pendingMaterialsSessions: [{ id: 's3', title: 'Keynote' }] },
+          }),
+        ],
+      },
+      export: { filename: 'speaker-readiness-materialsPending-2026-10-19.csv', csv: 'x', rowCount: 1 },
+    });
+    renderPage();
+    await screen.findByRole('list', { name: 'Accepted speakers' });
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'materialsPending' } });
+    expect(screen.getByTestId('location').textContent).toBe('?show=materialsPending');
+    const items = within(screen.getByRole('list', { name: 'Accepted speakers' })).getAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(within(items[0]).getByText('Missing: Nothing missing.')).toBeInTheDocument();
+    expect(within(items[0]).getByText('Waiting for review: Materials (Keynote).')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Export this list as CSV' }));
+    await screen.findByText(/Exported 1 speaker to speaker-readiness-materialsPending-2026-10-19.csv/);
+    expect(callsFor('export')).toEqual([{ action: 'export', group: 'materialsPending' }]);
+  });
+
   it('opens with the speaker named in the address selected', async () => {
     renderPage('/admin/speakers/reminders/send?speaker=cal');
     const box = await screen.findByRole('checkbox', { name: 'Cal Done' });

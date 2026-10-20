@@ -24,6 +24,8 @@
  *   times    24-hour "09:30" or 12-hour "9:30 AM", stored as "09:30"
  *   speakers speaker external IDs (from a speaker import) or speaker slugs,
  *            separated by ";" or "|"
+ *   materialsNotNeeded  "yes" or "no" (also y/n, true/false, 1/0); a blank
+ *            cell leaves the session without the mark
  *
  * A value that resolves to nothing is a row error that names it. The parent
  * session is not importable: a parent must be a published top-level
@@ -68,6 +70,7 @@ const FIELDS = Object.freeze([
   { id: 'place' },
   { id: 'location' },
   { id: 'recordingUrl' },
+  { id: 'materialsNotNeeded' },
   { id: 'speakers' },
   { id: 'slug' },
 ]);
@@ -83,6 +86,7 @@ const STORED_FIELD = Object.freeze({
   place: 'placeId',
   location: 'location',
   recordingUrl: 'recordingUrl',
+  materialsNotNeeded: 'materialsNotNeeded',
   speakers: 'speakerIds',
 });
 
@@ -143,6 +147,24 @@ function resolvePlace(raw, places) {
     ok: false,
     reason: `place: "${raw}" is not one of the venue's places. Use the place ID or name from event settings.`,
   };
+}
+
+const YES_WORDS = new Set(['yes', 'y', 'true', '1']);
+const NO_WORDS = new Set(['no', 'n', 'false', '0']);
+
+/**
+ * A yes-or-no cell as the stored mark: true, false, or null for a blank
+ * cell. Anything else is a row error.
+ *
+ * @param {string|null} raw
+ * @returns {{ ok: true, value: boolean|null } | { ok: false, reason: string }}
+ */
+function resolveYesNo(field, raw) {
+  if (raw === null) return { ok: true, value: null };
+  const wanted = lower(raw);
+  if (YES_WORDS.has(wanted)) return { ok: true, value: true };
+  if (NO_WORDS.has(wanted)) return { ok: true, value: false };
+  return { ok: false, reason: `${field}: "${raw}" is not yes or no. Write yes, no, or leave the cell empty.` };
 }
 
 /**
@@ -212,6 +234,11 @@ function mapRow({ row, mapping, context }) {
     }
     const resolved = resolve(raw, list);
     if (resolved.ok) values[STORED_FIELD[field]] = resolved.value;
+    else reasons.push(resolved.reason);
+  }
+  if (mapping.materialsNotNeeded) {
+    const resolved = resolveYesNo('materialsNotNeeded', cellOrNull(row[mapping.materialsNotNeeded]));
+    if (resolved.ok) values.materialsNotNeeded = resolved.value;
     else reasons.push(resolved.reason);
   }
   let speakerTokens = null;
@@ -403,5 +430,5 @@ module.exports = {
   loadContext,
   mapRow,
   planRow,
-  internals: { STORED_FIELD, normalizeClock, sessionIdFromTitle, resolveDay, resolveTrack, resolvePlace },
+  internals: { STORED_FIELD, normalizeClock, sessionIdFromTitle, resolveDay, resolveTrack, resolvePlace, resolveYesNo },
 };

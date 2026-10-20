@@ -46,6 +46,17 @@ describe('materialsCoverage', () => {
     expect(names(result.uncoveredSpeakers)).toEqual(['cy']);
   });
 
+  it('leaves out a session that needs no materials, for every speaker on it', () => {
+    const result = coverage(
+      [session('chat', ['ada', 'bo'], { materialsNotNeeded: true }), session('talk', ['bo'])],
+      [],
+    );
+    expect(result.consideredCount).toBe(1);
+    expect(names(result.uncoveredSessions)).toEqual(['talk']);
+    expect(names(result.uncoveredSpeakers)).toEqual(['bo']);
+    expect(result.uncoveredSpeakers[0].sessions).toEqual([{ id: 'talk', title: 'Title talk' }]);
+  });
+
   it('leaves out a session with no speakers, and a draft-only session', () => {
     const result = coverage(
       [session('s1', ['ada']), session('empty', []), { id: 'nolist', title: 'No list', dayId: 'day-1' }],

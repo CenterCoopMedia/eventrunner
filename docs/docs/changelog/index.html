@@ -118,6 +118,19 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Sessions that need no slides (#332). The session editor has a new <strong>Speaker materials</strong>
+          panel with one box: <strong>This session needs no slides or other materials</strong>. Speakers on a
+          marked session are not asked for materials. The speaker&#39;s <strong>Your next steps</strong> list, the
+          staff and scheduled speaker reminders, the <strong>Materials missing</strong> group and its CSV export,
+          and the Materials <strong>Coverage</strong> panel all leave the session out. A speaker whose sessions all
+          carry the mark owes no materials. The server accepts only true or false for the mark. The
+          session import reads it from a <code>materials_not_needed</code> column (yes or no), and the sessions
+          spreadsheet and the event package carry it.</li>
+          <li>Materials waiting for review (#332). The Speaker reminders page lists a session with a
+          pending material and no approved one as <strong>Waiting for review</strong> on the speaker&#39;s row. A new
+          <strong>Show</strong> group, <strong>Materials waiting for review</strong>, lists those speakers, and the readiness
+          CSV has a new column, &quot;Sessions with materials waiting for review&quot;. A pending material
+          still counts as sent, so no reminder names it.</li>
           <li>Scheduled attendee reminders (#518). A new <strong>Attendees</strong> panel on the <strong>Scheduled
           reminders</strong> page emails registered attendees before the event starts (7 and 1 days by
           default, at a send time on the event&#39;s clock). Staff write the subject and message in plain

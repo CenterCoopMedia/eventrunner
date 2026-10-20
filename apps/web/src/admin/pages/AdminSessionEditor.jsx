@@ -49,6 +49,7 @@ const EMPTY = {
   location: '',
   parentId: '',
   recordingUrl: '',
+  materialsNotNeeded: false,
   visible: true,
 };
 
@@ -66,6 +67,7 @@ function toForm(row) {
     location: session.location ?? '',
     parentId: session.parentId ?? '',
     recordingUrl: session.recordingUrl ?? '',
+    materialsNotNeeded: session.materialsNotNeeded === true,
     visible: session.visible !== false,
   };
 }
@@ -449,6 +451,18 @@ export default function AdminSessionEditor({ mode }) {
                 />
               </div>
             </div>
+          </Panel>
+
+          <Panel
+            title="Speaker materials"
+            description="Most sessions need slides or other materials from their speakers."
+          >
+            <CheckboxField
+              label="This session needs no slides or other materials"
+              hint="Speakers on this session are not asked for materials. The session does not count as missing materials. Speakers can still send materials if they want to."
+              checked={form.materialsNotNeeded}
+              onChange={(value) => set({ materialsNotNeeded: value })}
+            />
           </Panel>
 
           <Panel title="Publishing" description="Visibility takes effect when this draft is published.">

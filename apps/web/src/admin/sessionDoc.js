@@ -137,6 +137,8 @@ export function sessionFields(form) {
     location: optional(form.location),
     parentId: optional(form.parentId),
     recordingUrl: optional(form.recordingUrl),
+    // Always sent, so clearing the box clears the stored mark (issue #332).
+    materialsNotNeeded: form.materialsNotNeeded === true,
   };
 }
 

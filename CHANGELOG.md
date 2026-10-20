@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Sessions that need no slides (#332). The session editor has a new **Speaker materials**
+  panel with one box: **This session needs no slides or other materials**. Speakers on a
+  marked session are not asked for materials. The speaker's **Your next steps** list, the
+  staff and scheduled speaker reminders, the **Materials missing** group and its CSV export,
+  and the Materials **Coverage** panel all leave the session out. A speaker whose sessions all
+  carry the mark owes no materials. The server accepts only true or false for the mark. The
+  session import reads it from a `materials_not_needed` column (yes or no), and the sessions
+  spreadsheet and the event package carry it.
+- Materials waiting for review (#332). The Speaker reminders page lists a session with a
+  pending material and no approved one as **Waiting for review** on the speaker's row. A new
+  **Show** group, **Materials waiting for review**, lists those speakers, and the readiness
+  CSV has a new column, "Sessions with materials waiting for review". A pending material
+  still counts as sent, so no reminder names it.
 - Scheduled attendee reminders (#518). A new **Attendees** panel on the **Scheduled
   reminders** page emails registered attendees before the event starts (7 and 1 days by
   default, at a send time on the event's clock). Staff write the subject and message in plain
