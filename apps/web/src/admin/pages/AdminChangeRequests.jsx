@@ -260,9 +260,13 @@ export default function AdminChangeRequests() {
 
   // The requester email settings (issue #330); null until the first snapshot.
   const [emailSettings, setEmailSettings] = useState(null);
+  // A failed settings listener leaves the email state unknown; staff are
+  // told so until the next good snapshot (review finding 2 on #539).
+  const [settingsError, setSettingsError] = useState(null);
   useEffect(() => subscribeAdminCollection(
     'change_request_settings',
-    (docs) => setEmailSettings(readEmailSettings(docs)),
+    (docs) => { setEmailSettings(readEmailSettings(docs)); setSettingsError(null); },
+    setSettingsError,
   ), []);
   const settingsForRows = emailSettings ?? readEmailSettings([]);
 
@@ -349,7 +353,13 @@ export default function AdminChangeRequests() {
         }
       />
 
-      {emailSettings ? (
+      {settingsError ? (
+        <Notice
+          tone="caution"
+          message="We could not read the requester email settings, so we do not know which emails are on. Retrying."
+        />
+      ) : null}
+      {emailSettings && !settingsError ? (
         <div className="flex flex-col gap-2xs">
           <EmailSettingsSummary settings={emailSettings} />
           {isOperator ? <ChangeRequestEmailSettings settings={emailSettings} call={call} /> : null}

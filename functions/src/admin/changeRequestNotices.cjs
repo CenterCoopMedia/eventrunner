@@ -16,8 +16,9 @@
  * WHEN MAIL GOES. With the acknowledgement on, submitChangeRequest queues it
  * in the transaction that stores the request and sends it after the commit.
  * With the outcome on, updateChangeRequestStatus queues the done or the
- * declined email in the transaction that sets that status, the first time
- * the request gets that status, and sends it after the commit. A failed
+ * declined email in the transaction that sets that status, on the
+ * request's first-ever move to that status (read from its status history),
+ * and sends it after the commit. A failed
  * send never fails the request or the status change. No other path sends
  * one, and staff can only retry a notice that was queued.
  *
@@ -168,12 +169,16 @@ async function queueAcknowledgement({ db, tx, id, at }) {
 
 /**
  * The outcome record to queue with a status change, or null: only for done
- * or declined, only while the outcome email is on, and only the first time
- * the request gets that outcome.
+ * or declined, only while the outcome email is on, and only on the
+ * request's first-ever move to that outcome. `history` is the request's
+ * status history before this change (changeRequests.cjs historyOf). It is
+ * read as well as the notice record, so an operator who turns the email on
+ * later never sends one about an outcome the request already had.
  */
-async function queueOutcome({ db, tx, id, stored, status, at }) {
+async function queueOutcome({ db, tx, id, stored, history = [], status, at }) {
   if (!OUTCOME_SLOTS.includes(status)) return null;
   if (stored?.notices?.[status]) return null;
+  if (history.some((entry) => entry?.status === status)) return null;
   const settingsSnap = await tx.get(settingsRef(db));
   const settings = readNoticeSettings(settingsSnap.exists ? settingsSnap.data() : null);
   if (settings.outcome !== 'automatic') return null;

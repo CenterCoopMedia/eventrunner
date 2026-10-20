@@ -22,6 +22,7 @@ const BOOTSTRAP_DOC = { adminEmails: [OPERATOR], staffEmails: [STAFF] };
 const SITE = 'https://summit.example.org';
 const T0 = Date.parse('2026-10-20T10:00:00.000Z');
 const QUIET = { warn() {}, error() {}, info() {} };
+const OUTCOME_ID = '00000000-0000-4000-8000-000000000001';
 const CONFIG = { bootstrap: BOOTSTRAP_DOC, tierA: { publicUrl: SITE } };
 
 const TOKENS = {
@@ -77,9 +78,13 @@ async function setStatus(db, id, status, at, token = 'staff') {
   return res;
 }
 
+/** A save from a form that loaded the request's current outcome, unless the body says otherwise. */
 async function saveOutcome(db, body, { token = 'staff', config = CONFIG } = {}) {
+  const stored = body?.id ? db.read('change_requests', body.id) : null;
+  const loaded = stored && stored.outcome?.status === stored.status ? stored.outcome : null;
+  const full = { expectedStatus: stored?.status ?? 'done', expectedOutcomeId: loaded?.id ?? null, ...body };
   const res = makeRes();
-  await createSaveChangeRequestOutcomeHandler({ db, auth, getConfig: async () => config, now: () => T0 + 9000, log: QUIET })(req(token, body), res);
+  await createSaveChangeRequestOutcomeHandler({ db, auth, getConfig: async () => config, now: () => T0 + 9000, log: QUIET })(req(token, full), res);
   return res;
 }
 
@@ -124,9 +129,12 @@ test('outcome: done and declined record an outcome; reopening clears it; a new o
   const db = makeFakeDb({ 'change_requests/cr1': storedRequest() });
   await setStatus(db, 'cr1', 'done', T0 + 1000);
   assert.deepEqual(db.read('change_requests', 'cr1').outcome, {
+    id: db.read('change_requests', 'cr1').outcome.id,
     status: 'done', reply: null, resultUrl: null, resultCheckedBy: null, resultCheckedAt: null, recordedAt: new Date(T0 + 1000), recordedBy: STAFF,
   });
-  assert.equal((await saveOutcome(db, { id: 'cr1', reply: 'Fixed the hotel name.' })).statusCode, 200);
+  assert.match(db.read('change_requests', 'cr1').outcome.id, /^[0-9a-f-]{36}$/);
+  const loaded = db.read('change_requests', 'cr1').outcome;
+  assert.equal((await saveOutcome(db, { id: 'cr1', reply: 'Fixed the hotel name.', expectedStatus: 'done', expectedOutcomeId: loaded.id })).statusCode, 200);
 
   // The same status again keeps the outcome and its reply.
   await setStatus(db, 'cr1', 'done', T0 + 2000);
@@ -136,7 +144,10 @@ test('outcome: done and declined record an outcome; reopening clears it; a new o
   assert.equal(db.read('change_requests', 'cr1').outcome, null);
 
   await setStatus(db, 'cr1', 'declined', T0 + 4000);
-  assert.deepEqual(db.read('change_requests', 'cr1').outcome, {
+  const declinedOutcome = db.read('change_requests', 'cr1').outcome;
+  assert.notEqual(declinedOutcome.id, loaded.id);
+  assert.deepEqual(declinedOutcome, {
+    id: declinedOutcome.id,
     status: 'declined', reply: null, resultUrl: null, resultCheckedBy: null, resultCheckedAt: null, recordedAt: new Date(T0 + 4000), recordedBy: STAFF,
   });
 });
@@ -148,7 +159,7 @@ test('outcome: done and declined record an outcome; reopening clears it; a new o
 function doneRequest(overrides = {}) {
   return storedRequest({
     status: 'done',
-    outcome: { status: 'done', reply: null, resultUrl: null, resultCheckedBy: null, resultCheckedAt: null, recordedAt: new Date(T0 + 1000), recordedBy: STAFF },
+    outcome: { id: OUTCOME_ID, status: 'done', reply: null, resultUrl: null, resultCheckedBy: null, resultCheckedAt: null, recordedAt: new Date(T0 + 1000), recordedBy: STAFF },
     ...overrides,
   });
 }
@@ -159,8 +170,9 @@ test('outcome details: staff save a reply and a result link they checked on this
     id: 'cr1', reply: '  The hotel name is fixed.\r\nThanks.  ', resultUrl: `${SITE}/travel#hotel`, resultChecked: true,
   });
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.body, { id: 'cr1', saved: true });
+  assert.deepEqual(res.body, { id: 'cr1', saved: true, outcomeId: OUTCOME_ID });
   assert.deepEqual(db.read('change_requests', 'cr1').outcome, {
+    id: OUTCOME_ID,
     status: 'done',
     reply: 'The hotel name is fixed.\nThanks.',
     resultUrl: 'https://summit.example.org/travel#hotel',
@@ -196,7 +208,7 @@ test('outcome details: a result link needs the staff check, and a declined reque
 
 test('outcome details: a request without an outcome is 409; staff only; 404 for an unknown id', async () => {
   const db = makeFakeDb({ 'change_requests/cr1': storedRequest({ status: 'in_progress' }) });
-  const open = await saveOutcome(db, { id: 'cr1', reply: 'Soon.' });
+  const open = await saveOutcome(db, { id: 'cr1', reply: 'Soon.', expectedStatus: 'done', expectedOutcomeId: null });
   assert.equal(open.statusCode, 409);
   assert.equal((await saveOutcome(db, { id: 'cr1', reply: 'x' }, { token: 'visitor' })).statusCode, 403);
   assert.equal((await saveOutcome(db, { id: 'cr1', reply: 'x' }, { token: null })).statusCode, 401);
@@ -368,4 +380,50 @@ test('mine: the (uid ASC, createdAt DESC) composite index the query needs is dec
       { fieldPath: 'createdAt', order: 'DESCENDING' },
     ]));
   assert.ok(match, 'firestore.indexes.json must declare (uid ASC, createdAt DESC) on change_requests');
+});
+
+// Review finding 5 (#539): a reply or link saved from a form that loaded an
+// earlier outcome is refused, so it never lands on a different outcome.
+test('outcome details: a save for an outcome that changed since the form loaded is 409 and changes nothing', async () => {
+  const db = makeFakeDb({ 'change_requests/cr1': doneRequest() });
+  const formLoaded = { expectedStatus: 'done', expectedOutcomeId: OUTCOME_ID };
+
+  // done -> declined
+  await setStatus(db, 'cr1', 'declined', T0 + 2000);
+  const declined = await saveOutcome(db, { id: 'cr1', reply: 'Fixed.', ...formLoaded });
+  assert.equal(declined.statusCode, 409);
+  assert.equal(declined.body.error.code, 'outcome-changed');
+  assert.equal(db.read('change_requests', 'cr1').outcome.reply, null);
+
+  // done -> reopen -> done: the same status, a new outcome
+  const again = makeFakeDb({ 'change_requests/cr1': doneRequest() });
+  await setStatus(again, 'cr1', 'new', T0 + 2000);
+  await setStatus(again, 'cr1', 'done', T0 + 3000);
+  const stale = await saveOutcome(again, { id: 'cr1', reply: 'Fixed.', ...formLoaded });
+  assert.equal(stale.statusCode, 409);
+  assert.equal(again.read('change_requests', 'cr1').outcome.reply, null);
+});
+
+test('outcome details: the save must name the status and the outcome it loaded', async () => {
+  const db = makeFakeDb({ 'change_requests/cr1': doneRequest() });
+  for (const body of [
+    { id: 'cr1', reply: 'x', expectedStatus: undefined },
+    { id: 'cr1', reply: 'x', expectedStatus: 'new' },
+    { id: 'cr1', reply: 'x', expectedOutcomeId: undefined },
+    { id: 'cr1', reply: 'x', expectedOutcomeId: 42 },
+  ]) {
+    assert.equal((await saveOutcome(db, body)).statusCode, 400, JSON.stringify(body));
+  }
+});
+
+test('outcome details: a request done before outcomes existed is saved once, then needs its new id', async () => {
+  const legacy = storedRequest({ status: 'done', updatedAt: new Date(T0 + 1000), updatedBy: STAFF });
+  delete legacy.outcome;
+  const db = makeFakeDb({ 'change_requests/cr1': legacy });
+  const first = await saveOutcome(db, { id: 'cr1', reply: 'Done.', expectedStatus: 'done', expectedOutcomeId: null });
+  assert.equal(first.statusCode, 200);
+  const id = db.read('change_requests', 'cr1').outcome.id;
+  assert.equal(first.body.outcomeId, id);
+  assert.equal((await saveOutcome(db, { id: 'cr1', reply: 'Again.', expectedStatus: 'done', expectedOutcomeId: null })).statusCode, 409);
+  assert.equal((await saveOutcome(db, { id: 'cr1', reply: 'Again.', expectedStatus: 'done', expectedOutcomeId: id })).statusCode, 200);
 });

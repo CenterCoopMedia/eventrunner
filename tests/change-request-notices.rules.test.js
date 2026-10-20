@@ -225,8 +225,9 @@ describe('the requester’s own view', () => {
     await submit('ada', 'ada-key-0005', 'Ada wants the hotel fixed.');
     await submit('bo', 'bo-key-00001', 'Bo wants a new map.');
     await setStatus('ada-key-0005', 'done');
+    const loaded = (await readRequest('ada-key-0005')).outcome;
     const saved = await call(createSaveChangeRequestOutcomeHandler, 'staff', {
-      id: 'ada-key-0005', reply: 'Fixed the hotel name.', resultUrl: `${SITE}/travel`, resultChecked: true,
+      id: 'ada-key-0005', expectedStatus: 'done', expectedOutcomeId: loaded.id, reply: 'Fixed the hotel name.', resultUrl: `${SITE}/travel`, resultChecked: true,
     });
     expect(saved.statusCode).toBe(200);
 

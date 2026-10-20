@@ -24,6 +24,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { submitChangeRequest } from '../lib/changeRequestApi.js';
 import { createSubmissionKey } from '../lib/submissionKey.js';
+import { markChangeRequestSent } from '../lib/changeRequestMarker.js';
 import { DIALOG_FRAME_CLASS } from './FeedbackModal.jsx';
 import { focusFirstError, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
@@ -86,6 +87,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
       setError(result.error);
       return;
     }
+    markChangeRequestSent(user?.uid);
     setSent(true);
   }
 

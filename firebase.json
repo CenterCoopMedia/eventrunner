@@ -26,6 +26,7 @@
       },
       { "source": "/signin", "destination": "/index.html" },
       { "source": "/profile", "destination": "/index.html" },
+      { "source": "/profile/**", "destination": "/index.html" },
       { "source": "/attendees", "destination": "/index.html" },
       { "source": "/attendees/**", "destination": "/index.html" },
       { "source": "/schedule/mine", "destination": "/index.html" },
@@ -55,6 +56,10 @@
       },
       {
         "source": "/profile",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+      },
+      {
+        "source": "/profile/**",
         "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
       },
       {

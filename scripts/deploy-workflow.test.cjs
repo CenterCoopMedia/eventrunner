@@ -287,6 +287,8 @@ const firebaseJson = JSON.parse(
 const PRIVATE_SOURCES = [
   '/signin',
   '/profile',
+  // The reader's own change requests (#330) and any later account page.
+  '/profile/**',
   '/attendees',
   '/attendees/**',
   '/schedule/mine',

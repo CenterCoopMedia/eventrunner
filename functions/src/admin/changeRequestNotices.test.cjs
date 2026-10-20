@@ -513,3 +513,39 @@ test('a late finish never overwrites a newer attempt’s record', async () => {
   assert.equal(notices(db).done.attempt, 3);
   assert.equal(notices(db).done.state, 'sent');
 });
+
+// Review finding 4 (#539): an outcome email goes only on the request's
+// first-ever move to that outcome, read from the status history, so turning
+// the setting on later never emails about an old outcome.
+test('outcome: a request that was done before the setting went on gets no email when it is done again', async () => {
+  const db = makeFakeDb({
+    seed: {
+      [`change_requests/${KEY}`]: storedRequest({
+        status: 'new',
+        history: [
+          { status: 'new', at: new Date(T0) },
+          { status: 'done', at: new Date(T0 + 100) },
+          { status: 'new', at: new Date(T0 + 200) },
+        ],
+      }),
+    },
+  });
+  const mailer = makeMailer();
+  const res = await setStatus(db, mailer, 'done');
+  assert.deepEqual(res.body, { id: KEY, status: 'done', notice: null });
+  assert.equal(mailer.sent.length, 0);
+  assert.deepEqual(notices(db), {});
+
+  // A first decline is still a first outcome of its kind.
+  await setStatus(db, mailer, 'declined', { at: T0 + 2000 });
+  assert.deepEqual(mailer.sent.map((message) => message.tag), ['changeRequest.declined']);
+});
+
+test('outcome: repeating a done that predates the setting sends nothing', async () => {
+  const db = makeFakeDb({
+    seed: { [`change_requests/${KEY}`]: storedRequest({ status: 'done', history: [{ status: 'new', at: new Date(T0) }, { status: 'done', at: new Date(T0 + 100) }] }) },
+  });
+  const mailer = makeMailer();
+  assert.deepEqual((await setStatus(db, mailer, 'done')).body.notice, null);
+  assert.equal(mailer.sent.length, 0);
+});

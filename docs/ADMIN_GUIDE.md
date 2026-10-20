@@ -785,13 +785,13 @@ When an account is deleted in Attendees, the change requests it sent are deleted
 
 ### What the sender sees
 
-The sender follows their own requests on **Your change requests** (`/profile/change-requests`). The footer links to it, and so does the dialog after a send. The page shows only the sender's own requests. For each request it shows the text and page they sent, the status, and the history of status changes with their times. It does not show who made a change.
+The sender follows their own requests on **Your change requests** (`/profile/change-requests`). The footer links to it while the feature is on, and so does the dialog after a send. After the feature is off, the footer keeps the link for a signed-in reader who sent a request from that browser. Every email to the sender links to the page too. The page shows only the sender's own requests. For each request it shows the text and page they sent, the status, and the history of status changes with their times. It does not show who made a change.
 
 When a request is **Done** or **Declined**, the page also shows the reply and the result link you write for the sender. It shows nothing else that staff see: no staff address, no email record, and no other sender's request. The page works while the feature is off, so a sender can still read what they sent.
 
 ### Reply and result link
 
-A done or declined row has **Reply and result link** (or **Reply** for a declined request). Write the reply in plain words. The sender reads it on their page. It is not emailed.
+A done or declined row has **Reply and result link** (or **Reply** for a declined request). Write the reply in plain words. The sender reads it on their page. It is not emailed. If the request's outcome changes while the form is open, for example when someone reopens it, the save is refused. Read the request again, then write the reply.
 
 The result link is optional. It must be a page on this site, and you must open it and select **I opened this link and it shows the change** before you save it. Mark a request done only when you checked the change yourself. A deploy or a publish that ran is not proof that the change is live. Nothing in this system marks a request done by itself, and nothing acts on the text of a request.
 
@@ -800,7 +800,7 @@ The result link is optional. It must be a page on this site, and you must open i
 Two emails can go to the sender. Both are off by default. An operator turns them on under **Manage requester emails** at the top of the page. Every staff member sees a line that says which emails are on.
 
 - **The acknowledgement** goes when a request is stored.
-- **The outcome email** goes the first time a request is marked **Done**, and the first time it is marked **Declined**. Marking a request done again, or reopening it and marking it done again, sends nothing more.
+- **The outcome email** goes the first time a request is ever marked **Done**, and the first time it is ever marked **Declined**. The server reads the request's history, so turning the email on later sends nothing about an outcome a request already had. Marking a request done again, or reopening it and marking it done again, sends nothing more.
 
 The wording is fixed in the code, and no editor changes it. An email never quotes the request, the page, the reply, or the link. It says what happened and links to the sender's own page. The emails go on the transactional stream. An address that unsubscribed from announcements gets none of them. A historical demo sends none.
 

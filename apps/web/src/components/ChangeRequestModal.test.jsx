@@ -59,6 +59,21 @@ describe('ChangeRequestModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('marks this browser as one the account sent a request from, so the footer keeps the history link', async () => {
+    window.localStorage.removeItem('changeRequests.sent.uid-ada');
+    submitMock.mockResolvedValueOnce({ ok: false, error: 'No.' });
+    renderModal();
+    fireEvent.change(screen.getByLabelText('What should change?'), { target: { value: 'Fix it.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    await screen.findByRole('alert');
+    expect(window.localStorage.getItem('changeRequests.sent.uid-ada')).toBeNull();
+    submitMock.mockResolvedValueOnce({ ok: true, id: 'k1' });
+    fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
+    await screen.findByRole('link', { name: 'See your change requests' });
+    expect(window.localStorage.getItem('changeRequests.sent.uid-ada')).toBe('1');
+    window.localStorage.removeItem('changeRequests.sent.uid-ada');
+  });
+
   it('prefills the page with the path the reader was on, and sends a blank page as null', async () => {
     submitMock.mockResolvedValueOnce({ ok: true, id: 'k1' });
     renderModal();

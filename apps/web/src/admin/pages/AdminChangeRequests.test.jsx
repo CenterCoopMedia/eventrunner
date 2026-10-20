@@ -9,6 +9,7 @@ import { MemoryRouter, useLocation } from 'react-router';
 let rowsCallback;
 let errorCallback;
 let settingsCallback;
+let settingsErrorCallback;
 const subscribedTo = [];
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
@@ -16,6 +17,7 @@ vi.mock('../adminSource.js', () => ({
     // Issue #330: the page also reads the email settings.
     if (name === 'change_request_settings') {
       settingsCallback = onNext;
+      settingsErrorCallback = onError;
     } else {
       rowsCallback = onNext;
       errorCallback = onError;
@@ -738,7 +740,7 @@ describe('AdminChangeRequests: the reply and the result link', () => {
     callMock.mockResolvedValueOnce({ id: 'finished', saved: true });
     renderPage('/admin/change-requests?status=done');
     pushSettings(null);
-    pushRows([request('finished', { status: 'done', outcome: { status: 'done', reply: 'Old reply.', resultUrl: null } })]);
+    pushRows([request('finished', { status: 'done', outcome: { id: 'outcome-1', status: 'done', reply: 'Old reply.', resultUrl: null } })]);
     const row = rowFor('finished');
     fireEvent.click(within(row).getByRole('button', { name: 'Reply and result link' }));
     const reply = within(row).getByLabelText('Reply to the requester (optional)');
@@ -754,7 +756,7 @@ describe('AdminChangeRequests: the reply and the result link', () => {
     fireEvent.click(save);
     await flush();
     expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', {
-      id: 'finished', reply: 'We fixed the hotel name.', resultUrl: 'https://summit.example.org/travel', resultChecked: true,
+      id: 'finished', expectedStatus: 'done', expectedOutcomeId: 'outcome-1', reply: 'We fixed the hotel name.', resultUrl: 'https://summit.example.org/travel', resultChecked: true,
     });
     expect(within(row).getByText('Reply and link saved.')).toHaveAttribute('role', 'status');
   });
@@ -763,20 +765,23 @@ describe('AdminChangeRequests: the reply and the result link', () => {
     callMock.mockResolvedValueOnce({ id: 'refused', saved: true });
     renderPage('/admin/change-requests?status=declined');
     pushSettings(null);
-    pushRows([request('refused', { status: 'declined', outcome: { status: 'declined', reply: null, resultUrl: null } })]);
+    pushRows([request('refused', { status: 'declined', outcome: { id: 'outcome-2', status: 'declined', reply: null, resultUrl: null } })]);
     const row = rowFor('refused');
     fireEvent.click(within(row).getByRole('button', { name: 'Reply' }));
     expect(within(row).queryByLabelText('Result link (optional)')).toBeNull();
     fireEvent.change(within(row).getByLabelText('Reply to the requester (optional)'), { target: { value: 'We keep the hotel.' } });
     fireEvent.click(within(row).getByRole('button', { name: 'Save the reply' }));
     await flush();
-    expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', { id: 'refused', reply: 'We keep the hotel.', resultUrl: null });
+    expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', {
+      id: 'refused', expectedStatus: 'declined', expectedOutcomeId: 'outcome-2', reply: 'We keep the hotel.', resultUrl: null,
+    });
   });
 
   it('states the server’s refusal in place', async () => {
     callMock.mockRejectedValueOnce(new Error('resultUrl: must be an address on this site (https://summit.example.org).'));
     renderPage('/admin/change-requests?status=done');
     pushSettings(null);
+    // A request done before outcomes had an id: the form names none.
     pushRows([request('finished', { status: 'done', outcome: { status: 'done', reply: null, resultUrl: 'https://summit.example.org/old' } })]);
     const row = rowFor('finished');
     fireEvent.click(within(row).getByRole('button', { name: 'Reply and result link' }));
@@ -784,7 +789,83 @@ describe('AdminChangeRequests: the reply and the result link', () => {
     expect(within(row).queryByLabelText('I opened this link and it shows the change.')).toBeNull();
     fireEvent.click(within(row).getByRole('button', { name: 'Save the reply and link' }));
     await flush();
-    expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', { id: 'finished', reply: null, resultUrl: 'https://summit.example.org/old' });
+    expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', {
+      id: 'finished', expectedStatus: 'done', expectedOutcomeId: null, reply: null, resultUrl: 'https://summit.example.org/old',
+    });
     expect(within(row).getByText(/must be an address on this site/)).toBeInTheDocument();
+  });
+});
+
+// Review finding 5 (#539): the form names the outcome it loaded, so the
+// server refuses a save after the outcome changed under it.
+describe('AdminChangeRequests: the outcome a reply belongs to', () => {
+  it('keeps the outcome the form loaded, even when a newer one arrives, and then names the id the save answered', async () => {
+    renderPage('/admin/change-requests?status=done');
+    pushSettings(null);
+    pushRows([request('finished', { status: 'done', outcome: { id: 'outcome-1', status: 'done', reply: null, resultUrl: null } })]);
+    const row = () => rowFor('finished');
+    fireEvent.click(within(row()).getByRole('button', { name: 'Reply and result link' }));
+    fireEvent.change(within(row()).getByLabelText('Reply to the requester (optional)'), { target: { value: 'Fixed.' } });
+    // Reopened and done again elsewhere: the listener brings a new outcome.
+    pushRows([request('finished', { status: 'done', outcome: { id: 'outcome-9', status: 'done', reply: null, resultUrl: null } })]);
+    callMock.mockRejectedValueOnce(Object.assign(new Error('The request’s outcome changed since you opened this form. Nothing was saved.'), { code: 'outcome-changed' }));
+    fireEvent.click(within(row()).getByRole('button', { name: 'Save the reply and link' }));
+    await flush();
+    expect(callMock).toHaveBeenLastCalledWith('saveChangeRequestOutcome', expect.objectContaining({ expectedOutcomeId: 'outcome-1' }));
+    expect(within(row()).getByText(/outcome changed since you opened this form/)).toBeInTheDocument();
+  });
+
+  it('names the id the server answered on the next save', async () => {
+    renderPage('/admin/change-requests?status=done');
+    pushSettings(null);
+    pushRows([request('finished', { status: 'done', outcome: { status: 'done', reply: null, resultUrl: null } })]);
+    const row = rowFor('finished');
+    fireEvent.click(within(row).getByRole('button', { name: 'Reply and result link' }));
+    callMock.mockResolvedValueOnce({ id: 'finished', saved: true, outcomeId: 'outcome-new' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the reply and link' }));
+    await flush();
+    expect(callMock).toHaveBeenLastCalledWith('saveChangeRequestOutcome', expect.objectContaining({ expectedOutcomeId: null }));
+    callMock.mockResolvedValueOnce({ id: 'finished', saved: true, outcomeId: 'outcome-new' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the reply and link' }));
+    await flush();
+    expect(callMock).toHaveBeenLastCalledWith('saveChangeRequestOutcome', expect.objectContaining({ expectedOutcomeId: 'outcome-new' }));
+  });
+});
+
+// Review finding 2 (#539): a failed settings listener says the email state
+// is unknown, and the next good snapshot clears that.
+describe('AdminChangeRequests: the settings listener fails', () => {
+  it('states that the email state is unknown, and clears it on the next snapshot', () => {
+    renderPage();
+    pushRows([]);
+    expect(typeof settingsErrorCallback).toBe('function');
+    act(() => settingsErrorCallback(new Error('permission-denied')));
+    expect(screen.getByText('We could not read the requester email settings, so we do not know which emails are on. Retrying.')).toBeInTheDocument();
+    pushSettings({ acknowledgement: 'automatic', outcome: 'off', revision: 1 });
+    expect(screen.queryByText(/could not read the requester email settings/)).toBeNull();
+    expect(screen.getByText('The acknowledgement email is on. The outcome email is off.')).toBeInTheDocument();
+  });
+});
+
+// Review finding 3 (#539): a queued email that turns stale while the page is
+// open offers its retry at that moment, without a reload.
+describe('AdminChangeRequests: a queued email turns stale', () => {
+  it('shows the retry when the queued email crosses the stale time', () => {
+    vi.useFakeTimers();
+    try {
+      const now = Date.now();
+      renderPage('/admin/change-requests?status=all');
+      pushSettings({ acknowledgement: 'off', outcome: 'automatic', revision: 1 });
+      pushRows([request('one', {
+        status: 'done',
+        notices: { done: failedNotice({ state: 'queued', error: null, queuedAt: new Date(now - (10 * 60 * 1000 - 5000)) }) },
+      })]);
+      expect(within(rowFor('one')).queryByRole('button', { name: 'Retry the done email' })).toBeNull();
+      act(() => { vi.advanceTimersByTime(6000); });
+      expect(within(rowFor('one')).getByRole('button', { name: 'Retry the done email' })).toBeDisabled();
+      expect(within(rowFor('one')).getByLabelText('I checked the Email log. The earlier email was not delivered.')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

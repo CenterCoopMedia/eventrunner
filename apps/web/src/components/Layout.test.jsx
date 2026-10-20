@@ -1361,6 +1361,23 @@ describe('the footer change request control', () => {
     expect(requestsLink(container).parentElement).toBe(requestButton(container).parentElement);
   });
 
+  // Review finding 1 (#539): a reader who sent a request keeps the link to
+  // its history after the flag goes off. The modal marks this browser.
+  it('keeps the requests link for a reader who sent one from this browser, with the flag off', () => {
+    window.localStorage.setItem('changeRequests.sent.uid-ada', '1');
+    try {
+      const { container, unmount } = renderShell({}, { featureFlags: FIXTURE_FEATURES, user: SIGNED_IN });
+      expect(requestsLink(container)).toHaveAttribute('href', '/profile/change-requests');
+      expect(requestButton(container)).toBeNull();
+      unmount();
+      // Another account on the same browser does not get it.
+      const other = renderShell({}, { featureFlags: FIXTURE_FEATURES, user: { ...SIGNED_IN, uid: 'uid-bo' } });
+      expect(requestsLink(other.container)).toBeNull();
+    } finally {
+      window.localStorage.removeItem('changeRequests.sent.uid-ada');
+    }
+  });
+
   it('offers no requests link while the flag is off or the reader is signed out', () => {
     for (const options of [
       { featureFlags: FIXTURE_FEATURES, user: SIGNED_IN },

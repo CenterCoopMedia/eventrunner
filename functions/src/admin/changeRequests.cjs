@@ -9,9 +9,11 @@
  *                             signed-in account with a verified email, while
  *                             `features.changeRequests` is on.
  *   updateChangeRequestStatus POST { id, status } — staff tier.
- *   saveChangeRequestOutcome  POST { id, reply?, resultUrl?, resultChecked? }
- *                             — staff tier. The reply and the checked
- *                             result link of a done or declined request.
+ *   saveChangeRequestOutcome  POST { id, expectedStatus, expectedOutcomeId,
+ *                             reply?, resultUrl?, resultChecked? } — staff
+ *                             tier. The reply and the checked result link
+ *                             of a done or declined request. 409 when the
+ *                             outcome changed since the form loaded it.
  *   deleteChangeRequest       POST { id } — staff tier. Removes the request
  *                             and its text outright.
  *   listMyChangeRequests      POST {} — any signed-in account with a
@@ -274,9 +276,14 @@ function historyOf(stored) {
   return rebuilt;
 }
 
-/** An outcome with no reply and no result link yet. */
+/**
+ * An outcome with no reply and no result link yet. `id` names this outcome,
+ * so a reply saved from a form that loaded an earlier outcome is refused
+ * (saveChangeRequestOutcome), even after done, reopen, done again.
+ */
 function freshOutcome(status, at, by) {
   return {
+    id: crypto.randomUUID(),
     status,
     reply: null,
     resultUrl: null,
@@ -513,7 +520,7 @@ function createUpdateChangeRequestStatusHandler({ db, auth, getConfig, sendEmail
         const at = new Date(now());
         // The last read, before the first write: the outcome settings, the
         // demo policy, and whether this outcome already has an email.
-        const queued = await queueOutcome({ db, tx, id, stored, status, at });
+        const queued = await queueOutcome({ db, tx, id, stored, history: historyOf(stored), status, at });
         const changed = stored.status !== status;
         const history = changed
           ? [...historyOf(stored), { status, at }].slice(-HISTORY_LIMIT)
@@ -585,6 +592,16 @@ function createSaveChangeRequestOutcomeHandler({ db, auth, getConfig, now = Date
     const wantsUrl = rawUrl !== undefined && rawUrl !== null && rawUrl !== '';
     const checked = req.body?.resultChecked;
     if (checked !== undefined && typeof checked !== 'boolean') return badRequest(res, 'resultChecked: must be true or false.');
+    // The outcome the form loaded: its status, and its id (null for a
+    // request done before outcomes had one).
+    const expectedStatus = req.body?.expectedStatus;
+    if (!OUTCOME_STATUSES.includes(expectedStatus)) {
+      return badRequest(res, `expectedStatus: must be one of ${OUTCOME_STATUSES.join(', ')}, the status the form loaded.`);
+    }
+    const expectedOutcomeId = req.body?.expectedOutcomeId;
+    if (expectedOutcomeId !== null && (typeof expectedOutcomeId !== 'string' || !expectedOutcomeId || expectedOutcomeId.length > 64)) {
+      return badRequest(res, 'expectedOutcomeId: must be the outcome id the form loaded, or null.');
+    }
 
     let resultUrl = null;
     if (wantsUrl) {
@@ -608,10 +625,12 @@ function createSaveChangeRequestOutcomeHandler({ db, auth, getConfig, now = Date
         if (!snap.exists) return { status: 404 };
         const stored = snap.data() || {};
         if (!OUTCOME_STATUSES.includes(stored.status)) return { status: 409 };
+        const current = stored.outcome?.status === stored.status ? stored.outcome : null;
+        if (stored.status !== expectedStatus || (current?.id ?? null) !== expectedOutcomeId) {
+          return { status: 409, code: 'outcome-changed' };
+        }
         if (resultUrl && stored.status !== 'done') return { status: 400, message: 'resultUrl: only a done request has a result link.' };
-        const base = stored.outcome?.status === stored.status
-          ? stored.outcome
-          : freshOutcome(stored.status, dateOf(stored.updatedAt) ?? new Date(now()), stored.updatedBy);
+        const base = current ?? freshOutcome(stored.status, dateOf(stored.updatedAt) ?? new Date(now()), stored.updatedBy);
         const at = new Date(now());
         // A link that was already checked stays checked; a new one needs the
         // staff member to say they opened it and saw the change.
@@ -619,9 +638,12 @@ function createSaveChangeRequestOutcomeHandler({ db, auth, getConfig, now = Date
         if (resultUrl && !sameLink && checked !== true) {
           return { status: 400, message: 'resultChecked: open the link and confirm that it shows the change before you save it.' };
         }
+        // A request done before outcomes had an id gets one with this save.
+        const outcomeId = base.id ?? crypto.randomUUID();
         tx.update(ref, {
           outcome: {
             ...base,
+            id: outcomeId,
             reply: reply.reply,
             resultUrl,
             resultCheckedBy: resultUrl ? (sameLink ? base.resultCheckedBy : gate.email) : null,
@@ -634,18 +656,21 @@ function createSaveChangeRequestOutcomeHandler({ db, auth, getConfig, now = Date
           actor: gate,
           at,
         }));
-        return { status: 200 };
+        return { status: 200, outcomeId };
       });
     } catch (err) {
       log.error('saveChangeRequestOutcome failed', err);
       return internal(res, 'The outcome could not be saved. Try again.');
     }
     if (result.status === 404) return notFound(res, 'No such change request.');
+    if (result.code === 'outcome-changed') {
+      return sendError(res, 409, 'outcome-changed', 'The request’s outcome changed since you opened this form. Nothing was saved. Read the request again, then write the reply.');
+    }
     if (result.status === 409) {
       return sendError(res, 409, 'conflict', 'Mark the request done or declined first. Only a request with an outcome has a reply.');
     }
     if (result.status === 400) return badRequest(res, result.message);
-    res.status(200).json({ id, saved: true });
+    res.status(200).json({ id, saved: true, outcomeId: result.outcomeId });
   };
 }
 

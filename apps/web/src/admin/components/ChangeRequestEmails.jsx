@@ -177,6 +177,18 @@ function retryable(slot, record, row, settings, nowMs) {
 
 function DeliveryLine({ row, slot, record, settings, call }) {
   const [checkedLog, setCheckedLog] = useState(false);
+  // A queued email turns stale while the page is open. Draw the line again
+  // at that moment, so its retry appears without a reload (review finding 3
+  // on #539). The timer goes with a new record or the line.
+  const [, setTick] = useState(0);
+  const queuedAt = record.state === 'queued' ? toMillis(record.queuedAt) : null;
+  useEffect(() => {
+    if (queuedAt === null) return undefined;
+    const wait = queuedAt + QUEUED_STALE_MS - Date.now();
+    if (wait < 0) return undefined;
+    const timer = window.setTimeout(() => setTick((value) => value + 1), wait + 1);
+    return () => window.clearTimeout(timer);
+  }, [queuedAt]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
@@ -258,6 +270,10 @@ export function NoticeDelivery({ row, settings, call }) {
 export function OutcomeDetails({ row, call }) {
   const done = row.status === 'done';
   const saved = row.outcome?.status === row.status ? row.outcome : null;
+  // The outcome this form loaded. A save names it, and the server refuses
+  // the save when the request's outcome changed since (review finding 5 on
+  // #539). It follows the id the server answers after this form's own save.
+  const [loadedOutcomeId, setLoadedOutcomeId] = useState(saved?.id ?? null);
   const [open, setOpen] = useState(false);
   const [reply, setReply] = useState(saved?.reply ?? '');
   const [link, setLink] = useState(saved?.resultUrl ?? '');
@@ -285,12 +301,15 @@ export function OutcomeDetails({ row, call }) {
     setCheckError(null);
     setBusy(true);
     try {
-      await call('saveChangeRequestOutcome', {
+      const answer = await call('saveChangeRequestOutcome', {
         id: row.id,
+        expectedStatus: row.status,
+        expectedOutcomeId: loadedOutcomeId,
         reply: reply.trim() || null,
         resultUrl: done && trimmedLink ? trimmedLink : null,
         ...(needsCheck ? { resultChecked: true } : {}),
       });
+      if (typeof answer?.outcomeId === 'string') setLoadedOutcomeId(answer.outcomeId);
       setResult(done ? 'Reply and link saved.' : 'Reply saved.');
       setChecked(false);
     } catch (err) {
