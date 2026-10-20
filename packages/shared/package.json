@@ -9,6 +9,7 @@
     "./config": { "require": "./src/config/index.cjs", "import": "./src/config/index.mjs" },
     "./pitch": { "require": "./src/pitch.cjs", "import": "./src/pitch.mjs" },
     "./time": { "require": "./src/time.cjs", "import": "./src/time.mjs" },
+    "./eventDateTime": { "require": "./src/eventDateTime.cjs", "import": "./src/eventDateTime.mjs" },
     "./registration": { "require": "./src/registration.cjs", "import": "./src/registration.mjs" },
     "./ticketCommerce": { "require": "./src/ticketCommerce.cjs", "import": "./src/ticketCommerce.mjs" },
     "./badges": { "require": "./src/badges.cjs", "import": "./src/badges.mjs" },
