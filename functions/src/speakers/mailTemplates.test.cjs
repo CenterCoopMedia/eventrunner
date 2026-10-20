@@ -177,6 +177,12 @@ test('a save of one field keeps the shipped copy for the others', async () => {
   assert.deepEqual(Object.keys(db.read('email_templates', 'speaker.accepted')).sort(), ['subject', 'updatedAt', 'updatedBy']);
 });
 
+// Links are compared whole. A substring check would also pass for a link
+// on another host that merely contains the expected one.
+const linksIn = (text) => text.match(/https?:\/\/[^\s"'<>]+/g) ?? [];
+const hrefsIn = (html) => [...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1].replaceAll('&amp;', '&'));
+const hasLink = (links, expected) => links.some((found) => found === expected);
+
 test('preview renders the exact message with sample values, footer included', async () => {
   const db = makeDb();
   const res = await call(db, { action: 'preview', templateId: 'speaker.invite' });
@@ -185,8 +191,8 @@ test('preview renders the exact message with sample values, footer included', as
   assert.equal(preview.source, 'shipped');
   assert.equal(preview.subject, 'You are invited to speak at Example Summit');
   const link = `https://summit.example.org/speaker/accept?token=${internals.SAMPLE_INVITE_CODE}`;
-  assert.ok(preview.html.includes(link));
-  assert.ok(preview.text.includes(link));
+  assert.ok(hasLink(hrefsIn(preview.html), link));
+  assert.ok(hasLink(linksIn(preview.text), link));
   assert.ok(preview.text.includes(`Hi ${internals.SAMPLE_SPEAKER.firstName} ${internals.SAMPLE_SPEAKER.lastName},`));
   // The staff member who previews is the contact the invitation names.
   assert.ok(preview.text.includes(STAFF.email));
@@ -195,7 +201,7 @@ test('preview renders the exact message with sample values, footer included', as
   assert.deepEqual(preview.problems, []);
 
   const accepted = await call(db, { action: 'preview', templateId: 'speaker.accepted' });
-  assert.ok(accepted.body.preview.text.includes('https://summit.example.org/speaker/profile'));
+  assert.ok(hasLink(linksIn(accepted.body.preview.text), 'https://summit.example.org/speaker/profile'));
 });
 
 test('preview names a missing site address, since neither message then has a working link', async () => {
