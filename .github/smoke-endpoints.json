@@ -120,6 +120,7 @@
     "deleteAttendee",
     "exportEventData",
     "downloadEventPackage",
-    "invoiceAdmin"
+    "invoiceAdmin",
+    "invoicePdf"
   ]
 }

@@ -13,6 +13,7 @@ const {
   fitText,
   canEncode,
   sanitizeForFont,
+  wrapText,
 } = kit;
 
 // Test files are not on the spec §7.6 hex-literal allowlist, so fixture
@@ -40,6 +41,7 @@ test('kit: exports the shared helpers and nothing schedule-specific', () => {
     'resolveBranding',
     'resolveThemeColors',
     'sanitizeForFont',
+    'wrapText',
   ]);
 });
 
@@ -194,4 +196,24 @@ test('sanitizeForFont: keeps, transliterates, drops, or replaces', async () => {
   assert.equal(sanitizeForFont(body, ''), '');
   assert.equal(sanitizeForFont(body, null), '');
   assert.equal(sanitizeForFont(body, 42), '');
+});
+
+test('wrapText: breaks at spaces within the width, keeps line breaks, and splits a word wider than the line', async () => {
+  const { body } = await standardFonts();
+  const measure = (text) => body.widthOfTextAtSize(text, 10);
+  const lines = wrapText({ font: body, text: 'one two three four five six seven eight nine ten', size: 10, maxWidth: 80 });
+  assert.ok(lines.length > 1);
+  for (const line of lines) assert.ok(measure(line) <= 80, line);
+  assert.equal(lines.join(' '), 'one two three four five six seven eight nine ten');
+
+  assert.deepEqual(wrapText({ font: body, text: 'First line\n\nThird line', size: 10, maxWidth: 400 }), ['First line', '', 'Third line']);
+
+  const long = 'x'.repeat(200);
+  const pieces = wrapText({ font: body, text: long, size: 10, maxWidth: 60 });
+  assert.ok(pieces.length > 1);
+  for (const piece of pieces) assert.ok(measure(piece) <= 60);
+  assert.equal(pieces.join(''), long);
+
+  assert.deepEqual(wrapText({ font: body, text: '', size: 10, maxWidth: 60 }), []);
+  assert.deepEqual(wrapText({ font: body, text: null, size: 10, maxWidth: 60 }), []);
 });

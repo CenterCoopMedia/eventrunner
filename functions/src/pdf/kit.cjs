@@ -13,6 +13,9 @@
  *   - `fitText` finds the largest font size that fits a width
  *   - `canEncode` and `sanitizeForFont` keep text that a WinAnsi standard
  *     font cannot draw from crashing the document
+ *   - `wrapText` breaks a paragraph into lines that fit a width (added
+ *     for the invoice PDF, whose descriptions, addresses and notes run
+ *     longer than one line)
  *
  * Spec §7.6 allowlist: this file may hold hex literals because pdf-lib needs
  * numeric RGB, but the values in {@link DEFAULT_COLORS} are fallbacks only.
@@ -210,6 +213,54 @@ function sanitizeForFont(font, text) {
   return out.trim() ? out : '(unsupported characters)';
 }
 
+/**
+ * Break text into lines no wider than `maxWidth` at `size` in `font`. A
+ * line break in the text starts a new line, and an empty line is kept. A
+ * line breaks at spaces; a word wider than the whole line is split by
+ * characters, so no line ever runs past the width. The text must already
+ * suit the font (sanitizeForFont), because measuring it would throw.
+ *
+ * @param {{ font: import('pdf-lib').PDFFont, text: unknown, size: number, maxWidth: number }} args
+ * @returns {string[]}
+ */
+function wrapText({ font, text, size, maxWidth }) {
+  if (typeof text !== 'string' || text === '') return [];
+  const fits = (candidate) => font.widthOfTextAtSize(candidate, size) <= maxWidth;
+  const out = [];
+  for (const paragraph of text.split('\n')) {
+    const words = paragraph.split(' ').filter((word) => word !== '');
+    if (words.length === 0) {
+      out.push('');
+      continue;
+    }
+    let line = '';
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (fits(candidate)) {
+        line = candidate;
+        continue;
+      }
+      if (line) out.push(line);
+      if (fits(word)) {
+        line = word;
+        continue;
+      }
+      // One word wider than the line: split it by code point.
+      let piece = '';
+      for (const ch of word) {
+        if (piece && !fits(piece + ch)) {
+          out.push(piece);
+          piece = '';
+        }
+        piece += ch;
+      }
+      line = piece;
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+
 module.exports = {
   DEFAULT_COLORS,
   isNonEmptyString,
@@ -219,4 +270,5 @@ module.exports = {
   fitText,
   canEncode,
   sanitizeForFont,
+  wrapText,
 };
