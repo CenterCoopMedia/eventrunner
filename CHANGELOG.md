@@ -539,6 +539,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Groundwork for scheduled reminders (#518), with no change that users see.
+  [ADR 0006](docs/adr/0006-scheduled-reminders.md) records why a reminder schedule is not a
+  queue. The event-clock conversion the admin uses moved to `shared/eventDateTime`, so the
+  server reads a local time the same way. `shared/reminderSchedule` works out which reminder
+  is due from the settings and the clock. The speaker reminder internals moved to
+  `functions/src/speakers/reminderCore.cjs`, and the announcement send record and chunks
+  moved to `functions/src/announcements/sendRunner.cjs`, so a schedule can use the same send
+  paths.
+
 - The public address of the Pages site is one value, in `scripts/lib/pages-site.cjs`. The
   documentation generator, the demo build, and the link checker read it, so the canonical and
   social card URLs, the root-relative links, the demo's base, and the link checker's path mapping
