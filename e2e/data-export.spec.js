@@ -172,7 +172,7 @@ test.describe.serial('event data export', () => {
     const page = await context.newPage();
     await signIn(page, ADMIN_EMAIL);
     await page.goto('/admin/data-export');
-    await expect(page.getByRole('group', { name: 'Parts to include (8 of 8 chosen)' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Parts to include (9 of 9 chosen)' })).toBeVisible();
 
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 60_000 }),
