@@ -302,6 +302,43 @@ async function applyMintInvite({ db, speakerId, inviteType, mode, actor, now = D
 }
 
 /**
+ * The per-send values of speaker.invite. The send and the staff preview
+ * (speakers/mailTemplates.cjs) both use this, so a preview shows what the
+ * next invitation says.
+ */
+function inviteTokenValues({ config, speaker, token, inviteType, actor }) {
+  return {
+    speaker_name: speakerDisplayName(speaker),
+    invite_url: buildInviteUrl(config, token),
+    invite_type: inviteType,
+    // The organizer who sent it, so a confused recipient reaches a human
+    // rather than a shared inbox; the deployment's support address is the
+    // fallback when the actor has none.
+    admin_contact_email: actor?.email || config?.event?.legal?.supportEmail || '',
+  };
+}
+
+/** The per-send values of speaker.accepted; shared with the preview too. */
+function acceptedTokenValues({ config, speaker }) {
+  const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
+  const days = Array.isArray(config?.event?.days) ? config.event.days : [];
+  return {
+    speaker_name: speakerDisplayName(speaker),
+    // /speaker/profile is the wizard (issue #22): self-service editing
+    // of the canonical speakers/{id} record an organizer approves,
+    // distinct from /profile (the attendee users/{uid} record). Every
+    // accepted speaker lands here to write their bio and upload a
+    // headshot — see email/templates/speaker.accepted.cjs for the copy
+    // this URL backs.
+    profile_wizard_url: site ? `${site}/speaker/profile` : '',
+    // Declared but unreferenced in the shipped copy; a client override
+    // that wants a deadline gets the event's first day rather than an
+    // empty substitution and a warning.
+    deadline: typeof days[0]?.date === 'string' ? days[0].date : '',
+  };
+}
+
+/**
  * Render and send one speaker.invite mail.
  *
  * The send-boundary gate mirrors §6.1's auth-mail rule: refuse to send a
@@ -319,23 +356,11 @@ async function sendInviteEmail({
   const { getDefaultTemplate, loadTemplate } = require('../email/templates.cjs');
 
   const config = await getConfig();
-  const inviteUrl = buildInviteUrl(config, token);
+  const tokenValues = inviteTokenValues({ config, speaker, token, inviteType, actor });
+  const inviteUrl = tokenValues.invite_url;
   const template = getDefaultTemplate('speaker.invite');
   const { override } = await loadTemplate({ db, id: 'speaker.invite', now });
-  const rendered = render({
-    template,
-    override,
-    tokenValues: {
-      speaker_name: speakerDisplayName(speaker),
-      invite_url: inviteUrl,
-      invite_type: inviteType,
-      // The organizer who sent it, so a confused recipient reaches a human
-      // rather than a shared inbox; the deployment's support address is the
-      // fallback when the actor has none.
-      admin_contact_email: actor.email || config?.event?.legal?.supportEmail || '',
-    },
-    config,
-  });
+  const rendered = render({ template, override, tokenValues, config });
 
   if (!(rendered.html || '').includes(inviteUrl) || !(rendered.text || '').includes(inviteUrl)) {
     log.error('speaker.invite render lacks the invite URL in html and/or text; refusing to send');
@@ -649,27 +674,12 @@ async function sendAcceptedEmail({ db, sendEmail, getConfig, speakerId, speaker,
     const { render } = require('../email/render.cjs');
     const { getDefaultTemplate, loadTemplate } = require('../email/templates.cjs');
     const config = await getConfig();
-    const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
-    const days = Array.isArray(config?.event?.days) ? config.event.days : [];
     const template = getDefaultTemplate('speaker.accepted');
     const { override } = await loadTemplate({ db, id: 'speaker.accepted', now });
     const rendered = render({
       template,
       override,
-      tokenValues: {
-        speaker_name: speakerDisplayName(speaker),
-        // /speaker/profile is the wizard (issue #22): self-service editing
-        // of the canonical speakers/{id} record an organizer approves,
-        // distinct from /profile (the attendee users/{uid} record). Every
-        // accepted speaker lands here to write their bio and upload a
-        // headshot — see email/templates/speaker.accepted.cjs for the copy
-        // this URL backs.
-        profile_wizard_url: site ? `${site}/speaker/profile` : '',
-        // Declared but unreferenced in the shipped copy; a client override
-        // that wants a deadline gets the event's first day rather than an
-        // empty substitution and a warning.
-        deadline: typeof days[0]?.date === 'string' ? days[0].date : '',
-      },
+      tokenValues: acceptedTokenValues({ config, speaker }),
       config,
     });
     await sendEmail({
@@ -1092,6 +1102,8 @@ module.exports = {
   listInvites,
   sendInviteEmail,
   sendAcceptedEmail,
+  inviteTokenValues,
+  acceptedTokenValues,
   createSendSpeakerInviteHandler,
   createResendSpeakerInviteHandler,
   createCancelSpeakerInviteHandler,
