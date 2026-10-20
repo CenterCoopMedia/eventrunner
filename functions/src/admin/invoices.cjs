@@ -5,11 +5,24 @@
  * spec is the 2026-10-20 comment on that issue).
  *
  * One POST endpoint takes action-style requests, like the ticketing
- * organizer API (ticketing/commerceAdmin.cjs). This first part holds the
- * record and its draft: list, get, settings, saveDraft, deleteDraft and
- * saveSettings. Issue, mark paid, void, reopen, duplicate and send join
- * the same switch later (#209), so each new action declares its tier in
- * OPERATOR_ACTIONS or not, and nothing else moves.
+ * organizer API (ticketing/commerceAdmin.cjs): list, get, settings,
+ * saveDraft, deleteDraft and saveSettings (#208), then issue, markPaid,
+ * void and duplicate (#209). Each action declares its tier: only an
+ * operator voids or changes the settings. The PDF of an issued invoice is
+ * a separate endpoint, invoicePdf (invoicePdf.cjs), because it answers a
+ * file and not JSON.
+ *
+ * NUMBERS HAVE NO GAPS. A number is assigned only by `issue`, in the same
+ * transaction that moves invoice_counters/current on by one and writes the
+ * invoice. Either all of it commits or none of it does, so a failed or
+ * repeated issue never uses a number, and two issues at once each read the
+ * counter the other wrote. A void keeps its number: it stays used.
+ *
+ * LOCKED AFTER ISSUE. Issue freezes the totals (computed again from the
+ * stored lines), the issue date on the event clock and a copy of the
+ * issuer block from the settings. Only `draft` invoices save or delete.
+ * To correct an issued invoice, an operator voids it and staff duplicate
+ * it into a new draft.
  *
  * SERVER ONLY. invoices, invoice_counters and invoice_settings deny every
  * client read and write (firestore.rules). The settings hold the issuer's
@@ -32,9 +45,10 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
 const {
-  INVOICE_STATUSES, isInvoiceId, sanitizeInvoiceText, validateInvoiceDraft, validateInvoiceSettings,
-  resolveInvoiceCurrency, formatInvoiceNumber,
+  INVOICE_STATUSES, PAYMENT_METHODS, isInvoiceId, sanitizeInvoiceText, validateInvoiceDraft, validateInvoiceSettings,
+  resolveInvoiceCurrency, formatInvoiceNumber, invoiceDateIn, validatePayment, validateVoidReason, issueProblems,
 } = require('shared/invoice');
+const { CURRENCY_EXPONENTS } = require('shared/ticketCommerce');
 
 const INVOICES = 'invoices';
 const SETTINGS = 'invoice_settings';
@@ -43,9 +57,9 @@ const CATALOG = 'ticket_catalog';
 const AUDIT = 'admin_logs';
 const MAX_PAGE = 50;
 const MAX_SCAN = 250;
-const OPERATOR_ACTIONS = new Set(['saveSettings']);
+const OPERATOR_ACTIONS = new Set(['saveSettings', 'void']);
 const READ_ACTIONS = new Set(['list', 'get', 'settings']);
-const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'saveDraft', 'deleteDraft']);
+const ACTIONS = new Set([...READ_ACTIONS, ...OPERATOR_ACTIONS, 'saveDraft', 'deleteDraft', 'issue', 'markPaid', 'duplicate']);
 const CURSOR_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\|inv_[a-z0-9]{16,40}$/;
 
 class InvoiceError extends Error {
@@ -104,12 +118,51 @@ function statusOf(stored) {
   return INVOICE_STATUSES.includes(stored?.status) ? stored.status : 'draft';
 }
 
+function dateOrNull(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+function uidOrNull(value) {
+  return typeof value === 'string' ? value : null;
+}
+
+/** The issuer block an issued invoice copied from the settings, cleaned on read. */
+function publicIssuer(issuer) {
+  if (!issuer || typeof issuer !== 'object') return null;
+  return {
+    name: sanitizeInvoiceText(issuer.name),
+    address: sanitizeInvoiceText(issuer.address, { multiline: true }),
+    email: sanitizeInvoiceText(issuer.email),
+    taxId: sanitizeInvoiceText(issuer.taxId),
+    paymentInstructions: sanitizeInvoiceText(issuer.paymentInstructions, { multiline: true }),
+  };
+}
+function publicPayment(payment) {
+  if (!payment || typeof payment !== 'object') return null;
+  return {
+    paidOn: dateOrNull(payment.paidOn),
+    method: PAYMENT_METHODS.includes(payment.method) ? payment.method : 'other',
+    note: sanitizeInvoiceText(payment.note),
+    recordedAt: iso(payment.recordedAt),
+    recordedBy: uidOrNull(payment.recordedBy),
+  };
+}
+function publicVoided(voided) {
+  if (!voided || typeof voided !== 'object') return null;
+  return {
+    reason: sanitizeInvoiceText(voided.reason),
+    from: voided.from === 'paid' ? 'paid' : 'issued',
+    at: iso(voided.at),
+    by: uidOrNull(voided.by),
+  };
+}
+
 /** A list row: what the list shows, no lines. */
 function invoiceSummary(stored, id) {
   return {
     id,
     status: statusOf(stored),
     number: typeof stored.number === 'string' ? sanitizeInvoiceText(stored.number) : null,
+    issueDate: dateOrNull(stored.issueDate),
     currency: typeof stored.currency === 'string' ? stored.currency : 'usd',
     billTo: publicBillTo(stored.billTo),
     reference: sanitizeInvoiceText(stored.reference),
@@ -137,8 +190,19 @@ function publicInvoice(stored, id) {
       amount: amountOr0(row?.amount),
     })),
     notes: sanitizeInvoiceText(stored.notes, { multiline: true }),
-    createdBy: typeof stored.createdBy === 'string' ? stored.createdBy : null,
-    updatedBy: typeof stored.updatedBy === 'string' ? stored.updatedBy : null,
+    issuer: publicIssuer(stored.issuer),
+    issuedAt: iso(stored.issuedAt),
+    issuedBy: uidOrNull(stored.issuedBy),
+    payment: publicPayment(stored.payment),
+    voided: publicVoided(stored.voided),
+    duplicatedFrom: stored.duplicatedFrom && isInvoiceId(stored.duplicatedFrom.invoiceId)
+      ? {
+        invoiceId: stored.duplicatedFrom.invoiceId,
+        number: typeof stored.duplicatedFrom.number === 'string' ? sanitizeInvoiceText(stored.duplicatedFrom.number) : null,
+      }
+      : null,
+    createdBy: uidOrNull(stored.createdBy),
+    updatedBy: uidOrNull(stored.updatedBy),
   };
 }
 
@@ -241,6 +305,223 @@ async function deleteDraft({ db, actor, body, now }) {
   return { deleted: true, invoiceId: id };
 }
 
+/** The stored fields a draft may set, as validateInvoiceDraft takes them. */
+function draftInputOf(stored) {
+  return {
+    billTo: stored.billTo,
+    reference: stored.reference,
+    lines: (Array.isArray(stored.lines) ? stored.lines : []).map((line) => ({
+      description: line?.description, quantity: line?.quantity, unitAmount: line?.unitAmount,
+    })),
+    adjustments: (Array.isArray(stored.adjustments) ? stored.adjustments : []).map((row) => ({
+      kind: row?.kind, label: row?.label, amount: row?.amount,
+    })),
+    dueDate: stored.dueDate,
+    notes: stored.notes,
+  };
+}
+
+/** Read one invoice in a transaction, at the revision the caller saw. */
+async function lockedInvoice(tx, db, id, expectedRevision) {
+  const ref = db.collection(INVOICES).doc(id);
+  const snap = await tx.get(ref);
+  if (!snap.exists) fail(404, 'not-found', 'Invoice not found. It may have been deleted.');
+  const stored = snap.data();
+  if (amountOr0(stored.revision) !== expectedRevision) fail(409, 'conflict', 'The invoice changed since you opened it. Reload it and try again.');
+  return { ref, stored };
+}
+
+async function eventTimeZone(tx, db) {
+  const snap = await tx.get(db.collection('config').doc('event'));
+  const zone = snap.exists ? snap.data().timezone : null;
+  return typeof zone === 'string' ? zone : null;
+}
+
+/**
+ * Issue a draft: the next number, the frozen totals, the issue date and
+ * the issuer block, with the counter and the audit row, in one commit.
+ */
+async function issueInvoice({ db, actor, body, now }) {
+  const id = invoiceIdOf(body.invoiceId);
+  const expectedRevision = revisionOf(body.expectedRevision);
+  const logRef = auditRef(db);
+  let saved;
+  await db.runTransaction(async (tx) => {
+    await requireWrites(db, tx);
+    const { ref, stored } = await lockedInvoice(tx, db, id, expectedRevision);
+    if (statusOf(stored) !== 'draft') fail(409, 'conflict', 'Only a draft can be issued. This invoice already has a number.');
+    const counterRef = db.collection(COUNTERS).doc('current');
+    const [settingsSnap, counterSnap, timeZone] = await Promise.all([
+      tx.get(db.collection(SETTINGS).doc('current')), tx.get(counterRef), eventTimeZone(tx, db),
+    ]);
+    const at = now();
+    const issueDate = invoiceDateIn(at, timeZone);
+    const settings = publicSettings(settingsSnap.exists ? settingsSnap.data() : null);
+    // The stored draft is checked again with today's rules, and its figures
+    // are computed again: what is frozen is what the server computed.
+    const verdict = validateInvoiceDraft(draftInputOf(stored));
+    if (!verdict.ok) invalid('invoice', verdict.issues);
+    const problems = issueProblems(verdict.value, { settings, issueDate });
+    if (problems.length) invalid('invoice', problems);
+
+    // A missing counter starts at zero. A counter that is not a whole
+    // number is never guessed at: a wrong guess would reuse a number.
+    const lastNumber = counterSnap.exists ? counterSnap.data().lastNumber : 0;
+    if (!Number.isSafeInteger(lastNumber) || lastNumber < 0) {
+      fail(409, 'conflict', 'The invoice number counter is damaged, so no number was given. Ask an operator to check invoice_counters/current.');
+    }
+    const sequence = lastNumber + 1;
+    const number = formatInvoiceNumber(settings.prefix, sequence);
+    // Belt and braces: a counter set back by hand would hand out a used
+    // number. The query is in the transaction, so it is part of its reads.
+    const clash = await tx.get(db.collection(INVOICES).where('sequence', '==', sequence).limit(1));
+    if (!clash.empty) {
+      fail(409, 'conflict', `Invoice number ${number} is already used, so no number was given. Ask an operator to check invoice_counters/current.`);
+    }
+    const currency = Object.hasOwn(CURRENCY_EXPONENTS, stored.currency) ? stored.currency : resolveInvoiceCurrency(null, settings.currency);
+    saved = {
+      ...stored,
+      ...verdict.value,
+      currency,
+      status: 'issued',
+      number,
+      sequence,
+      issueDate,
+      issuer: {
+        name: settings.issuerName,
+        address: settings.issuerAddress,
+        email: settings.issuerEmail,
+        taxId: settings.taxId,
+        paymentInstructions: settings.paymentInstructions,
+      },
+      issuedAt: at,
+      issuedBy: actor.uid,
+      revision: expectedRevision + 1,
+      updatedAt: at,
+      updatedBy: actor.uid,
+    };
+    tx.set(counterRef, { lastNumber: sequence, lastInvoiceId: id, updatedAt: at });
+    tx.set(ref, saved);
+    audit(tx, logRef, {
+      action: 'issued', actor, now, docPath: `${INVOICES}/${id}`, invoiceId: id,
+      details: { revision: saved.revision, number, sequence, total: saved.totals.total, currency },
+    });
+  });
+  return { invoice: publicInvoice(saved, id) };
+}
+
+async function markPaid({ db, actor, body, now }) {
+  const id = invoiceIdOf(body.invoiceId);
+  const expectedRevision = revisionOf(body.expectedRevision);
+  const logRef = auditRef(db);
+  let saved;
+  await db.runTransaction(async (tx) => {
+    await requireWrites(db, tx);
+    const { ref, stored } = await lockedInvoice(tx, db, id, expectedRevision);
+    if (statusOf(stored) !== 'issued') fail(409, 'conflict', 'Only an issued invoice can be marked paid.');
+    const at = now();
+    const verdict = validatePayment(body.payment, { today: invoiceDateIn(at, await eventTimeZone(tx, db)) });
+    if (!verdict.ok) invalid('payment', verdict.issues);
+    saved = {
+      ...stored,
+      status: 'paid',
+      payment: { ...verdict.value, recordedAt: at, recordedBy: actor.uid },
+      revision: expectedRevision + 1,
+      updatedAt: at,
+      updatedBy: actor.uid,
+    };
+    tx.set(ref, saved);
+    audit(tx, logRef, {
+      action: 'paid', actor, now, docPath: `${INVOICES}/${id}`, invoiceId: id,
+      details: { revision: saved.revision, number: stored.number, paidOn: verdict.value.paidOn, method: verdict.value.method },
+    });
+  });
+  return { invoice: publicInvoice(saved, id) };
+}
+
+/** Operator only (OPERATOR_ACTIONS). The number stays used; nothing else changes. */
+async function voidInvoice({ db, actor, body, now }) {
+  const id = invoiceIdOf(body.invoiceId);
+  const expectedRevision = revisionOf(body.expectedRevision);
+  const reason = validateVoidReason(body.reason);
+  if (!reason.ok) invalid('void', reason.issues);
+  const logRef = auditRef(db);
+  let saved;
+  await db.runTransaction(async (tx) => {
+    await requireWrites(db, tx);
+    const { ref, stored } = await lockedInvoice(tx, db, id, expectedRevision);
+    const from = statusOf(stored);
+    if (from === 'draft') fail(409, 'conflict', 'A draft has no number. Delete it instead of voiding it.');
+    if (from === 'void') fail(409, 'conflict', 'This invoice is already void.');
+    const at = now();
+    saved = {
+      ...stored,
+      status: 'void',
+      voided: { reason: reason.value, from, at, by: actor.uid },
+      revision: expectedRevision + 1,
+      updatedAt: at,
+      updatedBy: actor.uid,
+    };
+    tx.set(ref, saved);
+    audit(tx, logRef, {
+      action: 'voided', actor, now, docPath: `${INVOICES}/${id}`, invoiceId: id,
+      details: { revision: saved.revision, number: stored.number, from, reason: reason.value },
+    });
+  });
+  return { invoice: publicInvoice(saved, id) };
+}
+
+/**
+ * Copy an invoice of any status into a new draft: the bill-to block, the
+ * lines, the tax and discount rows, the reference and the notes, in the
+ * same currency. No number, no issuer, no due date. The caller mints the
+ * new id once, so a retry after a lost answer finds the same draft.
+ */
+async function duplicateInvoice({ db, actor, body, now }) {
+  const sourceId = invoiceIdOf(body.invoiceId);
+  if (!isInvoiceId(body.newInvoiceId) || body.newInvoiceId === sourceId) {
+    fail(400, 'bad-request', 'newInvoiceId: Reload the invoice before duplicating it.');
+  }
+  const id = body.newInvoiceId;
+  const logRef = auditRef(db);
+  let saved;
+  await db.runTransaction(async (tx) => {
+    await requireWrites(db, tx);
+    const sourceRef = db.collection(INVOICES).doc(sourceId);
+    const ref = db.collection(INVOICES).doc(id);
+    const [sourceSnap, targetSnap] = await Promise.all([tx.get(sourceRef), tx.get(ref)]);
+    if (!sourceSnap.exists) fail(404, 'not-found', 'Invoice not found. It may have been deleted.');
+    if (targetSnap.exists) {
+      const existing = targetSnap.data();
+      if (existing.duplicatedFrom?.invoiceId === sourceId) {
+        saved = existing;
+        return;
+      }
+      fail(409, 'conflict', 'That invoice id is already used. Reload the invoice before duplicating it.');
+    }
+    const source = sourceSnap.data();
+    const verdict = validateInvoiceDraft({ ...draftInputOf(source), dueDate: null });
+    if (!verdict.ok) fail(409, 'conflict', 'This invoice could not be copied, because it no longer passes the draft checks. Write a new draft instead.');
+    const at = now();
+    const fromNumber = typeof source.number === 'string' ? source.number : null;
+    saved = {
+      ...verdict.value,
+      status: 'draft', number: null,
+      currency: Object.hasOwn(CURRENCY_EXPONENTS, source.currency) ? source.currency : 'usd',
+      duplicatedFrom: { invoiceId: sourceId, number: fromNumber },
+      revision: 1,
+      createdAt: at, createdBy: actor.uid, updatedAt: at, updatedBy: actor.uid,
+      listKey: `${at.toISOString()}|${id}`,
+    };
+    tx.create(ref, saved);
+    audit(tx, logRef, {
+      action: 'duplicated', actor, now, docPath: `${INVOICES}/${id}`, invoiceId: id,
+      details: { from: sourceId, fromNumber, revision: 1 },
+    });
+  });
+  return { invoice: publicInvoice(saved, id) };
+}
+
 /** Stored settings over the defaults, each field cleaned on read. */
 function publicSettings(stored) {
   const defaults = validateInvoiceSettings({}).value;
@@ -322,6 +603,10 @@ function createInvoiceAdminHandler({ db, auth, getConfig, now = () => new Date()
       else if (action === 'saveDraft') result = await saveDraft(deps);
       else if (action === 'deleteDraft') result = await deleteDraft(deps);
       else if (action === 'saveSettings') result = await saveSettings(deps);
+      else if (action === 'issue') result = await issueInvoice(deps);
+      else if (action === 'markPaid') result = await markPaid(deps);
+      else if (action === 'void') result = await voidInvoice(deps);
+      else if (action === 'duplicate') result = await duplicateInvoice(deps);
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof InvoiceError) return sendError(res, error.status, error.code, error.message);

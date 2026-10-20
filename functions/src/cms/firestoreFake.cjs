@@ -336,16 +336,24 @@ function makeFakeDb(seed = {}) {
         }
 
         let conflicted = false;
+        // A query check awaits, and another transaction may commit during
+        // that wait. Check the queries again until no write lands while
+        // they run; the document check and the writes below then run with
+        // no await between them, so the commit is atomic like Firestore's.
+        let writesSeen;
+        do {
+          writesSeen = writes.length;
+          for (const { query: readQuery, versions } of queryReads) {
+            const current = await readQuery.get();
+            const currentVersions = current.docs.map((doc) => [`${doc.ref._col}/${doc.id}`, doc.updateTime]);
+            if (JSON.stringify(currentVersions) !== JSON.stringify(versions)) {
+              conflicted = true;
+              break;
+            }
+          }
+        } while (!conflicted && writes.length !== writesSeen);
         for (const [key, version] of readVersions) {
           if (updateTimes.get(key) !== version) {
-            conflicted = true;
-            break;
-          }
-        }
-        for (const { query: readQuery, versions } of queryReads) {
-          const current = await readQuery.get();
-          const currentVersions = current.docs.map((doc) => [`${doc.ref._col}/${doc.id}`, doc.updateTime]);
-          if (JSON.stringify(currentVersions) !== JSON.stringify(versions)) {
             conflicted = true;
             break;
           }
