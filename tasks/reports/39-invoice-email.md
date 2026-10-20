@@ -55,3 +55,22 @@ matched; `build-demo --check` identical builds, within budget; `check:copy` clea
 lockfile hashes stable after a fresh `prepare:functions`; `e2e/invoices.spec.js` 6/6 and
 `e2e/data-export.spec.js` 2/2. Before the code, the new E2E test failed (no Email invoice
 button) and the new unit and web tests failed (commit d01500c).
+
+## Review round 1 (PR #535)
+
+Tests first (68ac723), then the fixes:
+- CodeQL "Incomplete URL substring sanitization" (3, test file): addresses are now
+  extracted (`addressesIn`) and compared exactly. Local CodeQL finds the 3 alerts on the
+  old file and 0 on the changed files.
+- Settled stale send: its audit row names the original sender; the requester is
+  `settledBy` (e4628e7).
+- Mark paid, void and reopen refuse with 409 while a send is reserved and not stale
+  (e4628e7). Commit 34d0dce imports the stale limit that e4628e7 exports; the tree is
+  correct from e4628e7 on.
+- Copy address: one shared predicate, `shared/email` `isBareEmailAddress`, used by
+  `validateInvoiceSend`, the email core and the invoice email (34d0dce).
+- The editor drops a preview answer that an edit overtook (b5f3971).
+
+Checks after the fixes: lint clean; `npm test` 3671/3671; web 3788/3788; `test:rules`
+471/471; check-docs, build-pages --check, generate-content --demo --check, build-demo
+--check and check:copy clean; `e2e/invoices.spec.js` 6/6, `e2e/data-export.spec.js` 2/2.
