@@ -131,6 +131,25 @@
           send-once key per attempt, and skip an address with a suppression record. Staff can
           retry a failed email with <code>retryChangeRequestNotice</code>. A new admin-readable collection,
           <code>change_request_settings</code>, holds the settings.</li>
+          <li>Invoices, part 5 (#519): pay an issued invoice by card through a Stripe link. When the
+          site&#39;s ticketing provider is Stripe and its account, mode and key are set, staff select
+          <strong>Make a card payment link</strong> on an issued invoice. The server builds a Stripe-hosted,
+          card-only Checkout Session from the frozen invoice: the invoice total, the invoice
+          currency, and the invoice number as the description. The browser sends only the invoice
+          id. The link works for 23 hours and one link is open at a time. It shows on the record,
+          prints on the PDF and goes in the invoice email while it works. Stripe&#39;s signed payment
+          event, read again from Stripe, marks the invoice paid with the method <strong>Card (Stripe)</strong>
+          and the Stripe ids, and writes the audit row and the delivery claim in the same
+          transaction, so a repeated event changes nothing. A payment after a void, after another
+          payment, through a closed link, for another amount or currency, or through an unknown
+          page is recorded on the invoice for review, logged, and raised to the operator, never
+          applied; a payment through an unknown page also closes every open link, and no new
+          link is made until an operator closes the review with a note, which also resolves its
+          alert. The paid date is the day of Stripe&#39;s event. Void and <strong>Mark paid</strong> close an open link
+          and ask Stripe to end it. Without Stripe the record says card links need Stripe. A
+          read-only demo refuses a link and ignores payment events. ADR 0004 gains an amendment
+          for this use of Stripe. <code>invoiceAdmin</code> binds <code>TICKETING_API_TOKEN</code> when the provider is
+          Stripe; no new function and no new webhook event type.</li>
           <li>Saved announcement messages (#496, #203). On the Announcements page, staff save a
           subject, a message and a button under a name, then load one into a new, unsent email.
           The audience stays as set, and any preview goes away. A draft with unsaved changes asks

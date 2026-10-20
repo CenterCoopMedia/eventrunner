@@ -304,6 +304,17 @@ function exportSeed() {
       issuer: { name: 'Example Events', address: '2 High Street', email: 'events@example.com', taxId: 'TAX-1', paymentInstructions: 'Pay by bank transfer to account 000000.' },
       issuedAt: AT, issuedBy: STAFF_UID,
       voided: { reason: 'Wrong amount', from: 'issued', at: AT, by: OPERATOR_UID },
+      // The Stripe pay link (#519) the void closed, and the card payment
+      // that came through it anyway, flagged for the operator.
+      payLinks: [{
+        linkId: 'pl_fixture00000000000000001', status: 'paid', sessionId: 'cs_test_fixture1', url: 'https://checkout.stripe.com/c/pay/cs_test_fixture1',
+        amount: 30000, currency: 'usd', livemode: false, createdAt: AT, createdBy: STAFF_UID,
+        expiresAt: new Date('2026-03-28T13:00:00.000Z'), closedAt: AT, closedReason: 'void', stripeClosed: false,
+      }],
+      paymentReviews: [{
+        reviewId: 'rv_fixture00000000000000001', code: 'invoice-void', sessionId: 'cs_test_fixture1', paymentIntentId: 'pi_fixture1',
+        amount: 30000, currency: 'usd', at: AT, invoiceStatus: 'void', resolved: false,
+      }],
       revision: 3, createdAt: AT, createdBy: STAFF_UID, updatedAt: AT, updatedBy: OPERATOR_UID,
       listKey: '2026-03-27T14:00:00.000Z|inv_fixture0000000000000002',
     },

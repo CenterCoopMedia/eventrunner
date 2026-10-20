@@ -6,7 +6,7 @@ Merging the implementation does not authorize a Stripe account connection, a pay
 
 ## 1. Name the owners and approve the offer
 
-One deployment serves one event, one organizer-owned Stripe account, one explicit test/live mode, and one currency. There are no Connect transfers, platform fees, subscriptions, or invoice payments in this ticket flow. The purchaser pays through Stripe-hosted Checkout; Event Runner never collects card details.
+One deployment serves one event, one organizer-owned Stripe account, one explicit test/live mode, and one currency. There are no Connect transfers, platform fees, subscriptions, or Stripe Invoices in this ticket flow. The same account also takes card payments for issued sponsor invoices through a pay link (section 6a and the [ADR 0004 amendment](../adr/0004-stripe-ticket-commerce.md#amendment-2026-10-20-invoice-pay-links)). The purchaser pays through Stripe-hosted Checkout; Event Runner never collects card details.
 
 | Responsibility | Owner and access |
 | --- | --- |
@@ -46,7 +46,7 @@ Only the organizer's authorized Stripe administrator creates account credentials
 | Stripe capability | Why the integration needs it |
 | --- | --- |
 | Read the owning account | `accounts.retrieve()` proves that the key belongs to `EVENT_STRIPE_ACCOUNT_ID`. |
-| Write Checkout Sessions; read Sessions and line items | Creates/recovers hosted Checkout, can expire a Session, and verifies the saved purchase against provider state. |
+| Write Checkout Sessions; read Sessions and line items | Creates/recovers hosted Checkout, can expire a Session, and verifies the saved purchase against provider state. The invoice pay link uses the same permissions: it creates, reads and expires one Session per link. |
 | Read Prices and Products as required for expanded line items | Reconciliation compares the provider's line-item products and amounts with the immutable order snapshot. Confirm the permission requirements of inline `price_data` during rehearsal. |
 | Read PaymentIntents and Charges | Verifies payment state and links relevant webhook events to the saved order. |
 | Read Refunds and Disputes | Records individual refund/dispute outcomes and their admission implications. |
@@ -55,7 +55,7 @@ Only the organizer's authorized Stripe administrator creates account credentials
 
 The runtime has no reason to receive permissions for money refunds, payouts, account changes, or Connect transfers. Creating a webhook endpoint is a separate organizer Dashboard action. If a restricted key fails, inspect the denied operation and adjust only the reviewed scope. Do not quietly replace it with an unrestricted live key. The implementation accepts mode-matching `rk_…` or `sk_…` keys; any use of an unrestricted key needs the organizer's explicit access decision.
 
-Store the API key as **`TICKETING_API_TOKEN`** in managed Secret Manager. Create the webhook endpoint described below and store its Stripe-generated signing secret as **`TICKETING_WEBHOOK_SECRET`**. A signing secret is distinct from an API key and belongs to that endpoint and mode; do not generate an arbitrary replacement string. No publishable Stripe key is needed in this hosted flow. See Stripe's [key types](https://docs.stripe.com/keys) and [key-handling guidance](https://docs.stripe.com/keys-best-practices).
+Store the API key as **`TICKETING_API_TOKEN`** in managed Secret Manager. Besides the ticketing functions, `invoiceAdmin` binds it when the provider is Stripe, for invoice pay links. Grant the runtime access before you deploy. Create the webhook endpoint described below and store its Stripe-generated signing secret as **`TICKETING_WEBHOOK_SECRET`**. A signing secret is distinct from an API key and belongs to that endpoint and mode; do not generate an arbitrary replacement string. No publishable Stripe key is needed in this hosted flow. See Stripe's [key types](https://docs.stripe.com/keys) and [key-handling guidance](https://docs.stripe.com/keys-best-practices).
 
 Use the approved secret-management interface or an approved secure input file to create/add a version. Do not put a secret value in a shell command, committed environment file, screenshot, issue, browser setting, or support message. The deploy workflow does not serialize Stripe secrets into public build variables or its functions environment file. Secret names and non-secret account identifiers may appear in the deployment record; values may not.
 
@@ -150,6 +150,21 @@ Public purchasers can have one unresolved reserved order and create at most five
 
 Original order amounts remain historical financial facts after cancellation, refund allocation, or attendee correction. A cancelled/refunded seat remains sold for capacity purposes in this MVP. Locally removed admission is not revived by later provider delivery. Account approval granted or revoked explicitly by an admin retains its existing precedence over ticket-derived approval.
 
+## 6a. Invoice pay links
+
+When the provider is Stripe, staff can make a card payment link for an issued sponsor invoice (**Pay by card** on the invoice record; see the [admin guide](../ADMIN_GUIDE.md#pay-by-card-through-a-stripe-link)). It is a hosted Checkout Session for the invoice total, made with this deployment's key. Payments arrive through the same webhook endpoint and event types. No new event type, secret or endpoint is needed. Test mode is stated on the record.
+
+| Situation | Staff/operator response |
+| --- | --- |
+| **Pay by card** says card links need Stripe | The provider is not `stripe`, or the account, mode or key is not set. Check the deployment variables and `TICKETING_API_TOKEN`. Invoices still work without it. |
+| Stripe did not answer, or refused, when the link was made | Select **Make a card payment link** again. A lost answer resends the same saved request and key, so no second page is made. A refusal closes the attempt: check the key's Checkout Session permissions and the account currency. |
+| The sponsor paid, but the invoice is still **Issued** | Check webhook delivery for the Checkout Session event in the Stripe Dashboard and the endpoint health. Do not use **Mark paid** for a card payment that is still arriving: if it lands later, it is flagged as paid twice. |
+| **A card payment needs review** / **Needs review** in the list | A payment came after a void, after another payment, through a closed link, for another amount or currency, or through a page the invoice has no record of. It was recorded and not applied, and the operator was alerted through **System errors**. A payment through an unknown page also closed every open link. No new link can be made until it is reviewed. Check it in the Stripe Dashboard, refund it there or record it another way, then select **Mark reviewed** with a note. That also resolves the system error. |
+| Void, or a payment recorded by hand, while a link is open | The link closes on the record and the site asks Stripe to end the page. If the record says Stripe was not told, the page may work until its end time; expire the Session in the Stripe Dashboard if needed. |
+| Refund or dispute of an invoice payment | Handle it in the Stripe Dashboard. The invoice does not change. If the money goes back, an operator reopens the invoice. |
+
+Pay link rehearsal belongs in the Stripe test rehearsal (section 9): a real test-mode invoice payment, a payment after void, and a link left to expire.
+
 ## 7. Pause, rotate credentials, and recover safely
 
 For an incident or planned maintenance, use **Review pausing sales → Pause new sales**, enter the reason, and confirm. This stops new purchases. Existing Checkout Sessions may still complete; signed webhooks, the existing queue worker, reconciliation, email, order status, and check-in must remain available.
@@ -199,6 +214,7 @@ A separately authorized rehearsal against the organizer's Stripe sandbox must re
 | Claim, group recipients, corrections, and email | Verified attendee isolation, purchaser-only financial details, one-person print view, protected claimed/used email, actual managed-email delivery, and a distinct Stripe payment receipt. |
 | Sales pause, compatible rollback, and rotation | Existing Sessions still reconcile while intake is closed; new credentials verify correctly; missed delivery can be recovered without duplicate admission. |
 | Check-in and correction | Online duplicate detection, invalid-ticket handling, operator-only undo, and audit evidence. |
+| Invoice pay link | A test-mode payment marks the invoice paid once, with **Card (Stripe)** and its ids; a replayed event changes nothing; a payment completed after a void is flagged, not applied, and alerts the operator; void expires an open Session; a link left to run out reads as ended. |
 
 **No real Stripe rehearsal is supplied by this implementation's synthetic test results.** Do not mark an unrun scenario passed or infer live readiness from a screenshot, a webhook registration stamp, or a successful build. Keep card data, secrets, raw provider payloads, and identifiable purchaser details out of PR artifacts. Live charges or refunds require their own organizer authorization; test-mode rehearsal permission does not authorize them.
 

@@ -66,6 +66,12 @@
  * (invoices.cjs refuseWhileSending), so the email never states a status
  * the invoice no longer has.
  *
+ * THE CARD LINK. An issued invoice with an open Stripe pay link (#519)
+ * names it in both bodies, with when it ends on the event clock, and its
+ * PDF prints it. A link that has ended by the time of the preview is left
+ * out; one that ends between the preview and the send changes the receipt,
+ * so the send asks for a new preview.
+ *
  * NO ADDRESSES IN THE AUDIT LOG. The admin_logs row names the send, the
  * number, the outcome and the message id. The addresses are on the invoice
  * and in the email log; the note text is only in the email itself. A
@@ -76,6 +82,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const { formatMoney, isInvoiceId, validateInvoiceSend } = require('shared/invoice');
 const { isBareEmailAddress } = require('shared/email');
 const { buildInvoicePdf, internals: { longDate } } = require('./invoicePdf.cjs');
+const { currentPayLink, payLinkExpiryText, internals: { safeUrl } } = require('./invoicePayLink.cjs');
 const { publicInvoice, internals: { InvoiceError, timeOf, SENDING_STALE_MS } } = require('./invoices.cjs');
 
 const INVOICES = 'invoices';
@@ -158,7 +165,7 @@ function readSendInput(body, to) {
  * The email for one invoice, rendered, and the receipt over it. Pure apart
  * from the template render.
  */
-function composeInvoiceEmail({ invoice, to, cc, note, config, stream }) {
+function composeInvoiceEmail({ invoice, to, cc, note, config, stream, now = new Date() }) {
   const { render } = require('../email/render.cjs');
   const { getDefaultTemplate } = require('../email/templates.cjs');
   const { withLegalFooter } = require('../email/send.cjs');
@@ -174,6 +181,8 @@ function composeInvoiceEmail({ invoice, to, cc, note, config, stream }) {
   } else {
     summary += ' Payment is due on receipt.';
   }
+  const open = currentPayLink(invoice, now);
+  const payLink = open && safeUrl(open.url) ? { url: safeUrl(open.url), expiresAt: open.expiresAt } : null;
   const rendered = render({
     template: getDefaultTemplate(TEMPLATE_ID),
     tokenValues: {
@@ -182,6 +191,8 @@ function composeInvoiceEmail({ invoice, to, cc, note, config, stream }) {
       greeting: contactName ? `Hello ${contactName},` : 'Hello,',
       invoice_summary: summary,
       staff_note: note,
+      pay_link_url: payLink ? payLink.url : '',
+      pay_link_end: payLink ? `The card payment link works until ${payLinkExpiryText(payLink.expiresAt, config?.event?.timezone)}.` : '',
     },
     config,
   });
@@ -264,7 +275,7 @@ async function previewSend({ db, getConfig, getMailer, body, now }) {
   const { cc, note } = readSendInput(body, to);
   const config = await getConfig();
   const channel = transactionalStream(config);
-  const { preview, receipt } = composeInvoiceEmail({ invoice, to, cc, note, config, stream: channel.ok ? channel.stream : null });
+  const { preview, receipt } = composeInvoiceEmail({ invoice, to, cc, note, config, stream: channel.ok ? channel.stream : null, now: now() });
   let cannotSendReason = channel.ok ? null : channel.reason;
   if (!cannotSendReason) {
     try {
@@ -347,7 +358,7 @@ async function sendInvoice({ db, actor, body, now, getConfig, getMailer, log }) 
     }
 
     const { invoice } = sendableInvoice(stored, id);
-    const composed = composeInvoiceEmail({ invoice, to, cc, note, config, stream: channel.stream });
+    const composed = composeInvoiceEmail({ invoice, to, cc, note, config, stream: channel.stream, now: new Date(nowMs) });
     if (composed.receipt !== body.receipt) {
       fail(409, 'stale-preview', 'The invoice or the email changed after the preview. Preview the email again, then send.');
     }
@@ -380,7 +391,7 @@ async function sendInvoice({ db, actor, body, now, getConfig, getMailer, log }) 
   const { invoice, composed } = reservation;
   let result;
   try {
-    const bytes = await buildInvoicePdf({ invoice, theme: config?.theme ?? null });
+    const bytes = await buildInvoicePdf({ invoice, theme: config?.theme ?? null, now: new Date(nowMs), timeZone: config?.event?.timezone ?? null });
     result = await mailer.send({
       ...composed.message,
       attachments: [{ filename: composed.filename, contentType: 'application/pdf', content: Buffer.from(bytes).toString('base64') }],

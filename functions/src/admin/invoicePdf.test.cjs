@@ -223,3 +223,84 @@ test('the PDF endpoint refuses a draft, an unknown invoice, a bad id, a non-admi
   assert.equal((await call(db, { invoiceId: ID }, 'missing')).statusCode, 401);
   assert.equal((await call(db, { invoiceId: ID }, 'staff', 'GET')).statusCode, 405);
 });
+
+// ------------------------------------------------------------- pay link (#519)
+
+const PAY_URL = 'https://checkout.stripe.com/c/pay/cs_test_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6#fidkdWxOYHwnPyd1blpxYHZxWjA0';
+function withLink(patch = {}, linkPatch = {}) {
+  return issued({
+    payLinks: [{
+      linkId: 'pl_000000000000000000000001', status: 'open', sessionId: 'cs_test_a1', url: PAY_URL,
+      amount: 481500, currency: 'usd', livemode: false, createdAt: NOW, createdBy: 'staff',
+      expiresAt: new Date('2026-10-21T15:30:00Z'), ...linkPatch,
+    }],
+    ...patch,
+  });
+}
+
+/** True for drawn text that is the first part of PAY_URL (compared exactly, never by substring). */
+function startsTheLink(text) {
+  return text.length >= 24 && PAY_URL.slice(0, text.length) === text;
+}
+
+/** The link annotations a PDF holds, as their URI strings. */
+async function linkTargets(bytes) {
+  const { PDFDocument, PDFName } = require('pdf-lib');
+  const doc = await PDFDocument.load(bytes);
+  const targets = [];
+  for (const page of doc.getPages()) {
+    const annots = page.node.Annots();
+    if (!annots) continue;
+    for (let index = 0; index < annots.size(); index += 1) {
+      const annot = annots.lookup(index);
+      const action = annot.lookup(PDFName.of('A'));
+      const uri = action?.lookup(PDFName.of('URI'));
+      if (uri) targets.push(uri.decodeText());
+    }
+  }
+  return targets;
+}
+
+test('an open pay link prints with its end time on the event clock, as a link that opens it', async () => {
+  const bytes = await buildInvoicePdf({ invoice: publicInvoice(withLink(), ID), theme: THEME, now: NOW, timeZone: 'America/New_York' });
+  const drawn = drawnText(bytes);
+  assert.ok(drawn.includes('Pay by card'), JSON.stringify(drawn));
+  assert.ok(drawn.includes('Pay $4,815.00 by card through Stripe at this link. The link works until October 21, 2026, 11:30 AM EDT.'), JSON.stringify(drawn));
+  // The address wraps by character; every part of it is drawn, in order.
+  const start = drawn.findIndex(startsTheLink);
+  assert.ok(start >= 0);
+  let joined = '';
+  for (let index = start; joined.length < PAY_URL.length && index < drawn.length; index += 1) joined += drawn[index];
+  assert.equal(joined, PAY_URL);
+  // One link over each drawn line of the address, each opening the whole address.
+  const targets = await linkTargets(bytes);
+  assert.ok(targets.length >= 1);
+  assert.ok(targets.every((target) => target === PAY_URL), JSON.stringify(targets));
+  // The bank instructions still print; the card link is one more way to pay.
+  assert.ok(drawn.includes('How to pay'));
+});
+
+test('no pay link prints once it has run out, after a void, after payment, or when it was cancelled', async () => {
+  const cases = [
+    [withLink(), new Date('2026-10-21T15:30:00Z')],
+    [withLink({ status: 'void', voided: { reason: 'Wrong amount', from: 'issued', at: NOW, by: 'operator' } }), NOW],
+    [withLink({ status: 'paid', payment: { paidOn: '2026-10-20', method: 'card', via: 'stripe', note: '', stripe: { sessionId: 'cs_test_a1', paymentIntentId: 'pi_a1' }, recordedAt: NOW, recordedBy: null } }, { status: 'paid' }), NOW],
+    [withLink({}, { status: 'cancelled', closedReason: 'paid' }), NOW],
+  ];
+  for (const [stored, now] of cases) {
+    const bytes = await buildInvoicePdf({ invoice: publicInvoice(stored, ID), theme: THEME, now, timeZone: 'America/New_York' });
+    const drawn = drawnText(bytes);
+    assert.equal(drawn.includes('Pay by card'), false, stored.status);
+    assert.equal(drawn.some(startsTheLink), false);
+    assert.deepEqual(await linkTargets(bytes), []);
+  }
+  const paid = drawnText(await buildInvoicePdf({ invoice: publicInvoice(cases[2][0], ID), theme: THEME, now: NOW }));
+  assert.ok(paid.includes('Paid on October 20, 2026. Method: Card (Stripe).'), JSON.stringify(paid));
+});
+
+test('the PDF endpoint prints the open link on the event clock', async () => {
+  const db = dbFor({ [`invoices/${ID}`]: withLink({}, { expiresAt: new Date(Date.now() + 60 * 60 * 1000) }) });
+  const res = await call(db, { invoiceId: ID }, 'staff', 'POST', { event: { historicalDemo: false, timezone: 'America/New_York' } });
+  assert.equal(res.statusCode, 200);
+  assert.ok(drawnText(res.sent).includes('Pay by card'));
+});

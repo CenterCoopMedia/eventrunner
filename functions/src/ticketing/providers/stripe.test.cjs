@@ -192,3 +192,72 @@ test('provider pagination is bounded and cannot silently omit refunds', async ()
   await assert.rejects(internals.allProviderPages(async () => ({ data: [{ id: `re_${n++}` }], has_more: true }), {}), /bounded page limit/);
   assert.equal(n, 10);
 });
+
+// ------------------------------------------------------- invoice pay links (#519)
+
+const INVOICE_ID = 'inv_0123456789abcdef0123';
+const INVOICE_METADATA = { eventRunnerInvoiceId: INVOICE_ID, eventRunnerEventId: 'conference-1', eventRunnerPayLinkId: 'pl_000000000000000000000001' };
+function invoiceParams(patch = {}) {
+  return {
+    mode: 'payment', ui_mode: 'hosted_page', allowed_payment_method_types: ['card'],
+    adaptive_pricing: { enabled: false }, automatic_tax: { enabled: false }, allow_promotion_codes: false,
+    client_reference_id: INVOICE_ID,
+    line_items: [{ price_data: { currency: 'usd', unit_amount: 450000, product_data: { name: 'Invoice INV-0007' } }, quantity: 1 }],
+    metadata: INVOICE_METADATA,
+    payment_intent_data: { metadata: INVOICE_METADATA, description: 'Invoice INV-0007' },
+    expires_at: 1761000000, success_url: 'https://event.example/', cancel_url: 'https://event.example/',
+    ...patch,
+  };
+}
+
+test('an invoice Checkout Session is one fixed card amount for one invoice of this event, and nothing else', async () => {
+  const { provider, calls } = fixture();
+  await provider.createInvoiceCheckoutSession(invoiceParams(), { idempotencyKey: 'invoice-pay-link:key' });
+  assert.equal(calls.create.length, 1);
+  assert.deepEqual(calls.create[0][1], { idempotencyKey: 'invoice-pay-link:key' });
+  for (const change of [
+    { ui_mode: 'embedded_page' }, { mode: 'subscription' },
+    { allowed_payment_method_types: ['card', 'us_bank_account'] }, { adaptive_pricing: { enabled: true } },
+    { automatic_tax: { enabled: true } }, { allow_promotion_codes: true },
+    { line_items: [{ price_data: { currency: 'usd', unit_amount: 450000, product_data: { name: 'x' } }, quantity: 2 }] },
+    { line_items: [{ price: 'price_123', quantity: 1 }] },
+    { line_items: [...invoiceParams().line_items, ...invoiceParams().line_items] },
+    { metadata: { ...INVOICE_METADATA, eventRunnerEventId: 'other' } },
+    { metadata: { ...INVOICE_METADATA, eventRunnerOrderId: ORDER.id } },
+    { metadata: { ...INVOICE_METADATA, eventRunnerInvoiceId: '../x' } },
+    { payment_intent_data: { metadata: { ...INVOICE_METADATA, eventRunnerPayLinkId: 'pl_other' } } },
+    { payment_intent_data: { metadata: INVOICE_METADATA, transfer_data: { destination: 'acct_other' } } },
+    { payment_intent_data: { metadata: INVOICE_METADATA, application_fee_amount: 100 } },
+  ]) {
+    await assert.rejects(provider.createInvoiceCheckoutSession(invoiceParams(change), { idempotencyKey: 'same' }), JSON.stringify(change));
+  }
+  await assert.rejects(provider.createInvoiceCheckoutSession(invoiceParams(), {}));
+  // The ticket policy refuses an invoice request, and the invoice policy refuses a ticket request.
+  await assert.rejects(provider.createCheckoutSession(invoiceParams(), { idempotencyKey: 'same' }));
+  assert.equal(calls.create.length, 1);
+});
+
+test('a Session event for an invoice routes to the invoice, and its PaymentIntent events are acknowledged only', async () => {
+  const session = { id: 'cs_test_invoice', object: 'checkout.session', metadata: INVOICE_METADATA };
+  const event = { ...EVENT, id: 'evt_invoice', data: { object: session } };
+  const { provider } = fixture({ event });
+  const delivery = signed(event);
+  const result = await provider.verifyWebhook(delivery.rawBody, delivery.headers);
+  assert.equal(result.valid, true);
+  assert.equal(result.eventType, 'invoice.checkout');
+  assert.equal(result.resourceId, INVOICE_ID);
+  assert.equal(result.sessionId, 'cs_test_invoice');
+  assert.match(result.deliveryId, /^stripe_[a-f0-9]{64}$/);
+
+  const otherEvent = { ...event, id: 'evt_invoice_other', data: { object: { ...session, metadata: { ...INVOICE_METADATA, eventRunnerEventId: 'other' } } } };
+  const other = fixture({ event: otherEvent });
+  const refused = signed(otherEvent);
+  assert.deepEqual(await other.provider.verifyWebhook(refused.rawBody, refused.headers), { valid: false, reason: 'wrong_event' });
+
+  const intent = { ...EVENT, id: 'evt_pi', type: 'payment_intent.succeeded', data: { object: { id: 'pi_invoice', metadata: INVOICE_METADATA } } };
+  const pi = fixture({ event: intent });
+  const piDelivery = signed(intent);
+  const acknowledged = await pi.provider.verifyWebhook(piDelivery.rawBody, piDelivery.headers);
+  assert.equal(acknowledged.valid, true);
+  assert.equal(acknowledged.eventType, 'ignored');
+});
