@@ -267,6 +267,8 @@ test.describe.serial('admin tiers and the Access page', () => {
     const shortRow = operatorPage.getByRole('row', { name: new RegExp(SHORT_EMAIL) });
     await expect(shortRow).toContainText('Ended');
     await expect(shortRow).toContainText('No access now.');
+    // The emulator runs no scheduled functions, so the sweep never takes it off here.
+    await expect(shortRow).toContainText('The account leaves this list within a minute.');
     const longRow = operatorPage.getByRole('row', { name: new RegExp(LONG_EMAIL) });
     await expect(longRow).toContainText('Access ends');
     await operatorContext.close();

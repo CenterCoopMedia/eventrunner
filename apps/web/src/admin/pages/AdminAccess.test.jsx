@@ -445,7 +445,7 @@ describe('staff access with an end time', () => {
     await renderPage({ list: TEMP_LIST });
     expect(rowFor('demo@example.org').textContent).toContain(`Access ends ${formatEndTime(ENDS)}`);
     expect(rowFor('ended@example.org').textContent).toContain('Ended');
-    expect(rowFor('ended@example.org').textContent).toContain(`Access ended ${formatEndTime('2026-10-01T12:00:00.000Z')}. No access now.`);
+    expect(rowFor('ended@example.org').textContent).toContain(`Access ended ${formatEndTime('2026-10-01T12:00:00.000Z')}. No access now. The account leaves this list within a minute.`);
     expect(rowFor('bad@example.org').textContent).toContain('The end time cannot be read. No access now.');
     expect(rowFor('bad@example.org').textContent).toContain('No access');
     expect(rowFor('demo@example.org').textContent).not.toContain('Ended');
@@ -544,5 +544,25 @@ describe('staff access with an end time', () => {
     expect(formatEndTime(ENDS)).toMatch(/2026/);
     expect(formatEndTime(ENDS)).toMatch(/[A-Z]{2,}|GMT|UTC/);
     expect(formatEndTime('not a time')).toBe('an unreadable time');
+  });
+});
+
+describe('an ended grant the sweep removed', () => {
+  it('is simply gone from the table on the next load', async () => {
+    const ended = { email: 'ended@example.org', tier: 'staff', expiresAt: '2026-10-01T12:00:00.000Z', expiryState: 'expired' };
+    await renderPage({
+      lists: [
+        { accounts: [{ email: 'ops@example.org', tier: 'operator' }, ended], callerEmail: 'ops@example.org' },
+        { accounts: [{ email: 'ops@example.org', tier: 'operator' }], callerEmail: 'ops@example.org' },
+      ],
+    });
+    expect(rowFor('ended@example.org').textContent).toContain('Ended');
+    // Any reload (here, after a change to another account) shows the list
+    // the server now holds.
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'new@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Grant staff access to new@example.org' })).getByRole('button', { name: 'Grant staff access' }));
+    await waitFor(() => expect(screen.queryByText('ended@example.org')).toBeNull());
+    expect(screen.getByText('1 account, 1 operator')).toBeInTheDocument();
   });
 });

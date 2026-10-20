@@ -49,7 +49,9 @@
 // or a short engagement. The field shows for staff only, because operator
 // access never ends. The browser reads the field in its own time zone and
 // sends an ISO instant; the server checks it again and decides, by its own
-// clock, whether each grant still works (`expiryState`). The page shows
+// clock, whether each grant still works (`expiryState`). A sweep on the
+// server takes an ended grant off the list within a minute, so an ended
+// row says so and is simply absent from the next load. The page shows
 // that answer in words and never works it out from the browser's clock. An
 // end time does not make the account read-only: until it comes, staff
 // edit and publish like any staff account, and the confirmation says so.
@@ -227,7 +229,7 @@ function EndTimeLine({ account }) {
   const text = account.expiryState === 'active'
     ? `Access ends ${formatEndTime(account.expiresAt)}.`
     : account.expiryState === 'expired'
-      ? `Access ended ${formatEndTime(account.expiresAt)}. No access now.`
+      ? `Access ended ${formatEndTime(account.expiresAt)}. No access now. The account leaves this list within a minute.`
       : 'The end time cannot be read. No access now.';
   return <p className="mt-3xs text-admin-xs text-admin-ink-secondary">{text}</p>;
 }
