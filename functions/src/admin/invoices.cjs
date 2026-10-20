@@ -905,5 +905,5 @@ module.exports = {
   createInvoiceAdminHandler,
   publicInvoice,
   get handlers() { return buildHandlers(); },
-  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings, InvoiceError, timeOf, SENDING_STALE_MS, stripePayments },
+  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings, InvoiceError, timeOf, SENDING_STALE_MS, stripePayments, refuseWhileSending },
 };

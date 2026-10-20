@@ -322,6 +322,11 @@ async function createPayLink({ db, actor, body, now, getPayments, log }) {
     const stored = snap.data();
     const refusal = linkRefusal(stored);
     if (refusal) fail(...refusal);
+    // A card payment the invoice did not expect may mean a page it does not
+    // know about is in use. No new link until an operator has reviewed it.
+    if ((Array.isArray(stored.paymentReviews) ? stored.paymentReviews : []).some((entry) => entry?.resolved !== true)) {
+      fail(409, 'payment-review-open', 'A card payment on this invoice needs review, so no new card link is made. An operator reviews it first.');
+    }
     const at = now();
     const links = (Array.isArray(stored.payLinks) ? stored.payLinks : []).map((link) => ({ ...link }));
     settleEnded(links, at);
@@ -329,6 +334,8 @@ async function createPayLink({ db, actor, body, now, getPayments, log }) {
     let replaced = null;
     if (last?.status === 'open') {
       if (timeOf(last.expiresAt) - at.getTime() > REUSE_MARGIN_MS) return { reuse: true, stored };
+      // An email being sent now states this link; it is not closed under it.
+      require('./invoices.cjs').internals.refuseWhileSending(stored, at);
       // Close to its end: a new link replaces it, and its page in Stripe is
       // ended below, so two pages are never open for long. A payment that
       // completes on it first still counts (applyInvoiceCheckout).
@@ -477,9 +484,16 @@ async function resolvePaymentReview({ db, actor, body, now }) {
     const entry = reviews.find((each) => each.reviewId === body.reviewId);
     if (!entry) fail(404, 'not-found', 'That payment is not on this invoice. Reload the invoice.');
     if (entry.resolved === true) fail(409, 'conflict', 'This payment was already reviewed. Reload the invoice.');
+    // The operator alert raised with this review closes with it, as
+    // System errors closes one (telemetry/systemErrorsAdmin.cjs).
+    const alertRef = safeId(entry.sessionId) ? db.collection(ALERTS).doc(alertIdFor(entry.sessionId)) : null;
+    const alertSnap = alertRef ? await tx.get(alertRef) : null;
     const at = now();
     Object.assign(entry, { resolved: true, resolvedAt: at, resolvedBy: actor.uid, note: note.value });
     tx.update(ref, { paymentReviews: reviews });
+    if (alertSnap?.exists && alertSnap.data().resolved !== true) {
+      tx.update(alertRef, { resolved: true, resolvedAt: at, resolvedBy: actor.email || actor.uid });
+    }
     auditRow(tx, db, {
       actor, at, id, action: 'payment-review-resolved',
       details: { number: stored.number ?? null, reviewId: entry.reviewId, code: entry.code, paymentIntentId: entry.paymentIntentId ?? null, note: note.value },
@@ -496,7 +510,9 @@ async function resolvePaymentReview({ db, actor, body, now }) {
  * @param {{ db: object, provider: object, deliveryId: string, invoiceId: string,
  *           sessionId: string, now?: () => Date, log?: object }} deps
  */
-async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessionId, now = () => new Date(), log = console }) {
+async function applyInvoiceCheckout({
+  db, provider, deliveryId, invoiceId, sessionId, eventCreated = null, now = () => new Date(), log = console,
+}) {
   if (!isInvoiceId(invoiceId) || !safeId(sessionId) || !safeId(deliveryId)) return { ignored: 'not_actionable' };
   const session = await provider.retrieveCheckoutSession(sessionId);
   if (session?.id !== sessionId || session.metadata?.eventRunnerInvoiceId !== invoiceId
@@ -527,7 +543,7 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
       if (!snap.exists) {
         // Money for an invoice that is gone: there is no record to flag, so the operator is told directly.
         if (paid) {
-          tx.create(db.collection(ALERTS).doc(`invoice_review_${hash(sessionId).slice(0, 40)}`), alertRow({
+          tx.create(db.collection(ALERTS).doc(alertIdFor(sessionId)), alertRow({
             at, message: `A Stripe card payment for invoice ${invoiceId} needs review: the invoice no longer exists. Check payment ${paymentIntentId || sessionId} in the Stripe Dashboard.`, invoiceId,
           }));
           return { invoice: 'flagged' };
@@ -578,6 +594,18 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
         delete link.idempotencyKey;
       }
       const number = typeof stored.number === 'string' ? sanitizeInvoiceText(stored.number) : null;
+      if (code === 'unknown-session') {
+        // A page this invoice has no record of took money: close every open
+        // link here and at Stripe until an operator has looked.
+        for (const other of links) {
+          if (OPEN.has(other.status)) {
+            Object.assign(other, { status: 'cancelled', closedAt: at, closedReason: 'suspended' });
+            delete other.request;
+            delete other.idempotencyKey;
+            closedHere.push(other);
+          }
+        }
+      }
       if (code) {
         const reviewId = `rv_${hash(sessionId).slice(0, 32)}`;
         reviews.push({
@@ -589,7 +617,7 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
           actor: null, at, id: invoiceId, action: 'stripe-payment-flagged', docId: `invoice_stripe_${hash(`${deliveryId}:flag`).slice(0, 40)}`,
           details: { number, code, sessionId, paymentIntentId, amount: session.amount_total ?? null, currency: session.currency ?? null, invoiceStatus: status ?? null },
         });
-        tx.create(db.collection(ALERTS).doc(`invoice_review_${hash(sessionId).slice(0, 40)}`), alertRow({
+        tx.create(db.collection(ALERTS).doc(alertIdFor(sessionId)), alertRow({
           at, invoiceId,
           message: `A Stripe card payment for invoice ${number || invoiceId} needs review: ${REVIEW_WORDS[code]}. It was recorded on the invoice and not applied.`,
         }));
@@ -610,7 +638,10 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
       tx.update(ref, {
         status: 'paid',
         payment: {
-          paidOn: invoiceDateIn(at, typeof timeZone === 'string' ? timeZone : null),
+          // The day Stripe recorded the payment, from the verified event,
+          // on the event clock. A late or retried delivery keeps that day;
+          // `recordedAt` is when this site recorded it.
+          paidOn: invoiceDateIn(paidAtOf(eventCreated, at), typeof timeZone === 'string' ? timeZone : null),
           method: 'card', via: 'stripe', note: '',
           stripe: { sessionId, paymentIntentId },
           recordedAt: at, recordedBy: null,
@@ -634,12 +665,24 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
     if (isDuplicateClaim(err)) return { duplicate: true };
     throw err;
   }
-  if (outcome?.invoice === 'paid' && closedHere.length) {
+  if ((outcome?.invoice === 'paid' || outcome?.invoice === 'flagged') && closedHere.length) {
     await expireClosedLinksAtStripe({
       db, id: invoiceId, closed: closedHere, getPayments: () => ({ available: true, provider }), now, log,
     });
   }
   return outcome;
+}
+
+/** Stripe's event time (Unix seconds), never later than now; else now. */
+function paidAtOf(eventCreated, at) {
+  if (!Number.isSafeInteger(eventCreated) || eventCreated <= 0) return at;
+  const ms = eventCreated * 1000;
+  return ms < at.getTime() ? new Date(ms) : at;
+}
+
+/** The operator alert of one flagged payment: one per Stripe session. */
+function alertIdFor(sessionId) {
+  return `invoice_review_${hash(sessionId).slice(0, 40)}`;
 }
 
 function alertRow({ at, message, invoiceId }) {

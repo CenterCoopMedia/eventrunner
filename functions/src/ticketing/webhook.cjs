@@ -242,7 +242,8 @@ function createTicketingWebhookHandler({ db, provider, now = () => new Date(), l
       try {
         const { applyInvoiceCheckout } = require('../admin/invoicePayLink.cjs');
         outcome = await applyInvoiceCheckout({
-          db, provider, deliveryId, invoiceId: verification.resourceId, sessionId: verification.sessionId, now, log,
+          db, provider, deliveryId, invoiceId: verification.resourceId, sessionId: verification.sessionId,
+          eventCreated: verification.eventCreated ?? null, now, log,
         });
       } catch (err) {
         log.error('ticketing: invoice payment could not be recorded', { code: err?.code || err?.type || 'internal' });

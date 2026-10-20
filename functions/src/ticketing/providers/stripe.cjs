@@ -246,7 +246,9 @@ function createStripeProvider({ env = process.env, db, getConfig, stripeClient, 
         if (!event.type.startsWith('checkout.session.')) return { valid: true, eventType: 'ignored', deliveryId };
         const sessionId = safeId(object.id);
         if (!sessionId) return { valid: false, reason: 'wrong_event' };
-        return { valid: true, deliveryId, eventType: 'invoice.checkout', resourceId: invoiceId, sessionId };
+        // The event time is Stripe's record of when the payment happened.
+        const eventCreated = Number.isSafeInteger(currentEvent.created) ? currentEvent.created : null;
+        return { valid: true, deliveryId, eventType: 'invoice.checkout', resourceId: invoiceId, sessionId, eventCreated };
       }
       let metadata = object?.metadata;
       let paymentIntentId = event.type.startsWith('payment_intent.') ? objectId(object) : objectId(object?.payment_intent);
