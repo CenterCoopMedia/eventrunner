@@ -28,7 +28,7 @@ vi.mock('../../contexts/AuthContext.jsx', () => ({
   }),
 }));
 
-import AdminAccess, { describeChange, describeResult } from './AdminAccess.jsx';
+import AdminAccess, { describeChange, describeResult, formatEndTime, nextEndReloadDelay } from './AdminAccess.jsx';
 import { TIER_SCOPE } from '../AdminLayout.jsx';
 
 const LIST = {
@@ -416,5 +416,231 @@ describe('AdminAccess', () => {
     expect(describeResult({ email: 'a@example.org', tier: null, previousTier: 'staff' })).toBe('Access removed for a@example.org.');
     expect(describeResult({ email: 'a@example.org', tier: 'operator', previousTier: null })).toBe('Operator access granted to a@example.org.');
     expect(describeResult({ email: 'a@example.org', tier: 'staff', previousTier: 'operator' })).toBe('a@example.org is now staff.');
+  });
+});
+
+// Expiring staff access (issue #331). The server decides whether a grant
+// has ended (expiryState), by its own clock; the page states it in words.
+describe('staff access with an end time', () => {
+  const ENDS = '2026-10-27T17:00:00.000Z';
+  const TEMP_LIST = {
+    accounts: [
+      { email: 'ops@example.org', tier: 'operator' },
+      { email: 'bad@example.org', tier: 'staff', expiresAt: null, expiryState: 'invalid' },
+      { email: 'demo@example.org', tier: 'staff', expiresAt: ENDS, expiryState: 'active' },
+      { email: 'desk@example.org', tier: 'staff' },
+      { email: 'ended@example.org', tier: 'staff', expiresAt: '2026-10-01T12:00:00.000Z', expiryState: 'expired' },
+    ],
+    callerEmail: 'ops@example.org',
+  };
+
+  /** The datetime-local value for an instant, in the browser's own zone. */
+  function localValue(isoString) {
+    const date = new Date(isoString);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  it('shows each end time in the tier column, and says in words when a grant has ended or cannot be read', async () => {
+    await renderPage({ list: TEMP_LIST });
+    expect(rowFor('demo@example.org').textContent).toContain(`Access ends ${formatEndTime(ENDS)}`);
+    expect(rowFor('ended@example.org').textContent).toContain('Ended');
+    expect(rowFor('ended@example.org').textContent).toContain(`Access ended ${formatEndTime('2026-10-01T12:00:00.000Z')}. No access now. The account leaves this list within a minute.`);
+    expect(rowFor('bad@example.org').textContent).toContain('The end time cannot be read. No access now.');
+    expect(rowFor('bad@example.org').textContent).toContain('No access');
+    expect(rowFor('demo@example.org').textContent).not.toContain('Ended');
+    // A permanent grant says nothing about an end.
+    expect(rowFor('desk@example.org').textContent).not.toMatch(/end/i);
+  });
+
+  it('offers an end time for staff only, and sends it as an ISO instant after a confirmation that names it', async () => {
+    await renderPage();
+    expect(screen.getByLabelText('Access ends (optional)')).toHaveAttribute('type', 'datetime-local');
+    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'operator' } });
+    expect(screen.queryByLabelText('Access ends (optional)')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'staff' } });
+
+    const ends = new Date(Date.now() + 3 * 24 * 3_600_000);
+    ends.setSeconds(0, 0);
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'demo@example.org' } });
+    fireEvent.change(screen.getByLabelText('Access ends (optional)'), { target: { value: localValue(ends.toISOString()) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+
+    const surface = screen.getByRole('region', { name: 'Grant staff access to demo@example.org until ' + formatEndTime(ends.toISOString()) });
+    // The scope, the end, and that the end does not make the account read-only.
+    expect(surface.textContent).toContain(`run ${TIER_SCOPE.staff}`);
+    expect(surface.textContent).toContain(`Access ends ${formatEndTime(ends.toISOString())}.`);
+    expect(surface.textContent).toContain('Until then, staff can edit and publish content. An end time does not make the account read-only.');
+
+    fireEvent.click(within(surface).getByRole('button', { name: 'Grant staff access' }));
+    await waitFor(() => {
+      expect(callMock).toHaveBeenCalledWith('setAdminAccess', { email: 'demo@example.org', tier: 'staff', expiresAt: ends.toISOString() });
+    });
+  });
+
+  it('refuses an end time that is not later than now, or more than 90 days away, before asking anything', async () => {
+    await renderPage();
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'demo@example.org' } });
+    const field = screen.getByLabelText('Access ends (optional)');
+    fireEvent.change(field, { target: { value: localValue(new Date(Date.now() - 3_600_000).toISOString()) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    expect(screen.getByText('Pick a time later than now.')).toBeInTheDocument();
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+
+    fireEvent.change(field, { target: { value: localValue(new Date(Date.now() + 91 * 24 * 3_600_000).toISOString()) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    expect(screen.getByText('Pick a time at most 90 days from now.')).toBeInTheDocument();
+    expect(screen.queryByRole('region')).toBeNull();
+    expect(setCalls()).toHaveLength(0);
+  });
+
+  it('a new end time for an account that is already staff is a change, stated as one', async () => {
+    await renderPage({ list: TEMP_LIST });
+    const ends = new Date(Date.now() + 5 * 24 * 3_600_000);
+    ends.setSeconds(0, 0);
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'desk@example.org' } });
+    fireEvent.change(screen.getByLabelText('Access ends (optional)'), { target: { value: localValue(ends.toISOString()) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    const surface = screen.getByRole('region', { name: 'Change when access ends for desk@example.org' });
+    expect(surface.textContent).toContain(`desk@example.org keeps staff access until ${formatEndTime(ends.toISOString())}, then loses it.`);
+  });
+
+  it('staff with no end time, for an account with one, makes the grant permanent, and says so', async () => {
+    await renderPage({ list: TEMP_LIST });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'demo@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    const surface = screen.getByRole('region', { name: 'Change when access ends for demo@example.org' });
+    expect(surface.textContent).toContain('demo@example.org keeps staff access with no end time.');
+    fireEvent.click(within(surface).getByRole('button', { name: 'Remove the end time' }));
+    await waitFor(() => expect(callMock).toHaveBeenCalledWith('setAdminAccess', { email: 'demo@example.org', tier: 'staff' }));
+  });
+
+  it('the same tier and the same end time again is said in place and asks nothing', async () => {
+    await renderPage({ list: TEMP_LIST });
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'demo@example.org' } });
+    fireEvent.change(screen.getByLabelText('Access ends (optional)'), { target: { value: localValue(ENDS) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    expect(screen.getByText(`demo@example.org already has staff access until ${formatEndTime(ENDS)}.`)).toBeInTheDocument();
+    expect(screen.queryByRole('region')).toBeNull();
+  });
+
+  it('making a temporary staff account an operator says the end time goes', async () => {
+    await renderPage({ list: TEMP_LIST });
+    fireEvent.click(rowFor('demo@example.org').querySelector('button'));
+    const surface = screen.getByRole('region', { name: 'Change demo@example.org to operator' });
+    expect(surface.textContent).toContain('Operator access has no end time, so the end time is removed.');
+  });
+
+  it('reports a grant with an end time in the result line', () => {
+    expect(describeResult({ email: 'a@example.org', tier: 'staff', previousTier: null, expiresAt: ENDS }))
+      .toBe(`Staff access granted to a@example.org until ${formatEndTime(ENDS)}.`);
+    expect(describeResult({ email: 'a@example.org', tier: 'staff', previousTier: 'staff', expiresAt: ENDS }))
+      .toBe(`a@example.org keeps staff access until ${formatEndTime(ENDS)}.`);
+    expect(describeResult({ email: 'a@example.org', tier: 'staff', previousTier: 'staff', expiresAt: null }))
+      .toBe('a@example.org keeps staff access with no end time.');
+  });
+
+  it('formats an end time with its time zone, and says so when there is none', () => {
+    expect(formatEndTime(ENDS)).toMatch(/2026/);
+    expect(formatEndTime(ENDS)).toMatch(/[A-Z]{2,}|GMT|UTC/);
+    expect(formatEndTime('not a time')).toBe('an unreadable time');
+  });
+});
+
+describe('an ended grant the sweep removed', () => {
+  it('is simply gone from the table on the next load', async () => {
+    const ended = { email: 'ended@example.org', tier: 'staff', expiresAt: '2026-10-01T12:00:00.000Z', expiryState: 'expired' };
+    await renderPage({
+      lists: [
+        { accounts: [{ email: 'ops@example.org', tier: 'operator' }, ended], callerEmail: 'ops@example.org' },
+        { accounts: [{ email: 'ops@example.org', tier: 'operator' }], callerEmail: 'ops@example.org' },
+      ],
+    });
+    expect(rowFor('ended@example.org').textContent).toContain('Ended');
+    // Any reload (here, after a change to another account) shows the list
+    // the server now holds.
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'new@example.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Grant staff access to new@example.org' })).getByRole('button', { name: 'Grant staff access' }));
+    await waitFor(() => expect(screen.queryByText('ended@example.org')).toBeNull());
+    expect(screen.getByText('1 account, 1 operator')).toBeInTheDocument();
+  });
+});
+
+// Codex review on #541: an open page must show "Ended" when an end time
+// passes, without a manual reload. The page reloads the list from the
+// server just after the nearest active end time.
+describe('an end time passing while the page is open', () => {
+  const MAX_DELAY = 2_147_483_647;
+  const at = (ms) => new Date(ms).toISOString();
+
+  it('reloads the list just after the nearest end time, so the row shows Ended', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const ends = Date.now() + 10 * 60_000;
+      const later = Date.now() + 60 * 60_000;
+      const ops = { email: 'ops@example.org', tier: 'operator' };
+      await renderPage({
+        lists: [
+          { accounts: [ops, { email: 'demo@example.org', tier: 'staff', expiresAt: at(ends), expiryState: 'active' }, { email: 'later@example.org', tier: 'staff', expiresAt: at(later), expiryState: 'active' }], callerEmail: 'ops@example.org' },
+          { accounts: [ops, { email: 'demo@example.org', tier: 'staff', expiresAt: at(ends), expiryState: 'expired' }, { email: 'later@example.org', tier: 'staff', expiresAt: at(later), expiryState: 'active' }], callerEmail: 'ops@example.org' },
+        ],
+      });
+      expect(rowFor('demo@example.org').textContent).not.toContain('Ended');
+      expect(listCalls()).toHaveLength(1);
+      // A second before the end: nothing yet.
+      await act(async () => { vi.advanceTimersByTime(ends - Date.now() - 1000); });
+      expect(listCalls()).toHaveLength(1);
+      await act(async () => { vi.advanceTimersByTime(5000); });
+      await waitFor(() => expect(listCalls()).toHaveLength(2));
+      await waitFor(() => expect(rowFor('demo@example.org').textContent).toContain('Ended'));
+      expect(rowFor('later@example.org').textContent).not.toContain('Ended');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('never asks setTimeout for more than its maximum delay, and stops when the page goes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const spy = vi.spyOn(window, 'setTimeout');
+    try {
+      const far = Date.now() + 60 * 24 * 3_600_000;
+      const { unmount } = await renderPage({
+        list: { accounts: [{ email: 'ops@example.org', tier: 'operator' }, { email: 'demo@example.org', tier: 'staff', expiresAt: at(far), expiryState: 'active' }], callerEmail: 'ops@example.org' },
+      });
+      const delays = spy.mock.calls.map(([, delay]) => delay).filter((delay) => typeof delay === 'number');
+      expect(Math.max(...delays)).toBeLessThanOrEqual(MAX_DELAY);
+      expect(delays).toContain(MAX_DELAY);
+      unmount();
+      const before = listCalls().length;
+      await act(async () => { vi.advanceTimersByTime(MAX_DELAY + 1000); });
+      expect(listCalls()).toHaveLength(before);
+    } finally {
+      spy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('sets no timer when no grant has an active end time', async () => {
+    const spy = vi.spyOn(window, 'setTimeout');
+    try {
+      await renderPage();
+      const long = spy.mock.calls.filter(([, delay]) => typeof delay === 'number' && delay > 60_000);
+      expect(long).toHaveLength(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('nextEndReloadDelay', () => {
+  it('picks the nearest active end time plus a second, caps at the timer maximum, and backs off when the server lags', () => {
+    const now = Date.parse('2026-10-20T12:00:00Z');
+    const row = (offsetMs, expiryState = 'active') => ({ tier: 'staff', expiresAt: new Date(now + offsetMs).toISOString(), expiryState });
+    expect(nextEndReloadDelay(null, now)).toBeNull();
+    expect(nextEndReloadDelay([{ tier: 'operator' }, row(-5000, 'expired'), { tier: 'staff', expiresAt: null, expiryState: 'invalid' }], now)).toBeNull();
+    expect(nextEndReloadDelay([row(60_000), row(5000)], now)).toBe(6000);
+    expect(nextEndReloadDelay([row(80 * 24 * 3_600_000)], now)).toBe(2_147_483_647);
+    expect(nextEndReloadDelay([row(-1000)], now)).toBe(30_000);
   });
 });
