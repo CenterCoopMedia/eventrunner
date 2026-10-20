@@ -774,6 +774,29 @@ describe('paying an invoice by card (issue 519)', () => {
     expect(within(panel).getByText(/An operator reviews it\./)).toBeInTheDocument();
   });
 
+  it('switches to the ended state and offers a new link when the open link runs out, without a reload', async () => {
+    const ending = { ...OPEN, expiresAt: new Date(Date.now() + 1500).toISOString() };
+    answers.get = { invoice: { ...ISSUED, payLinks: [ending] }, canVoid: false, cardPayments: STRIPE };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const card = screen.getByRole('region', { name: 'Pay by card' });
+    expect(within(card).getByRole('link', { name: /Open the card payment link/ })).toBeInTheDocument();
+    expect(await within(card).findByRole('button', { name: 'Make a card payment link' }, { timeout: 4000 })).toBeInTheDocument();
+    expect(within(card).queryByRole('link', { name: /Open the card payment link/ })).toBeNull();
+  });
+
+  it('keeps the amount of a flagged payment in a currency the formatter does not know', async () => {
+    const review = {
+      reviewId: 'rv_0000000000000000000000000002', code: 'currency-mismatch', sessionId: 'cs_test_0002', paymentIntentId: 'pi_test_0002',
+      amount: 450000, currency: 'jpy', at: '2026-10-20T13:00:00.000Z', invoiceStatus: 'issued', resolved: false, resolvedAt: null, note: '',
+    };
+    answers.get = { invoice: { ...ISSUED, payLinks: [], paymentReviews: [review], needsReview: true }, canVoid: false, cardPayments: STRIPE };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const panel = screen.getByRole('region', { name: 'A card payment needs review' });
+    expect(within(panel).getByText(/Stripe took 450000 JPY \(in the currency's smallest unit\) for this invoice in a different currency \(JPY\)\./)).toBeInTheDocument();
+  });
+
   it('marks an invoice that needs review in the list', async () => {
     answers.list = { invoices: [{ ...ISSUED, status: 'void', needsReview: true }], nextCursor: null };
     await renderAt('/admin/invoices');

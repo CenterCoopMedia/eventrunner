@@ -92,8 +92,12 @@ function fakeStripe() {
       return session;
     },
     /** A signed delivery for one event about a session, as Stripe would POST it. */
-    delivery(eventId, type, sessionId, { secret = ENV.TICKETING_WEBHOOK_SECRET, account } = {}) {
-      const event = { id: eventId, object: 'event', type, livemode: false, ...(account ? { account } : {}), data: { object: structuredClone(sessions.get(sessionId)) } };
+    delivery(eventId, type, sessionId, { secret = ENV.TICKETING_WEBHOOK_SECRET, account, created } = {}) {
+      const event = {
+        id: eventId, object: 'event', type, livemode: false, ...(account ? { account } : {}),
+        ...(created ? { created: Math.floor(created.getTime() / 1000) } : {}),
+        data: { object: structuredClone(sessions.get(sessionId)) },
+      };
       events.set(eventId, event);
       const rawBody = Buffer.from(JSON.stringify(event));
       return { method: 'POST', rawBody, body: event, headers: { 'stripe-signature': sdk.webhooks.generateTestHeaderString({ payload: rawBody, secret }) }, query: {} };
@@ -609,4 +613,75 @@ test('a link near its end is replaced and closed at Stripe; a payment through it
   assert.equal(stored.payLinks[1].stripeClosed, true);
   assert.deepEqual(env.fake.calls.expire, [oldSession, newSession]);
   assert.equal(env.alerts().length, 0);
+});
+
+// ------------------------------------------------------------- review round 1 (PR #537)
+
+test('a payment through an unknown session suspends every open link, and no new link is made until it is reviewed', async () => {
+  const env = setup();
+  const made = await env.call({ action: 'createPayLink', invoiceId: ID });
+  const open = made.body.invoice.payLinks[0].sessionId;
+  const params = structuredClone(env.fake.calls.create[0].params);
+  params.metadata.eventRunnerPayLinkId = 'pl_000000000000000000000000';
+  const stray = await env.fake.client.checkout.sessions.create(params, { idempotencyKey: 'outside' });
+  env.fake.pay(stray.id);
+  const res = await env.deliver(env.fake.delivery('evt_stray', 'checkout.session.completed', stray.id));
+  assert.equal(res.body.invoice, 'flagged');
+  const stored = env.stored();
+  assert.equal(stored.payLinks[0].status, 'cancelled');
+  assert.equal(stored.payLinks[0].closedReason, 'suspended');
+  assert.equal(stored.payLinks[0].stripeClosed, true);
+  assert.deepEqual(env.fake.calls.expire, [open]);
+  const refused = await env.call({ action: 'createPayLink', invoiceId: ID });
+  assert.equal(refused.statusCode, 409);
+  assert.equal(refused.body.error.code, 'payment-review-open');
+  assert.equal(env.fake.calls.create.length, 2);
+  const review = env.stored().paymentReviews[0];
+  await env.call({ action: 'resolvePaymentReview', invoiceId: ID, reviewId: review.reviewId, note: 'Refunded in Stripe' }, 'operator');
+  assert.equal((await env.call({ action: 'createPayLink', invoiceId: ID })).statusCode, 200);
+});
+
+test('closing a review resolves its operator alert in the same commit', async () => {
+  const env = setup();
+  const made = await env.call({ action: 'createPayLink', invoiceId: ID });
+  const sessionId = made.body.invoice.payLinks[0].sessionId;
+  env.fake.pay(sessionId, { currency: 'cad' });
+  await env.deliver(env.fake.delivery('evt_cad', 'checkout.session.completed', sessionId));
+  assert.equal(env.alerts()[0].resolved, false);
+  const review = env.stored().paymentReviews[0];
+  const res = await env.call({ action: 'resolvePaymentReview', invoiceId: ID, reviewId: review.reviewId, note: 'Refunded' }, 'operator');
+  assert.equal(res.statusCode, 200);
+  const [alert] = env.alerts();
+  assert.equal(alert.resolved, true);
+  assert.equal(alert.resolvedBy, 'operator@example.org');
+  assert.ok(alert.resolvedAt instanceof Date);
+});
+
+test('the paid date is the day Stripe recorded the payment, on the event clock', async () => {
+  const env = setup();
+  const made = await env.call({ action: 'createPayLink', invoiceId: ID });
+  const sessionId = made.body.invoice.payLinks[0].sessionId;
+  env.fake.pay(sessionId);
+  // 23:30 on October 18 in New York; the webhook is processed on October 20.
+  const created = new Date('2026-10-19T03:30:00Z');
+  await env.deliver(env.fake.delivery('evt_late_delivery', 'checkout.session.completed', sessionId, { created }));
+  const stored = env.stored();
+  assert.equal(stored.payment.paidOn, '2026-10-18');
+  assert.ok(stored.payment.recordedAt.getTime() > NOW.getTime());
+});
+
+test('a link is not replaced while the invoice is being emailed', async () => {
+  const env = setup();
+  const made = await env.call({ action: 'createPayLink', invoiceId: ID });
+  env.advance(LINK_LIFETIME_MS - 10 * 60 * 1000);
+  const at = new Date(NOW.getTime() + LINK_LIFETIME_MS - 9 * 60 * 1000);
+  await env.db.collection('invoices').doc(ID).update({ sends: [{ sendId: 'send-0001', status: 'sending', to: 'billing@example.org', at }] });
+  const refused = await env.call({ action: 'createPayLink', invoiceId: ID });
+  assert.equal(refused.statusCode, 409);
+  assert.match(refused.body.error.message, /being emailed/);
+  assert.equal(env.stored().payLinks[0].status, 'open');
+  assert.equal(env.stored().payLinks.length, 1);
+  assert.deepEqual(env.fake.calls.expire, []);
+  assert.equal(env.fake.calls.create.length, 1);
+  assert.equal(made.statusCode, 200);
 });
