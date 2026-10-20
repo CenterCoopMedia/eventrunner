@@ -222,3 +222,81 @@
   .admin-settings-grid > .admin-panel:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .admin-settings-row-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); }
 }
+
+/* Issue #477: the rail folds and hides, and the Branding panes resize.
+   Nothing here animates: a state change in the room is instant, so a
+   reader who asks for reduced motion meets the same static change. */
+.admin-mobile-docket__content[hidden], .admin-docket-group[hidden] { display: none; }
+.admin-docket-group-toggle {
+  display: flex; align-items: center; gap: var(--space-xs); width: 100%;
+  min-height: var(--admin-control-height); padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--admin-radius); text-align: start;
+}
+.admin-docket-group-toggle__current {
+  display: block; margin-top: var(--space-3xs); overflow-wrap: anywhere;
+  font-weight: 400; letter-spacing: normal; text-transform: none;
+  color: rgb(var(--admin-rail-ink-muted-rgb));
+}
+.admin-docket-group-toggle + .admin-docket-group { margin-top: var(--space-3xs); }
+/* A chevron drawn from two borders in the text's own colour, so it follows
+   the ink of whatever it sits in. It points where the control will move. */
+.admin-chevron {
+  display: inline-block; flex-shrink: 0; width: 0.5rem; height: 0.5rem;
+  border-inline-end: 2px solid currentColor; border-block-end: 2px solid currentColor;
+}
+.admin-chevron[data-direction='down'] { transform: translateY(-25%) rotate(45deg); }
+.admin-chevron[data-direction='up'] { transform: translateY(25%) rotate(-135deg); }
+.admin-chevron[data-direction='start'] { transform: rotate(135deg); }
+.admin-chevron[data-direction='end'] { transform: rotate(-45deg); }
+[dir='rtl'] .admin-chevron[data-direction='start'] { transform: rotate(-45deg); }
+[dir='rtl'] .admin-chevron[data-direction='end'] { transform: rotate(135deg); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-docket-group-toggle:hover { background: rgb(var(--admin-rail-ground-hover-rgb)); }
+}
+@media (min-width: 1024px) {
+  .admin-rail[data-collapsed='true'] { width: 6rem; }
+  .admin-rail[data-collapsed='true'] .admin-rail__job { justify-content: center; padding-inline: var(--space-xs); }
+  .admin-rail[data-collapsed='true'] .admin-rail-toggle { flex-direction: column; padding-inline: var(--space-2xs); text-align: center; }
+}
+
+/* The bar between two panes (components/PaneSplitter.jsx). The whole bar
+   is the 24px target; the grip in its middle is what a reader sees. */
+.admin-splitter {
+  position: relative; display: flex; align-items: center; justify-content: center; align-self: stretch;
+  width: 24px; min-height: var(--admin-control-height); cursor: col-resize; touch-action: none;
+  border-radius: var(--admin-radius-small, var(--admin-radius));
+}
+.admin-splitter::before {
+  content: ''; position: absolute; inset-block: 0; inset-inline-start: calc(50% - 0.5px);
+  border-inline-start: 1px solid rgb(var(--admin-rule-hairline-rgb));
+}
+.admin-splitter__grip {
+  position: relative; width: 6px; height: 2.5rem;
+  border: 1px solid rgb(var(--admin-rule-control-rgb)); border-radius: var(--admin-radius-small, var(--admin-radius));
+  background: rgb(var(--admin-ground-raised-rgb));
+}
+.admin-splitter:focus-visible .admin-splitter__grip, .admin-splitter:active .admin-splitter__grip {
+  width: 10px; border-color: rgb(var(--admin-action-rgb)); background: rgb(var(--admin-action-rgb));
+}
+/* Beside a long form the grip rides at the middle of the screen. */
+.admin-splitter--tall { align-items: flex-start; }
+.admin-splitter--tall .admin-splitter__grip { position: sticky; top: calc(50vh - 1.25rem); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-splitter:hover .admin-splitter__grip { width: 10px; border-color: rgb(var(--admin-action-rgb)); }
+}
+@media (forced-colors: active) {
+  .admin-splitter__grip { border-color: CanvasText; background: Canvas; }
+  .admin-splitter:focus-visible .admin-splitter__grip { background: Highlight; }
+}
+/* At 1280px and up the editor and the preview sit side by side, and the bar
+   between them sets the share (AdminBranding.jsx). Below that they stack. */
+@media (min-width: 1280px) {
+  .admin-branding-workspace[data-split] {
+    grid-template-columns:
+      minmax(min(100%, 20rem), var(--admin-branding-editor-share))
+      24px
+      minmax(min(100%, 20rem), var(--admin-branding-preview-share));
+    column-gap: var(--space-2xs);
+  }
+}
+.admin-branding-layout-actions { display: flex; justify-content: flex-end; margin-bottom: var(--space-2xs); }

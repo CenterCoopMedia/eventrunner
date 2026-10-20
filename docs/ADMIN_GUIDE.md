@@ -8,7 +8,11 @@ Open **Session pitches** to review private proposals. Share `/pitch` for public 
 
 **The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.
 
-**On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
+**The rail groups the sections by the work.** Under **Overview** are six groups: **Content** (what the site says and shows), **Program** (sessions, pitches, speakers and organizations), **Registration and tickets**, **Communications** (announcements, live updates and the email log), **Operations** (import, feedback, change requests and data export) and **Settings** (the event, features, branding, access and system errors). Select a group's name to open or close it. The group that holds the page you are on opens by itself. If you close it, its name still shows the current page under it. The browser remembers which groups you opened or closed. Your tier decides which sections a group shows.
+
+**Hide the rail for more room.** On a wide screen, select **Hide menu** at the top of the rail. The rail narrows to the event mark and a **Show menu** button. Select **Show menu** to bring the sections back. The page you are on, and any draft on it, do not change. The browser remembers your choice. **Hide menu** is the first control after the skip link, so Tab reaches it at once.
+
+**On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. The groups open and close there too. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
 
 ## Find your way: The tour
 
@@ -58,6 +62,8 @@ Switch the features on again, and publish the pages, when the program is ready. 
 One tab decides how the whole public site looks. Controls on one side, the **Page preview** on the other rendering your own pages with the draft applied — the client's real pages, not swatches.
 
 **What the preview can show you.** Pick the page — Home, Schedule, Session, Speakers, or Updates. Switch between **Desktop** and **Phone**, which render at real widths so the page's own breakpoints fire inside the frame. **Fit** the frame or see it at **Actual size**. Show it **Light**, **Dark**, or **Compare light and dark** side by side. And turn on the **stress test**: A made-up event name that wraps three times and a day packed with 28 sessions, so you meet a hard page here rather than after a client sends one. Nothing in the stress test is saved. If a colour or a font will not render as you asked, the preview says so.
+
+**Make room for the preview.** On a screen 1280 pixels wide or more, the controls and the preview sit side by side with a bar between them. Drag the bar, or select it with Tab and use the Left and Right arrow keys, to give one side more room. Shift with an arrow key moves it further. Home and End go to the limits: Each side keeps at least 30 percent of the row. Enter, a double-click, or **Reset widths** puts it back in the middle. In **Compare light and dark**, a second bar between the two frames works the same way, and **Reset frame widths** puts it back. The bars change only how much room each side has. The frame still renders the page at the width you picked, and **Fit** scales it to its side. Your draft does not change, and nothing is published. The browser remembers both widths. On a narrower screen the preview sits under the controls, and there is no bar. **Hide menu** on the rail also gives the preview more room.
 
 Work down the controls in this order.
 
@@ -565,7 +571,7 @@ Unresolved system-error rows — the operational surface for things like an inva
 
 ## Data export
 
-The event's records as spreadsheets, and the event data package for the handoff after an event. Open it from the System group on the rail. Every export writes an admin log entry before the file is sent; if the entry cannot be written, no file is made. The server keeps no copy of any file.
+The event's records as spreadsheets, and the event data package for the handoff after an event. Open it from the Operations group on the rail. Every export writes an admin log entry before the file is sent; if the entry cannot be written, no file is made. The server keeps no copy of any file.
 
 **Spreadsheets.** Each row saves one CSV file named for its list and the date, such as `sessions-2026-10-01.csv`. The file shows the current version of every record and its state (Draft, Live, or Live with unpublished changes), so a draft is in the file too. The sessions and organizations files also have a **Hidden** column: `yes` for a record the site does not show. A cell that starts with `=`, `+`, `-`, or `@` gains a leading apostrophe, as in the attendee export, so a spreadsheet shows it as text.
 
