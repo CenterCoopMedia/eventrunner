@@ -24,8 +24,10 @@
  *   times    24-hour "09:30" or 12-hour "9:30 AM", stored as "09:30"
  *   speakers speaker external IDs (from a speaker import) or speaker slugs,
  *            separated by ";" or "|"
- *   materialsNotNeeded  "yes" or "no" (also y/n, true/false, 1/0); a blank
- *            cell leaves the session without the mark
+ *   materialsNotNeeded  "yes" sets the mark; "no" or a blank cell clears
+ *            it. y/n, true/false and 1/0 work too. The mark is stored as
+ *            true or null, as the editor stores it, so a cleared mark and
+ *            one never set compare equal on a re-import
  *
  * A value that resolves to nothing is a row error that names it. The parent
  * session is not importable: a parent must be a published top-level
@@ -153,17 +155,17 @@ const YES_WORDS = new Set(['yes', 'y', 'true', '1']);
 const NO_WORDS = new Set(['no', 'n', 'false', '0']);
 
 /**
- * A yes-or-no cell as the stored mark: true, false, or null for a blank
- * cell. Anything else is a row error.
+ * A yes-or-no cell as the stored mark: true for yes, null for no or a
+ * blank cell. Anything else is a row error.
  *
  * @param {string|null} raw
- * @returns {{ ok: true, value: boolean|null } | { ok: false, reason: string }}
+ * @returns {{ ok: true, value: true|null } | { ok: false, reason: string }}
  */
 function resolveYesNo(field, raw) {
   if (raw === null) return { ok: true, value: null };
   const wanted = lower(raw);
   if (YES_WORDS.has(wanted)) return { ok: true, value: true };
-  if (NO_WORDS.has(wanted)) return { ok: true, value: false };
+  if (NO_WORDS.has(wanted)) return { ok: true, value: null };
   return { ok: false, reason: `${field}: "${raw}" is not yes or no. Write yes, no, or leave the cell empty.` };
 }
 

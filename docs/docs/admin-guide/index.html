@@ -618,7 +618,7 @@
           <li><code>start_time</code>, <code>end_time</code>: 24-hour (<code>13:30</code>) or 12-hour (<code>1:30 PM</code>).</li>
           <li><code>track</code>: the track letter or the track name.</li>
           <li><code>place</code>: the place ID or the place name.</li>
-          <li><code>materials_not_needed</code>: <code>yes</code> when the session needs no slides or other materials, <code>no</code> when it does. <code>y</code>, <code>n</code>, <code>true</code>, <code>false</code>, <code>1</code> and <code>0</code> also work. An empty cell does not set the mark. Any other value is an error.</li>
+          <li><code>materials_not_needed</code>: <code>yes</code> when the session needs no slides or other materials. <code>no</code> or an empty cell means the session needs them. <code>y</code>, <code>n</code>, <code>true</code>, <code>false</code>, <code>1</code> and <code>0</code> also work. Any other value is an error.</li>
           <li><code>speakers</code>: speaker external IDs from a speaker import, or speaker slugs, separated by <code>;</code>. A speaker that does not exist, or that was removed, is an error.</li>
           <li><code>session_id</code>: the session&#39;s address on the site, for new sessions only. Leave it empty and the import makes it from the title. A <code>session_id</code> that an existing session uses matches that session.</li>
           </ul>

@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   marked session are not asked for materials. The speaker's **Your next steps** list, the
   staff and scheduled speaker reminders, the **Materials missing** group and its CSV export,
   and the Materials **Coverage** panel all leave the session out. A speaker whose sessions all
-  carry the mark owes no materials. The server accepts only true or false for the mark. The
+  carry the mark owes no materials. The server refuses any value for the mark but true or false. The
   session import reads it from a `materials_not_needed` column (yes or no), and the sessions
   spreadsheet and the event package carry it.
 - Materials waiting for review (#332). The Speaker reminders page lists a session with a

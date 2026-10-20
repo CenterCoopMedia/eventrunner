@@ -642,7 +642,7 @@ If the file or the mapping changes after the preview, the import is refused. Pre
 - `start_time`, `end_time`: 24-hour (`13:30`) or 12-hour (`1:30 PM`).
 - `track`: the track letter or the track name.
 - `place`: the place ID or the place name.
-- `materials_not_needed`: `yes` when the session needs no slides or other materials, `no` when it does. `y`, `n`, `true`, `false`, `1` and `0` also work. An empty cell does not set the mark. Any other value is an error.
+- `materials_not_needed`: `yes` when the session needs no slides or other materials. `no` or an empty cell means the session needs them. `y`, `n`, `true`, `false`, `1` and `0` also work. Any other value is an error.
 - `speakers`: speaker external IDs from a speaker import, or speaker slugs, separated by `;`. A speaker that does not exist, or that was removed, is an error.
 - `session_id`: the session's address on the site, for new sessions only. Leave it empty and the import makes it from the title. A `session_id` that an existing session uses matches that session.
 
