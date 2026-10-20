@@ -17,6 +17,12 @@ import EmptyState from '../components/EmptyState.jsx';
 import SystemPage from '../components/SystemPage.jsx';
 import SpecimenLabel from '../components/editorial/SpecimenLabel.jsx';
 import AssetImage from '../components/media/AssetImage.jsx';
+
+// The portrait's slot width, for the display sizes (issue #333). The shelf
+// runs one, two, three and four across at its breakpoints; the reading list
+// sets the portrait in a 14rem column from `sm` and full width below it.
+const SHELF_PORTRAIT_SIZES = '(min-width: 80rem) 25vw, (min-width: 64rem) 33vw, (min-width: 40rem) 50vw, 100vw';
+const LIST_PORTRAIT_SIZES = '(min-width: 40rem) 14rem, 100vw';
 import { primaryActionClass } from '../components/controlClasses.js';
 
 export default function Speakers() {
@@ -109,7 +115,12 @@ export default function Speakers() {
                         would be the name said twice to a screen reader. */}
                     {hasHeadshot ? (
                       <div className="portrait-shelf__frame">
-                        <AssetImage path={speaker.headshotPath} alt="" className="" />
+                        <AssetImage
+                          path={speaker.headshotPath}
+                          alt=""
+                          className=""
+                          sizes={arrangement === 'grid' ? SHELF_PORTRAIT_SIZES : LIST_PORTRAIT_SIZES}
+                        />
                       </div>
                     ) : null}
                     <div className={besidePortrait ? 'mt-xs sm:mt-0' : 'mt-xs'}>
