@@ -270,3 +270,21 @@ test('an invoice send refuses a bad copy address, a copy to the billing email, a
   assert.deepEqual(long.issues, [{ path: 'note', message: `Use ${INVOICE_LIMITS.sendNote} characters or fewer for the note.` }]);
   assert.equal(validateInvoiceSend('nope', { to: 'billing@example.org' }).ok, false);
 });
+
+test('a Stripe card payment reads "Card (Stripe)"; a hand-recorded one keeps its method words (#519)', () => {
+  const { paymentMethodText } = require('./invoice.cjs');
+  assert.equal(paymentMethodText({ method: 'card', via: 'stripe' }), 'Card (Stripe)');
+  assert.equal(paymentMethodText({ method: 'card' }), 'Card');
+  assert.equal(paymentMethodText({ method: 'check', via: null }), 'Check');
+  assert.equal(paymentMethodText({ method: 'barter' }), 'Other');
+  assert.equal(paymentMethodText(null), '');
+});
+
+test('each pay link status has words, and a review note is required, one line and cleaned (#519)', () => {
+  const { PAY_LINK_STATUSES, PAY_LINK_STATUS_WORDS, validateReviewNote } = require('./invoice.cjs');
+  assert.deepEqual(PAY_LINK_STATUSES, ['creating', 'open', 'paid', 'expired', 'cancelled', 'failed']);
+  for (const status of PAY_LINK_STATUSES) assert.equal(typeof PAY_LINK_STATUS_WORDS[status], 'string');
+  assert.deepEqual(validateReviewNote(' Refunded in Stripe‮ '), { ok: true, issues: [], value: 'Refunded in Stripe' });
+  assert.equal(validateReviewNote('').ok, false);
+  assert.equal(validateReviewNote('x'.repeat(INVOICE_LIMITS.reviewNote + 1)).ok, false);
+});

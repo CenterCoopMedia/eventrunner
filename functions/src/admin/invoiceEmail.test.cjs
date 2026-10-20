@@ -547,3 +547,46 @@ test('a send whose record cannot be written still answers what the provider did'
   // The reservation stays at "sending", so no other send starts until it is settled.
   assert.equal(db.read('invoices', ID).sends[0].status, 'sending');
 });
+
+// ------------------------------------------------------------- pay link (#519)
+
+const PAY_URL = 'https://checkout.stripe.com/c/pay/cs_test_a1b2c3?x=1&y=2#fid';
+function withOpenLink(expiresAt) {
+  return issued({
+    payLinks: [{
+      linkId: 'pl_000000000000000000000001', status: 'open', sessionId: 'cs_test_a1b2c3', url: PAY_URL,
+      amount: 481500, currency: 'usd', livemode: false, createdAt: NOW, createdBy: 'staff', expiresAt,
+    }],
+  });
+}
+/** Every href in an html body, decoded, compared exactly by the caller. */
+function hrefsIn(html) {
+  return [...html.matchAll(/href="([^"]*)"/g)].map(([, value]) => value.replace(/&amp;/g, '&'));
+}
+
+test('the email carries the open pay link and when it ends, in both bodies and in the attached PDF', async () => {
+  fixedNow = NOW;
+  const db = dbFor(withOpenLink(new Date('2026-10-21T15:30:00Z')));
+  const mailer = mailerFor(db);
+  const { preview, sent } = await previewAndSend(db, mailer);
+  assert.equal(sent.statusCode, 200, JSON.stringify(sent.body));
+  const shown = preview.body.preview;
+  assert.ok(hrefsIn(shown.html).some((href) => href === PAY_URL), shown.html);
+  assert.ok(shown.text.split('\n').some((line) => line === `Pay by card: ${PAY_URL}`), shown.text);
+  for (const body of [shown.html, shown.text]) {
+    assert.ok(body.includes('The card payment link works until October 21, 2026, 11:30 AM EDT.'), body);
+  }
+  const [mail] = mailer.mail;
+  assert.ok(hrefsIn(mail.html).some((href) => href === PAY_URL));
+});
+
+test('an expired link, or none, leaves the email without one', async () => {
+  fixedNow = NOW;
+  for (const invoice of [withOpenLink(new Date('2026-10-20T11:00:00Z')), issued()]) {
+    const db = dbFor(invoice);
+    const preview = await call(db, { action: 'previewSend', invoiceId: ID });
+    assert.equal(preview.statusCode, 200);
+    assert.equal(hrefsIn(preview.body.preview.html).some((href) => href === PAY_URL), false);
+    assert.equal(preview.body.preview.text.includes('Pay by card'), false);
+  }
+});

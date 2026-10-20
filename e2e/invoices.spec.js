@@ -23,6 +23,15 @@
 // and the test reads it there with its PDF attachment, then finds the send on
 // the invoice and in admin_logs. A second send to the same address minutes
 // later needs a confirmation, and a void invoice or a draft is refused.
+//
+// Card payment links (part 5, #519): this suite runs the manual ticketing
+// provider, so there is no Stripe. The record says card links need Stripe and
+// the server refuses to make one. A link written the way the server writes
+// it then shows on the record, prints on the PDF and goes in the email; a
+// void closes it, and says Stripe was not told. A card payment flagged for
+// review shows in the list and on the record, and an operator closes it with
+// a note. Stripe itself is never called: its own flow is covered by
+// functions/src/admin/invoicePayLink.test.cjs with signed fixture events.
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { test, expect } from '@playwright/test';
@@ -393,5 +402,98 @@ test.describe.serial('issued invoices', () => {
     expect((await callFunction('invoiceAdmin', { action: 'saveDraft', invoiceId: draftId, expectedRevision: 0, invoice: DRAFT }, staffToken)).status).toBe(200);
     const draftSend = await callFunction('invoiceAdmin', { action: 'send', invoiceId: draftId, sendId: 'e2e-draft-0001', receipt: 'a'.repeat(64) }, staffToken);
     expect(draftSend.status).toBe(409);
+  });
+
+  test('without Stripe no card link is made; a stored link shows, prints, mails and closes on void (#519)', async () => {
+    const id = 'inv_e2eissue00000000000004';
+    const db = adminDb();
+    const stored = (await db.collection('invoices').doc(id).get()).data();
+    expect(stored.status).toBe('issued');
+    const { number } = stored;
+    await page.goto(`/admin/invoices/${id}`);
+    await expect(page.getByRole('heading', { level: 1, name: number })).toBeVisible();
+    const card = page.getByRole('region', { name: 'Pay by card' });
+    await expect(card).toContainText('Card payment links need Stripe.');
+    await expect(card.getByRole('button', { name: 'Make a card payment link' })).toHaveCount(0);
+    const refused = await callFunction('invoiceAdmin', { action: 'createPayLink', invoiceId: id }, staffToken);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('pay-links-unavailable');
+    expect((await db.collection('invoices').doc(id).get()).data().payLinks).toBeUndefined();
+
+    // A link Stripe made while this site used Stripe, as the server stores it.
+    const payUrl = 'https://checkout.stripe.com/c/pay/cs_test_e2e0001';
+    await db.collection('invoices').doc(id).update({
+      payLinks: [{
+        linkId: 'pl_e2e000000000000000000001', status: 'open', sessionId: 'cs_test_e2e0001', url: payUrl,
+        amount: stored.totals.total, currency: stored.currency, livemode: false,
+        createdAt: new Date(), createdBy: 'e2e', expiresAt: new Date(Date.now() + 6 * 60 * 60 * 1000),
+      }],
+    });
+    await page.reload();
+    const link = card.getByRole('link', { name: /Open the card payment link/ });
+    await expect(link).toBeVisible();
+    expect(await link.getAttribute('href')).toBe(payUrl);
+    await expect(card).toContainText('Works until');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Download PDF' }).click(),
+    ]);
+    const lines = pdfText(readFileSync(await download.path())).split('\n');
+    expect(lines).toContain('Pay by card');
+    expect(lines).toContain(payUrl);
+
+    const since = mailFileSize();
+    await page.getByRole('button', { name: 'Email invoice' }).click();
+    const form = page.getByRole('region', { name: `Email ${number}` });
+    await form.getByRole('button', { name: 'Preview email' }).click();
+    await expect(form.getByRole('region', { name: 'Email preview' })).toContainText('Pay by card');
+    await form.getByRole('button', { name: 'Send to sponsor@example.test' }).click();
+    await expect(page.getByRole('status').filter({ hasText: `Emailed ${number} to sponsor@example.test` })).toBeVisible();
+    const mail = await waitForTaggedMail(since, 'sponsor@example.test', 'invoice.send');
+    const hrefs = [...mail.html.matchAll(/href="([^"]*)"/g)].map(([, value]) => value.replace(/&amp;/g, '&'));
+    expect(hrefs).toContain(payUrl);
+    expect(mail.text.split('\n')).toContain(`Pay by card: ${payUrl}`);
+
+    // A void closes the link. Stripe is not set up here, so the record says Stripe was not told.
+    await page.getByRole('button', { name: 'Void this invoice' }).click();
+    await page.getByLabel('Reason').fill('Billed twice');
+    await page.getByRole('button', { name: `Void ${number}` }).click();
+    await expect(page.locator('[data-invoice-status="void"]')).toBeVisible();
+    await expect(card).toContainText('Cancelled');
+    await expect(card).toContainText('Stripe was not told');
+    await expect(card.getByRole('link', { name: /Open the card payment link/ })).toHaveCount(0);
+    const voided = (await db.collection('invoices').doc(id).get()).data();
+    expect(voided.payLinks[0]).toMatchObject({ status: 'cancelled', closedReason: 'void', stripeClosed: false });
+  });
+
+  test('a flagged card payment shows in the list and on the record, and an operator closes it (#519)', async () => {
+    const db = adminDb();
+    const reviewId = 'rv_e2e000000000000000000001';
+    await db.collection('invoices').doc(FIRST).update({
+      paymentReviews: [{
+        reviewId, code: 'invoice-void', sessionId: 'cs_test_e2e0002', paymentIntentId: 'pi_test_e2e0002',
+        amount: 450000, currency: 'usd', at: new Date(), invoiceStatus: 'void', resolved: false,
+      }],
+    });
+    await page.goto('/admin/invoices');
+    const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: 'INV-0001' }) });
+    await expect(row).toContainText('Needs review');
+
+    await page.goto(`/admin/invoices/${FIRST}`);
+    const panel = page.getByRole('region', { name: 'A card payment needs review' });
+    await expect(panel).toContainText('after it was voided');
+    await expect(panel).toContainText('pi_test_e2e0002');
+    const staffResolve = await callFunction('invoiceAdmin', { action: 'resolvePaymentReview', invoiceId: FIRST, reviewId, note: 'x' }, staffToken);
+    expect(staffResolve.status).toBe(403);
+    await panel.getByRole('button', { name: 'Mark reviewed' }).click();
+    await panel.getByLabel('Review note').fill('Refunded in the Stripe Dashboard');
+    await panel.getByRole('button', { name: 'Save review' }).click();
+    await expect(page.getByRole('region', { name: 'A card payment needs review' })).toHaveCount(0);
+    await expect(page.getByText('Reviewed: Refunded in the Stripe Dashboard')).toBeVisible();
+    const after = (await db.collection('invoices').doc(FIRST).get()).data();
+    expect(after.paymentReviews[0]).toMatchObject({ resolved: true, note: 'Refunded in the Stripe Dashboard' });
+    const logs = await db.collection('admin_logs').where('invoiceId', '==', FIRST).get();
+    expect(logs.docs.map((doc) => doc.data().action)).toContain('invoices.payment-review-resolved');
   });
 });
