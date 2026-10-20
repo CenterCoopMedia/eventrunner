@@ -44,8 +44,8 @@ if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
 | Tier | Endpoints |
 |---|---|
-| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, `exportEventData` for `orders` and `admissions`, and `invoiceAdmin` for `saveSettings` and `void` |
-| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `speakerMailTemplates`, `reminderSchedules`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers`, `organizations` and `invoices`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, `invoiceAdmin` (every action but `saveSettings` and `void`), `invoicePdf`, and the other five `webMcp*` diagnostics |
+| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, `exportEventData` for `orders` and `admissions`, and `invoiceAdmin` for `saveSettings`, `void` and `reopen` |
+| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `speakerMailTemplates`, `reminderSchedules`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers`, `organizations` and `invoices`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, `invoiceAdmin` (every action but `saveSettings`, `void` and `reopen`), `invoicePdf`, and the other five `webMcp*` diagnostics |
 
 Announcement email admits staff because staff run attendee communication day to day, the same tier as the site banner on that page. The safety is in the flow, not the tier: the server picks the audience, the send must match the preview's receipt, the page confirms the count, every recipient has a send-once key, every address can unsubscribe, and every send writes `admin_logs`.
 
@@ -206,11 +206,12 @@ the native attendee read/checkout handlers do not need them.
 
 `invoiceAdmin` (`src/admin/invoices.cjs`, issues #208 and #209) is a POST action API
 in the shape of `ticketingCommerceAdmin`: `list`, `get`, `settings`, `saveDraft`,
-`deleteDraft`, `saveSettings`, `issue`, `markPaid`, `void` and `duplicate`. Staff run
-every action but `saveSettings` and `void`, which need an operator:
-`invoice_settings/current` holds the issuer's tax ID and bank details, and a void is
-final. Every answer that carries an invoice also carries `canVoid`, so the page offers
-Void only to an operator. Send (email) and the Stripe pay link come in later parts.
+`deleteDraft`, `saveSettings`, `issue`, `markPaid`, `void`, `reopen` and `duplicate`.
+Staff run every action but `saveSettings`, `void` and `reopen`, which need an
+operator: `invoice_settings/current` holds the issuer's tax ID and bank details, a
+void is final, and a reopen undoes a recorded payment. Every answer that carries an
+invoice also carries `canVoid` and `canReopen`, so the page offers those controls only
+to an operator. Send (email) and the Stripe pay link come in later parts.
 
 The three collections (`invoices`, `invoice_counters`, `invoice_settings`) deny every
 client read and write. `saveDraft` takes the client-minted `invoiceId` and the
@@ -244,7 +245,10 @@ the issuer block; only a draft saves or deletes.
 `markPaid` takes `{ invoiceId, expectedRevision, payment: { paidOn, method, note } }`
 on an issued invoice; `validatePayment` refuses a date after today on the event clock.
 `void` takes `{ invoiceId, expectedRevision, reason }` on an issued or paid invoice and
-keeps the number and any payment. `duplicate` takes `{ invoiceId, newInvoiceId }`: the
+keeps the number and any payment. `reopen` takes `{ invoiceId, expectedRevision,
+reason }` on a paid invoice (a void one is refused), sets it back to issued, and moves
+the payment to `paymentHistory` with the reason, the time and the operator; nothing is
+deleted. `duplicate` takes `{ invoiceId, newInvoiceId }`: the
 client mints the new id once, and a retry with the same pair answers the same draft.
 The copy has the source's bill-to, lines, adjustments, reference, notes and currency,
 no number, no issuer and no due date, and `duplicatedFrom`.

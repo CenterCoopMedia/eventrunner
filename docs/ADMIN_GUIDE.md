@@ -26,7 +26,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 
 | Tier | Sections | For |
 |---|---|---|
-| Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
+| Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
 | Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
@@ -508,6 +508,16 @@ The PDF uses a standard font. A character it cannot draw, such as a letter in a 
 
 The status becomes **Paid**, and the record shows the payment.
 
+### Reopen a paid invoice
+
+Operators only. Reopen a paid invoice when the payment did not hold, for example a check that bounced, or when it was marked paid by mistake.
+
+1. Open the paid invoice and select **Reopen this invoice**.
+2. Enter the **Reason for reopening**. It is required.
+3. Select **Reopen** and the number, such as **Reopen INV-0004**.
+
+The status goes back to **Issued**, with the same number, so the invoice can be paid again. The payment is not deleted: it moves to **Earlier payments** on the record, with your reason. A void invoice cannot be reopened.
+
 ### Void an invoice
 
 Operators only. Void an issued or paid invoice when it is wrong or no longer due.
@@ -516,7 +526,7 @@ Operators only. Void an issued or paid invoice when it is wrong or no longer due
 2. Enter the **Reason**. It is required.
 3. Select **Void** and the number, such as **Void INV-0004**.
 
-The status becomes **Void**. The invoice stays in the list, and its number stays used: it is never given to another invoice. A paid invoice keeps its payment record. A void cannot be undone. Staff see who can void instead of the control.
+The status becomes **Void**. The invoice stays in the list, and its number stays used: it is never given to another invoice. A paid invoice keeps its payment record. A void cannot be undone. Staff see who can void and reopen instead of the controls.
 
 ### Correct an issued invoice
 
@@ -727,7 +737,7 @@ The event's records as spreadsheets, and the event data package for the handoff 
 | Organizations and sponsors | Staff | Organization ID, name, state, hidden, tier, website, description, support description, logo path, order |
 | Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |
 | Admissions | Operator | Ticket ID, order ID, provider, ticket type, holder's first and last name, email, status, whether an account claimed it, checked in, purchased |
-| Invoices | Staff | Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created |
+| Invoices | Staff | Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created. A reopened invoice's earlier payments are in the event data package. |
 
 No spreadsheet holds an account id, an invite token, staged speaker edits, a private note, a checkout link, bank details, or a raw payment provider record. Amounts are in the currency's major unit (`25.00`). Staff do not see the two operator rows; the page says who exports them. Attendees and session pitches export from their own pages, because those exports follow the page's filter.
 

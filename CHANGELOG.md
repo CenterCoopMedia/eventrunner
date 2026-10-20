@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the invoice as `<number>.pdf` from the new `invoicePdf` endpoint, built with the shared PDF
   kit; a paid invoice says when and how, and a void one says VOID and why. Staff mark an
   issued invoice paid with a date, a method and a note. Only an operator voids, with a reason;
-  the number stays used. **Duplicate as a new draft** copies any invoice into a new draft
+  the number stays used. Only an operator reopens a paid invoice, with a reason, after a
+  payment that did not hold; the payment is kept in the invoice's payment history. **Duplicate as a new draft** copies any invoice into a new draft
   with no number. Data export gains an invoices spreadsheet for staff, the event data package
   a `billing/` part, and the repeat-event template leaves invoices behind so a new event
   starts at `0001`. Every write refuses on a read-only demo and records an audit row in the

@@ -1080,7 +1080,8 @@ design-config store:
 
 The rules deny every client read and write on all three, for both admin tiers. Staff create,
 edit, issue, send and mark paid through the `invoiceAdmin` endpoint; only an operator voids,
-reopens a paid invoice, or changes the settings. Each write refuses on a read-only demo and writes
+reopens a paid invoice, or changes the settings. A reopen takes a paid invoice back to issued and
+keeps its payment, with the reason, in a history list on the invoice. Each write refuses on a read-only demo and writes
 its `admin_logs` row in the same transaction. `invoiceDesignConfigs` and `sponsorPackages` stay
 cut: the sponsor package block and `cmsOrganizations` supply what an invoice starts from. A Stripe
 pay link for an issued invoice needs its own amendment to ADR 0004
