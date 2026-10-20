@@ -65,6 +65,8 @@ const ADMIN_READABLE = [
   // Airtable pitch intake: the operator chooses the source; staff see runs.
   { path: "session_pitch_sources/airtable", tier: "operator" },
   { path: "session_pitch_sync/airtable", tier: "admin" },
+  // A speaker-only live update (issue #200): both tiers read every audience.
+  { path: "live_updates/lu-tier", tier: "admin" },
 ];
 
 /**
@@ -212,6 +214,13 @@ beforeAll(async () => {
       createdAt: new Date(),
       reviewedAt: null,
       reviewedBy: null,
+    });
+    await setDoc(doc(db, "live_updates/lu-tier"), {
+      message: "Tier fixture.",
+      audience: "speakers",
+      category: null,
+      pinned: false,
+      postedAt: new Date(),
     });
     await setDoc(doc(db, "session_pitch_settings/notices"), {
       receiptMode: "automatic",
@@ -1506,27 +1515,120 @@ describe("sessionBookmarks aggregate", () => {
   });
 });
 
-// Issue #28: live-updates admin form + feedback inbox.
+// Issue #28: live-updates admin form + feedback inbox. Issue #200: each row
+// names its audience, and the rules, not the card, decide who reads it.
 describe("live_updates dashboard feed", () => {
+  // One row per audience, plus a row written before the audience field
+  // existed. The pinned speaker row is what the card's pinned query would
+  // reach first, so it is the row a leak would show.
+  const ROWS = {
+    "lu-everyone": { audience: "everyone", pinned: false },
+    "lu-attendees": { audience: "attendees", pinned: false },
+    "lu-speakers": { audience: "speakers", pinned: true },
+    "lu-legacy": { pinned: false },
+    "lu-unknown": { audience: "staff", pinned: false },
+  };
+
   beforeAll(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), "live_updates/u1"), {
-        message: "Doors open at 9am.",
-        pinned: false,
-        postedAt: new Date(),
-      });
+      for (const [id, fields] of Object.entries(ROWS)) {
+        await setDoc(doc(ctx.firestore(), `live_updates/${id}`), {
+          message: `Row ${id}.`,
+          category: null,
+          postedAt: new Date(),
+          updatedAt: new Date(),
+          ...fields,
+        });
+      }
     });
   });
 
-  it("allows anyone, including anonymous, to read entries", async () => {
-    await assertSucceeds(getDoc(doc(anon(), "live_updates/u1")));
-    await assertSucceeds(getDoc(doc(nonAdmin(), "live_updates/u1")));
+  /** The card's two queries, with the audience predicate the client sends. */
+  function recentQuery(db, audiences) {
+    return query(
+      collection(db, "live_updates"),
+      where("audience", "in", audiences),
+      orderBy("postedAt", "desc"),
+      limit(20),
+    );
+  }
+  function pinnedQuery(db, audiences) {
+    return query(
+      collection(db, "live_updates"),
+      where("pinned", "==", true),
+      where("audience", "in", audiences),
+      orderBy("postedAt", "desc"),
+      limit(100),
+    );
+  }
+
+  it("lets anyone, signed out included, read a row for everyone", async () => {
+    await assertSucceeds(getDoc(doc(anon(), "live_updates/lu-everyone")));
+    await assertSucceeds(getDoc(doc(attendee("pending-1"), "live_updates/lu-everyone")));
+    await assertSucceeds(getDocs(recentQuery(anon(), ["everyone"])));
+    await assertSucceeds(getDocs(pinnedQuery(anon(), ["everyone"])));
+  });
+
+  it("denies a signed-out reader a speaker-only row, by id and by query", async () => {
+    await assertFails(getDoc(doc(anon(), "live_updates/lu-speakers")));
+    await assertFails(getDocs(recentQuery(anon(), ["everyone", "speakers"])));
+    await assertFails(getDocs(pinnedQuery(anon(), ["speakers"])));
+    // A query that asks for no audience at all could return any row.
+    await assertFails(getDocs(query(collection(anon(), "live_updates"), limit(20))));
+  });
+
+  it("denies a plain approved attendee a speaker-only row, by id and by query", async () => {
+    const db = attendee("approved-1");
+    await assertFails(getDoc(doc(db, "live_updates/lu-speakers")));
+    await assertFails(getDocs(recentQuery(db, ["everyone", "attendees", "speakers"])));
+    await assertFails(getDocs(pinnedQuery(db, ["everyone", "attendees", "speakers"])));
+    await assertFails(getDocs(query(collection(db, "live_updates"), limit(20))));
+  });
+
+  it("lets an approved attendee read rows for attendees, with the matching predicate", async () => {
+    const db = attendee("approved-1");
+    await assertSucceeds(getDoc(doc(db, "live_updates/lu-attendees")));
+    await assertSucceeds(getDocs(recentQuery(db, ["everyone", "attendees"])));
+    await assertSucceeds(getDocs(pinnedQuery(db, ["everyone", "attendees"])));
+  });
+
+  it("denies a signed-in account that is not approved the attendee rows", async () => {
+    const db = attendee("pending-1");
+    await assertFails(getDoc(doc(db, "live_updates/lu-attendees")));
+    await assertFails(getDoc(doc(db, "live_updates/lu-speakers")));
+    await assertFails(getDocs(recentQuery(db, ["everyone", "attendees"])));
+    await assertFails(getDoc(doc(anon(), "live_updates/lu-attendees")));
+  });
+
+  it("lets a speaker read every audience, whatever their registration state", async () => {
+    const db = attendee("speaker-1");
+    for (const id of ["lu-everyone", "lu-attendees", "lu-speakers"]) {
+      await assertSucceeds(getDoc(doc(db, `live_updates/${id}`)));
+    }
+    await assertSucceeds(getDocs(recentQuery(db, ["everyone", "attendees", "speakers"])));
+    await assertSucceeds(getDocs(pinnedQuery(db, ["everyone", "attendees", "speakers"])));
+  });
+
+  it("fails closed on a row with no audience or an unknown one: only admins read it", async () => {
+    for (const id of ["lu-legacy", "lu-unknown"]) {
+      await assertFails(getDoc(doc(anon(), `live_updates/${id}`)));
+      await assertFails(getDoc(doc(attendee("approved-1"), `live_updates/${id}`)));
+      await assertFails(getDoc(doc(attendee("speaker-1"), `live_updates/${id}`)));
+      await assertSucceeds(getDoc(doc(admin(), `live_updates/${id}`)));
+      await assertSucceeds(getDoc(doc(staff(), `live_updates/${id}`)));
+    }
+  });
+
+  it("lets either admin tier list every row with no predicate, for the admin page", async () => {
+    await assertSucceeds(getDocs(query(collection(admin(), "live_updates"))));
+    await assertSucceeds(getDocs(query(collection(staff(), "live_updates"))));
   });
 
   it("denies all client writes, admin included — only saveLiveUpdate/deleteLiveUpdate (Admin SDK) write it", async () => {
-    await assertFails(setDoc(doc(admin(), "live_updates/u1"), { message: "hacked" }));
-    await assertFails(setDoc(doc(nonAdmin(), "live_updates/u1"), { message: "hacked" }));
-    await assertFails(deleteDoc(doc(admin(), "live_updates/u1")));
+    await assertFails(setDoc(doc(admin(), "live_updates/lu-everyone"), { message: "hacked" }));
+    await assertFails(setDoc(doc(nonAdmin(), "live_updates/lu-everyone"), { message: "hacked" }));
+    await assertFails(setDoc(doc(attendee("speaker-1"), "live_updates/lu-new"), { message: "hacked", audience: "everyone" }));
+    await assertFails(deleteDoc(doc(admin(), "live_updates/lu-everyone")));
   });
 });
 

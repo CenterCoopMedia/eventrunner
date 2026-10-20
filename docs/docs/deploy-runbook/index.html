@@ -662,6 +662,18 @@
           Keep the original provider, account, payment attempts, and inventory records throughout
           recovery; deleting a hold or making a replacement order does not establish the original
           payment&#39;s outcome.</p>
+          <h3 id="importing-users-or-data-with-the-firebase-cli">Importing users or data with the Firebase CLI<a class="heading-anchor" href="#importing-users-or-data-with-the-firebase-cli" aria-label="Link to this section">#</a></h3>
+          <p>The pinned <code>firebase-tools</code> 15.22.4 reads <code>firebase auth:import</code> and <code>firebase database:import</code>
+          files through stream-json 1.9.1. That version has open advisories: crafted JSON can stall the CLI
+          or change the prototype of a parsed object. There is no fix we can take until the CLI moves past
+          15.22.4 (see <code>scripts/ci/audit-exceptions.json</code>).</p>
+          <ul>
+          <li>Only import a file you made yourself with <code>firebase auth:export</code> (or <code>database:get</code>) from one
+          of this operator&#39;s own projects, and that has stayed on your machine or in your storage since.</li>
+          <li>Never import a file from a client, a vendor, an email attachment or any other third party.
+          To bring in users from outside, turn their data into a new export file with your own tools
+          first, and check it before you import it.</li>
+          </ul>
           <h2 id="7-rotating-access">7. Rotating access<a class="heading-anchor" href="#7-rotating-access" aria-label="Link to this section">#</a></h2>
           <p>There is no key to rotate. To revoke a client&#39;s deploy access, remove the IAM policy binding from
           §2 (<code>gcloud iam service-accounts remove-iam-policy-binding</code>) or delete the GitHub Environment; both

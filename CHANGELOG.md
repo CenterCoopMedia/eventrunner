@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reminder wording gains two optional tokens, `{{due_date}}` and `{{days_left}}`, set only by
   the schedule. Every run that emails anyone writes one admin log entry.
 
+- Live updates have a category and an audience: everyone, approved attendees and speakers,
+  or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
+  approved attendee cannot get or list a speaker-only entry, and the card's queries carry the
+  matching audience filter. Each save writes the new and the previous audience to
+  `admin_logs`. The card also lists the event's milestones as key dates, in date order, and
+  shows them when the feed is empty (#200).
+
 - The admin rail groups its sections into Content, Program, Registration and tickets,
   Communications, Operations and Settings. Each group opens and closes from a button on its
   name. The group of the current page opens by itself, and a closed one names the current page.
@@ -573,6 +580,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `live_updates` is no longer readable by everyone. A row with no audience, which is every
+  row saved before this release, is readable by admins only, so it leaves the public card.
+  The Live updates page counts these rows and marks each one; edit and save a row to give it
+  an audience. Deploy the two new `live_updates` indexes in `firestore.indexes.json` with the
+  rules, or the card's queries fail until the indexes are built (#200).
+
 - Groundwork for scheduled reminders (#518), with no change that users see.
   [ADR 0006](docs/adr/0006-scheduled-reminders.md) records why a reminder schedule is not a
   queue. The event-clock conversion the admin uses moved to `shared/eventDateTime`, so the
@@ -901,5 +914,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   base commit, as the path classifier already did, so a pull request cannot replace
   the scripts that decide those required checks. A pull request can still edit the
   workflow file itself; an independent check producer remains #259 (#354).
+- `scripts/ci/audit-exceptions.json` now records each open audit finding we cannot fix
+  yet, with its reason: three stream-json advisories under the pinned Firebase CLI, braces
+  under Tailwind CSS 3 (no fixed release), Quill 2.0.3's HTML export advisory (no fixed
+  release; the editor does not load the affected blots and cleans every export), and
+  GHSA-rj75-hqrm-r3gf on postcss-selector-parser, which the installed 6.1.5 already fixes
+  but the advisory still lists. The deploy runbook now says to run `firebase auth:import`
+  only on files you exported from your own project.
+- An audit exception now covers an advisory only up to the severity recorded for it. If an
+  advisory is later raised above that severity, the audit policy check fails again.
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.

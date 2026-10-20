@@ -53,7 +53,9 @@ passes when a maintainer has logged it, with a reason, in
 [`scripts/ci/audit-exceptions.json`](scripts/ci/audit-exceptions.json). That
 file is the running record of every known vulnerability we have chosen not to
 fix yet — package, advisory link, severity, exposure, why it is unfixed, and
-the date we last reviewed it. Findings in build tools or local dev tooling
+the date we last reviewed it. An entry covers an advisory only up to the
+severity it records; if the advisory is later raised above that, CI fails
+again until someone reviews it. Findings in build tools or local dev tooling
 (for example the Firebase CLI or Vite) are tracked there too, but they never
 fail CI on their own.
 

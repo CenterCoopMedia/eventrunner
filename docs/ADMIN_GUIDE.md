@@ -548,6 +548,19 @@ Every send, test send, and restored address writes an `admin_logs` row with your
 
 Compose, edit, and delete entries in the live-updates feed shown on the public site. There is no draft/publish step here, unlike the CMS content tabs — a save is live immediately. This is an admin-authored feed only; nothing ingests from Slack or any other external source.
 
+Each entry has these fields:
+
+- **Message.** The text, at most 1,000 characters. Line breaks stay.
+- **Category.** Optional. One or two words, at most 24 characters, shown as a tag beside the entry. It follows the same rule as a category on the Updates page.
+- **Who can read it.** **Everyone, signed in or not**; **Approved attendees and speakers**; or **Speakers only**. The database enforces this, not only the page: a reader outside the audience cannot load the entry at all. A speaker is an account linked to a speaker record. An attendee whose registration is not approved yet sees only the entries for everyone. On the card, an entry that is not for everyone carries a tag in words: **For attendees** or **For speakers**.
+- **Pinned.** Pinned entries show first, above newer entries that are not pinned.
+
+The list shows each entry's audience and category beside its time. Every save writes an `admin_logs` row with your address, the audience, and the audience the entry had before, so a change that shows an entry to more people can be traced. A delete writes a row too.
+
+**Entries from before audiences.** An entry saved before the audience field existed has no audience. The database shows it to admins only, so it is gone from the public card. The list marks it **Admins only, no audience set**, and a notice above the form counts these entries. Select **Edit**: the form opens on **Everyone, signed in or not**, which is what the entry meant when you wrote it. Choose the audience and save.
+
+**Key dates.** The card also lists the event's key dates: the milestones under Settings → Event settings, in **Milestones and the registration goal**. They are in date order, and two milestones on the same date are in name order. Each shows its name and its date, with the year. The key dates show when the feed is empty too. With no entries and no milestones, the card is not shown. The card shows only while **Live updates** is on under Features.
+
 ## Feedback
 
 Every submission from the public feedback modal, newest first, with a mark-reviewed / archived action. Admins can read the feedback collection directly; only the status change goes through an admin endpoint, because every client write to that collection is denied outright.
@@ -733,7 +746,7 @@ Select **Add account**. Focus moves to the new row's **Service** field. Each acc
 
 The **Milestones** panel lists the dates the Overview counts down to, such as the day proposals close or the day the programme is announced. The Overview shows them in date order, each with its date and the days left: **In 12 days**, **Today**, or **3 days ago** once it has passed.
 
-**Anyone can read the milestones and the goal.** They are stored with the event settings, which the public site reads, so every name, date, and goal is public. Keep private notes out of them.
+**Anyone can read the milestones and the goal.** They are stored with the event settings, which the public site reads, so every name, date, and goal is public. Keep private notes out of them. While **Live updates** is on under Features, the live updates card shows the milestones to visitors as **Key dates**.
 
 Select **Add milestone**. Focus moves to the new row's name field. Each milestone has a name, at most 80 characters, and a date. An event can list 20 milestones; at 20, **Add milestone** does nothing and says so until you remove one. **Remove milestone** moves focus to the milestone that takes its place, or to the one before it when you removed the last, or to **Add milestone** when none is left. A milestone goes when you save. A milestone with no name or no date is refused when you save, and focus moves to the field that needs it.
 

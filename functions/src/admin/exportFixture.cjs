@@ -177,7 +177,9 @@ function exportSeed() {
     'announcements/announcement-1': {
       message: 'Lunch is served.', level: 'info', startsAt: AT, endsAt: AT, link: null, createdAt: AT, updatedAt: AT,
     },
-    'live_updates/live-1': { message: 'Room change for the panel.', pinned: false, postedAt: AT, updatedAt: AT },
+    'live_updates/live-1': {
+      message: 'Room change for the panel.', pinned: false, category: null, audience: 'everyone', postedAt: AT, updatedAt: AT,
+    },
 
     // storeAsset (media/upload.cjs): the uploader's address and account id.
     'media_assets/asset-1': {

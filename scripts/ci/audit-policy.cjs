@@ -19,6 +19,7 @@ const { execFileSync } = require('node:child_process');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const EXCEPTIONS_PATH = path.join(__dirname, 'audit-exceptions.json');
 const FAIL_SEVERITIES = new Set(['high', 'critical']);
+const SEVERITY_RANK = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 
 // Every workspace that carries its own package-lock.json gets audited on
 // its own -- functions/ deploys from its own lockfile, independent of the
@@ -123,18 +124,22 @@ function isExcepted(name, advisories, exceptions) {
   const normalized = advisories.map((advisory) => (
     typeof advisory === 'string' ? { url: advisory, severity: undefined } : advisory
   ));
-  const reviewed = new Set(
-    exceptions
-      .filter((entry) => entry.package === name && entry.exposure === 'production')
-      .flatMap((entry) => entry.advisories),
-  );
+  const entries = exceptions.filter((entry) => entry.package === name && entry.exposure === 'production');
   // Advisories at the gating severities are what this policy is about. When
   // npm reports no per-advisory severity at all (an older report shape), hold
   // every collected advisory to the same rule rather than exempting the lot.
   const gating = normalized.filter((advisory) => FAIL_SEVERITIES.has(advisory.severity));
-  const urls = (gating.length > 0 ? gating : normalized).map((advisory) => advisory.url);
-  if (urls.length === 0) return false;
-  return urls.every((url) => reviewed.has(url));
+  const checked = gating.length > 0 ? gating : normalized;
+  if (checked.length === 0) return false;
+  // A reviewer accepted an advisory at the severity they recorded. If it is
+  // later reclassified higher, the entry no longer covers it. An advisory with
+  // no reported severity is held to critical; an entry with no recorded
+  // severity covers nothing.
+  return checked.every((advisory) => {
+    const reported = SEVERITY_RANK[advisory.severity] ?? SEVERITY_RANK.critical;
+    return entries.some((entry) => entry.advisories.includes(advisory.url)
+      && (SEVERITY_RANK[entry.severity] ?? -1) >= reported);
+  });
 }
 
 function evaluateReport(report, exceptions, target) {
