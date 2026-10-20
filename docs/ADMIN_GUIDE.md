@@ -26,8 +26,8 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 
 | Tier | Sections | For |
 |---|---|---|
-| Operator | Everything below, plus Features, Branding, Access, System errors, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
+| Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -456,7 +456,7 @@ If a payment response is lost, the purchaser uses **Resume existing checkout** o
 
 ## Invoices
 
-**Invoices** under Registration and tickets is where staff bill sponsors and partners. This first release covers drafts and the invoice settings. Issuing, the PDF, marking an invoice paid, voiding and sending come in a later release; this section grows with them.
+**Invoices** under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download its PDF, and record the payment. Sending the PDF by email and a card payment link come in later releases.
 
 Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.
 
@@ -477,6 +477,50 @@ A draft has no number. The number (`INV-0001`, `INV-0002`, and so on, with no ga
 If someone else saved the same draft after you opened it, your save is refused. Select **Reload the saved invoice**, then make your change again.
 
 To remove a draft, open it and select **Delete this draft**. Only a draft can be deleted.
+
+### Issue an invoice
+
+Issuing gives a draft its number and makes it a real invoice. It cannot be undone.
+
+1. Save the draft. Issue uses the saved draft, not the form. If the form has changes, the page asks you to save first.
+2. Select **Issue invoice**. The page names the next number, such as `INV-0004`.
+3. Select **Issue this invoice**.
+
+The invoice takes the next number, today's date on the event's clock as its issue date, and a copy of the issuer name, address, email, tax ID and payment instructions from the invoice settings. The server computes the totals again and keeps them. After that the invoice cannot change: later edits to the settings or to the organization do not reach it, and its PDF always shows the same details.
+
+Issue is refused, and the page names the reason, when the draft has no line, when its due date is before the issue date, or when the invoice settings have no issuer name. An operator fills in the settings.
+
+Numbers have no gaps. Two people who issue at the same moment get two numbers in a row. A number is used only when an issue succeeds, so a refused issue uses none.
+
+### Download the PDF
+
+Open an issued, paid or void invoice and select **Download PDF**. The browser saves it as the invoice number, such as `INV-0004.pdf`. The PDF shows both parties, the dates, every line, the discounts and tax, the total, how to pay, and the notes. A paid invoice says when and how it was paid. A void invoice says **VOID** and the reason, and has no payment instructions. A draft has no PDF.
+
+The PDF uses a standard font. A character it cannot draw, such as a letter in a non-Latin script, is dropped or replaced with the nearest plain letter.
+
+### Mark an invoice paid
+
+1. Open the issued invoice and select **Mark paid**.
+2. Set **Date paid**. It starts at today on the event's clock and cannot be after today.
+3. Choose the **Method**: bank transfer, check, card, cash, or other.
+4. Add a **Payment note** if you want one, such as a check number.
+5. Select **Record payment**.
+
+The status becomes **Paid**, and the record shows the payment.
+
+### Void an invoice
+
+Operators only. Void an issued or paid invoice when it is wrong or no longer due.
+
+1. Open the invoice and select **Void this invoice**.
+2. Enter the **Reason**. It is required.
+3. Select **Void** and the number, such as **Void INV-0004**.
+
+The status becomes **Void**. The invoice stays in the list, and its number stays used: it is never given to another invoice. A paid invoice keeps its payment record. A void cannot be undone. Staff see who can void instead of the control.
+
+### Correct an issued invoice
+
+An issued invoice cannot change. To correct one, an operator voids it, then you select **Duplicate as a new draft**. The copy is a new draft with the same bill-to details, lines, discounts, tax, reference and notes, in the same currency. It has no number and no due date. It links back to the invoice it came from. Check it, save it, and issue it; it takes the next number. You can duplicate any invoice, for example to bill the same sponsor again next year.
 
 ### Find an invoice
 
@@ -683,10 +727,11 @@ The event's records as spreadsheets, and the event data package for the handoff 
 | Organizations and sponsors | Staff | Organization ID, name, state, hidden, tier, website, description, support description, logo path, order |
 | Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |
 | Admissions | Operator | Ticket ID, order ID, provider, ticket type, holder's first and last name, email, status, whether an account claimed it, checked in, purchased |
+| Invoices | Staff | Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created |
 
-No spreadsheet holds an account id, an invite token, staged speaker edits, a private note, a checkout link, or a raw payment provider record. Amounts are in the currency's major unit (`25.00`). Staff do not see the two operator rows; the page says who exports them. Attendees and session pitches export from their own pages, because those exports follow the page's filter.
+No spreadsheet holds an account id, an invite token, staged speaker edits, a private note, a checkout link, bank details, or a raw payment provider record. Amounts are in the currency's major unit (`25.00`). Staff do not see the two operator rows; the page says who exports them. Attendees and session pitches export from their own pages, because those exports follow the page's filter.
 
-**The event data package.** Operators only. **Download event data package** saves one zip file named `event-data-package-<date>.zip`. It holds a JSON file for each record type, CSV files for the main lists, `manifest.json` with record counts and checksums, and `README.md`, which describes each file, the links between files, and how to handle the personal data in it. Choose the parts under **Parts to include**; all eight are chosen at the start. **Include staff notes on session pitches** is off at the start. The package holds live records only, in its CSV files too: a draft that was never published, or a newer draft of a live record, is not in it. A hidden live record is in it, with `visible: false` in JSON and **Hidden** `yes` in CSV. The package never holds the admin allowlist, credentials, the admin log, or raw provider records. It holds file paths and links for media and materials, not the files.
+**The event data package.** Operators only. **Download event data package** saves one zip file named `event-data-package-<date>.zip`. It holds a JSON file for each record type, CSV files for the main lists, `manifest.json` with record counts and checksums, and `README.md`, which describes each file, the links between files, and how to handle the personal data in it. Choose the parts under **Parts to include**; all nine are chosen at the start. **Include staff notes on session pitches** is off at the start. The package holds live records only, in its CSV files too: a draft that was never published, or a newer draft of a live record, is not in it. A hidden live record is in it, with `visible: false` in JSON and **Hidden** `yes` in CSV. The package never holds the admin allowlist, credentials, the admin log, or raw provider records. It holds file paths and links for media and materials, not the files. The **Invoices** part holds every invoice, drafts too, because an invoice draft is a record and not an unpublished edit. Each issued invoice keeps its own copy of the issuer block and payment instructions. The invoice settings and the number counter stay behind.
 
 The page sends a package of up to 9 MB built from at most 50,000 stored documents. Each document counts once, even when two files draw on it. A larger event gets a message that names `scripts/export-event-package.cjs`, which builds the same package from a terminal. [Archive and hand off a past event](operator/archive-handoff.md) covers the script, how to check a package, a full Firebase backup, the Storage files, and how to keep the past site online read-only.
 

@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goes, who it would reach, who waits on the 24-hour limit, and what the last run did. The
   reminder wording gains two optional tokens, `{{due_date}}` and `{{days_left}}`, set only by
   the schedule. Every run that emails anyone writes one admin log entry.
+- Invoices, part 3 (#209). Staff issue a saved draft after a confirmation that names the
+  next number. Issue gives it the next number (`INV-0001`, with no gaps, in one transaction
+  with the counter), the issue date on the event's clock, and a copy of the issuer block from
+  the settings, and freezes the totals; later edits do not reach it. **Download PDF** saves
+  the invoice as `<number>.pdf` from the new `invoicePdf` endpoint, built with the shared PDF
+  kit; a paid invoice says when and how, and a void one says VOID and why. Staff mark an
+  issued invoice paid with a date, a method and a note. Only an operator voids, with a reason;
+  the number stays used. **Duplicate as a new draft** copies any invoice into a new draft
+  with no number. Data export gains an invoices spreadsheet for staff, the event data package
+  a `billing/` part, and the repeat-event template leaves invoices behind so a new event
+  starts at `0001`. Every write refuses on a read-only demo and records an audit row in the
+  same transaction.
 - Invoices, part 1 (#208). Staff write and save sponsor invoice drafts under
   **Invoices**. Choosing an organization fills the name to bill and, when its tier names a
   sponsor package, the first line. The totals change as staff type, in a live region, and
