@@ -361,6 +361,18 @@ describe('issuing an invoice', () => {
     expect(invoiceCalls().some((body) => body.action === 'issue')).toBe(false);
   });
 
+  it('does not issue when the form changed after the confirmation opened', async () => {
+    answers.get = { invoice: STORED, canVoid: false };
+    await renderAt(`/admin/invoices/${STORED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }));
+    const confirm = await screen.findByRole('button', { name: 'Issue this invoice' });
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Changed after.' } });
+    fireEvent.click(confirm);
+    expect(await screen.findByText('Save the draft first. Issue uses the saved draft, not the form.')).toBeInTheDocument();
+    expect(invoiceCalls().some((body) => body.action === 'issue')).toBe(false);
+  });
+
   it('states a refused issue and marks the field it names', async () => {
     answers.get = { invoice: { ...STORED, dueDate: '2026-10-01' }, canVoid: false };
     answers.issue = () => response({ error: { code: 'bad-request', message: 'Invalid invoice: dueDate: The due date is before the issue date (2026-10-20). Change the due date.; settings.issuerName: The invoice settings have no issuer name. Ask an operator to fill in the invoice settings.' } }, 400);
@@ -403,6 +415,7 @@ describe('an issued invoice', () => {
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
     const date = await screen.findByLabelText('Date paid', { exact: false });
+    await waitFor(() => expect(date).toHaveFocus());
     expect(date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     fireEvent.change(date, { target: { value: '2026-10-19' } });
     fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'check' } });
@@ -436,6 +449,7 @@ describe('an issued invoice', () => {
     await renderAt(`/admin/invoices/${ISSUED.id}`);
     await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Void this invoice' }));
+    await waitFor(() => expect(screen.getByLabelText('Reason')).toHaveFocus());
     fireEvent.click(await screen.findByRole('button', { name: 'Void INV-0004' }));
     const reason = screen.getByLabelText('Reason');
     await waitFor(() => expect(reason).toHaveFocus());

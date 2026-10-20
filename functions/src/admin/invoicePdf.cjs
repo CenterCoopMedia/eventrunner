@@ -192,13 +192,16 @@ async function buildInvoicePdf({ invoice, theme = null }) {
     ...(invoice.reference ? [['Reference', invoice.reference]] : []),
   ];
   const detailWidth = contentWidth / details.length;
-  details.forEach(([label, value], index) => {
+  const detailLines = details.map(([, value]) => wrapText({ font: bold, text: safe(bold, value), size: BODY_SIZE, maxWidth: detailWidth - 8 }));
+  ensure(13 + Math.max(...detailLines.map((lines) => lines.length), 1) * (BODY_SIZE + LINE_GAP));
+  details.forEach(([label], index) => {
     const x = MARGIN + index * detailWidth;
     page.drawText(label, { x, y, size: 8, font: body, color: color('inkMuted') });
-    const shown = wrapText({ font: bold, text: safe(bold, value), size: BODY_SIZE, maxWidth: detailWidth - 8 })[0] ?? '';
-    if (shown) page.drawText(shown, { x, y: y - 13, size: BODY_SIZE, font: bold, color: color('ink') });
+    detailLines[index].forEach((line, row) => {
+      page.drawText(line, { x, y: y - 13 - row * (BODY_SIZE + LINE_GAP), size: BODY_SIZE, font: bold, color: color('ink') });
+    });
   });
-  y -= 36;
+  y -= 22 + Math.max(...detailLines.map((lines) => lines.length), 1) * (BODY_SIZE + LINE_GAP);
 
   // The lines table.
   const amountX = right;
@@ -248,11 +251,14 @@ async function buildInvoicePdf({ invoice, theme = null }) {
     ]),
   ];
   for (const [label, value, font] of totalRows) {
-    ensure(BODY_SIZE + LINE_GAP);
-    const shownLabel = wrapText({ font, text: safe(font, label), size: BODY_SIZE, maxWidth: labelX - MARGIN - 40 })[0] ?? '';
-    drawRight(shownLabel, labelX, font, 'inkMuted');
+    // A long label wraps, right-aligned, and the amount sits on its first line.
+    const labelLines = wrapText({ font, text: safe(font, label), size: BODY_SIZE, maxWidth: labelX - MARGIN - 40 });
+    ensure(Math.max(labelLines.length, 1) * (BODY_SIZE + LINE_GAP));
     drawRight(value, amountX, font);
-    y -= BODY_SIZE + LINE_GAP;
+    for (const line of labelLines.length ? labelLines : ['']) {
+      drawRight(line, labelX, font, 'inkMuted');
+      y -= BODY_SIZE + LINE_GAP;
+    }
   }
   ensure(30);
   y -= 4;

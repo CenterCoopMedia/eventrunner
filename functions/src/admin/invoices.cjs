@@ -356,7 +356,18 @@ async function issueInvoice({ db, actor, body, now }) {
     ]);
     const at = now();
     const issueDate = invoiceDateIn(at, timeZone);
-    const settings = publicSettings(settingsSnap.exists ? settingsSnap.data() : null);
+    // The issuer block and the prefix are copied onto the invoice for
+    // good, so settings that no longer pass their own checks (a value
+    // edited outside the settings page) are refused, not cleaned and used.
+    const storedSettings = settingsSnap.exists ? settingsSnap.data() : {};
+    const settingsCheck = validateInvoiceSettings({ ...validateInvoiceSettings({}).value, ...storedSettings });
+    if (!settingsCheck.ok) {
+      fail(409, 'conflict', 'The invoice settings do not pass their checks, so the invoice was not issued. Ask an operator to open the invoice settings and save them again.');
+    }
+    const settings = settingsCheck.value;
+    if (!Object.hasOwn(CURRENCY_EXPONENTS, stored.currency)) {
+      fail(409, 'conflict', 'This draft\'s currency is not supported, so it was not issued. Duplicate it into a new draft.');
+    }
     // The stored draft is checked again with today's rules, and its figures
     // are computed again: what is frozen is what the server computed.
     const verdict = validateInvoiceDraft(draftInputOf(stored));
@@ -378,7 +389,7 @@ async function issueInvoice({ db, actor, body, now }) {
     if (!clash.empty) {
       fail(409, 'conflict', `Invoice number ${number} is already used, so no number was given. Ask an operator to check invoice_counters/current.`);
     }
-    const currency = Object.hasOwn(CURRENCY_EXPONENTS, stored.currency) ? stored.currency : resolveInvoiceCurrency(null, settings.currency);
+    const { currency } = stored;
     saved = {
       ...stored,
       ...verdict.value,

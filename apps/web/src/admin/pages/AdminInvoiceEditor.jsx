@@ -326,7 +326,13 @@ export default function AdminInvoiceEditor({ mode }) {
   }
 
   async function issue() {
-    if (busy || unsaved) return;
+    if (busy) return;
+    // The form changed after the confirmation opened: issue would send the
+    // saved revision, not what is on screen, so ask for a save instead.
+    if (unsaved) {
+      setIssueConfirm({ unsaved: true, nextNumber: null });
+      return;
+    }
     setBusy('issue');
     clearError();
     setStatus('');
@@ -513,6 +519,7 @@ export default function AdminInvoiceEditor({ mode }) {
 
       {issueConfirm && !locked ? (
         <IssueConfirm
+          key={issueConfirm.unsaved ? 'unsaved' : 'ready'}
           confirm={issueConfirm}
           busy={busy === 'issue'}
           onIssue={issue}

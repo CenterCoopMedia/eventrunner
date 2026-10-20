@@ -526,3 +526,18 @@ test('every invoice answer says whether the caller may void it', async () => {
   assert.equal((await call(db, { action: 'void', invoiceId: ID, expectedRevision: 2, reason: 'x' }, 'operator')).body.canVoid, true);
   assert.equal('canVoid' in (await call(db, { action: 'list' })).body, false);
 });
+
+test('issue refuses invoice settings that no longer validate, and a draft whose currency is not supported', async () => {
+  const badPrefix = issuedDb({ 'invoice_settings/current': { ...SETTINGS, prefix: 'bad prefix "x"' } });
+  await saveNew(badPrefix);
+  const refused = await call(badPrefix, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(refused.statusCode, 409);
+  assert.match(refused.body.error.message, /invoice settings/);
+  assert.equal((await badPrefix.collection('invoice_counters').doc('current').get()).exists, false);
+
+  const odd = issuedDb({ [`invoices/${ID}`]: { ...draft(), status: 'draft', number: null, currency: 'xyz', revision: 1, totals: {} } });
+  const res = await call(odd, { action: 'issue', invoiceId: ID, expectedRevision: 1 });
+  assert.equal(res.statusCode, 409);
+  assert.match(res.body.error.message, /currency/);
+  assert.equal((await odd.collection('invoices').doc(ID).get()).data().status, 'draft');
+});

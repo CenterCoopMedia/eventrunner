@@ -112,6 +112,21 @@ test('an address too tall for one page stacks the parties and runs on, with no l
   assert.ok(drawn.includes('$4,815.00'));
 });
 
+test('a long reference and a long discount label wrap rather than lose words', async () => {
+  const reference = 'Purchase order 2026-0042 for the regional newsroom collaborative spring program';
+  const label = 'Discount for a multi-year commitment agreed with the partnership committee in the spring of this year';
+  const invoice = publicInvoice(issued({
+    reference,
+    adjustments: [{ kind: 'discount', label, amount: 50000 }],
+    totals: { subtotal: 500000, discountTotal: 50000, taxTotal: 0, total: 450000 },
+  }), ID);
+  const drawn = drawnText(await buildInvoicePdf({ invoice, theme: THEME }));
+  const words = (text) => text.split(' ');
+  const joined = drawn.join(' ');
+  for (const word of [...words(reference), ...words(label)]) assert.ok(joined.includes(word), word);
+  assert.ok(drawn.includes('-$500.00'));
+});
+
 test('a paid invoice says when and how it was paid, and a void one says void and why', async () => {
   const paid = drawnText(await buildInvoicePdf({
     invoice: publicInvoice(issued({ status: 'paid', payment: { paidOn: '2026-10-19', method: 'bank-transfer', note: 'Ref 42', recordedAt: NOW, recordedBy: 'staff' } }), ID),

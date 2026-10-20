@@ -12,6 +12,7 @@
 // and sends nothing, like every admin form.
 import { useEffect, useId, useRef, useState } from 'react';
 import {
+  INVOICE_LIMITS,
   PAYMENT_METHODS,
   PAYMENT_METHOD_WORDS,
   invoiceDateIn,
@@ -69,6 +70,11 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
     if (focusRequest > 0) focusFirstError(sectionRef.current);
   }, [focusRequest]);
 
+  // The button that opened the form is gone, so the keyboard starts here.
+  useEffect(() => {
+    sectionRef.current?.querySelector('input, select')?.focus();
+  }, []);
+
   async function submit() {
     if (busy) return;
     const verdict = validatePayment(payment, { today: invoiceDateIn(new Date(), timeZone) });
@@ -116,7 +122,7 @@ function MarkPaidForm({ timeZone, busy, onSubmit, onCancel }) {
         value={payment.note}
         onChange={(value) => set({ note: value })}
         error={errors.get('note')}
-        maxLength={500}
+        maxLength={INVOICE_LIMITS.paymentNote}
         className="sm:max-w-[28rem]"
       />
       <div className="flex flex-wrap items-center gap-xs">
@@ -143,6 +149,10 @@ function VoidForm({ number, busy, onSubmit, onCancel }) {
   useEffect(() => {
     if (focusRequest > 0) focusFirstError(sectionRef.current);
   }, [focusRequest]);
+
+  useEffect(() => {
+    sectionRef.current?.querySelector('input')?.focus();
+  }, []);
 
   async function submit() {
     if (busy) return;
@@ -178,7 +188,7 @@ function VoidForm({ number, busy, onSubmit, onCancel }) {
         value={reason}
         onChange={setReason}
         error={error}
-        maxLength={500}
+        maxLength={INVOICE_LIMITS.voidReason}
         className="sm:max-w-[28rem]"
       />
       <div className="flex flex-wrap items-center gap-xs">
