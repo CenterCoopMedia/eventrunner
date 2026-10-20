@@ -260,3 +260,13 @@ export async function signIn(page, email) {
   await page.getByRole('button', { name: /^sign in$/i }).click();
   await page.waitForURL((url) => url.pathname !== '/signin');
 }
+
+// The admin rail folds its groups (issue #477): only the group that holds
+// the current page opens by itself. A spec that reaches a link in another
+// group opens every group head first, the way a reader would.
+export async function openAdminGroups(page) {
+  const closed = page.locator('.admin-docket-group-toggle[aria-expanded="false"]:visible');
+  while (await closed.count()) {
+    await closed.first().click();
+  }
+}

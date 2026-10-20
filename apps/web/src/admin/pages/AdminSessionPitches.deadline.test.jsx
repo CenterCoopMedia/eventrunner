@@ -70,7 +70,7 @@ describe('AdminSessionPitches deadline', () => {
     open();
     fireEvent.change(dateField(), { target: { value: '' } });
     fireEvent.change(timeField(), { target: { value: '' } });
-    expect(screen.getByText('No deadline is set. Enter one to save.')).toBeInTheDocument();
+    expect(screen.getByText('No deadline is set. Enter one, or choose “Open until I close it”.')).toBeInTheDocument();
     fireEvent.click(saveButton());
     expect(call).not.toHaveBeenCalled();
     expect(await screen.findByText('Enter a date and a time.')).toBeInTheDocument();
@@ -169,6 +169,72 @@ describe('AdminSessionPitches deadline', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load saved settings' }));
     expect(timeField()).toHaveValue('12:00');
     expect(screen.getByLabelText('Accept session pitches')).not.toBeChecked();
+  });
+
+  it('reads a saved call with no deadline as "Open until I close it"', () => {
+    pitchCall = { enabled: true, closesAt: null, externalFormUrl: null };
+    open();
+    expect(screen.getByRole('radio', { name: 'Open until I close it' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'At a set date and time' })).not.toBeChecked();
+    expect(screen.queryByLabelText('Deadline Date')).toBeNull();
+    expect(screen.getByText('Intake stays open until an operator clears “Accept session pitches” and saves. The public page shows no deadline.')).toBeInTheDocument();
+  });
+
+  it('saves "Open until I close it" as a null deadline without asking for a date', async () => {
+    call.mockImplementation(async (_name, body) => body);
+    open();
+    fireEvent.change(dateField(), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Open until I close it' }));
+    expect(screen.queryByLabelText('Deadline Date')).toBeNull();
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(call).toHaveBeenCalledWith('updatePitchCall', { enabled: true, closesAt: null, externalFormUrl: null }));
+    expect(await screen.findByText('Call settings saved.')).toBeInTheDocument();
+  });
+
+  it('keeps the no-deadline choice with an external form', async () => {
+    call.mockImplementation(async (_name, body) => body);
+    open();
+    fireEvent.click(screen.getByRole('radio', { name: 'Open until I close it' }));
+    fireEvent.change(screen.getByLabelText('Where people pitch'), { target: { value: 'external' } });
+    fireEvent.change(screen.getByLabelText('External form address'), { target: { value: 'https://airtable.com/appExample/shrExample' } });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(call).toHaveBeenCalledWith('updatePitchCall', { enabled: true, closesAt: null, externalFormUrl: 'https://airtable.com/appExample/shrExample' }));
+  });
+
+  it('closes a no-deadline call by hand: clear "Accept session pitches" and save', async () => {
+    call.mockImplementation(async (_name, body) => body);
+    pitchCall = { enabled: true, closesAt: null, externalFormUrl: null };
+    open();
+    fireEvent.click(screen.getByLabelText('Accept session pitches'));
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(call).toHaveBeenCalledWith('updatePitchCall', { enabled: false, closesAt: null, externalFormUrl: null }));
+  });
+
+  it('brings the earlier date back when staff return to a set deadline', async () => {
+    open();
+    fireEvent.click(screen.getByRole('radio', { name: 'Open until I close it' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'At a set date and time' }));
+    expect(dateField()).toHaveValue('2027-01-31');
+    expect(timeField()).toHaveValue('23:59:59');
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(call).toHaveBeenCalledWith('updatePitchCall', { enabled: true, closesAt: STORED, externalFormUrl: null }));
+  });
+
+  it('asks for a date when staff move a no-deadline call to a set deadline', async () => {
+    pitchCall = { enabled: true, closesAt: null, externalFormUrl: null };
+    open();
+    fireEvent.click(screen.getByRole('radio', { name: 'At a set date and time' }));
+    fireEvent.click(saveButton());
+    expect(call).not.toHaveBeenCalled();
+    expect(await screen.findByText('Enter a date and a time.')).toBeInTheDocument();
+    await waitFor(() => expect(dateField()).toHaveFocus());
+  });
+
+  it('takes a no-deadline call saved elsewhere in place', () => {
+    open();
+    act(() => pushCall({ enabled: true, closesAt: null, externalFormUrl: null }));
+    expect(screen.getByRole('radio', { name: 'Open until I close it' })).toBeChecked();
+    expect(screen.queryByText(/The saved call settings changed/)).toBeNull();
   });
 
   it('shows the call settings to operators only', () => {

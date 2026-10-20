@@ -21,7 +21,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, signIn,
+  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, openAdminGroups, signIn,
 } from './helpers.mjs';
 
 const STRANGER_EMAIL = 'e2e-stats-stranger@example.test';
@@ -261,6 +261,7 @@ test.describe.serial('the event statistics endpoint', () => {
     const nav = page.getByRole('navigation', { name: 'Admin sections' });
     const milestones = page.locator('section', { has: page.getByRole('heading', { name: 'Milestones', exact: true }) });
     const openEventPage = async () => {
+      await openAdminGroups(page);
       await nav.getByRole('link', { name: 'Event', exact: true }).click();
       // The form adopts the live config/event before it is edited.
       await expect(page.getByLabel('Event name', { exact: true })).toHaveValue(stored.name);

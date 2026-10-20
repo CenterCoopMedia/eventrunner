@@ -209,7 +209,7 @@ Every collection the site renders can be edited and published from the admin.
 Organizers can announce, message, and bill, and attendees can talk to each other where a client wants that.
 
 - [x] Add the announcement store and the site banner (#199)
-- [ ] Extend live updates with categories, audience, and key dates (#200)
+- [x] Extend live updates with categories, audience, and key dates (#200)
 - [x] Add batch send to the email provider interface (#201)
 - [x] Add the announcement email composer (#202)
 - [ ] Add saved templates and a send history to the composer (#203). The send history and **Use this message** shipped; named saved templates did not.

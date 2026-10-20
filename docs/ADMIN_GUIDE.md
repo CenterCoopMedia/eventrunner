@@ -2,13 +2,17 @@
 
 How to run a client's site from the admin panel, in the order the work happens. For the narrative "why does this work this way" version, hand a new staff member [`docs/handbook/for-event-staff.md`](handbook/for-event-staff.md) first; come back here for a specific task. For what the look is made of underneath — every site style, every option, every token — see [`design-reference.md`](design-reference.md). You do not need it to run a site.
 
-Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators control the call deadline and choose this site's form or an external form, such as Airtable. With an Airtable form, an operator connects the approved table once; staff then choose **Refresh from Airtable**, or an operator turns on an automatic refresh. A refresh adds new pitches, updates changed text, keeps every decision and note, and marks changed or removed records in the queue. A person who pitches through this site's form gets a receipt. Receipts are on by default; to turn them off, choose **Staff send each receipt** under **Manage pitch emails**. Staff send acceptance and decline emails from each pitch, after a preview. Saving a decision sends no email. See [Operate session pitch intake](operator/session-pitches.md) for decisions, pitch emails, the Airtable refresh, CSV import and export, draft conversion, and private data boundaries.
+Open **Session pitches** to review private proposals. Share `/pitch` for public intake. Operators set the call deadline, or choose **Open until I close it** for a call with no deadline, and choose this site's form or an external form, such as Airtable. With an Airtable form, an operator connects the approved table once; staff then choose **Refresh from Airtable**, or an operator turns on an automatic refresh. A refresh adds new pitches, updates changed text, keeps every decision and note, and marks changed or removed records in the queue. A person who pitches through this site's form gets a receipt. Receipts are on by default; to turn them off, choose **Staff send each receipt** under **Manage pitch emails**. Staff send acceptance and decline emails from each pitch, after a preview. Saving a decision sends no email. See [Operate session pitch intake](operator/session-pitches.md) for decisions, pitch emails, the Airtable refresh, CSV import and export, draft conversion, and private data boundaries.
 
 **Draft and live are separate almost everywhere below.** Saving writes a draft; publishing copies it to what attendees see. If a change is not showing up on the public site, check that you published, not only saved.
 
 **The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.
 
-**On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
+**The rail groups the sections by the work.** Under **Overview** are six groups: **Content** (what the site says and shows), **Program** (sessions, pitches, speakers and organizations), **Registration and tickets**, **Communications** (announcements, live updates and the email log), **Operations** (import, feedback, change requests and data export) and **Settings** (the event, features, branding, access and system errors). Select a group's name to open or close it. The group that holds the page you are on opens by itself. If you close it, its name still shows the current page under it. The browser remembers which groups you opened or closed. Your tier decides which sections a group shows.
+
+**Hide the rail for more room.** On a wide screen, select **Hide menu** at the top of the rail. The rail narrows to the event mark and a **Show menu** button. Select **Show menu** to bring the sections back. The page you are on, and any draft on it, do not change. The browser remembers your choice. **Hide menu** is the first control after the skip link, so Tab reaches it at once.
+
+**On a phone, the compact top bar names the event and current section.** Open **Menu** to use the grouped admin sections and account controls in a full-screen sheet. The groups open and close there too. Each destination is a full-width row. The page title and its actions scroll with the form on a phone, so they do not cover the first controls.
 
 ## Find your way: The tour
 
@@ -49,7 +53,7 @@ A site can open before the program exists. For example, it can sell early bird t
 1. **Turn off what is not ready.** On Settings → Features, switch off **Public schedule**, **Speaker directory**, **Sponsor list**, **Attendee directory** and **Written updates**. Their navigation links leave the header and footer. On **Pages**, hide any other page that is not ready.
 2. **Write the home page.** In the Content editor, keep the opening section short: the event name, dates, place and one paragraph. The Content editor has no switch that hides a whole section. To take a section off the home page, hide or delete each block in it: open the block, select **Edit block settings**, clear **Visible**, and publish, or delete the block. A section with no visible block is not shown, and neither is its heading. Three home sections also draw from other lists: the key facts row always shows the event dates, the sponsor strip shows while **Sponsor list** is on, and the history section shows the past editions in Timeline. To take one of those off, or to remove any section itself, open the home page in **Pages** and remove the section there. Check every seeded block before launch. Placeholder text that starts with "[Replace]", and the seeded **By the numbers** statistics (0 attendees expected, 0 sessions planned), show on the public site until you edit or hide them. A button or link that leads to a section you switched off, or to a page that is hidden or does not exist, is not shown. The Content editor says so under **Destination** as you type. The save still succeeds, and the link appears when you switch the section on or make the page visible.
 3. **Open ticket sales.** Publish the reviewed Stripe catalog (see [Ticketing](#ticketing)). The home page lead and the header then show **Get tickets**. Before the catalog is published, neither shows a ticket action.
-4. **Open the call for sessions.** In **Session pitches**, an operator sets the deadline as a date and a time on the event's clock, chooses this site's form or an external form (for example, Airtable) and selects **Accept session pitches**. While the call is open, the home page lead shows **Pitch a session**. It appears in the home page lead only: the header, the navigation and the footer have no link to it.
+4. **Open the call for sessions.** In **Session pitches**, an operator sets the deadline as a date and a time on the event's clock, or chooses **Open until I close it** and closes the call by hand later. The operator then chooses this site's form or an external form (for example, Airtable) and selects **Accept session pitches**. While the call is open, the home page lead shows **Pitch a session**. It appears in the home page lead only: the header, the navigation and the footer have no link to it.
 
 Switch the features on again, and publish the pages, when the program is ready. No deploy is needed for any of these steps.
 
@@ -58,6 +62,8 @@ Switch the features on again, and publish the pages, when the program is ready. 
 One tab decides how the whole public site looks. Controls on one side, the **Page preview** on the other rendering your own pages with the draft applied — the client's real pages, not swatches.
 
 **What the preview can show you.** Pick the page — Home, Schedule, Session, Speakers, or Updates. Switch between **Desktop** and **Phone**, which render at real widths so the page's own breakpoints fire inside the frame. **Fit** the frame or see it at **Actual size**. Show it **Light**, **Dark**, or **Compare light and dark** side by side. And turn on the **stress test**: A made-up event name that wraps three times and a day packed with 28 sessions, so you meet a hard page here rather than after a client sends one. Nothing in the stress test is saved. If a colour or a font will not render as you asked, the preview says so.
+
+**Make room for the preview.** On a screen 1280 pixels wide or more, the controls and the preview sit side by side with a bar between them. Drag the bar, or select it with Tab and use the Left and Right arrow keys, to give one side more room. Shift with an arrow key moves it further. Home and End go to the limits: Each side keeps at least 30 percent of the row. Enter, a double-click, or **Reset widths** puts it back in the middle. In **Compare light and dark**, a second bar between the two frames works the same way, and **Reset frame widths** puts it back. The bars change only how much room each side has. The frame still renders the page at the width you picked, and **Fit** scales it to its side. Your draft does not change, and nothing is published. The browser remembers both widths. On a narrower screen the preview sits under the controls, and there is no bar. **Hide menu** on the rail also gives the preview more room.
 
 Work down the controls in this order.
 
@@ -522,6 +528,19 @@ Every send, test send, and restored address writes an `admin_logs` row with your
 
 Compose, edit, and delete entries in the live-updates feed shown on the public site. There is no draft/publish step here, unlike the CMS content tabs — a save is live immediately. This is an admin-authored feed only; nothing ingests from Slack or any other external source.
 
+Each entry has these fields:
+
+- **Message.** The text, at most 1,000 characters. Line breaks stay.
+- **Category.** Optional. One or two words, at most 24 characters, shown as a tag beside the entry. It follows the same rule as a category on the Updates page.
+- **Who can read it.** **Everyone, signed in or not**; **Approved attendees and speakers**; or **Speakers only**. The database enforces this, not only the page: a reader outside the audience cannot load the entry at all. A speaker is an account linked to a speaker record. An attendee whose registration is not approved yet sees only the entries for everyone. On the card, an entry that is not for everyone carries a tag in words: **For attendees** or **For speakers**.
+- **Pinned.** Pinned entries show first, above newer entries that are not pinned.
+
+The list shows each entry's audience and category beside its time. Every save writes an `admin_logs` row with your address, the audience, and the audience the entry had before, so a change that shows an entry to more people can be traced. A delete writes a row too.
+
+**Entries from before audiences.** An entry saved before the audience field existed has no audience. The database shows it to admins only, so it is gone from the public card. The list marks it **Admins only, no audience set**, and a notice above the form counts these entries. Select **Edit**: the form opens on **Everyone, signed in or not**, which is what the entry meant when you wrote it. Choose the audience and save.
+
+**Key dates.** The card also lists the event's key dates: the milestones under Settings → Event settings, in **Milestones and the registration goal**. They are in date order, and two milestones on the same date are in name order. Each shows its name and its date, with the year. The key dates show when the feed is empty too. With no entries and no milestones, the card is not shown. The card shows only while **Live updates** is on under Features.
+
 ## Feedback
 
 Every submission from the public feedback modal, newest first, with a mark-reviewed / archived action. Admins can read the feedback collection directly; only the status change goes through an admin endpoint, because every client write to that collection is denied outright.
@@ -582,7 +601,7 @@ Unresolved system-error rows — the operational surface for things like an inva
 
 ## Data export
 
-The event's records as spreadsheets, and the event data package for the handoff after an event. Open it from the System group on the rail. Every export writes an admin log entry before the file is sent; if the entry cannot be written, no file is made. The server keeps no copy of any file.
+The event's records as spreadsheets, and the event data package for the handoff after an event. Open it from the Operations group on the rail. Every export writes an admin log entry before the file is sent; if the entry cannot be written, no file is made. The server keeps no copy of any file.
 
 **Spreadsheets.** Each row saves one CSV file named for its list and the date, such as `sessions-2026-10-01.csv`. The file shows the current version of every record and its state (Draft, Live, or Live with unpublished changes), so a draft is in the file too. The sessions and organizations files also have a **Hidden** column: `yes` for a record the site does not show. A cell that starts with `=`, `+`, `-`, or `@` gains a leading apostrophe, as in the attendee export, so a spreadsheet shows it as text.
 
@@ -707,7 +726,7 @@ Select **Add account**. Focus moves to the new row's **Service** field. Each acc
 
 The **Milestones** panel lists the dates the Overview counts down to, such as the day proposals close or the day the programme is announced. The Overview shows them in date order, each with its date and the days left: **In 12 days**, **Today**, or **3 days ago** once it has passed.
 
-**Anyone can read the milestones and the goal.** They are stored with the event settings, which the public site reads, so every name, date, and goal is public. Keep private notes out of them.
+**Anyone can read the milestones and the goal.** They are stored with the event settings, which the public site reads, so every name, date, and goal is public. Keep private notes out of them. While **Live updates** is on under Features, the live updates card shows the milestones to visitors as **Key dates**.
 
 Select **Add milestone**. Focus moves to the new row's name field. Each milestone has a name, at most 80 characters, and a date. An event can list 20 milestones; at 20, **Add milestone** does nothing and says so until you remove one. **Remove milestone** moves focus to the milestone that takes its place, or to the one before it when you removed the last, or to **Add milestone** when none is left. A milestone goes when you save. A milestone with no name or no date is refused when you save, and focus moves to the field that needs it.
 
