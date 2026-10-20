@@ -172,6 +172,9 @@ function createWebhookProvider({ env = process.env, fetchImpl = globalThis.fetch
     return null;
   }
 
+  // No `capabilities`: whether the operator's relay can deliver an
+  // attachment or a copy address is not known here, so the email core
+  // refuses a message with either one rather than let the relay drop it.
   return { name: 'webhook', send, verifyDeliveryWebhook, parseDeliveryEvent };
 }
 

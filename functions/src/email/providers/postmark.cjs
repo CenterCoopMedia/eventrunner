@@ -24,6 +24,15 @@ const BATCH_MAX_MESSAGES = 500;
 const BATCH_MAX_BYTES = 50 * 1024 * 1024;
 
 /**
+ * Postmark accepts a message of at most 10 MB, attachments included, and an
+ * attachment travels as base64, a third larger. 7 MB of files is about
+ * 9.3 MB of base64 and leaves room for the bodies. Postmark needs no
+ * setting for attachments on a transactional stream; it refuses some file
+ * types, and PDF is not one of them.
+ */
+const MAX_ATTACHMENT_BYTES = 7 * 1024 * 1024;
+
+/**
  * Constant-time string equality: compare SHA-256 digests so length never
  * short-circuits through timingSafeEqual's length precondition.
  * @param {string} a @param {string} b
@@ -85,6 +94,7 @@ function toPostmarkPayload(message) {
     To: formatAddress(message.to),
     Subject: message.subject,
   };
+  if (message.cc) payload.Cc = formatAddress(message.cc);
   if (message.html) payload.HtmlBody = message.html;
   if (message.text) payload.TextBody = message.text;
   if (message.replyTo) payload.ReplyTo = message.replyTo;
@@ -94,6 +104,13 @@ function toPostmarkPayload(message) {
       .map(([Name, Value]) => ({ Name, Value: String(Value) }));
   }
   if (message.messageStream) payload.MessageStream = message.messageStream;
+  if (Array.isArray(message.attachments) && message.attachments.length > 0) {
+    payload.Attachments = message.attachments.map((attachment) => ({
+      Name: attachment.filename,
+      Content: attachment.content,
+      ContentType: attachment.contentType,
+    }));
+  }
   return payload;
 }
 
@@ -452,6 +469,8 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
     sendBatch,
     checkBatch,
     batchLimits: { maxMessages: BATCH_MAX_MESSAGES, maxBytes: BATCH_MAX_BYTES },
+    capabilities: { attachments: true, cc: true },
+    attachmentLimits: { maxBytes: MAX_ATTACHMENT_BYTES },
     getMessageStream,
     verifyDeliveryWebhook,
     parseDeliveryEvent,
@@ -461,5 +480,5 @@ function createPostmarkProvider({ env = process.env, fetchImpl = globalThis.fetc
 
 module.exports = {
   createPostmarkProvider,
-  internals: { toPostmarkPayload, formatAddress, passFail, API_BASE, BATCH_MAX_MESSAGES, BATCH_MAX_BYTES },
+  internals: { toPostmarkPayload, formatAddress, passFail, API_BASE, BATCH_MAX_MESSAGES, BATCH_MAX_BYTES, MAX_ATTACHMENT_BYTES },
 };

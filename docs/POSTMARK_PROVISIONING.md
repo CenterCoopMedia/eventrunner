@@ -84,6 +84,13 @@ end. Roughly:
    `postmark.cjs`) only omits `MessageStream` from the API payload — letting Postmark use the
    Server's default stream — when that value is unset. Note whatever you name or rename the stream
    to here; §5 needs it to register the webhook on the stream sends actually land on.
+5. Invoice email (`invoiceAdmin` `send`) attaches the invoice PDF and can add one Cc address. It
+   goes on this transactional stream and needs no Postmark setting: attachments and Cc are on by
+   default. Postmark refuses a message over 10 MB, attachments included, and some file types;
+   PDF is not one of them. The code caps attachments at 7 MB of file, which base64 turns into
+   about 9.3 MB. The send is refused before it reaches Postmark when
+   `config/providers.email.messageStream` (or the default `outbound`, when unset) equals
+   `announcementStream`.
 
 ## 2a. Per deployment: the broadcast stream for announcements
 
@@ -333,6 +340,8 @@ Before calling a deployment's Postmark setup done:
 - [ ] With an authorized synthetic recipient, a real announcement's unsubscribe link suppresses
       that address on the broadcast stream, and the next preview leaves it out. Local tests prove
       the mapping only; this check proves the provider's link replacement and suppression.
+- [ ] An invoice emailed from **Invoices** with **Email invoice** arrives on the transactional
+      stream in **Activity**, with the PDF attached and the Cc address you added.
 - [ ] A test bounce (send to a Postmark-provided bounce test address, or an intentionally invalid
       recipient) produces a `sent_emails` row with `deliveryStatus` patched. This confirms the
       complete webhook round trip, including the Firestore update.

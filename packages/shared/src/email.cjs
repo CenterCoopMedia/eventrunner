@@ -22,7 +22,28 @@ function isEmailAddress(value) {
   return typeof value === 'string' && EMAIL_ADDRESS_RE.test(value);
 }
 
+/**
+ * Characters that make an address more than one plain mailbox: a list
+ * separator, a display-name bracket or quote, a comment, a route, an
+ * escape, or whitespace (a line break would start a new header).
+ */
+const NOT_BARE_RE = /[\s,;:<>"()[\]\\]/;
+
+/**
+ * One plain address and nothing else, for a value that goes into a mail
+ * header as typed (the invoice email copy address, #208 part 4). The
+ * shared form check and the email core's boundary both use this, so a
+ * preview never accepts what the send refuses.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isBareEmailAddress(value) {
+  return isEmailAddress(value) && !NOT_BARE_RE.test(value);
+}
+
 module.exports = {
   EMAIL_ADDRESS_RE,
   isEmailAddress,
+  isBareEmailAddress,
 };

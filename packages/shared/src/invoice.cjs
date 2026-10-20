@@ -18,7 +18,7 @@
  * and no rounding rule to agree on.
  */
 const { CURRENCY_EXPONENTS } = require('./ticketCommerce.cjs');
-const { EMAIL_ADDRESS_RE } = require('./email.cjs');
+const { EMAIL_ADDRESS_RE, isBareEmailAddress } = require('./email.cjs');
 const { isKnownTimeZone, wallParts } = require('./eventDateTime.cjs');
 
 /** The largest single amount or total: 99,999,999.99 in a two-digit currency. */
@@ -42,6 +42,7 @@ const INVOICE_LIMITS = Object.freeze({
   paymentNote: 500,
   voidReason: 500,
   reopenReason: 500,
+  sendNote: 1000,
 });
 const INVOICE_STATUSES = Object.freeze(['draft', 'issued', 'paid', 'void']);
 const ADJUSTMENT_KINDS = Object.freeze(['discount', 'tax']);
@@ -438,6 +439,42 @@ function validateReopenReason(input) {
 }
 
 /**
+ * What staff add when they email an issued invoice (#208, part 4): an
+ * optional copy address and an optional note for the email body. The
+ * recipient is never an input: it is the billing email on the invoice,
+ * passed here as `to`, so a request cannot send the invoice anywhere else.
+ * Unknown fields are dropped.
+ *
+ * The copy address is one address, checked as typed with
+ * shared/email isBareEmailAddress, the same rule the email core applies:
+ * a list, a display name, a quote or a line break is refused, so it cannot
+ * add a recipient or a header. The note is plain text, cleaned like the invoice notes.
+ *
+ * @param {unknown} input
+ * @param {{ to: string }} context the billing email on the invoice
+ * @returns {{ ok: boolean, value: { cc: string|null, note: string }|null, issues: Array<{ path: string, message: string }> }}
+ */
+function validateInvoiceSend(input, { to } = {}) {
+  if (!isRecord(input)) {
+    return { ok: false, value: null, issues: [{ path: 'send', message: 'Enter the email details.' }] };
+  }
+  const issues = [];
+  const rawCc = typeof input.cc === 'string' ? input.cc.trim().toLowerCase() : '';
+  let cc = null;
+  if (rawCc) {
+    if (rawCc.length > INVOICE_LIMITS.email || !isBareEmailAddress(rawCc)) {
+      issues.push({ path: 'cc', message: 'Enter a valid email for the copy, or leave it empty.' });
+    } else if (typeof to === 'string' && rawCc === to.trim().toLowerCase()) {
+      issues.push({ path: 'cc', message: 'The billing email already gets the invoice. Enter a different address for the copy, or leave it empty.' });
+    } else {
+      cc = rawCc;
+    }
+  }
+  const note = textField(issues, 'note', input.note, INVOICE_LIMITS.sendNote, { multiline: true, label: 'the note' });
+  return issues.length ? { ok: false, value: null, issues } : { ok: true, issues: [], value: { cc, note } };
+}
+
+/**
  * What stops a valid draft from being issued: no line, a due date before
  * the issue date, or invoice settings with no issuer name. An empty list
  * means it is ready.
@@ -464,5 +501,5 @@ module.exports = {
   PAYMENT_METHODS, PAYMENT_METHOD_WORDS, DEFAULT_INVOICE_PREFIX, DEFAULT_INVOICE_CURRENCY,
   isInvoiceId, sanitizeInvoiceText, computeInvoiceTotals, parseMoneyInput, minorToInput, formatMoney,
   resolveInvoiceCurrency, formatInvoiceNumber, validateInvoiceDraft, validateInvoiceSettings,
-  invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems,
+  invoiceDateIn, validatePayment, validateVoidReason, validateReopenReason, issueProblems, validateInvoiceSend,
 };

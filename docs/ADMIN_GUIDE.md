@@ -27,7 +27,7 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 | Tier | Sections | For |
 |---|---|---|
 | Operator | Everything below, plus Features, Branding, Access, System errors, voiding an invoice, reopening a paid invoice, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices (write, issue, download, email, mark paid and duplicate), Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, organizations, and invoices) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -500,7 +500,7 @@ If a payment response is lost, the purchaser uses **Resume existing checkout** o
 
 ## Invoices
 
-**Invoices** under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download its PDF, and record the payment. Sending the PDF by email and a card payment link come in later releases.
+**Invoices** under Registration and tickets is where staff bill sponsors and partners. Write a draft, issue it, download or email its PDF, and record the payment. A card payment link comes in a later release.
 
 Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.
 
@@ -541,6 +541,35 @@ Numbers have no gaps. Two people who issue at the same moment get two numbers in
 Open an issued, paid or void invoice and select **Download PDF**. The browser saves it as the invoice number, such as `INV-0004.pdf`. The PDF shows both parties, the dates, every line, the discounts and tax, the total, how to pay, and the notes. A paid invoice says when and how it was paid. A void invoice says **VOID** and the reason, and has no payment instructions. A draft has no PDF.
 
 The PDF uses a standard font. A character it cannot draw, such as a letter in a non-Latin script, is dropped or replaced with the nearest plain letter.
+
+### Email the invoice
+
+Staff can email an issued or paid invoice. The PDF goes as an attachment to the billing email on the invoice. You cannot send it to another address, but you can add one copy.
+
+1. Open the invoice and select **Email invoice**.
+2. Optional: In **Copy to**, type one more address, such as your finance team. It cannot be the billing email.
+3. Optional: In **Note**, write a short message. It appears in the email under the line that names the invoice. It can hold up to 1,000 characters.
+4. Select **Preview email**. The page shows the address, the copy, where replies go, the subject, the file name and the text of the email.
+5. Read the preview, then select **Send to** and the billing email.
+
+Replies go to the issuer email in the invoice settings, when it has one. If you change the copy address or the note, preview the email again. If the invoice changes after the preview, for example someone marks it paid, the send is refused. Preview it again.
+
+The record shows each email under **Emails sent**: when, to which addresses, and whether it was sent. Each email is also in the **Email log** and the audit log. The audit log does not hold the addresses or the note.
+
+If an address got this invoice less than 15 minutes ago, the preview says so. To send it again, tick **Send it again anyway**. This stops a double send by mistake. A send that failed does not count. One invoice can be emailed at most five times in an hour.
+
+The email is refused, and the page says why, when:
+
+- The invoice is a draft or void.
+- The invoice has no billing email. Download the PDF and send it yourself, or void the invoice and duplicate it with a billing email.
+- The site is a read-only demo.
+- The site's email provider cannot send attachments. Download the PDF and attach it to your own email.
+
+While an email of the invoice is being sent, **Mark paid**, **Void** and **Reopen** are refused. Try again when the email is sent. A send that stopped part way stops blocking them after five minutes.
+
+If the page says the email may have been sent, the email provider did not confirm it. Check the **Email log** before you send it again.
+
+Invoice email is transactional mail. It never goes on the announcement stream and has no unsubscribe link.
 
 ### Mark an invoice paid
 

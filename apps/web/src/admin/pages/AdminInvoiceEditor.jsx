@@ -15,9 +15,10 @@
 // next number. Issue sends the revision the form was filled from, so it
 // issues the saved draft and never the unsaved form: with changes on the
 // form, the page asks for a save first. After issue the fields sit in a
-// disabled fieldset, and InvoiceRecord shows the frozen record with Mark
-// paid, Duplicate and, for an operator, Void and Reopen (a paid invoice). Download PDF is in the
-// header of every issued invoice.
+// disabled fieldset, and InvoiceRecord shows the frozen record with Email
+// invoice (an issued or paid one), Mark paid, Duplicate and, for an
+// operator, Void and Reopen (a paid invoice). Download PDF is in the header
+// of every issued invoice.
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -400,6 +401,31 @@ export default function AdminInvoiceEditor({ mode }) {
     }
   }
 
+  /** The email preview (part 4). The form states a refusal in place, so this rethrows. */
+  async function previewEmail(input) {
+    clearError();
+    return call('invoiceAdmin', { action: 'previewSend', invoiceId, ...input });
+  }
+
+  async function sendEmail(input) {
+    setBusy('email');
+    clearError();
+    setStatus('');
+    try {
+      const result = await call('invoiceAdmin', { action: 'send', invoiceId, ...input });
+      applyInvoice(result);
+      const copy = input.cc ? `, with a copy to ${input.cc}` : '';
+      const to = result.invoice.billTo?.email ?? 'the billing email';
+      const message = result.outcome === 'uncertain'
+        ? `The email provider did not confirm the email of ${result.invoice.number}. It may have been sent. Check the email log before you send it again.`
+        : `Emailed ${result.invoice.number} to ${to}${copy}.`;
+      setStatus(message);
+      showToast(message, { announce: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function duplicate() {
     if (busy) return;
     if (duplicateIdRef.current === null) duplicateIdRef.current = mintInvoiceId();
@@ -586,6 +612,8 @@ export default function AdminInvoiceEditor({ mode }) {
           onVoid={voidInvoice}
           onReopen={reopenInvoice}
           onDuplicate={duplicate}
+          onPreviewEmail={previewEmail}
+          onSendEmail={sendEmail}
         />
       ) : null}
 

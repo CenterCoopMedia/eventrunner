@@ -15,10 +15,75 @@
 const crypto = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { internals: renderInternals } = require('./render.cjs');
+const { isBareEmailAddress } = require('shared/email');
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [500, 2000];
 const BODY_STORE_LIMIT = 100 * 1024; // 100 KB, per body (spec §3.1)
+
+/**
+ * Attachments (issue #208, part 4: the invoice PDF). An attachment is
+ * `{ filename, contentType, content }` with `content` in base64. Only these
+ * types are sent; the list grows with a caller that needs another.
+ */
+const ATTACHMENT_TYPES = new Set(['application/pdf']);
+const ATTACHMENT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/** What a provider says it can carry. @param {object} provider @param {'attachments'|'cc'} name */
+function providerCan(provider, name) {
+  return provider?.capabilities?.[name] === true;
+}
+
+/** Decoded size of a base64 string. @param {string} content */
+function base64Bytes(content) {
+  return Buffer.from(content, 'base64').length;
+}
+
+/**
+ * Why a message's attachments and copy address cannot be sent with this
+ * provider, or null. Checked before any claim, audit-only refusal or
+ * provider request, so a provider that would drop an attachment never gets
+ * the message.
+ * @param {object} message @param {object} provider
+ * @returns {string|null} an error code
+ */
+function extrasProblem(message, provider) {
+  if (message.cc !== undefined && message.cc !== null) {
+    if (!providerCan(provider, 'cc')) return 'cc-unsupported';
+    const cc = typeof message.cc === 'string' ? message.cc : message.cc?.email;
+    if (!isBareEmailAddress(cc)) return 'invalid-cc';
+  }
+  if (message.attachments === undefined || message.attachments === null) return null;
+  if (!Array.isArray(message.attachments)) return 'invalid-attachment';
+  if (message.attachments.length === 0) return null;
+  if (!providerCan(provider, 'attachments')) return 'attachments-unsupported';
+  let total = 0;
+  for (const attachment of message.attachments) {
+    if (!attachment || typeof attachment !== 'object'
+      || typeof attachment.filename !== 'string' || !ATTACHMENT_NAME_RE.test(attachment.filename)
+      || !ATTACHMENT_TYPES.has(attachment.contentType)
+      || typeof attachment.content !== 'string' || attachment.content.length === 0
+      || attachment.content.length % 4 !== 0 || !BASE64_RE.test(attachment.content)) {
+      return 'invalid-attachment';
+    }
+    total += base64Bytes(attachment.content);
+  }
+  const max = provider?.attachmentLimits?.maxBytes;
+  if (Number.isFinite(max) && total > max) return 'attachments-too-large';
+  return null;
+}
+
+/** The name, type and size of each attachment, for the audit row. Never the content. */
+function attachmentSummary(attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return null;
+  // A refused, malformed attachment is summarised too, so this never throws.
+  return attachments.map((attachment) => ({
+    filename: typeof attachment?.filename === 'string' ? attachment.filename.slice(0, 100) : null,
+    contentType: typeof attachment?.contentType === 'string' ? attachment.contentType.slice(0, 100) : null,
+    bytes: typeof attachment?.content === 'string' ? base64Bytes(attachment.content) : 0,
+  }));
+}
 
 /** @param {string} onceKey */
 function claimIdForOnceKey(onceKey) {
@@ -150,11 +215,15 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
   /**
    * @param {object} message EmailMessage (spec §3.1): { to, from?, replyTo?,
    *   subject, text?, html?, headers?, tag?, onceKey?, idempotencyKey?,
-   *   source?, storeRendered?, auditRedact?, sendId? }. `auditRedact` is a list of
+   *   source?, storeRendered?, auditRedact?, cc?, attachments?, sendId? }. `auditRedact` is a list of
    *   { find, replace } pairs applied to the bodies the audit row stores,
    *   never to the mail sent: a per-recipient secret such as a signed
-   *   unsubscribe link stays out of the admin-readable log. `sendId` names
-   *   the announcement send a message belongs to; only the audit row keeps it.
+   *   unsubscribe link stays out of the admin-readable log. `cc` is one
+   *   plain address; `attachments` is a list of { filename, contentType,
+   *   content (base64) }. Either one needs a provider that declares it in
+   *   `capabilities`, or the message is refused before any claim. `sendId`
+   *   names the announcement send a message belongs to; only the audit row
+   *   keeps it.
    * @returns {Promise<object>} EmailSendResult
    */
   /**
@@ -187,6 +256,10 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         text: text.value,
         bodyTruncated: html.truncated || text.truncated,
         source: message.source || null,
+        // A copy address and the attachments' names and sizes, when the
+        // message had them. The file content never reaches this row.
+        ...(message.cc ? { cc: typeof message.cc === 'string' ? message.cc : message.cc.email ?? null } : {}),
+        ...(attachmentSummary(message.attachments) ? { attachments: attachmentSummary(message.attachments) } : {}),
         ...(typeof message.sendId === 'string' && message.sendId ? { sendId: message.sendId } : {}),
         sentAt: new Date(),
       });
@@ -218,6 +291,15 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
       // failed send is how operators lose mail-delivery incidents.
       const outcome = { providerMessageId: null, status: 'failed', error: 'no recipient', retries: 0 };
       await writeAuditRow(message, null, null, outcome);
+      return outcome;
+    }
+
+    // An attachment or a copy address this provider cannot carry, or a
+    // malformed one, is refused before the claim: no claim, no request.
+    const extras = extrasProblem(message, provider);
+    if (extras) {
+      const outcome = { providerMessageId: null, status: 'failed', error: extras, retries: 0 };
+      await writeAuditRow(message, null, toEmail, outcome);
       return outcome;
     }
 
@@ -342,6 +424,10 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
         throw new EmailBatchError('invalid-batch', `Message ${index + 1} repeats a send-once key.`);
       }
       seenKeys.add(message.onceKey);
+      const extras = extrasProblem(message, provider);
+      if (extras) {
+        throw new EmailBatchError(extras, `Message ${index + 1} has an attachment or a copy address this provider cannot send (${extras}).`);
+      }
     });
 
     const policy = await checkDemoWrites({ db });
@@ -660,6 +746,7 @@ function buildHandlers() {
 
 module.exports = {
   createEmailCore,
+  providerCan,
   withLegalFooter,
   createDeliveryWebhookHandler,
   EmailBatchError,
@@ -671,6 +758,8 @@ module.exports = {
   internals: {
     isRetryable,
     truncateForAudit,
+    extrasProblem,
+    providerCan,
     claimIdForOnceKey,
     isAlreadyExists,
     resolveMessage,

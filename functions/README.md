@@ -5,7 +5,7 @@ Cloud Functions, one domain module per directory under `src/`. `index.js` is an 
 Landed so far (M2 backend foundation):
 
 - `src/core/` — config loader/cache (`getEventConfig`, Tier A env accessors), CORS, error responses, lazy firebase-admin init
-- `src/email/` — the one send path (bounded retry, `onceKey` send-once claims, `sent_emails` audit; `sendBatch` sends many single-recipient messages in one provider batch call, needs a send-once key on every entry, refuses a malformed or oversized batch and a provider without batch support before any claim, retries only retryable entries, and marks a throw or a missing result uncertain with no replay), template renderer with the `_html` escaping rules, phase-2 templates (`auth.otp`, `account.welcome`), Postmark/webhook/console adapters, delivery-event ingest (`emailDeliveryWebhook`; an event for a message with no `sent_emails` row yet answers 503 with `Retry-After` for 15 minutes after the event, so the provider retries it, and is acknowledged after that), and the staff-tier email log readers (`log.cjs`: `listSentEmails` lists rows without bodies and searches a bounded window of 500; `getSentEmail` returns one row's bodies and records the read in `admin_logs`)
+- `src/email/` — the one send path (bounded retry, `onceKey` send-once claims, `sent_emails` audit; `sendBatch` sends many single-recipient messages in one provider batch call, needs a send-once key on every entry, refuses a malformed or oversized batch and a provider without batch support before any claim, retries only retryable entries, and marks a throw or a missing result uncertain with no replay), template renderer with the `_html` escaping rules, phase-2 templates (`auth.otp`, `account.welcome`), Postmark/webhook/console adapters (Postmark and console declare `capabilities` for a copy address and attachments; the webhook relay declares none), delivery-event ingest (`emailDeliveryWebhook`; an event for a message with no `sent_emails` row yet answers 503 with `Retry-After` for 15 minutes after the event, so the provider retries it, and is acknowledged after that), and the staff-tier email log readers (`log.cjs`: `listSentEmails` lists rows without bodies and searches a bounded window of 500; `getSentEmail` returns one row's bodies and records the read in `admin_logs`)
 - `src/auth/` — emailed-code sign-in: challenge store, rate bucket, attempt lockout, send-boundary code gate, custom-token issuance
 - `src/notify/` — operator notifier with webhook/email/none sinks
 - `src/cms/` — the two-revision publish model (spec §8.4): block-type registry, draft-only content/page/update editors (`cmsSaveUpdate` takes `title`, `body`, `publishAt`, `pinned`, `category`, `featured`, `featuredImage`, and `content`, and refuses any other key by name), version history reads with a what-changed list per version, and the chunked resumable publish pipeline over the six publishable collections and their `_drafts` siblings; `organizations.cjs` checks each organization field's type and length at the content save (the website stored canonical, the logo a Storage object path), and a create's document id, which is the organization's page address (`/sponsors/:slug`): it must be slug-shaped, and one already in use answers 409 at the save; `timeline.cjs` checks each timeline entry at the same save (the year a whole number from 1900 to 2100, the title required text on one line up to 120 characters, the description optional text up to 600 characters), refuses a key the request sends outside those fields by name, and drops a stray key only the stored entry carries
@@ -235,12 +235,13 @@ the native attendee read/checkout handlers do not need them.
 
 `invoiceAdmin` (`src/admin/invoices.cjs`, issues #208 and #209) is a POST action API
 in the shape of `ticketingCommerceAdmin`: `list`, `get`, `settings`, `saveDraft`,
-`deleteDraft`, `saveSettings`, `issue`, `markPaid`, `void`, `reopen` and `duplicate`.
+`deleteDraft`, `saveSettings`, `issue`, `markPaid`, `void`, `reopen`, `duplicate`,
+`previewSend` and `send`.
 Staff run every action but `saveSettings`, `void` and `reopen`, which need an
 operator: `invoice_settings/current` holds the issuer's tax ID and bank details, a
 void is final, and a reopen undoes a recorded payment. Every answer that carries an
 invoice also carries `canVoid` and `canReopen`, so the page offers those controls only
-to an operator. Send (email) and the Stripe pay link come in later parts.
+to an operator. The Stripe pay link comes in a later part.
 
 The three collections (`invoices`, `invoice_counters`, `invoice_settings`) deny every
 client read and write. `saveDraft` takes the client-minted `invoiceId` and the
@@ -289,8 +290,50 @@ each line goes through `sanitizeForFont` and `wrapText` from `src/pdf/kit.cjs`. 
 writes drawn text as hex strings, so a parenthesis or a PDF keyword in a name stays
 text. Reading a PDF writes nothing, so a read-only demo serves it.
 
+**Email.** `previewSend` and `send` (`src/admin/invoiceEmail.cjs`, part 4) email an
+issued or paid invoice with its PDF attached, on the transactional stream. The
+recipient is the billing email on the invoice; a request may add one `cc` and a
+`note` (`shared/invoice` `validateInvoiceSend`) and cannot name another recipient.
+No display name goes in an address. `previewSend` writes nothing and answers the
+subject, both bodies (footer included), the file name, the addresses, a `receipt`
+(SHA-256 over those, the stream, the invoice id and its revision), `canSend` with a
+reason, and `recentSend`. `send` takes `{ invoiceId, sendId, receipt, cc?, note?,
+confirmResend? }`. It refuses a draft, a void invoice, a missing billing email, a
+read-only demo, a provider without `capabilities.attachments` (409
+`attachments-unsupported`; the webhook relay declares none), and a transactional
+stream equal to `announcementStream` (409 `stream-misconfigured`), all before anything
+is recorded. In one transaction it composes the email again from the stored invoice,
+refuses a changed receipt (409 `stale-preview`), refuses any send still `sending` (409
+`in-progress`), refuses a new send to an address that got this invoice less than 15
+minutes ago unless `confirmResend` (409 `recent-send`; a failed send does not count,
+an uncertain one does), refuses a sixth send of the invoice inside an hour even when
+confirmed (429 `rate-limited`), and reserves the send on the invoice's `sends` list. The
+email core's send-once claim `invoice-send:{invoiceId}:{sendId}` is the second
+barrier, so a repeat of a `sendId` sends nothing and answers the first outcome
+(`repeated: true`). A second transaction records the status, the time and the
+provider's message id on the invoice and writes the `admin_logs` row
+(`invoices.emailed` or `invoices.email-failed`) together; the row holds no address and
+no note. A send left `sending` for five minutes is settled by its claim (`uncertain`
+with a claim, `failed` without); its row names the original sender, and the requester
+whose send settled it as `settledBy`. While a send is reserved and not stale,
+`markPaid`, `void` and `reopen` answer 409, so the email never states an old status. A send does not change the invoice revision. A
+provider refusal answers 502 `send-failed` and keeps only the provider's status code.
+`invoiceAdmin` binds the send secrets of the configured provider.
+
+The email core (`src/email/send.cjs`) carries `cc` (one plain address) and
+`attachments` (`{ filename, contentType, content }`, base64, PDF only) to a provider
+that declares them in `capabilities` (the copy address must pass `shared/email`
+`isBareEmailAddress`, the same rule the editor and `validateInvoiceSend` apply); otherwise it refuses the message before any
+claim or request (`cc-unsupported`, `attachments-unsupported`, `invalid-attachment`,
+`attachments-too-large` over `attachmentLimits.maxBytes`), and `sendBatch` throws
+`EmailBatchError` with the same code. The `sent_emails` row keeps the copy address and
+each attachment's name, type and size, never its content. Postmark maps them to `Cc`
+and `Attachments` (7 MB of files, inside its 10 MB message limit). The console
+provider writes them to `E2E_MAIL_FILE`, content included, and logs only the names.
+
 **Export.** `exportEventData` has an `invoices` dataset (staff), and the event data
 package a `billing` part with `billing/invoices.json` and `billing/invoices.csv`
-(`exportRecords.cjs` `invoiceRecord`: no account ids). `invoice_settings` and
+(`exportRecords.cjs` `invoiceRecord`: no account ids; `emailSends` keeps each email's
+status, addresses, times and message id). `invoice_settings` and
 `invoice_counters` are in the package's EXCLUDED list, and the repeat-event template
 leaves all three collections behind.

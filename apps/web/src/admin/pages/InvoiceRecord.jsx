@@ -1,6 +1,6 @@
 // The record of an issued invoice (issue #209), and what staff can do with
-// it: mark it paid, duplicate it into a new draft, and, for an operator,
-// void it or reopen a paid one.
+// it: email it as a PDF (part 4, InvoiceEmailForm), mark it paid, duplicate
+// it into a new draft, and, for an operator, void it or reopen a paid one.
 //
 // Everything here is the server's frozen copy: the number, the issue date
 // and the issuer block were fixed at issue, so later settings edits do not
@@ -30,6 +30,7 @@ import {
 } from '../components/formControls.jsx';
 import { messageOf } from '../invoiceDoc.js';
 import { focusFirstError } from '../../lib/focusFirstError.js';
+import InvoiceEmailForm from './InvoiceEmailForm.jsx';
 
 const panelClass = 'admin-panel min-w-0 rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md';
 const termClass = 'text-admin-ink-secondary';
@@ -230,12 +231,50 @@ function PaymentHistory({ history }) {
   );
 }
 
+/** How each email of the PDF ended, in words. */
+const SEND_STATUS_WORDS = Object.freeze({
+  sent: 'Sent',
+  failed: 'Not sent',
+  uncertain: 'May have been sent',
+  sending: 'Sending',
+});
+
+/** "2026-10-20 14:05" on the reader's clock, or the stored text. */
+function sendTime(iso) {
+  const ms = Date.parse(iso ?? '');
+  if (!Number.isFinite(ms)) return 'an unknown time';
+  const date = new Date(ms);
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Each email of the PDF, newest first. */
+function EmailHistory({ sends }) {
+  const headingId = useId();
+  if (!sends?.length) return null;
+  return (
+    <div className="flex flex-col gap-3xs">
+      <h3 id={headingId} className="text-admin-base font-bold text-admin-ink">Emails sent</h3>
+      <ul aria-labelledby={headingId} className="flex list-disc flex-col gap-3xs ps-5 text-admin-sm text-admin-ink">
+        {[...sends].reverse().map((entry, index) => (
+          <li key={entry.sendId ?? index}>
+            {`${SEND_STATUS_WORDS[entry.status] ?? 'May have been sent'}: ${sendTime(entry.at)}, to ${entry.to}${entry.cc ? `, copy to ${entry.cc}` : ''}.`}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * @param {{ invoice: object, canVoid: boolean, canReopen: boolean, timeZone?: string, busy: string|null,
  *           onMarkPaid: (payment: object) => Promise<void>, onVoid: (reason: string) => Promise<void>,
- *           onReopen: (reason: string) => Promise<void>, onDuplicate: () => void }} props
+ *           onReopen: (reason: string) => Promise<void>, onDuplicate: () => void,
+ *           onPreviewEmail: (input: object) => Promise<object>, onSendEmail: (input: object) => Promise<void> }} props
  */
-export default function InvoiceRecord({ invoice, canVoid, canReopen, timeZone, busy, onMarkPaid, onVoid, onReopen, onDuplicate }) {
+export default function InvoiceRecord({
+  invoice, canVoid, canReopen, timeZone, busy, onMarkPaid, onVoid, onReopen, onDuplicate, onPreviewEmail, onSendEmail,
+}) {
   const headingId = useId();
   const [open, setOpen] = useState(null);
   const issuer = invoice.issuer ?? {};
@@ -269,6 +308,7 @@ export default function InvoiceRecord({ invoice, canVoid, canReopen, timeZone, b
           {invoice.voided ? <Row term="Void reason">{invoice.voided.reason}</Row> : null}
         </dl>
         <PaymentHistory history={invoice.paymentHistory} />
+        <EmailHistory sends={invoice.emailSends} />
         {status === 'void' ? (
           <p className="max-w-[65ch] text-admin-sm text-admin-ink-secondary">
             {invoice.number} stays used. It is never given to another invoice. To bill again, duplicate this invoice as a new draft.
@@ -276,6 +316,11 @@ export default function InvoiceRecord({ invoice, canVoid, canReopen, timeZone, b
         ) : null}
 
         <div className="flex flex-wrap items-center gap-xs">
+          {(status === 'issued' || status === 'paid') && open !== 'email' ? (
+            <button type="button" className={secondaryButtonClass} disabled={busy !== null} onClick={() => setOpen('email')}>
+              Email invoice
+            </button>
+          ) : null}
           {status === 'issued' && open !== 'paid' ? (
             <button type="button" className={secondaryButtonClass} disabled={busy !== null} onClick={() => setOpen('paid')}>
               Mark paid
@@ -307,6 +352,18 @@ export default function InvoiceRecord({ invoice, canVoid, canReopen, timeZone, b
           </p>
         ) : null}
 
+        {open === 'email' && (status === 'issued' || status === 'paid') ? (
+          <InvoiceEmailForm
+            invoice={invoice}
+            busy={busy === 'email'}
+            onCancel={() => setOpen(null)}
+            onPreview={onPreviewEmail}
+            onSend={async (input) => {
+              await onSendEmail(input);
+              setOpen(null);
+            }}
+          />
+        ) : null}
         {open === 'paid' && status === 'issued' ? (
           <MarkPaidForm
             timeZone={timeZone}
