@@ -6,22 +6,43 @@
  * feature's `slackPushWebhook` and its four secrets are not ported (the
  * issue is explicit that this is now fed by an admin form only).
  *
- *   saveLiveUpdate   POST { id?, update: { message, pinned? } } — create or
- *                    edit one entry. Omitting `id` creates a new entry with a
- *                    random id. `postedAt` is stamped once, on first create,
- *                    and preserved on every later edit — editing a typo must
- *                    not bump an entry back to the top of a time-ordered feed.
+ *   saveLiveUpdate   POST { id?, update: { message, pinned?, category?,
+ *                    audience? } } — create or edit one entry. Omitting `id`
+ *                    creates a new entry with a random id. `postedAt` is
+ *                    stamped once, on first create, and preserved on every
+ *                    later edit — editing a typo must not bump an entry back
+ *                    to the top of a time-ordered feed.
  *   deleteLiveUpdate POST { id } — remove one entry.
  *
  * `live_updates` has no draft/publish revision model (unlike cmsUpdates):
- * every write lands directly on the live doc, and firestore.rules make the
- * collection anonymously readable (a plain admin-authored feed, not gated
- * editorial content) with all writes denied to clients — only this module,
- * via the Admin SDK, ever writes it. Every write gets an admin_logs row
- * (cms/store.cjs's logAdminAction, same best-effort contract as elsewhere:
- * a failed audit write never fails the mutation it describes).
+ * every write lands directly on the live doc, with all client writes denied
+ * — only this module, via the Admin SDK, ever writes it.
  *
- * The public doc deliberately carries no actor identity: `live_updates` is
+ * AUDIENCE (issue #200). Every row names who may read it: `everyone`,
+ * `attendees` (approved attendees and speakers), or `speakers`.
+ * firestore.rules enforce it at the database, so the card's query carries
+ * the matching predicate and cannot widen it. The field is optional on the
+ * wire and always stored. An edit that omits it keeps the row's audience,
+ * so a client that does not know the field (an admin tab still open on an
+ * older bundle) can never widen a speaker-only row. A new row, or an old
+ * one with none, gets `everyone`, which is what every row meant before the
+ * field existed. The rules fail closed on a row with no audience, so a save
+ * is also how an old row gets one. The audience goes into the admin_logs
+ * row with the one it replaced, so a widened row can be traced. The save
+ * reads, writes and audits in one transaction, so a concurrent change to
+ * the audience is never overwritten by an edit that omitted it.
+ *
+ * CATEGORY. One short line the card sets as a tag, with the same rule the
+ * Updates page's category uses (shared/update validUpdateCategory), so the
+ * two tags cannot disagree. Optional; omitted on an edit, the row keeps its
+ * category, and omitted on a new row, it is stored null.
+ *
+ * Every write gets an admin_logs row. A delete uses cms/store.cjs's
+ * logAdminAction (best effort: a failed audit write never fails the delete).
+ * A save writes the same row shape inside its transaction instead, because
+ * its audit carries the audience it replaced, read in that transaction.
+ *
+ * The public doc deliberately carries no actor identity: an `everyone` row is
  * anonymously readable, and config/bootstrap is a server-only
  * allowlist (firestore.rules denies even an admin a direct read of it) —
  * stamping `updatedBy` here would let any visitor enumerate admin addresses
@@ -34,6 +55,7 @@ const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction } = require('../cms/store.cjs');
 const { internals: pagesInternals } = require('../cms/pages.cjs');
+const { validUpdateCategory, UPDATE_CATEGORY_MAX } = require('shared/update');
 
 const { DOC_ID_RE } = pagesInternals;
 
@@ -41,7 +63,15 @@ const LIVE_UPDATES_COLLECTION = 'live_updates';
 const MAX_MESSAGE_LEN = 1000;
 
 /** Keys a live_updates doc may carry — anything else is rejected by name. */
-const UPDATE_KEYS = Object.freeze(['message', 'pinned']);
+const UPDATE_KEYS = Object.freeze(['message', 'pinned', 'category', 'audience']);
+
+/**
+ * Who may read a row, narrowest last. firestore.rules
+ * (readableLiveUpdateAudiences) and apps/web/src/lib/liveUpdatesSource.js
+ * carry the same three words; rules cannot import this list.
+ */
+const AUDIENCES = Object.freeze(['everyone', 'attendees', 'speakers']);
+const DEFAULT_AUDIENCE = 'everyone';
 
 function isNonEmptyString(v) {
   return typeof v === 'string' && v.trim().length > 0;
@@ -69,6 +99,12 @@ function validateLiveUpdateDoc(doc) {
   }
   if ('pinned' in doc && typeof doc.pinned !== 'boolean') {
     errors.push('pinned: must be a boolean');
+  }
+  if (doc.category !== undefined && doc.category !== null && !validUpdateCategory(doc.category)) {
+    errors.push(`category: must be null or 1 to ${UPDATE_CATEGORY_MAX} characters on one line`);
+  }
+  if (doc.audience !== undefined && !AUDIENCES.includes(doc.audience)) {
+    errors.push(`audience: must be one of ${AUDIENCES.join(', ')}`);
   }
   return { ok: errors.length === 0, errors };
 }
@@ -98,31 +134,50 @@ function createSaveLiveUpdateHandler({ db, auth, getConfig, now = Date.now, log 
     const at = new Date(now());
     const ref = db.collection(LIVE_UPDATES_COLLECTION).doc(id);
     try {
-      const snap = await ref.get();
-      // postedAt is stamped once and never moved: an edit fixing a typo must
-      // not bump an entry back to the top of a time-ordered feed.
-      const postedAt = snap.exists && snap.data()?.postedAt ? snap.data().postedAt : at;
-      // No updatedBy/actor field here — see the module doc comment: this
-      // doc is anonymously readable, and admin_logs (below) is where actor
-      // identity belongs.
-      await ref.set({
-        message: update.message,
-        pinned: update.pinned === true,
-        postedAt,
-        updatedAt: at,
+      // One transaction for the read, the write and the audit row. An edit
+      // that omits the audience keeps the row's, so the value it keeps and
+      // the audit's previous audience must come from the same read the
+      // write commits against: a narrowing to speakers that lands between a
+      // plain read and the write would otherwise be overwritten back to
+      // everyone. On contention Firestore runs the callback again on the
+      // newer row. The audit row is created in the same commit (the shape
+      // logAdminAction writes), so it can never name a stale audience.
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const prior = snap.exists ? snap.data() : null;
+        // postedAt is stamped once and never moved: an edit fixing a typo
+        // must not bump an entry back to the top of a time-ordered feed.
+        const postedAt = prior?.postedAt ? prior.postedAt : at;
+        const previousAudience = typeof prior?.audience === 'string' ? prior.audience : null;
+        let audience = DEFAULT_AUDIENCE;
+        if (update.audience !== undefined) audience = update.audience;
+        else if (AUDIENCES.includes(previousAudience)) audience = previousAudience;
+        let category = typeof prior?.category === 'string' ? prior.category : null;
+        if (update.category !== undefined) category = typeof update.category === 'string' ? update.category.trim() : null;
+        // No updatedBy/actor field here — see the module doc comment: this
+        // doc can be anonymously readable, and admin_logs is where actor
+        // identity belongs.
+        tx.set(ref, {
+          message: update.message,
+          pinned: update.pinned === true,
+          category,
+          audience,
+          postedAt,
+          updatedAt: at,
+        });
+        tx.create(db.collection('admin_logs').doc(), {
+          action: 'saveLiveUpdate',
+          docPath: `${LIVE_UPDATES_COLLECTION}/${id}`,
+          uid: gate.uid,
+          email: gate.email,
+          at,
+          details: { audience, previousAudience },
+        });
       });
     } catch (err) {
       log.error('saveLiveUpdate write failed', err);
       return internal(res, 'The live update could not be saved.');
     }
-    await logAdminAction({
-      db,
-      action: 'saveLiveUpdate',
-      docPath: `${LIVE_UPDATES_COLLECTION}/${id}`,
-      actor: { uid: gate.uid, email: gate.email },
-      now,
-      log,
-    });
     res.status(200).json({ id });
   };
 }
@@ -205,5 +260,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { UPDATE_KEYS, MAX_MESSAGE_LEN, LIVE_UPDATES_COLLECTION },
+  internals: { UPDATE_KEYS, MAX_MESSAGE_LEN, LIVE_UPDATES_COLLECTION, AUDIENCES, DEFAULT_AUDIENCE },
 };

@@ -118,6 +118,14 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Live updates have a category and an audience: everyone, approved attendees and speakers,
+          or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
+          approved attendee cannot get or list a speaker-only entry, and the card&#39;s queries carry the
+          matching audience filter. Each save writes the new and the previous audience to
+          <code>admin_logs</code>. The card also lists the event&#39;s milestones as key dates, in date order, and
+          shows them when the feed is empty (#200).</li>
+          </ul>
+          <ul>
           <li>The admin rail groups its sections into Content, Program, Registration and tickets,
           Communications, Operations and Settings. Each group opens and closes from a button on its
           name. The group of the current page opens by itself, and a closed one names the current page.
@@ -686,6 +694,13 @@
           section the client has already written. Both are reported by init as kept.</li>
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li><code>live_updates</code> is no longer readable by everyone. A row with no audience, which is every
+          row saved before this release, is readable by admins only, so it leaves the public card.
+          The Live updates page counts these rows and marks each one; edit and save a row to give it
+          an audience. Deploy the two new <code>live_updates</code> indexes in <code>firestore.indexes.json</code> with the
+          rules, or the card&#39;s queries fail until the indexes are built (#200).</li>
+          </ul>
           <ul>
           <li>Groundwork for scheduled reminders (#518), with no change that users see.
           <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0006-scheduled-reminders.md">ADR 0006</a> records why a reminder schedule is not a

@@ -492,11 +492,42 @@ service cloud.firestore {
     }
 
     // Live updates dashboard feed (spec §9 "Live updates card", issue #28):
-    // a plain admin-authored feed, not gated editorial content like the CMS
-    // two-revision collections above — harmless to read publicly, written
-    // only by saveLiveUpdate/deleteLiveUpdate (Admin SDK).
+    // an admin-authored feed, written only by saveLiveUpdate/
+    // deleteLiveUpdate (Admin SDK). Each row names its `audience` (issue
+    // #200), and THE READ IS GATED HERE, not in the card: a speaker-only row
+    // that only the card hid would still be one query away for anyone.
+    //
+    //   everyone   anyone, signed out included
+    //   attendees  approved attendees and speakers (requesterIsApprovedAttendee)
+    //   speakers   accounts linked to a speaker record (users.speakerId set)
+    //
+    // The audiences a reader may see are a list, and the row's audience must
+    // be in it. A `list` query succeeds only when the rules can prove every
+    // row it could return passes, so the client's queries carry
+    // `where('audience', 'in', <that same list>)` (apps/web/src/lib/
+    // liveUpdatesSource.js); a query with no audience predicate is refused
+    // for everyone but an admin.
+    //
+    // THE DEFAULT FAILS CLOSED: a row with no audience (one written before
+    // #200) or an unknown one matches no reader branch, so only admins read
+    // it. The admin page names those rows, and saving one again sets its
+    // audience.
+    function requesterIsSpeaker() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && requesterUserDoc().get('speakerId', null) != null;
+    }
+
+    function readableLiveUpdateAudiences() {
+      return request.auth == null ? ['everyone']
+        : requesterIsSpeaker() ? ['everyone', 'attendees', 'speakers']
+        : requesterIsApprovedAttendee() ? ['everyone', 'attendees']
+        : ['everyone'];
+    }
+
     match /live_updates/{docId} {
-      allow read: if true;
+      allow read: if resource.data.get('audience', '') in readableLiveUpdateAudiences();
+      allow read: if isAdmin();
       allow write: if false;
     }
 
