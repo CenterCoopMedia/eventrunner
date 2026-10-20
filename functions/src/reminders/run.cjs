@@ -26,25 +26,39 @@ const BRANCHES = Object.freeze([
 ]);
 
 /**
- * One run of every branch.
+ * How long one run may start new work: the 540-second function timeout,
+ * less a minute for the step in flight, the last-run stamps and the admin
+ * log rows.
+ */
+const RUN_BUDGET_MS = 480_000;
+
+/**
+ * One run of every branch. The branches run side by side, not one after
+ * the other, and share one deadline: a long speaker run cannot use up the
+ * time the attendee run needs, or the other way round. Each branch stops
+ * starting new work (a speaker, a chunk of 200 addresses) at the deadline;
+ * what is left has no ledger row or is still on its send record, so the
+ * next hourly run sends it. The branches touch different documents and
+ * hold different leases, so running them together is safe.
  *
- * @param {{ db, getConfig, sendEmail, provider?, emailCore?, notifyOperator?, now?, log? }} deps
+ * @param {{ db, getConfig, sendEmail, provider?, emailCore?, notifyOperator?, now?, log?, deadlineMs? }} deps
  *   `sendEmail` serves the speaker branch; `provider` and `emailCore` the
  *   attendee branch.
  * @returns {Promise<Record<string, { outcome: string, reason?: string }>>}
  */
 async function runScheduledReminders(deps, branches = BRANCHES) {
   const log = deps.log ?? console;
-  const results = {};
-  for (const branch of branches) {
+  const now = deps.now ?? Date.now;
+  const deadlineMs = deps.deadlineMs ?? now() + RUN_BUDGET_MS;
+  const entries = await Promise.all(branches.map(async (branch) => {
     try {
-      results[branch.id] = await branch.run(deps);
+      return [branch.id, await branch.run({ ...deps, deadlineMs })];
     } catch (err) {
       log.error(`scheduled reminders: the ${branch.id} branch failed`, err);
-      results[branch.id] = { outcome: 'failed', reason: 'internal' };
+      return [branch.id, { outcome: 'failed', reason: 'internal' }];
     }
-  }
-  return results;
+  }));
+  return Object.fromEntries(entries);
 }
 
 /** The secrets a run needs: the mail provider's, and the operator notifier's. */
@@ -92,5 +106,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { BRANCHES },
+  internals: { BRANCHES, RUN_BUDGET_MS },
 };

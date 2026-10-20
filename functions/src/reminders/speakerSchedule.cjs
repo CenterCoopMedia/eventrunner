@@ -268,7 +268,7 @@ function ids(rows) {
  * Send what is due now, inside the lease. Never called while the schedule
  * is off or paused.
  */
-async function sendDue({ db, getConfig, sendEmail, notifyOperator, now, log, schedule }) {
+async function sendDue({ db, getConfig, sendEmail, notifyOperator, now, log, schedule, deadlineMs = null }) {
   const config = await getConfig();
   const timeZone = eventTimeZone(config);
   const loaded = await loadReminderTemplate(db, now);
@@ -338,6 +338,11 @@ async function sendDue({ db, getConfig, sendEmail, notifyOperator, now, log, sch
       const nowMs = now();
       // A long run must not send into quiet hours or past its window. The
       // rest get no ledger row, so a later run in the window reaches them.
+      // The hourly run's deadline (run.cjs): the rest wait for the next run.
+      if (deadlineMs !== null && nowMs >= deadlineMs) {
+        result.reason = 'time-limit';
+        break;
+      }
       if (isQuietAt(new Date(nowMs), timeZone)) {
         result.reason = 'quiet-hours';
         break;

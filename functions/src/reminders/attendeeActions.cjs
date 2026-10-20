@@ -114,16 +114,22 @@ async function nextRunFor({ db, schedule, facts, timeZone, nowMs }) {
   const windows = plan.windows.map(core.windowOut);
   const none = { status: 'none', message: 'No reminder is left before the event starts.', windows };
   let target = null;
+  let reach = null;
   if (plan.due) {
     const record = await db.collection(SENDS).doc(sendIdFor(plan.due.windowKey)).get();
-    const finished = record.exists && record.data()?.status !== 'sending';
-    if (!finished) target = { status: 'due', at: new Date(nowMs).toISOString(), offsetDays: plan.due.offsetDays, windowKey: plan.due.windowKey };
+    const data = record.exists ? record.data() : null;
+    if (!data || data.status === 'sending') {
+      target = { status: 'due', at: new Date(nowMs).toISOString(), offsetDays: plan.due.offsetDays, windowKey: plan.due.windowKey };
+      // A send in progress reaches only the addresses left on its frozen
+      // list, not the whole audience as it is now.
+      if (data) reach = { count: Math.max(0, (data.total ?? 0) - (data.nextIndex ?? 0)), remaining: true };
+    }
   }
   if (!target && plan.next) {
     target = { status: 'upcoming', at: plan.next.at.toISOString(), offsetDays: plan.next.offsetDays, windowKey: plan.next.windowKey };
   }
   if (!target) return none;
-  return { ...target, windows, reach: await reachNow(db) };
+  return { ...target, windows, reach: reach ?? await reachNow(db) };
 }
 
 async function getAction({ db, getConfig, provider, now }) {

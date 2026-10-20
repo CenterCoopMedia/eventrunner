@@ -36,9 +36,11 @@
  * EACH CHUNK IS CHECKED AGAIN. Before each chunk the run stops when quiet
  * hours have begun or the window has closed, and the lease transaction
  * reads the schedule again: a schedule turned off, paused, re-approved or
- * re-configured since the run began stops the run. A record left part way
- * by quiet hours is continued by a later run in the same window. A record
- * whose window closed, or that was started on an earlier approval, is
+ * re-configured since the run began stops the run, and its record is
+ * marked `stopped`. A record left part way by quiet hours or by the hourly
+ * run's deadline is continued by a later run in the same window. A record
+ * whose window closed, that was started on an earlier approval (wording,
+ * facts or settings), or whose announcement stream changed part way, is
  * marked `stopped` and is never continued.
  *
  * APPROVED WORDING AND FACTS ONLY. Staff approve a wording version (the
@@ -57,7 +59,14 @@ const { DEFAULT_OFFSETS, isQuietAt, resolveLocalInstant } = require('shared/remi
 const { internals: renderInternals } = require('../email/render.cjs');
 const announcementLayout = require('../email/templates/announcement.email.cjs');
 const { AudienceError, resolveAudience } = require('../announcements/audience.cjs');
-const { renderAnnouncement, receiptFor, resolveChannel, senderOf, validateDraft } = require('../announcements/compose.cjs');
+const {
+  renderAnnouncement,
+  receiptFor,
+  resolveChannel,
+  senderOf,
+  validateDraft,
+  internals: composeInternals,
+} = require('../announcements/compose.cjs');
 const {
   SENDS,
   CHUNK_SIZE,
@@ -394,6 +403,7 @@ async function startWindow({ db, config, channel, schedule, facts, window, versi
         offsetDays: window.offsetDays,
         wordingVersion: version,
         factsVersion: facts.version,
+        settingsVersion: settingsVersion(schedule),
       },
     },
     guard,
@@ -419,7 +429,29 @@ async function startWindow({ db, config, channel, schedule, facts, window, versi
  * Send what is due now, inside the lease. Never called while the schedule
  * is off or paused.
  */
-async function sendDue({ db, getConfig, provider, emailCore, notifyOperator, now, log, schedule }) {
+/** True for a refusal of the announcement channel, not of one message. */
+function isChannelRefusal(code) {
+  return code === 'channel-changed' || Object.hasOwn(composeInternals.CHANNEL_MESSAGES, code);
+}
+
+/**
+ * Tell the operator that a send could not go on because of the channel.
+ * The same notice key as the check before a send, so one fault is one
+ * notice.
+ */
+async function tellChannelFault({ notifyOperator, code, message, stopped }) {
+  await notifyOperator({
+    kind: 'warning',
+    title: 'Scheduled attendee reminders cannot send',
+    summary: stopped
+      ? `The announcement stream or its unsubscribe handling changed while an attendee reminder was being sent, so the rest of that reminder day's send is stopped and will not be sent. ${message}`
+      : `An attendee reminder send could not go on: ${message} The next hourly run tries again.`,
+    fields: { schedule: SCHEDULE_ID, reason: code },
+    dedupeKey: `reminder-schedule-channel:${SCHEDULE_ID}`,
+  });
+}
+
+async function sendDue({ db, getConfig, provider, emailCore, notifyOperator, now, log, schedule, deadlineMs = null }) {
   const config = await getConfig();
   const timeZone = eventTimeZone(config);
   const version = attendeeWordingVersion(schedule.draft);
@@ -496,9 +528,10 @@ async function sendDue({ db, getConfig, provider, emailCore, notifyOperator, now
   }
   const record = snap.data();
   if (record.reminder?.wordingVersion !== schedule.approvedWordingVersion
-    || record.reminder?.factsVersion !== schedule.approvedFactsVersion) {
-    // Started on an earlier approval: never continued with wording or
-    // facts nobody approved now, and never sent a second time.
+    || record.reminder?.factsVersion !== schedule.approvedFactsVersion
+    || record.reminder?.settingsVersion !== settingsVersion(schedule)) {
+    // Started on an earlier approval (other wording, facts or settings):
+    // never continued on what nobody approved now, and never sent twice.
     const stopped = await markStopped({ db, sendId, nowMs: now(), reason: 'superseded' });
     return {
       outcome: 'completed',
@@ -518,6 +551,11 @@ async function sendDue({ db, getConfig, provider, emailCore, notifyOperator, now
   try {
     for (let chunk = 0; chunk < maxChunks && last.status === 'sending'; chunk += 1) {
       const nowMs = now();
+      // The hourly run's deadline (run.cjs): a later run sends the rest.
+      if (deadlineMs !== null && nowMs >= deadlineMs) {
+        result.reason = 'time-limit';
+        break;
+      }
       // A long run must not send into quiet hours or past its window.
       if (isQuietAt(new Date(nowMs), timeZone)) {
         result.reason = 'quiet-hours';
@@ -535,7 +573,9 @@ async function sendDue({ db, getConfig, provider, emailCore, notifyOperator, now
         break;
       }
       if (lease.stopped) {
+        // Turned off, paused or changed: this record is never continued.
         result.reason = lease.stopped;
+        await markStopped({ db, sendId, nowMs, reason: lease.stopped });
         break;
       }
       if (lease.busy) {
@@ -547,6 +587,14 @@ async function sendDue({ db, getConfig, provider, emailCore, notifyOperator, now
         const [, code, message] = finished.error;
         result.outcome = 'failed';
         result.error = { code, message };
+        if (isChannelRefusal(code)) {
+          // A changed stream or mode can never continue this record: its
+          // bodies and unsubscribe links were made for the old one. Any
+          // other channel refusal may pass, so the record waits.
+          const stopped = code === 'channel-changed'
+            && await markStopped({ db, sendId, nowMs: now(), reason: 'channel-changed' });
+          await tellChannelFault({ notifyOperator, code, message, stopped });
+        }
         break;
       }
       last = finished.data ?? last;

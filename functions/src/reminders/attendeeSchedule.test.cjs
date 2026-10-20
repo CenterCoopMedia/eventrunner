@@ -316,6 +316,10 @@ test('turning the schedule off part way stops the run before its next chunk', as
   assert.equal(result.reason, 'schedule-changed');
   assert.equal(result.counts.sent, CHUNK_SIZE);
   assert.equal(box.mail.length, CHUNK_SIZE);
+  // Codex review on #532: the record is not left "sending" for ever.
+  const record = db.read('announcement_sends', result.sendId);
+  assert.equal(record.status, 'stopped');
+  assert.equal(record.stoppedReason, 'schedule-changed');
   const later = await run(db, IN_7D + HOUR, { box });
   assert.deepEqual(later, { outcome: 'skipped', reason: 'off' });
   assert.equal(box.mail.length, CHUNK_SIZE);
@@ -421,4 +425,105 @@ test('the hourly run serves both schedules, and a fault in one does not stop the
   });
   assert.deepEqual(results.speakers, { outcome: 'skipped', reason: 'off' });
   assert.equal(results.attendees.counts.sent, 2);
+});
+
+// --- Codex review on #532 ------------------------------------------------------
+
+test('a re-approval that changes only the settings stops the rest of a send begun on the earlier approval', async () => {
+  const db = seed({}, { people: crowd(CHUNK_SIZE + 1) });
+  const box = mailbox();
+  let clock = Date.parse('2026-11-25T00:55:00Z');
+  box.afterBatch = () => { clock = Date.parse('2026-11-25T01:05:00Z'); };
+  const first = await run(db, () => clock, { box });
+  assert.equal(first.reason, 'quiet-hours');
+  assert.equal(db.read('announcement_sends', first.sendId).reminder.settingsVersion.length, 32);
+  // Staff change the send time and approve again overnight; the wording
+  // and the facts are the same.
+  await db.collection(SCHEDULES).doc(SCHEDULE_ID).set({ sendTime: '09:00', approvedAt: new Date('2026-11-25T02:00:00Z') }, { merge: true });
+  box.afterBatch = null;
+  const morning = await run(db, Date.parse('2026-11-25T13:30:00Z'), { box });
+  assert.equal(morning.reason, 'superseded');
+  assert.equal(morning.counts.sent, 0);
+  assert.equal(box.mail.length, CHUNK_SIZE);
+  assert.equal(db.read('announcement_sends', first.sendId).status, 'stopped');
+});
+
+test('a run stops between chunks at its deadline, and the next run sends the rest', async () => {
+  const db = seed({}, { people: crowd(CHUNK_SIZE + 1) });
+  const box = mailbox();
+  let clock = IN_7D;
+  box.afterBatch = () => { clock = IN_7D + 9 * 60_000; };
+  const getConfig = async () => CONFIG;
+  const emailCore = createEmailCore({ db, provider: box.provider, getConfig, sleep: async () => {}, log: QUIET });
+  const first = await runAttendeeSchedule({
+    db, getConfig, provider: box.provider, emailCore, now: () => clock, log: QUIET, deadlineMs: IN_7D + 8 * 60_000,
+  });
+  assert.equal(first.reason, 'time-limit');
+  assert.equal(first.counts.sent, CHUNK_SIZE);
+  assert.equal(first.deferred, 1);
+  assert.equal(db.read('announcement_sends', first.sendId).status, 'sending');
+  box.afterBatch = null;
+  const next = await run(db, IN_7D + HOUR, { box });
+  assert.equal(next.counts.sent, 1);
+  assert.equal(new Set(box.mail.map((m) => m.to)).size, CHUNK_SIZE + 1);
+});
+
+test('a stream changed part way stops the send, tells the operator once, and is not retried every hour', async () => {
+  const db = seed({}, { people: crowd(CHUNK_SIZE + 1) });
+  const box = mailbox();
+  const tell = notifier();
+  let clock = Date.parse('2026-11-25T00:55:00Z');
+  box.afterBatch = () => { clock = Date.parse('2026-11-25T01:05:00Z'); };
+  const first = await run(db, () => clock, { box });
+  assert.equal(first.reason, 'quiet-hours');
+  box.afterBatch = null;
+  const moved = { ...CONFIG, providers: { email: { ...CONFIG.providers.email, announcementStream: 'other-stream' } } };
+  const morning = await run(db, Date.parse('2026-11-25T13:30:00Z'), { box, config: moved, notifyOperator: tell.notifyOperator });
+  assert.equal(morning.outcome, 'failed');
+  assert.equal(morning.error.code, 'channel-changed');
+  assert.equal(box.mail.length, CHUNK_SIZE);
+  const record = db.read('announcement_sends', first.sendId);
+  assert.equal(record.status, 'stopped');
+  assert.equal(record.stoppedReason, 'channel-changed');
+  assert.equal(tell.events.length, 1);
+  assert.equal(tell.events[0].dedupeKey, 'reminder-schedule-channel:attendees');
+  assert.match(tell.events[0].summary, /stopped/);
+  const later = await run(db, Date.parse('2026-11-25T14:30:00Z'), { box, config: moved, notifyOperator: tell.notifyOperator });
+  assert.equal(later.outcome, 'completed');
+  assert.equal(later.counts.sent, 0);
+  assert.equal(tell.events.length, 1);
+});
+
+test('the hourly run gives both schedules the same time: a slow speaker branch does not delay the attendee branch', async () => {
+  const order = [];
+  let attendeeStarted;
+  const started = new Promise((resolve) => { attendeeStarted = resolve; });
+  const seen = [];
+  const branches = [
+    {
+      id: 'speakers',
+      run: async (deps) => {
+        order.push('speakers');
+        seen.push(deps.deadlineMs);
+        // Waits for the attendee branch: a run that served the branches one
+        // after the other would time out here.
+        const raced = await Promise.race([started.then(() => 'together'), new Promise((r) => { setTimeout(() => r('starved'), 500); })]);
+        return { outcome: raced };
+      },
+    },
+    {
+      id: 'attendees',
+      run: async (deps) => {
+        order.push('attendees');
+        seen.push(deps.deadlineMs);
+        attendeeStarted();
+        return { outcome: 'completed' };
+      },
+    },
+  ];
+  const results = await runScheduledReminders({ db: {}, getConfig: async () => CONFIG, now: () => IN_7D, log: QUIET }, branches);
+  assert.deepEqual(results, { speakers: { outcome: 'together' }, attendees: { outcome: 'completed' } });
+  // One deadline for both, inside the function's 540 seconds.
+  assert.equal(seen[0], seen[1]);
+  assert.ok(seen[0] > IN_7D && seen[0] <= IN_7D + 540_000);
 });

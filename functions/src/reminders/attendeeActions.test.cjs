@@ -264,3 +264,20 @@ test('the next run moves on once the due window has sent, and the last run reads
   assert.equal(due.body.nextRun.status, 'due');
   assert.equal(due.body.nextRun.offsetDays, 7);
 });
+
+// Codex review on #532.
+test('while a reminder day is sending, the next run counts the addresses left in that send', async () => {
+  const db = seed({
+    'announcement_sends/reminder-attendees-2026-12-01-7d': {
+      status: 'sending',
+      audience: 'registered',
+      recipients: [{ email: 'x@example.test' }, { email: 'y@example.test' }, { email: 'z@example.test' }],
+      total: 3,
+      nextIndex: 2,
+    },
+  });
+  const res = await call(db, { action: 'get' }, { now: Date.parse('2026-11-24T16:00:00Z') });
+  assert.equal(res.body.nextRun.status, 'due');
+  assert.deepEqual(res.body.nextRun.reach, { count: 1, remaining: true });
+  assert.doesNotMatch(JSON.stringify(res.body), /@example/);
+});
