@@ -142,6 +142,9 @@ it and every `defineSecret`-backed function fails at cold start or at read, not 
 Scheduler job behind `cleanupExpiredAuthChallenges` (an `onSchedule` v2 function,
 `functions/src/auth/otp.cjs`) — every deployment has at least this one scheduled function, so the
 role is not conditional the way `secretmanager.secretAccessor` is.
+The same role creates the job behind `endExpiredStaffAccess` (`functions/src/admin/access.cjs`,
+every minute, issue #331). It needs no secret. It reads `config/bootstrap` once a minute and writes
+only when a staff grant's end time has passed.
 The same role creates the job behind `runScheduledReminders` (`functions/src/reminders/run.cjs`,
 every 60 minutes, issue #518). That function binds the mail provider's secrets, and the operator
 webhook's when `EVENT_OPERATOR_NOTIFIER=webhook`, so the secret bindings in §2 cover it. It sends
@@ -577,6 +580,11 @@ client already past step 3 never needs it again.
   `us-central1` as its placeholder, correct for that value and every client that doesn't override
   the region. The site publisher applies the same patch in code (`patchHostingRegion`,
   `scripts/publish-site.cjs`).
+- **The staff end-time job exists.** After the first deploy that includes `endExpiredStaffAccess`,
+  the same listing shows `firebase-schedule-endExpiredStaffAccess-<EVENT_FIREBASE_REGION>`, set to
+  `every 1 minutes`, and it must be `ENABLED`. A paused job does not reopen an ended grant: the
+  server and the rules still refuse it on every request. It only means a browser tab opened before
+  the end time can keep reading until it reconnects.
 - **The reminder scheduler job exists.** After the first deploy that includes
   `runScheduledReminders`, list the Cloud Scheduler jobs and find
   `firebase-schedule-runScheduledReminders-<EVENT_FIREBASE_REGION>`, set to `every 60 minutes`:

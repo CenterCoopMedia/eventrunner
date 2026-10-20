@@ -251,6 +251,9 @@
           Scheduler job behind <code>cleanupExpiredAuthChallenges</code> (an <code>onSchedule</code> v2 function,
           <code>functions/src/auth/otp.cjs</code>) — every deployment has at least this one scheduled function, so the
           role is not conditional the way <code>secretmanager.secretAccessor</code> is.
+          The same role creates the job behind <code>endExpiredStaffAccess</code> (<code>functions/src/admin/access.cjs</code>,
+          every minute, issue #331). It needs no secret. It reads <code>config/bootstrap</code> once a minute and writes
+          only when a staff grant&#39;s end time has passed.
           The same role creates the job behind <code>runScheduledReminders</code> (<code>functions/src/reminders/run.cjs</code>,
           every 60 minutes, issue #518). That function binds the mail provider&#39;s secrets, and the operator
           webhook&#39;s when <code>EVENT_OPERATOR_NOTIFIER=webhook</code>, so the secret bindings in §2 cover it. It sends
@@ -635,6 +638,11 @@
           <code>us-central1</code> as its placeholder, correct for that value and every client that doesn&#39;t override
           the region. The site publisher applies the same patch in code (<code>patchHostingRegion</code>,
           <code>scripts/publish-site.cjs</code>).</p></li>
+          <li><p><strong>The staff end-time job exists.</strong> After the first deploy that includes <code>endExpiredStaffAccess</code>,
+          the same listing shows <code>firebase-schedule-endExpiredStaffAccess-&lt;EVENT_FIREBASE_REGION&gt;</code>, set to
+          <code>every 1 minutes</code>, and it must be <code>ENABLED</code>. A paused job does not reopen an ended grant: the
+          server and the rules still refuse it on every request. It only means a browser tab opened before
+          the end time can keep reading until it reconnects.</p></li>
           <li><p><strong>The reminder scheduler job exists.</strong> After the first deploy that includes
           <code>runScheduledReminders</code>, list the Cloud Scheduler jobs and find
           <code>firebase-schedule-runScheduledReminders-&lt;EVENT_FIREBASE_REGION&gt;</code>, set to <code>every 60 minutes</code>:</p>
