@@ -48,6 +48,7 @@ const {
   validateOrganizationFields,
 } = require('./organizations.cjs');
 const { TIMELINE_COLLECTION, validateTimelineFields } = require('./timeline.cjs');
+const { readOrganizationAccess, removeOrganizationAccess } = require('./organizationRepresentatives.cjs');
 const { sanitizeRichTextFields } = require('./richText.cjs');
 
 const SECTION_FIELD_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -667,15 +668,30 @@ function createCmsDeleteContentHandler({ db, auth, getConfig, now = Date.now, lo
     // child created between the check and the delete aborts it rather than
     // being orphaned by a verdict that had already passed. Every other
     // collection deletes through the plain batch path, unchanged.
+    //
+    // An organization takes its representatives' access and its queued
+    // edit with it, in the same transaction (issue #334): a new
+    // organization at the same address must not inherit either.
     let paths;
     try {
-      paths = target.collection === 'cmsSchedule'
-        ? await db.runTransaction(async (tx) => {
-            const deletable = await checkSessionDeletable({ db, tx, docId: target.docId });
-            if (!deletable.ok) throw new RequestError(409, 'has-children', deletable.message);
-            return deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
-          })
-        : await deleteBoth({ db, collection: target.collection, docId: target.docId });
+      if (target.collection === 'cmsSchedule') {
+        paths = await db.runTransaction(async (tx) => {
+          const deletable = await checkSessionDeletable({ db, tx, docId: target.docId });
+          if (!deletable.ok) throw new RequestError(409, 'has-children', deletable.message);
+          return deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+        });
+      } else if (target.collection === ORGANIZATIONS_COLLECTION) {
+        paths = await db.runTransaction(async (tx) => {
+          const access = await readOrganizationAccess({ db, tx, organizationId: target.docId });
+          const deleted = await deleteBoth({ db, tx, collection: target.collection, docId: target.docId });
+          removeOrganizationAccess({
+            db, tx, organizationId: target.docId, access, actor, at: new Date(now()),
+          });
+          return deleted;
+        });
+      } else {
+        paths = await deleteBoth({ db, collection: target.collection, docId: target.docId });
+      }
     } catch (err) {
       if (err?.httpError) {
         const { status, code, message } = err.httpError;

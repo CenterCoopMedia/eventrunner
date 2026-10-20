@@ -550,6 +550,25 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Organization representatives (issue #334). A grant
+    // (`organization_representatives/{uid}`) names the account that may
+    // edit one organization's profile, and a queued edit
+    // (`organization_edit_requests/{organizationId}`) holds that person's
+    // unreviewed text and identity. Either admin tier reads both for the
+    // organization editor's listeners. Nobody else reads them, the
+    // representative included: it reaches its own organization only
+    // through ownOrganizationProfile, which takes the organization from the
+    // grant. Every write goes through functions/src/cms/
+    // organizationRepresentatives.cjs with its admin_logs row.
+    match /organization_representatives/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /organization_edit_requests/{organizationId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Session pitches contain submitter identity, proposal text, review
     // status, and private staff notes. Either admin tier may review them.
     // Visitors cannot read even their own pitch, and every write goes

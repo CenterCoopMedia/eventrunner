@@ -107,6 +107,10 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
 const PER_ACCOUNT_STORES = Object.freeze([
   { phase: 'directory', kind: 'doc', collection: 'users_public' },
   { phase: 'directory', kind: 'doc', collection: 'schedule_shares' },
+  // Organization representative access (issue #334). Directory, not sweep:
+  // the account stops being a representative in the same commit that
+  // deletes it, so no edit lands between the two.
+  { phase: 'directory', kind: 'doc', collection: 'organization_representatives' },
   {
     phase: 'directory',
     kind: 'claim',
@@ -125,6 +129,13 @@ const PER_ACCOUNT_STORES = Object.freeze([
   // its transaction, so none lands after the account document goes.
   { phase: 'sweep', kind: 'owned', collection: 'change_requests', field: 'uid', key: 'changeRequests' },
   { phase: 'sweep', kind: 'doc', collection: 'change_request_rate_limits', key: 'changeRequestLimits' },
+  // A representative's edit waiting for review names its sender (issue
+  // #334). The edit transaction reads the grant, which the directory phase
+  // deletes, so none lands after it.
+  {
+    phase: 'sweep', kind: 'owned', collection: 'organization_edit_requests', field: 'submittedByUid',
+    key: 'organizationEdits',
+  },
 ]);
 
 /** Firestore's per-transaction write ceiling. */
