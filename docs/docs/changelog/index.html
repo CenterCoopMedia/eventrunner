@@ -539,6 +539,12 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>A speaker reminder send now refuses shipped wording that changed after its preview. When no
+          wording is saved, the preview&#39;s wording version is <code>shipped:</code> and a digest of the shipped
+          subject and bodies. It used to be the fixed value <code>shipped</code>, so a deploy that changed the
+          shipped copy between a preview and a send could send wording nobody read (#518).</li>
+          </ul>
+          <ul>
           <li>The Functions deploy step now fails when a Function is not deployed. After a quota error
           (HTTP 429) on a create, <code>firebase-tools</code> 15.22.4 can exit 0 before the create is done, with
           no summary. Run 39329645906 reported success while <code>downloadEventPackage</code> did not exist.
@@ -663,6 +669,16 @@
           section the client has already written. Both are reported by init as kept.</li>
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
+          <ul>
+          <li>Groundwork for scheduled reminders (#518), with no change that users see.
+          <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0006-scheduled-reminders.md">ADR 0006</a> records why a reminder schedule is not a
+          queue. The event-clock conversion the admin uses moved to <code>shared/eventDateTime</code>, so the
+          server reads a local time the same way. <code>shared/reminderSchedule</code> works out which reminder
+          is due from the settings and the clock. The speaker reminder internals moved to
+          <code>functions/src/speakers/reminderCore.cjs</code>, and the announcement send record and chunks
+          moved to <code>functions/src/announcements/sendRunner.cjs</code>, so a schedule can use the same send
+          paths.</li>
+          </ul>
           <ul>
           <li>The PDF helpers for theme colors, header text, text fitting and font-safe text moved from
           <code>functions/src/schedule/pdf.cjs</code> into <code>functions/src/pdf/kit.cjs</code>, so the invoice PDF can
