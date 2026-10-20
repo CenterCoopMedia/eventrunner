@@ -8,7 +8,10 @@
       "https://github.com/advisories/GHSA-8cw4-87c7-c6xx",
       "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
       "https://github.com/advisories/GHSA-8988-4f7v-96qf",
-      "https://github.com/advisories/GHSA-w5hq-g745-h8pq"
+      "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+      "https://github.com/advisories/GHSA-528h-pc64-c93x",
+      "https://github.com/advisories/GHSA-hqr4-qq8f-hg3x",
+      "https://github.com/advisories/GHSA-mjw6-4jj6-33hc"
     ],
     "affects": [
       "firebase-tools",
@@ -22,10 +25,46 @@
       "@google-cloud/pubsub",
       "@opentelemetry/core",
       "gaxios",
-      "uuid"
+      "uuid",
+      "stream-json"
     ],
-    "rationale": "firebase-tools carries no advisory of its own. It is a devDependency used only to run local emulators and to deploy from a developer or release machine; it never ships in a deployed artifact. It is held at ~15.22.4, which brings tar 7.5.22 and clears every tar advisory. 15.34.0 also drops proxy-agent (and with it basic-ftp, get-uri, and pac-proxy-agent) and moves to csv-parse 7, but since 15.23.0 the CLI sends every request, emulator calls to 127.0.0.1 included, through HTTPS_PROXY and ignores NO_PROXY. On a machine with a proxy set, the Storage emulator then cannot read Firestore, and the storage rules that call firestore.exists() deny the owner. The chokidar ^3 (braces 3.0.3, no patched release), @google-cloud/pubsub ^5 (@opentelemetry/core 1.x), and gaxios ^6 (uuid 9.x) findings remain in every 15.x release, 15.34.0 included. npm's proposed fix is firebase-tools@13.13.3, a downgrade. Move to the newest 15.x once a release honours NO_PROXY for emulator traffic.",
+    "rationale": "firebase-tools carries no advisory of its own. It is a devDependency used only to run local emulators and to deploy from a developer or release machine; it never ships in a deployed artifact. It is held at ~15.22.4, which brings tar 7.5.22 and clears every tar advisory. 15.34.0 also drops proxy-agent (and with it basic-ftp, get-uri, and pac-proxy-agent) and moves to csv-parse 7, but since 15.23.0 the CLI sends every request, emulator calls to 127.0.0.1 included, through HTTPS_PROXY and ignores NO_PROXY. On a machine with a proxy set, the Storage emulator then cannot read Firestore, and the storage rules that call firestore.exists() deny the owner. 15.22.4 also pulls stream-json ^1.7.3 (1.9.1); the three stream-json advisories are fixed only in 3.6.0, which 15.34.0 takes, and stream-json 2 and 3 rewrote the module layout the CLI requires, so an override is not safe. The CLI also reads caller-chosen files through it: auth:import pipes the import file through Pick.withParser and StreamArray, and database:import parses its file the same way, so a crafted file can stall the CLI or replace a parsed object's prototype. The rule in docs/DEPLOY_RUNBOOK.md (Importing users or data with the Firebase CLI) is that operators import only files they exported themselves from one of their own projects, never a file from a client, vendor or other third party. The chokidar ^3 (braces 3.0.3, no patched release), @google-cloud/pubsub ^5 (@opentelemetry/core 1.x), and gaxios ^6 (uuid 9.x) findings remain in every 15.x release, 15.34.0 included. npm's proposed fix is firebase-tools@13.13.3, a downgrade. Move to the newest 15.x once a release honours NO_PROXY for emulator traffic.",
     "reviewedBy": "amditisj@montclair.edu",
-    "reviewDate": "2026-10-19"
+    "reviewDate": "2026-10-20"
+  },
+  {
+    "package": "tailwindcss",
+    "exposure": "build",
+    "severity": "high",
+    "advisories": [
+      "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "https://github.com/advisories/GHSA-rj75-hqrm-r3gf"
+    ],
+    "affects": [
+      "tailwindcss",
+      "chokidar",
+      "fast-glob",
+      "micromatch",
+      "braces",
+      "postcss-nested",
+      "postcss-selector-parser"
+    ],
+    "rationale": "tailwindcss 3 is a devDependency of apps/web and runs only at build time, over this repository's own source and CSS; none of it ships in the built site. Every 3.x release, 3.4.19 included, depends on chokidar ^3, fast-glob ^3 and micromatch ^4, and all of them reach braces 3.0.3, the newest braces release; the advisory has no patched version. The only exit is tailwindcss 4, a different engine and config format, which is a migration, not a security patch. The postcss-selector-parser advisory (GHSA-rj75-hqrm-r3gf) is already fixed in the installed 6.1.5: its changelog says it backports the 7.1.6 fix to the 6.x line for Tailwind CSS 3, and a 40,000-class flat selector parses in 86 ms on 6.1.5 against 2,084 ms on 6.1.2. The advisory still lists every version below 7.1.6, so npm audit flags 6.1.5 until GitHub updates the range; drop this advisory from the entry once it stops being reported. Review again when braces publishes a fix or apps/web moves to tailwindcss 4.",
+    "reviewedBy": "amditisj@montclair.edu",
+    "reviewDate": "2026-10-20"
+  },
+  {
+    "package": "quill",
+    "exposure": "production",
+    "severity": "low",
+    "advisories": [
+      "https://github.com/advisories/GHSA-v3m3-f69x-jf25"
+    ],
+    "affects": [
+      "quill"
+    ],
+    "rationale": "quill 2.0.3 is the newest release and the advisory (XSS through the HTML export) has no patched version. 2.0.2 is not listed but is older code, not a fix. The admin rich-text editor imports Quill core only, never registers the formula, video or image blots the export path abuses, sanitizes every paste, load and export with the shared allowlist, and cmsCreateContent and cmsUpdateContent sanitize again before storage (ADR 0001). The editor loads only on the admin richtext field, not in the public bundle. Review again when Quill publishes a fixed release.",
+    "reviewedBy": "amditisj@montclair.edu",
+    "reviewDate": "2026-10-20"
   }
 ]
