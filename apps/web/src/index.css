@@ -34,12 +34,10 @@
   --hero-copy-border-inline-start: 0;
 }
 
-/* Keep the NC Local hero copy in the text column beside the photograph. */
-@media screen and (min-width: 640px) {
-  [data-historical-demo='nclocal'] .event-hero--illustrated .event-hero__copy {
-    inline-size: calc(100% - var(--hero-art-width));
-  }
-}
+/* The NC Local copy column comes from the shared --hero-copy-column, which
+   reads the 50% photograph share above. A separate width here ended the copy
+   at 50% while the photograph started at the 22rem minimum, leaving a strip
+   of band between them on heroes narrower than 704px. */
 
 @layer base {
   :root {
@@ -2418,18 +2416,25 @@
     border-block: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
     border-block-start: var(--hero-rule-block-start);
     background: rgb(var(--color-surface-alt-rgb));
+    /* The copy column, from the hero's leading edge to the photograph.
+       It is declared here, not with the tokens on :root, so that a
+       wrapper that sets its own --hero-art-width (the NC Local
+       composition) changes it. The photograph and its veil start where
+       the column ends, so no word sits on the picture (#345). */
+    --hero-copy-column: max(calc(100% - var(--hero-art-width)), var(--hero-copy-min-inline-size));
   }
   .event-hero:not(.event-hero--illustrated) { min-block-size: 0; }
   .event-hero:not(.event-hero--illustrated) .event-hero__copy {
-    inline-size: 100%;
+    inline-size: calc(100% - var(--hero-inset-inline));
     padding-block: var(--space-lg);
+    padding-inline-end: var(--hero-inset-inline);
   }
   .event-hero__figure { display: contents; }
   .event-hero__media { position: absolute; inset: 0; pointer-events: none; }
   .event-hero__art {
     position: absolute;
     inset: 0 0 0 auto;
-    inline-size: var(--hero-art-width);
+    inline-size: calc(100% - var(--hero-copy-column));
     block-size: 100%;
     object-fit: cover;
     object-position: var(--hero-art-position);
@@ -2437,25 +2442,33 @@
   }
   .event-hero__veil {
     position: absolute;
-    inset: 0;
+    inset: 0 0 0 var(--hero-copy-column);
     z-index: -1;
     background: var(--hero-veil-background);
   }
+  /* The hero is a coloured band, so its copy keeps a deliberate inset
+     from the band's edge (#478). The inset is a margin, not padding, so a
+     style's own rule (the Newsroom accent bar) sits inside it too. */
   .event-hero__copy {
-    inline-size: 65%;
+    container-type: inline-size;
+    inline-size: calc(var(--hero-copy-column) - var(--hero-inset-inline));
+    margin-inline-start: var(--hero-inset-inline);
     padding-block: var(--space-2xl);
     padding-block-end: var(--hero-copy-pad-block-end);
     padding-inline: var(--hero-copy-pad-inline-start) var(--space-lg);
     border-inline-start: var(--hero-copy-border-inline-start);
   }
   .event-hero__title {
-    font-size: var(--hero-title-size);
+    font-size: min(var(--hero-title-size), var(--hero-title-fit));
     line-height: .98;
     font-style: var(--hero-title-style);
     font-weight: var(--hero-title-weight);
     letter-spacing: var(--hero-title-tracking);
     text-transform: var(--hero-title-transform);
     text-wrap: balance;
+    /* A long word in the copy column breaks at a syllable with a hyphen
+       before it breaks at an arbitrary letter. */
+    hyphens: auto;
     overflow-wrap: anywhere;
     color: rgb(var(--color-text-primary-rgb));
   }
@@ -2476,11 +2489,20 @@
     color: rgb(var(--color-text-secondary-rgb));
   }
   .event-hero__action { margin-block-start: var(--space-lg); gap: var(--space-md); }
+  /* An action label is CMS text. One with no space in it wraps inside its
+     button, which keeps its touch-target height, instead of pushing the
+     button past the copy column onto the photograph. */
+  .event-hero__copy :is(a, button) {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
   .event-hero__caption {
     position: absolute;
     inset: auto var(--space-sm) var(--space-sm) auto;
     z-index: 1;
-    max-inline-size: min(26rem, calc(100% - 2 * var(--space-sm)));
+    max-inline-size: min(26rem, calc(100% - var(--hero-copy-column) - 2 * var(--space-sm)));
     padding: var(--space-2xs) var(--space-xs);
     background: rgb(var(--color-surface-rgb) / .92);
     color: rgb(var(--color-text-primary-rgb));
@@ -2610,12 +2632,15 @@
     .site-masthead__identity { max-inline-size: 18rem; }
     .event-hero { min-block-size: 0; display: flex; flex-direction: column; }
     .event-hero__copy {
-      inline-size: 100%;
-      padding: var(--space-lg) 0;
-      padding-inline-start: var(--space-sm);
+      inline-size: calc(100% - var(--hero-inset-inline));
+      padding-block: var(--space-lg);
+      padding-inline-end: var(--hero-inset-inline);
       order: 0;
     }
-    .event-hero__title { font-size: clamp(2.35rem, 9vw, 3.35rem); }
+    /* Phones keep their own title size, capped by the copy column's width
+       so a word such as "community," fits its line once the inset and a
+       style's accent bar have taken their share. */
+    .event-hero__title { font-size: min(clamp(2.35rem, 9vw, 3.35rem), var(--hero-title-fit-narrow)); }
     .event-hero__figure { display: block; position: relative; order: 1; inline-size: 100%; }
     .event-hero__media { position: relative; block-size: 14rem; }
     .event-hero__art { inline-size: 100%; block-size: 100%; z-index: 0; }
@@ -2705,7 +2730,7 @@
     border: 0;
     background: transparent;
   }
-  .event-hero__copy { inline-size: 100%; padding: 0; border: 0; }
+  .event-hero__copy { inline-size: 100%; margin: 0; padding: 0; border: 0; }
   .event-hero__title { font-size: var(--text-h1); line-height: var(--text-h1-leading); }
 
   .schedule-screen {
