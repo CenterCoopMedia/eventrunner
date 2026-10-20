@@ -45,7 +45,7 @@ if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 | Tier | Endpoints |
 |---|---|
 | operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, and `exportEventData` for `orders` and `admissions` |
-| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers` and `organizations`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, and the other five `webMcp*` diagnostics |
+| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `reminderSchedules`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers` and `organizations`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, and the other five `webMcp*` diagnostics |
 
 Announcement email admits staff because staff run attendee communication day to day, the same tier as the site banner on that page. The safety is in the flow, not the tier: the server picks the audience, the send must match the preview's receipt, the page confirms the count, every recipient has a send-once key, every address can unsubscribe, and every send writes `admin_logs`.
 
@@ -119,6 +119,34 @@ on the pitch base only. It is bound through `defineSecret` only when the deploym
 `EVENT_AIRTABLE_ENABLED=true` (validated by `scripts/validate-deploy-env.cjs` and written to
 the functions env file by `deploy-client.yml`), and never in the emulator. It is redacted
 from every stored, returned or logged message.
+
+## Scheduled reminders
+
+ADR 0006 and issue #518. `src/reminders/` holds two exports:
+
+- `reminderSchedules` (staff): one POST endpoint with an `action` and a `schedule` (only
+  `speakers` for now). `get` returns the settings, the state (on, off or paused), the next run
+  and the last run. `save` checks and stores the offsets (1 to 6 whole days from 1 to 365), the
+  send time (`HH:MM` on the event clock), the due date (RFC3339) and the items. `preview`
+  renders one sample per offset and returns the wording version and a settings version.
+  `approve` needs both, and refuses when either changed since the preview. `disable` turns the
+  schedule off. Every write checks the historical-demo policy first and writes an
+  `admin_logs` row. A settings change while the schedule is on pauses it.
+- `runScheduledReminders`: `onSchedule` every 60 minutes, no retry. It reads
+  `reminder_schedules/speakers`, works out the due window with `shared/reminderSchedule`, and
+  sends through `src/speakers/reminderCore.cjs`, the staff send path. The batch id is fixed per
+  window (`sched-{due date}-{N}d`). `reminder_ledger/speakers__{window}__{speakerId}` is
+  created in the same transaction as the `speaker_reminders` reservation, so a speaker gets at
+  most one reminder per window, and a failed or uncertain send is not sent again. The run
+  holds a 15-minute lease on `reminder_schedule_runs/speakers`, and stores its last run
+  there. It does nothing while off or paused, on a historical demo, or after the last event
+  day. Wording that is not the approved version pauses the schedule, writes an `admin_logs`
+  row and tells the operator. A run that emails anyone writes one `admin_logs` row. The
+  attendee branch (#518, the third pull request) joins `BRANCHES` in `src/reminders/run.cjs`.
+
+Saving or resetting the speaker reminder wording (`speakerReminders`) pauses a schedule that
+is on when the new wording version differs from the approved one. Secrets: the mail
+provider's, and the operator webhook's when `EVENT_OPERATOR_NOTIFIER=webhook`.
 
 ## Stripe commerce
 

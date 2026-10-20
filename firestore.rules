@@ -627,6 +627,15 @@ service cloud.firestore {
     // functions/src/speakers/reminders.cjs, read by staff through that
     // endpoint.
     match /speaker_reminders/{speakerId} { allow read, write: if false; }
+    // Reminder schedules (issue #518, ADR 0006). The settings
+    // (`reminder_schedules/{speakers|attendees}`) change only through the
+    // staff `reminderSchedules` endpoint. The run lease and last run
+    // (`reminder_schedule_runs`) and the record of each scheduled send
+    // (`reminder_ledger`) are written only by `runScheduledReminders`.
+    // Staff read all three through that endpoint.
+    match /reminder_schedules/{scheduleId} { allow read, write: if false; }
+    match /reminder_schedule_runs/{scheduleId} { allow read, write: if false; }
+    match /reminder_ledger/{entryId} { allow read, write: if false; }
     // Speaker invitations (`speaker_invites/{sha256(token)}`, spec §4.1,
     // issue #21). Server-only in BOTH directions, and the read denial is
     // the load-bearing half: the document id is the digest of a live

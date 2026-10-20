@@ -43,6 +43,8 @@ const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
 const speakersProjection = require('./src/speakers/projection.cjs');
 const speakersInvites = require('./src/speakers/invites.cjs');
 const speakersReminders = require('./src/speakers/reminders.cjs');
+const reminderSchedules = require('./src/reminders/schedules.cjs');
+const reminderScheduleRun = require('./src/reminders/run.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
 const systemErrorsAdmin = require('./src/telemetry/systemErrorsAdmin.cjs');
@@ -109,6 +111,8 @@ module.exports = {
   ...speakersProjection.handlers,
   ...speakersInvites.handlers,
   ...speakersReminders.handlers,
+  ...reminderSchedules.handlers,
+  ...reminderScheduleRun.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
   ...systemErrorsAdmin.handlers,
