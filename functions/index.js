@@ -66,6 +66,7 @@ const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
 const recordImport = require('./src/imports/recordImport.cjs');
 const adminDataExport = require('./src/admin/dataExport.cjs');
 const adminEventPackage = require('./src/admin/eventPackage.cjs');
+const adminInvoices = require('./src/admin/invoices.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -132,4 +133,5 @@ module.exports = {
   ...recordImport.handlers,
   ...adminDataExport.handlers,
   ...adminEventPackage.handlers,
+  ...adminInvoices.handlers,
 };

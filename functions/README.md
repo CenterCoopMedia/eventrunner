@@ -44,8 +44,8 @@ if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
 | Tier | Endpoints |
 |---|---|
-| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, and `exportEventData` for `orders` and `admissions` |
-| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers` and `organizations`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, and the other five `webMcp*` diagnostics |
+| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, `exportEventData` for `orders` and `admissions`, and `invoiceAdmin` for `saveSettings` |
+| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers` and `organizations`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, `invoiceAdmin` (every action but `saveSettings`), and the other five `webMcp*` diagnostics |
 
 Announcement email admits staff because staff run attendee communication day to day, the same tier as the site banner on that page. The safety is in the flow, not the tier: the server picks the audience, the send must match the preview's receipt, the page confirms the count, every recipient has a send-once key, every address can unsubscribe, and every send writes `admin_logs`.
 
@@ -170,3 +170,28 @@ Transactional mutations include `config/event` in their read set, so enabling
 `historicalDemo` during a request prevents the commit. Managed email secrets are
 bound only to the organizer endpoint that can resend and the confirmation trigger;
 the native attendee read/checkout handlers do not need them.
+
+## Invoices
+
+`invoiceAdmin` (`src/admin/invoices.cjs`, issue #208) is a POST action API in the
+shape of `ticketingCommerceAdmin`. This release has `list`, `get`, `settings`,
+`saveDraft`, `deleteDraft` and `saveSettings`. Staff run every action but
+`saveSettings`, which needs an operator because `invoice_settings/current` holds the
+issuer's tax ID and bank details. Issue, mark paid, void, reopen, duplicate and send
+join the same switch with #209.
+
+The three collections (`invoices`, `invoice_counters`, `invoice_settings`) deny every
+client read and write. `saveDraft` takes the client-minted `invoiceId` and the
+`expectedRevision` the form read; revision 0 creates the draft. The body is checked
+by `shared/invoice` `validateInvoiceDraft`, which keeps only the fields a draft may
+set and computes the totals again in minor units. A request's own totals, status or
+number are dropped. A draft's currency is fixed when it is created: the ticket
+catalog currency, then the settings currency, then USD. A draft has no number; the
+number is assigned only at issue, so `deleteDraft` leaves no gap.
+
+Every write refuses on a read-only demo, refuses a stale revision with 409, and
+writes its `admin_logs` row (`invoices.*`) in the same transaction. The settings row
+names the fields that changed and never their values. `list` reads newest first on
+`listKey` and examines at most 250 records per page, like the ticketing lists. Text
+is cleaned with `sanitizeInvoiceText` on write and again on read. Responses carry
+`Cache-Control: private, no-store`.
