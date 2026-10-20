@@ -2637,7 +2637,10 @@
       padding-inline-end: var(--hero-inset-inline);
       order: 0;
     }
-    .event-hero__title { font-size: clamp(2.35rem, 9vw, 3.35rem); }
+    /* Phones keep their own title size, capped by the copy column's width
+       so a word such as "community," fits its line once the inset and a
+       style's accent bar have taken their share. */
+    .event-hero__title { font-size: min(clamp(2.35rem, 9vw, 3.35rem), var(--hero-title-fit-narrow)); }
     .event-hero__figure { display: block; position: relative; order: 1; inline-size: 100%; }
     .event-hero__media { position: relative; block-size: 14rem; }
     .event-hero__art { inline-size: 100%; block-size: 100%; z-index: 0; }

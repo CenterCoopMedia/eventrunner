@@ -17,7 +17,7 @@ import { adminDb } from './helpers.mjs';
 
 const THEMES = ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine'];
 const MODES = ['light', 'dark'];
-const WIDTHS = [320, 640, 768, 1024, 1280, 1440, 1920];
+const WIDTHS = [320, 360, 375, 640, 768, 1024, 1280, 1440, 1920];
 // The phone layout stacks the photograph under the copy below this width.
 const SIDE_BY_SIDE_MIN = 640;
 // The smallest inner inset the copy may have from the hero's edge.
