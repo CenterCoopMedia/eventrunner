@@ -29,9 +29,11 @@ import { linkButtonClass, secondaryButtonClass } from './formControls.jsx';
 export const TOUR_GROUP_COPY = Object.freeze({
   lead: 'How the event is going, in figures the server counts.',
   content: 'What the site says and shows.',
-  people: 'Who takes part in the event.',
-  operations: 'The event while it runs.',
-  system: 'How this site is set up.',
+  program: 'What is on the program, and who speaks.',
+  registration: 'Who registers, and what lets them in.',
+  communications: 'What the event tells people, and what it sent.',
+  operations: 'Records in and out, and what people send back.',
+  settings: 'How this site is set up.',
 });
 
 /**

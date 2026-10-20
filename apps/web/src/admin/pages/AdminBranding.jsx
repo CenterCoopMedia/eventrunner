@@ -33,6 +33,13 @@
 // the editor and pressing Publish cannot pin a style to a shape it never
 // asked for. That is why Zine keeps its copier grain through a save.
 //
+// ROOM FOR THE PREVIEW (issue #477). From 1280px the editor and the preview
+// sit side by side, and a bar between them (PaneSplitter) sets how wide each
+// one is, from 30 to 70 percent of the row. The share is remembered in this
+// browser. It changes only the room each pane has: the frame still renders
+// at the CSS width the operator picked, and Fit still scales it to the room.
+// Below 1280px the panes stack, as before, and there is no bar.
+//
 // Logo/asset slots are unchanged: config/theme.logos holds PATHS into the
 // Storage bucket, and each slot is an ImagePicker over the `branding/`
 // namespace. Whatever is in `logos` is carried through every save verbatim.
@@ -70,6 +77,8 @@ import {
   rgbTripleToHex,
 } from '../../lib/themeRuntime.js';
 import { clearThemePreview } from '../themePreview.js';
+import { BRANDING_SPLIT_KEY, readSplit, writeSplit } from '../layoutPreference.js';
+import { useMediaQuery } from '../../lib/viewport.js';
 import { choiceCopy, presetCopy } from '../presetCopy.js';
 import {
   DestructiveConfirm,
@@ -80,15 +89,23 @@ import {
   ServerErrorSummary,
   TextField,
   choiceButtonClass,
+  linkButtonClass,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { RecordState } from '../components/adminChrome.jsx';
 import { state } from '../recordState.js';
 import ThemeProof from '../components/ThemeProof.jsx';
+import PaneSplitter from '../components/PaneSplitter.jsx';
 import ImagePicker from '../components/media/ImagePicker.jsx';
 
 const LOGO_SLOTS = ['primary', 'mark', 'footer', 'ogDefault', 'favicon'];
+
+/** Where the editor and the preview stop stacking (adminWorkspace.css). */
+export const BRANDING_SIDE_BY_SIDE = '(min-width: 1280px)';
+
+/** The editor's share of the row, in percent: its limits and its default. */
+export const BRANDING_SPLIT = Object.freeze({ min: 30, max: 70, defaultValue: 50 });
 
 /** The two slots the normal workflow asks for, in the order it asks. */
 const WORKFLOW_LOGO_SLOTS = ['primary', 'mark'];
@@ -409,6 +426,12 @@ export default function AdminBranding() {
   // The mode the admin mark's legibility is judged in: whichever mode the
   // preview is showing, so the warning and the picture agree.
   const [previewMode, setPreviewMode] = useState('light');
+  const sideBySide = useMediaQuery(BRANDING_SIDE_BY_SIDE);
+  const [split, setSplit] = useState(() => readSplit(BRANDING_SPLIT_KEY, BRANDING_SPLIT));
+  const changeSplit = (next) => {
+    writeSplit(BRANDING_SPLIT_KEY, next);
+    setSplit(next);
+  };
   const accent = adminAccentVerdict(candidate, previewMode);
 
   /** One option group, rendered as a picker with the reason for the pick. */
@@ -526,9 +549,20 @@ export default function AdminBranding() {
         })}
       </div>
 
-      <div className="admin-branding-workspace">
+      <div
+        className="admin-branding-workspace"
+        data-split={sideBySide ? split : undefined}
+        style={
+          sideBySide
+            ? {
+                '--admin-branding-editor-share': `${split}fr`,
+                '--admin-branding-preview-share': `${100 - split}fr`,
+              }
+            : undefined
+        }
+      >
         {/* ------------------------------------------- the staff decisions */}
-        <div className="admin-branding-controls flex min-w-0 flex-col gap-md">
+        <div id="admin-branding-editor" className="admin-branding-controls flex min-w-0 flex-col gap-md">
           <section
             id="admin-theme-identity"
             aria-labelledby="admin-theme-task-identity"
@@ -1039,8 +1073,37 @@ export default function AdminBranding() {
 
         </div>
 
+        {sideBySide ? (
+          <PaneSplitter
+              id="admin-branding-splitter"
+              label="Resize the editor and the preview"
+              valueText={`Editor ${split}%, preview ${100 - split}%`}
+              value={split}
+              {...BRANDING_SPLIT}
+              onChange={changeSplit}
+              controls="admin-branding-editor"
+              className="admin-splitter--tall"
+            />
+        ) : null}
+
         {/* --------------------------------------------- the page preview */}
         <div className="admin-branding-preview">
+          {sideBySide ? (
+            <div className="admin-branding-layout-actions">
+              <button
+                type="button"
+                className={linkButtonClass}
+                disabled={split === BRANDING_SPLIT.defaultValue}
+                onClick={() => {
+                  changeSplit(BRANDING_SPLIT.defaultValue);
+                  // The button turns off at the default; the bar keeps the focus.
+                  document.getElementById('admin-branding-splitter')?.focus();
+                }}
+              >
+                Reset widths
+              </button>
+            </div>
+          ) : null}
           <ThemeProof
             themeDoc={candidate}
             isDirty={isDirty}

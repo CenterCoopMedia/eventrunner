@@ -13,7 +13,7 @@
 // because every later spec signs in as the seeded operator.
 import { test, expect } from '@playwright/test';
 import {
-  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, signIn,
+  ADMIN_EMAIL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, openAdminGroups, signIn,
 } from './helpers.mjs';
 
 const STAFF_EMAIL = 'e2e-staff@example.test';
@@ -128,6 +128,7 @@ test.describe.serial('admin tiers and the Access page', () => {
     await expect(nav).toBeVisible();
     // /admin opens on the overview, a staff section (issue #179).
     await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
+    await openAdminGroups(page);
     for (const label of ['Overview', 'Pages', 'Sessions', 'Speakers', 'Attendees', 'Materials', 'Event']) {
       await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
