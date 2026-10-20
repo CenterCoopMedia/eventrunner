@@ -283,23 +283,22 @@ test('invoices: the frozen records go in billing/, and the settings and the coun
   const [paid, voided] = invoices;
   assert.deepEqual(paid.totals, { subtotal: 500000, discountTotal: 0, taxTotal: 25000, total: 525000 });
   assert.equal(paid.issuer.paymentInstructions, 'Pay by bank transfer to account 000000.');
-  assert.deepEqual(paid.payment, { paidOn: '2026-04-02', method: 'bank-transfer', via: null, stripe: null, note: 'Ref 42', recordedAt: '2026-03-27T14:00:00.000Z' });
+  assert.deepEqual(paid.payment, { paidOn: '2026-04-02', method: 'bank-transfer', via: null, note: 'Ref 42', recordedAt: '2026-03-27T14:00:00.000Z' });
   assert.deepEqual(voided.voided, { reason: 'Wrong amount', from: 'issued', at: '2026-03-27T14:00:00.000Z' });
   assert.deepEqual(paid.paymentHistory, [{
     paidOn: '2026-03-30', method: 'check', note: 'Check 1042', recordedAt: '2026-03-27T14:00:00.000Z',
     reopenedAt: '2026-03-27T14:00:00.000Z', reason: 'Check bounced',
   }]);
   assert.deepEqual(voided.paymentHistory, []);
-  // The Stripe pay link and the flagged card payment (#519), without staff account ids.
-  // A link that is not open has no address.
+  // The Stripe pay link and the flagged card payment (#519): no Stripe id,
+  // payment page address or staff account, like an order.
   assert.deepEqual(voided.payLinks, [{
-    linkId: 'pl_fixture00000000000000001', status: 'paid', sessionId: 'cs_test_fixture1', url: null,
-    amount: 30000, currency: 'usd', livemode: false, createdAt: '2026-03-27T14:00:00.000Z',
-    expiresAt: '2026-03-28T13:00:00.000Z', closedAt: '2026-03-27T14:00:00.000Z', closedReason: 'void', stripeClosed: false,
+    linkId: 'pl_fixture00000000000000001', status: 'paid', mode: 'test', amount: 30000, currency: 'usd',
+    createdAt: '2026-03-27T14:00:00.000Z', expiresAt: '2026-03-28T13:00:00.000Z',
+    closedAt: '2026-03-27T14:00:00.000Z', closedReason: 'void', stripeClosed: false,
   }]);
   assert.deepEqual(voided.paymentReviews, [{
-    reviewId: 'rv_fixture00000000000000001', code: 'invoice-void', sessionId: 'cs_test_fixture1', paymentIntentId: 'pi_fixture1',
-    amount: 30000, currency: 'usd', at: '2026-03-27T14:00:00.000Z', invoiceStatus: 'void',
+    code: 'invoice-void', amount: 30000, currency: 'usd', at: '2026-03-27T14:00:00.000Z', invoiceStatus: 'void',
     resolved: false, resolvedAt: null, note: '',
   }]);
   assert.equal(voided.needsReview, true);

@@ -272,7 +272,10 @@ test('an open pay link prints with its end time on the event clock, as a link th
   let joined = '';
   for (let index = start; joined.length < PAY_URL.length && index < drawn.length; index += 1) joined += drawn[index];
   assert.equal(joined, PAY_URL);
-  assert.deepEqual(await linkTargets(bytes), [PAY_URL]);
+  // One link over each drawn line of the address, each opening the whole address.
+  const targets = await linkTargets(bytes);
+  assert.ok(targets.length >= 1);
+  assert.ok(targets.every((target) => target === PAY_URL), JSON.stringify(targets));
   // The bank instructions still print; the card link is one more way to pay.
   assert.ok(drawn.includes('How to pay'));
 });
