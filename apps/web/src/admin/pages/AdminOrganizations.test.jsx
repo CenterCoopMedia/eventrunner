@@ -139,7 +139,9 @@ describe('the organizations list', () => {
   it('says it is loading until both revisions have arrived', async () => {
     holdAdminCollections = true;
     await renderAt('/admin/organizations');
-    expect(await screen.findByRole('status', { name: 'Loading organizations…' })).toBeInTheDocument();
+    // The first test in the file pays for the list chunk's first transform,
+    // which can pass the default second when other files run beside it.
+    expect(await screen.findByRole('status', { name: 'Loading organizations…' }, { timeout: 5000 })).toBeInTheDocument();
     await waitFor(() => expect(adminSubscriptions.has('cmsOrganizations_drafts')).toBe(true));
     pushOrganizations(LIVE, DRAFTS);
     expect(screen.queryByRole('status', { name: 'Loading organizations…' })).toBeNull();
@@ -540,5 +542,139 @@ describe('the organization editor', () => {
     expect(endpointOf(0)).toBe('cmsDeleteContent');
     expect(bodyOf(0)).toEqual({ collection: 'cmsOrganizations', docId: 'tide-media' });
     await waitFor(() => expect(currentPath).toBe('/admin/organizations'));
+  });
+});
+
+// Issue #334: representatives and the edits they send for review.
+const GRANTS = [
+  { id: 'uid-ada', uid: 'uid-ada', email: 'ada@example.org', organizationId: 'tide-media' },
+  // Another organization's representative never shows on this one.
+  { id: 'uid-bo', uid: 'uid-bo', email: 'bo@example.org', organizationId: 'beacon-fund' },
+];
+const REQUESTS = [{
+  id: 'tide-media',
+  organizationId: 'tide-media',
+  fields: { description: 'A newsroom for the whole coast.', bio: 'Founded in 2001.' },
+  base: { description: null, bio: null },
+  submittedByUid: 'uid-ada',
+  submittedByEmail: 'ada@example.org',
+  submittedAt: { toDate: () => new Date('2026-10-20T10:00:00Z') },
+}];
+
+function pushRepresentatives(grants = GRANTS, requests = REQUESTS) {
+  act(() => {
+    adminSubscriptions.get('organization_representatives')(grants);
+    adminSubscriptions.get('organization_edit_requests')(requests);
+  });
+}
+
+async function openTideMedia() {
+  await renderAt('/admin/organizations/tide-media');
+  await waitFor(() => expect(adminSubscriptions.has('organization_edit_requests')).toBe(true));
+  pushOrganizations(LIVE, DRAFTS);
+  await screen.findByDisplayValue('Tide Media Collective');
+  pushRepresentatives();
+}
+
+describe('organization representatives', () => {
+  it('lists this organization’s representatives only, and the list marks an edit waiting', async () => {
+    await renderAt('/admin/organizations');
+    await waitFor(() => expect(adminSubscriptions.has('organization_edit_requests')).toBe(true));
+    pushOrganizations(LIVE, DRAFTS);
+    pushRepresentatives();
+    const row = (await screen.findByRole('link', { name: 'Tide Media Collective' })).closest('tr');
+    expect(within(row).getByText('Edit waiting for review')).toBeInTheDocument();
+    const beacon = screen.getByRole('link', { name: 'Beacon Fund' }).closest('tr');
+    expect(within(beacon).queryByText('Edit waiting for review')).toBeNull();
+  });
+
+  it('shows the edit beside the draft text, and applies it to the draft', async () => {
+    await openTideMedia();
+    const review = screen.getByRole('region', { name: 'Edit waiting for review' });
+    expect(review).toHaveTextContent('ada@example.org');
+    expect(review).toHaveTextContent('A newsroom for the whole coast.');
+    expect(review).toHaveTextContent('Founded in 2001.');
+    const reps = screen.getByRole('region', { name: 'Representatives' });
+    expect(within(reps).getByText('ada@example.org')).toBeInTheDocument();
+    expect(within(reps).queryByText('bo@example.org')).toBeNull();
+
+    fetch.mockResolvedValueOnce(response({
+      organizationId: 'tide-media', docPath: 'cmsOrganizations_drafts/tide-media', appliedFields: ['description', 'bio'],
+    }));
+    fireEvent.click(within(review).getByRole('button', { name: 'Apply to draft' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(endpointOf(0)).toBe('organizationRepresentatives');
+    expect(bodyOf(0)).toEqual({ action: 'apply', organizationId: 'tide-media' });
+    // Stated in place; the toast only repeats it.
+    const applied = await screen.findAllByText('Edit applied to the draft. Publish to show it on the site.');
+    expect(applied.some((node) => node.getAttribute('role') === 'status')).toBe(true);
+    // The form now holds the applied text, so the next save keeps it.
+    expect(screen.getByLabelText('Description')).toHaveValue('A newsroom for the whole coast.');
+  });
+
+  it('asks before it overwrites a field staff changed since, then sends overwrite', async () => {
+    await openTideMedia();
+    const review = screen.getByRole('region', { name: 'Edit waiting for review' });
+    fetch.mockResolvedValueOnce(refusal(
+      409,
+      'description: changed by staff since this edit was sent. Check it, then apply with overwrite.',
+      'staff-changed',
+    ));
+    fireEvent.click(within(review).getByRole('button', { name: 'Apply to draft' }));
+    expect(await within(review).findByText(/changed by staff since this edit was sent/)).toBeInTheDocument();
+    fetch.mockResolvedValueOnce(response({ organizationId: 'tide-media', appliedFields: ['description', 'bio'] }));
+    fireEvent.click(within(review).getByRole('button', { name: 'Apply and replace staff text' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1)).toEqual({ action: 'apply', organizationId: 'tide-media', overwrite: true });
+  });
+
+  it('will not apply over unsaved text in the same field', async () => {
+    await openTideMedia();
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Typed by staff, not saved.' } });
+    const review = screen.getByRole('region', { name: 'Edit waiting for review' });
+    expect(within(review).getByRole('button', { name: 'Apply to draft' })).toBeDisabled();
+    expect(review).toHaveTextContent('Save or undo your changes to Description first.');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('discards an edit after a confirmation', async () => {
+    await openTideMedia();
+    const review = screen.getByRole('region', { name: 'Edit waiting for review' });
+    fireEvent.click(within(review).getByRole('button', { name: 'Discard this edit' }));
+    const moment = screen.getByRole('region', { name: 'Discard the edit from ada@example.org' });
+    fetch.mockResolvedValueOnce(response({ organizationId: 'tide-media' }));
+    fireEvent.click(within(moment).getByRole('button', { name: 'Discard this edit' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toEqual({ action: 'discard', organizationId: 'tide-media' });
+  });
+
+  it('adds a representative by address and removes one after a confirmation', async () => {
+    await openTideMedia();
+    const reps = screen.getByRole('region', { name: 'Representatives' });
+    fetch.mockResolvedValueOnce(response({ uid: 'uid-cy', organizationId: 'tide-media', changed: true }));
+    fireEvent.change(within(reps).getByLabelText('Account address'), { target: { value: 'cy@example.org' } });
+    fireEvent.click(within(reps).getByRole('button', { name: 'Add representative' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0)).toEqual({ action: 'grant', organizationId: 'tide-media', email: 'cy@example.org' });
+    expect(await within(reps).findByText('Representative added. They edit at /profile/organization.')).toBeInTheDocument();
+
+    fireEvent.click(within(reps).getByRole('button', { name: 'Remove ada@example.org' }));
+    const moment = screen.getByRole('region', { name: 'Remove ada@example.org' });
+    expect(moment).toHaveTextContent('Their edit waiting for review is discarded.');
+    fetch.mockResolvedValueOnce(response({ uid: 'uid-ada', organizationId: 'tide-media', discardedEdit: true }));
+    fireEvent.click(within(moment).getByRole('button', { name: 'Remove access' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    expect(bodyOf(1)).toEqual({ action: 'revoke', uid: 'uid-ada' });
+  });
+
+  it('names the server’s refusal of an address next to the field', async () => {
+    await openTideMedia();
+    const reps = screen.getByRole('region', { name: 'Representatives' });
+    fetch.mockResolvedValueOnce(refusal(404, 'email: no account uses this address. Ask them to sign in to the site once, then try again.', 'no-account'));
+    const field = within(reps).getByLabelText('Account address');
+    fireEvent.change(field, { target: { value: 'nobody@example.org' } });
+    fireEvent.click(within(reps).getByRole('button', { name: 'Add representative' }));
+    await waitFor(() => expect(field).toHaveAttribute('aria-invalid', 'true'));
+    expect(field).toHaveAccessibleDescription(expect.stringContaining('no account uses this address'));
   });
 });
