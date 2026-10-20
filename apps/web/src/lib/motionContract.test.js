@@ -56,6 +56,32 @@ const SOURCES = sourceFiles().map((file) => ({
   text: fs.readFileSync(file, 'utf8'),
 }));
 
+/**
+ * The files allowed to draw a full round (`rounded-full`): compact chips
+ * only (issue #475, docs/interface-guidelines.md "Chips"). Paths are
+ * relative to apps/web/src. None ships yet: the event days and tracks are
+ * multi-field records and stay rows. A chip that lands is added here, with
+ * a test file beside it.
+ */
+const CHIP_FILES = Object.freeze([]);
+
+/**
+ * What a chip's source must carry, as a list of the things it lacks: a
+ * button of its own, a remove label that names the value ("Remove
+ * Practice", never a bare ×), and the full control height, so the compact
+ * shape never shrinks the target.
+ *
+ * @param {string} text
+ * @returns {string[]}
+ */
+function chipProblems(text) {
+  const problems = [];
+  if (!/<button\b/.test(text)) problems.push('a chip carries its own remove button');
+  if (!/aria-label=\{?[`'"]Remove \S/.test(text)) problems.push('the remove button names the value it removes');
+  if (!/\b(min-h-admin-control|touch-target)\b/.test(text)) problems.push('the remove button keeps the full control height');
+  return problems;
+}
+
 /** The at-rule ancestry of a node, innermost last. */
 function ancestry(node) {
   const chain = [];
@@ -302,10 +328,36 @@ describe('every class string the app ships', () => {
     expect(found, 'prefix it with motion-safe:').toEqual([]);
   });
 
-  it('rounds nothing to a pill but a focus ring', () => {
-    // Pill-shaped everything is rejected outright (§2.4), and a circular
-    // crop is a generic-template tell.
-    expect(hits(/\brounded-full\b/)).toEqual([]);
+  it('rounds to a pill only in a listed chip', () => {
+    // Pill-shaped DECORATION is still rejected (§2.4), and a circular crop
+    // is still a generic-template tell. A purposeful compact chip is not
+    // decoration (issue #475): it is the shape of one short value with its
+    // own remove control. So the shape is allowed in the files listed in
+    // CHIP_FILES and nowhere else, and each listed file is held to the
+    // chip's semantics below rather than to a ban on the shape.
+    const found = hits(/\brounded-full\b/).filter((hit) => !CHIP_FILES.includes(hit.replace(/:\d+$/, '')));
+    expect(found, 'a full round belongs to a listed chip; see docs/interface-guidelines.md, Chips').toEqual([]);
+  });
+
+  it('holds every listed chip to the chip contract', () => {
+    for (const file of CHIP_FILES) {
+      const source = SOURCES.find((entry) => entry.file === file);
+      expect(source, `${file} exists`).toBeDefined();
+      expect(chipProblems(source.text), file).toEqual([]);
+      expect(fs.existsSync(path.join(SRC, file.replace(/\.jsx$/, '.test.jsx'))), `${file} has its own test`).toBe(true);
+    }
+  });
+
+  it('knows a chip from a pill', () => {
+    // The contract check above is only worth something if it can fail.
+    const chip = `<li className="rounded-full"><span>Practice</span>
+      <button type="button" aria-label={\`Remove \${value}\`} className="min-h-admin-control">×</button></li>`;
+    expect(chipProblems(chip)).toEqual([]);
+    expect(chipProblems('<span className="rounded-full">New</span>')).toEqual([
+      'a chip carries its own remove button',
+      'the remove button names the value it removes',
+      'the remove button keeps the full control height',
+    ]);
   });
 
   it('draws no shadow and no blurred panel', () => {

@@ -43,6 +43,7 @@ const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx')
 const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
 // Scheduled reminders (issue #518): one screen behind one link.
 const AdminReminderSchedules = lazy(() => import('./pages/AdminReminderSchedules.jsx'));
+const AdminSpeakerMail = lazy(() => import('./pages/AdminSpeakerMail.jsx'));
 const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
@@ -206,6 +207,10 @@ export default function AdminApp() {
           <Route
             path="speakers/reminders/send"
             element={<DeferredAdminPage label="speaker reminders"><AdminSpeakerReminders /></DeferredAdminPage>}
+          />
+          <Route
+            path="speakers/mail/wording"
+            element={<DeferredAdminPage label="speaker email wording"><AdminSpeakerMail /></DeferredAdminPage>}
           />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
           {/* The rail links to the section; the attendee schedule (#518)

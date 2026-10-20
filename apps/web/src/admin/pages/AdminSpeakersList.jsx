@@ -197,6 +197,9 @@ export default function AdminSpeakersList() {
             <Link to="reminders/send" className={secondaryButtonClass}>
               Send reminders
             </Link>
+            <Link to="mail/wording" className={secondaryButtonClass}>
+              Edit email wording
+            </Link>
             <Link to="new" className={primaryButtonClass}>
               Create a speaker
             </Link>
