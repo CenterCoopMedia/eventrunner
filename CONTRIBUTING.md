@@ -34,7 +34,7 @@ We will bounce:
 - Personal infrastructure (hostnames, chat IDs, personal emails, private operator adapters)
 - Secrets, live-project credentials, or real PII in tests, fixtures, screenshots, or logs
 - A second queue. `ticket_sync_queue` is the only queue in the system
-- Features already cut from v1 (video generator, bulk broadcast, invoicing, social feeds, speaker chat) unless a linked issue reopens the case
+- Features already cut from v1 (video generator, bulk broadcast, social feeds, speaker chat) unless a linked issue reopens the case. Sponsor invoicing was reopened by #208.
 - Drive-by refactors with no product change
 
 The [governance](GOVERNANCE.md) note is the short version of who decides.

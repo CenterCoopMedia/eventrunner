@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goes, who it would reach, who waits on the 24-hour limit, and what the last run did. The
   reminder wording gains two optional tokens, `{{due_date}}` and `{{days_left}}`, set only by
   the schedule. Every run that emails anyone writes one admin log entry.
+- Invoices, part 1 (#208). Staff write and save sponsor invoice drafts under
+  **Invoices**. Choosing an organization fills the name to bill and, when its tier names a
+  sponsor package, the first line. The totals change as staff type, in a live region, and
+  the server computes them again in minor units on every save; a total below zero is
+  refused. A save over a newer revision is refused. A draft has no number. Numbers come
+  with issue in a later release. **Invoice settings** hold the issuer, tax ID, payment
+  instructions and number prefix; staff read them and only an operator changes them. The
+  `invoices`, `invoice_counters` and `invoice_settings` collections are server-only, every
+  write refuses on a read-only demo, and each write records an audit row. ADR 0001 §4.2 is
+  amended to restore invoicing.
 
 - Staff edit the wording of the speaker invitation and the acceptance confirmation
   (#204). **Edit email wording** on the Speakers list opens one editor per message, with

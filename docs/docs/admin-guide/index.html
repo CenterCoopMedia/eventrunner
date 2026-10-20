@@ -132,6 +132,7 @@
               <li><a href="#speakers">Speakers</a></li>
               <li><a href="#attendees">Attendees</a></li>
               <li><a href="#ticketing">Ticketing</a></li>
+              <li><a href="#invoices">Invoices</a></li>
               <li><a href="#import-records">Import records</a></li>
               <li><a href="#announcements">Announcements</a></li>
               <li><a href="#live-updates">Live updates</a></li>
@@ -167,8 +168,8 @@
           <tr><th>Tier</th><th>Sections</th><th>For</th></tr>
           </thead>
           <tbody>
-          <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, System errors, and on Data export the ticket order and admission spreadsheets and the event data package</td><td>The person who set the site up and answers for the deployment</td></tr>
-          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations)</td><td>The people who run the event day to day</td></tr>
+          <tr><td>Operator</td><td>Everything below, plus Features, Branding, Access, System errors, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package</td><td>The person who set the site up and answers for the deployment</td></tr>
+          <tr><td>Staff</td><td>Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations)</td><td>The people who run the event day to day</td></tr>
           </tbody>
           </table>
           </div>
@@ -471,6 +472,28 @@
           <p>Money refunds happen through <strong>Open this payment in Stripe Dashboard</strong>, using the organizer&#39;s authorized Stripe account. <strong>Refund history</strong> records provider results. A succeeded full refund invalidates all tickets. For a succeeded partial refund, an operator chooses <strong>Refund to allocate</strong>, then selects affected tickets or explicitly chooses <strong>Keep every ticket valid</strong> for a price adjustment. <strong>Review refund allocation</strong> confirms that decision without creating a money refund. A dispute appears under <strong>Payment disputes</strong> for merchant review; it does not automatically cancel admission. Reasons and actions appear in <strong>Audit trail</strong>.</p>
           <p>For complimentary seats, an operator opens <strong>Issue complimentary admission</strong>, enters each attendee and a reason, and uses <strong>Review complimentary tickets</strong> before the final issue confirmation. Comps consume real event/type capacity. At the door, staff enter or scan a human-readable code in <strong>Ticket code for check-in</strong>, then select <strong>Check in attendee</strong>. A repeat reports already checked in. Only an operator can use <strong>Review check-in correction → Undo recorded check-in</strong>, with a reason.</p>
           <p>If a payment response is lost, the purchaser uses <strong>Resume existing checkout</strong> or <strong>Recover existing checkout</strong>. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the <a href="/eventrunner/docs/stripe-ticketing/#6-support-the-payment-and-the-attendee-separately">support matrix</a> before suggesting another payment, refund, resend, or admission change.</p>
+          <h2 id="invoices">Invoices<a class="heading-anchor" href="#invoices" aria-label="Link to this section">#</a></h2>
+          <p><strong>Invoices</strong> under Registration and tickets is where staff bill sponsors and partners. This first release covers drafts and the invoice settings. Issuing, the PDF, marking an invoice paid, voiding and sending come in a later release; this section grows with them.</p>
+          <p>Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.</p>
+          <h3 id="write-a-draft">Write a draft<a class="heading-anchor" href="#write-a-draft" aria-label="Link to this section">#</a></h3>
+          <ol>
+          <li>Open <strong>Invoices</strong>, then <strong>New invoice</strong>.</li>
+          <li>Under <strong>Organization</strong>, choose the organization to bill. The page fills <strong>Name to bill</strong> with its name. If the organization&#39;s tier matches the name of a sponsor package on the site, the first line becomes that package, with the first number in the package&#39;s price as the unit price. Lines you already wrote are kept.</li>
+          <li>Check the contact name, billing email, billing address and reference. Only <strong>Name to bill</strong> is required.</li>
+          <li>Write the lines. Each line has a description, a whole-number quantity and a unit price. Type prices as digits, such as <code>1250.00</code>; commas between thousands are fine. An invoice holds up to 50 lines. A line you leave blank is left out when you save.</li>
+          <li>Add discounts and tax with <strong>Add a discount</strong> and <strong>Add a tax</strong>. Type each amount by hand. A discount subtracts and a tax adds. There are no rates. An invoice holds up to 10 of these rows.</li>
+          <li>Set a due date if you want one. It is a date on the event&#39;s clock.</li>
+          <li>Select <strong>Save draft</strong>.</li>
+          </ol>
+          <p>The totals under the form change as you type. They are a preview: The server computes the same figures again when you save, and the saved figures are the ones that count. A total below zero is refused. Reduce a discount.</p>
+          <p>A draft has no number. The number (<code>INV-0001</code>, <code>INV-0002</code>, and so on, with no gaps) is given when the invoice is issued, so deleting a draft never leaves a gap. Each invoice uses one currency: The ticket catalog&#39;s currency, then the currency in the invoice settings, then US dollars. A draft keeps the currency it was created with.</p>
+          <p>If someone else saved the same draft after you opened it, your save is refused. Select <strong>Reload the saved invoice</strong>, then make your change again.</p>
+          <p>To remove a draft, open it and select <strong>Delete this draft</strong>. Only a draft can be deleted.</p>
+          <h3 id="find-an-invoice">Find an invoice<a class="heading-anchor" href="#find-an-invoice" aria-label="Link to this section">#</a></h3>
+          <p>The list shows the newest invoices first, with the status as a word: <strong>Draft</strong>, <strong>Issued</strong>, <strong>Paid</strong> or <strong>Void</strong>. Use <strong>Status</strong> to show one status, and <strong>Search</strong> to find an invoice by its number, the name or email it is billed to, or its reference. <strong>Show more invoices</strong> continues the same search. One search reads 250 invoices at a time. When those hold no match and older invoices remain, the page says so; select <strong>Show older invoices</strong> to search on.</p>
+          <h3 id="invoice-settings">Invoice settings<a class="heading-anchor" href="#invoice-settings" aria-label="Link to this section">#</a></h3>
+          <p>Open <strong>Invoice settings</strong> from the Invoices page. The settings hold what every issued invoice copies: The issuer name, address and email, the tax ID, the payment instructions, the number prefix and the fallback currency. Staff can read them. Only an operator can change them, because they hold the bank details. The settings are not part of the public event settings.</p>
+          <p>The number prefix is 1 to 10 capital letters, digits or hyphens, and starts with a letter. The page shows the next number.</p>
           <h2 id="import-records">Import records<a class="heading-anchor" href="#import-records" aria-label="Link to this section">#</a></h2>
           <p>Add speakers, sessions and organizations (sponsors and partners) from a CSV file, for example an export from a spreadsheet or another event system. Open <strong>Import records</strong> under Operations. Staff and operators can use it.</p>
           <p><strong>The import saves drafts only.</strong> It publishes nothing and sends no email or invitation:</p>

@@ -131,6 +131,16 @@
           goes, who it would reach, who waits on the 24-hour limit, and what the last run did. The
           reminder wording gains two optional tokens, <code>{{due_date}}</code> and <code>{{days_left}}</code>, set only by
           the schedule. Every run that emails anyone writes one admin log entry.</li>
+          <li>Invoices, part 1 (#208). Staff write and save sponsor invoice drafts under
+          <strong>Invoices</strong>. Choosing an organization fills the name to bill and, when its tier names a
+          sponsor package, the first line. The totals change as staff type, in a live region, and
+          the server computes them again in minor units on every save; a total below zero is
+          refused. A save over a newer revision is refused. A draft has no number. Numbers come
+          with issue in a later release. <strong>Invoice settings</strong> hold the issuer, tax ID, payment
+          instructions and number prefix; staff read them and only an operator changes them. The
+          <code>invoices</code>, <code>invoice_counters</code> and <code>invoice_settings</code> collections are server-only, every
+          write refuses on a read-only demo, and each write records an audit row. ADR 0001 §4.2 is
+          amended to restore invoicing.</li>
           </ul>
           <ul>
           <li>Staff edit the wording of the speaker invitation and the acceptance confirmation

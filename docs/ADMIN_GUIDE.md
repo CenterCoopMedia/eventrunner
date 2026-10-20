@@ -26,8 +26,8 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 
 | Tier | Sections | For |
 |---|---|---|
-| Operator | Everything below, plus Features, Branding, Access, System errors, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
+| Operator | Everything below, plus Features, Branding, Access, System errors, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -453,6 +453,40 @@ Money refunds happen through **Open this payment in Stripe Dashboard**, using th
 For complimentary seats, an operator opens **Issue complimentary admission**, enters each attendee and a reason, and uses **Review complimentary tickets** before the final issue confirmation. Comps consume real event/type capacity. At the door, staff enter or scan a human-readable code in **Ticket code for check-in**, then select **Check in attendee**. A repeat reports already checked in. Only an operator can use **Review check-in correction → Undo recorded check-in**, with a reason.
 
 If a payment response is lost, the purchaser uses **Resume existing checkout** or **Recover existing checkout**. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the [support matrix](operator/stripe-ticketing.md#6-support-the-payment-and-the-attendee-separately) before suggesting another payment, refund, resend, or admission change.
+
+## Invoices
+
+**Invoices** under Registration and tickets is where staff bill sponsors and partners. This first release covers drafts and the invoice settings. Issuing, the PDF, marking an invoice paid, voiding and sending come in a later release; this section grows with them.
+
+Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.
+
+### Write a draft
+
+1. Open **Invoices**, then **New invoice**.
+2. Under **Organization**, choose the organization to bill. The page fills **Name to bill** with its name. If the organization's tier matches the name of a sponsor package on the site, the first line becomes that package, with the first number in the package's price as the unit price. Lines you already wrote are kept.
+3. Check the contact name, billing email, billing address and reference. Only **Name to bill** is required.
+4. Write the lines. Each line has a description, a whole-number quantity and a unit price. Type prices as digits, such as `1250.00`; commas between thousands are fine. An invoice holds up to 50 lines. A line you leave blank is left out when you save.
+5. Add discounts and tax with **Add a discount** and **Add a tax**. Type each amount by hand. A discount subtracts and a tax adds. There are no rates. An invoice holds up to 10 of these rows.
+6. Set a due date if you want one. It is a date on the event's clock.
+7. Select **Save draft**.
+
+The totals under the form change as you type. They are a preview: The server computes the same figures again when you save, and the saved figures are the ones that count. A total below zero is refused. Reduce a discount.
+
+A draft has no number. The number (`INV-0001`, `INV-0002`, and so on, with no gaps) is given when the invoice is issued, so deleting a draft never leaves a gap. Each invoice uses one currency: The ticket catalog's currency, then the currency in the invoice settings, then US dollars. A draft keeps the currency it was created with.
+
+If someone else saved the same draft after you opened it, your save is refused. Select **Reload the saved invoice**, then make your change again.
+
+To remove a draft, open it and select **Delete this draft**. Only a draft can be deleted.
+
+### Find an invoice
+
+The list shows the newest invoices first, with the status as a word: **Draft**, **Issued**, **Paid** or **Void**. Use **Status** to show one status, and **Search** to find an invoice by its number, the name or email it is billed to, or its reference. **Show more invoices** continues the same search. One search reads 250 invoices at a time. When those hold no match and older invoices remain, the page says so; select **Show older invoices** to search on.
+
+### Invoice settings
+
+Open **Invoice settings** from the Invoices page. The settings hold what every issued invoice copies: The issuer name, address and email, the tax ID, the payment instructions, the number prefix and the fallback currency. Staff can read them. Only an operator can change them, because they hold the bank details. The settings are not part of the public event settings.
+
+The number prefix is 1 to 10 capital letters, digits or hyphens, and starts with a letter. The page shows the next number.
 
 ## Import records
 

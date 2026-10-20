@@ -264,7 +264,7 @@ describe('admin route gating', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'This section needs operator access' })).toBeNull();
     openEveryGroup();
-    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Scheduled reminders', 'Live updates', 'Ticketing', 'Import records', 'Feedback', 'Email log', 'Change requests', 'Event', 'Data export']) {
+    for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Scheduled reminders', 'Live updates', 'Ticketing', 'Invoices', 'Import records', 'Feedback', 'Email log', 'Change requests', 'Event', 'Data export']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
     for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
@@ -524,7 +524,7 @@ describe('admin route gating', () => {
     currentUser = { uid: 'staff-1', email: 'staff@example.org', getIdToken: async () => 'id-token' };
     await renderAt('/admin/features');
     const refusal = screen.getByRole('heading', { name: 'This section needs operator access' }).parentElement;
-    expect(refusal.textContent).toContain('Overview, Pages, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Sessions, Session pitches, Speakers, Organizations, Attendees, Ticketing, Badges, Announcements, Scheduled reminders, Live updates, Email log, Import records, Feedback, Change requests, Data export and Event');
+    expect(refusal.textContent).toContain('Overview, Pages, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Sessions, Session pitches, Speakers, Organizations, Attendees, Ticketing, Invoices, Badges, Announcements, Scheduled reminders, Live updates, Email log, Import records, Feedback, Change requests, Data export and Event');
     expect(refusal.textContent).not.toMatch(/deployment settings/);
   });
 });
