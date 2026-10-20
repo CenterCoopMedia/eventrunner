@@ -434,8 +434,8 @@ function buildHandlers(env = process.env) {
       memory: '1GiB',
       timeoutSeconds: 120,
       // One image at a time per instance: decoding is the memory cost,
-      // and two at once could pass the limit. Each upload also fires five
-      // short runs for its own writes, so the cap leaves room for those;
+      // and two at once could pass the limit. Each upload also fires up to
+      // five short runs for its own writes, so the cap leaves room for those;
       // it still bounds the bill when many files land together.
       concurrency: 1,
       maxInstances: 10,

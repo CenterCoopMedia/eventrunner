@@ -61,13 +61,14 @@ Tests live beside each module (`*.test.cjs`, `node --test`) and run with fakes â
 
 `src/media/imageSizes.cjs` holds two Cloud Storage triggers on `EVENT_STORAGE_BUCKET` (issue #333). They have no HTTP endpoint, so they are not in `.github/smoke-endpoints.json`.
 
-- `mediaImageSizes` runs when an object is written. It acts only on a PNG, JPEG or WebP upload at `cms-images/{assetId}/{name}`, `branding/{assetId}/{name}` or `speaker-photos/{speakerId}/{assetId}/{name}`. The rule is `shared/imageSizes`, which the web app reads too. It writes WebP copies at 320, 640, 1280 and 1920 pixels wide to `{folder}/_sizes/{width}.webp`, and `{folder}/_sizes/manifest.json`. It never enlarges. It never changes the original.
+- `mediaImageSizes` runs when an object is written. It acts only on a PNG, JPEG or WebP upload at `cms-images/{assetId}/{name}`, `branding/{assetId}/{name}` or `speaker-photos/{speakerId}/{assetId}/{name}`. The rule is `shared/imageSizes`, which the web app reads too. It writes WebP copies at each of 320, 640, 1280 and 1920 pixels that is narrower than the original, to `{folder}/_sizes/{generation}/{width}.webp`, and `{folder}/_sizes/manifest.json` with the generation and each copy's real width. The page lists each copy at that width, then the original at its own width. It never changes the original.
+- One generation per run. The run reads the generation its event names, and checks that the name still holds it before it writes copies and after it writes the manifest. A run that lost to an overwrite removes its folder and its manifest. A finished run removes the folders of earlier generations.
 - It reads the bytes, not the declared type. The magic numbers and the decoder must agree. It refuses a file over 5 MiB before the download, and an image over 40 megapixels from its header, before it decodes pixels. `sharp` holds the same pixel limit while it decodes. A truncated or corrupt file is refused.
 - Each copy is turned upright from the EXIF orientation and written with no EXIF, GPS, XMP or ICC data.
 - A refused or failed image gets a manifest with `status: 'refused'` or `'failed'` and a `reason`, and no copies. Retries are off.
 - Every copy and the manifest fire the trigger again. Those runs stop at once: a path with a `_sizes` segment is never a source, and each write carries an `imageSizeOf` metadata stamp. They download nothing.
 - `mediaImageSizesCleanup` runs when an object is deleted. For a source path it deletes the `_sizes/` folder, unless the original still exists (an overwrite also fires a delete event). `mediaImageSizes` also checks at the end that its original still exists, and removes what it wrote if not.
-- Limits: 1 GiB of memory, one image per instance, at most 10 instances, 120 seconds. Each upload costs one full run and five short ones.
+- Limits: 1 GiB of memory, one image per instance, at most 10 instances, 120 seconds. Each upload costs one full run and up to five short ones, one for each copy and the manifest.
 
 The emulator reads the triggers without `functions/.env`, so the module falls back to the default bucket in `FIREBASE_CONFIG`. A unit test that requires the barrel has neither, and the module then exports no trigger.
 

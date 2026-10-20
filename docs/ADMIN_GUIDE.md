@@ -277,10 +277,11 @@ A browsable library, split by namespace because each answers a different questio
 
 Upload, edit alt text, and delete from the library. A delete warns you first if anything currently on the site references the asset — do not dismiss that warning without checking what it names.
 
-**Display sizes.** When you upload a PNG, JPEG or WebP image here, or a speaker headshot, the site makes smaller copies of it a few seconds later. The copies are WebP files 320, 640, 1280 and 1920 pixels wide. They are never wider than your upload. Speaker portraits, sponsor logos, the lead image and the home hero use them, so a phone downloads a small file and not your full upload. Your upload stays as it is. The site still uses it when a copy does not exist.
+**Display sizes.** When you upload a PNG, JPEG or WebP image here, or a speaker headshot, the site makes smaller copies of it a few seconds later. The copies are WebP files 320, 640, 1280 and 1920 pixels wide, but only the widths narrower than your upload. A small upload gets fewer copies, or none. Speaker portraits, sponsor logos, the lead image and the home hero use them, so a phone downloads a small file and not your full upload. Your upload stays as it is. The site still uses it when a copy does not exist.
 
 - The copies have no camera data. Location (GPS), camera make and other EXIF details are removed, and the picture is turned upright first.
 - The site makes no copies of SVG or GIF files, of animated images, of files over 5 MB, or of images over 40 megapixels. A file that is not really an image gets no copies. The page then shows your upload, as before.
+- If an image file is replaced at the same address, the copies of the old picture are removed and new ones are made.
 - An image uploaded before this feature has no copies. The page shows the original. To get copies, upload the image again and choose the new one.
 - When you delete an image, its copies are deleted too.
 

@@ -9,26 +9,26 @@ Desktop is 1280 × 900. Phone is 390 × 844. Both runs use the E2E emulator seed
 
 ## Bytes the browser downloaded
 
+After, each image also reads its `manifest.json` once per page load (283 to 1,013 bytes). The page lists each copy at the real width the manifest states, then the original at its own width.
+
 | Image | Viewport | Before | After |
 |---|---|---|---|
 | Speaker portrait, speakers page | Phone | 134,966 (original) | 33,588 (`640.webp`) |
-| Speaker portrait, speakers page | Desktop | 134,966 (original) | 10,038 (`320.webp`) |
+| Speaker portrait, speakers page | Desktop | 134,966 (original) | 33,588 (`640.webp`, already in the browser cache from the phone step; a fresh load asks for `320.webp`, 10,038) |
 | Sponsor logo, sponsors page | Phone and desktop | 189,976 (original) | 12,650 (`320.webp`) |
-| Small logo, sponsors page | Phone and desktop | 1,440 (original) | 706 (`320.webp`, 120 px wide) |
+| Small logo, sponsors page | Phone and desktop | 1,440 (original) | 1,440 (original: it is 120 px wide, so it gets no copies) |
 | Home hero | Phone | 0 (no request; the picture did not load) | 48,696 (`640.webp`) |
 | Home hero | Desktop | 0 (no request; the picture did not load) | 170,334 (`1280.webp`) |
 
-The same measure on the other repository photos, from `renderImageSizes` (bytes for each width; a width above the original is the original width):
+The same measure on the other repository photos, from `renderImageSizes`. The function writes only widths narrower than the original, so a dash means no copy; the page uses the original there.
 
 | Fixture | Original | 320 | 640 | 1280 | 1920 |
 |---|---|---|---|---|---|
-| `demo/speakers/elena-santos.webp`, 1254 × 1254 | 134,966 | 10,038 | 33,588 | 118,050 | 118,050 |
-| `demo/speakers/nora-chen.webp`, 1254 × 1254 | 45,096 | 5,532 | 13,868 | 34,876 | 34,876 |
+| `demo/speakers/elena-santos.webp`, 1254 × 1254 | 134,966 | 10,038 | 33,588 | – | – |
+| `demo/speakers/nora-chen.webp`, 1254 × 1254 | 45,096 | 5,532 | 13,868 | – | – |
 | `demo/sponsors/beacon-community-fund.webp`, 2060 × 763 | 189,976 | 12,650 | 32,254 | 82,024 | 146,190 |
-| `hero/broadsheet.webp`, 1536 × 1024 | 236,900 | 13,094 | 48,696 | 170,334 | 252,880 |
-| `hero/nclocal-summit.jpg`, 950 × 535 | 89,195 | 11,000 | 29,268 | 54,208 | 54,208 |
-
-One case is larger: `broadsheet.webp` at full width is 7% larger than the upload, because the upload was already a tuned WebP. A browser only asks for that file for a slot wider than 1280 device pixels.
+| `hero/broadsheet.webp`, 1536 × 1024 | 236,900 | 13,094 | 48,696 | 170,334 | – |
+| `hero/nclocal-summit.jpg`, 950 × 535 | 89,195 | 11,000 | 29,268 | – | – |
 
 ## Screenshots
 
