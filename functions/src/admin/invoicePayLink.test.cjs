@@ -586,3 +586,27 @@ test('two presses at once share one session, and neither closes the link the oth
   assert.deepEqual(env.fake.calls.expire, []);
   assert.equal(env.audits().filter((row) => row.action === 'invoices.pay-link-created').length, 1);
 });
+
+test('a link near its end is replaced and closed at Stripe; a payment through it still counts, and closes the new one', async () => {
+  const env = setup();
+  const first = await env.call({ action: 'createPayLink', invoiceId: ID });
+  const oldSession = first.body.invoice.payLinks[0].sessionId;
+  // The payer completes the old page just before staff make a new link.
+  env.fake.pay(oldSession);
+  env.advance(LINK_LIFETIME_MS - 10 * 60 * 1000);
+  const second = await env.call({ action: 'createPayLink', invoiceId: ID });
+  assert.equal(second.statusCode, 200, JSON.stringify(second.body));
+  assert.deepEqual(second.body.invoice.payLinks.map((link) => [link.status, link.closedReason]), [['cancelled', 'replaced'], ['open', null]]);
+  assert.deepEqual(env.fake.calls.expire, [oldSession]);
+  const newSession = second.body.invoice.payLinks[1].sessionId;
+
+  const res = await env.deliver(env.fake.delivery('evt_old_page', 'checkout.session.completed', oldSession));
+  assert.equal(res.body.invoice, 'paid');
+  const stored = env.stored();
+  assert.equal(stored.status, 'paid');
+  assert.deepEqual(stored.payLinks.map((link) => link.status), ['paid', 'cancelled']);
+  assert.equal(stored.payLinks[1].closedReason, 'paid');
+  assert.equal(stored.payLinks[1].stripeClosed, true);
+  assert.deepEqual(env.fake.calls.expire, [oldSession, newSession]);
+  assert.equal(env.alerts().length, 0);
+});

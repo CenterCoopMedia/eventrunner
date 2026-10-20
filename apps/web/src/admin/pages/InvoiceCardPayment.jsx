@@ -37,7 +37,7 @@ const CLOSED_WORDS = Object.freeze({
   refused: 'Stripe refused it.',
   mismatch: 'Stripe answered with a page that did not match the invoice.',
   'no-answer': 'Stripe did not answer in time.',
-  replaced: 'The invoice changed while it was made.',
+  replaced: 'A new link replaced it near its end.',
   issued: 'The invoice changed while it was made.',
 });
 
@@ -86,7 +86,10 @@ function linkHistoryText(link, timeZone) {
   if (link.status === 'cancelled' && link.stripeClosed === true) text += ' Stripe closed it.';
   if (link.status === 'cancelled' && link.stripeClosed !== true) {
     const end = formatPayLinkEnd(link.expiresAt, timeZone);
-    text += ` Stripe was not told, so the link may work${end ? ` until ${end}` : ' until it ends'}. A payment through it is flagged for review, not applied.`;
+    const outcome = link.closedReason === 'replaced'
+      ? 'A payment through it still counts while the invoice is unpaid.'
+      : 'A payment through it is flagged for review, not applied.';
+    text += ` Stripe was not told, so the link may work${end ? ` until ${end}` : ' until it ends'}. ${outcome}`;
   }
   return text;
 }

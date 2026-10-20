@@ -242,7 +242,10 @@ raw provider payload is stored. The event data package carries the links and rev
 without Stripe ids or URLs, like orders.
 
 **Lifetime.** A Checkout Session ends within 24 hours. A link is made for 23 hours, and
-staff make a new one after it ends. One link is open at a time. A lost create answer is
+staff make a new one after it ends. One link is open at a time. A press in the last 15
+minutes of a link replaces it: the old link is cancelled and its Session expired, and a
+payment that completed on it first still counts. A payment applied through one link
+closes and expires any other open link. A lost create answer is
 retried with the same request and key for 22 hours, inside Stripe's idempotency window and
 while the frozen end time is still valid. A Stripe 4xx closes the attempt.
 

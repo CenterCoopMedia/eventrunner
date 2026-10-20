@@ -326,8 +326,14 @@ async function createPayLink({ db, actor, body, now, getPayments, log }) {
     const links = (Array.isArray(stored.payLinks) ? stored.payLinks : []).map((link) => ({ ...link }));
     settleEnded(links, at);
     const last = links.at(-1);
-    if (last?.status === 'open' && timeOf(last.expiresAt) - at.getTime() > REUSE_MARGIN_MS) {
-      return { reuse: true, stored };
+    let replaced = null;
+    if (last?.status === 'open') {
+      if (timeOf(last.expiresAt) - at.getTime() > REUSE_MARGIN_MS) return { reuse: true, stored };
+      // Close to its end: a new link replaces it, and its page in Stripe is
+      // ended below, so two pages are never open for long. A payment that
+      // completes on it first still counts (applyInvoiceCheckout).
+      Object.assign(last, { status: 'cancelled', closedAt: at, closedReason: 'replaced' });
+      replaced = last;
     }
     if (last?.status === 'creating') {
       if (at.getTime() - timeOf(last.createdAt) < RETRY_WINDOW_MS && last.request && last.idempotencyKey) {
@@ -350,9 +356,12 @@ async function createPayLink({ db, actor, body, now, getPayments, log }) {
       createdAt: at, createdBy: actor.uid, expiresAt: new Date(request.expires_at * 1000),
     };
     tx.update(ref, { payLinks: [...links, attempt] });
-    return { attempt };
+    return { attempt, replaced };
   });
   if (plan.reuse) return { ...invoiceAnswer(plan.stored, id), repeated: true };
+  if (plan.replaced) {
+    await expireClosedLinksAtStripe({ db, id, closed: [plan.replaced], getPayments: () => payments, now, log });
+  }
 
   const { attempt } = plan;
   let session;
@@ -503,8 +512,11 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
   const paymentIntentId = safeId(objectId(session.payment_intent));
   const linkIdFromSession = safeId(session.metadata?.eventRunnerPayLinkId);
 
+  let closedHere = [];
+  let outcome;
   try {
-    return await db.runTransaction(async (tx) => {
+    outcome = await db.runTransaction(async (tx) => {
+      closedHere = [];
       const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
       const policy = await checkDemoWrites({ db, transaction: tx });
       throwIfDemoPolicyUnavailable(policy);
@@ -557,7 +569,7 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
       else if (status === 'void') code = 'invoice-void';
       else if (status === 'paid') code = 'invoice-already-paid';
       else if (status !== 'issued') code = 'invoice-not-issued';
-      else if (link.status === 'cancelled') code = 'link-cancelled';
+      else if (link.status === 'cancelled' && link.closedReason !== 'replaced') code = 'link-cancelled';
 
       if (link) {
         link.status = 'paid';
@@ -586,9 +598,14 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
 
       const timeZone = eventSnap.exists ? eventSnap.data().timezone : null;
       const revision = Number.isSafeInteger(stored.revision) ? stored.revision : 0;
-      // Any other open link closes with the payment.
+      // Any other open link closes with the payment, and is ended at Stripe below.
       for (const other of links) {
-        if (other !== link && OPEN.has(other.status)) Object.assign(other, { status: 'cancelled', closedAt: at, closedReason: 'paid' });
+        if (other !== link && OPEN.has(other.status)) {
+          Object.assign(other, { status: 'cancelled', closedAt: at, closedReason: 'paid' });
+          delete other.request;
+          delete other.idempotencyKey;
+          closedHere.push(other);
+        }
       }
       tx.update(ref, {
         status: 'paid',
@@ -617,6 +634,12 @@ async function applyInvoiceCheckout({ db, provider, deliveryId, invoiceId, sessi
     if (isDuplicateClaim(err)) return { duplicate: true };
     throw err;
   }
+  if (outcome?.invoice === 'paid' && closedHere.length) {
+    await expireClosedLinksAtStripe({
+      db, id: invoiceId, closed: closedHere, getPayments: () => ({ available: true, provider }), now, log,
+    });
+  }
+  return outcome;
 }
 
 function alertRow({ at, message, invoiceId }) {
