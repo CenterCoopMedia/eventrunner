@@ -408,11 +408,15 @@ Select **Save attendee settings** to store them. Wording the same as the shipped
 - A deploy changes the shipped wording or the announcement email layout.
 - The event start, the venue or the ticket link changes in Event settings.
 
-A paused schedule sends nothing. Preview, then approve to turn it on again. When a check finds a change, it also tells the operator. If you approve new wording or new facts during a reminder day whose send has begun, the rest of that send stops. The next reminder day uses the new approval.
+A paused schedule sends nothing. Preview, then approve to turn it on again. When a check finds a change, it also tells the operator. If you approve again during a reminder day whose send has begun, with new wording, new settings or new facts, the rest of that send stops. The next reminder day uses the new approval.
 
-**Next run.** The panel says when the next reminder goes, with the time zone named, which reminder day it is, and how many attendees it would reach. It does not list their addresses. It also says what the last check did.
+**Next run.** The panel says when the next reminder goes, with the time zone named, which reminder day it is, and how many attendees it would reach. While a reminder day's send is in progress, it says how many addresses are left in that send. It does not list addresses. It also says what the last check did.
 
-**Turn off attendee reminders** stops the schedule. A check in progress stops before its next group of 200 addresses.
+**Turn off attendee reminders** stops the schedule. A check in progress stops before its next group of 200 addresses, and the rest of that reminder day's send is marked **Stopped**. A pause does the same.
+
+**If the announcement stream changes during a send.** The rest of that reminder day's send stops and shows **Stopped**, and the operator is told. Any other fault with the stream also tells the operator; the next check tries again.
+
+**Time limit.** Each check runs the speaker and the attendee schedules side by side, for up to eight minutes. A check that reaches the limit stops before its next speaker or its next group of 200 addresses, and the next check sends the rest.
 
 The schedule does nothing on a historical demo, and nothing after the last event day. Every approval, settings save, pause, and turn-off writes an admin log entry. Each check that emails anyone writes one admin log entry that names the speakers.
 

@@ -161,12 +161,18 @@ ADR 0006 and issue #518. `src/reminders/` holds two exports. The rules every sch
   is created in the same transaction as `announcement_sends/{sendId}`, so the email core's
   claim `announcement:{sendId}:{address hash}` sends each address once per window. Before each
   chunk the run stops for quiet hours or a closed window, and the lease transaction reads the
-  schedule again (`takeLease({ guard })`). A record left by quiet hours is continued in the same
-  window. A record whose window closed, or that an earlier approval started, is marked
+  schedule again (`takeLease({ guard })`); a stop there marks the record `stopped`. A record
+  left by quiet hours or the deadline is continued in the same window. A record whose window
+  closed, that an earlier approval started (its wording, facts or settings version differs), or
+  whose stream changed part way (`channel-changed`, which also tells the operator) is marked
   `stopped` and never continued; `sendAnnouncementEmail` refuses to continue a record with
   `reminder` set. Changed wording or facts pause the schedule and tell the operator; a channel
   that cannot send fails the run and tells the operator. The admin log row holds counts, never
   addresses.
+- The two branches run side by side with one deadline (`RUN_BUDGET_MS`, 480 seconds inside the
+  540-second timeout). Each stops before its next speaker or chunk at the deadline
+  (`time-limit`), so a long speaker run cannot starve the attendee run, and the next hourly run
+  sends the rest.
 
 Saving or resetting the speaker reminder wording (`speakerReminders`) pauses a schedule that
 is on when the new wording version differs from the approved one. Secrets: the mail

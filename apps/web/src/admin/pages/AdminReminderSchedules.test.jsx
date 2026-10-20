@@ -15,6 +15,7 @@ import {
   attendeeLastRunWords,
   attendeeStateWords,
   lastRunWords,
+  reachWords,
   nextRunWords,
   readOffsetInputs,
   stateWords,
@@ -428,6 +429,16 @@ describe('reminderSchedules helpers', () => {
     expect(lastRunWords({ finishedAt: '2026-11-13T15:31:00.000Z', outcome: 'nothing-due', counts: {} }, ZONE)).toMatch(/nothing was due\.$/);
     expect(lastRunWords({ finishedAt: '2026-11-14T01:00:30.000Z', outcome: 'completed', reason: 'quiet-hours', offsetDays: 7, counts: { sent: 1, deferred: 1 } }, ZONE))
       .toMatch(/sent 1 reminder, quiet hours began, so 1 speaker waits for the next run\.$/);
+  });
+
+  it('words a run cut at its time limit, and the addresses left in a send in progress', () => {
+    const at = '2026-11-24T15:31:00.000Z';
+    expect(lastRunWords({ finishedAt: at, outcome: 'completed', reason: 'time-limit', offsetDays: 7, counts: { sent: 3, deferred: 2 } }, ZONE))
+      .toMatch(/sent 3 reminders, the run reached its time limit, so 2 speakers wait for the next run\.$/);
+    expect(attendeeLastRunWords({ finishedAt: at, outcome: 'completed', reason: 'time-limit', offsetDays: 7, counts: { sent: 200, deferred: 1 } }, ZONE))
+      .toMatch(/sent 200 emails, the run reached its time limit, so 1 address waits for the next run\.$/);
+    expect(reachWords({ count: 1, remaining: true })).toBe('1 address is left in this reminder day’s send.');
+    expect(reachWords({ count: 0, remaining: true })).toBe('0 addresses are left in this reminder day’s send.');
   });
 
   it('words the attendee schedule and its last run, in addresses', () => {

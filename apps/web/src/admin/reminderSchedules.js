@@ -66,6 +66,7 @@ export function lastRunWords(lastRun, timeZone) {
       if (lastRun.reason === 'quiet-hours') parts.push(`quiet hours began, so ${speakerWord(left)} ${left === 1 ? 'waits' : 'wait'} for the next run`);
       if (lastRun.reason === 'schedule-changed') parts.push(`the schedule changed during the run, so it stopped before ${speakerWord(left)}`);
       if (lastRun.reason === 'window-closed') parts.push(`the reminder day ended during the run, before ${speakerWord(left)}`);
+      if (lastRun.reason === 'time-limit') parts.push(`the run reached its time limit, so ${speakerWord(left)} ${left === 1 ? 'waits' : 'wait'} for the next run`);
       what = `${lastRun.offsetDays ? `the ${lastRun.offsetDays}-day reminder: ` : ''}${parts.join(', ')}`;
       break;
     }
@@ -119,6 +120,9 @@ export function addressWord(count) {
 export function reachWords(reach) {
   if (!reach) return '';
   if (reach.count === null || reach.count === undefined) return reach.problem ?? '';
+  if (reach.remaining) {
+    return `${addressWord(reach.count)} ${reach.count === 1 ? 'is' : 'are'} left in this reminder day’s send.`;
+  }
   const parts = [`It would reach ${attendeeWord(reach.count)}.`];
   if (reach.suppressed) {
     parts.push(`${addressWord(reach.suppressed)} unsubscribed and ${reach.suppressed === 1 ? 'is' : 'are'} left out.`);
@@ -166,6 +170,7 @@ export function attendeeLastRunWords(lastRun, timeZone) {
       if (lastRun.reason === 'quiet-hours') parts.push(`quiet hours began, so ${addressWord(left)} ${left === 1 ? 'waits' : 'wait'} for the next run`);
       if (lastRun.reason === 'schedule-changed') parts.push(`the schedule changed during the run, so it stopped before ${addressWord(left)}`);
       if (lastRun.reason === 'window-closed') parts.push(`the reminder day ended during the run, before ${addressWord(left)}`);
+      if (lastRun.reason === 'time-limit') parts.push(`the run reached its time limit, so ${addressWord(left)} ${left === 1 ? 'waits' : 'wait'} for the next run`);
       if (lastRun.reason === 'superseded') parts.push('the send began on an earlier approval, so it stopped and sends no more');
       if (lastRun.reason === 'busy') parts.push('another run held the send, so this run stopped');
       what = `${lastRun.offsetDays ? `the ${lastRun.offsetDays}-day reminder: ` : ''}${parts.join(', ')}`;

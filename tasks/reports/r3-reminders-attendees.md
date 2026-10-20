@@ -25,3 +25,11 @@ Rules are unchanged: `reminder_schedules/{scheduleId}` and the other two collect
 - **Days in the email** are the days left when that window's send began. A send resumed the next morning keeps the earlier number.
 - **Shipped wording.** Saving text equal to the shipped draft keeps the shipped draft, so a deploy that changes it still pauses. The wording version also covers the announcement layout.
 - **Approval needs a working channel.** Approve is refused while announcement email cannot be sent; a run that finds the channel broken fails and tells the operator (deduplicated).
+
+## Review fixes (Codex on #532)
+
+1. The send record binds the settings version too: a settings-only re-approval stops the rest of that day's send.
+2. The branches run side by side with one 480-second deadline that both respect between steps.
+3. The next-run count of a send in progress is the addresses left on its frozen list.
+4. A guard stop (off, paused, changed) marks the record `stopped`.
+5. A per-chunk channel refusal tells the operator (same notice key); `channel-changed` also stops the record.
