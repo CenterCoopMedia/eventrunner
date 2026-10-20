@@ -68,7 +68,7 @@
     "--hero-art-width": "56%",
     "--hero-copy-pad-inline-start": "var(--space-md)",
     "--hero-copy-border-inline-start": ".35rem solid rgb(var(--color-accent-rgb))",
-    "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-rgb)) 38%, rgb(var(--color-surface-rgb) / .95) 45%, rgb(var(--color-surface-rgb) / 0) 67%)",
+    "--hero-veil-background": "linear-gradient(90deg, rgb(var(--color-surface-alt-rgb) / .95) 0%, rgb(var(--color-surface-alt-rgb) / 0) 34%)",
     "--standfirst-font": "var(--font-heading)",
     "--standfirst-weight": "var(--weight-regular)"
   },

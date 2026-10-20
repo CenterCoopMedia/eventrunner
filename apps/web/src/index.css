@@ -2418,6 +2418,12 @@
     border-block: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
     border-block-start: var(--hero-rule-block-start);
     background: rgb(var(--color-surface-alt-rgb));
+    /* The copy column, from the hero's leading edge to the photograph.
+       It is declared here, not with the tokens on :root, so that a
+       wrapper that sets its own --hero-art-width (the NC Local
+       composition) changes it. The photograph and its veil start where
+       the column ends, so no word sits on the picture (#345). */
+    --hero-copy-column: max(calc(100% - var(--hero-art-width)), var(--hero-copy-min-inline-size));
   }
   .event-hero:not(.event-hero--illustrated) { min-block-size: 0; }
   .event-hero:not(.event-hero--illustrated) .event-hero__copy {
@@ -2429,7 +2435,7 @@
   .event-hero__art {
     position: absolute;
     inset: 0 0 0 auto;
-    inline-size: var(--hero-art-width);
+    inline-size: calc(100% - var(--hero-copy-column));
     block-size: 100%;
     object-fit: cover;
     object-position: var(--hero-art-position);
@@ -2437,12 +2443,12 @@
   }
   .event-hero__veil {
     position: absolute;
-    inset: 0;
+    inset: 0 0 0 var(--hero-copy-column);
     z-index: -1;
     background: var(--hero-veil-background);
   }
   .event-hero__copy {
-    inline-size: 65%;
+    inline-size: var(--hero-copy-column);
     padding-block: var(--space-2xl);
     padding-block-end: var(--hero-copy-pad-block-end);
     padding-inline: var(--hero-copy-pad-inline-start) var(--space-lg);
@@ -2480,7 +2486,7 @@
     position: absolute;
     inset: auto var(--space-sm) var(--space-sm) auto;
     z-index: 1;
-    max-inline-size: min(26rem, calc(100% - 2 * var(--space-sm)));
+    max-inline-size: min(26rem, calc(100% - var(--hero-copy-column) - 2 * var(--space-sm)));
     padding: var(--space-2xs) var(--space-xs);
     background: rgb(var(--color-surface-rgb) / .92);
     color: rgb(var(--color-text-primary-rgb));

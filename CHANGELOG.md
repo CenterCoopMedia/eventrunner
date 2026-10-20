@@ -418,6 +418,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The event hero no longer puts its title, intro or buttons on the photograph. From 640px
+  up, the copy has its own column and the photograph fills the rest, in every site style.
+  The column is at least 22rem or 42% of the hero, so a style that asks for a wide
+  photograph gets a narrower one instead. The veil now softens only the photograph's
+  leading edge. The NC Local composition keeps its half-and-half layout (#345).
+
 - The Functions deploy step now fails when a Function is not deployed. After a quota error
   (HTTP 429) on a create, `firebase-tools` 15.22.4 can exit 0 before the create is done, with
   no summary. Run 39329645906 reported success while `downloadEventPackage` did not exist.
