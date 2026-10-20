@@ -95,3 +95,95 @@ export function nextRunWords(nextRun, timeZone) {
   }
   return nextRun.message ?? '';
 }
+
+// --- attendees ---------------------------------------------------------------
+
+/** The attendee schedule's state in words. Never shown by colour alone. */
+export function attendeeStateWords(state) {
+  if (state === 'on') return 'Scheduled attendee reminders are on.';
+  if (state === 'paused') return 'Scheduled attendee reminders are paused.';
+  return 'Scheduled attendee reminders are off.';
+}
+
+/** "1 attendee" / "2 attendees". */
+export function attendeeWord(count) {
+  return `${count} ${count === 1 ? 'attendee' : 'attendees'}`;
+}
+
+/** "1 address" / "2 addresses". */
+export function addressWord(count) {
+  return `${count} ${count === 1 ? 'address' : 'addresses'}`;
+}
+
+/** Who the reminder would reach, and who unsubscribed, as counts. */
+export function reachWords(reach) {
+  if (!reach) return '';
+  if (reach.count === null || reach.count === undefined) return reach.problem ?? '';
+  const parts = [`It would reach ${attendeeWord(reach.count)}.`];
+  if (reach.suppressed) {
+    parts.push(`${addressWord(reach.suppressed)} unsubscribed and ${reach.suppressed === 1 ? 'is' : 'are'} left out.`);
+  }
+  return parts.join(' ');
+}
+
+const PLACEHOLDER = '{{days_until}}';
+
+/**
+ * The wording problems the server would refuse, for a message before any
+ * request: an empty field, or a placeholder other than {{days_until}}.
+ *
+ * @returns {{ subject: string|null, message: string|null }}
+ */
+export function draftProblems(draft, { maxSubjectLength = 120, maxMessageLength = 5000 } = {}) {
+  const check = (text, max, name) => {
+    const value = String(text ?? '').trim();
+    if (!value) return `Write a ${name}.`;
+    if (value.length > max) return `Use ${max} characters or fewer.`;
+    const unknown = [...new Set((value.match(/\{\{[^{}]*\}\}/g) || []).filter((found) => found !== PLACEHOLDER))];
+    if (unknown.length) return `Only ${PLACEHOLDER} can be used. Remove ${unknown.join(', ')}.`;
+    return null;
+  };
+  return {
+    subject: check(draft.subject, maxSubjectLength, 'subject'),
+    message: check(draft.message, maxMessageLength, 'message'),
+  };
+}
+
+/** The last attendee run, in one sentence, counted in emails and addresses. */
+export function attendeeLastRunWords(lastRun, timeZone) {
+  if (!lastRun) return 'The schedule has not run yet.';
+  const when = eventTime(lastRun.finishedAt ?? lastRun.startedAt, timeZone);
+  const counts = lastRun.counts ?? {};
+  let what;
+  switch (lastRun.outcome) {
+    case 'completed': {
+      const sent = counts.sent ?? 0;
+      const parts = [`sent ${sent} ${sent === 1 ? 'email' : 'emails'}`];
+      if (counts.failed) parts.push(`${counts.failed} could not be emailed`);
+      if (counts.uncertain) parts.push(`${counts.uncertain} may have gone (check the Email log)`);
+      if (counts.suppressed) parts.push(`${addressWord(counts.suppressed)} unsubscribed during the send`);
+      const left = counts.deferred ?? 0;
+      if (lastRun.reason === 'quiet-hours') parts.push(`quiet hours began, so ${addressWord(left)} ${left === 1 ? 'waits' : 'wait'} for the next run`);
+      if (lastRun.reason === 'schedule-changed') parts.push(`the schedule changed during the run, so it stopped before ${addressWord(left)}`);
+      if (lastRun.reason === 'window-closed') parts.push(`the reminder day ended during the run, before ${addressWord(left)}`);
+      if (lastRun.reason === 'superseded') parts.push('the send began on an earlier approval, so it stopped and sends no more');
+      if (lastRun.reason === 'busy') parts.push('another run held the send, so this run stopped');
+      what = `${lastRun.offsetDays ? `the ${lastRun.offsetDays}-day reminder: ` : ''}${parts.join(', ')}`;
+      break;
+    }
+    case 'nothing-due':
+      what = 'nothing was due';
+      break;
+    case 'paused':
+      what = lastRun.reason === 'facts-changed'
+        ? 'the event start, the venue or the ticket link was not the approved one, so it sent nothing and paused the schedule'
+        : 'the wording was not the approved wording, so it sent nothing and paused the schedule';
+      break;
+    case 'failed':
+      what = `it stopped: ${String(lastRun.error?.message ?? 'a server error').replace(/\.$/, '')}`;
+      break;
+    default:
+      what = lastRun.outcome ?? 'unknown';
+  }
+  return `Last run ${when}: ${what}.`;
+}

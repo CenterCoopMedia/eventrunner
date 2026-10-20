@@ -12,8 +12,9 @@
 // reminders page) or to the settings while it is on pauses it until staff
 // approve again. The state, the pause and every result are stated in words.
 //
-// Only the speaker section exists. The attendee section (#518, the third
-// pull request) joins this page as its own Panel.
+// The attendee section is its own Panel (components/
+// AttendeeReminderSchedule.jsx). It follows the same path, with wording
+// and the event facts in place of the due date and the items.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { READINESS_ITEMS, READINESS_ITEM_LABELS } from 'shared/speakerReadiness';
@@ -30,6 +31,7 @@ import {
 } from '../reminderSchedules.js';
 import { describeTimeZone } from '../../lib/eventDateTime.js';
 import EventDateTimeField from '../components/EventDateTimeField.jsx';
+import AttendeeReminderSchedule from '../components/AttendeeReminderSchedule.jsx';
 import {
   CheckboxField,
   FieldError,
@@ -409,6 +411,7 @@ export default function AdminReminderSchedules() {
         actions={<Link to="/admin/speakers/reminders/send" className={linkButtonClass}>Speaker reminders</Link>}
       />
       <SpeakerSchedule call={call} />
+      <AttendeeReminderSchedule call={call} />
     </div>
   );
 }
