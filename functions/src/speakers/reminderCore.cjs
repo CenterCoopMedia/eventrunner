@@ -80,18 +80,32 @@ function wordingDigest(source) {
 }
 
 /**
- * Which wording a preview showed: a digest of the saved subject, html and
- * text, or `shipped:` and a digest of the shipped ones. A send must carry
- * the same value. The shipped copy has a digest too, so a deploy that
- * changes it between a preview and a send (or an approval and a scheduled
- * run) is a change of wording, not the same "shipped" (issue #518).
+ * Which wording a send uses: a digest of the subject, html and text the
+ * renderer will use, or `shipped:` and a digest of the shipped ones. A
+ * preview returns it and a send (or an approval and a scheduled run) must
+ * match it. The shipped copy has a digest too, so a deploy that changes it
+ * is a change of wording, not the same "shipped" (issue #518).
+ *
+ * The version names the wording ACTUALLY SENT. A saved field left blank
+ * takes the shipped field, so the digest covers the shipped field too. A
+ * saved wording that fails the template's token check is not sent at all:
+ * render() falls back to the shipped copy, so its version is the shipped
+ * version. An approval made on that fallback then pauses when a deploy
+ * changes the shipped copy, like any other approval of shipped wording.
  *
  * @param {object|null} override the saved wording, or null
  * @param {object} [shipped] the shipped template; the deployed one by default
  */
 function wordingVersion(override, shipped = null) {
-  if (override) return wordingDigest(override);
   const template = shipped ?? require('../email/templates.cjs').getDefaultTemplate(TEMPLATE_ID);
+  if (override) {
+    const candidate = {};
+    for (const key of ['subject', 'html', 'text']) {
+      candidate[key] = typeof override[key] === 'string' ? override[key] : template[key];
+    }
+    const { validateTemplateBody } = require('../email/render.cjs');
+    if (validateTemplateBody(template, candidate).ok) return wordingDigest(candidate);
+  }
   return `${SHIPPED_WORDING_PREFIX}${wordingDigest(template)}`;
 }
 
@@ -154,10 +168,14 @@ function remindableEntries(stores) {
  * The token values for one speaker's reminder. Every value is plain text:
  * the renderer escapes them in the html body.
  */
-function reminderTokenValues({ config, speaker, readiness, items, actor }) {
+function reminderTokenValues({ config, speaker, readiness, items, actor, due = null }) {
   const site = siteUrl(config);
   const wants = (item) => items.includes(item);
   return {
+    // Set only by the reminder schedule, which has a due date. Empty for a
+    // staff send, so the shipped `{{#if due_date}}` line drops out.
+    due_date: due?.dateLabel ?? '',
+    days_left: due && Number.isInteger(due.daysLeft) ? String(due.daysLeft) : '',
     speaker_name: speakerDisplayName(speaker),
     dashboard_url: site ? `${site}/speaker/dashboard` : '',
     profile_url: site ? `${site}/speaker/profile` : '',
@@ -177,10 +195,10 @@ function reminderTokenValues({ config, speaker, readiness, items, actor }) {
  * Render one reminder: what send() is handed (`message`), and what the
  * provider receives (`delivered`, footer included) for the preview.
  */
-function renderReminder({ template, override, config, speaker, readiness, items, actor }) {
+function renderReminder({ template, override, config, speaker, readiness, items, actor, due = null }) {
   const { render } = require('../email/render.cjs');
   const { withLegalFooter } = require('../email/send.cjs');
-  const tokenValues = reminderTokenValues({ config, speaker, readiness, items, actor });
+  const tokenValues = reminderTokenValues({ config, speaker, readiness, items, actor, due });
   const rendered = render({ template, override, tokenValues, config });
   const link = tokenValues.dashboard_url;
   if (!link || !(rendered.html || '').includes(link) || !(rendered.text || '').includes(link)) {
