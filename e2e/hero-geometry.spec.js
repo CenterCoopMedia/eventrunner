@@ -1,10 +1,12 @@
-// Event hero geometry in every site style, mode and width (#345).
+// Event hero geometry in every site style, mode and width (#345, #478).
 //
 // The hero sets its copy beside a photograph from 640px up and above it on
-// phones. The copy column ran onto the photograph in every style (#345),
-// and no check measured what a reader sees. This spec measures the rendered
-// glyph boxes on Home and the Program page, not the CSS, so a later token
-// change that moves the words onto the picture fails here.
+// phones. Two defects reached the public page because no check measured
+// what a reader sees: the copy column ran onto the photograph (#345), and
+// the copy started at the hero's coloured left edge with no inner inset
+// (#478). This spec measures the rendered glyph boxes on Home and the
+// Program page, not the CSS, so a later token change that moves the words
+// onto the picture or against the edge fails here.
 //
 // It drives the real public Home page against the seeded emulators. The
 // demo build is not used: its Newsroom style is the NC Local historical
@@ -18,6 +20,8 @@ const MODES = ['light', 'dark'];
 const WIDTHS = [320, 640, 768, 1024, 1280, 1440, 1920];
 // The phone layout stacks the photograph under the copy below this width.
 const SIDE_BY_SIDE_MIN = 640;
+// The smallest inner inset the copy may have from the hero's edge.
+const MIN_INSET = 12;
 const LONG_TITLE = 'The Fifteenth Annual Regional Convening of Community Newsrooms, Public Media Partners and Neighborhood Reporters';
 
 /** Glyph boxes of every text run and control in the copy, and the boxes they sit in. */
@@ -62,8 +66,17 @@ function heroFaults(width, metrics) {
   const faults = [];
   if (metrics.scrollWidth > metrics.clientWidth) faults.push(`page scrolls sideways (${metrics.scrollWidth}px)`);
   expect(metrics.boxes.length, 'the hero copy has text').toBeGreaterThan(0);
+  const textLeft = Math.min(...metrics.boxes.map((box) => box.left));
+  const textRight = Math.max(...metrics.boxes.map((box) => box.right));
   const textBottom = Math.max(...metrics.boxes.map((box) => box.bottom));
+  // #478: the copy keeps a visible inset from the hero's edge.
+  if (textLeft - metrics.hero.left < MIN_INSET) {
+    faults.push(`copy starts ${round(textLeft - metrics.hero.left)}px from the hero's left edge`);
+  }
   const sideBySide = metrics.illustrated && width >= SIDE_BY_SIDE_MIN;
+  if (!sideBySide && metrics.hero.right - textRight < MIN_INSET) {
+    faults.push(`copy ends ${round(metrics.hero.right - textRight)}px from the hero's right edge`);
+  }
   if (metrics.illustrated && sideBySide) {
     // #345: no word or control sits on the photograph. Name the line that
     // reaches furthest onto it.
@@ -77,7 +90,7 @@ function heroFaults(width, metrics) {
   return faults;
 }
 
-test('hero copy stays off the photograph in every style, mode and width', async ({ page }, testInfo) => {
+test('hero copy keeps its inset and stays off the photograph in every style, mode and width', async ({ page }, testInfo) => {
   test.setTimeout(420_000);
   const db = adminDb();
   const themeRef = db.doc('config/theme');
@@ -121,6 +134,28 @@ test('hero copy stays off the photograph in every style, mode and width', async 
               report.push({ route, theme, mode, copy, width, faults: found });
               for (const fault of found) faults.push(`${route} ${theme} ${mode} ${copy} ${width}px: ${fault}`);
             }
+          }
+        }
+      }
+    }
+
+    // A hero with no photograph is a coloured band: its copy needs the same
+    // inset on both sides (#478).
+    await imageRef.delete();
+    for (const theme of THEMES) {
+      for (const mode of MODES) {
+        await themeRef.set({ ...savedTheme, preset: theme, mode });
+        for (const route of ['/', '/schedule']) {
+          await page.setViewportSize({ width: 1280, height: 900 });
+          await page.goto(route);
+          await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+          await expect(page.locator('html')).toHaveAttribute('data-mode', mode);
+          await expect(page.locator('.event-hero:not(.event-hero--illustrated) .event-hero__title')).toBeVisible();
+          for (const width of WIDTHS) {
+            await page.setViewportSize({ width, height: 900 });
+            const found = heroFaults(width, await measureHero(page));
+            report.push({ route, theme, mode, copy: 'no photograph', width, faults: found });
+            for (const fault of found) faults.push(`${route} ${theme} ${mode} no photograph ${width}px: ${fault}`);
           }
         }
       }

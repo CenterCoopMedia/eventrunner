@@ -100,7 +100,7 @@
   }
 
   .event-hero.event-hero--compact .event-hero__copy {
-    inline-size: 100%;
+    inline-size: auto;
   }
 
   .event-hero--compact .event-hero__figure {

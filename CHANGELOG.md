@@ -424,6 +424,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   photograph gets a narrower one instead. The veil now softens only the photograph's
   leading edge. The NC Local composition keeps its half-and-half layout (#345).
 
+- The event hero's title, dateline, intro and buttons no longer start at the hero band's
+  coloured left edge. A new `--hero-inset-inline` token insets the copy from 0.75rem on
+  phones to 2.5rem on wide screens, on Home and the Program page, with or without a
+  photograph. On phones the copy also keeps that inset from the right edge. An audit of the
+  public pages in all six styles found no other coloured section whose text touches its
+  edge (#478).
+
 - The Functions deploy step now fails when a Function is not deployed. After a quota error
   (HTTP 429) on a create, `firebase-tools` 15.22.4 can exit 0 before the create is done, with
   no summary. Run 39329645906 reported success while `downloadEventPackage` did not exist.

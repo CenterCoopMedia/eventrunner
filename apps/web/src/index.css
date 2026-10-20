@@ -37,7 +37,7 @@
 /* Keep the NC Local hero copy in the text column beside the photograph. */
 @media screen and (min-width: 640px) {
   [data-historical-demo='nclocal'] .event-hero--illustrated .event-hero__copy {
-    inline-size: calc(100% - var(--hero-art-width));
+    inline-size: calc(100% - var(--hero-art-width) - var(--hero-inset-inline));
   }
 }
 
@@ -2427,8 +2427,9 @@
   }
   .event-hero:not(.event-hero--illustrated) { min-block-size: 0; }
   .event-hero:not(.event-hero--illustrated) .event-hero__copy {
-    inline-size: 100%;
+    inline-size: calc(100% - var(--hero-inset-inline));
     padding-block: var(--space-lg);
+    padding-inline-end: var(--hero-inset-inline);
   }
   .event-hero__figure { display: contents; }
   .event-hero__media { position: absolute; inset: 0; pointer-events: none; }
@@ -2447,8 +2448,12 @@
     z-index: -1;
     background: var(--hero-veil-background);
   }
+  /* The hero is a coloured band, so its copy keeps a deliberate inset
+     from the band's edge (#478). The inset is a margin, not padding, so a
+     style's own rule (the Newsroom accent bar) sits inside it too. */
   .event-hero__copy {
-    inline-size: var(--hero-copy-column);
+    inline-size: calc(var(--hero-copy-column) - var(--hero-inset-inline));
+    margin-inline-start: var(--hero-inset-inline);
     padding-block: var(--space-2xl);
     padding-block-end: var(--hero-copy-pad-block-end);
     padding-inline: var(--hero-copy-pad-inline-start) var(--space-lg);
@@ -2616,9 +2621,9 @@
     .site-masthead__identity { max-inline-size: 18rem; }
     .event-hero { min-block-size: 0; display: flex; flex-direction: column; }
     .event-hero__copy {
-      inline-size: 100%;
-      padding: var(--space-lg) 0;
-      padding-inline-start: var(--space-sm);
+      inline-size: calc(100% - var(--hero-inset-inline));
+      padding-block: var(--space-lg);
+      padding-inline-end: var(--hero-inset-inline);
       order: 0;
     }
     .event-hero__title { font-size: clamp(2.35rem, 9vw, 3.35rem); }
@@ -2711,7 +2716,7 @@
     border: 0;
     background: transparent;
   }
-  .event-hero__copy { inline-size: 100%; padding: 0; border: 0; }
+  .event-hero__copy { inline-size: 100%; margin: 0; padding: 0; border: 0; }
   .event-hero__title { font-size: var(--text-h1); line-height: var(--text-h1-leading); }
 
   .schedule-screen {
