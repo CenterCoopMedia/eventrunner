@@ -146,7 +146,7 @@ const SECTIONS = Object.freeze([
     id: 'program',
     label: 'Program',
     files: [
-      jsonFile('program/sessions.json', 'cmsSchedule', sessionRecord, 'Live sessions. visible is false for a session the site hides, such as one converted from a pitch and not yet shown. speakerIds lists speakers/speakers.json ids; parentId names another session.'),
+      jsonFile('program/sessions.json', 'cmsSchedule', sessionRecord, 'Live sessions. visible is false for a session the site hides, such as one converted from a pitch and not yet shown. speakerIds lists speakers/speakers.json ids; parentId names another session. materialsNotNeeded is true when the speakers send no materials.'),
       datasetFile('program/sessions.csv', 'sessions', 'Live sessions as a spreadsheet: day, times, speaker names, and Hidden for a session the site hides. No drafts.'),
     ],
   },

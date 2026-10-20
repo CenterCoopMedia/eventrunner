@@ -17,7 +17,15 @@
  *     so markup and whitespace alone do not count).
  *   - Materials: each of the speaker's sessions with at least one pending
  *     or approved material. A rejected material does not count. This is the
- *     same counted set the Materials coverage panel uses.
+ *     same counted set the Materials coverage panel uses. A session staff
+ *     marked `materialsNotNeeded: true` (a conversation, a break-out with no
+ *     slides) asks for no materials, so it is never in this list. A speaker
+ *     whose sessions all carry the mark owes no materials (issue #332).
+ *   - Waiting for review: each session that needs materials, has a pending
+ *     one and no approved one. The speaker has done their part, so this is
+ *     not a missing item and no reminder asks for it. It is the staff's
+ *     part: the reminder page and its export list it apart, so staff can
+ *     tell "sent, not reviewed" from "approved".
  *
  * "The speaker's sessions" are the published, visible sessions whose
  * `speakerIds` name the speaker: the sessions the speaker sees on their
@@ -71,6 +79,14 @@ function materialCounts(material) {
   return COUNTED_MATERIAL_STATUSES.includes(material?.reviewStatus);
 }
 
+/**
+ * Whether a session asks its speakers for materials. Only the stored value
+ * `true` turns it off, so a missing or malformed mark keeps the request.
+ */
+function sessionNeedsMaterials(session) {
+  return session?.materialsNotNeeded !== true;
+}
+
 function sessionHasDescription(session) {
   return hasRichTextContent(session?.description);
 }
@@ -108,15 +124,18 @@ function sessionTitle(session) {
  *   bio: boolean, headshot: boolean,
  *   descriptionSessions: Array<{ id: string, title: string }>,
  *   materialsSessions: Array<{ id: string, title: string }>,
+ *   pendingMaterialsSessions: Array<{ id: string, title: string }>,
  *   missing: string[],
  * }} `bio`/`headshot` are true when MISSING; `missing` lists the item ids
- *   with a gap, in READINESS_ITEMS order.
+ *   with a gap, in READINESS_ITEMS order. `pendingMaterialsSessions` are
+ *   sessions whose materials wait for staff review; they are not missing.
  */
 function speakerReadiness({ speaker, sessions, materialsBySession }) {
   const bio = !speakerHasBio(speaker);
   const headshot = !speakerHasHeadshot(speaker);
   const descriptionSessions = [];
   const materialsSessions = [];
+  const pendingMaterialsSessions = [];
   const seen = new Set();
   for (const session of Array.isArray(sessions) ? sessions : []) {
     if (!session || seen.has(session.id)) continue;
@@ -124,7 +143,13 @@ function speakerReadiness({ speaker, sessions, materialsBySession }) {
     const ref = { id: session.id, title: sessionTitle(session) };
     if (!sessionHasDescription(session)) descriptionSessions.push(ref);
     const materials = materialsBySession?.[session.id] ?? [];
-    if (!materials.some(materialCounts)) materialsSessions.push(ref);
+    if (!materials.some(materialCounts)) {
+      // A session that needs no materials is never missing them.
+      if (sessionNeedsMaterials(session)) materialsSessions.push(ref);
+    } else if (!materials.some((material) => material?.reviewStatus === 'approved')) {
+      // An upload still waits for staff review, even where none was needed.
+      pendingMaterialsSessions.push(ref);
+    }
   }
   const gaps = {
     bio,
@@ -137,6 +162,7 @@ function speakerReadiness({ speaker, sessions, materialsBySession }) {
     headshot,
     descriptionSessions,
     materialsSessions,
+    pendingMaterialsSessions,
     missing: READINESS_ITEMS.filter((item) => gaps[item]),
   };
 }
@@ -162,6 +188,7 @@ module.exports = {
   speakerHasBio,
   speakerHasHeadshot,
   materialCounts,
+  sessionNeedsMaterials,
   sessionHasDescription,
   sessionsForSpeaker,
   speakerReadiness,

@@ -9,10 +9,13 @@
 // live document, so it cannot hold a material (materials/store.cjs checks
 // the live document) and is left out. A speaker id with no record still
 // counts and is shown as the id. A speaker is named when none of the
-// considered sessions they are on has a counted material.
+// considered sessions they are on has a counted material. A session staff
+// marked as needing no materials (`materialsNotNeeded`, shared/
+// speakerReadiness sessionNeedsMaterials) is not considered at all.
 //
 // The page hands this the same material array its table renders, before
 // any filter, so the panel and the table cannot disagree.
+import { sessionNeedsMaterials } from 'shared/speakerReadiness';
 import { UNKNOWN_DAY_LABEL, resolveDayLabel } from './sessionDoc.js';
 
 /** The review states that count toward coverage. */
@@ -25,7 +28,8 @@ export const COUNTED_REVIEW_STATUSES = Object.freeze(['pending', 'approved']);
  * @param {Array<{ id: string, live: object|null }>} rows useAdminSessions rows, in schedule order
  * @param {Array<{ id: string, label?: string, date?: string }>} [days] config/event days
  * @param {string} [timeZone]
- * @returns {Array<{ id: string, title: string, dayLabel: string, speakerIds: string[] }>}
+ * @returns {Array<{ id: string, title: string, dayLabel: string, speakerIds: string[],
+ *   materialsNotNeeded: boolean }>}
  */
 export function liveSessions(rows, days = [], timeZone) {
   const dayLabels = new Map(days.map((day, index) => [day.id, resolveDayLabel(day, index, timeZone)]));
@@ -39,6 +43,7 @@ export function liveSessions(rows, days = [], timeZone) {
         title,
         dayLabel: !dayId ? 'Unscheduled' : (dayLabels.get(dayId) ?? UNKNOWN_DAY_LABEL),
         speakerIds: Array.isArray(row.live.speakerIds) ? row.live.speakerIds : [],
+        materialsNotNeeded: row.live.materialsNotNeeded === true,
       };
     });
 }
@@ -68,6 +73,7 @@ export function materialsCoverage({ sessions, speakers, materials }) {
 
   const considered = [];
   for (const session of sessions ?? []) {
+    if (!sessionNeedsMaterials(session)) continue;
     const ids = [...new Set(session.speakerIds ?? [])].filter(
       (id) => typeof id === 'string' && id && speakerById.get(id)?.status !== 'removed',
     );

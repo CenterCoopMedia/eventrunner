@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   describeMissing,
+  describePending,
   formatWhen,
   itemLabels,
   newBatchId,
@@ -12,7 +13,7 @@ import {
 
 const rows = [
   { id: 'a', readiness: { missing: ['bio', 'materials'] } },
-  { id: 'b', readiness: { missing: [] } },
+  { id: 'b', readiness: { missing: [], pendingMaterialsSessions: [{ id: 's9', title: 'Nine' }] } },
   { id: 'c', readiness: { missing: ['description'] } },
 ];
 
@@ -24,6 +25,15 @@ describe('speaker reminder helpers', () => {
     expect(rowsInGroup(rows, 'any').map((row) => row.id)).toEqual(['a', 'c']);
     expect(rowsInGroup(rows, 'all').map((row) => row.id)).toEqual(['a', 'b', 'c']);
     expect(rowsInGroup(rows, 'materials').map((row) => row.id)).toEqual(['a']);
+    expect(readGroup('materialsPending')).toBe('materialsPending');
+    expect(rowsInGroup(rows, 'materialsPending').map((row) => row.id)).toEqual(['b']);
+  });
+
+  it('names the sessions whose materials wait for review, apart from what is missing', () => {
+    expect(describePending({ pendingMaterialsSessions: [{ id: 's1', title: 'One' }, { id: 's2', title: 'Two' }] }))
+      .toBe('Materials (One; Two)');
+    expect(describePending({ pendingMaterialsSessions: [] })).toBe('');
+    expect(describePending({})).toBe('');
   });
 
   it('names the missing items with the sessions they apply to', () => {
