@@ -206,7 +206,7 @@ The main branch protection rule requires the stable `CI gate` check.
 
 Tags, `CHANGELOG.md` hygiene, and what a release includes are in [RELEASING.md](RELEASING.md).
 
-One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
+One lint rule to know about before it bites you: hex color literals (`#336699`) are banned everywhere except `functions/src/email/templates/**`, `functions/src/schedule/pdf.cjs`, `functions/src/pdf/kit.cjs`, and `apps/web/src/generated/theme.css`. Colors come from theme tokens.
 
 ## Security
 
