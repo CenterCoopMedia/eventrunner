@@ -49,6 +49,7 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       'shared/time',
+      'shared/eventDateTime',
       'shared/pitch',
       'shared/registration',
       'shared/announcement',
