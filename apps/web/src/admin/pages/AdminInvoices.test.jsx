@@ -667,7 +667,7 @@ describe('emailing an invoice', () => {
   });
 });
 
-describe('paying an invoice by card (#519)', () => {
+describe('paying an invoice by card (issue 519)', () => {
   const STRIPE = { available: true, reason: null, testMode: true };
   const PAY_URL = 'https://checkout.stripe.com/c/pay/cs_test_0001#fragment';
   const OPEN = {

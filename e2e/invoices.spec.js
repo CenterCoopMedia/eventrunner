@@ -404,7 +404,7 @@ test.describe.serial('issued invoices', () => {
     expect(draftSend.status).toBe(409);
   });
 
-  test('without Stripe no card link is made; a stored link shows, prints, mails and closes on void (#519)', async () => {
+  test('without Stripe no card link is made; a stored link shows, prints, mails and closes on void (issue 519)', async () => {
     const id = 'inv_e2eissue00000000000004';
     const db = adminDb();
     const stored = (await db.collection('invoices').doc(id).get()).data();
@@ -467,7 +467,7 @@ test.describe.serial('issued invoices', () => {
     expect(voided.payLinks[0]).toMatchObject({ status: 'cancelled', closedReason: 'void', stripeClosed: false });
   });
 
-  test('a flagged card payment shows in the list and on the record, and an operator closes it (#519)', async () => {
+  test('a flagged card payment shows in the list and on the record, and an operator closes it (issue 519)', async () => {
     const db = adminDb();
     const reviewId = 'rv_e2e000000000000000000001';
     await db.collection('invoices').doc(FIRST).update({
