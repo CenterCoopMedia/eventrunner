@@ -21,6 +21,17 @@ service cloud.firestore {
     // case-insensitive match (server-side requireAdmin lowercases both
     // sides, and setAdminAccess lowercases on write).
     //
+    // EXPIRING STAFF ACCESS (issue #331). `staffExpiry` maps a lowercased
+    // staff address to a timestamp. The grant works while request.time is
+    // before it and stops at it, on every read, with no sweep and no token
+    // round trip (admin access is never a custom claim, so a token issued
+    // before the end carries nothing past it). An address with no key is a
+    // permanent grant. A key whose value is not a timestamp is refused, and
+    // a `staffExpiry` field that is not a map refuses every staff grant:
+    // fail closed. Only isStaff() reads it, so an operator never expires.
+    // functions/src/core/auth.cjs resolveAdminTier reads the same map with
+    // the same comparison.
+    //
     // Cost: one document read per admin-gated evaluation. Firestore caches
     // repeated get() calls of the same path within one evaluation, so
     // `isOperator() || isStaff()` reads bootstrap once, not twice.
@@ -29,9 +40,12 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
+    function bootstrapData() {
+      return get(/databases/$(database)/documents/config/bootstrap).data;
+    }
+
     function bootstrapAllowlist(field) {
-      return get(/databases/$(database)/documents/config/bootstrap)
-        .data.get(field, []);
+      return bootstrapData().get(field, []);
     }
 
     function isOperator() {
@@ -39,9 +53,19 @@ service cloud.firestore {
         && bootstrapAllowlist('adminEmails').hasAny([request.auth.token.email.lower()]);
     }
 
+    // The staff grant for `email` has not ended. Called only after the
+    // address was found on staffEmails.
+    function staffGrantActive(email) {
+      let expiry = bootstrapData().get('staffExpiry', {});
+      return expiry is map
+        && (!(email in expiry)
+          || (expiry[email] is timestamp && request.time < expiry[email]));
+    }
+
     function isStaff() {
       return isVerifiedSignIn()
-        && bootstrapAllowlist('staffEmails').hasAny([request.auth.token.email.lower()]);
+        && bootstrapAllowlist('staffEmails').hasAny([request.auth.token.email.lower()])
+        && staffGrantActive(request.auth.token.email.lower());
     }
 
     // Either tier. Every content, people, and operations collection below
