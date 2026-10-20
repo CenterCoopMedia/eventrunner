@@ -33,6 +33,7 @@ const SENT = {
   processed: 3,
   counts: { sent: 2, failed: 1, uncertain: 0, skipped: 0, suppressed: 0 },
   auditGaps: 0,
+  recipientRowsLinked: true,
   createdAt: Date.UTC(2026, 9, 1, 14, 0),
   createdBy: 'staff@example.org',
   busy: false,
@@ -142,6 +143,16 @@ describe('AnnouncementEmailComposer', () => {
     expect(screen.queryByRole('region', { name: 'Speaker check-in moved: details' })).toBeNull();
     await act(async () => { fireEvent.click(toggle); });
     expect(call.mock.calls.filter(([name]) => name === 'getAnnouncementSend')).toHaveLength(1);
+  });
+
+  it('for a send from before rows carried the send id, says where its messages are and offers no filtered link', async () => {
+    const legacy = { ...SENT, recipientRowsLinked: false };
+    respond({ listAnnouncementSends: listResponse([legacy]), getAnnouncementSend: { send: { ...DETAIL, recipientRowsLinked: false } } });
+    await renderLoaded();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Show details' })); });
+    const region = screen.getByRole('region', { name: 'Speaker check-in moved: details' });
+    expect(within(region).queryByRole('link', { name: /email log/ })).toBeNull();
+    expect(within(region).getByText('This send is older than the email log filter for one send. Its messages are in the email log under the source Announcement.')).toBeInTheDocument();
   });
 
   it('says when the email log could not record part of a send', async () => {
@@ -561,6 +572,19 @@ describe('AnnouncementEmailComposer saved messages', () => {
     expect(screen.queryByRole('heading', { name: 'Preview' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Send to/ })).toBeNull();
     expect(call.mock.calls.filter(([name]) => name === 'sendAnnouncementEmail')).toHaveLength(0);
+  });
+
+  it('asks before a load when a loaded message was cleared: an empty form is still a change', async () => {
+    respond({ listAnnouncementSends: listResponse([]), announcementMessages: savedStore() });
+    await renderLoaded();
+    await within(savedPanel()).findByText('This week');
+    await act(async () => { fireEvent.click(within(savedRow('This week')).getByRole('button', { name: 'Load' })); });
+    for (const label of ['Subject', 'Email message', 'Button link (optional)', 'Button label (optional)']) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value: '' } });
+    }
+    fireEvent.click(within(savedRow('Last week')).getByRole('button', { name: 'Load' }));
+    expect(await screen.findByRole('heading', { name: 'Replace your draft with "Weekly note"?' })).toBeInTheDocument();
+    expect(actionsOf('load')).toHaveLength(1);
   });
 
   it('updates the loaded message by its id, and renames one of two with the same name', async () => {

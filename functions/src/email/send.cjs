@@ -306,7 +306,8 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    * `uncertain: true`.
    *
    * A result whose audit row could not be written carries
-   * `auditFailed: true`. Its status is still the provider's answer.
+   * `auditFailed: true`. Its status is still the provider's answer. The
+   * claim keeps the mark, so a skipped result for that key carries it too.
    *
    * @param {object[]} messages EmailMessage[], one recipient each
    * @returns {Promise<object[]>} one EmailSendResult per entry, in input order
@@ -449,17 +450,21 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
     }));
     for (const [index, outcome] of outcomes) results[index] = outcome;
 
-    // A failure is kept on its claim, so a replay of the batch can report it
-    // (skippedResult) even when the caller lost the first answer.
+    // A failure, and a lost audit row, are kept on the claim, so a replay of
+    // the batch can report them (skippedResult) even when the caller lost
+    // the first answer.
     await Promise.all(outcomes.map(async ([index, outcome]) => {
-      if (outcome.status === 'sent') return;
-      const failure = {
-        providerStatus: outcome.providerStatus ?? null,
-        uncertain: outcome.uncertain === true,
-        error: outcome.error == null ? null : String(outcome.error).slice(0, 300),
-      };
+      if (outcome.status === 'sent' && !outcome.auditFailed) return;
+      const patch = outcome.auditFailed ? { auditFailed: true } : {};
+      if (outcome.status !== 'sent') {
+        patch.failure = {
+          providerStatus: outcome.providerStatus ?? null,
+          uncertain: outcome.uncertain === true,
+          error: outcome.error == null ? null : String(outcome.error).slice(0, 300),
+        };
+      }
       try {
-        await db.collection('email_claims').doc(claimIdForOnceKey(messages[index].onceKey)).update({ failure });
+        await db.collection('email_claims').doc(claimIdForOnceKey(messages[index].onceKey)).update(patch);
       } catch (err) {
         log.warn('email_claims failure record failed', err);
       }
@@ -475,17 +480,21 @@ function createEmailCore({ db, provider, getConfig, sleep, log = console }) {
    */
   async function skippedResult(ref) {
     let failure = null;
+    let gap = {};
     try {
-      failure = (await ref.get()).data()?.failure ?? null;
+      const claim = (await ref.get()).data();
+      failure = claim?.failure ?? null;
+      if (claim?.auditFailed === true) gap = { auditFailed: true };
     } catch (err) {
       log.warn('email_claims read failed', err);
     }
-    if (!failure) return { providerMessageId: null, status: 'sent', skipped: true, retries: 0 };
+    if (!failure) return { providerMessageId: null, status: 'sent', skipped: true, retries: 0, ...gap };
     return {
       providerMessageId: null,
       status: 'failed',
       skipped: true,
       retries: 0,
+      ...gap,
       providerStatus: typeof failure.providerStatus === 'number' ? failure.providerStatus : undefined,
       error: failure.error ?? 'An earlier attempt failed.',
       ...(failure.uncertain ? { uncertain: true } : {}),

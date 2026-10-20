@@ -31,7 +31,11 @@
  * send id. When the email core could not write a row (`auditFailed` on
  * the result), the record counts it in `auditGaps`. The provider's answer
  * still decides the counts, so an accepted message stays accepted and is
- * never sent again; the history says the email log is missing rows.
+ * never sent again; the history says the email log is missing rows. The
+ * core keeps the mark on the send-once claim, so a chunk replayed after a
+ * lost progress write counts the gap again, as it counts the failures.
+ * A record made by this code says so in `recipientRowsCarrySendId`: the
+ * email log can list its rows by send. An older record has no such field.
  */
 
 const crypto = require('node:crypto');
@@ -105,6 +109,7 @@ async function startSendRecord({
     failures: [],
     retryRecipients: [],
     auditGaps: 0,
+    recipientRowsCarrySendId: true,
     retryOf,
     retriedBy: null,
     unsubscribeKey: newUnsubscribeKey(),

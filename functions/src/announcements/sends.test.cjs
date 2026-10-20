@@ -1021,6 +1021,60 @@ for (const backend of backends) {
     assert.equal((await call(h.detail, { body: { id: 'send-expired-1' } })).status, 404);
   });
 
+  t('an audit gap survives a lost progress write: the continued send still counts it once', async () => {
+    const h = await harness({ backend });
+    const realCollection = h.db.collection.bind(h.db);
+    let failNext = 1;
+    h.db.collection = (name) => {
+      const col = realCollection(name);
+      if (name !== 'sent_emails') return col;
+      return {
+        ...col,
+        async add(data) {
+          if (failNext > 0) { failNext -= 1; throw new Error('UNAVAILABLE: audit store down'); }
+          return col.add(data);
+        },
+      };
+    };
+    // The lease transaction runs, then the chunk's progress transaction fails once.
+    const realTransaction = h.db.runTransaction.bind(h.db);
+    let transactions = 0;
+    h.db.runTransaction = (fn) => {
+      transactions += 1;
+      return transactions === 2 ? Promise.reject(new Error('deadline exceeded')) : realTransaction(fn);
+    };
+    const preview = await call(h.preview, { body: { draft: DRAFT, audience: 'registered' } });
+    const { sendId, receipt } = preview.body;
+    const lost = await call(h.send, { body: { sendId, receipt, draft: DRAFT, audience: 'registered' } });
+    assert.equal(lost.status, 500);
+
+    await h.db.collection('announcement_sends').doc(sendId).update({ lease: null });
+    const resumed = await call(h.send, { body: { sendId } });
+    assert.equal(resumed.status, 200, JSON.stringify(resumed.body));
+    assert.equal(resumed.body.send.status, 'sent');
+    assert.equal(resumed.body.send.auditGaps, 1);
+    assert.equal(h.mail.length, 2, 'nobody gets a second copy');
+  });
+
+  t('a send records that its recipient rows carry its id; an older send says they do not', async () => {
+    const h = await harness({ backend });
+    const { sent } = await previewAndSend(h);
+    const record = (await h.db.collection('announcement_sends').doc(sent.body.send.id).get()).data();
+    assert.equal(record.recipientRowsCarrySendId, true);
+    assert.equal(sent.body.send.recipientRowsLinked, true);
+
+    // A send recorded before this change: no flag, so no per-send log filter.
+    await h.db.collection('announcement_sends').doc('send-legacy-1').set({
+      status: 'sent', audience: 'registered', subject: 'Older note', message: 'Old.', link: null, mode: 'app',
+      html: '<p>Old.</p>', text: 'Old.', total: 1, nextIndex: 1, counts: { sent: 1 }, failures: [],
+      createdAt: new Date('2026-01-01T00:00:00Z'), createdBy: { uid: 'u-staff', email: STAFF },
+    });
+    const list = await call(h.list);
+    assert.equal(list.body.sends.find((s) => s.id === 'send-legacy-1').recipientRowsLinked, false);
+    const detail = await call(h.detail, { body: { id: 'send-legacy-1' } });
+    assert.equal(detail.body.send.recipientRowsLinked, false);
+  });
+
   t('a failed recipient audit write shows as a recording gap, and nobody gets a second copy', async () => {
     const h = await harness({ backend });
     const realCollection = h.db.collection.bind(h.db);

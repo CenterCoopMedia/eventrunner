@@ -122,6 +122,9 @@ function summarize(id, data, nowMs) {
     counts,
     // Recipient rows the email log could not record (issue #497).
     auditGaps: Number.isInteger(data.auditGaps) ? data.auditGaps : 0,
+    // Whether the email log can list this send's rows by its id. A send
+    // recorded before rows carried the id cannot be filtered that way.
+    recipientRowsLinked: data.recipientRowsCarrySendId === true,
     createdAt: toMillis(data.createdAt),
     createdBy: data.createdBy?.email || null,
     scheduled: Boolean(data.reminder),

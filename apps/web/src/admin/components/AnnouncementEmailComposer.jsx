@@ -29,7 +29,9 @@
 // newest first. "Show details" reads one send's frozen content and failed
 // addresses from getAnnouncementSend, which writes an admin_logs row for
 // the read; "Use this message" and a retry read the content the same way.
-// The details link to that send's recipient rows in the email log.
+// The details link to that send's recipient rows in the email log. A send
+// recorded before those rows carried its id has no such link; the details
+// say its rows are in the email log under the source Announcement.
 //
 // SAVED MESSAGES (issue #496) live in AnnouncementSavedMessages. A load
 // replaces the subject, message and link, keeps the audience, and drops
@@ -169,14 +171,20 @@ function SendDetail({ send, state, regionId }) {
         <p className="max-w-[65ch] text-admin-sm text-admin-ink">
           This is the message as the send started it, with a test unsubscribe link in place of each recipient&apos;s own link. It is not a copy of what each person received.
         </p>
-        <p className="text-admin-sm">
-          <Link
-            to={`/admin/email-log?send=${encodeURIComponent(send.id)}`}
-            className="admin-target font-semibold text-admin-ink underline underline-offset-2"
-          >
-            Open the recipient messages in the email log
-          </Link>
-        </p>
+        {send.recipientRowsLinked ? (
+          <p className="text-admin-sm">
+            <Link
+              to={`/admin/email-log?send=${encodeURIComponent(send.id)}`}
+              className="admin-target font-semibold text-admin-ink underline underline-offset-2"
+            >
+              Open the recipient messages in the email log
+            </Link>
+          </p>
+        ) : (
+          <p className="text-admin-sm text-admin-ink">
+            This send is older than the email log filter for one send. Its messages are in the email log under the source Announcement.
+          </p>
+        )}
         <dl className="grid grid-cols-[max-content_1fr] gap-x-sm gap-y-3xs text-admin-sm">
           <dt className="font-semibold text-admin-ink">Subject</dt>
           <dd className="text-admin-ink">{detail.renderedSubject}</dd>
@@ -365,7 +373,9 @@ export default function AnnouncementEmailComposer() {
     setFocusSendId(null);
   }, [focusSendId, history]);
 
-  const dirty = hasContent(draft) && contentKey(draft) !== baseline;
+  // With content loaded or saved, any difference from it is an edit, an
+  // emptied form included. With none, only typed content is.
+  const dirty = baseline === contentKey(EMPTY_DRAFT) ? hasContent(draft) : contentKey(draft) !== baseline;
 
   /** The next page of the history, after the last send shown. */
   async function loadOlder() {
