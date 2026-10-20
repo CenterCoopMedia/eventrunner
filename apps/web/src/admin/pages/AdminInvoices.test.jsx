@@ -524,3 +524,145 @@ describe('an issued invoice', () => {
     expect(screen.getByLabelText('Name to bill')).not.toBeDisabled();
   });
 });
+
+describe('emailing an invoice', () => {
+  const RECEIPT = 'a'.repeat(64);
+  function previewAnswer(extra = {}) {
+    return (body) => response({
+      preview: {
+        to: 'billing@example.org',
+        cc: body.cc ? body.cc.trim().toLowerCase() : null,
+        replyTo: 'events@example.org',
+        subject: 'Invoice INV-0004 from Example Events',
+        text: `Hello,\n\nInvoice INV-0004 for $4,500.00 is attached as a PDF.${body.note ? `\n\n${body.note}` : ''}`,
+        html: '<p>Hello,</p>',
+        filename: 'INV-0004.pdf',
+      },
+      receipt: RECEIPT, canSend: true, cannotSendReason: null, recentSend: null, resendWindowMinutes: 15,
+      ...extra,
+    });
+  }
+
+  it('previews the email, then sends it to the billing email with a copy and a note', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    answers.previewSend = previewAnswer();
+    answers.send = (body) => response({
+      outcome: 'sent',
+      invoice: { ...ISSUED, emailSends: [{ sendId: body.sendId, status: 'sent', to: 'billing@example.org', cc: 'finance@example.org', at: '2026-10-20T12:05:00.000Z', by: 'admin-1', providerMessageId: 'console-1' }] },
+      canVoid: false,
+    });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
+    const form = await screen.findByRole('region', { name: 'Email INV-0004' });
+    expect(within(form).getByText('billing@example.org')).toBeInTheDocument();
+    await waitFor(() => expect(within(form).getByLabelText('Copy to', { exact: false })).toHaveFocus());
+    fireEvent.change(within(form).getByLabelText('Copy to', { exact: false }), { target: { value: 'Finance@Example.org' } });
+    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Thanks again.' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({
+      action: 'previewSend', invoiceId: ISSUED.id, cc: 'finance@example.org', note: 'Thanks again.',
+    }));
+    const preview = await within(form).findByRole('region', { name: 'Email preview' });
+    expect(within(preview).getByText('Invoice INV-0004 from Example Events')).toBeInTheDocument();
+    expect(within(preview).getByText('INV-0004.pdf')).toBeInTheDocument();
+    expect(within(preview).getByText(/Thanks again\./)).toBeInTheDocument();
+
+    fireEvent.click(within(form).getByRole('button', { name: 'Send to billing@example.org' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toMatchObject({
+      action: 'send', invoiceId: ISSUED.id, receipt: RECEIPT, cc: 'finance@example.org', note: 'Thanks again.', confirmResend: false,
+    }));
+    expect(invoiceCalls().at(-1).sendId).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
+    await waitFor(() => expect(screen.getAllByText('Emailed INV-0004 to billing@example.org, with a copy to finance@example.org.').length).toBeGreaterThan(0));
+    const history = screen.getByRole('list', { name: 'Emails sent' });
+    expect(within(history).getByText(/billing@example\.org/)).toBeInTheDocument();
+    expect(within(history).getByText(/Sent/)).toBeInTheDocument();
+  });
+
+  it('asks for a new preview when the note changes after the preview', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    answers.previewSend = previewAnswer();
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
+    const form = await screen.findByRole('region', { name: 'Email INV-0004' });
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    await within(form).findByRole('region', { name: 'Email preview' });
+    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Changed.' } });
+    expect(within(form).queryByRole('region', { name: 'Email preview' })).toBeNull();
+    expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
+  });
+
+  it('drops a preview answer that arrives after the note changed, so Send cannot use old input', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    let release;
+    const answer = previewAnswer();
+    answers.previewSend = (body) => new Promise((resolve) => { release = () => resolve(answer(body)); });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
+    const form = await screen.findByRole('region', { name: 'Email INV-0004' });
+    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'First.' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    await waitFor(() => expect(typeof release).toBe('function'));
+    fireEvent.change(within(form).getByLabelText('Note', { exact: false }), { target: { value: 'Second.' } });
+    await act(async () => { release(); });
+    expect(within(form).queryByRole('region', { name: 'Email preview' })).toBeNull();
+    expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
+    expect(invoiceCalls().some((body) => body.action === 'send')).toBe(false);
+  });
+
+  it('needs a confirmation to send again to an address emailed a few minutes ago', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    answers.previewSend = previewAnswer({ recentSend: { at: '2026-10-20T12:00:00.000Z', to: 'billing@example.org' } });
+    answers.send = (body) => response({ outcome: 'sent', invoice: { ...ISSUED, emailSends: [] }, canVoid: false, echo: body });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
+    const form = await screen.findByRole('region', { name: 'Email INV-0004' });
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    await within(form).findByRole('region', { name: 'Email preview' });
+    expect(within(form).getByText(/was emailed to billing@example\.org less than 15 minutes ago/)).toBeInTheDocument();
+    const again = within(form).getByLabelText('Send it again anyway');
+    fireEvent.click(within(form).getByRole('button', { name: 'Send to billing@example.org' }));
+    await waitFor(() => expect(again).toHaveFocus());
+    expect(invoiceCalls().some((body) => body.action === 'send')).toBe(false);
+    fireEvent.click(again);
+    fireEvent.click(within(form).getByRole('button', { name: 'Send to billing@example.org' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toMatchObject({ action: 'send', confirmResend: true }));
+  });
+
+  it('marks a copy address the rules refuse and sends nothing', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    answers.previewSend = previewAnswer();
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
+    const form = await screen.findByRole('region', { name: 'Email INV-0004' });
+    const cc = within(form).getByLabelText('Copy to', { exact: false });
+    fireEvent.change(cc, { target: { value: 'not an address' } });
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    await waitFor(() => expect(cc).toHaveFocus());
+    expect(cc).toHaveAttribute('aria-invalid', 'true');
+    expect(invoiceCalls().some((body) => body.action === 'previewSend')).toBe(false);
+  });
+
+  it('states why the site cannot send the invoice, and offers no send', async () => {
+    answers.get = { invoice: ISSUED, canVoid: false };
+    answers.previewSend = previewAnswer({ canSend: false, cannotSendReason: 'This site\'s email provider cannot send attachments.' });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Email invoice' }));
+    const form = await screen.findByRole('region', { name: 'Email INV-0004' });
+    fireEvent.click(within(form).getByRole('button', { name: 'Preview email' }));
+    expect(await within(form).findByText(/cannot send attachments/)).toBeInTheDocument();
+    expect(within(form).queryByRole('button', { name: 'Send to billing@example.org' })).toBeNull();
+  });
+
+  it('offers no email for a void invoice', async () => {
+    answers.get = { invoice: { ...ISSUED, status: 'void', voided: { reason: 'Wrong', from: 'issued', at: null, by: null } }, canVoid: true };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    expect(screen.queryByRole('button', { name: 'Email invoice' })).toBeNull();
+  });
+});

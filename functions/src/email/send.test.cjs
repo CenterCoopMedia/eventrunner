@@ -515,3 +515,85 @@ test('mail fails closed on missing, invalid, or failed policy reads without cons
     return true;
   });
 });
+
+// --- attachments and a copy address (invoice email, #208 part 4) -----------
+
+const PDF_BASE64 = Buffer.from('%PDF-1.7 example').toString('base64');
+const ATTACHMENT = { filename: 'INV-0001.pdf', contentType: 'application/pdf', content: PDF_BASE64 };
+
+test('an attachment and a copy address reach a provider that declares both; the audit row keeps no file content', async () => {
+  const sent = [];
+  const { db, core: c } = core({
+    provider: {
+      name: 'console',
+      capabilities: { attachments: true, cc: true },
+      send: async (m) => { sent.push(m); return { providerMessageId: 'id-1', status: 'sent', providerStatus: 200 }; },
+    },
+  });
+  const result = await c.send({
+    to: 'billing@example.org', cc: 'finance@example.org', subject: 'Invoice INV-0001', text: 'x', tag: 'invoice.send', attachments: [ATTACHMENT],
+  });
+  assert.equal(result.status, 'sent');
+  assert.deepEqual(sent[0].attachments, [ATTACHMENT]);
+  assert.equal(sent[0].cc, 'finance@example.org');
+  const row = db.state.sentRows[0];
+  assert.equal(row.cc, 'finance@example.org');
+  assert.deepEqual(row.attachments, [{ filename: 'INV-0001.pdf', contentType: 'application/pdf', bytes: 16 }]);
+  assert.equal(JSON.stringify(row).includes(PDF_BASE64), false);
+});
+
+test('an attachment or a copy address the provider cannot carry is refused before any claim or request', async () => {
+  for (const [message, error] of [
+    [{ attachments: [ATTACHMENT] }, 'attachments-unsupported'],
+    [{ cc: 'finance@example.org' }, 'cc-unsupported'],
+  ]) {
+    let calls = 0;
+    const { db, core: c } = core({ provider: { name: 'webhook', send: async () => { calls += 1; return { status: 'sent' }; } } });
+    const result = await c.send({ to: 'billing@example.org', subject: 's', text: 'x', onceKey: 'k-1', ...message });
+    assert.equal(result.status, 'failed');
+    assert.equal(result.error, error);
+    assert.equal(calls, 0);
+    assert.equal(db.state.claims.size, 0);
+    assert.equal(db.state.sentRows.length, 1);
+    assert.equal(db.state.sentRows[0].error, error);
+  }
+});
+
+test('a malformed or oversized attachment is refused before any claim or request', async () => {
+  const provider = () => ({
+    name: 'console',
+    capabilities: { attachments: true, cc: true },
+    attachmentLimits: { maxBytes: 10 },
+    send: async () => { throw new Error('must not send'); },
+  });
+  for (const [attachments, error] of [
+    [[{ ...ATTACHMENT, filename: 'bad\r\nname.pdf' }], 'invalid-attachment'],
+    [[{ ...ATTACHMENT, content: 'not base64 !' }], 'invalid-attachment'],
+    [[{ ...ATTACHMENT, contentType: 'text/html' }], 'invalid-attachment'],
+    [[{ filename: 'INV-0001.pdf', contentType: 'application/pdf' }], 'invalid-attachment'],
+    [[null], 'invalid-attachment'],
+    ['one', 'invalid-attachment'],
+    [[ATTACHMENT], 'attachments-too-large'],
+  ]) {
+    const { db, core: c } = core({ provider: provider() });
+    const result = await c.send({ to: 'billing@example.org', subject: 's', text: 'x', onceKey: 'k-2', attachments });
+    assert.equal(result.error, error, JSON.stringify(attachments));
+    assert.equal(db.state.claims.size, 0);
+    // The refusal still has its audit row.
+    assert.equal(db.state.sentRows.length, 1);
+    assert.equal(db.state.sentRows[0].error, error);
+  }
+});
+
+test('a copy address with characters the shared rule refuses is refused before any claim', async () => {
+  const { isBareEmailAddress } = require('shared/email');
+  for (const cc of ['a<b@example.org', '"a"@example.org', 'a(b)@example.org', 'a;b@example.org', 'finance@example']) {
+    assert.equal(isBareEmailAddress(cc), false, cc);
+    const { db, core: c } = core({
+      provider: { name: 'console', capabilities: { attachments: true, cc: true }, send: async () => { throw new Error('must not send'); } },
+    });
+    const result = await c.send({ to: 'billing@example.org', cc, subject: 's', text: 'x', onceKey: 'k-cc' });
+    assert.equal(result.error, 'invalid-cc', cc);
+    assert.equal(db.state.claims.size, 0);
+  }
+});

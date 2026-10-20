@@ -80,6 +80,8 @@ test('listTemplateIds includes account, speaker, claim, and native ticket confir
     'account.welcome',
     'auth.otp',
     'feedback.confirmation',
+    // Issue #208 part 4: an issued invoice, emailed by staff with its PDF.
+    'invoice.send',
     // Issue #324: session pitch receipt and decision emails.
     'pitch.accepted',
     'pitch.declined',

@@ -20,6 +20,7 @@ const DEFAULTS = {
   'auth.otp': require('./templates/auth.otp.cjs'),
   'account.welcome': require('./templates/account.welcome.cjs'),
   'feedback.confirmation': require('./templates/feedback.confirmation.cjs'),
+  'invoice.send': require('./templates/invoice.send.cjs'),
   'speaker.invite': require('./templates/speaker.invite.cjs'),
   'speaker.accepted': require('./templates/speaker.accepted.cjs'),
   'speaker.confirmation': require('./templates/speaker.confirmation.cjs'),
