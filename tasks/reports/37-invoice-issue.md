@@ -11,7 +11,8 @@ Part 3 of the five-part invoicing plan (spec: the 2026-10-20 comment on #208).
   optional note), `validateVoidReason` (required), and `issueProblems` (a line, a due
   date not before the issue date, an issuer name in the settings).
 - **invoiceAdmin** (`functions/src/admin/invoices.cjs`): `issue`, `markPaid`, `void`
-  (operator only) and `duplicate`. Issue reads the draft, the settings, the counter and
+  (operator only), `reopen` (operator only; paid back to issued, the payment kept in
+  `paymentHistory`) and `duplicate`. Issue reads the draft, the settings, the counter and
   `config/event` in one transaction and writes the invoice and `lastNumber + 1`
   together, so no number is lost or shared. A counter that is not a whole number, a
   `sequence` another invoice holds, settings that fail their checks, and an unsupported
@@ -56,9 +57,12 @@ Part 3 of the five-part invoicing plan (spec: the 2026-10-20 comment on #208).
 
 ## Decisions the owner may want to change
 
-- A paid invoice can be voided by an operator and keeps its payment record. The spec's
-  "reopen a paid invoice" (operator) is not built: no PR in the plan names a `reopen`
-  action, and void plus duplicate covers corrections.
+- A paid invoice can be voided by an operator and keeps its payment record.
+- Reopen (added at the director's request, from the spec's access rule): operator only,
+  paid to issued, a reason required. The payment moves to `paymentHistory` with the
+  reason, the time and the operator, and is never deleted. A void invoice is refused.
+  The invoices CSV shows the current payment only; the history is in
+  `billing/invoices.json`.
 - Issue needs an issuer name in the settings and a due date that is not before the
   issue date. A payment date may be before the issue date (a prepayment), not after today.
 - The prefix in the settings at issue time names the number; the sequence is one counter
@@ -71,11 +75,10 @@ Part 3 of the five-part invoicing plan (spec: the 2026-10-20 comment on #208).
 ## Left undone
 
 - Emailing the PDF (part 4) and the Stripe pay link (part 5, #519).
-- ADR 0001 §4.2 still says an operator "reopens a paid invoice"; see above.
 
-## Checks (final run, after the last code edit)
+## Checks (final run, after the reopen work and the merge of origin/main 6c4032b)
 
-lint clean; `npm test` 3601/3601; web 316 files, 3770/3770; `test:rules` 468/468;
+lint clean; `npm test` 3604/3604; web 316 files, 3772/3772; `test:rules` 468/468;
 `check-docs` passed; `build-pages --check` matched; `generate-content --demo --check`
 matched; `build-demo --check` identical builds, within budget; `check:copy` clean;
 `e2e/invoices.spec.js` 5/5.
