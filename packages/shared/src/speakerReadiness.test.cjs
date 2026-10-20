@@ -159,7 +159,12 @@ test('materials waiting for review are told apart from approved ones', () => {
   // A pending material counts as sent: the speaker has done their part.
   assert.deepEqual(result.materialsSessions, [{ id: 'r', title: 'Rejected only' }]);
   // Staff still have to review it, so the session is listed apart. One
-  // approved material is enough to leave this list.
-  assert.deepEqual(result.pendingMaterialsSessions, [{ id: 'p', title: 'Pending only' }]);
+  // approved material is enough to leave this list. A session that needs no
+  // materials is never missing them, but an upload to it still waits for
+  // review, so staff must see it.
+  assert.deepEqual(result.pendingMaterialsSessions, [
+    { id: 'p', title: 'Pending only' },
+    { id: 'n', title: 'No materials needed' },
+  ]);
   assert.deepEqual(result.missing, ['materials']);
 });

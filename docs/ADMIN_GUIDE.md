@@ -326,7 +326,7 @@ Email accepted speakers about the items they still owe. Select **Send reminders*
 
 Only published sessions that are not hidden count. Only speakers who accepted an invitation are listed. A speaker who is not invited yet, or whose invitation is still open, gets the invitation instead.
 
-**Materials waiting for review.** A pending material counts as sent, because the speaker has done their part. Staff have not approved it yet, so the page also lists it apart. A session with a pending material and no approved material shows on the speaker's row as **Waiting for review**. One approved material ends the wait. No reminder names it.
+**Materials waiting for review.** A pending material counts as sent, because the speaker has done their part. Staff have not approved it yet, so the page also lists it apart. A session with a pending material and no approved material shows on the speaker's row as **Waiting for review**. One approved material ends the wait. A session marked as needing no materials is never missing them, but an upload to it is still listed here until staff review it. No reminder names it.
 
 **Choose speakers.** **Show** narrows the list: **Anything missing** (the default), one item, **Materials waiting for review**, or **Every accepted speaker**. The choice stays in the page address. Each row names the missing items with the session titles, and says when the speaker was last reminded and about what. Tick one speaker, or select **Select all shown**. A change to **Show** clears the selection. **Items to include** picks the items a reminder may name. Each speaker's message names only the chosen items that speaker still owes.
 

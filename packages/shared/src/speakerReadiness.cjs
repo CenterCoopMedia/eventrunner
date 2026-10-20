@@ -142,10 +142,14 @@ function speakerReadiness({ speaker, sessions, materialsBySession }) {
     seen.add(session.id);
     const ref = { id: session.id, title: sessionTitle(session) };
     if (!sessionHasDescription(session)) descriptionSessions.push(ref);
-    if (!sessionNeedsMaterials(session)) continue;
     const materials = materialsBySession?.[session.id] ?? [];
-    if (!materials.some(materialCounts)) materialsSessions.push(ref);
-    else if (!materials.some((material) => material?.reviewStatus === 'approved')) pendingMaterialsSessions.push(ref);
+    if (!materials.some(materialCounts)) {
+      // A session that needs no materials is never missing them.
+      if (sessionNeedsMaterials(session)) materialsSessions.push(ref);
+    } else if (!materials.some((material) => material?.reviewStatus === 'approved')) {
+      // An upload still waits for staff review, even where none was needed.
+      pendingMaterialsSessions.push(ref);
+    }
   }
   const gaps = {
     bio,
