@@ -434,6 +434,7 @@ test('staff apply an edit to the draft, keeping their own draft changes; the pub
     organizationId: 'beacon-fund',
     docPath: 'cmsOrganizations_drafts/beacon-fund',
     appliedFields: ['description', 'bio'],
+    applied: { description: 'Funds travel and child care.', bio: 'A new history.' },
   });
   const draft = db.read('cmsOrganizations_drafts', 'beacon-fund');
   assert.equal(draft.description, 'Funds travel and child care.');
@@ -561,4 +562,31 @@ test('a second representative of the same organization cannot merge into, or rea
   const ada = await own(db, 'ada', { action: 'get' });
   assert.deepEqual(ada.body.pending.fields, { description: 'From Ada.' });
   assert.equal(ada.body.otherPending, false);
+});
+
+// Codex review on #540: the editor must adopt what apply actually wrote. A
+// transaction that retries reads the queue again, so the values can be a
+// newer edit than the one the page listed.
+test('apply answers with the values it wrote to the draft, read inside its own transaction', async () => {
+  const db = seed();
+  await own(db, 'ada', { action: 'submit', fields: { description: 'First text.' } });
+  // The representative sends again after the page listed the first text,
+  // and the first attempt of the apply transaction meets that write.
+  let raced = false;
+  const runTransaction = db.runTransaction.bind(db);
+  db.runTransaction = async (fn, options) => runTransaction(async (tx) => {
+    const result = await fn(tx);
+    if (!raced) {
+      raced = true;
+      await own(db, 'ada', { action: 'submit', fields: { description: '  Newer text.  ', url: 'HTTPS://Beacon.example.org/new' } });
+    }
+    return result;
+  }, options);
+  const res = await staff(db, { action: 'apply', organizationId: 'beacon-fund' });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.ok(raced);
+  const draft = db.read('cmsOrganizations_drafts', 'beacon-fund');
+  assert.equal(draft.description, 'Newer text.');
+  assert.deepEqual(res.body.applied, { description: draft.description, url: draft.url });
+  assert.deepEqual(res.body.appliedFields, ['description', 'url']);
 });

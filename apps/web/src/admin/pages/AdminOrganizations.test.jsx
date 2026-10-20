@@ -599,7 +599,10 @@ describe('organization representatives', () => {
     expect(within(reps).queryByText('bo@example.org')).toBeNull();
 
     fetch.mockResolvedValueOnce(response({
-      organizationId: 'tide-media', docPath: 'cmsOrganizations_drafts/tide-media', appliedFields: ['description', 'bio'],
+      organizationId: 'tide-media',
+      docPath: 'cmsOrganizations_drafts/tide-media',
+      appliedFields: ['description', 'bio'],
+      applied: { description: 'A newsroom for the whole coast.', bio: 'Founded in 2001.' },
     }));
     fireEvent.click(within(review).getByRole('button', { name: 'Apply to draft' }));
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
@@ -610,6 +613,22 @@ describe('organization representatives', () => {
     expect(applied.some((node) => node.getAttribute('role') === 'status')).toBe(true);
     // The form now holds the applied text, so the next save keeps it.
     expect(screen.getByLabelText('Description')).toHaveValue('A newsroom for the whole coast.');
+  });
+
+  // Codex review on #540: the server may apply a newer edit than the one
+  // this page listed. The form takes what the server says it wrote.
+  it('adopts the values the server applied, not the edit the page listed', async () => {
+    await openTideMedia();
+    const review = screen.getByRole('region', { name: 'Edit waiting for review' });
+    fetch.mockResolvedValueOnce(response({
+      organizationId: 'tide-media',
+      docPath: 'cmsOrganizations_drafts/tide-media',
+      appliedFields: ['description', 'url'],
+      applied: { description: 'A newer text the representative sent.', url: 'https://tide.example.org/new' },
+    }));
+    fireEvent.click(within(review).getByRole('button', { name: 'Apply to draft' }));
+    await waitFor(() => expect(screen.getByLabelText('Description')).toHaveValue('A newer text the representative sent.'));
+    expect(screen.getByLabelText('Website')).toHaveValue('https://tide.example.org/new');
   });
 
   it('asks before it overwrites a field staff changed since, then sends overwrite', async () => {

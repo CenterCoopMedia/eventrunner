@@ -65,8 +65,13 @@ function EditReview({ organizationId, request, current, isUnsaved, onApplied, on
     setBusy('apply');
     setError(null);
     try {
-      await call(ENDPOINT, { action: 'apply', organizationId, ...(overwrite ? { overwrite: true } : {}) });
-      onApplied(Object.fromEntries(fields.map((field) => [field, request.fields[field]])));
+      const result = await call(ENDPOINT, { action: 'apply', organizationId, ...(overwrite ? { overwrite: true } : {}) });
+      // What the server wrote, not this page's copy of the edit: a retried
+      // apply reads the queue again and can write a newer edit.
+      const applied = result?.applied && typeof result.applied === 'object' ? result.applied : {};
+      onApplied(Object.fromEntries(
+        Object.entries(applied).filter(([field]) => field in REPRESENTATIVE_FIELD_LABELS),
+      ));
       onResult({ tone: 'ok', message: 'Edit applied to the draft. Publish to show it on the site.' });
     } catch (err) {
       setError(err);

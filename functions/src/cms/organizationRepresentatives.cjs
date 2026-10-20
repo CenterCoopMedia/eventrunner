@@ -440,9 +440,15 @@ async function applyApprove({ db, organizationId, overwrite, actor, now }) {
         at: new Date(now()),
         details: { fields: Object.keys(fields), overwrite: overwrite === true },
       }));
+      // The values this attempt wrote, as stored. A retried attempt reads
+      // the queue again, so they can be newer than what the caller listed,
+      // and the editor adopts these, never its own copy.
+      const applied = Object.fromEntries(
+        Object.keys(fields).map((field) => [field, verdict.fields[field] ?? null]),
+      );
       return {
         ok: true,
-        body: { organizationId, docPath: written.docPath, appliedFields: Object.keys(fields) },
+        body: { organizationId, docPath: written.docPath, appliedFields: Object.keys(fields), applied },
       };
     });
   } catch (err) {
