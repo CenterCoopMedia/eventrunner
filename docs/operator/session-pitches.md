@@ -5,10 +5,10 @@ Session pitch intake is a private server workflow. A caller needs a verified Fir
 The public `config/pitch_call` document contains only three fields:
 
 - `enabled`: A Boolean.
-- `closesAt`: An RFC3339 date and time.
+- `closesAt`: An RFC3339 date and time, or `null` for a call with no deadline.
 - `externalFormUrl`: An https address of an external form, or `null`. Older documents without this field use this site's form.
 
-The call is closed when the document is missing or malformed, when `enabled` is false, or when `closesAt` has passed. Operators set all three fields through `updatePitchCall`. Clients cannot write the document directly.
+The call is closed when the document is missing or malformed, when `enabled` is false, or when `closesAt` has passed. A call with `closesAt: null` has no deadline: it stays open until an operator saves `enabled: false`. A document with no `closesAt` field at all is malformed, so it reads as closed. Operators set all three fields through `updatePitchCall`. Clients cannot write the document directly.
 
 ## Choose where people pitch
 
@@ -17,14 +17,14 @@ A call uses one intake at a time:
 - **This site's pitch form** (`externalFormUrl: null`). Proposals go directly into the private queue.
 - **An external form** (for example, Airtable). `/pitch` shows the call status, the deadline and one **Open the pitch form** link while the call is open. The site's own form and sign-in are hidden. `submitSessionPitch` refuses new pitches, so one call never has two queues. A retry of a pitch stored before the switch is still acknowledged; it creates nothing new. The external service stores the answers under its own terms. Bring them into the queue with an [Airtable refresh](#refresh-pitches-from-airtable) or the [reviewed CSV import](#reviewed-csv-import-and-private-export).
 
-The deadline and the enabled state apply in both modes. While the call is open, the home page lead shows a **Pitch a session** action to `/pitch`. Share `/pitch`, not the external address, so closing the call also removes the link.
+The deadline (or no deadline) and the enabled state apply in both modes. While the call is open, the home page lead shows a **Pitch a session** action to `/pitch`. Share `/pitch`, not the external address, so closing the call also removes the link.
 
 ### Set up an Airtable form
 
 1. In the Airtable base, make these fields: `email` (email), `title` (single line text), `description` (long text), `organization` (single line text), `format` (single line text or single select) and `consent` (checkbox). State the review and contact purpose in the checkbox's form label.
 2. For the CSV import only, add a formula field named `externalId` with the formula `RECORD_ID()`. Airtable fills it for each response. The Airtable refresh uses the record ID directly and does not need this field.
 3. Make a form view from these fields. Make `email`, `title`, `description` and `consent` required. Copy the form's public share link.
-4. In **Session pitches**, expand **Manage the call for sessions**. Choose **An external form, such as Airtable**, paste the share link, set the deadline, select **Accept session pitches** and save.
+4. In **Session pitches**, expand **Manage the call for sessions**. Choose **An external form, such as Airtable**, paste the share link, set the deadline or choose **Open until I close it**, select **Accept session pitches** and save.
 5. Bring the responses into the review queue. Use the [Airtable refresh](#refresh-pitches-from-airtable) when the deployment has an Airtable token. Otherwise download a CSV of a grid view (**Download CSV**) and use the [reviewed CSV import](#reviewed-csv-import-and-private-export). In a CSV, a ticked checkbox exports as `checked`, which the import reads as consent. Import 50 rows or fewer at a time. Use the source name `airtable` for every import from this form, so a later Airtable refresh adopts those rows and does not duplicate them.
 
 Firestore stays the record for the review queue. Airtable stays the record for the form answers.
@@ -117,7 +117,7 @@ All endpoints use `POST`, the configured Functions region, the normal CORS allow
 }
 ```
 
-The server stores the closing time as a canonical UTC RFC3339 value. `externalFormUrl` must be empty, `null` or an https address of 2,048 characters or fewer. An empty string or `null` saves `null` and selects this site's form. A request without the field keeps the stored form, so a deadline-only update cannot reopen native intake. The response returns all three stored fields. It writes the configuration and its `admin_logs` row in one transaction. The public configuration does not store an operator uid or email.
+The server stores the closing time as a canonical UTC RFC3339 value. `"closesAt": null` saves a call with no deadline. A missing, blank or malformed `closesAt` is refused with `400`; only an explicit `null` means no deadline. `externalFormUrl` must be empty, `null` or an https address of 2,048 characters or fewer. An empty string or `null` saves `null` and selects this site's form. A request without the field keeps the stored form, so a deadline-only update cannot reopen native intake. The response returns all three stored fields. It writes the configuration and its `admin_logs` row in one transaction. The public configuration does not store an operator uid or email.
 
 ### Submit a pitch
 
@@ -281,15 +281,17 @@ Before deploying this version, check existing CMS pages and page drafts at `/pit
 
 The public `/pitch` route uses the event branding and theme. Visitors can write before signing in. Google or an emailed code verifies their email without a ticket. The form retains entries and the retry key in browser tab storage through sign-in, reloads, and request failures. It clears the stored draft after a confirmed submission. Browser storage failure leaves entries available while the page stays open.
 
-The form requires a title, description, and organizer-review consent. Organization and format are optional. It displays the deadline in the visitor's timezone. A missing, malformed, expired, or unreadable call keeps submission unavailable. Configure the deployment's consent and retention policy before opening intake; this acknowledgement does not grant permission to publish a proposal.
+The form requires a title, description, and organizer-review consent. Organization and format are optional. It displays the deadline in the visitor's timezone. A call with no deadline shows no date and no countdown. It says there is no set deadline. A missing, malformed, expired, or unreadable call keeps submission unavailable. Configure the deployment's consent and retention policy before opening intake; this acknowledgement does not grant permission to publish a proposal.
 
 Open **Session pitches** at `/admin/pitches`. Staff can search by title, email, or organization, filter by decision, and open each proposal. Save notes and the chosen decision explicitly. A concurrent edit disables saving and keeps your unsaved notes visible. Copy your notes before choosing **Load current review**, then reconcile them with the current revision. Saving a decision sends no email. Send the acceptance or decline email from the pitch after you save the decision (see [Pitch emails](#pitch-emails)).
 
-Operators can expand **Manage the call for sessions** and save an enabled state, a deadline and where people pitch. Staff cannot change these settings.
+Operators can expand **Manage the call for sessions** and save an enabled state, a deadline and where people pitch.
+
+Under **When intake closes**, choose **At a set date and time** or **Open until I close it**. With **Open until I close it**, the call has no deadline. To close it, clear **Accept session pitches** and save. The public page shows no deadline. If you go back to **At a set date and time** before you save, the earlier date and time come back. Staff cannot change these settings.
 
 Enter the **Deadline** as a **Date** and a **Time** on the event's clock. The time zone comes from **Event settings** and shows under the fields. The line under it states the deadline in words, with the zone and the UTC offset for the chosen date. For example, 11:59 PM on January 31 reads "Intake closes Sunday, January 31, 2027 at 11:59 PM Eastern Standard Time (UTC−05:00)." The page stores the same RFC3339 instant as before.
 
-A deadline is required. A cleared deadline does not save. A time that the clocks skip when daylight saving time starts does not exist, so the page refuses it and asks for another time. A time that happens twice when daylight saving time ends shows two choices, one before and one after the clocks go back. Choose one before you save. A failed save keeps your entries. If another operator saves the call while you edit it, your entries stay and a notice offers **Load saved settings**.
+With **At a set date and time**, a deadline is required. A cleared deadline does not save. A time that the clocks skip when daylight saving time starts does not exist, so the page refuses it and asks for another time. A time that happens twice when daylight saving time ends shows two choices, one before and one after the clocks go back. Choose one before you save. A failed save keeps your entries. If another operator saves the call while you edit it, your entries stay and a notice offers **Load saved settings**.
 
 ### Reviewed CSV import and private export
 
