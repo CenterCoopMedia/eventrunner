@@ -10,7 +10,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { render as testingRender, screen, within } from '@testing-library/react';
+import { render as testingRender, screen, waitFor, within } from '@testing-library/react';
+import { readyManifest, stubManifests, TEST_GENERATION } from '../test/imageSizeManifests.js';
+import { resetImageSizeCacheForTest } from '../lib/mediaSource.js';
 
 import { MemoryRouter } from 'react-router';
 
@@ -149,8 +151,13 @@ describe('SponsorWall', () => {
 
   // Issue #333: a mark offers the display sizes at its tier's width, so a
   // wall of logos does not download every original upload.
-  it('offers each mark the display sizes at its tier width', () => {
+  it('offers each mark the display sizes at its tier width', async () => {
     organizationsData = undefined;
+    resetImageSizeCacheForTest();
+    stubManifests({
+      'cms-images/a1b2c3/one.png': readyManifest('cms-images/a1b2c3/one.png', 2060),
+      'cms-images/d4e5f6/two.png': readyManifest('cms-images/d4e5f6/two.png', 800),
+    });
     const { container } = render(
       <SponsorWall
         organizations={[
@@ -160,9 +167,15 @@ describe('SponsorWall', () => {
       />,
     );
     const [first, second] = [...container.querySelectorAll('.logo-wall__mark img')];
-    expect(first.getAttribute('srcset')).toContain(encodeURIComponent('cms-images/a1b2c3/_sizes/320.webp'));
+    await waitFor(() => expect(second).toHaveAttribute('srcset'));
+    expect(first.getAttribute('srcset')).toContain(
+      `${encodeURIComponent(`cms-images/a1b2c3/_sizes/${TEST_GENERATION}/320.webp`)}?alt=media 320w`,
+    );
+    expect(second.getAttribute('srcset')).toContain(' 800w');
+    expect(second.getAttribute('srcset')).not.toContain('1280w');
     expect(first).toHaveAttribute('sizes', '15rem');
     expect(second).toHaveAttribute('sizes', '12rem');
+    vi.unstubAllGlobals();
   });
 
   it('fits each mark inside its box, whatever size file it loads', () => {

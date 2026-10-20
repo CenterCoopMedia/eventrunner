@@ -1,9 +1,11 @@
 // The event hero's artwork (issue #333). A picture picked from the media
 // library is a Storage path: it resolves to the bucket and offers the
 // display sizes the function wrote. Alt text and focal point stay.
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import EventHero from './EventHero.jsx';
+import { readyManifest, stubManifests, TEST_GENERATION } from '../test/imageSizeManifests.js';
+import { resetImageSizeCacheForTest } from '../lib/mediaSource.js';
 
 const IMAGE = {
   blockType: 'image',
@@ -14,18 +16,29 @@ const IMAGE = {
 };
 
 describe('EventHero artwork', () => {
-  it('resolves a picked path to the bucket and offers the sizes', () => {
+  beforeEach(() => {
+    resetImageSizeCacheForTest();
+    stubManifests({ [IMAGE.url]: readyManifest(IMAGE.url, 2400) });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('resolves a picked path to the bucket and offers the sizes', async () => {
     render(<EventHero name="Summit" image={IMAGE} />);
     const img = screen.getByAltText(IMAGE.alt);
+    await waitFor(() => expect(img).toHaveAttribute('srcset'));
     expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
-    expect(img.getAttribute('srcset')).toContain(encodeURIComponent('cms-images/a1b2c3/_sizes/1920.webp'));
+    expect(img.getAttribute('srcset')).toContain(
+      `${encodeURIComponent(`cms-images/a1b2c3/_sizes/${TEST_GENERATION}/1920.webp`)}?alt=media 1920w`,
+    );
+    expect(img.getAttribute('srcset')).toContain(' 2400w');
     expect(img).toHaveAttribute('sizes', '100vw');
     expect(img).toHaveAttribute('fetchpriority', 'high');
     expect(img).toHaveStyle({ objectPosition: '10% 90%' });
   });
 
-  it('falls back to the original when a size fails to load', () => {
+  it('falls back to the original when a size fails to load', async () => {
     render(<EventHero name="Summit" image={IMAGE} />);
+    await waitFor(() => expect(screen.getByAltText(IMAGE.alt)).toHaveAttribute('srcset'));
     fireEvent.error(screen.getByAltText(IMAGE.alt));
     expect(screen.getByAltText(IMAGE.alt)).not.toHaveAttribute('srcset');
   });

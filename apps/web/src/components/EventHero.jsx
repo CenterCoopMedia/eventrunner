@@ -47,7 +47,7 @@ export default function EventHero({
       </div>
       {src ? <figure className="event-hero__figure">
         <div className="event-hero__media">
-          <img className="event-hero__art" src={art.src} srcSet={art.srcSet} sizes={art.srcSet ? '100vw' : undefined} onError={art.onError} alt={alt} style={{ objectPosition: focalPosition(image) }} fetchpriority="high" />
+          <img className="event-hero__art" src={art.src} srcSet={art.srcSet} sizes={art.srcSet ? '100vw' : undefined} onError={art.onError} alt={alt} style={{ objectPosition: focalPosition(image), ...(art.pending ? { visibility: 'hidden' } : null) }} fetchpriority="high" />
       {src && image.demoTransitSign ? (
         <div className="event-hero__sign" aria-hidden="true">
           <WayfindingIcon name="transit" /><span>→</span>

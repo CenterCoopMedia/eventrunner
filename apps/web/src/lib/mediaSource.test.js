@@ -6,7 +6,8 @@
 // firebaseStorageDownloadTokens, so getDownloadURL rejects for exactly the
 // files the library exists to show. The token-free media URL is served
 // subject to storage.rules instead.
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TEST_GENERATION, readyManifest, stubManifests } from '../test/imageSizeManifests.js';
 
 vi.mock('../firebase.js', () => ({
   app: {},
@@ -22,12 +23,14 @@ vi.mock('../firebase.js', () => ({
 const {
   PROFILE_PHOTO_MAX_BYTES,
   PROFILE_PHOTO_TYPES,
-  assetSrcSet,
   assetUrl,
   brandingSrc,
   checkFile,
   formatBytes,
   imageBlockSources,
+  imageSizeSrcSet,
+  peekImageSizeSrcSet,
+  resetImageSizeCacheForTest,
   storagePath,
 } = await import('./mediaSource.js');
 
@@ -69,28 +72,66 @@ describe('assetUrl', () => {
   });
 });
 
-// Issue #333: the function writes display sizes beside an upload, and the
-// page offers them through srcset. The original stays the src.
-describe('assetSrcSet', () => {
-  const sizeUrl = (path) =>
+// Issue #333: the function writes display sizes beside an upload, and a
+// manifest that states each copy's real width. The page reads the manifest
+// and lists every candidate at its true width, the original included
+// (Codex review on #538). The original stays the src.
+describe('imageSizeSrcSet', () => {
+  const objectUrl = (path) =>
     `https://firebasestorage.googleapis.com/v0/b/${encodeURIComponent(BUCKET)}/o/${encodeURIComponent(path)}?alt=media`;
+  const PHOTO = 'speaker-photos/spk-1/a1b2c3/face.jpg';
 
-  it('lists the WebP sizes beside an uploaded headshot, widest last', () => {
-    expect(assetSrcSet('speaker-photos/spk-1/a1b2c3/face.jpg')).toBe(
-      [320, 640, 1280, 1920]
-        .map((width) => `${sizeUrl(`speaker-photos/spk-1/a1b2c3/_sizes/${width}.webp`)} ${width}w`)
-        .join(', '),
+  beforeEach(() => {
+    resetImageSizeCacheForTest();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('lists each copy at its real width, then the original at its own', async () => {
+    const fetchMock = stubManifests({ [PHOTO]: readyManifest(PHOTO, 1254) });
+    expect(await imageSizeSrcSet(PHOTO)).toBe(
+      [
+        `${objectUrl(`speaker-photos/spk-1/a1b2c3/_sizes/${TEST_GENERATION}/320.webp`)} 320w`,
+        `${objectUrl(`speaker-photos/spk-1/a1b2c3/_sizes/${TEST_GENERATION}/640.webp`)} 640w`,
+        `${objectUrl(PHOTO)} 1254w`,
+      ].join(', '),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      objectUrl('speaker-photos/spk-1/a1b2c3/_sizes/manifest.json'),
+      expect.objectContaining({ credentials: 'omit' }),
     );
   });
 
-  it('lists sizes for library uploads too', () => {
-    expect(assetSrcSet('cms-images/a1b2c3/hero.png')).toContain(
-      encodeURIComponent('cms-images/a1b2c3/_sizes/640.webp'),
-    );
-    expect(assetSrcSet('branding/a1b2c3/logo.webp')).toContain(' 1920w');
+  it('never lists a width larger than the file, whatever the manifest claims', async () => {
+    // A 200px upload: the function writes no copy, so there is no srcset
+    // and the original is the only candidate.
+    stubManifests({ [PHOTO]: readyManifest(PHOTO, 200) });
+    expect(await imageSizeSrcSet(PHOTO)).toBeNull();
+    resetImageSizeCacheForTest();
+    // A manifest that labels a copy wider than its file is not believed.
+    const lying = readyManifest(PHOTO, 1254);
+    lying.sizes[0] = { ...lying.sizes[0], width: 2000 };
+    stubManifests({ [PHOTO]: lying });
+    expect(await imageSizeSrcSet(PHOTO)).not.toContain(' 2000w');
   });
 
-  it('offers no sizes where the function writes none', () => {
+  it('offers no sizes when there is no ready manifest for this very file', async () => {
+    stubManifests({});
+    expect(await imageSizeSrcSet(PHOTO)).toBeNull();
+    resetImageSizeCacheForTest();
+    stubManifests({ [PHOTO]: { ...readyManifest(PHOTO, 1254), status: 'refused' } });
+    expect(await imageSizeSrcSet(PHOTO)).toBeNull();
+    resetImageSizeCacheForTest();
+    stubManifests({ [PHOTO]: { ...readyManifest(PHOTO, 1254), source: 'speaker-photos/spk-1/zzz/face.jpg' } });
+    expect(await imageSizeSrcSet(PHOTO)).toBeNull();
+    resetImageSizeCacheForTest();
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    expect(await imageSizeSrcSet(PHOTO)).toBeNull();
+  });
+
+  it('asks for nothing where the function writes no sizes', async () => {
+    const fetchMock = stubManifests({});
     for (const path of [
       null,
       'branding/logo.svg',
@@ -100,33 +141,44 @@ describe('assetSrcSet', () => {
       'profile-photos/uid-1/photo.jpg',
       'speaker-photos/spk-1/photo.jpg',
       'demo/speakers/marisol-reyes.webp',
-      'default-avatars/avatar-01.svg',
       'https://example.org/x.jpg',
     ]) {
-      expect(assetSrcSet(path)).toBeNull();
+      expect(await imageSizeSrcSet(path)).toBeNull();
+      expect(peekImageSizeSrcSet(path)).toBeNull();
     }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('reads each manifest once, and knows the answer afterwards', async () => {
+    const fetchMock = stubManifests({ [PHOTO]: readyManifest(PHOTO, 1254) });
+    expect(peekImageSizeSrcSet(PHOTO)).toBeUndefined();
+    const [first, second] = await Promise.all([imageSizeSrcSet(PHOTO), imageSizeSrcSet(PHOTO)]);
+    expect(first).toBe(second);
+    expect(peekImageSizeSrcSet(PHOTO)).toBe(first);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('imageBlockSources', () => {
-  it('resolves a picked library path to the bucket, with sizes', () => {
+  it('resolves a picked library path to the bucket, and names it for its sizes', () => {
     // The image block stores the object path the picker chose. As a bare
     // relative src it named a page on the site, not the object.
-    const { src, srcSet } = imageBlockSources('cms-images/a1b2c3/hero.jpg');
-    expect(src).toBe(assetUrl('cms-images/a1b2c3/hero.jpg'));
-    expect(srcSet).toBe(assetSrcSet('cms-images/a1b2c3/hero.jpg'));
+    expect(imageBlockSources('cms-images/a1b2c3/hero.jpg')).toEqual({
+      src: assetUrl('cms-images/a1b2c3/hero.jpg'),
+      path: 'cms-images/a1b2c3/hero.jpg',
+    });
   });
 
-  it('resolves a library GIF to the bucket, without sizes', () => {
+  it('resolves a library GIF to the bucket too', () => {
     expect(imageBlockSources('cms-images/a1b2c3/loop.gif')).toEqual({
       src: assetUrl('cms-images/a1b2c3/loop.gif'),
-      srcSet: null,
+      path: 'cms-images/a1b2c3/loop.gif',
     });
   });
 
   it('leaves a link, a site path, and a seeded flat path as they were', () => {
     for (const url of ['https://example.org/hall.jpg', '/hero/newsroom.webp', 'branding/logo.svg']) {
-      expect(imageBlockSources(url)).toEqual({ src: url, srcSet: null });
+      expect(imageBlockSources(url)).toEqual({ src: url, path: null });
     }
   });
 });

@@ -1,7 +1,9 @@
 // The lead image device (design brief §2.5.2): one optional image beside the
 // opening copy, with required alt text, a stable crop, and a focal point.
-import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readyManifest, stubManifests, TEST_GENERATION } from '../test/imageSizeManifests.js';
+import { resetImageSizeCacheForTest } from '../lib/mediaSource.js';
 import LeadImage, { focalPosition } from './LeadImage.jsx';
 
 const BLOCK = {
@@ -50,27 +52,41 @@ describe('LeadImage', () => {
 describe('LeadImage display sizes', () => {
   const PICKED = { ...BLOCK, url: 'cms-images/a1b2c3/hall.jpg', focalX: 30, focalY: 70 };
 
-  it('resolves a picked path to the bucket and offers the sizes', () => {
+  beforeEach(() => {
+    resetImageSizeCacheForTest();
+    stubManifests({ 'cms-images/a1b2c3/hall.jpg': readyManifest('cms-images/a1b2c3/hall.jpg', 1500) });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('resolves a picked path to the bucket and offers the sizes at real widths', async () => {
     render(<LeadImage block={PICKED} />);
     const img = screen.getByAltText(BLOCK.alt);
+    await waitFor(() => expect(img).toHaveAttribute('srcset'));
     expect(img.getAttribute('src')).toContain('firebasestorage.googleapis.com');
     expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
-    expect(img.getAttribute('srcset')).toContain(encodeURIComponent('cms-images/a1b2c3/_sizes/640.webp'));
+    expect(img.getAttribute('srcset')).toContain(
+      `${encodeURIComponent(`cms-images/a1b2c3/_sizes/${TEST_GENERATION}/640.webp`)}?alt=media 640w`,
+    );
+    expect(img.getAttribute('srcset')).toContain(`${encodeURIComponent('cms-images/a1b2c3/hall.jpg')}?alt=media 1500w`);
+    expect(img.getAttribute('srcset')).not.toContain('1920w');
     expect(img.getAttribute('sizes')).toBe('(min-width: 64rem) 22rem, 100vw');
     expect(img).toHaveStyle({ objectPosition: '30% 70%' });
   });
 
-  it('falls back to the original when a size fails to load', () => {
+  it('falls back to the original when a size fails to load', async () => {
     render(<LeadImage block={PICKED} />);
-    fireEvent.error(screen.getByAltText(BLOCK.alt));
     const img = screen.getByAltText(BLOCK.alt);
-    expect(img).not.toHaveAttribute('srcset');
-    expect(img.getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
+    await waitFor(() => expect(img).toHaveAttribute('srcset'));
+    fireEvent.error(img);
+    expect(screen.getByAltText(BLOCK.alt)).not.toHaveAttribute('srcset');
+    expect(screen.getByAltText(BLOCK.alt).getAttribute('src')).toContain(encodeURIComponent('cms-images/a1b2c3/hall.jpg'));
   });
 
-  it('offers no sizes for a link to another site', () => {
+  it('offers no sizes for a link to another site, and asks for no manifest', () => {
     render(<LeadImage block={BLOCK} />);
     expect(screen.getByAltText(BLOCK.alt)).not.toHaveAttribute('srcset');
+    expect(screen.getByAltText(BLOCK.alt)).toHaveAttribute('src', BLOCK.url);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });
 

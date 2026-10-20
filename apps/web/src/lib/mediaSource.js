@@ -38,7 +38,7 @@
 // to the rules. `allow get: if true` on the public namespaces is what makes
 // it work for anonymous visitors, `session-materials/` stays closed, and a
 // thumbnail costs no metadata round trip.
-import { imageSizePaths } from 'shared/imageSizes';
+import { imageSizePaths, readImageSizeManifest } from 'shared/imageSizes';
 import { isMediaLibraryPath, storageObjectPath } from 'shared/venue';
 import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
@@ -203,57 +203,113 @@ export function assetUrl(path) {
   )}/o/${encodeURIComponent(object)}?alt=media`;
 }
 
-/**
- * The `srcset` for an upload's display sizes (issue #333), or null.
- *
- * functions/src/media/imageSizes.cjs writes a few fixed widths as WebP
- * beside each library upload and speaker headshot. The rule for which
- * uploads get them, and where, is shared (shared/imageSizes), so this
- * builds the list without a lookup. The original stays the `src`: a page
- * that fails to load a size drops the srcset and shows the original, which
- * covers an upload from before this feature, one still being processed,
- * and one the function refused.
- *
- * A size may be narrower than its listed width, when the upload itself was
- * narrower: the function never enlarges. So only a slot whose box the CSS
- * sizes (object-fit) should take a srcset, never one sized by its file.
- *
- * @param {unknown} path
- * @returns {string|null}
- */
-export function assetSrcSet(path) {
-  const object = storagePath(path);
-  const paths = object ? imageSizePaths(object) : null;
-  if (!paths) return null;
-  const candidates = [];
-  for (const size of paths.sizes) {
-    const url = assetUrl(size.path);
-    if (!url) return null;
-    candidates.push(`${url} ${size.width}w`);
+// --- Display sizes (issue #333) ---------------------------------------------
+//
+// functions/src/media/imageSizes.cjs writes WebP copies beside each library
+// upload and speaker headshot, at the fixed widths narrower than the
+// original, and a manifest.json that states each copy's real width. The
+// page reads the manifest and lists every candidate at its true width: the
+// copies, then the original at its own width, so a srcset descriptor never
+// claims a width the file does not have (Codex review on #538). The
+// original stays the src, so an upload from before this feature, one still
+// being processed, and one the function refused all show the original.
+//
+// Each manifest is read once per page load. The answers are kept by path,
+// so a page a visitor returns to knows them at once.
+
+/** How long the page waits for a manifest before it shows the original. */
+const MANIFEST_TIMEOUT_MS = 4000;
+
+const sizeAnswers = new Map();
+const sizeRequests = new Map();
+
+async function fetchImageSizeSrcSet(object, manifestPath) {
+  const manifestUrl = assetUrl(manifestPath);
+  const originalUrl = assetUrl(object);
+  if (!manifestUrl || !originalUrl || typeof fetch !== 'function') return null;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), MANIFEST_TIMEOUT_MS) : null;
+  try {
+    const response = await fetch(manifestUrl, { credentials: 'omit', signal: controller?.signal });
+    if (!response?.ok) return null;
+    const read = readImageSizeManifest(object, await response.json());
+    if (!read || read.sizes.length === 0) return null;
+    const candidates = [];
+    for (const size of read.sizes) {
+      const url = assetUrl(size.path);
+      if (!url) return null;
+      candidates.push(`${url} ${size.width}w`);
+    }
+    candidates.push(`${originalUrl} ${read.width}w`);
+    return candidates.join(', ');
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-  return candidates.join(', ');
 }
 
 /**
- * The `src` and `srcset` for an image block's `url` (lead and hero images).
+ * What is already known about a path's display sizes: the srcset, null for
+ * none, or undefined when the manifest has not been read yet.
+ *
+ * @param {unknown} path
+ * @returns {string|null|undefined}
+ */
+export function peekImageSizeSrcSet(path) {
+  const object = storagePath(path);
+  if (!object || !imageSizePaths(object) || !assetUrl(object)) return null;
+  return sizeAnswers.has(object) ? sizeAnswers.get(object) : undefined;
+}
+
+/**
+ * The srcset for an upload's display sizes, from its manifest, or null.
+ *
+ * @param {unknown} path
+ * @returns {Promise<string|null>}
+ */
+export function imageSizeSrcSet(path) {
+  const known = peekImageSizeSrcSet(path);
+  if (known !== undefined) return Promise.resolve(known);
+  const object = storagePath(path);
+  if (!sizeRequests.has(object)) {
+    const request = fetchImageSizeSrcSet(object, imageSizePaths(object).manifest).then((srcSet) => {
+      sizeAnswers.set(object, srcSet);
+      sizeRequests.delete(object);
+      return srcSet;
+    });
+    sizeRequests.set(object, request);
+  }
+  return sizeRequests.get(object);
+}
+
+/** Forget every manifest answer. Tests only. */
+export function resetImageSizeCacheForTest() {
+  sizeAnswers.clear();
+  sizeRequests.clear();
+}
+
+/**
+ * The `src` for an image block's `url` (lead and hero images), and the
+ * object path whose display sizes it may have.
  *
  * The media library picker stores an object PATH there
  * (admin/components/media/ImagePicker.jsx). As a bare relative `src` that
  * path named a page on the site, not the object. A path in a library
- * folder with an asset segment now resolves to the bucket, with its sizes
- * where the function writes them. A link to another site, a site path such
- * as `/hero/x.webp`, and a flat seeded `branding/` file keep their value.
+ * folder with an asset segment now resolves to the bucket. A link to
+ * another site, a site path such as `/hero/x.webp`, and a flat seeded
+ * `branding/` file keep their value and have no sizes.
  *
  * @param {unknown} url a block's url, already through isSafeHref
- * @returns {{ src: unknown, srcSet: string|null }}
+ * @returns {{ src: unknown, path: string|null }}
  */
 export function imageBlockSources(url) {
   const object = storagePath(url);
   if (object && isMediaLibraryPath(object) && object.split('/').length > 2) {
     const src = assetUrl(object);
-    if (src) return { src, srcSet: assetSrcSet(object) };
+    if (src) return { src, path: object };
   }
-  return { src: url, srcSet: null };
+  return { src: url, path: null };
 }
 
 /**

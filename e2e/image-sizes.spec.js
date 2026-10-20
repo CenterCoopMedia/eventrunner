@@ -54,7 +54,10 @@ test.describe('image sizes', () => {
     const dir = headshotPath.slice(0, headshotPath.lastIndexOf('/'));
     const manifest = await waitForManifest(`${dir}/_sizes/manifest.json`);
     expect(manifest.status).toBe('ready');
-    expect(manifest.sizes.map((size) => size.target)).toEqual([320, 640, 1280, 1920]);
+    // Only widths narrower than the 1254 px original are written, each at
+    // its real width, under the original's generation.
+    expect(manifest.sizes.map((size) => [size.target, size.width])).toEqual([[320, 320], [640, 640]]);
+    expect(manifest.sizes.every((size) => size.path.startsWith(`${dir}/_sizes/${manifest.sourceGeneration}/`))).toBe(true);
 
     await adminDb().collection('speakers_public').doc(speakerId).set({
       displayName,
@@ -93,15 +96,16 @@ test.describe('image sizes', () => {
       const plate = page.getByRole('listitem').filter({ hasText: displayName });
       const img = plate.locator('.portrait-shelf__frame img');
       await img.scrollIntoViewIfNeeded();
-      await expect(img).toHaveAttribute('srcset', /_sizes%2F320\.webp\?alt=media 320w/);
+      // Every candidate at its real width: the two copies, then the original.
+      await expect(img).toHaveAttribute('srcset', /_sizes%2F\d+%2F320\.webp\?alt=media 320w, .*_sizes%2F\d+%2F640\.webp\?alt=media 640w, .*portrait\.webp\?alt=media 1254w$/);
       // The slot width the page states for its arrangement (Speakers.jsx).
       await expect(img).toHaveAttribute('sizes', /100vw$/);
       await expect.poll(() => img.evaluate((el) => el.complete && el.naturalWidth > 0)).toBe(true);
 
       const currentSrc = decodeURIComponent(await img.evaluate((el) => el.currentSrc));
       expect(currentSrc).toContain('/_sizes/');
-      expect(currentSrc).toMatch(/\/_sizes\/(320|640)\.webp/);
-      const loaded = [...imageBytes].find(([url]) => url.includes('/_sizes/'));
+      expect(currentSrc).toMatch(/\/_sizes\/\d+\/(320|640)\.webp/);
+      const loaded = [...imageBytes].find(([url]) => url.includes('/_sizes/') && url.endsWith('.webp?alt=media'));
       expect(loaded, [...imageBytes.keys()].join('\n')).toBeTruthy();
       // The point of the issue: the list does not download the original.
       expect([...imageBytes.keys()].some((url) => url.includes(headshotPath))).toBe(false);

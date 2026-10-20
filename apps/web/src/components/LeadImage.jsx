@@ -3,9 +3,9 @@
 // focal point, and all three are enforced here.
 //
 // The device and its rules: docs/interface-guidelines.md, Editorial devices.
-import { useState } from 'react';
 import { isSafeHref } from '../lib/sanitizeHtml.js';
 import { imageBlockSources } from '../lib/mediaSource.js';
+import { useImageSizeSrcSet } from '../lib/useImageSizeSrcSet.js';
 
 /** Where the crop centres when the block states no focal point. */
 const CENTRE = 50;
@@ -33,21 +33,23 @@ const LEAD_IMAGE_SIZES = '(min-width: 64rem) 22rem, 100vw';
  * The src, srcset and error handler for an image block's url (issue #333).
  *
  * A picked library path resolves to the bucket and offers its display
- * sizes. If a size fails to load, the srcset goes and the original loads.
- * The event hero uses this too, so the two image devices stay in step.
+ * sizes at the real widths its manifest states. The src waits for the
+ * manifest, so the original is not downloaded first. If a size fails to
+ * load, the srcset goes and the original loads. The event hero uses this
+ * too, so the two image devices stay in step.
  *
  * @param {unknown} url a block's url, already through isSafeHref
- * @returns {{ src: unknown, srcSet: string|undefined, onError: () => void }}
+ * @returns {{ src: unknown, srcSet: string|undefined, pending: boolean, onError: () => void }}
  */
 export function useSizedImageSources(url) {
-  const { src, srcSet } = imageBlockSources(url);
-  const [failedFor, setFailedFor] = useState(null);
-  const offer = Boolean(srcSet) && failedFor !== src;
+  const { src, path } = imageBlockSources(url);
+  const display = useImageSizeSrcSet(path, Boolean(path));
   return {
-    src,
-    srcSet: offer ? srcSet : undefined,
+    src: display.pending ? undefined : src,
+    srcSet: display.srcSet,
+    pending: display.pending,
     onError: () => {
-      if (offer) setFailedFor(src);
+      display.onError();
     },
   };
 }
@@ -75,7 +77,10 @@ export default function LeadImage({ block, className = '' }) {
         alt={alt}
         loading="lazy"
         className="lead-image rounded-brand outline outline-1 -outline-offset-1 outline-text-primary/[0.08]"
-        style={{ objectPosition: focalPosition(block) }}
+        style={{
+          objectPosition: focalPosition(block),
+          ...(image.pending ? { visibility: 'hidden' } : null),
+        }}
       />
       {caption ? (
         <figcaption className="mt-2xs font-data text-caption text-text-secondary">

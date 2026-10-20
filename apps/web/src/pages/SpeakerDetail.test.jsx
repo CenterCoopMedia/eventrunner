@@ -2,7 +2,9 @@
 // speakers_public projection Speakers.jsx reads, plus the sessions cross-
 // link (a query over scheduleData, not a stored list — spec §4.3).
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { readyManifest, stubManifests, TEST_GENERATION } from '../test/imageSizeManifests.js';
+import { resetImageSizeCacheForTest } from '../lib/mediaSource.js';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { getRouteTitlePart, resetRouteTitleForTest } from '../lib/useDocumentTitle.js';
 
@@ -171,14 +173,19 @@ describe('SpeakerDetail', () => {
 
   // Issue #333: the headshot beside the name is 3.5rem square, so the
   // smallest display size is enough.
-  it('offers the display sizes at the headshot width', () => {
-    speakers = [{ ...PROJECTED, headshotPath: 'speaker-photos/rae-okonkwo/a1b2c3/face.jpg' }];
+  it('offers the display sizes at the headshot width', async () => {
+    const SIZED = 'speaker-photos/rae-okonkwo/a1b2c3/face.jpg';
+    resetImageSizeCacheForTest();
+    stubManifests({ [SIZED]: readyManifest(SIZED, 1254) });
+    speakers = [{ ...PROJECTED, headshotPath: SIZED }];
     scheduleData = [];
     const { container } = renderAt('/speakers/rae-okonkwo');
     const img = container.querySelector('header img');
+    await waitFor(() => expect(img).toHaveAttribute('srcset'));
     expect(img).toHaveAttribute('sizes', '3.5rem');
     expect(img.getAttribute('srcset')).toContain(
-      encodeURIComponent('speaker-photos/rae-okonkwo/a1b2c3/_sizes/320.webp'),
+      `${encodeURIComponent(`speaker-photos/rae-okonkwo/a1b2c3/_sizes/${TEST_GENERATION}/320.webp`)}?alt=media 320w`,
     );
+    vi.unstubAllGlobals();
   });
 });

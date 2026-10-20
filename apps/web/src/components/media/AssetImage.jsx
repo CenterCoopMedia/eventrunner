@@ -23,14 +23,17 @@
 //
 // DISPLAY SIZES (issue #333). A caller that knows how wide its slot is
 // passes `sizes`, and the image then offers the WebP sizes the function
-// writes beside an upload. The original stays the src. If a size fails to
+// writes beside an upload, each at the real width its manifest states
+// (lib/useImageSizeSrcSet.js). The src waits for the manifest, so the
+// original is not downloaded first. The original stays the src. If a size fails to
 // load (an upload from before the feature, one still being processed, or
 // one the function refused), the image drops the srcset and loads the
 // original, and only a failure of the original is a miss. With no `sizes`
 // the image is the original alone: an editor's preview shows an upload
 // seconds old, before its sizes exist.
 import { useEffect, useState } from 'react';
-import { assetSrcSet, assetUrl } from '../../lib/mediaSource.js';
+import { assetUrl } from '../../lib/mediaSource.js';
+import { useImageSizeSrcSet } from '../../lib/useImageSizeSrcSet.js';
 
 /**
  * THIS COMPONENT RESERVES NO SPACE OF ITS OWN. It renders an <img>, or one
@@ -51,10 +54,8 @@ import { assetSrcSet, assetUrl } from '../../lib/mediaSource.js';
  */
 export default function AssetImage({ path, alt = '', className = '', decorative = false, sizes }) {
   const url = assetUrl(path);
-  const srcSet = sizes ? assetSrcSet(path) : null;
+  const display = useImageSizeSrcSet(path, Boolean(sizes) && Boolean(url));
   const [failed, setFailed] = useState(false);
-  // Keyed by path, so a new path offers its sizes from its first render.
-  const [sizesFailedFor, setSizesFailedFor] = useState(null);
 
   // A new path is a new image: clear the previous failure so one missing
   // object does not poison the slot for everything chosen after it.
@@ -76,16 +77,20 @@ export default function AssetImage({ path, alt = '', className = '', decorative 
       </span>
     );
   }
-  const offerSizes = Boolean(srcSet) && sizesFailedFor !== path;
   return (
     <img
-      src={url}
-      srcSet={offerSizes ? srcSet : undefined}
-      sizes={offerSizes ? sizes : undefined}
+      src={display.pending ? undefined : url}
+      srcSet={display.srcSet}
+      sizes={display.srcSet ? sizes : undefined}
       alt={alt}
       loading="lazy"
       className={className}
-      onError={() => (offerSizes ? setSizesFailedFor(path) : setFailed(true))}
+      // Hidden only while the manifest is read, so the alt text does not
+      // flash in the slot before the picture.
+      style={display.pending ? { visibility: 'hidden' } : undefined}
+      onError={() => {
+        if (!display.onError()) setFailed(true);
+      }}
     />
   );
 }
