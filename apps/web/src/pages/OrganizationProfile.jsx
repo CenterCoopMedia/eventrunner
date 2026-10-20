@@ -135,7 +135,7 @@ export default function OrganizationProfile() {
     );
   }
 
-  const { organizationId, organization, pending } = load.view;
+  const { organizationId, organization, pending, otherPending } = load.view;
   if (!organization) {
     return (
       <EmptyState
@@ -213,6 +213,11 @@ export default function OrganizationProfile() {
       {pending ? (
         <p role="status" className="mt-md border-hairline border-warning/40 bg-warning/10 px-sm py-xs font-data text-caption text-warning">
           {PENDING_NOTE}
+        </p>
+      ) : null}
+      {otherPending ? (
+        <p role="status" className="mt-md border-hairline border-rule-hairline bg-surface-alt px-sm py-xs font-data text-caption text-text-primary">
+          Another representative of your organization has an edit waiting for review. You can send yours after the event team reviews it.
         </p>
       ) : null}
       {serverMessages.length > 0 ? (

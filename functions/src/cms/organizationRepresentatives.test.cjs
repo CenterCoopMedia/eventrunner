@@ -242,6 +242,7 @@ test('a representative reads its own organization: the public profile and nothin
       url: ORG_A.url,
     },
     pending: null,
+    otherPending: false,
   });
   assert.ok(auth.revocationChecks.every(Boolean), 'every token is checked for revocation');
 });
@@ -266,7 +267,7 @@ test('an organization that is not published yet shows no profile and takes no ed
   });
   const res = await own(db, 'cy', { action: 'get' });
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.body, { organizationId: 'new-grant', organization: null, pending: null });
+  assert.deepEqual(res.body, { organizationId: 'new-grant', organization: null, pending: null, otherPending: false });
   const edit = await own(db, 'cy', { action: 'submit', fields: { description: 'Mine.' } });
   assert.equal(edit.statusCode, 409);
   assert.equal(edit.body.error.code, 'not-published');
@@ -540,4 +541,24 @@ test('staff discard an edit: the request goes, the organization is untouched, an
   assert.ok(auditRows(db).some((row) => row.action === 'discardOrganizationEdit'
     && row.docPath === `${EDIT_REQUESTS}/beacon-fund`));
   assert.equal((await staff(db, { action: 'discard', organizationId: 'beacon-fund' })).statusCode, 404);
+});
+
+test('a second representative of the same organization cannot merge into, or read, the first one’s edit', async () => {
+  const db = seed({
+    [`${REPRESENTATIVES}/uid-cy`]: { uid: 'uid-cy', email: 'cy@example.org', organizationId: 'beacon-fund' },
+  });
+  await own(db, 'ada', { action: 'submit', fields: { description: 'From Ada.' } });
+  const view = await own(db, 'cy', { action: 'get' });
+  assert.equal(view.body.pending, null);
+  assert.equal(view.body.otherPending, true);
+  const res = await own(db, 'cy', { action: 'submit', fields: { bio: 'From Cy.' } });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'other-edit-waiting');
+  const stored = db.read(EDIT_REQUESTS, 'beacon-fund');
+  assert.deepEqual(stored.fields, { description: 'From Ada.' });
+  assert.equal(stored.submittedByUid, 'uid-ada');
+  // Ada's own view still shows her edit.
+  const ada = await own(db, 'ada', { action: 'get' });
+  assert.deepEqual(ada.body.pending.fields, { description: 'From Ada.' });
+  assert.equal(ada.body.otherPending, false);
 });

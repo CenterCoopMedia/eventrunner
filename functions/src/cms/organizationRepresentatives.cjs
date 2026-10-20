@@ -32,7 +32,10 @@
  * open edit per organization. It is NOT a field on the organization's
  * draft: store.publishDocs copies every non-reserved draft key to the live
  * document, so a queue there would publish the sender's identity and the
- * unreviewed text. A second edit merges onto the first. `base` holds, per
+ * unreviewed text. A second edit from the same
+ * account merges onto the first; while one account's edit waits, another
+ * representative of the same organization is refused, so the queue never
+ * mixes two people's text under one name. `base` holds, per
  * field, the live value the representative saw when that field first
  * entered the queue, so staff can tell an edit apart from a change of
  * their own made since.
@@ -160,13 +163,20 @@ async function applyGetOwn({ db, uid }) {
     db.collection(ORGANIZATIONS_COLLECTION).doc(organizationId).get(),
     db.collection(EDIT_REQUESTS).doc(organizationId).get(),
   ]);
-  if (!liveSnap.exists) return { ok: true, body: { organizationId, organization: null, pending: null } };
+  if (!liveSnap.exists) {
+    return { ok: true, body: { organizationId, organization: null, pending: null, otherPending: false } };
+  }
+  // Another representative's edit is theirs to see: this caller learns only
+  // that one is waiting.
+  const queued = pendingView(requestSnap.exists ? requestSnap.data() : null);
+  const mine = queued !== null && requestSnap.data()?.submittedByUid === uid;
   return {
     ok: true,
     body: {
       organizationId,
       organization: profileView(liveSnap.data() || {}),
-      pending: pendingView(requestSnap.exists ? requestSnap.data() : null),
+      pending: mine ? queued : null,
+      otherPending: queued !== null && !mine,
     },
   };
 }
@@ -200,6 +210,16 @@ async function applySubmit({ db, uid, email, sent, now }) {
       }
       const live = liveSnap.data() || {};
       const prior = requestSnap.exists ? requestSnap.data() : null;
+      // One edit per organization, and it is its sender's: a second
+      // representative's text must not merge in under the first one's
+      // name, where a revocation of either would treat it wrongly.
+      if (pendingView(prior) !== null && prior.submittedByUid !== uid) {
+        throw new Refusal(
+          409,
+          'other-edit-waiting',
+          'Another representative of your organization has an edit waiting for review. Send yours after the event team reviews it.',
+        );
+      }
       const fields = isPlainObject(prior?.fields) ? { ...prior.fields } : {};
       const base = isPlainObject(prior?.base) ? { ...prior.base } : {};
 

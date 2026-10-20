@@ -134,6 +134,14 @@ describe('OrganizationProfile', () => {
       .toBeInTheDocument();
   });
 
+  it('says when another representative’s edit is waiting, without showing it', async () => {
+    getOwnOrganizationMock.mockResolvedValue({ ...LIVE, pending: null, otherPending: true });
+    renderPage();
+    expect(await screen.findByText(/Another representative of your organization has an edit waiting for review/))
+      .toBeInTheDocument();
+    expect(screen.getByLabelText('Short description')).toHaveValue('Funds the travel grants.');
+  });
+
   it('names a website that is not a web link and sends nothing', async () => {
     renderPage();
     const website = await screen.findByLabelText('Website');
