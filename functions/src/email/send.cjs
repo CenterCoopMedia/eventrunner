@@ -15,6 +15,7 @@
 const crypto = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { internals: renderInternals } = require('./render.cjs');
+const { isBareEmailAddress } = require('shared/email');
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [500, 2000];
@@ -51,7 +52,7 @@ function extrasProblem(message, provider) {
   if (message.cc !== undefined && message.cc !== null) {
     if (!providerCan(provider, 'cc')) return 'cc-unsupported';
     const cc = typeof message.cc === 'string' ? message.cc : message.cc?.email;
-    if (typeof cc !== 'string' || !/^[^\s@,<>"]+@[^\s@,<>"]+$/.test(cc)) return 'invalid-cc';
+    if (!isBareEmailAddress(cc)) return 'invalid-cc';
   }
   if (message.attachments === undefined || message.attachments === null) return null;
   if (!Array.isArray(message.attachments)) return 'invalid-attachment';

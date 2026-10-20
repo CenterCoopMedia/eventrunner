@@ -59,7 +59,12 @@
  * A record left at `sending` for SENDING_STALE_MS (the instance died, or
  * the second transaction failed) is settled by the email core's claim: a
  * claim means the mail may have gone (`uncertain`); no claim means it never
- * reached the provider (`failed`).
+ * reached the provider (`failed`). Its audit row names the person who
+ * started it, and the requester who settled it as `settledBy`.
+ *
+ * While a send is reserved and not stale, mark paid, void and reopen wait
+ * (invoices.cjs refuseWhileSending), so the email never states a status
+ * the invoice no longer has.
  *
  * NO ADDRESSES IN THE AUDIT LOG. The admin_logs row names the send, the
  * number, the outcome and the message id. The addresses are on the invoice
@@ -69,17 +74,15 @@
  */
 const { createHash, randomUUID } = require('node:crypto');
 const { formatMoney, isInvoiceId, validateInvoiceSend } = require('shared/invoice');
-const { isEmailAddress } = require('shared/email');
+const { isBareEmailAddress } = require('shared/email');
 const { buildInvoicePdf, internals: { longDate } } = require('./invoicePdf.cjs');
-const { publicInvoice, internals: { InvoiceError, timeOf } } = require('./invoices.cjs');
+const { publicInvoice, internals: { InvoiceError, timeOf, SENDING_STALE_MS } } = require('./invoices.cjs');
 
 const INVOICES = 'invoices';
 const AUDIT = 'admin_logs';
 const TEMPLATE_ID = 'invoice.send';
 /** A second send to the same address inside this window needs a confirmation. */
 const RESEND_WINDOW_MS = 15 * 60 * 1000;
-/** A reservation older than this, still `sending`, is settled by the claim. */
-const SENDING_STALE_MS = 5 * 60 * 1000;
 /** At most this many sends of one invoice in an hour, confirmed or not. */
 const HOURLY_LIMIT = 5;
 const HOUR_MS = 60 * 60 * 1000;
@@ -140,7 +143,7 @@ function sendableInvoice(stored, id) {
     fail(409, 'conflict', 'A void invoice is not sent. Duplicate it as a new draft to bill again.');
   }
   const to = invoice.billTo.email.toLowerCase();
-  if (!isEmailAddress(to) || /[\s,<>"]/.test(to)) {
+  if (!isBareEmailAddress(to)) {
     fail(409, 'conflict', 'This invoice has no billing email, so it cannot be emailed. Download the PDF and send it yourself, or void it and duplicate it with a billing email.');
   }
   return { invoice, to };
@@ -185,7 +188,7 @@ function composeInvoiceEmail({ invoice, to, cc, note, config, stream }) {
   });
   const delivered = withLegalFooter(rendered, config);
   const issuerEmail = typeof invoice.issuer?.email === 'string' ? invoice.issuer.email.toLowerCase() : '';
-  const replyTo = isEmailAddress(issuerEmail) && !/[\s,<>"]/.test(issuerEmail)
+  const replyTo = isBareEmailAddress(issuerEmail)
     ? issuerEmail
     : (config?.event?.sender?.replyTo || config?.event?.sender?.email || null);
   const subject = oneLine(rendered.subject);
@@ -225,12 +228,18 @@ function recentSendTo(sends, addresses, nowMs) {
   return found ? { at: new Date(found.atMs).toISOString(), to: found.to } : null;
 }
 
+/**
+ * The admin_logs row for one send. A send settled by a later request stays
+ * the act of the person who started it (`entry.by`); the requester whose
+ * send settled it is `details.settledBy`.
+ */
 function auditRow(tx, db, { actor, now, id, number, entry, settled = false }) {
+  const uid = settled && typeof entry.by === 'string' ? entry.by : actor.uid;
   tx.create(db.collection(AUDIT).doc(randomUUID()), {
     action: entry.status === 'failed' ? 'invoices.email-failed' : 'invoices.emailed',
     docPath: `${INVOICES}/${id}`,
-    uid: actor.uid,
-    actorUid: actor.uid,
+    uid,
+    actorUid: uid,
     at: now(),
     invoiceId: id,
     details: {
@@ -242,7 +251,7 @@ function auditRow(tx, db, { actor, now, id, number, entry, settled = false }) {
       note: entry.note === true,
       resend: entry.resend === true,
       ...(entry.providerStatus ? { providerStatus: entry.providerStatus } : {}),
-      ...(settled ? { settled: true } : {}),
+      ...(settled ? { settled: true, settledBy: actor.uid } : {}),
     },
   });
 }

@@ -18,7 +18,7 @@
  * and no rounding rule to agree on.
  */
 const { CURRENCY_EXPONENTS } = require('./ticketCommerce.cjs');
-const { EMAIL_ADDRESS_RE } = require('./email.cjs');
+const { EMAIL_ADDRESS_RE, isBareEmailAddress } = require('./email.cjs');
 const { isKnownTimeZone, wallParts } = require('./eventDateTime.cjs');
 
 /** The largest single amount or total: 99,999,999.99 in a two-digit currency. */
@@ -445,9 +445,10 @@ function validateReopenReason(input) {
  * passed here as `to`, so a request cannot send the invoice anywhere else.
  * Unknown fields are dropped.
  *
- * The copy address is one address, checked as typed: a list, a display
- * name or a line break is refused, so it cannot add a recipient or a
- * header. The note is plain text, cleaned like the invoice notes.
+ * The copy address is one address, checked as typed with
+ * shared/email isBareEmailAddress, the same rule the email core applies:
+ * a list, a display name, a quote or a line break is refused, so it cannot
+ * add a recipient or a header. The note is plain text, cleaned like the invoice notes.
  *
  * @param {unknown} input
  * @param {{ to: string }} context the billing email on the invoice
@@ -461,7 +462,7 @@ function validateInvoiceSend(input, { to } = {}) {
   const rawCc = typeof input.cc === 'string' ? input.cc.trim().toLowerCase() : '';
   let cc = null;
   if (rawCc) {
-    if (rawCc.length > INVOICE_LIMITS.email || !EMAIL_ADDRESS_RE.test(rawCc) || rawCc.includes(',')) {
+    if (rawCc.length > INVOICE_LIMITS.email || !isBareEmailAddress(rawCc)) {
       issues.push({ path: 'cc', message: 'Enter a valid email for the copy, or leave it empty.' });
     } else if (typeof to === 'string' && rawCc === to.trim().toLowerCase()) {
       issues.push({ path: 'cc', message: 'The billing email already gets the invoice. Enter a different address for the copy, or leave it empty.' });
