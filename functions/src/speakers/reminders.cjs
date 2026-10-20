@@ -20,6 +20,10 @@
  *   saveTemplate   save new wording, checked against the template's tokens
  *   resetTemplate  delete the saved wording; the shipped copy applies again
  *
+ * Saving or resetting the wording pauses the reminder schedule
+ * (reminders/speakerSchedule.cjs) when it is on and the new wording is not
+ * the version staff approved for it.
+ *
  * WHAT IS MISSING comes from shared/speakerReadiness, the same rule the
  * speaker's own "Your next steps" list uses, read here from the canonical
  * stores (speakers, the live cmsSchedule documents, session_materials).
@@ -346,6 +350,15 @@ async function exportAction({ db, now, actor, body }) {
   return { filename: `speaker-readiness-${group}-${stamp}.csv`, csv, rowCount: rows.length };
 }
 
+/**
+ * New wording pauses a reminder schedule that is on, when the wording sent
+ * from now on is not the version staff approved for it (issue #518). A save
+ * that keeps the approved version (the same text again) does not pause it.
+ */
+function pauseScheduleOnWordingChange(deps) {
+  return require('../reminders/speakerSchedule.cjs').pauseIfWordingChanged(deps);
+}
+
 function templateFields(source) {
   return { subject: source.subject, html: source.html, text: source.text };
 }
@@ -394,6 +407,7 @@ async function saveTemplateAction({ db, now, log, actor, body }) {
     updatedBy: actor.email,
   });
   await logAdminAction({ db, action: 'saveEmailTemplate', docPath: `${TEMPLATES}/${TEMPLATE_ID}`, actor, now, log });
+  await pauseScheduleOnWordingChange({ db, now, actor, log });
   return templateAction({ db });
 }
 
@@ -401,6 +415,7 @@ async function resetTemplateAction({ db, now, log, actor }) {
   await requireWritable(db);
   await db.collection(TEMPLATES).doc(TEMPLATE_ID).delete();
   await logAdminAction({ db, action: 'resetEmailTemplate', docPath: `${TEMPLATES}/${TEMPLATE_ID}`, actor, now, log });
+  await pauseScheduleOnWordingChange({ db, now, actor, log });
   return templateAction({ db });
 }
 

@@ -80,18 +80,32 @@ function wordingDigest(source) {
 }
 
 /**
- * Which wording a preview showed: a digest of the saved subject, html and
- * text, or `shipped:` and a digest of the shipped ones. A send must carry
- * the same value. The shipped copy has a digest too, so a deploy that
- * changes it between a preview and a send (or an approval and a scheduled
- * run) is a change of wording, not the same "shipped" (issue #518).
+ * Which wording a send uses: a digest of the subject, html and text the
+ * renderer will use, or `shipped:` and a digest of the shipped ones. A
+ * preview returns it and a send (or an approval and a scheduled run) must
+ * match it. The shipped copy has a digest too, so a deploy that changes it
+ * is a change of wording, not the same "shipped" (issue #518).
+ *
+ * The version names the wording ACTUALLY SENT. A saved field left blank
+ * takes the shipped field, so the digest covers the shipped field too. A
+ * saved wording that fails the template's token check is not sent at all:
+ * render() falls back to the shipped copy, so its version is the shipped
+ * version. An approval made on that fallback then pauses when a deploy
+ * changes the shipped copy, like any other approval of shipped wording.
  *
  * @param {object|null} override the saved wording, or null
  * @param {object} [shipped] the shipped template; the deployed one by default
  */
 function wordingVersion(override, shipped = null) {
-  if (override) return wordingDigest(override);
   const template = shipped ?? require('../email/templates.cjs').getDefaultTemplate(TEMPLATE_ID);
+  if (override) {
+    const candidate = {};
+    for (const key of ['subject', 'html', 'text']) {
+      candidate[key] = typeof override[key] === 'string' ? override[key] : template[key];
+    }
+    const { validateTemplateBody } = require('../email/render.cjs');
+    if (validateTemplateBody(template, candidate).ok) return wordingDigest(candidate);
+  }
   return `${SHIPPED_WORDING_PREFIX}${wordingDigest(template)}`;
 }
 
@@ -154,10 +168,14 @@ function remindableEntries(stores) {
  * The token values for one speaker's reminder. Every value is plain text:
  * the renderer escapes them in the html body.
  */
-function reminderTokenValues({ config, speaker, readiness, items, actor }) {
+function reminderTokenValues({ config, speaker, readiness, items, actor, due = null }) {
   const site = siteUrl(config);
   const wants = (item) => items.includes(item);
   return {
+    // Set only by the reminder schedule, which has a due date. Empty for a
+    // staff send, so the shipped `{{#if due_date}}` line drops out.
+    due_date: due?.dateLabel ?? '',
+    days_left: due && Number.isInteger(due.daysLeft) ? String(due.daysLeft) : '',
     speaker_name: speakerDisplayName(speaker),
     dashboard_url: site ? `${site}/speaker/dashboard` : '',
     profile_url: site ? `${site}/speaker/profile` : '',
@@ -177,10 +195,10 @@ function reminderTokenValues({ config, speaker, readiness, items, actor }) {
  * Render one reminder: what send() is handed (`message`), and what the
  * provider receives (`delivered`, footer included) for the preview.
  */
-function renderReminder({ template, override, config, speaker, readiness, items, actor }) {
+function renderReminder({ template, override, config, speaker, readiness, items, actor, due = null }) {
   const { render } = require('../email/render.cjs');
   const { withLegalFooter } = require('../email/send.cjs');
-  const tokenValues = reminderTokenValues({ config, speaker, readiness, items, actor });
+  const tokenValues = reminderTokenValues({ config, speaker, readiness, items, actor, due });
   const rendered = render({ template, override, tokenValues, config });
   const link = tokenValues.dashboard_url;
   if (!link || !(rendered.html || '').includes(link) || !(rendered.text || '').includes(link)) {
@@ -250,14 +268,26 @@ async function requireWritable(db) {
  * When it exists already, nothing is reserved (`recorded`). The schedule's
  * ledger uses it (ADR 0006); the staff endpoint does not.
  *
+ * `guard` is an optional `{ ref, check(data) }`: a document read in the
+ * same transaction, and a check that returns a reason to stop, or null.
+ * A stop reserves and writes nothing (`stopped`). The schedule uses it to
+ * read its own settings again before each speaker.
+ *
  * @returns {Promise<{ ok: true, sentCount: number } | { ok: false, outcome: string, reason?: string }>}
  */
-async function reserve({ db, speakerId, batchId, items, actor, nowMs, also = null }) {
+async function reserve({ db, speakerId, batchId, items, actor, nowMs, also = null, guard = null }) {
   const ref = db.collection(REMINDERS).doc(speakerId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     // Every read comes before the first write in a transaction.
     const alsoSnap = also ? await tx.get(also.ref) : null;
+    if (guard) {
+      // The caller's precondition, read in this transaction: when it no
+      // longer holds, nothing is reserved or written.
+      const guardSnap = await tx.get(guard.ref);
+      const stop = guard.check(guardSnap.exists ? guardSnap.data() : null);
+      if (stop) return { ok: false, outcome: 'stopped', reason: stop };
+    }
     let state = snap.exists ? snap.data() : {};
     const attempt = timestampMs(state.lastAttemptAt);
     if (state.lastStatus === 'sending' && Number.isFinite(attempt) && nowMs - attempt >= SENDING_STALE_MS
@@ -303,12 +333,13 @@ async function reserve({ db, speakerId, batchId, items, actor, nowMs, also = nul
 }
 
 /**
- * Reserve, send and stamp one speaker's reminder. `also` goes to reserve().
- * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'uncertain' | 'skipped', reason?: string }>}
+ * Reserve, send and stamp one speaker's reminder. `also` and `guard` go to
+ * reserve().
+ * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'uncertain' | 'skipped' | 'stopped', reason?: string }>}
  */
-async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs, also = null }) {
+async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs, also = null, guard = null }) {
   const { speakerId, items } = recipient;
-  const reservation = await reserve({ db, speakerId, batchId, items, actor, nowMs, also });
+  const reservation = await reserve({ db, speakerId, batchId, items, actor, nowMs, also, guard });
   if (!reservation.ok) return reservation;
   let result;
   try {

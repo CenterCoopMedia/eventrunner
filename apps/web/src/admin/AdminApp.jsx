@@ -41,6 +41,8 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
 const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
+// Scheduled reminders (issue #518): one screen behind one link.
+const AdminReminderSchedules = lazy(() => import('./pages/AdminReminderSchedules.jsx'));
 const AdminSpeakerMail = lazy(() => import('./pages/AdminSpeakerMail.jsx'));
 const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
@@ -216,6 +218,13 @@ export default function AdminApp() {
             element={<DeferredAdminPage label="speaker email wording"><AdminSpeakerMail /></DeferredAdminPage>}
           />
           <Route path="speakers/:speakerId" element={<AdminSpeakerEditor mode="edit" />} />
+          {/* The rail links to the section; the attendee schedule (#518)
+              joins the same page, so the section opens on it. */}
+          <Route path="reminders" element={<Navigate to="scheduled" replace />} />
+          <Route
+            path="reminders/scheduled"
+            element={<DeferredAdminPage label="scheduled reminders"><AdminReminderSchedules /></DeferredAdminPage>}
+          />
           <Route
             path="updates"
             element={<DeferredAdminPage label="updates"><AdminUpdatesList /></DeferredAdminPage>}

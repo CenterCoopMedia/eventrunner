@@ -182,6 +182,10 @@ function makeSpeakersDb(seed = {}) {
         // the collection level.
         orderBy: (field, direction) => query(name, [], undefined).orderBy(field, direction),
         get: () => query(name, [], undefined).get(),
+        // A field projection (`select('sessionId', ...)`, reminderCore's
+        // readiness read) returns whole documents here: the readers only
+        // look at the fields they named.
+        select: () => query(name, [], undefined),
       };
     },
     async getAll(...refs) {

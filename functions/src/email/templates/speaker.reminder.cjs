@@ -15,6 +15,15 @@
  *                                      with no description, joined by "; "
  *   {{materials_sessions}}             the titles with no pending or
  *                                      approved material, joined the same way
+ *   {{due_date}}, {{days_left}}        set only by the reminder schedule
+ *                                      (functions/src/reminders/), empty for
+ *                                      a staff send: the due date in words on
+ *                                      the event's clock, and the whole
+ *                                      calendar days left until it. Each
+ *                                      belongs inside an {{#if}}. The shipped
+ *                                      copy uses only the date, so it never
+ *                                      reads "1 days" or "0 days"; staff
+ *                                      wording may use either.
  *
  * Session titles are staff-authored but still plain tokens, so the renderer
  * HTML-escapes them in the html body. No value here may populate an `_html`
@@ -41,6 +50,7 @@ const html = wrap(
     '{{#if description_sessions}}<li>Send us a description for: {{description_sessions}}.</li>{{/if}}',
     '{{#if materials_sessions}}<li>Send your slides or other materials for: {{materials_sessions}}.</li>{{/if}}',
     '</ul>',
+    '{{#if due_date}}<p style="margin:0 0 16px 0;">Please send them by {{due_date}}.</p>{{/if}}',
     '<p style="margin:0 0 16px 0;text-align:center;">',
     '<a href="{{dashboard_url}}" style="display:inline-block;padding:12px 24px;background-color:{{brand_primary}};color:#ffffff;font-family:Helvetica,Arial,sans-serif;font-weight:bold;text-decoration:none;">Open your speaker dashboard</a>',
     '</p>',
@@ -59,7 +69,9 @@ const text = [
   '{{/if}}{{#if description_sessions}}- Send us a description for: {{description_sessions}}.',
   '{{/if}}{{#if materials_sessions}}- Send your slides or other materials for: {{materials_sessions}}.',
   '{{/if}}',
-  'Open your speaker dashboard:',
+  '{{#if due_date}}Please send them by {{due_date}}.',
+  '',
+  '{{/if}}Open your speaker dashboard:',
   '{{dashboard_url}}',
   '',
   'Questions? Reply to this message or write to {{admin_contact_email}}.',
@@ -82,6 +94,8 @@ module.exports = {
     'needs_headshot',
     'description_sessions',
     'materials_sessions',
+    'due_date',
+    'days_left',
   ],
   requiredTokens: ['dashboard_url'],
   storeRendered: true,

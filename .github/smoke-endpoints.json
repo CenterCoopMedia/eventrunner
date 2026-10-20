@@ -47,6 +47,7 @@
     "cancelSpeakerInvite",
     "listSpeakerInvites",
     "speakerReminders",
+    "reminderSchedules",
     "speakerMailTemplates",
     "validateSpeakerInvite",
     "acceptSpeakerInvite",
