@@ -187,7 +187,7 @@
   --hero-rule-block-start: var(--rule-hairline-width) solid rgb(var(--rule-hairline-rgb));
   --hero-art-width: 70%;
   --hero-art-position: 70% 50%;
-  --hero-copy-min-inline-size: max(22rem, 50%);
+  --hero-copy-min-inline-size: min(max(22rem, 50%), 100%);
   --hero-inset-inline: clamp(var(--space-sm), 3vw, var(--space-xl));
   --hero-veil-background: linear-gradient(90deg, rgb(var(--color-surface-alt-rgb)) 0%, rgb(var(--color-surface-alt-rgb) / 0) 24%);
   --hero-copy-pad-inline-start: 0;
@@ -195,6 +195,7 @@
   --hero-copy-pad-block-end: var(--space-2xl);
   --hero-title-size: clamp(2.7rem, 5.8vw, 5.75rem);
   --hero-title-fit: 13cqi;
+  --hero-title-fit-narrow: 16cqi;
   --hero-title-style: normal;
   --hero-title-weight: var(--weight-bold);
   --hero-title-tracking: -.045em;
