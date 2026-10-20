@@ -76,10 +76,11 @@ function extrasProblem(message, provider) {
 /** The name, type and size of each attachment, for the audit row. Never the content. */
 function attachmentSummary(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return null;
+  // A refused, malformed attachment is summarised too, so this never throws.
   return attachments.map((attachment) => ({
-    filename: attachment.filename,
-    contentType: attachment.contentType,
-    bytes: base64Bytes(attachment.content),
+    filename: typeof attachment?.filename === 'string' ? attachment.filename.slice(0, 100) : null,
+    contentType: typeof attachment?.contentType === 'string' ? attachment.contentType.slice(0, 100) : null,
+    bytes: typeof attachment?.content === 'string' ? base64Bytes(attachment.content) : 0,
   }));
 }
 

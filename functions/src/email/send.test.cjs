@@ -570,6 +570,8 @@ test('a malformed or oversized attachment is refused before any claim or request
     [[{ ...ATTACHMENT, filename: 'bad\r\nname.pdf' }], 'invalid-attachment'],
     [[{ ...ATTACHMENT, content: 'not base64 !' }], 'invalid-attachment'],
     [[{ ...ATTACHMENT, contentType: 'text/html' }], 'invalid-attachment'],
+    [[{ filename: 'INV-0001.pdf', contentType: 'application/pdf' }], 'invalid-attachment'],
+    [[null], 'invalid-attachment'],
     ['one', 'invalid-attachment'],
     [[ATTACHMENT], 'attachments-too-large'],
   ]) {
@@ -577,5 +579,8 @@ test('a malformed or oversized attachment is refused before any claim or request
     const result = await c.send({ to: 'billing@example.org', subject: 's', text: 'x', onceKey: 'k-2', attachments });
     assert.equal(result.error, error, JSON.stringify(attachments));
     assert.equal(db.state.claims.size, 0);
+    // The refusal still has its audit row.
+    assert.equal(db.state.sentRows.length, 1);
+    assert.equal(db.state.sentRows[0].error, error);
   }
 });
