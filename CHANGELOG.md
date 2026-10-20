@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Change request progress and outcome emails (#330). A signed-in sender reads their own
+  requests on **Your change requests** (`/profile/change-requests`): the status, the
+  history of status changes, and, once a request is done or declined, the reply and the
+  result link staff wrote for them. The new endpoint `listMyChangeRequests` answers only
+  the caller's requests and only those fields. Staff record the reply and an optional
+  result link with `saveChangeRequestOutcome`. The link must be on the site's own origin,
+  and staff must confirm they opened it. Two emails, both off by default, are turned on by
+  an operator through `saveChangeRequestNoticeSettings`: an acknowledgement when a request
+  is stored, and one outcome email the first time a request is done or declined. They have
+  fixed wording, quote nothing of the request, go on the transactional stream, use one
+  send-once key per attempt, and skip an address with a suppression record. Staff can
+  retry a failed email with `retryChangeRequestNotice`. A new admin-readable collection,
+  `change_request_settings`, holds the settings.
 - Organization representatives (#334). Staff give one account access to one
   organization from the organization editor, and remove it there. The
   representative edits the short description, the about text and the website

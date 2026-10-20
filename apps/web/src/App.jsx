@@ -68,6 +68,7 @@ const TicketClaim = lazyPage(() => import('./pages/TicketClaim.jsx'));
 const Tickets = lazyPage(() => import('./pages/Tickets.jsx'));
 const TicketStatus = lazyPage(() => import('./pages/TicketStatus.jsx'));
 const MyTickets = lazyPage(() => import('./pages/MyTickets.jsx'));
+const MyChangeRequests = lazyPage(() => import('./pages/MyChangeRequests.jsx'));
 const Profile = lazyPage(() => import('./pages/Profile.jsx'));
 const OrganizationProfile = lazyPage(() => import('./pages/OrganizationProfile.jsx'));
 const Attendees = lazyPage(() => import('./pages/Attendees.jsx'));
@@ -143,6 +144,7 @@ export function AppRoutes() {
         <Route path="tickets/status" element={<DeferredPage component={TicketStatus} label="order status" />} />
         <Route path="tickets/mine" element={<DeferredPage component={MyTickets} label="your tickets" />} />
         <Route path="profile" element={<DeferredPage component={Profile} label="profile" />} />
+        <Route path="profile/change-requests" element={<DeferredPage component={MyChangeRequests} label="your change requests" />} />
         {/* A representative's own organization (issue #334), under the
             reserved `profile` segment beside the account's own profile. */}
         <Route path="profile/organization" element={<DeferredPage component={OrganizationProfile} label="your organization" />} />

@@ -54,6 +54,7 @@
 // Each step is "did anyone actually say", never "is this the default value"
 // — statedPageLayout and resolveNavPlacement both report absence as absence.
 import { Suspense, lazy, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { hasSentChangeRequest } from '../lib/changeRequestMarker.js';
 import { Link, NavLink, Outlet, matchPath, useLocation } from 'react-router';
 import { resolveHeader } from 'shared/theme';
 import { listSocialAccounts } from 'shared/config';
@@ -318,6 +319,10 @@ export default function Layout() {
   // a signed-in reader: the server stores the request against the sign-in
   // and refuses a signed-out one (issue #188).
   const canRequestChange = features.changeRequests === true && Boolean(user);
+  // The link to the reader's own requests has its own condition: it stays
+  // for a reader who sent one from this browser after the flag goes off, so
+  // the history stays one select away (issue #330).
+  const canSeeRequests = canRequestChange || (Boolean(user) && hasSentChangeRequest(user?.uid));
   // The dialog goes with the control: a flag turned off or a sign-out closes
   // it, and it does not come back on its own when either returns.
   useEffect(() => {
@@ -626,7 +631,7 @@ export default function Layout() {
                 </ul>
               </nav>
             )}
-            {features.feedbackInbox || canRequestChange ? (
+            {features.feedbackInbox || canRequestChange || canSeeRequests ? (
               <div className="mt-md flex flex-wrap gap-xs">
                 {features.feedbackInbox ? (
                   <button
@@ -645,6 +650,12 @@ export default function Layout() {
                   >
                     Request a change
                   </button>
+                ) : null}
+                {/* The reader's own requests and their progress (issue #330). */}
+                {canSeeRequests ? (
+                  <Link to="/profile/change-requests" className={quietActionClass}>
+                    Your change requests
+                  </Link>
                 ) : null}
               </div>
             ) : null}

@@ -9,12 +9,42 @@
  *                             signed-in account with a verified email, while
  *                             `features.changeRequests` is on.
  *   updateChangeRequestStatus POST { id, status } — staff tier.
+ *   saveChangeRequestOutcome  POST { id, expectedStatus, expectedOutcomeId,
+ *                             reply?, resultUrl?, resultChecked? } — staff
+ *                             tier. The reply and the checked result link
+ *                             of a done or declined request. 409 when the
+ *                             outcome changed since the form loaded it.
  *   deleteChangeRequest       POST { id } — staff tier. Removes the request
  *                             and its text outright.
+ *   listMyChangeRequests      POST {} — any signed-in account with a
+ *                             verified email. The caller's own requests,
+ *                             in the requester-safe shape (issue #330).
  *
  * `change_requests` is admin-readable (the admin page lists it through a
- * listener) and never client-written: these three handlers are its only
- * writers. `change_request_rate_limits/{uid}` is server-only.
+ * listener) and never client-written: these handlers and the notice
+ * delivery in changeRequestNotices.cjs are its only writers.
+ * `change_request_rate_limits/{uid}` is server-only.
+ *
+ * PROGRESS FOR THE REQUESTER (issue #330). A requester cannot read
+ * `change_requests`: the document holds their address and uid, the address
+ * of the staff member who last changed it, the delivery records of its
+ * emails, and who checked a result link. listMyChangeRequests reads the
+ * caller's own documents with the Admin SDK and answers only the fields in
+ * `requesterView`: the text and page they sent, the status, the `history`
+ * of statuses with their times (never who set them), and, while the
+ * request is done or declined, the `outcome` with the staff reply and the
+ * result link written for the requester. Nothing else leaves the server.
+ * The read is not gated by the flag: a requester can still see what they
+ * sent after an operator turns change requests off.
+ *
+ * THE OUTCOME is recorded by staff, never by a deploy or any other process:
+ * marking a request done or declined stores `outcome`, and
+ * saveChangeRequestOutcome adds an optional reply and an optional result
+ * link. A result link must be on this site's own origin
+ * (`config.tierA.publicUrl`, compared exactly after parsing) and needs the
+ * staff member to confirm that they opened it and saw the change. The
+ * request text is never an instruction to anything: no handler reads it to
+ * decide what to do.
  *
  * THE FLAG gates submission only, and the server reads it LIVE from
  * `config/features`, not from the five-minute container cache
@@ -34,8 +64,12 @@
  * the delete removes that document in one transaction BEFORE it sweeps
  * change_requests, so a store that commits first is swept, and a store that
  * reads after it is refused. A bootstrap admin needs no account document,
- * because an account delete refuses an admin. No mail is sent and no
- * notifier fires, so no personal data leaves the deployment.
+ * because an account delete refuses an admin.
+ *
+ * EMAIL. With the operator's settings on, a stored request gets an
+ * acknowledgement, and a request marked done or declined gets an outcome
+ * email, through changeRequestNotices.cjs. Both are off by default. An email
+ * holds no request text; it links to the requester's own page.
  *
  * ONE TRANSACTION PER WRITE, WITH ITS AUDIT ROW. Every submission, status
  * change, and removal commits together with its `admin_logs` row, so a
@@ -61,6 +95,7 @@ const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
 const { isValidDocId } = require('../cms/store.cjs');
+const { queueAcknowledgement, queueOutcome, deliverNotice } = require('./changeRequestNotices.cjs');
 
 const COLLECTION = 'change_requests';
 const RATE_LIMIT_COLLECTION = 'change_request_rate_limits';
@@ -75,6 +110,13 @@ const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 const STATUSES = Object.freeze(['new', 'in_progress', 'done', 'declined']);
+const OUTCOME_STATUSES = Object.freeze(['done', 'declined']);
+/** The newest status changes kept on a request for its requester. */
+const HISTORY_LIMIT = 50;
+const MAX_REPLY_LENGTH = 1000;
+const MAX_RESULT_URL_LENGTH = 2048;
+/** The newest requests listMyChangeRequests answers. */
+const MY_REQUESTS_LIMIT = 50;
 // The same shape submitFeedback accepts: a client-generated token that is
 // safe as a bare document id, never caller-chosen free text.
 const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
@@ -199,6 +241,120 @@ async function changeRequestsEnabled(db) {
   return snap.exists && snap.data()?.changeRequests === true;
 }
 
+/** A stored time as a Date, or null. */
+function dateOf(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value : null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  return null;
+}
+
+function isoOf(value) {
+  return dateOf(value)?.toISOString() ?? null;
+}
+
+/**
+ * The status history of a stored request. A request stored before issue
+ * #330 has none, so one is rebuilt from its own times: received at
+ * createdAt, and its current status at updatedAt.
+ *
+ * @returns {Array<{ status: string, at: Date }>}
+ */
+function historyOf(stored) {
+  if (Array.isArray(stored?.history)) {
+    return stored.history
+      .filter((entry) => STATUSES.includes(entry?.status) && dateOf(entry?.at))
+      .map((entry) => ({ status: entry.status, at: dateOf(entry.at) }));
+  }
+  const rebuilt = [];
+  const created = dateOf(stored?.createdAt);
+  if (created) rebuilt.push({ status: 'new', at: created });
+  const updated = dateOf(stored?.updatedAt);
+  if (stored?.status && stored.status !== 'new' && STATUSES.includes(stored.status) && updated) {
+    rebuilt.push({ status: stored.status, at: updated });
+  }
+  return rebuilt;
+}
+
+/**
+ * An outcome with no reply and no result link yet. `id` names this outcome,
+ * so a reply saved from a form that loaded an earlier outcome is refused
+ * (saveChangeRequestOutcome), even after done, reopen, done again.
+ */
+function freshOutcome(status, at, by) {
+  return {
+    id: crypto.randomUUID(),
+    status,
+    reply: null,
+    resultUrl: null,
+    resultCheckedBy: null,
+    resultCheckedAt: null,
+    recordedAt: at,
+    recordedBy: by ?? null,
+  };
+}
+
+/**
+ * One request as its requester may read it. Every field is listed here, so
+ * a field added to the stored document later stays private until someone
+ * adds it on purpose.
+ */
+function requesterView(id, data) {
+  const status = STATUSES.includes(data?.status) ? data.status : 'new';
+  const stored = data?.outcome;
+  const outcome = OUTCOME_STATUSES.includes(status) && stored?.status === status
+    ? {
+      status,
+      reply: typeof stored.reply === 'string' && stored.reply ? stored.reply : null,
+      resultUrl: status === 'done' && typeof stored.resultUrl === 'string' && stored.resultUrl ? stored.resultUrl : null,
+      recordedAt: isoOf(stored.recordedAt),
+    }
+    : null;
+  return {
+    id,
+    message: typeof data?.message === 'string' ? data.message : '',
+    page: typeof data?.page === 'string' && data.page ? data.page : null,
+    status,
+    createdAt: isoOf(data?.createdAt),
+    history: historyOf(data).map((entry) => ({ status: entry.status, at: entry.at.toISOString() })),
+    outcome,
+  };
+}
+
+/**
+ * A result link staff checked, or a refusal. Only an http(s) address on
+ * this site's own origin passes: both are parsed, and the origins are
+ * compared exactly, so a look-alike host, a credential, another port or a
+ * relative address is refused.
+ *
+ * @param {unknown} value
+ * @param {string} publicUrl config.tierA.publicUrl
+ * @returns {{ ok: true, href: string } | { ok: false, message: string }}
+ */
+function readResultUrl(value, publicUrl) {
+  if (typeof value !== 'string' || !value.trim()) return { ok: false, message: 'resultUrl: must be a web address.' };
+  const raw = value.trim();
+  if (raw.length > MAX_RESULT_URL_LENGTH) {
+    return { ok: false, message: `resultUrl: at most ${MAX_RESULT_URL_LENGTH} characters.` };
+  }
+  let site;
+  try {
+    site = new URL(String(publicUrl ?? '').trim());
+  } catch {
+    return { ok: false, message: 'resultUrl: this site has no public address set, so a result link cannot be checked.' };
+  }
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return { ok: false, message: 'resultUrl: must be a full address on this site, such as a page link copied from the browser.' };
+  }
+  if ((site.protocol !== 'https:' && site.protocol !== 'http:') || url.username || url.password || url.origin !== site.origin) {
+    return { ok: false, message: `resultUrl: must be an address on this site (${site.origin}).` };
+  }
+  return { ok: true, href: url.href };
+}
+
 /**
  * Store one request, its rate-limit slot, and its audit row together.
  *
@@ -234,6 +390,9 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
     if (recent.limited) return { outcome: 'limited', retryAfterMs: recent.retryAfterMs };
 
     const at = new Date(nowMs);
+    // The last read, before the first write: the acknowledgement settings
+    // and the demo policy (changeRequestNotices.cjs).
+    const acknowledgement = await queueAcknowledgement({ db, tx, id, at });
     tx.set(limitRef, { requests: [...recent.requests, nowMs], updatedAt: at });
     tx.create(ref, {
       message,
@@ -244,6 +403,9 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
       createdAt: at,
       updatedAt: null,
       updatedBy: null,
+      history: [{ status: 'new', at }],
+      outcome: null,
+      ...(acknowledgement ? { notices: { received: acknowledgement } } : {}),
     });
     tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
       action: 'submitChangeRequest',
@@ -251,7 +413,7 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
       actor,
       at,
     }));
-    return { outcome: 'stored' };
+    return { outcome: 'stored', acknowledgement };
   });
 }
 
@@ -259,7 +421,7 @@ async function storeRequest({ db, id, actor, message, page, nowMs }) {
  * @param {{ db: object, auth: { verifyIdToken: (t: string) => Promise<object> },
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
-function createSubmitChangeRequestHandler({ db, auth, now = Date.now, log = console }) {
+function createSubmitChangeRequestHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }) {
   return async function submitChangeRequest(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
@@ -313,6 +475,14 @@ function createSubmitChangeRequestHandler({ db, auth, now = Date.now, log = cons
     if (result.outcome === 'taken' || result.outcome === 'changed') {
       return sendError(res, 409, 'conflict', 'submissionKey: already used. Open the form again.');
     }
+    // The request is durable before the acknowledgement goes. A replay
+    // finds it stored and sends nothing; a failed send only marks the
+    // record for staff to retry (deliverNotice never throws).
+    if (result.outcome === 'stored' && result.acknowledgement) {
+      await deliverNotice({
+        db, sendEmail, getConfig, now, log, id, slot: 'received', record: result.acknowledgement, to: email,
+      });
+    }
     res.status(201).json({ id, ok: true });
   };
 }
@@ -327,7 +497,7 @@ function readId(body) {
  * @param {{ db: object, auth: object, getConfig?: () => Promise<object>,
  *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
  */
-function createUpdateChangeRequestStatusHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+function createUpdateChangeRequestStatusHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }) {
   return async function updateChangeRequestStatus(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
@@ -341,27 +511,195 @@ function createUpdateChangeRequestStatusHandler({ db, auth, getConfig, now = Dat
     }
 
     const ref = db.collection(COLLECTION).doc(id);
-    let found;
+    let result;
     try {
-      found = await db.runTransaction(async (tx) => {
+      result = await db.runTransaction(async (tx) => {
         const snap = await tx.get(ref);
-        if (!snap.exists) return false;
+        if (!snap.exists) return null;
+        const stored = snap.data() || {};
         const at = new Date(now());
-        tx.update(ref, { status, updatedAt: at, updatedBy: gate.email });
+        // The last read, before the first write: the outcome settings, the
+        // demo policy, and whether this outcome already has an email.
+        const queued = await queueOutcome({ db, tx, id, stored, history: historyOf(stored), status, at });
+        const changed = stored.status !== status;
+        const history = changed
+          ? [...historyOf(stored), { status, at }].slice(-HISTORY_LIMIT)
+          : historyOf(stored);
+        let outcome = null;
+        if (OUTCOME_STATUSES.includes(status)) {
+          // The same outcome again keeps its reply and link; a new one starts empty.
+          outcome = !changed && stored.outcome?.status === status ? stored.outcome : freshOutcome(status, at, gate.email);
+        }
+        tx.update(ref, {
+          status,
+          updatedAt: at,
+          updatedBy: gate.email,
+          history,
+          outcome,
+          ...(queued ? { notices: { ...stored.notices, [queued.slot]: queued.record } } : {}),
+        });
         tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
           action: 'updateChangeRequestStatus',
           docPath: `${COLLECTION}/${id}`,
           actor: gate,
           at,
         }));
-        return true;
+        return { queued, to: stored.email };
       });
     } catch (err) {
       log.error('updateChangeRequestStatus failed', err);
       return internal(res, 'The status could not be saved. Try again.');
     }
-    if (!found) return notFound(res, 'No such change request.');
-    res.status(200).json({ id, status });
+    if (!result) return notFound(res, 'No such change request.');
+    // The status is saved before the email goes; a failed send is stated,
+    // and staff can retry it from the request.
+    let notice = null;
+    if (result.queued) {
+      const delivered = await deliverNotice({
+        db, sendEmail, getConfig, now, log, id, slot: result.queued.slot, record: result.queued.record, to: result.to,
+      });
+      notice = { slot: result.queued.slot, state: delivered.state };
+    }
+    res.status(200).json({ id, status, notice });
+  };
+}
+
+/** Read the reply staff write for the requester: text, or null for none. */
+function readReply(value) {
+  if (value === undefined || value === null) return { ok: true, reply: null };
+  if (typeof value !== 'string') return { ok: false, message: 'reply: must be text.' };
+  const reply = value.replace(/\r\n?/g, '\n').trim();
+  if (reply.length > MAX_REPLY_LENGTH) return { ok: false, message: `reply: at most ${MAX_REPLY_LENGTH} characters.` };
+  return { ok: true, reply: reply || null };
+}
+
+/**
+ * @param {{ db: object, auth: object, getConfig: () => Promise<object>,
+ *           now?: () => number, log?: Pick<Console, 'warn'|'error'> }} deps
+ */
+function createSaveChangeRequestOutcomeHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+  return async function saveChangeRequestOutcome(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    if (bodyBytes(req.body) > MAX_BODY_BYTES) return sendError(res, 413, 'payload-too-large', 'The request is too large.');
+
+    const id = readId(req.body);
+    if (!id) return badRequest(res, 'id: must be a change request id.');
+    const reply = readReply(req.body?.reply);
+    if (!reply.ok) return badRequest(res, reply.message);
+    const rawUrl = req.body?.resultUrl;
+    const wantsUrl = rawUrl !== undefined && rawUrl !== null && rawUrl !== '';
+    const checked = req.body?.resultChecked;
+    if (checked !== undefined && typeof checked !== 'boolean') return badRequest(res, 'resultChecked: must be true or false.');
+    // The outcome the form loaded: its status, and its id (null for a
+    // request done before outcomes had one).
+    const expectedStatus = req.body?.expectedStatus;
+    if (!OUTCOME_STATUSES.includes(expectedStatus)) {
+      return badRequest(res, `expectedStatus: must be one of ${OUTCOME_STATUSES.join(', ')}, the status the form loaded.`);
+    }
+    const expectedOutcomeId = req.body?.expectedOutcomeId;
+    if (expectedOutcomeId !== null && (typeof expectedOutcomeId !== 'string' || !expectedOutcomeId || expectedOutcomeId.length > 64)) {
+      return badRequest(res, 'expectedOutcomeId: must be the outcome id the form loaded, or null.');
+    }
+
+    let resultUrl = null;
+    if (wantsUrl) {
+      let config;
+      try {
+        config = await getConfig();
+      } catch (err) {
+        log.error('saveChangeRequestOutcome: the config could not be read', err);
+        return internal(res, 'The outcome could not be saved. Try again.');
+      }
+      const parsed = readResultUrl(rawUrl, config?.tierA?.publicUrl);
+      if (!parsed.ok) return badRequest(res, parsed.message);
+      resultUrl = parsed.href;
+    }
+
+    const ref = db.collection(COLLECTION).doc(id);
+    let result;
+    try {
+      result = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return { status: 404 };
+        const stored = snap.data() || {};
+        if (!OUTCOME_STATUSES.includes(stored.status)) return { status: 409 };
+        const current = stored.outcome?.status === stored.status ? stored.outcome : null;
+        if (stored.status !== expectedStatus || (current?.id ?? null) !== expectedOutcomeId) {
+          return { status: 409, code: 'outcome-changed' };
+        }
+        if (resultUrl && stored.status !== 'done') return { status: 400, message: 'resultUrl: only a done request has a result link.' };
+        const base = current ?? freshOutcome(stored.status, dateOf(stored.updatedAt) ?? new Date(now()), stored.updatedBy);
+        const at = new Date(now());
+        // A link that was already checked stays checked; a new one needs the
+        // staff member to say they opened it and saw the change.
+        const sameLink = Boolean(resultUrl) && resultUrl === base.resultUrl;
+        if (resultUrl && !sameLink && checked !== true) {
+          return { status: 400, message: 'resultChecked: open the link and confirm that it shows the change before you save it.' };
+        }
+        // A request done before outcomes had an id gets one with this save.
+        const outcomeId = base.id ?? crypto.randomUUID();
+        tx.update(ref, {
+          outcome: {
+            ...base,
+            id: outcomeId,
+            reply: reply.reply,
+            resultUrl,
+            resultCheckedBy: resultUrl ? (sameLink ? base.resultCheckedBy : gate.email) : null,
+            resultCheckedAt: resultUrl ? (sameLink ? base.resultCheckedAt : at) : null,
+          },
+        });
+        tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
+          action: 'saveChangeRequestOutcome',
+          docPath: `${COLLECTION}/${id}`,
+          actor: gate,
+          at,
+        }));
+        return { status: 200, outcomeId };
+      });
+    } catch (err) {
+      log.error('saveChangeRequestOutcome failed', err);
+      return internal(res, 'The outcome could not be saved. Try again.');
+    }
+    if (result.status === 404) return notFound(res, 'No such change request.');
+    if (result.code === 'outcome-changed') {
+      return sendError(res, 409, 'outcome-changed', 'The request’s outcome changed since you opened this form. Nothing was saved. Read the request again, then write the reply.');
+    }
+    if (result.status === 409) {
+      return sendError(res, 409, 'conflict', 'Mark the request done or declined first. Only a request with an outcome has a reply.');
+    }
+    if (result.status === 400) return badRequest(res, result.message);
+    res.status(200).json({ id, saved: true, outcomeId: result.outcomeId });
+  };
+}
+
+/**
+ * The caller's own requests, newest first, in the requester-safe shape.
+ *
+ * @param {{ db: object, auth: { verifyIdToken: (t: string, checkRevoked?: boolean) => Promise<object> },
+ *           log?: Pick<Console, 'warn'|'error'> }} deps
+ */
+function createListMyChangeRequestsHandler({ db, auth, log = console }) {
+  return async function listMyChangeRequests(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const decoded = await verifySender({ auth }, req);
+    if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Sign in to see your change requests.');
+    if (decoded.email_verified !== true) {
+      return sendError(res, 403, 'forbidden', 'Sign in with a verified email address to see your change requests.');
+    }
+    let snap;
+    try {
+      snap = await db.collection(COLLECTION)
+        .where('uid', '==', decoded.uid)
+        .orderBy('createdAt', 'desc')
+        .limit(MY_REQUESTS_LIMIT)
+        .get();
+    } catch (err) {
+      log.error('listMyChangeRequests failed', err);
+      return internal(res, 'Your change requests could not be loaded. Try again.');
+    }
+    res.status(200).json({ requests: snap.docs.map((doc) => requesterView(doc.id, doc.data())) });
   };
 }
 
@@ -404,8 +742,10 @@ function createDeleteChangeRequestHandler({ db, auth, getConfig, now = Date.now,
 
 /**
  * Deployable exports: submitChangeRequest, updateChangeRequestStatus,
- * deleteChangeRequest. firebase-functions and firebase-admin are required
- * lazily here only.
+ * saveChangeRequestOutcome, deleteChangeRequest, listMyChangeRequests, and
+ * from changeRequestNotices.cjs saveChangeRequestNoticeSettings and
+ * retryChangeRequestNotice. firebase-functions and firebase-admin are
+ * required lazily here only.
  */
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
@@ -420,30 +760,53 @@ function buildHandlers() {
     await handler(req, res);
   };
 
+  const { defineSecret } = require('firebase-functions/params');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  const providerName = (process.env.EVENT_EMAIL_PROVIDER || '').trim();
+  // Only the endpoints that send mail bind the provider's send secrets.
+  const secrets = (SEND_SECRETS_BY_PROVIDER[providerName] || []).map(defineSecret);
+
   const buildDeps = () => {
     const { getDb } = require('../core/firestore.cjs');
     const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
     const db = getDb();
-    return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }) };
+    const getConfig = () => getEventConfig({ db });
+    const sendEmail = (message) => {
+      const { createEmailCore } = require('../email/send.cjs');
+      const { getEmailProvider } = require('../email/providers/index.cjs');
+      return createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig }).send(message);
+    };
+    return { db, auth: getAuth(), getConfig, sendEmail };
   };
 
-  const expose = (create) =>
-    onRequest({ region }, withCors(async (req, res) => {
+  const expose = (create, options = {}) =>
+    onRequest({ region, ...options }, withCors(async (req, res) => {
       await create(buildDeps())(req, res);
     }));
 
+  const {
+    createSaveChangeRequestNoticeSettingsHandler,
+    createRetryChangeRequestNoticeHandler,
+  } = require('./changeRequestNotices.cjs');
+
   return {
-    submitChangeRequest: expose(createSubmitChangeRequestHandler),
-    updateChangeRequestStatus: expose(createUpdateChangeRequestStatusHandler),
+    submitChangeRequest: expose(createSubmitChangeRequestHandler, { secrets }),
+    updateChangeRequestStatus: expose(createUpdateChangeRequestStatusHandler, { secrets }),
+    saveChangeRequestOutcome: expose(createSaveChangeRequestOutcomeHandler),
     deleteChangeRequest: expose(createDeleteChangeRequestHandler),
+    listMyChangeRequests: expose(createListMyChangeRequestsHandler),
+    saveChangeRequestNoticeSettings: expose(createSaveChangeRequestNoticeSettingsHandler),
+    retryChangeRequestNotice: expose(createRetryChangeRequestNoticeHandler, { secrets }),
   };
 }
 
 module.exports = {
   createSubmitChangeRequestHandler,
   createUpdateChangeRequestStatusHandler,
+  createSaveChangeRequestOutcomeHandler,
   createDeleteChangeRequestHandler,
+  createListMyChangeRequestsHandler,
   get handlers() {
     return buildHandlers();
   },
@@ -452,6 +815,9 @@ module.exports = {
     rateLimitWindow,
     rateLimitMessage,
     readSubmission,
+    readResultUrl,
+    requesterView,
+    historyOf,
     COLLECTION,
     RATE_LIMIT_COLLECTION,
     STATUSES,
@@ -461,5 +827,9 @@ module.exports = {
     RATE_LIMIT_MAX,
     RATE_LIMIT_WINDOW_MS,
     FLAG_OFF_MESSAGE,
+    HISTORY_LIMIT,
+    MAX_REPLY_LENGTH,
+    MAX_RESULT_URL_LENGTH,
+    MY_REQUESTS_LIMIT,
   },
 };

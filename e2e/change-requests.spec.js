@@ -11,11 +11,18 @@
 // token. Turning the flag off again refuses the very next request, and once
 // staff delete the visitor's account, its still-valid token is refused.
 //
+// Issue #330: with an operator's email settings on, the visitor gets an
+// acknowledgement, follows the request on their own page, and gets one
+// outcome email when staff mark it done; staff write a reply and a checked
+// result link, and the visitor reads both. The requester's read never holds
+// another requester's request or any identity.
+//
 // config/bootstrap and config/features are restored when the file is done,
 // because later specs sign in as the seeded operator and read the flags.
 import { test, expect } from '@playwright/test';
 import {
-  adminDb, callFunction, ensureUser, idTokenFor, signIn,
+  APP_BASE_URL, adminDb, adminIdToken, callFunction, ensureUser, idTokenFor, mailFileSize, signIn,
+  taggedMailSince, waitForTaggedMail,
 } from './helpers.mjs';
 
 const VISITOR_EMAIL = 'e2e-change-visitor@example.test';
@@ -73,6 +80,8 @@ test.describe.serial('change requests', () => {
     if (seededFeatures) await config.doc('features').set(seededFeatures);
     const left = await db.collection('change_requests').where('uid', '==', visitorUid ?? '').get();
     await Promise.all(left.docs.map((doc) => doc.ref.delete()));
+    await db.collection('change_requests').doc(`staff${stamp}`).delete();
+    await db.collection('change_request_settings').doc('notices').delete();
     if (visitorUid) await db.collection('change_request_rate_limits').doc(visitorUid).delete();
   });
 
@@ -217,6 +226,93 @@ test.describe.serial('change requests', () => {
     const refused = await callFunction('submitChangeRequest', { message: 'After the flag.', submissionKey: `after${stamp}` }, visitorToken);
     expect(refused.status).toBe(404);
     expect((await adminDb().collection('change_requests').doc(`after${stamp}`).get()).exists).toBe(false);
+  });
+
+  test('the requester follows progress on their own page and gets one email per step', async () => {
+    test.setTimeout(120_000);
+    await setFlag(true);
+    const followMessage = `Please fix the parking map (${stamp}).`;
+    const requestsUrl = `${APP_BASE_URL}/profile/change-requests`;
+    const resultUrl = `${APP_BASE_URL}/faq`;
+
+    // An operator turns both emails on through the real endpoint.
+    const operatorToken = await adminIdToken();
+    const current = await adminDb().collection('change_request_settings').doc('notices').get();
+    const saved = await callFunction('saveChangeRequestNoticeSettings', {
+      acknowledgement: 'automatic', outcome: 'automatic', expectedRevision: current.exists ? current.data().revision : 0,
+    }, operatorToken);
+    expect(saved.status, JSON.stringify(saved.body)).toBe(200);
+    const since = mailFileSize();
+
+    // The visitor sends a request and gets the acknowledgement. It links to
+    // their own page and quotes nothing of the request.
+    await visitor.goto('/faq');
+    await footerButton(visitor).click();
+    const dialog = visitor.getByRole('dialog', { name: 'Request a change' });
+    await dialog.getByLabel('What should change?').fill(followMessage);
+    await dialog.getByRole('button', { name: 'Send request' }).click();
+    await expect(visitor.getByRole('dialog', { name: 'Request sent' })).toBeVisible();
+    const received = await waitForTaggedMail(since, VISITOR_EMAIL, 'changeRequest.received');
+    const linkLine = received.text.split('\n').find((line) => line.startsWith('http'));
+    expect(linkLine).toBe(requestsUrl);
+    expect(`${received.subject} ${received.text} ${received.html}`).not.toContain(String(stamp));
+
+    // The dialog's link opens the visitor's page, which shows the request.
+    await visitor.getByRole('link', { name: 'See your change requests' }).click();
+    await expect(visitor).toHaveURL(requestsUrl);
+    await expect(visitor.getByRole('dialog')).toHaveCount(0);
+    const item = visitor.getByRole('listitem').filter({ has: visitor.getByRole('heading', { level: 2 }) }).filter({ hasText: followMessage });
+    await expect(item).toContainText('Status: Received');
+
+    // Staff move it on and mark it done: one outcome email.
+    const stored = await adminDb().collection('change_requests').where('uid', '==', visitorUid).where('message', '==', followMessage).get();
+    expect(stored.size).toBe(1);
+    const id = stored.docs[0].id;
+    await staff.goto('/admin/change-requests?status=all');
+    await expect(staff.getByText('The acknowledgement email is on. The outcome email is on.')).toBeVisible();
+    const row = staff.getByRole('listitem').filter({ hasText: followMessage }).first();
+    await row.getByRole('button', { name: 'Mark in progress' }).click();
+    await row.getByRole('button', { name: 'Mark done' }).click();
+    await expect(row.getByRole('button', { name: 'Reopen' })).toBeVisible();
+    const done = await waitForTaggedMail(since, VISITOR_EMAIL, 'changeRequest.done');
+    expect(done.subject).toMatch(/is marked done$/);
+    expect(done.text.split('\n').find((line) => line.startsWith('http'))).toBe(requestsUrl);
+    await expect(row.getByRole('list', { name: 'Emails to the requester' })).toContainText('Done email');
+
+    // Staff write a reply and a result link they checked on this site.
+    await row.getByRole('button', { name: 'Reply and result link' }).click();
+    await row.getByLabel('Reply to the requester (optional)').fill('We fixed the parking map.');
+    await row.getByLabel('Result link (optional)').fill(resultUrl);
+    await row.getByLabel('I opened this link and it shows the change.').check();
+    await row.getByRole('button', { name: 'Save the reply and link' }).click();
+    await expect(row.getByText('Reply and link saved.')).toBeVisible();
+
+    // The visitor reads the outcome, the reply, the link and the history.
+    await visitor.getByRole('button', { name: 'Refresh' }).click();
+    await expect(item).toContainText('Status: Done');
+    await expect(item.getByText('We fixed the parking map.')).toBeVisible();
+    await expect(item.getByRole('link', { name: 'See the result' })).toHaveAttribute('href', resultUrl);
+    await expect(item.getByRole('list', { name: 'History' }).getByRole('listitem')).toHaveCount(3);
+
+    // One email per step, whatever else happened.
+    expect(taggedMailSince(since, VISITOR_EMAIL, 'changeRequest.received')).toHaveLength(1);
+    expect(taggedMailSince(since, VISITOR_EMAIL, 'changeRequest.done')).toHaveLength(1);
+
+    // Isolation: a staff member's own request stays out of the visitor's
+    // read, and the read holds no address, uid or staff field.
+    const staffToken = await idTokenFor(await ensureUser(STAFF_EMAIL));
+    const staffSent = await callFunction('submitChangeRequest', { message: `Staff request (${stamp}).`, submissionKey: `staff${stamp}` }, staffToken);
+    expect(staffSent.status).toBe(201);
+    const mine = await callFunction('listMyChangeRequests', {}, visitorToken);
+    expect(mine.status).toBe(200);
+    expect(mine.body.requests.map((request) => request.id)).toContain(id);
+    expect(mine.body.requests.map((request) => request.id)).not.toContain(`staff${stamp}`);
+    const text = JSON.stringify(mine.body);
+    for (const secret of [VISITOR_EMAIL, STAFF_EMAIL, visitorUid, 'notices', 'resultCheckedBy']) {
+      expect(text).not.toContain(secret);
+    }
+    await adminDb().collection('change_request_settings').doc('notices').delete();
+    await setFlag(false);
   });
 
   // Review finding 6: deleting an account removes its change requests, so

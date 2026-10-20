@@ -1,6 +1,14 @@
 {
   "indexes": [
     {
+      "collectionGroup": "change_requests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "cmsPublishQueue",
       "queryScope": "COLLECTION",
       "fields": [

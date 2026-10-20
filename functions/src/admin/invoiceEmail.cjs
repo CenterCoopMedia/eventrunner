@@ -120,13 +120,12 @@ function oneLine(value) {
  * is the announcement stream. Null means the provider's default.
  */
 function transactionalStream(config) {
-  const email = config?.providers?.email ?? {};
-  const stream = typeof email.messageStream === 'string' && email.messageStream.trim() ? email.messageStream.trim() : null;
-  const announcement = typeof email.announcementStream === 'string' ? email.announcementStream.trim() : '';
-  if (announcement && (stream ?? 'outbound') === announcement) {
+  const { transactionalStream: resolve } = require('../email/stream.cjs');
+  const channel = resolve(config);
+  if (!channel.ok) {
     return { ok: false, reason: 'The transactional email stream is set to the announcement stream, so invoices are not emailed. Ask an operator to set config/providers.email.messageStream to the transactional stream.' };
   }
-  return { ok: true, stream };
+  return channel;
 }
 
 /** Why this provider cannot send the email, or null. */

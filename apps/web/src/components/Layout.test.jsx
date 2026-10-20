@@ -1351,6 +1351,44 @@ describe('the footer change request control', () => {
     expect(dialog).not.toBeNull();
   });
 
+  // Issue #330: the reader's own requests, beside the control that sends one.
+  const requestsLink = (container) =>
+    within(container.querySelector('footer')).queryByRole('link', { name: 'Your change requests' });
+
+  it('links the signed-in reader to their own change requests while the flag is on', () => {
+    const { container } = renderShell({}, { featureFlags: { ...FIXTURE_FEATURES, changeRequests: true }, user: SIGNED_IN });
+    expect(requestsLink(container)).toHaveAttribute('href', '/profile/change-requests');
+    expect(requestsLink(container).parentElement).toBe(requestButton(container).parentElement);
+  });
+
+  // Review finding 1 (#539): a reader who sent a request keeps the link to
+  // its history after the flag goes off. The modal marks this browser.
+  it('keeps the requests link for a reader who sent one from this browser, with the flag off', () => {
+    window.localStorage.setItem('changeRequests.sent.uid-ada', '1');
+    try {
+      const { container, unmount } = renderShell({}, { featureFlags: FIXTURE_FEATURES, user: SIGNED_IN });
+      expect(requestsLink(container)).toHaveAttribute('href', '/profile/change-requests');
+      expect(requestButton(container)).toBeNull();
+      unmount();
+      // Another account on the same browser does not get it.
+      const other = renderShell({}, { featureFlags: FIXTURE_FEATURES, user: { ...SIGNED_IN, uid: 'uid-bo' } });
+      expect(requestsLink(other.container)).toBeNull();
+    } finally {
+      window.localStorage.removeItem('changeRequests.sent.uid-ada');
+    }
+  });
+
+  it('offers no requests link while the flag is off or the reader is signed out', () => {
+    for (const options of [
+      { featureFlags: FIXTURE_FEATURES, user: SIGNED_IN },
+      { featureFlags: { ...FIXTURE_FEATURES, changeRequests: true } },
+    ]) {
+      const { container, unmount } = renderShell({}, options);
+      expect(requestsLink(container)).toBeNull();
+      unmount();
+    }
+  });
+
   it('sits beside Share feedback when both are on', () => {
     const { container } = renderShell({}, {
       featureFlags: { ...FIXTURE_FEATURES, feedbackInbox: true, changeRequests: true },

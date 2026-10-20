@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./demoMode.js', () => ({ IS_DEMO: false, default: false }));
 
-import { submitChangeRequest } from './changeRequestApi.js';
+import { listMyChangeRequests, submitChangeRequest } from './changeRequestApi.js';
 
 const ENV = { VITE_FUNCTIONS_ORIGIN: 'https://functions.example.test/' };
 const PAYLOAD = { message: 'The travel page lists the wrong hotel.', page: '/travel', submissionKey: 'key0000000000001' };
@@ -81,6 +81,51 @@ describe('submitChangeRequest', () => {
       ok: false,
       error: 'Change requests are off in this read-only demo.',
     });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+// Issue #330: the requester's own requests.
+describe('listMyChangeRequests', () => {
+  const ROWS = [{ id: 'k1', message: 'Fix it.', page: null, status: 'new', createdAt: '2026-10-20T10:00:00.000Z', history: [], outcome: null }];
+
+  it('posts an empty body with the bearer token to the endpoint and answers the rows', async () => {
+    const fetchImpl = respond(200, { requests: ROWS });
+    const result = await listMyChangeRequests({ user, env: ENV, fetchImpl });
+    expect(result).toEqual({ ok: true, requests: ROWS });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('https://functions.example.test/listMyChangeRequests');
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe('Bearer id-token-1');
+    expect(JSON.parse(init.body)).toEqual({});
+  });
+
+  it('answers an empty list for a body with no rows, and the server’s words on a refusal', async () => {
+    expect(await listMyChangeRequests({ user, env: ENV, fetchImpl: respond(200, {}) })).toEqual({ ok: true, requests: [] });
+    const refused = respond(403, { error: { code: 'forbidden', message: 'Sign in with a verified email address to see your change requests.' } });
+    expect(await listMyChangeRequests({ user, env: ENV, fetchImpl: refused })).toEqual({
+      ok: false,
+      error: 'Sign in with a verified email address to see your change requests.',
+    });
+  });
+
+  it('sends nothing without a signed-in user, and never throws on a network failure', async () => {
+    const fetchImpl = respond(200, { requests: [] });
+    expect(await listMyChangeRequests({ user: null, env: ENV, fetchImpl })).toEqual({ ok: false, error: 'Sign in to see your change requests.' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const offline = vi.fn(async () => { throw new TypeError('Failed to fetch'); });
+    expect(await listMyChangeRequests({ user, env: ENV, fetchImpl: offline })).toEqual({
+      ok: false,
+      error: 'We could not reach the server. Check your connection and try again.',
+    });
+  });
+
+  it('refuses in the read-only demo and sends nothing', async () => {
+    vi.resetModules();
+    vi.doMock('./demoMode.js', () => ({ IS_DEMO: true, default: true }));
+    const { listMyChangeRequests: demoList } = await import('./changeRequestApi.js');
+    const fetchImpl = respond(200, {});
+    expect(await demoList({ user, env: ENV, fetchImpl })).toEqual({ ok: false, error: 'Change requests are off in this read-only demo.' });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

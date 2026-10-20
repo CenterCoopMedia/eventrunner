@@ -79,6 +79,10 @@ test('listTemplateIds includes account, speaker, claim, and native ticket confir
   assert.deepEqual(listTemplateIds().sort(), [
     'account.welcome',
     'auth.otp',
+    // Issue #330: change request notices, fixed wording.
+    'changeRequest.declined',
+    'changeRequest.done',
+    'changeRequest.received',
     'feedback.confirmation',
     // Issue #208 part 4: an issued invoice, emailed by staff with its PDF.
     'invoice.send',

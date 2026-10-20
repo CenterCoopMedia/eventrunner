@@ -8,15 +8,26 @@ import { MemoryRouter, useLocation } from 'react-router';
 
 let rowsCallback;
 let errorCallback;
+let settingsCallback;
+let settingsErrorCallback;
 const subscribedTo = [];
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
     subscribedTo.push(name);
-    rowsCallback = onNext;
-    errorCallback = onError;
+    // Issue #330: the page also reads the email settings.
+    if (name === 'change_request_settings') {
+      settingsCallback = onNext;
+      settingsErrorCallback = onError;
+    } else {
+      rowsCallback = onNext;
+      errorCallback = onError;
+    }
     return () => {};
   },
 }));
+
+let isOperator = false;
+vi.mock('../../contexts/AuthContext.jsx', () => ({ useAuth: () => ({ isOperator }) }));
 
 const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
@@ -79,12 +90,14 @@ beforeEach(() => {
   subscribedTo.length = 0;
   features = { changeRequests: true };
   currentSearch = '';
+  isOperator = false;
+  settingsCallback = undefined;
 });
 
 describe('AdminChangeRequests: the list', () => {
   it('reads change_requests and lists the open ones newest first by default', () => {
     renderPage();
-    expect(subscribedTo).toEqual(['change_requests']);
+    expect(subscribedTo).toEqual(['change_requests', 'change_request_settings']);
     pushRows(ROWS);
     const texts = items().map((li) => li.textContent);
     expect(texts).toHaveLength(2);
@@ -579,6 +592,278 @@ describe('AdminChangeRequests: the form and the flag', () => {
       expect(screen.getByText('Say what should change.')).toBeInTheDocument();
       expect(send).toBeEnabled();
       expect(callMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// Issue #330: requester emails, their delivery records, and the outcome
+// details staff write for the requester.
+function pushSettings(settings) {
+  act(() => settingsCallback(settings ? [{ id: 'notices', ...settings }] : []));
+}
+
+describe('AdminChangeRequests: requester email settings', () => {
+  it('tells every staff member whether each email is on, and gives staff no control', () => {
+    renderPage();
+    pushRows([]);
+    pushSettings({ acknowledgement: 'automatic', outcome: 'off', revision: 2 });
+    expect(screen.getByText('The acknowledgement email is on. The outcome email is off.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Manage requester emails' })).toBeNull();
+    expect(screen.queryByLabelText('Acknowledgement email')).toBeNull();
+  });
+
+  it('reads both as off before an operator saves them', () => {
+    renderPage();
+    pushRows([]);
+    pushSettings(null);
+    expect(screen.getByText('The acknowledgement email is off. The outcome email is off.')).toBeInTheDocument();
+  });
+
+  it('lets an operator save them with the revision they edited', async () => {
+    isOperator = true;
+    callMock.mockResolvedValueOnce({ acknowledgement: 'automatic', outcome: 'automatic', revision: 3 });
+    renderPage();
+    pushRows([]);
+    pushSettings({ acknowledgement: 'off', outcome: 'off', revision: 2 });
+    fireEvent.click(screen.getByRole('button', { name: 'Manage requester emails' }));
+    fireEvent.change(screen.getByLabelText('Acknowledgement email'), { target: { value: 'automatic' } });
+    fireEvent.change(screen.getByLabelText('Outcome email'), { target: { value: 'automatic' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save email settings' }));
+    await flush();
+    expect(callMock).toHaveBeenCalledWith('saveChangeRequestNoticeSettings', {
+      acknowledgement: 'automatic', outcome: 'automatic', expectedRevision: 2,
+    });
+    expect(screen.getByText('Email settings saved.')).toHaveAttribute('role', 'status');
+  });
+
+  it('keeps an operator’s edits and refuses the save when another operator saved first', () => {
+    isOperator = true;
+    renderPage();
+    pushRows([]);
+    pushSettings({ acknowledgement: 'off', outcome: 'off', revision: 2 });
+    fireEvent.click(screen.getByRole('button', { name: 'Manage requester emails' }));
+    fireEvent.change(screen.getByLabelText('Outcome email'), { target: { value: 'automatic' } });
+    pushSettings({ acknowledgement: 'automatic', outcome: 'off', revision: 3 });
+    expect(screen.getByText('Another operator saved the email settings. Load the current settings, then make your change again.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save email settings' })).toBeDisabled();
+    expect(screen.getByLabelText('Outcome email')).toHaveValue('automatic');
+  });
+});
+
+const failedNotice = (overrides = {}) => ({
+  state: 'failed', templateId: 'changeRequest.done', attempt: 1, mode: 'automatic',
+  queuedAt: new Date(), updatedAt: new Date(), error: 'Inactive recipient', ...overrides,
+});
+
+describe('AdminChangeRequests: email delivery on a request', () => {
+  it('states each email’s delivery on its row', () => {
+    renderPage('/admin/change-requests?status=all');
+    pushSettings({ acknowledgement: 'automatic', outcome: 'automatic', revision: 1 });
+    pushRows([request('one', {
+      status: 'done',
+      notices: { received: failedNotice({ state: 'sent', templateId: 'changeRequest.received', error: null }), done: failedNotice() },
+    })]);
+    const delivery = within(rowFor('one')).getByRole('list', { name: 'Emails to the requester' });
+    const lines = within(delivery).getAllByRole('listitem').map((li) => li.textContent);
+    expect(lines[0]).toContain('Acknowledgement');
+    expect(lines[0]).toContain('Sent');
+    expect(lines[1]).toContain('Done email');
+    expect(lines[1]).toContain('Not sent');
+    expect(lines[1]).toContain('Reason: Inactive recipient');
+  });
+
+  it('retries a failed email and says so', async () => {
+    callMock.mockResolvedValueOnce({ id: 'one', slot: 'done', state: 'sent', attempt: 2 });
+    renderPage('/admin/change-requests?status=all');
+    pushSettings({ acknowledgement: 'off', outcome: 'automatic', revision: 1 });
+    pushRows([request('one', { status: 'done', notices: { done: failedNotice() } })]);
+    fireEvent.click(within(rowFor('one')).getByRole('button', { name: 'Retry the done email' }));
+    await flush();
+    expect(callMock).toHaveBeenCalledWith('retryChangeRequestNotice', { id: 'one', slot: 'done' });
+    expect(within(rowFor('one')).getByText('Email sent.')).toHaveAttribute('role', 'status');
+  });
+
+  it('asks for the Email log check before it retries an email that may have been sent', async () => {
+    callMock.mockResolvedValueOnce({ id: 'one', slot: 'done', state: 'sent', attempt: 2 });
+    renderPage('/admin/change-requests?status=all');
+    pushSettings({ acknowledgement: 'off', outcome: 'automatic', revision: 1 });
+    pushRows([request('one', { status: 'done', notices: { done: failedNotice({ state: 'unknown' }) } })]);
+    const row = rowFor('one');
+    expect(within(row).getByText('May have been sent')).toBeInTheDocument();
+    const retryButton = within(row).getByRole('button', { name: 'Retry the done email' });
+    expect(retryButton).toBeDisabled();
+    fireEvent.click(within(row).getByLabelText('I checked the Email log. The earlier email was not delivered.'));
+    expect(retryButton).toBeEnabled();
+    fireEvent.click(retryButton);
+    await flush();
+    expect(callMock).toHaveBeenCalledWith('retryChangeRequestNotice', { id: 'one', slot: 'done', confirmUnknown: true });
+  });
+
+  it('offers no retry for a sent email, while that email is off, or once the status moved on', () => {
+    renderPage('/admin/change-requests?status=all');
+    pushSettings({ acknowledgement: 'automatic', outcome: 'off', revision: 1 });
+    pushRows([
+      request('sent', { status: 'done', notices: { received: failedNotice({ state: 'sent', templateId: 'changeRequest.received' }) } }),
+      request('off', { status: 'done', notices: { done: failedNotice() } }),
+      request('moved', { status: 'done', notices: { received: failedNotice({ templateId: 'changeRequest.received' }) } }),
+    ]);
+    for (const id of ['sent', 'off', 'moved']) {
+      expect(within(rowFor(id)).queryByRole('button', { name: /^Retry/ })).toBeNull();
+    }
+  });
+
+  it('states a refused retry on its row', async () => {
+    callMock.mockRejectedValueOnce(new Error('This email was already sent. It is not sent again.'));
+    renderPage('/admin/change-requests?status=all');
+    pushSettings({ acknowledgement: 'off', outcome: 'automatic', revision: 1 });
+    pushRows([request('one', { status: 'declined', notices: { declined: failedNotice({ templateId: 'changeRequest.declined' }) } })]);
+    fireEvent.click(within(rowFor('one')).getByRole('button', { name: 'Retry the decline email' }));
+    await flush();
+    expect(within(rowFor('one')).getByRole('alert')).toHaveTextContent('The email was not sent. This email was already sent. It is not sent again.');
+  });
+});
+
+describe('AdminChangeRequests: the reply and the result link', () => {
+  it('is offered on done and declined requests only', () => {
+    renderPage('/admin/change-requests?status=all');
+    pushSettings(null);
+    pushRows(ROWS);
+    expect(within(rowFor('finished')).getByRole('button', { name: 'Reply and result link' })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(rowFor('refused')).getByRole('button', { name: 'Reply' })).toBeInTheDocument();
+    expect(within(rowFor('older')).queryByRole('button', { name: /^Reply/ })).toBeNull();
+    expect(within(rowFor('newer')).queryByRole('button', { name: /^Reply/ })).toBeNull();
+  });
+
+  it('saves a reply and a checked link on this site, prefilled from the saved outcome', async () => {
+    callMock.mockResolvedValueOnce({ id: 'finished', saved: true });
+    renderPage('/admin/change-requests?status=done');
+    pushSettings(null);
+    pushRows([request('finished', { status: 'done', outcome: { id: 'outcome-1', status: 'done', reply: 'Old reply.', resultUrl: null } })]);
+    const row = rowFor('finished');
+    fireEvent.click(within(row).getByRole('button', { name: 'Reply and result link' }));
+    const reply = within(row).getByLabelText('Reply to the requester (optional)');
+    expect(reply).toHaveValue('Old reply.');
+    fireEvent.change(reply, { target: { value: 'We fixed the hotel name.' } });
+    fireEvent.change(within(row).getByLabelText('Result link (optional)'), { target: { value: 'https://summit.example.org/travel' } });
+    const save = within(row).getByRole('button', { name: 'Save the reply and link' });
+    // A new link needs the check first.
+    fireEvent.click(save);
+    expect(callMock).not.toHaveBeenCalled();
+    expect(within(row).getByText('Open the link and confirm that it shows the change.')).toBeInTheDocument();
+    fireEvent.click(within(row).getByLabelText('I opened this link and it shows the change.'));
+    fireEvent.click(save);
+    await flush();
+    expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', {
+      id: 'finished', expectedStatus: 'done', expectedOutcomeId: 'outcome-1', reply: 'We fixed the hotel name.', resultUrl: 'https://summit.example.org/travel', resultChecked: true,
+    });
+    expect(within(row).getByText('Reply and link saved.')).toHaveAttribute('role', 'status');
+  });
+
+  it('a declined request has a reply and no result link', async () => {
+    callMock.mockResolvedValueOnce({ id: 'refused', saved: true });
+    renderPage('/admin/change-requests?status=declined');
+    pushSettings(null);
+    pushRows([request('refused', { status: 'declined', outcome: { id: 'outcome-2', status: 'declined', reply: null, resultUrl: null } })]);
+    const row = rowFor('refused');
+    fireEvent.click(within(row).getByRole('button', { name: 'Reply' }));
+    expect(within(row).queryByLabelText('Result link (optional)')).toBeNull();
+    fireEvent.change(within(row).getByLabelText('Reply to the requester (optional)'), { target: { value: 'We keep the hotel.' } });
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the reply' }));
+    await flush();
+    expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', {
+      id: 'refused', expectedStatus: 'declined', expectedOutcomeId: 'outcome-2', reply: 'We keep the hotel.', resultUrl: null,
+    });
+  });
+
+  it('states the server’s refusal in place', async () => {
+    callMock.mockRejectedValueOnce(new Error('resultUrl: must be an address on this site (https://summit.example.org).'));
+    renderPage('/admin/change-requests?status=done');
+    pushSettings(null);
+    // A request done before outcomes had an id: the form names none.
+    pushRows([request('finished', { status: 'done', outcome: { status: 'done', reply: null, resultUrl: 'https://summit.example.org/old' } })]);
+    const row = rowFor('finished');
+    fireEvent.click(within(row).getByRole('button', { name: 'Reply and result link' }));
+    // The saved link was checked already, so the check is not asked again.
+    expect(within(row).queryByLabelText('I opened this link and it shows the change.')).toBeNull();
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the reply and link' }));
+    await flush();
+    expect(callMock).toHaveBeenCalledWith('saveChangeRequestOutcome', {
+      id: 'finished', expectedStatus: 'done', expectedOutcomeId: null, reply: null, resultUrl: 'https://summit.example.org/old',
+    });
+    expect(within(row).getByText(/must be an address on this site/)).toBeInTheDocument();
+  });
+});
+
+// Review finding 5 (#539): the form names the outcome it loaded, so the
+// server refuses a save after the outcome changed under it.
+describe('AdminChangeRequests: the outcome a reply belongs to', () => {
+  it('keeps the outcome the form loaded, even when a newer one arrives, and then names the id the save answered', async () => {
+    renderPage('/admin/change-requests?status=done');
+    pushSettings(null);
+    pushRows([request('finished', { status: 'done', outcome: { id: 'outcome-1', status: 'done', reply: null, resultUrl: null } })]);
+    const row = () => rowFor('finished');
+    fireEvent.click(within(row()).getByRole('button', { name: 'Reply and result link' }));
+    fireEvent.change(within(row()).getByLabelText('Reply to the requester (optional)'), { target: { value: 'Fixed.' } });
+    // Reopened and done again elsewhere: the listener brings a new outcome.
+    pushRows([request('finished', { status: 'done', outcome: { id: 'outcome-9', status: 'done', reply: null, resultUrl: null } })]);
+    callMock.mockRejectedValueOnce(Object.assign(new Error('The request’s outcome changed since you opened this form. Nothing was saved.'), { code: 'outcome-changed' }));
+    fireEvent.click(within(row()).getByRole('button', { name: 'Save the reply and link' }));
+    await flush();
+    expect(callMock).toHaveBeenLastCalledWith('saveChangeRequestOutcome', expect.objectContaining({ expectedOutcomeId: 'outcome-1' }));
+    expect(within(row()).getByText(/outcome changed since you opened this form/)).toBeInTheDocument();
+  });
+
+  it('names the id the server answered on the next save', async () => {
+    renderPage('/admin/change-requests?status=done');
+    pushSettings(null);
+    pushRows([request('finished', { status: 'done', outcome: { status: 'done', reply: null, resultUrl: null } })]);
+    const row = rowFor('finished');
+    fireEvent.click(within(row).getByRole('button', { name: 'Reply and result link' }));
+    callMock.mockResolvedValueOnce({ id: 'finished', saved: true, outcomeId: 'outcome-new' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the reply and link' }));
+    await flush();
+    expect(callMock).toHaveBeenLastCalledWith('saveChangeRequestOutcome', expect.objectContaining({ expectedOutcomeId: null }));
+    callMock.mockResolvedValueOnce({ id: 'finished', saved: true, outcomeId: 'outcome-new' });
+    fireEvent.click(within(row).getByRole('button', { name: 'Save the reply and link' }));
+    await flush();
+    expect(callMock).toHaveBeenLastCalledWith('saveChangeRequestOutcome', expect.objectContaining({ expectedOutcomeId: 'outcome-new' }));
+  });
+});
+
+// Review finding 2 (#539): a failed settings listener says the email state
+// is unknown, and the next good snapshot clears that.
+describe('AdminChangeRequests: the settings listener fails', () => {
+  it('states that the email state is unknown, and clears it on the next snapshot', () => {
+    renderPage();
+    pushRows([]);
+    expect(typeof settingsErrorCallback).toBe('function');
+    act(() => settingsErrorCallback(new Error('permission-denied')));
+    expect(screen.getByText('We could not read the requester email settings, so we do not know which emails are on. Retrying.')).toBeInTheDocument();
+    pushSettings({ acknowledgement: 'automatic', outcome: 'off', revision: 1 });
+    expect(screen.queryByText(/could not read the requester email settings/)).toBeNull();
+    expect(screen.getByText('The acknowledgement email is on. The outcome email is off.')).toBeInTheDocument();
+  });
+});
+
+// Review finding 3 (#539): a queued email that turns stale while the page is
+// open offers its retry at that moment, without a reload.
+describe('AdminChangeRequests: a queued email turns stale', () => {
+  it('shows the retry when the queued email crosses the stale time', () => {
+    vi.useFakeTimers();
+    try {
+      const now = Date.now();
+      renderPage('/admin/change-requests?status=all');
+      pushSettings({ acknowledgement: 'off', outcome: 'automatic', revision: 1 });
+      pushRows([request('one', {
+        status: 'done',
+        notices: { done: failedNotice({ state: 'queued', error: null, queuedAt: new Date(now - (10 * 60 * 1000 - 5000)) }) },
+      })]);
+      expect(within(rowFor('one')).queryByRole('button', { name: 'Retry the done email' })).toBeNull();
+      act(() => { vi.advanceTimersByTime(6000); });
+      expect(within(rowFor('one')).getByRole('button', { name: 'Retry the done email' })).toBeDisabled();
+      expect(within(rowFor('one')).getByLabelText('I checked the Email log. The earlier email was not delivered.')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

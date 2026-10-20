@@ -16,8 +16,10 @@
  * of the lowercased address. The record holds no address, so the
  * collection is not a second mailing list. Audience resolution hashes each
  * candidate address and leaves out every one with a record, so a later
- * send honours the opt-out. It covers announcement email only: sign-in
- * codes, receipts and speaker mail are transactional and do not read it.
+ * send honours the opt-out. It covers announcement email, and the optional
+ * change request notices (admin/changeRequestNotices.cjs, issue #330), which
+ * skip a suppressed address. Sign-in codes, receipts and speaker mail are
+ * transactional and do not read it.
  *
  * THE SIGNED LINK. The link names the send and the recipient's suppression
  * id, plus an HMAC-SHA256 of the two under a random key that lives only on

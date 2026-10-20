@@ -21,8 +21,10 @@
 // the server belongs to the request and stays one urgent line at the head
 // of the form (issue 219).
 import { useEffect, useId, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { submitChangeRequest } from '../lib/changeRequestApi.js';
 import { createSubmissionKey } from '../lib/submissionKey.js';
+import { markChangeRequestSent } from '../lib/changeRequestMarker.js';
 import { DIALOG_FRAME_CLASS } from './FeedbackModal.jsx';
 import { focusFirstError, TextAreaField, TextField } from './forms/publicForm.jsx';
 import { primaryActionClass, secondaryActionClass } from './controlClasses.js';
@@ -85,6 +87,7 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
       setError(result.error);
       return;
     }
+    markChangeRequestSent(user?.uid);
     setSent(true);
   }
 
@@ -106,6 +109,13 @@ export default function ChangeRequestModal({ onClose, user, initialPage = '' }) 
             </h2>
             <p role="status" className="font-data text-caption text-text-secondary">
               We got your request. The event team will read it.
+            </p>
+            <p className="font-data text-caption text-text-secondary">
+              {/* Issue #330: the reader can follow the request. The dialog
+                  closes on the way, so it does not sit over the next page. */}
+              <Link to="/profile/change-requests" className="underline" onClick={onClose}>
+                See your change requests
+              </Link>
             </p>
             <div>
               {/* The send control is gone, so focus moves to the one
