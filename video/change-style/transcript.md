@@ -10,7 +10,7 @@ The fictional event’s admin Overview is open. The account has operator access,
 
 **0:06–0:11. “Open Branding, then Page style.”**
 
-The pointer opens Branding under System.
+The pointer opens Branding under Settings.
 
 **0:11–0:17. “Open Branding, then Page style.”**
 
@@ -81,7 +81,7 @@ On phone, the pointer opens the admin Menu.
 
 **0:09–0:14. “Open Menu, then Branding.”**
 
-The pointer opens Branding under System.
+The pointer opens Branding under Settings.
 
 **0:14–0:17. “Open Page style.”**
 

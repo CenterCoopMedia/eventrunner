@@ -16,11 +16,25 @@
 // Overview stands first and alone, with no folio over it, because it is
 // where the admin opens rather than a kind of work (issue #179). The named
 // sections under it read as a standing list grouped by what the operator
-// came to do: content, people, operations, system. Group heads are folios.
-// Every item is a word — no icon rail, no collapse to glyphs, no counts in
-// bubbles. The current item is a filled block in the action blue and carries
-// four signals, never colour alone: the marker at its leading edge, the bold
-// weight, the ground shift, and `aria-current="page"`.
+// came to do: content, program, registration and tickets, communications,
+// operations, settings. Every item is a word — no icon rail, no glyph-only
+// item, no counts in bubbles. The current item is a filled block in the
+// action blue and carries four signals, never colour alone: the marker at
+// its leading edge, the bold weight, the ground shift, and
+// `aria-current="page"`.
+//
+// GROUPS FOLD (issue #477). Each group head is a button that opens and
+// closes its list, so the rail stays short. The group that holds the current
+// page opens itself on every navigation; a closed group that holds it still
+// names the current page in its head. Other groups keep what the reader
+// chose, in this browser (layoutPreference.js).
+//
+// THE RAIL HIDES (issue #477). On a wide screen "Hide menu" at the head of
+// the rail narrows it to the job mark and a "Show menu" button, which gives
+// the work surface the room. It is the same button in both states, so the
+// focus stays on it, and it is the one way back to the sections: one Tab
+// from the skip link. The choice is remembered in this browser. Nothing
+// about the route, the page or a draft changes when the rail hides.
 //
 // On a narrow screen the rail becomes one compact head of the page: job,
 // current section and a native Menu disclosure. Opening it shows the same
@@ -47,7 +61,7 @@
 // the stone; "Take the tour" on the rail opens it again. It is its own lazy
 // chunk (components/AdminTour.jsx), and its steps are this docket.
 import './adminWorkspace.css';
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import useAccountViews from '../hooks/useAccountViews.js';
 import RoleSwitcher from '../components/RoleSwitcher.jsx';
@@ -59,6 +73,12 @@ import { AdminEmptyState } from './components/adminChrome.jsx';
 import PendingChangesBanner from './components/PendingChangesBanner.jsx';
 import { linkButtonClass } from './components/formControls.jsx';
 import { PendingChangesProvider } from './PendingChangesContext.jsx';
+import {
+  readDocketGroups,
+  readRailCollapsed,
+  writeDocketGroups,
+  writeRailCollapsed,
+} from './layoutPreference.js';
 import { markTourDone, readTourDone } from './tourState.js';
 
 /** Every docket item is an ABSOLUTE path. A relative `to` resolves against
@@ -83,14 +103,19 @@ export const ADMIN_DESKTOP_VIEWPORT = '(min-width: 1024px)';
 /**
  * The docket. A lead group with no label holds the Overview, the page the
  * admin opens on (issue #179): it reports on every group below it, so it
- * belongs to none of them, and the rail draws no folio over it. Then four
- * groups, in the order an operator works: what the event says, who is in
- * it, how it runs, and how the deployment is set up.
+ * belongs to none of them, and the rail draws no folio over it. Then six
+ * groups, in the order an operator works (issue #477): what the site says,
+ * what is on the program, who registers, what goes out to people, the work
+ * that keeps the event running, and how the deployment is set up.
+ *
+ * This list is the only place a section is named. A new page is one line in
+ * its group: the rail, the tier check, the tour and the Access page all read
+ * it from here.
  *
  * The Overview is staff work: it shows counts only, and the rows behind the
  * unresolved error count stay on the operator-only System errors page.
  *
- * Content, people and operations are staff work. Under System, the event
+ * Every group but Settings is staff work. Under Settings, the event
  * settings admit staff (dates, venue, places and social handles are content
  * an organizer runs; the server holds the sender address back for an
  * operator); features, branding, access and system errors are the
@@ -108,9 +133,6 @@ export const DOCKET = Object.freeze([
     label: 'Content',
     items: [
       { to: 'pages', label: 'Pages', tier: 'staff' },
-      { to: 'sessions', label: 'Sessions', tier: 'staff' },
-      { to: 'pitches', label: 'Session pitches', tier: 'staff' },
-      { to: 'organizations', label: 'Organizations', tier: 'staff' },
       { to: 'content', label: 'Content', tier: 'staff' },
       { to: 'updates', label: 'Updates', tier: 'staff' },
       { to: 'timeline', label: 'Timeline', tier: 'staff' },
@@ -121,34 +143,49 @@ export const DOCKET = Object.freeze([
     ],
   },
   {
-    id: 'people',
-    label: 'People',
+    id: 'program',
+    label: 'Program',
     items: [
+      { to: 'sessions', label: 'Sessions', tier: 'staff' },
+      { to: 'pitches', label: 'Session pitches', tier: 'staff' },
       { to: 'speakers', label: 'Speakers', tier: 'staff' },
+      { to: 'organizations', label: 'Organizations', tier: 'staff' },
+    ],
+  },
+  {
+    id: 'registration',
+    label: 'Registration and tickets',
+    items: [
       { to: 'attendees', label: 'Attendees', tier: 'staff' },
+      { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
       { to: 'badges', label: 'Badges', tier: 'staff' },
+    ],
+  },
+  {
+    id: 'communications',
+    label: 'Communications',
+    items: [
+      { to: 'announcements', label: 'Announcements', tier: 'staff' },
+      { to: 'reminders', label: 'Scheduled reminders', tier: 'staff' },
+      { to: 'live-updates', label: 'Live updates', tier: 'staff' },
+      { to: 'email-log', label: 'Email log', tier: 'staff' },
     ],
   },
   {
     id: 'operations',
     label: 'Operations',
     items: [
-      { to: 'announcements', label: 'Announcements', tier: 'staff' },
-      { to: 'reminders', label: 'Scheduled reminders', tier: 'staff' },
-      { to: 'live-updates', label: 'Live updates', tier: 'staff' },
-      { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
       { to: 'import', label: 'Import records', tier: 'staff' },
       { to: 'feedback', label: 'Feedback', tier: 'staff' },
-      { to: 'email-log', label: 'Email log', tier: 'staff' },
       { to: 'change-requests', label: 'Change requests', tier: 'staff' },
+      { to: 'data-export', label: 'Data export', tier: 'staff' },
     ],
   },
   {
-    id: 'system',
-    label: 'System',
+    id: 'settings',
+    label: 'Settings',
     items: [
       { to: 'settings', label: 'Event', tier: 'staff' },
-      { to: 'data-export', label: 'Data export', tier: 'staff' },
       { to: 'features', label: 'Features', tier: 'operator' },
       { to: 'branding', label: 'Branding', tier: 'operator' },
       { to: 'access', label: 'Access', tier: 'operator' },
@@ -246,6 +283,52 @@ export function docketForTier(held) {
 }
 
 /**
+ * The group that holds the section at `pathname`, or null.
+ *
+ * @param {{ id: string, items: { to: string }[] }[]} docket
+ * @param {string} pathname
+ * @returns {string|null}
+ */
+export function activeGroupId(docket, pathname) {
+  const section = adminSection(pathname);
+  return docket.find((group) => group.items.some((item) => item.to === section))?.id ?? null;
+}
+
+/**
+ * Whether a folding group is open. The reader's own choice wins. With no
+ * choice, a group is open when it holds the current page or the reader has
+ * opened a page in it since the admin loaded, so the rail does not fold up
+ * under the pointer between two clicks. The lead group has no head and is
+ * always open.
+ *
+ * @param {{ id: string, label: string|null }} group
+ * @param {{ choices: Record<string, boolean>, visited: Set<string>, activeId: string|null }} state
+ * @returns {boolean}
+ */
+export function docketGroupOpen(group, { choices, visited, activeId }) {
+  if (!group.label) return true;
+  if (typeof choices[group.id] === 'boolean') return choices[group.id];
+  return group.id === activeId || visited.has(group.id);
+}
+
+/**
+ * The choices after a navigation into `activeId`: a group the reader closed
+ * opens again when they arrive on one of its pages, so the current page is
+ * never inside a closed group because of a choice made elsewhere. Every
+ * other choice stays.
+ *
+ * @param {Record<string, boolean>} choices
+ * @param {string|null} activeId
+ * @returns {Record<string, boolean>}
+ */
+export function choicesOnArrival(choices, activeId) {
+  if (!activeId || choices[activeId] !== false) return choices;
+  const next = { ...choices };
+  delete next[activeId];
+  return next;
+}
+
+/**
  * A docket item. The marker is a short rule in the rail's own ink at the
  * leading edge of the current item, full item height, and it never appears
  * on an inactive item — the transparent border on the inactive state keeps
@@ -337,6 +420,45 @@ function AdminDesk() {
   const activeSection = docket
     .flatMap((group) => group.items)
     .find((item) => item.to === section);
+  // The rail can hide on a wide screen only; a phone has its own Menu.
+  const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed);
+  const railHidden = wide && railCollapsed;
+  const railToggleRef = useRef(null);
+  const toggleRail = () => {
+    const next = !railCollapsed;
+    writeRailCollapsed(next);
+    setRailCollapsed(next);
+  };
+  // The folding groups (issue #477). `choices` is what the reader opened or
+  // closed by hand, kept in this browser; `visited` is the groups opened by
+  // a navigation since this shell mounted, kept in memory only.
+  const activeGroup = activeGroupId(docket, pathname);
+  const [groupChoices, setGroupChoices] = useState(() =>
+    choicesOnArrival(readDocketGroups(), activeGroup),
+  );
+  const [visitedGroups, setVisitedGroups] = useState(
+    () => new Set(activeGroup ? [activeGroup] : []),
+  );
+  useEffect(() => {
+    if (!activeGroup) return;
+    setVisitedGroups((visited) =>
+      visited.has(activeGroup) ? visited : new Set(visited).add(activeGroup),
+    );
+    setGroupChoices((choices) => {
+      const next = choicesOnArrival(choices, activeGroup);
+      if (next !== choices) writeDocketGroups(next);
+      return next;
+    });
+  }, [activeGroup]);
+  const groupState = useMemo(
+    () => ({ choices: groupChoices, visited: visitedGroups, activeId: activeGroup }),
+    [groupChoices, visitedGroups, activeGroup],
+  );
+  const toggleGroup = (group) => {
+    const next = { ...groupChoices, [group.id]: !docketGroupOpen(group, groupState) };
+    writeDocketGroups(next);
+    setGroupChoices(next);
+  };
   // The editor tour (issue #198): null while closed, else the run number.
   // Run 0 is the first visit and takes no focus; each "Take the tour" is a
   // new run, so it starts again at step 1 with the focus on its heading.
@@ -380,7 +502,10 @@ function AdminDesk() {
   const endTour = () => {
     markTourDone(uid);
     setTour(null);
-    (wide || mobileDocketOpen ? takeTourRef : mobileMenuRef).current?.focus();
+    // A hidden rail has no Take the tour button to return to; its Show menu
+    // button is the rail's one visible control.
+    const target = railHidden ? railToggleRef : wide || mobileDocketOpen ? takeTourRef : mobileMenuRef;
+    target.current?.focus();
   };
 
   return (
@@ -388,8 +513,11 @@ function AdminDesk() {
       <a href="#admin-content" className="skip-link skip-link--admin">
         Skip to main content
       </a>
-      <div className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto">
-        <div className="flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline px-sm lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
+      <div
+        className="admin-rail relative flex min-h-14 shrink-0 flex-row flex-wrap items-stretch bg-admin-rail-ground text-admin-rail-ink lg:sticky lg:top-0 lg:h-screen lg:w-admin-rail lg:flex-col lg:flex-nowrap lg:overflow-y-auto"
+        data-collapsed={railHidden ? 'true' : undefined}
+      >
+        <div className="admin-rail__job flex min-w-0 flex-1 items-center gap-xs border-admin-rail-rule border-e-admin-hairline px-sm lg:flex-none lg:gap-sm lg:border-b-admin-hairline lg:border-e-0 lg:px-md lg:py-sm">
           {markSrc && !markFailed ? (
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-admin-small bg-admin-ground-raised p-3xs lg:h-9 lg:w-9">
               <img
@@ -400,10 +528,28 @@ function AdminDesk() {
               />
             </span>
           ) : null}
-          <p className="min-w-0 truncate text-admin-base font-bold text-admin-rail-ink">
+          <p
+            className={`min-w-0 truncate text-admin-base font-bold text-admin-rail-ink${railHidden ? ' sr-only' : ''}`}
+          >
             {eventConfig.shortName}
           </p>
         </div>
+
+        {wide ? (
+          <div className="border-admin-rail-rule border-b-admin-hairline px-xs py-xs">
+            <button
+              type="button"
+              ref={railToggleRef}
+              className={`${railButtonClass} admin-rail-toggle w-full gap-2xs`}
+              aria-expanded={!railCollapsed}
+              aria-controls="admin-docket"
+              onClick={toggleRail}
+            >
+              <span className="admin-chevron" data-direction={railCollapsed ? 'end' : 'start'} aria-hidden="true" />
+              <span>{railCollapsed ? 'Show menu' : 'Hide menu'}</span>
+            </button>
+          </div>
+        ) : null}
 
         <details
           className="admin-mobile-docket shrink-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
@@ -424,33 +570,63 @@ function AdminDesk() {
             </span>
             <span className="shrink-0">Menu</span>
           </summary>
-          <div className="admin-mobile-docket__content fixed inset-x-0 bottom-0 top-14 z-40 min-h-0 overflow-y-auto overscroll-contain bg-admin-rail-ground lg:static lg:z-auto lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-visible">
+          <div
+            id="admin-docket"
+            hidden={railHidden}
+            className="admin-mobile-docket__content fixed inset-x-0 bottom-0 top-14 z-40 min-h-0 overflow-y-auto overscroll-contain bg-admin-rail-ground lg:static lg:z-auto lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-visible">
             <nav aria-label="Admin sections" className="flex-1 px-md py-sm lg:px-xs">
-              {docket.map((group) => (
-                <div key={group.id} className="py-xs first:pt-0 lg:mt-sm lg:py-0 lg:first:mt-0">
-                  {group.label ? (
-                    <p className="admin-folio px-sm pb-3xs pt-2xs">
-                      {group.label}
-                    </p>
-                  ) : null}
-                  <ul className="flex flex-col gap-3xs">
-                    {group.items.map((item) => (
-                      <li key={item.to} className="w-full">
-                        <NavLink
-                          to={`${ROOT}/${item.to}`}
-                          className={docketItemClass}
-                          onClick={() => {
-                            if (!wide) mobileMenuRef.current?.focus();
-                            setMobileDocketOpen(false);
-                          }}
-                        >
-                          {item.label}
-                        </NavLink>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+              {docket.map((group) => {
+                const open = docketGroupOpen(group, groupState);
+                const listId = `admin-docket-group-${group.id}`;
+                const headId = `${listId}-head`;
+                // A closed group that holds the current page names it, so
+                // the reader never loses where they are.
+                const current = !open && group.id === activeGroup ? activeSection?.label : null;
+                return (
+                  <div key={group.id} className="py-xs first:pt-0 lg:mt-sm lg:py-0 lg:first:mt-0">
+                    {group.label ? (
+                      <button
+                        type="button"
+                        id={headId}
+                        className="admin-docket-group-toggle admin-folio"
+                        aria-expanded={open}
+                        aria-controls={listId}
+                        onClick={() => toggleGroup(group)}
+                      >
+                        <span className="min-w-0 flex-1">
+                          {group.label}
+                          {current ? <span className="sr-only">, current page: </span> : null}
+                          {current ? (
+                            <span className="admin-docket-group-toggle__current">{current}</span>
+                          ) : null}
+                        </span>
+                        <span className="admin-chevron" data-direction={open ? 'up' : 'down'} aria-hidden="true" />
+                      </button>
+                    ) : null}
+                    <ul
+                      id={listId}
+                      hidden={!open}
+                      aria-labelledby={group.label ? headId : undefined}
+                      className="admin-docket-group flex flex-col gap-3xs"
+                    >
+                      {group.items.map((item) => (
+                        <li key={item.to} className="w-full">
+                          <NavLink
+                            to={`${ROOT}/${item.to}`}
+                            className={docketItemClass}
+                            onClick={() => {
+                              if (!wide) mobileMenuRef.current?.focus();
+                              setMobileDocketOpen(false);
+                            }}
+                          >
+                            {item.label}
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
             </nav>
 
             <div className="flex flex-wrap items-center justify-between gap-xs border-admin-rail-rule border-t-admin-hairline px-md py-sm lg:flex-col lg:items-stretch">

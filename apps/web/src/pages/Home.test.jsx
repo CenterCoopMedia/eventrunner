@@ -209,6 +209,12 @@ describe('Home pitch action', () => {
     }
   });
 
+  it('links to the pitch page while a call with no deadline is open', () => {
+    pitchCall = { enabled: true, closesAt: null, externalFormUrl: null };
+    render(<Home />);
+    expect(screen.getByRole('link', { name: 'Pitch a session' })).toHaveAttribute('href', '/pitch');
+  });
+
   it('removes the pitch action at the deadline without a reload', async () => {
     vi.useFakeTimers({ now: Date.parse('2027-01-31T23:59:00Z') });
     pitchCall = { enabled: true, closesAt: '2027-01-31T23:59:30Z' };

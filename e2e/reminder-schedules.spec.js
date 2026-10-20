@@ -9,7 +9,7 @@
 // speaker and the staff grant are removed at the end, so the speaker
 // reminders spec still sees the shipped wording.
 import { test, expect } from '@playwright/test';
-import { adminDb, signIn } from './helpers.mjs';
+import { adminDb, openAdminGroups, signIn } from './helpers.mjs';
 
 const STAFF_EMAIL = 'e2e-schedules-staff@example.test';
 
@@ -50,7 +50,7 @@ test.describe.serial('Scheduled reminders', () => {
     await page.goto('/admin/reminders');
     await expect(page).toHaveURL(/\/admin\/reminders\/scheduled$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Scheduled reminders' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('schedule-state')).toHaveText('Scheduled speaker reminders are off.');
 
     // A due date thirty days out, at 17:00 on the event clock.
@@ -85,7 +85,10 @@ test.describe.serial('Scheduled reminders', () => {
     await page.getByRole('button', { name: 'Save wording' }).click();
     await expect(page.getByText('Wording saved. The next preview and send use it.')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Scheduled reminders' }).first().click();
+    // Back through the rail: the item sits in the Communications group,
+    // which is folded while a Program page is open.
+    await openAdminGroups(page);
+    await page.getByRole('navigation', { name: 'Admin sections' }).getByRole('link', { name: 'Scheduled reminders' }).click();
     await expect(page.getByTestId('schedule-state')).toContainText('Scheduled speaker reminders are paused.');
     await expect(page.getByText('Paused: The reminder wording changed after it was approved. Preview the wording, then approve it again.')).toBeVisible();
   });
