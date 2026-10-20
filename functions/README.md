@@ -349,7 +349,10 @@ answer (503 `stripe-unavailable`) is retried with the same request and key for 2
 a Stripe 4xx closes the attempt (502 `stripe-refused`). A second transaction checks
 Stripe's answer against the attempt (id, https URL, amount, currency, metadata, mode),
 opens the link, drops the frozen request and key, and writes `invoices.pay-link-created`.
-A press while a link has more than 15 minutes left answers it (`repeated: true`).
+A press while a link has more than 15 minutes left answers it (`repeated: true`); a
+press in its last 15 minutes cancels and expires it and makes a new one, except while an
+email of the invoice is `sending` (409, `refuseWhileSending`). While any `paymentReviews`
+entry is unresolved, `createPayLink` answers 409 `payment-review-open`.
 `markPaid` and `void` set an open link to `cancelled` in their own transaction and then
 expire the Session at Stripe; `stripeClosed` records whether Stripe confirmed. The
 public link carries its address only while `open`.
@@ -365,7 +368,12 @@ paymentIntentId }, recordedBy: null }`, revision + 1, `invoices.paid` with `acto
 'stripe'`) or appends to `paymentReviews` (codes `invoice-void`,
 `invoice-already-paid`, `invoice-not-issued`, `link-cancelled`, `currency-mismatch`,
 `amount-mismatch`, `unknown-session`), writes `invoices.stripe-payment-flagged`, and
-creates a `system_errors` row (`invoice-payment-review`) so the operator is alerted. A
+creates a `system_errors` row (`invoice-payment-review`, id `invoice_review_<hash of the
+session id>`) so the operator is alerted. An `unknown-session` payment also cancels every
+open link and expires it at Stripe. `resolvePaymentReview` marks that alert resolved in
+the same transaction. `paidOn` is the Stripe event's `created` time on the event clock
+(`eventCreated` from the provider's verification), never later than processing time;
+`recordedAt` is processing time. A
 replayed or second event about a recorded session answers `duplicate` or
 `already-recorded`. `invoiceAdmin` binds `TICKETING_API_TOKEN` when the provider is
 Stripe; the webhook secret stays with `ticketingWebhook`.

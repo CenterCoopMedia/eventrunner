@@ -244,7 +244,8 @@ without Stripe ids or URLs, like orders.
 **Lifetime.** A Checkout Session ends within 24 hours. A link is made for 23 hours, and
 staff make a new one after it ends. One link is open at a time. A press in the last 15
 minutes of a link replaces it: the old link is cancelled and its Session expired, and a
-payment that completed on it first still counts. A payment applied through one link
+payment that completed on it first still counts. A link is not replaced while an email of
+the invoice is being sent, since that email states the link. A payment applied through one link
 closes and expires any other open link. A lost create answer is
 retried with the same request and key for 22 hours, inside Stripe's idempotency window and
 while the frozen end time is still valid. A Stripe 4xx closes the attempt.
@@ -259,7 +260,9 @@ the invoice (by Session id, or by the link id in its metadata when the create an
 lost), and checks `status=complete`, `payment_status=paid`, the amount against the link
 and the invoice total, and the currency. When all match and the invoice is issued, it
 marks the invoice paid (method `card`, via Stripe, with the Session and PaymentIntent
-ids), raises the revision, and writes the `admin_logs` row. A replayed or second event
+ids), raises the revision, and writes the `admin_logs` row. The paid date is the day of
+Stripe's event on the event clock, so a late or retried delivery keeps the real day; the
+time the site recorded it is kept apart. A replayed or second event
 about a recorded Session changes nothing. PaymentIntent, charge, refund and dispute events
 that carry invoice metadata are acknowledged without work.
 
@@ -267,7 +270,10 @@ that carry invoice metadata are acknowledged without work.
 through a cancelled link, for another amount or currency, or with no stored link, is
 recorded on the invoice for review, written to `admin_logs`, and raised to the operator
 through a `system_errors` row, in the same transaction. The invoice status does not
-change. An operator closes the review with a note after acting in the Stripe Dashboard.
+change. A payment through a Session the invoice has no record of also cancels every open
+link and expires it at Stripe. While any review is open, no new link is made. An operator
+closes the review with a note after acting in the Stripe Dashboard; that closes its
+`system_errors` alert in the same transaction.
 Event Runner never refunds.
 
 **Void, paid by hand, reopen.** Void and a payment recorded by hand set an open link to

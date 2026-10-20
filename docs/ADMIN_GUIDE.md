@@ -582,7 +582,7 @@ The link opens a Stripe payment page for the invoice total, in the invoice curre
 
 While a link works, the PDF prints it under **Pay by card**, and **Email invoice** puts it in the email. The bank details under **How to pay** still print.
 
-When the sponsor pays, Stripe tells the site. The invoice becomes **Paid** on its own, with the method **Card (Stripe)**, the Stripe payment ID and today's date on the event's clock. The audit log records it. Nobody needs to select **Mark paid**.
+When the sponsor pays, Stripe tells the site. The invoice becomes **Paid** on its own, with the method **Card (Stripe)**, the Stripe payment ID and the date Stripe took the payment, on the event's clock. The audit log records it. Nobody needs to select **Mark paid**.
 
 In Stripe test mode, the record says so, and no real money moves.
 
@@ -590,7 +590,7 @@ If Stripe does not answer when you make a link, the page says so. Select **Make 
 
 **Void and Mark paid close the link.** When an operator voids the invoice, or someone records a payment with **Mark paid**, the link closes on the record, and the site asks Stripe to end the payment page. If Stripe cannot be reached, the record says Stripe was not told, and the page may still work until it ends. The record lists every earlier link and how it ended.
 
-**A card payment that does not fit is never applied.** Stripe can take a payment the invoice did not expect: after a void, after the invoice was paid another way, through a closed link, for another amount or currency, or through a payment page the invoice has no record of. The invoice does not change. The payment is recorded on the invoice under **A card payment needs review**, the invoice list shows **Needs review**, the audit log records it, and the operator gets a system error alert. Check the payment in the Stripe Dashboard, then refund it there or record it another way. Then an operator selects **Mark reviewed**, writes a **Review note** and selects **Save review**. Staff see the review but cannot close it.
+**A card payment that does not fit is never applied.** Stripe can take a payment the invoice did not expect: after a void, after the invoice was paid another way, through a closed link, for another amount or currency, or through a payment page the invoice has no record of. The invoice does not change. The payment is recorded on the invoice under **A card payment needs review**, the invoice list shows **Needs review**, the audit log records it, and the operator gets a system error alert. Check the payment in the Stripe Dashboard, then refund it there or record it another way. Then an operator selects **Mark reviewed**, writes a **Review note** and selects **Save review**. This also closes the system error alert. Staff see the review but cannot close it. While a review is open, no new card payment link can be made. A payment through a page the invoice has no record of also closes every open link on the invoice.
 
 Refunds and disputes stay in the Stripe Dashboard. A refund does not change the invoice. If the money goes back, an operator reopens the invoice.
 
