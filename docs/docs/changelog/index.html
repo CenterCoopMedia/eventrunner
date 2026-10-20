@@ -130,6 +130,18 @@
           amended to restore invoicing.</li>
           </ul>
           <ul>
+          <li>Event settings has familiar controls for the time zone, the days, and the tracks. Staff
+          search for the time zone by city, region, zone name, or UTC offset and choose it from a
+          list on the WAI-ARIA combobox pattern. The list shows each zone&#39;s current offset, and
+          the field states the offset on the event days, including a clock change during the
+          event. The stored value is still the IANA name. Each day and track has its own labelled
+          remove control, and one compact add control sits in each panel heading. A new day gets a
+          <code>day-N</code> id that no day or session uses, so staff no longer type ids, and saved ids do not
+          change. Removing a day or track that sessions use first states what happens to those
+          sessions. The design guidance and the shape test now allow a listed compact chip, held
+          to a semantic contract, in place of a blanket ban (#475).</li>
+          </ul>
+          <ul>
           <li>Live updates have a category and an audience: everyone, approved attendees and speakers,
           or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
           approved attendee cannot get or list a speaker-only entry, and the card&#39;s queries carry the
