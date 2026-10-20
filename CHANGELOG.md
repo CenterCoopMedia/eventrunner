@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Event settings has familiar controls for the time zone, the days, and the tracks. Staff
+  search for the time zone by city, region, zone name, or UTC offset and choose it from a
+  list on the WAI-ARIA combobox pattern. The list shows each zone's current offset, and
+  the field states the offset on the event days, including a clock change during the
+  event. The stored value is still the IANA name. Each day and track has its own labelled
+  remove control, and one compact add control sits in each panel heading. A new day gets a
+  `day-N` id that no day or session uses, so staff no longer type ids, and saved ids do not
+  change. Removing a day or track that sessions use first states what happens to those
+  sessions. The design guidance and the shape test now allow a listed compact chip, held
+  to a semantic contract, in place of a blanket ban (#475).
+
 - Staff set the pitch call deadline and the ticket catalog's sale windows as a date and a
   time on the event's clock. The fields name the event's time zone and state the result in
   words, with the UTC offset for the chosen date. A time that daylight saving time skips is

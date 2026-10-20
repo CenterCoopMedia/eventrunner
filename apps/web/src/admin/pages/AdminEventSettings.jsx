@@ -22,9 +22,7 @@ import {
   SaveStatus,
   ServerErrorSummary,
   TextField,
-  dangerButtonClass,
   primaryButtonClass,
-  secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { StatusBadge } from '../components/adminChrome.jsx';
 import { subscribeAdminCollection } from '../adminSource.js';
@@ -46,12 +44,16 @@ import MilestonesEditor, {
   normalizeMilestones,
   validateMilestoneRows,
 } from '../components/MilestonesEditor.jsx';
+import TimeZoneField from '../components/TimeZoneField.jsx';
+import EventDaysEditor, { daysPayload, normalizeDays } from '../components/EventDaysEditor.jsx';
+import EventTracksEditor, {
+  markTracksSaved,
+  normalizeTracks,
+  tracksPayload,
+} from '../components/EventTracksEditor.jsx';
 
 /** Shared empty result, so a render with no errors is not a new Map. */
 const NO_ERRORS = new Map();
-
-const blankDay = () => ({ id: '', label: '', date: '', startTime: '', endTime: '' });
-const blankTrack = () => ({ letter: '', name: '' });
 
 /** Editable slice of config/event, normalized for controlled inputs. */
 function toForm(eventConfig) {
@@ -68,18 +70,8 @@ function toForm(eventConfig) {
     shortName: c.shortName ?? '',
     tagline: c.tagline ?? '',
     timezone: c.timezone ?? '',
-    days: Array.isArray(c.days)
-      ? c.days.map((day) => ({
-          id: day?.id ?? '',
-          label: day?.label ?? '',
-          date: day?.date ?? '',
-          startTime: day?.startTime ?? '',
-          endTime: day?.endTime ?? '',
-        }))
-      : [],
-    tracks: Array.isArray(c.tracks)
-      ? c.tracks.map((track) => ({ letter: track?.letter ?? '', name: track?.name ?? '' }))
-      : [],
+    days: normalizeDays(c.days),
+    tracks: normalizeTracks(c.tracks),
     venue: {
       name: venue.name ?? '',
       addressLine1: venue.addressLine1 ?? '',
@@ -124,6 +116,27 @@ function toForm(eventConfig) {
   };
 }
 
+/**
+ * Session titles grouped by one reference a session carries (its day id,
+ * its track letter), each title once.
+ *
+ * @param {object[]} sessions
+ * @param {(session: object) => unknown} referenceOf
+ * @returns {Map<string, string[]>}
+ */
+function sessionUsage(sessions, referenceOf) {
+  const usage = new Map();
+  for (const session of sessions) {
+    const reference = referenceOf(session);
+    if (typeof reference !== 'string' || !reference) continue;
+    const rows = usage.get(reference) ?? [];
+    const label = session.title || session.id;
+    if (!rows.includes(label)) rows.push(label);
+    usage.set(reference, rows);
+  }
+  return usage;
+}
+
 /** Blank optional strings are sent as null — the server's "clear this" form. */
 const orNull = (value) => {
   const trimmed = typeof value === 'string' ? value.trim() : value;
@@ -156,20 +169,8 @@ function toPayload(form, { includeSender = true } = {}) {
     shortName: form.shortName,
     tagline: orNull(form.tagline),
     timezone: form.timezone,
-    days: form.days.map((day) => ({
-      id: day.id,
-      label: day.label,
-      date: day.date,
-      startTime: day.startTime,
-      endTime: day.endTime,
-    })),
-    // A letter is a wayfinding mark, so it is always sent as a capital —
-    // the server accepts A-Z only, and an operator should not have to know
-    // that to type one.
-    tracks: form.tracks.map((track) => ({
-      letter: String(track.letter ?? '').trim().toUpperCase(),
-      name: track.name,
-    })),
+    days: daysPayload(form.days),
+    tracks: tracksPayload(form.tracks),
     venue: {
       name: orNull(form.venue.name),
       addressLine1: orNull(form.venue.addressLine1),
@@ -319,17 +320,22 @@ export default function AdminEventSettings() {
     ?? socialErrors.get(field)
     ?? milestoneErrors.get(field)
     ?? fieldErrors.get(field);
-  const placeUsage = useMemo(() => {
-    const usage = new Map();
-    for (const session of [...liveSessions, ...draftSessions]) {
-      if (!session.placeId) continue;
-      const rows = usage.get(session.placeId) ?? [];
-      const label = session.title || session.id;
-      if (!rows.includes(label)) rows.push(label);
-      usage.set(session.placeId, rows);
-    }
-    return usage;
-  }, [liveSessions, draftSessions]);
+  const placeUsage = useMemo(
+    () => sessionUsage([...liveSessions, ...draftSessions], (session) => session.placeId),
+    [liveSessions, draftSessions],
+  );
+  // The sessions on each day and in each track, live and draft, so a
+  // removal can say what it does to them (issue #475).
+  const dayUsage = useMemo(
+    () => sessionUsage([...liveSessions, ...draftSessions], (session) => session.dayId),
+    [liveSessions, draftSessions],
+  );
+  const trackUsage = useMemo(
+    () => sessionUsage([...liveSessions, ...draftSessions], (session) => (
+      typeof session.track === 'string' ? session.track.trim().toUpperCase() : ''
+    )),
+    [liveSessions, draftSessions],
+  );
 
   const setGroup = (group, patch) =>
     setForm((current) => ({ ...current, [group]: { ...current[group], ...patch } }));
@@ -340,16 +346,6 @@ export default function AdminEventSettings() {
         ...current.speakerResources,
         slideTemplate: { ...current.speakerResources.slideTemplate, ...patch },
       },
-    }));
-  const setDay = (index, patch) =>
-    setForm((current) => ({
-      ...current,
-      days: current.days.map((day, i) => (i === index ? { ...day, ...patch } : day)),
-    }));
-  const setTrack = (index, patch) =>
-    setForm((current) => ({
-      ...current,
-      tracks: current.tracks.map((track, i) => (i === index ? { ...track, ...patch } : track)),
     }));
 
   async function submit(event) {
@@ -395,6 +391,8 @@ export default function AdminEventSettings() {
           ...current.venue,
           places: current.venue.places.map((place) => ({ ...place, persisted: true })),
         },
+        // The saved letters are now the ones sessions can point at.
+        tracks: markTracksSaved(current.tracks),
       }));
       setSocialChecked(false);
       setMilestonesChecked(false);
@@ -441,7 +439,7 @@ export default function AdminEventSettings() {
             <p>The name, event days, and session tracks that shape the schedule.</p>
           </div>
           <div className="admin-settings-grid admin-settings-grid--essentials">
-            <Panel className="admin-settings-card" title="Identity" description="The event name and timezone used on the site and in email.">
+            <Panel className="admin-settings-card" title="Identity" description="The event name and time zone used on the site and in email.">
               <div className="admin-settings-fields">
                 <TextField
                   label="Event name"
@@ -464,143 +462,28 @@ export default function AdminEventSettings() {
                     error={errorFor('tagline')}
                   />
                 </div>
-                <TextField
-                  label="Timezone"
-                  value={form.timezone}
-                  onChange={(value) => setForm((c) => ({ ...c, timezone: value }))}
-                  error={errorFor('timezone')}
-                  hint="An IANA timezone name, e.g. America/New_York."
-                />
+                <div className="admin-settings-field--wide">
+                  <TimeZoneField
+                    value={form.timezone}
+                    onChange={(value) => setForm((c) => ({ ...c, timezone: value }))}
+                    error={errorFor('timezone')}
+                    days={form.days}
+                  />
+                </div>
               </div>
             </Panel>
-            <Panel className="admin-settings-card"
-              title="Days"
-              description="Listed in ascending date order; each day needs an id, a date, and start/end times."
-              actions={
-                <button
-                  type="button"
-                  className={secondaryButtonClass}
-                  onClick={() => setForm((c) => ({ ...c, days: [...c.days, blankDay()] }))}
-                >
-                  Add day
-                </button>
-              }
-            >
-              {form.days.length === 0 ? (
-                <p className="text-admin-sm text-admin-ink-secondary">No days configured yet.</p>
-              ) : (
-                <ol className="admin-settings-row-list">
-                  {form.days.map((day, index) => (
-                    <li
-                      key={index}
-                      className="admin-settings-row-card"
-                    >
-                      <p className="admin-settings-row-heading">Day {index + 1}</p>
-                      <div className="admin-settings-fields">
-                        <TextField
-                          label={`Day ${index + 1} id`}
-                          value={day.id}
-                          onChange={(value) => setDay(index, { id: value })}
-                          error={errorFor(`days[${index}].id`)}
-                        />
-                        <TextField
-                          label={`Day ${index + 1} label`}
-                          value={day.label}
-                          onChange={(value) => setDay(index, { label: value })}
-                          error={errorFor(`days[${index}].label`)}
-                        />
-                        <TextField
-                          label={`Day ${index + 1} date`}
-                          type="date"
-                          value={day.date}
-                          onChange={(value) => setDay(index, { date: value })}
-                          error={errorFor(`days[${index}].date`) ?? errorFor(`days[${index}]`)}
-                        />
-                        <div className="admin-settings-field--wide admin-settings-time-fields">
-                          <TextField
-                            label={`Day ${index + 1} start`}
-                            type="time"
-                            value={day.startTime}
-                            onChange={(value) => setDay(index, { startTime: value })}
-                            error={errorFor(`days[${index}].startTime`)}
-                          />
-                          <TextField
-                            label={`Day ${index + 1} end`}
-                            type="time"
-                            value={day.endTime}
-                            onChange={(value) => setDay(index, { endTime: value })}
-                            error={errorFor(`days[${index}].endTime`)}
-                          />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className={`${dangerButtonClass} mt-sm`}
-                        onClick={() =>
-                          setForm((c) => ({ ...c, days: c.days.filter((_, i) => i !== index) }))
-                        }
-                      >
-                        Remove day {index + 1}
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Panel>
-            <Panel className="admin-settings-card"
-              title="Tracks"
-              description="Sessions that run at the same time, on separate lines. Each line has a letter and a name, and the schedule shows both. Leave this empty if everything happens in one room."
-              actions={
-                <button
-                  type="button"
-                  className={secondaryButtonClass}
-                  onClick={() => setForm((c) => ({ ...c, tracks: [...c.tracks, blankTrack()] }))}
-                >
-                  Add track
-                </button>
-              }
-            >
-              {form.tracks.length === 0 ? (
-                <p className="text-admin-sm text-admin-ink-secondary">No tracks configured yet.</p>
-              ) : (
-                <ol className="admin-settings-row-list">
-                  {form.tracks.map((track, index) => (
-                    <li
-                      key={index}
-                      className="admin-settings-row-card"
-                    >
-                      <p className="admin-settings-row-heading">Track {index + 1}</p>
-                      <div className="admin-settings-fields">
-                        <TextField
-                          label={`Track ${index + 1} letter`}
-                          value={track.letter}
-                          onChange={(value) => setTrack(index, { letter: value })}
-                          error={errorFor(`tracks[${index}].letter`)}
-                          maxLength={1}
-                          hint="One letter, A to Z. It is how a reader tells the lines apart."
-                        />
-                        <TextField
-                          label={`Track ${index + 1} name`}
-                          value={track.name}
-                          onChange={(value) => setTrack(index, { name: value })}
-                          error={errorFor(`tracks[${index}].name`)}
-                          hint="Shown beside the letter, e.g. Practice."
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className={`${dangerButtonClass} mt-sm`}
-                        onClick={() =>
-                          setForm((c) => ({ ...c, tracks: c.tracks.filter((_, i) => i !== index) }))
-                        }
-                      >
-                        Remove track {index + 1}
-                      </button>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </Panel>
+            <EventDaysEditor
+              days={form.days}
+              onChange={(days) => setForm((c) => ({ ...c, days }))}
+              errorFor={errorFor}
+              dayUsage={dayUsage}
+            />
+            <EventTracksEditor
+              tracks={form.tracks}
+              onChange={(tracks) => setForm((c) => ({ ...c, tracks }))}
+              errorFor={errorFor}
+              trackUsage={trackUsage}
+            />
           </div>
         </div>
         <div role="group" aria-labelledby="event-settings-venue">

@@ -318,6 +318,76 @@ describe('event settings', () => {
     ]);
   });
 
+  // Issue #475: the time zone is chosen from a searchable list, and the
+  // save still sends the IANA name.
+  it('chooses the time zone from the list by keyboard and saves the IANA name', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    const zone = screen.getByRole('combobox', { name: 'Time zone' });
+    expect(zone.value).toMatch(/^New York \(Eastern Time, UTC−0[45]:00\)$/);
+    expect(screen.queryByLabelText('Timezone')).toBeNull();
+
+    fireEvent.focus(zone);
+    fireEvent.change(zone, { target: { value: 'los angeles' } });
+    fireEvent.keyDown(zone, { key: 'Enter' });
+    // Enter answered the list; nothing was sent.
+    expect(fetch).not.toHaveBeenCalled();
+    expect(zone.value).toMatch(/^Los Angeles \(Pacific Time, UTC−0[78]:00\)$/);
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.timezone).toBe('America/Los_Angeles');
+  });
+
+  // Issue #475: a new day gets its id from the form, the saved day keeps
+  // its own, and a refused save tried again sends the same ids.
+  it('gives a new day an id, keeps the saved one, and resends the same id after a refusal', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    expect(screen.queryByLabelText('Day 1 id')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add day' }));
+    fireEvent.change(screen.getByLabelText('Day 2 label'), { target: { value: 'Day two' } });
+    fireEvent.change(screen.getByLabelText('Day 2 date'), { target: { value: '2026-10-16' } });
+    fireEvent.change(screen.getByLabelText('Day 2 start'), { target: { value: '09:00' } });
+    fireEvent.change(screen.getByLabelText('Day 2 end'), { target: { value: '16:00' } });
+
+    fetch.mockResolvedValueOnce(errorResponse(400, 'bad-request', 'name: must be a nonempty string'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await screen.findByRole('alert');
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+
+    const expected = [
+      LIVE_EVENT.days[0],
+      { id: 'day-2', label: 'Day two', date: '2026-10-16', startTime: '09:00', endTime: '16:00' },
+    ];
+    expect(bodyOf(0).event.days).toEqual(expected);
+    expect(bodyOf(1).event.days).toEqual(expected);
+  });
+
+  it('states what removing a day does to the sessions on it before it goes', async () => {
+    await renderAt('/admin/settings');
+    await pushConfig('event', LIVE_EVENT);
+    act(() => adminSubscriptions.get('cmsSchedule')([{ id: 's1', title: 'Opening plenary', dayId: 'day-1' }]));
+    act(() => adminSubscriptions.get('cmsSchedule_drafts')([{ id: 's2', title: 'Draft workshop', dayId: 'day-1' }]));
+
+    const day = screen.getByRole('listitem', { name: /Day 1/ });
+    expect(within(day).getByText('Used by 2 sessions: Opening plenary and Draft workshop.')).toBeInTheDocument();
+    fireEvent.click(within(day).getByRole('button', { name: 'Remove day 1, Day one' }));
+    const warning = within(day).getByRole('group', { name: 'Remove day 1?' });
+    expect(warning).toHaveTextContent('2 sessions use this day.');
+    fireEvent.click(within(warning).getByRole('button', { name: 'Keep day 1' }));
+    expect(screen.getByLabelText('Day 1 date')).toHaveValue('2026-10-15');
+
+    fetch.mockResolvedValueOnce(okResponse({ docPath: 'config/event' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save event settings' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).event.days).toEqual(LIVE_EVENT.days);
+  });
+
   it('edits venue places and one-way movements', async () => {
     await renderAt('/admin/settings');
     await pushConfig('event', {
@@ -657,7 +727,7 @@ describe('event settings', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('timezone: must be a valid IANA timezone (got "Mars/Olympus")');
     expect(alert).toHaveTextContent('sender.email: must be an email address');
-    expect(screen.getByLabelText('Timezone')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('combobox', { name: 'Time zone' })).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('Sender email')).toHaveAttribute('aria-invalid', 'true');
   });
 
