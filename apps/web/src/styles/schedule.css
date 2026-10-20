@@ -99,7 +99,7 @@
     align-items: stretch;
   }
 
-  .event-hero.event-hero--compact .event-hero__copy {
+  .event-hero.event-hero--compact.event-hero--illustrated .event-hero__copy {
     inline-size: auto;
   }
 

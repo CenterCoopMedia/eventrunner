@@ -2452,6 +2452,7 @@
      from the band's edge (#478). The inset is a margin, not padding, so a
      style's own rule (the Newsroom accent bar) sits inside it too. */
   .event-hero__copy {
+    container-type: inline-size;
     inline-size: calc(var(--hero-copy-column) - var(--hero-inset-inline));
     margin-inline-start: var(--hero-inset-inline);
     padding-block: var(--space-2xl);
@@ -2460,13 +2461,16 @@
     border-inline-start: var(--hero-copy-border-inline-start);
   }
   .event-hero__title {
-    font-size: var(--hero-title-size);
+    font-size: min(var(--hero-title-size), var(--hero-title-fit));
     line-height: .98;
     font-style: var(--hero-title-style);
     font-weight: var(--hero-title-weight);
     letter-spacing: var(--hero-title-tracking);
     text-transform: var(--hero-title-transform);
     text-wrap: balance;
+    /* A long word in the copy column breaks at a syllable with a hyphen
+       before it breaks at an arbitrary letter. */
+    hyphens: auto;
     overflow-wrap: anywhere;
     color: rgb(var(--color-text-primary-rgb));
   }

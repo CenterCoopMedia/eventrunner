@@ -420,8 +420,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The event hero no longer puts its title, intro or buttons on the photograph. From 640px
   up, the copy has its own column and the photograph fills the rest, in every site style.
-  The column is at least 22rem or 42% of the hero, so a style that asks for a wide
-  photograph gets a narrower one instead. The veil now softens only the photograph's
+  The column is at least 22rem or half the hero, so a style that asks for a wide
+  photograph gets a narrower one instead. From 640px up the title size is capped at a share
+  of the column's width, so a long word such as "Neighborhood" fits its line instead of
+  breaking at a letter. The veil now softens only the photograph's
   leading edge. The NC Local composition keeps its half-and-half layout (#345).
 
 - The event hero's title, dateline, intro and buttons no longer start at the hero band's

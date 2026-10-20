@@ -31,6 +31,7 @@ async function measureHero(page) {
     const copy = hero.querySelector('.event-hero__copy');
     const art = hero.querySelector('.event-hero__art');
     const boxes = [];
+    const brokenWords = [];
     const range = document.createRange();
     const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -38,6 +39,13 @@ async function measureHero(page) {
       range.selectNodeContents(node);
       for (const rect of range.getClientRects()) {
         if (rect.width > 0) boxes.push({ text: node.textContent.trim().slice(0, 40), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
+      }
+      // A word whose letters land on two lines was broken inside the word.
+      for (const match of node.textContent.matchAll(/\S+/g)) {
+        range.setStart(node, match.index);
+        range.setEnd(node, match.index + match[0].length);
+        const lines = new Set([...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)));
+        if (lines.size > 1) brokenWords.push(match[0]);
       }
     }
     for (const control of copy.querySelectorAll('a, button')) {
@@ -51,6 +59,7 @@ async function measureHero(page) {
       hero: { left: heroRect.left, right: heroRect.right },
       art: artRect ? { left: artRect.left, top: artRect.top } : null,
       boxes,
+      brokenWords,
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
     };
@@ -62,8 +71,14 @@ function round(value) {
 }
 
 /** Every way the copy breaks the contract at one width, as readable lines. */
-function heroFaults(width, metrics) {
+function heroFaults(width, metrics, copy) {
   const faults = [];
+  // A narrower copy column must not break a word at an arbitrary letter.
+  // The long stress title's longest word is wider than a 320px phone line in
+  // most styles; that was already so before the column existed.
+  if (metrics.brokenWords.length && (copy !== 'long' || width >= SIDE_BY_SIDE_MIN)) {
+    faults.push(`breaks inside ${metrics.brokenWords.join(', ')}`);
+  }
   if (metrics.scrollWidth > metrics.clientWidth) faults.push(`page scrolls sideways (${metrics.scrollWidth}px)`);
   expect(metrics.boxes.length, 'the hero copy has text').toBeGreaterThan(0);
   const textLeft = Math.min(...metrics.boxes.map((box) => box.left));
@@ -116,6 +131,8 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
             await titleRef.set({ ...savedTitle, section: 'hero', field: 'title', blockType: 'text', value: LONG_TITLE, visible: true });
           } else if (savedTitle) {
             await titleRef.set(savedTitle);
+          } else {
+            await titleRef.delete();
           }
           for (const route of ['/', '/schedule']) {
             await page.setViewportSize({ width: 1280, height: 900 });
@@ -130,7 +147,7 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
             await page.evaluate(() => document.fonts.ready);
             for (const width of WIDTHS) {
               await page.setViewportSize({ width, height: 900 });
-              const found = heroFaults(width, await measureHero(page));
+              const found = heroFaults(width, await measureHero(page), copy);
               report.push({ route, theme, mode, copy, width, faults: found });
               for (const fault of found) faults.push(`${route} ${theme} ${mode} ${copy} ${width}px: ${fault}`);
             }
@@ -142,6 +159,8 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
     // A hero with no photograph is a coloured band: its copy needs the same
     // inset on both sides (#478).
     await imageRef.delete();
+    if (savedTitle) await titleRef.set(savedTitle);
+    else await titleRef.delete();
     for (const theme of THEMES) {
       for (const mode of MODES) {
         await themeRef.set({ ...savedTheme, preset: theme, mode });
@@ -153,7 +172,7 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
           await expect(page.locator('.event-hero:not(.event-hero--illustrated) .event-hero__title')).toBeVisible();
           for (const width of WIDTHS) {
             await page.setViewportSize({ width, height: 900 });
-            const found = heroFaults(width, await measureHero(page));
+            const found = heroFaults(width, await measureHero(page), 'normal');
             report.push({ route, theme, mode, copy: 'no photograph', width, faults: found });
             for (const fault of found) faults.push(`${route} ${theme} ${mode} no photograph ${width}px: ${fault}`);
           }
