@@ -29,7 +29,6 @@ import AdminFeatureSettings from './pages/AdminFeatureSettings.jsx';
 import AdminBadgeSettings from './pages/AdminBadgeSettings.jsx';
 import AdminMedia from './pages/AdminMedia.jsx';
 import AdminLiveUpdates from './pages/AdminLiveUpdates.jsx';
-import AdminAnnouncements from './pages/AdminAnnouncements.jsx';
 import AdminFeedback from './pages/AdminFeedback.jsx';
 import AdminSystemErrors from './pages/AdminSystemErrors.jsx';
 import AdminTicketing from './pages/AdminTicketing.jsx';
@@ -101,6 +100,9 @@ const AdminTimelineEditor = lazy(() => import('./pages/AdminTimelineEditor.jsx')
 const AdminInvoicesList = lazy(() => import('./pages/AdminInvoicesList.jsx'));
 const AdminInvoiceEditor = lazy(() => import('./pages/AdminInvoiceEditor.jsx'));
 const AdminInvoiceSettings = lazy(() => import('./pages/AdminInvoiceSettings.jsx'));
+// Announcements (issues #202, #203): the banner editor, the email composer,
+// its saved messages and its send history load when somebody opens them.
+const AdminAnnouncements = lazy(() => import('./pages/AdminAnnouncements.jsx'));
 
 function DeferredAdminPage({ children, label }) {
   return <Suspense fallback={<AdminLoadingState label={`Loading ${label}…`} />}>{children}</Suspense>;
@@ -314,7 +316,10 @@ export default function AdminApp() {
             element={<DeferredAdminPage label="the record import"><AdminRecordImport /></DeferredAdminPage>}
           />
           <Route path="live-updates" element={<AdminLiveUpdates />} />
-          <Route path="announcements" element={<AdminAnnouncements />} />
+          <Route
+            path="announcements"
+            element={<DeferredAdminPage label="announcements"><AdminAnnouncements /></DeferredAdminPage>}
+          />
           <Route path="feedback" element={<AdminFeedback />} />
           <Route
             path="email-log"
