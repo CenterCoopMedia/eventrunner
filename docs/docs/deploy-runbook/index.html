@@ -250,7 +250,11 @@
           <code>cloudscheduler.admin</code> is what <code>firebase deploy --only functions</code> needs to create/update the Cloud
           Scheduler job behind <code>cleanupExpiredAuthChallenges</code> (an <code>onSchedule</code> v2 function,
           <code>functions/src/auth/otp.cjs</code>) — every deployment has at least this one scheduled function, so the
-          role is not conditional the way <code>secretmanager.secretAccessor</code> is.</p>
+          role is not conditional the way <code>secretmanager.secretAccessor</code> is.
+          The same role creates the job behind <code>runScheduledReminders</code> (<code>functions/src/reminders/run.cjs</code>,
+          every 60 minutes, issue #518). That function binds the mail provider&#39;s secrets, and the operator
+          webhook&#39;s when <code>EVENT_OPERATOR_NOTIFIER=webhook</code>, so the secret bindings in §2 cover it. It sends
+          nothing until staff approve a reminder schedule in the admin.</p>
           <p>Bind the deploy service account so <strong>only</strong> this repository, on <code>refs/heads/main</code>, may impersonate
           it — both conditions in one <code>principalSet</code>, via the combined attribute mapped in §1:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gcloud iam service-accounts add-iam-policy-binding &quot;${DEPLOY_SA_EMAIL}&quot; \
@@ -529,22 +533,22 @@
           client already past step 3 never needs it again.</p>
           <h2 id="6-verifying-the-setup">6. Verifying the setup<a class="heading-anchor" href="#6-verifying-the-setup" aria-label="Link to this section">#</a></h2>
           <ul>
-          <li><code>gcloud iam service-accounts get-iam-policy &quot;${DEPLOY_SA_EMAIL}&quot; --project=&lt;GCP_PROJECT_ID&gt;
+          <li><p><code>gcloud iam service-accounts get-iam-policy &quot;${DEPLOY_SA_EMAIL}&quot; --project=&lt;GCP_PROJECT_ID&gt;
           --format=&quot;json(bindings)&quot;</code> shows the <code>workloadIdentityUser</code> binding from §2, and its member ends
           in <code>.../attribute.repository_and_ref/&lt;GH_ORG&gt;/&lt;GH_REPO&gt;#refs/heads/main</code> — not
           <code>attribute.repository/&lt;GH_ORG&gt;/&lt;GH_REPO&gt;</code> alone. A repository-only binding is the gap this runbook
           now closes: it lets any dispatched run on any branch of this repository impersonate the deploy
-          service account.</li>
-          <li>Confirm the negative case as well: <code>gh workflow run deploy.yml --ref
+          service account.</p></li>
+          <li><p>Confirm the negative case as well: <code>gh workflow run deploy.yml --ref
           &lt;some-non-main-branch&gt; -f client=&lt;CLIENT_ENV&gt;</code> must fail at the <code>google-github-actions/auth</code> step
           with a token-exchange <code>permission_denied</code> — that is the WIF condition doing its job. It should
           also fail earlier, at &quot;Waiting for review&quot; or immediately, if the deployment branch rule (§2) is
-          set, since GitHub itself won&#39;t start a job against <code>&lt;CLIENT_ENV&gt;</code> from that ref.</li>
-          <li>A <code>workflow_dispatch</code> run of <code>deploy.yml</code> with <code>client: &lt;CLIENT_ENV&gt;</code> <strong>from <code>main</code></strong> should reach
+          set, since GitHub itself won&#39;t start a job against <code>&lt;CLIENT_ENV&gt;</code> from that ref.</p></li>
+          <li><p>A <code>workflow_dispatch</code> run of <code>deploy.yml</code> with <code>client: &lt;CLIENT_ENV&gt;</code> <strong>from <code>main</code></strong> should reach
           the <code>smoke</code> job and pass — it OPTIONS-preflights every endpoint in <code>.github/smoke-endpoints.json</code>
           against <code>https://&lt;EVENT_FIREBASE_REGION&gt;-&lt;EVENT_FIREBASE_PROJECT_ID&gt;.cloudfunctions.net</code> and GETs
-          <code>EVENT_PUBLIC_URL</code>.</li>
-          <li>Between <code>hosting</code> and <code>smoke</code>, the <code>post</code> job redeploys <code>updatesMeta</code> and <code>routeMeta</code>
+          <code>EVENT_PUBLIC_URL</code>.</p></li>
+          <li><p>Between <code>hosting</code> and <code>smoke</code>, the <code>post</code> job redeploys <code>updatesMeta</code> and <code>routeMeta</code>
           (<code>functions/src/public/og.cjs</code>) alone. Both self-fetch the deployed hosting <code>index.html</code> as their
           SSR template and hold it per container (issue #27; M7 issue 4). That self-fetch carries its own
           three-second deadline (<code>TEMPLATE_FETCH_TIMEOUT_MS</code>), so a hosting connection that stalls rather
@@ -559,8 +563,8 @@
           was the ADR&#39;s <code>post</code> step (§8.1), deferred at the M2 deploy PR pending
           <code>functions/src/public/og.cjs</code> landing — <code>smoke</code>&#39;s OPTIONS-preflight of both functions now runs
           against the freshly-redeployed instances, not the ones from the <code>functions</code> job earlier in the
-          same run.</li>
-          <li><strong>What <code>routeMeta</code> costs, and the cache header that bounds it.</strong> Every public route that is not a
+          same run.</p></li>
+          <li><p><strong>What <code>routeMeta</code> costs, and the cache header that bounds it.</strong> Every public route that is not a
           static file now reaches a function on its first uncached load, rather than being rewritten
           straight to <code>index.html</code>. Three things bound that. The response carries
           <code>Cache-Control: public, max-age=0, s-maxage=300, must-revalidate</code>, so the Hosting CDN — not the
@@ -578,8 +582,8 @@
           and reach the function, where they cost one Firestore page lookup and return the plain shell.
           That is a line on the functions invocation graph. <code>routeMeta</code> sets <code>maxInstances</code> to 20
           so that traffic stays bounded. The rewrite stays, because this function is the front door.
-          App Check stays off this function. A crawler and a first visit have no App Check token.</li>
-          <li><strong>The card image a deployment falls back to is a PNG, not the SVG placeholder.</strong> The Open Graph
+          App Check stays off this function. A crawler and a first visit have no App Check token.</p></li>
+          <li><p><strong>The card image a deployment falls back to is a PNG, not the SVG placeholder.</strong> The Open Graph
           and Twitter crawlers fetch the image themselves and do not reliably decode SVG, so a card built
           on <code>branding/og-default.svg</code> unfurls with an empty frame, which a reader takes for a broken link
           rather than a plain one. <code>routeMeta</code> therefore skips any SVG candidate, wherever it comes from (the
@@ -588,16 +592,16 @@
           <code>scripts/dev/build-og-placeholder.mjs</code> and shipped in the web build. An operator who uploads a
           PNG or a JPEG through the Branding tab gets theirs instead. The tags state the image type always
           and the size only for the bundled card, which is the only one anything here has measured. The
-          SVG stays in the bundle: the app renders it in-page, where SVG is fine.</li>
-          <li><strong><code>routeMeta</code> does not answer 5xx once it has ever fetched a template.</strong> The site&#39;s whole front
+          SVG stays in the bundle: the app renders it in-page, where SVG is fine.</p></li>
+          <li><p><strong><code>routeMeta</code> does not answer 5xx once it has ever fetched a template.</strong> The site&#39;s whole front
           door is this function, so each read it makes degrades on its own: a hosting request that fails or
           answers non-2xx serves the held template, and a config read that fails — or an unset
           <code>EVENT_PUBLIC_URL</code> — serves that template with the event-level tags and no <code>noindex</code>, because a
           read that failed is not a page that does not exist. Only a container that has never fetched a
           template at all answers 500. A run of 500s from this function therefore means the very first
           self-fetch is failing: check <code>EVENT_PUBLIC_URL</code> and that hosting is actually serving
-          <code>/index.html</code>.</li>
-          <li><code>firebase.json</code>&#39;s rewrite <strong>order</strong> is load-bearing. <code>/updates/**</code> goes to <code>updatesMeta</code> first;
+          <code>/index.html</code>.</p></li>
+          <li><p><code>firebase.json</code>&#39;s rewrite <strong>order</strong> is load-bearing. <code>/updates/**</code> goes to <code>updatesMeta</code> first;
           then the account and staff routes (<code>/signin</code>, <code>/profile</code>, <code>/attendees</code>, <code>/attendees/**</code>,
           <code>/schedule/mine</code>, <code>/speaker/**</code>, <code>/ticket/**</code>, <code>/admin</code>, <code>/admin/**</code>) are rewritten straight to
           <code>/index.html</code>, because they carry nothing a crawler should index and spending a function
@@ -607,13 +611,13 @@
           serves an existing static file before it applies any rewrite, which is what keeps <code>/assets/**</code>,
           <code>/branding/**</code>, and <code>routeMeta</code>&#39;s own self-fetch of <code>/index.html</code> from re-entering the function.
           <code>scripts/deploy-workflow.test.cjs</code> asserts the whole arrangement, so a rewrite added out of order
-          fails the suite rather than a deploy.</li>
-          <li>Those same private sources appear again under <code>hosting.headers</code>, setting
+          fails the suite rather than a deploy.</p></li>
+          <li><p>Those same private sources appear again under <code>hosting.headers</code>, setting
           <code>X-Robots-Tag: noindex</code>. The shell they serve is one file for every route, so it cannot carry a
           per-route robots meta the way a <code>routeMeta</code> response can; hosting states it in the response
           header instead, which crawlers read the same way. Without it, the one part of the site with no
-          server-set tags would be the part that most needs them.</li>
-          <li>Both hosting rewrites name their function&#39;s Cloud Functions <strong>region</strong> in object form
+          server-set tags would be the part that most needs them.</p></li>
+          <li><p>Both hosting rewrites name their function&#39;s Cloud Functions <strong>region</strong> in object form
           (<code>&quot;function&quot;: { &quot;functionId&quot;: &quot;...&quot;, &quot;region&quot;: &quot;...&quot; }</code>) — the shorthand string form
           (<code>&quot;function&quot;: &quot;routeMeta&quot;</code>) silently defaults to <code>us-central1</code>, which would route every
           non-default-region client&#39;s public requests at a backend that does not exist there (a 404 from
@@ -627,11 +631,21 @@
           be left behind on the placeholder. Nothing is committed back — the committed file keeps
           <code>us-central1</code> as its placeholder, correct for that value and every client that doesn&#39;t override
           the region. The site publisher applies the same patch in code (<code>patchHostingRegion</code>,
-          <code>scripts/publish-site.cjs</code>).</li>
-          <li>If <code>google-github-actions/auth</code> fails with <code>permission_denied</code> on a run you expected to succeed
+          <code>scripts/publish-site.cjs</code>).</p></li>
+          <li><p><strong>The reminder scheduler job exists.</strong> After the first deploy that includes
+          <code>runScheduledReminders</code>, list the Cloud Scheduler jobs and find
+          <code>firebase-schedule-runScheduledReminders-&lt;EVENT_FIREBASE_REGION&gt;</code>, set to <code>every 60 minutes</code>:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gcloud scheduler jobs list --project=&lt;GCP_PROJECT_ID&gt; --location=&lt;EVENT_FIREBASE_REGION&gt; \
+            --format=&quot;table(name,schedule,state)&quot;
+          </code></pre>
+          <p>The job must be <code>ENABLED</code>. A paused or missing job means no scheduled reminder goes out, and
+          the admin&#39;s <strong>Scheduled reminders</strong> page then shows a last run older than an hour while a
+          schedule is on. The job runs every hour on every deployment; a run with no schedule turned on
+          reads one document and returns.</p></li>
+          <li><p>If <code>google-github-actions/auth</code> fails with <code>permission_denied</code> on a run you expected to succeed
           (dispatched from <code>main</code>), the attribute condition (§1) or the repository+ref binding (§2) is the
           first thing to re-check — copy the exact <code>repository</code> and <code>ref</code> claims GitHub sent from the failed
-          run&#39;s log against what the binding names.</li>
+          run&#39;s log against what the binding names.</p></li>
           </ul>
           <h3 id="archiving-an-event-with-ticket-sales">Archiving an event with ticket sales<a class="heading-anchor" href="#archiving-an-event-with-ticket-sales" aria-label="Link to this section">#</a></h3>
           <p>Pause new sales with the catalog&#39;s <code>salesPaused</code> setting while payment, held-capacity,

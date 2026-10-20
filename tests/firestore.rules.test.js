@@ -586,6 +586,10 @@ describe("server-only collections stay deny-all", () => {
     "record_imports",
     // Speaker reminder bookkeeping: the batch and time of the last reminder.
     "speaker_reminders",
+    // Reminder schedules (issue #518): settings, run lease, send ledger.
+    "reminder_schedules",
+    "reminder_schedule_runs",
+    "reminder_ledger",
     // Ticketing (spec §3.3, §4.2). `tickets` names every purchaser's
     // address and who claimed it; `ticket_webhook_deliveries` is the dedup
     // claim store a forged pre-claim could use to make a real delivery
@@ -598,6 +602,11 @@ describe("server-only collections stay deny-all", () => {
     "ticket_inventory",
     "ticket_orders",
     "ticket_payment_attempts",
+    // Invoicing (issue #208): billing contacts, the issuer's bank details,
+    // and the gapless number sequence.
+    "invoices",
+    "invoice_counters",
+    "invoice_settings",
   ]) {
     it(`denies all access to ${c}, admin included`, async () => {
       await assertFails(getDoc(doc(anon(), `${c}/d1`)));
@@ -684,6 +693,45 @@ describe("ticketing stays server-only (spec §3.3, §4.2, issue #29)", () => {
     await assertFails(getDoc(doc(admin(), "ticket_sync_queue/ord-1")));
     await assertFails(setDoc(doc(admin(), "ticket_sync_queue/ord-2"), { status: "pending" }));
     await assertFails(deleteDoc(doc(admin(), "ticket_sync_queue/ord-1")));
+  });
+});
+
+describe("invoicing stays server-only for both admin tiers (issue 208)", () => {
+  beforeAll(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, "invoices/inv_0123456789abcdef0123"), {
+        status: "draft",
+        number: null,
+        billTo: { name: "Example Press", email: "billing@example.org" },
+        totals: { total: 100 },
+      });
+      await setDoc(doc(db, "invoice_counters/current"), { lastNumber: 3 });
+      await setDoc(doc(db, "invoice_settings/current"), {
+        prefix: "INV",
+        paymentInstructions: "Account 000000.",
+      });
+    });
+  });
+
+  it("denies a read and a list of every invoice collection to operator, staff and attendee", async () => {
+    for (const db of [admin(), staff(), nonAdmin(), anon()]) {
+      await assertFails(getDoc(doc(db, "invoices/inv_0123456789abcdef0123")));
+      await assertFails(getDocs(collection(db, "invoices")));
+      await assertFails(getDocs(query(collection(db, "invoices"), where("status", "==", "draft"))));
+      await assertFails(getDoc(doc(db, "invoice_counters/current")));
+      await assertFails(getDoc(doc(db, "invoice_settings/current")));
+    }
+  });
+
+  it("denies every client write, so totals, numbers and bank details change only on the server", async () => {
+    for (const db of [admin(), staff()]) {
+      await assertFails(setDoc(doc(db, "invoices/inv_fedcba98765432100000"), { status: "draft" }));
+      await assertFails(updateDoc(doc(db, "invoices/inv_0123456789abcdef0123"), { totals: { total: 1 } }));
+      await assertFails(deleteDoc(doc(db, "invoices/inv_0123456789abcdef0123")));
+      await assertFails(updateDoc(doc(db, "invoice_counters/current"), { lastNumber: 1 }));
+      await assertFails(setDoc(doc(db, "invoice_settings/current"), { paymentInstructions: "Other account." }));
+    }
   });
 });
 

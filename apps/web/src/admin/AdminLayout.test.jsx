@@ -332,9 +332,11 @@ describe('the admin shell', () => {
     // Email log, issue #183, Change requests, issue #188, Organizations,
     // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
     // issue #195, Unpublished changes, issue #196, and Announcements,
-    // issue #199), Import records, and Data export, issue #329, every one a word. No
-    // icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(28);
+    // issue #199), Import records, Data export, issue #329, Invoices, issue
+    // #208, and Scheduled reminders, issue #518, every one a word. No icon
+    // rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(30);
+    expect(screen.getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('href', '/admin/reminders');
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
       'href',
@@ -407,8 +409,8 @@ describe('the admin shell', () => {
       'overview',
       'pages', 'content', 'updates', 'timeline', 'media', 'materials', 'versions', 'unpublished',
       'sessions', 'pitches', 'speakers', 'organizations',
-      'attendees', 'ticketing', 'badges',
-      'announcements', 'live-updates', 'email-log',
+      'attendees', 'ticketing', 'invoices', 'badges',
+      'announcements', 'reminders', 'live-updates', 'email-log',
       'import', 'feedback', 'change-requests', 'data-export',
       'settings',
     ]);
@@ -421,6 +423,9 @@ describe('the admin shell', () => {
     expect(sectionTier('/admin/announcements')).toBe('staff');
     // The email log is staff visible (issue #183).
     expect(sectionTier('/admin/email-log')).toBe('staff');
+    // Scheduled reminders are staff work (issue #518); the section owns the
+    // page under it.
+    expect(sectionTier('/admin/reminders/scheduled')).toBe('staff');
     // Change requests are staff work (issue #188). An undeclared item would
     // fall to the operator and lock staff out of their own queue.
     expect(sectionTier('/admin/change-requests')).toBe('staff');

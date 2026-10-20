@@ -43,6 +43,8 @@ const speakersLifecycle = require('./src/speakers/lifecycle.cjs');
 const speakersProjection = require('./src/speakers/projection.cjs');
 const speakersInvites = require('./src/speakers/invites.cjs');
 const speakersReminders = require('./src/speakers/reminders.cjs');
+const reminderSchedules = require('./src/reminders/schedules.cjs');
+const reminderScheduleRun = require('./src/reminders/run.cjs');
 const speakersMailTemplates = require('./src/speakers/mailTemplates.cjs');
 const clientErrors = require('./src/telemetry/clientErrors.cjs');
 const systemErrors = require('./src/telemetry/systemErrors.cjs');
@@ -67,6 +69,7 @@ const maintenanceCleanup = require('./src/maintenance/cleanup.cjs');
 const recordImport = require('./src/imports/recordImport.cjs');
 const adminDataExport = require('./src/admin/dataExport.cjs');
 const adminEventPackage = require('./src/admin/eventPackage.cjs');
+const adminInvoices = require('./src/admin/invoices.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -110,6 +113,8 @@ module.exports = {
   ...speakersProjection.handlers,
   ...speakersInvites.handlers,
   ...speakersReminders.handlers,
+  ...reminderSchedules.handlers,
+  ...reminderScheduleRun.handlers,
   ...speakersMailTemplates.handlers,
   ...clientErrors.handlers,
   ...systemErrors.handlers,
@@ -134,4 +139,5 @@ module.exports = {
   ...recordImport.handlers,
   ...adminDataExport.handlers,
   ...adminEventPackage.handlers,
+  ...adminInvoices.handlers,
 };

@@ -158,6 +158,7 @@ export const DOCKET = Object.freeze([
     items: [
       { to: 'attendees', label: 'Attendees', tier: 'staff' },
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
+      { to: 'invoices', label: 'Invoices', tier: 'staff' },
       { to: 'badges', label: 'Badges', tier: 'staff' },
     ],
   },
@@ -166,6 +167,7 @@ export const DOCKET = Object.freeze([
     label: 'Communications',
     items: [
       { to: 'announcements', label: 'Announcements', tier: 'staff' },
+      { to: 'reminders', label: 'Scheduled reminders', tier: 'staff' },
       { to: 'live-updates', label: 'Live updates', tier: 'staff' },
       { to: 'email-log', label: 'Email log', tier: 'staff' },
     ],

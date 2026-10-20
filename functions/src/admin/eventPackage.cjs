@@ -230,6 +230,7 @@ const EXCLUDED = Object.freeze([
   { source: '*_rate_limits', reason: 'Rate-limit windows. Operational only.' },
   { source: 'sent_emails, email_claims, email_templates', reason: 'The outbound mail log and its bodies.' },
   { source: 'speaker_invites, speaker_slugs', reason: 'Invite token hashes and slug reservations.' },
+  { source: 'speaker_reminders, reminder_schedules, reminder_schedule_runs, reminder_ledger', reason: 'Reminder settings and the record of each reminder sent. Operational only.' },
   { source: 'ticket_webhook_deliveries, ticket_sync_queue, ticket_payment_attempts, ticket_inventory', reason: 'Raw provider payloads, the sync queue, payment attempts and holds.' },
   { source: 'users/*/bookmarks, users/*/sessionNotes, schedule_shares', reason: 'Each attendee\'s private saved sessions and notes.' },
   { source: 'users_public, speakers_public, session_materials_public, announcements_public', reason: 'Public projections of records the package already holds.' },

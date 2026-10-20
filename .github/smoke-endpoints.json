@@ -47,6 +47,7 @@
     "cancelSpeakerInvite",
     "listSpeakerInvites",
     "speakerReminders",
+    "reminderSchedules",
     "speakerMailTemplates",
     "validateSpeakerInvite",
     "acceptSpeakerInvite",
@@ -118,6 +119,7 @@
     "updateAttendee",
     "deleteAttendee",
     "exportEventData",
-    "downloadEventPackage"
+    "downloadEventPackage",
+    "invoiceAdmin"
   ]
 }

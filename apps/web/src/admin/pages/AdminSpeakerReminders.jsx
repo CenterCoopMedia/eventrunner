@@ -15,7 +15,9 @@
 // never reaches a speaker or an item the preview did not show.
 //
 // The wording editor saves an email_templates/speaker.reminder override
-// that the server checks against the template's tokens.
+// that the server checks against the template's tokens. A save or a reset
+// pauses scheduled reminders (AdminReminderSchedules.jsx) until staff
+// approve the new wording there.
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { READINESS_ITEMS, READINESS_ITEM_LABELS } from 'shared/speakerReadiness';
@@ -270,6 +272,9 @@ function WordingEditor({ call, timeZone }) {
           onChange={(value) => setDraft({ ...draft, text: value })}
         />
         {result ? <Notice tone={result.tone} message={result.message} /> : null}
+        <p className="text-admin-sm font-medium text-admin-state-caution">
+          Saving pauses scheduled reminders until you approve them again.
+        </p>
         <div className="flex flex-wrap items-center gap-xs">
           <button type="submit" className={primaryButtonClass} aria-busy={busy}>
             {busy ? 'Saving…' : 'Save wording'}
@@ -455,6 +460,7 @@ export default function AdminSpeakerReminders() {
             <button type="button" className={secondaryButtonClass} onClick={exportList} aria-busy={busy === 'export'}>
               {busy === 'export' ? 'Exporting…' : 'Export this list as CSV'}
             </button>
+            <Link to="/admin/reminders/scheduled" className={linkButtonClass}>Scheduled reminders</Link>
             <Link to="/admin/speakers" className={linkButtonClass}>Back to speakers</Link>
           </>
         }

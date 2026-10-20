@@ -8,7 +8,7 @@ Open **Session pitches** to review private proposals. Share `/pitch` for public 
 
 **The banner above each admin page counts what is saved and not published.** It names the count by kind, such as "2 unpublished changes: 1 content block, 1 page.", and links to **Unpublished changes**, where you publish them. It shows on every admin page except that one, and only while the count is above zero. When the count cannot be read, the banner says so and tries again.
 
-**The rail groups the sections by the work.** Under **Overview** are six groups: **Content** (what the site says and shows), **Program** (sessions, pitches, speakers and organizations), **Registration and tickets**, **Communications** (announcements, live updates and the email log), **Operations** (import, feedback, change requests and data export) and **Settings** (the event, features, branding, access and system errors). Select a group's name to open or close it. The group that holds the page you are on opens by itself. If you close it, its name still shows the current page under it. The browser remembers which groups you opened or closed. Your tier decides which sections a group shows.
+**The rail groups the sections by the work.** Under **Overview** are six groups: **Content** (what the site says and shows), **Program** (sessions, pitches, speakers and organizations), **Registration and tickets**, **Communications** (announcements, scheduled reminders, live updates and the email log), **Operations** (import, feedback, change requests and data export) and **Settings** (the event, features, branding, access and system errors). Select a group's name to open or close it. The group that holds the page you are on opens by itself. If you close it, its name still shows the current page under it. The browser remembers which groups you opened or closed. Your tier decides which sections a group shows.
 
 **Hide the rail for more room.** On a wide screen, select **Hide menu** at the top of the rail. The rail narrows to the event mark and a **Show menu** button. Select **Show menu** to bring the sections back. The page you are on, and any draft on it, do not change. The browser remembers your choice. **Hide menu** is the first control after the skip link, so Tab reaches it at once.
 
@@ -26,8 +26,8 @@ An admin account holds one of two tiers. The rail shows the tier under your addr
 
 | Tier | Sections | For |
 |---|---|---|
-| Operator | Everything below, plus Features, Branding, Access, System errors, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
-| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Live updates, Ticketing, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
+| Operator | Everything below, plus Features, Branding, Access, System errors, changes to the invoice settings, and on Data export the ticket order and admission spreadsheets and the event data package | The person who set the site up and answers for the deployment |
+| Staff | Overview, Pages, Sessions, Organizations, Content, Updates, Timeline, Media, Materials, Version history, Unpublished changes, Speakers, Attendees, Badges, Announcements, Scheduled reminders, Live updates, Ticketing, Invoices, Import records, Feedback, Email log, Change requests, Event settings, and Data export (spreadsheets of sessions, speakers, and organizations) | The people who run the event day to day |
 
 Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (`seo.defaultOgImagePath`): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.
 
@@ -341,7 +341,44 @@ Every reminder goes through the event's email provider and appears in the Email 
 
 **Reminder wording.** The **Reminder wording** panel edits the subject, the HTML body, and the plain text body. Each missing item is one line inside a condition, for example `{{#if materials_sessions}}…{{/if}}`, so a line appears only when the speaker owes that item. `{{description_sessions}}` and `{{materials_sessions}}` hold the session titles. Both bodies must keep `{{dashboard_url}}`, the link to the speaker's dashboard. The server refuses a token the template does not know and says which one. **Use the shipped wording** deletes the saved wording. Each save and each reset writes an admin log entry. Save, then preview, to read the new wording as each speaker gets it.
 
+Saving or resetting the wording pauses scheduled reminders until you approve them again (see **Scheduled reminders** below). The panel says so above **Save wording**.
+
 **Export this list as CSV** saves the speakers the current **Show** choice lists, one row per speaker, with the name, the email address, the status, the missing items, the session titles, and the last reminder. Use it with your own mailing tool. A cell that starts like a spreadsheet formula is escaped. Each export writes an admin log entry first. If that entry cannot be written, no file is made.
+
+### Scheduled reminders
+
+Send speaker reminders on a schedule, before a due date. Open **Scheduled reminders** under Communications on the rail, or **Scheduled reminders** at the top of the Speaker reminders page. Staff and operators can use this page. The schedule is off until you preview it and approve it.
+
+**Settings.** Under **Speakers**:
+
+- **Days before the due date**: One reminder for each number, from 1 to 365 days, at most six. The default is 14, 7 and 2 days.
+- **Due date**: The date and time the items are due, on the event's clock. The field names the event's time zone. Approving needs a due date.
+- **Send time**: The time of day each reminder goes, on the event's clock. The default is 10:00.
+- **Items to remind about**: Biography, Headshot, Session description, Materials. All four by default.
+
+Select **Save settings** to store them.
+
+**Who gets a reminder.** Each accepted speaker with an email address who still owes one of the chosen items. The rule is the same as on the Speaker reminders page. Each message names only the chosen items that speaker still owes, and says the due date. A speaker who finishes gets no more reminders.
+
+**When.** A reminder for 7 days goes 7 calendar days before the due date, at the send time. Across a daylight saving change it still goes at the send time on the clock people read. The site checks once an hour. If a check is missed, the next one sends the reminder, until the next reminder day starts. Then the earlier reminder is dropped, so nobody gets the 14-day reminder 3 days before. Nothing sends from 8:00 PM to 8:00 AM on the event's clock; a reminder due then waits for 8:00 AM. A check that reaches 8:00 PM part way stops, and the rest of the speakers get the reminder the next morning.
+
+**At most one per reminder day, and one in 24 hours.** A speaker gets each reminder day's message once. The 24-hour limit of the Speaker reminders page applies in both directions: A speaker reminded by hand in the last 24 hours waits until the 24 hours end, and a scheduled reminder stops a reminder by hand for 24 hours. A message the email provider may have accepted counts as sent and is not sent again. Check the Email log.
+
+**Preview, then approve.** Save the settings, then select **Preview**. The page shows one sample message for each reminder day, as the first speaker who owes an item would get it. If nobody owes an item, it uses a sample speaker. Select **Approve and turn on** to turn the schedule on with that wording and those settings. If the wording or the settings changed after your preview, the server refuses. Preview again, then approve.
+
+**Paused.** The schedule pauses, and says why, in these cases:
+
+- Someone saves or resets the reminder wording on the Speaker reminders page.
+- A deploy changes the shipped wording that the schedule sends.
+- Someone saves different settings while the schedule is on.
+
+A paused schedule sends nothing. Preview, then approve to turn it on again. When a check finds wording you did not approve, it also tells the operator.
+
+**Next run.** The panel says when the next reminder goes, with the time zone named, which reminder day it is, and who it would reach. It names the speakers who wait on the 24-hour limit, and when they can get one. It also says what the last check did.
+
+**Turn off** stops the schedule. A check in progress stops before its next speaker. A pause or a settings change does the same. Nothing sends until you approve it again.
+
+The schedule does nothing on a historical demo, and nothing after the last event day. Every approval, settings save, pause, and turn-off writes an admin log entry. Each check that emails anyone writes one admin log entry that names the speakers.
 
 ## Attendees
 
@@ -416,6 +453,40 @@ Money refunds happen through **Open this payment in Stripe Dashboard**, using th
 For complimentary seats, an operator opens **Issue complimentary admission**, enters each attendee and a reason, and uses **Review complimentary tickets** before the final issue confirmation. Comps consume real event/type capacity. At the door, staff enter or scan a human-readable code in **Ticket code for check-in**, then select **Check in attendee**. A repeat reports already checked in. Only an operator can use **Review check-in correction → Undo recorded check-in**, with a reason.
 
 If a payment response is lost, the purchaser uses **Resume existing checkout** or **Recover existing checkout**. A declined attempt can continue through its existing open Stripe session. Returning from Stripe, closing its window, or seeing a local countdown does not fulfill or cancel an order. Use the [support matrix](operator/stripe-ticketing.md#6-support-the-payment-and-the-attendee-separately) before suggesting another payment, refund, resend, or admission change.
+
+## Invoices
+
+**Invoices** under Registration and tickets is where staff bill sponsors and partners. This first release covers drafts and the invoice settings. Issuing, the PDF, marking an invoice paid, voiding and sending come in a later release; this section grows with them.
+
+Invoices are private. The database refuses every browser read and write, for operators and staff alike, and every change goes through the server. Each change writes a row to the audit log.
+
+### Write a draft
+
+1. Open **Invoices**, then **New invoice**.
+2. Under **Organization**, choose the organization to bill. The page fills **Name to bill** with its name. If the organization's tier matches the name of a sponsor package on the site, the first line becomes that package, with the first number in the package's price as the unit price. Lines you already wrote are kept.
+3. Check the contact name, billing email, billing address and reference. Only **Name to bill** is required.
+4. Write the lines. Each line has a description, a whole-number quantity and a unit price. Type prices as digits, such as `1250.00`; commas between thousands are fine. An invoice holds up to 50 lines. A line you leave blank is left out when you save.
+5. Add discounts and tax with **Add a discount** and **Add a tax**. Type each amount by hand. A discount subtracts and a tax adds. There are no rates. An invoice holds up to 10 of these rows.
+6. Set a due date if you want one. It is a date on the event's clock.
+7. Select **Save draft**.
+
+The totals under the form change as you type. They are a preview: The server computes the same figures again when you save, and the saved figures are the ones that count. A total below zero is refused. Reduce a discount.
+
+A draft has no number. The number (`INV-0001`, `INV-0002`, and so on, with no gaps) is given when the invoice is issued, so deleting a draft never leaves a gap. Each invoice uses one currency: The ticket catalog's currency, then the currency in the invoice settings, then US dollars. A draft keeps the currency it was created with.
+
+If someone else saved the same draft after you opened it, your save is refused. Select **Reload the saved invoice**, then make your change again.
+
+To remove a draft, open it and select **Delete this draft**. Only a draft can be deleted.
+
+### Find an invoice
+
+The list shows the newest invoices first, with the status as a word: **Draft**, **Issued**, **Paid** or **Void**. Use **Status** to show one status, and **Search** to find an invoice by its number, the name or email it is billed to, or its reference. **Show more invoices** continues the same search. One search reads 250 invoices at a time. When those hold no match and older invoices remain, the page says so; select **Show older invoices** to search on.
+
+### Invoice settings
+
+Open **Invoice settings** from the Invoices page. The settings hold what every issued invoice copies: The issuer name, address and email, the tax ID, the payment instructions, the number prefix and the fallback currency. Staff can read them. Only an operator can change them, because they hold the bank details. The settings are not part of the public event settings.
+
+The number prefix is 1 to 10 capital letters, digits or hyphens, and starts with a letter. The page shows the next number.
 
 ## Import records
 

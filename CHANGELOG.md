@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Scheduled speaker reminders (#518). On the new **Scheduled reminders** page, staff set a
+  due date for the speaker items, the days before it to send (14, 7 and 2 by default), a send
+  time on the event's clock, and the items to name. They preview one sample per reminder day,
+  then approve and turn the schedule on. It is off by default. Once an hour,
+  `runScheduledReminders` sends the approved wording to each accepted speaker who still owes a
+  chosen item, at most once per reminder day, through the same send path as a staff reminder.
+  The 24-hour limit applies in both directions between scheduled and staff reminders. Nothing
+  sends from 20:00 to 08:00 on the event's clock, on a historical demo, or after the event.
+  New wording, or a settings change while the schedule is on, pauses it until staff approve it
+  again. The page states whether the schedule is on, off or paused, when the next reminder
+  goes, who it would reach, who waits on the 24-hour limit, and what the last run did. The
+  reminder wording gains two optional tokens, `{{due_date}}` and `{{days_left}}`, set only by
+  the schedule. Every run that emails anyone writes one admin log entry.
+- Invoices, part 1 (#208). Staff write and save sponsor invoice drafts under
+  **Invoices**. Choosing an organization fills the name to bill and, when its tier names a
+  sponsor package, the first line. The totals change as staff type, in a live region, and
+  the server computes them again in minor units on every save; a total below zero is
+  refused. A save over a newer revision is refused. A draft has no number. Numbers come
+  with issue in a later release. **Invoice settings** hold the issuer, tax ID, payment
+  instructions and number prefix; staff read them and only an operator changes them. The
+  `invoices`, `invoice_counters` and `invoice_settings` collections are server-only, every
+  write refuses on a read-only demo, and each write records an audit row. ADR 0001 §4.2 is
+  amended to restore invoicing.
+
 - Staff edit the wording of the speaker invitation and the acceptance confirmation
   (#204). **Edit email wording** on the Speakers list opens one editor per message, with
   the subject, the HTML body and the plain text body. The server checks each save: an
@@ -476,6 +500,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   photograph. On phones the copy also keeps that inset from the right edge. An audit of the
   public pages in all six styles found no other coloured section whose text touches its
   edge (#478).
+
+- The speaker reminder wording version now names the wording that is actually sent. Saved
+  wording that fails its token check is sent as the shipped copy, so its version is now the
+  shipped version, not the digest of the saved text. A saved field left blank takes the
+  shipped field, and the version now covers that field too (#518).
 
 - A speaker reminder send now refuses shipped wording that changed after its preview. When no
   wording is saved, the preview's wording version is `shipped:` and a digest of the shipped

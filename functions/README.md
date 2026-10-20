@@ -44,8 +44,8 @@ if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
 
 | Tier | Endpoints |
 |---|---|
-| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, and `exportEventData` for `orders` and `admissions` |
-| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `speakerMailTemplates`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers` and `organizations`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, and the other five `webMcp*` diagnostics |
+| operator | `updateFeatures`, `updateTheme`, `updatePitchCall`, `savePitchNoticeSettings`, `updateAirtablePitchSource`, `listAdminAccess`, `setAdminAccess`, `listSystemErrors`, `resolveSystemErrors`, `webMcpInspectSystemErrors`, `downloadEventPackage`, `exportEventData` for `orders` and `admissions`, and `invoiceAdmin` for `saveSettings` |
+| staff | `updateEventConfig` (a change to the `sender` block or to `seo.defaultOgImagePath` needs an operator; unchanged values go through and the stored bytes are kept), `updateBadges`, every `cms*` endpoint, `mediaUpload`, `mediaDelete`, `mediaUpdateMetadata` (each refuses staff for anything that is branding: an upload into `branding/`, a branding asset, or an asset a `config/theme` slot or `config/event.seo.defaultOgImagePath` references; delete and relabel also refuse staff when the usage scan fails), `scanMediaUsage`, `createSpeaker`, `updateSpeaker`, `deleteSpeaker`, `applySpeakerPendingEdits`, `discardSpeakerPendingEdits`, `sendSpeakerInvite`, `resendSpeakerInvite`, `cancelSpeakerInvite`, `listSpeakerInvites`, `speakerReminders`, `speakerMailTemplates`, `reminderSchedules`, `approveUser`, `revokeUser`, `exportAttendees`, `exportEventData` (for `sessions`, `speakers` and `organizations`; it refuses staff the two operator datasets by name), `updateAttendee`, `deleteAttendee`, `removeUserCustomBadge`, `getEventStats`, `saveLiveUpdate`, `deleteLiveUpdate`, `updateFeedbackStatus`, `updateChangeRequestStatus`, `deleteChangeRequest`, `reviewSessionPitch`, `sendSessionPitchNotice`, `importSessionPitches`, `convertSessionPitch`, `refreshAirtablePitches`, the materials endpoints, `getTicketingStatus`, `ticketingSync`, `ticketingImportCsv`, `ticketingListTickets`, `createUserFromTicket`, `importRecordsCsv`, `listSentEmails`, `getSentEmail`, `listAnnouncementSends`, `previewAnnouncementEmail`, `sendAnnouncementTest`, `sendAnnouncementEmail`, `removeEmailSuppression`, `invoiceAdmin` (every action but `saveSettings`), and the other five `webMcp*` diagnostics |
 
 Announcement email admits staff because staff run attendee communication day to day, the same tier as the site banner on that page. The safety is in the flow, not the tier: the server picks the audience, the send must match the preview's receipt, the page confirms the count, every recipient has a send-once key, every address can unsubscribe, and every send writes `admin_logs`.
 
@@ -120,6 +120,37 @@ on the pitch base only. It is bound through `defineSecret` only when the deploym
 the functions env file by `deploy-client.yml`), and never in the emulator. It is redacted
 from every stored, returned or logged message.
 
+## Scheduled reminders
+
+ADR 0006 and issue #518. `src/reminders/` holds two exports:
+
+- `reminderSchedules` (staff): one POST endpoint with an `action` and a `schedule` (only
+  `speakers` for now). `get` returns the settings, the state (on, off or paused), the next run
+  and the last run. `save` checks and stores the offsets (1 to 6 whole days from 1 to 365), the
+  send time (`HH:MM` on the event clock), the due date (RFC3339) and the items. `preview`
+  renders one sample per offset and returns the wording version and a settings version.
+  `approve` needs both, and refuses when either changed since the preview. `disable` turns the
+  schedule off. Every write checks the historical-demo policy first and writes an
+  `admin_logs` row. A settings change while the schedule is on pauses it.
+- `runScheduledReminders`: `onSchedule` every 60 minutes, no retry. It reads
+  `reminder_schedules/speakers`, works out the due window with `shared/reminderSchedule`, and
+  sends through `src/speakers/reminderCore.cjs`, the staff send path. The batch id is fixed per
+  window (`sched-{due date}-{N}d`). `reminder_ledger/speakers__{window}__{speakerId}` is
+  created in the same transaction as the `speaker_reminders` reservation, so a speaker gets at
+  most one reminder per window, and a failed or uncertain send is not sent again. The run
+  holds a 15-minute lease on `reminder_schedule_runs/speakers`, and stores its last run
+  there. It does nothing while off or paused, on a historical demo, or after the last event
+  day. Before each speaker it stops when quiet hours begin or the window closes, and each
+  reservation transaction reads the schedule again (`reserve({ guard })`), so turning it off,
+  pausing it or changing it stops the run before the next speaker. Speakers not tried get no
+  ledger row. A fault part way keeps the sends already made in `lastRun` and the admin log. Wording that is not the approved version pauses the schedule, writes an `admin_logs`
+  row and tells the operator. A run that emails anyone writes one `admin_logs` row. The
+  attendee branch (#518, the third pull request) joins `BRANCHES` in `src/reminders/run.cjs`.
+
+Saving or resetting the speaker reminder wording (`speakerReminders`) pauses a schedule that
+is on when the new wording version differs from the approved one. Secrets: the mail
+provider's, and the operator webhook's when `EVENT_OPERATOR_NOTIFIER=webhook`.
+
 ## Stripe commerce
 
 `ticketingCatalog` is a public, redacted GET. `ticketingCheckout` accepts POST from
@@ -170,3 +201,28 @@ Transactional mutations include `config/event` in their read set, so enabling
 `historicalDemo` during a request prevents the commit. Managed email secrets are
 bound only to the organizer endpoint that can resend and the confirmation trigger;
 the native attendee read/checkout handlers do not need them.
+
+## Invoices
+
+`invoiceAdmin` (`src/admin/invoices.cjs`, issue #208) is a POST action API in the
+shape of `ticketingCommerceAdmin`. This release has `list`, `get`, `settings`,
+`saveDraft`, `deleteDraft` and `saveSettings`. Staff run every action but
+`saveSettings`, which needs an operator because `invoice_settings/current` holds the
+issuer's tax ID and bank details. Issue, mark paid, void, reopen, duplicate and send
+join the same switch with #209.
+
+The three collections (`invoices`, `invoice_counters`, `invoice_settings`) deny every
+client read and write. `saveDraft` takes the client-minted `invoiceId` and the
+`expectedRevision` the form read; revision 0 creates the draft. The body is checked
+by `shared/invoice` `validateInvoiceDraft`, which keeps only the fields a draft may
+set and computes the totals again in minor units. A request's own totals, status or
+number are dropped. A draft's currency is fixed when it is created: the ticket
+catalog currency, then the settings currency, then USD. A draft has no number; the
+number is assigned only at issue, so `deleteDraft` leaves no gap.
+
+Every write refuses on a read-only demo, refuses a stale revision with 409, and
+writes its `admin_logs` row (`invoices.*`) in the same transaction. The settings row
+names the fields that changed and never their values. `list` reads newest first on
+`listKey` and examines at most 250 records per page, like the ticketing lists. Text
+is cleaned with `sanitizeInvoiceText` on write and again on read. Responses carry
+`Cache-Control: private, no-store`.

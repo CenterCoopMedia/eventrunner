@@ -67,3 +67,42 @@ test('the shipped wording version is a digest of the shipped copy, so a deploy t
   assert.match(saved, /^[0-9a-f]{32}$/);
   assert.notEqual(saved, version);
 });
+
+// Note from PR 1 (#518): saved wording that fails its token check is not
+// what a speaker gets. The renderer falls back to the shipped copy, so the
+// version must name the shipped copy too. A schedule approved on the
+// fallback must then pause when a deploy changes the shipped copy.
+test('saved wording that fails its token check has the shipped version, because the shipped copy is what is sent', () => {
+  const { getDefaultTemplate } = require('../email/templates.cjs');
+  const { wordingVersion } = require('./reminderCore.cjs');
+  const shipped = getDefaultTemplate('speaker.reminder');
+  const broken = { subject: 'Hi', html: '<p>No link here.</p>', text: 'No link here.' };
+  assert.equal(wordingVersion(broken), wordingVersion(null));
+  assert.match(wordingVersion(broken), /^shipped:[0-9a-f]{32}$/);
+  const edited = { ...shipped, text: `${shipped.text} edited` };
+  assert.equal(wordingVersion(broken, edited), wordingVersion(null, edited));
+  assert.notEqual(wordingVersion(broken, edited), wordingVersion(broken));
+});
+
+test('saved wording that sets only some fields has a version that covers the shipped fields it keeps', () => {
+  const { getDefaultTemplate } = require('../email/templates.cjs');
+  const { wordingVersion } = require('./reminderCore.cjs');
+  const shipped = getDefaultTemplate('speaker.reminder');
+  const subjectOnly = { subject: 'New subject for {{event_name}}' };
+  const version = wordingVersion(subjectOnly);
+  assert.match(version, /^[0-9a-f]{32}$/);
+  // The html and text bodies still come from the shipped copy, so a deploy
+  // that changes them changes what is sent, and the version with it.
+  assert.notEqual(wordingVersion(subjectOnly, { ...shipped, html: `${shipped.html} ` }), version);
+});
+
+test('the version a render reports is the version of the wording it used', () => {
+  const { getDefaultTemplate } = require('../email/templates.cjs');
+  const { render } = require('../email/render.cjs');
+  const { wordingVersion } = require('./reminderCore.cjs');
+  const template = getDefaultTemplate('speaker.reminder');
+  const broken = { subject: 'Hi', html: '<p>No link.</p>', text: 'No link.' };
+  const out = render({ template, override: broken, tokenValues: {}, config: {} });
+  assert.equal(out.usedFallback, true);
+  assert.equal(wordingVersion(broken), wordingVersion(null));
+});
