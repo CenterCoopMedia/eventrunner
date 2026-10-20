@@ -161,6 +161,24 @@ describe('speaker email wording', () => {
     expect(screen.queryByRole('region', { name: 'Invitation preview' })).toBeNull();
   });
 
+  it('previews unchanged words as the wording in use, without sending them', async () => {
+    serve({
+      templates: { templates: [saved(INVITE, { subject: 'Saved {{event_name}}' }), ACCEPTED] },
+      preview: {
+        preview: {
+          id: 'speaker.invite', source: 'saved', usedFallback: false, problems: [], warnings: [],
+          subject: 'Saved Example Event', html: '<p>x</p>', text: 'x',
+        },
+      },
+    });
+    renderPage();
+    const invite = await invitationForm();
+    fireEvent.click(invite.getByRole('button', { name: 'Preview' }));
+    const region = await screen.findByRole('region', { name: 'Invitation preview' });
+    expect(within(region).getByText('The saved wording')).toBeInTheDocument();
+    expect(callMock).toHaveBeenLastCalledWith('speakerMailTemplates', { action: 'preview', templateId: 'speaker.invite' });
+  });
+
   it('says when saved wording fails its check and speakers get the shipped wording', async () => {
     serve({
       templates: {

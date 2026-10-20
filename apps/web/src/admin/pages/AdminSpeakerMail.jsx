@@ -177,7 +177,9 @@ function MessageEditor({ entry, call, timeZone, onChange }) {
   }
 
   function runPreview() {
-    run('preview', { action: 'preview', ...draft }, (data) => {
+    // Unchanged words preview what the next email sends: the saved wording,
+    // or the shipped wording, as the server reads it now.
+    run('preview', changed ? { action: 'preview', ...draft } : { action: 'preview' }, (data) => {
       setPreview(data.preview);
       setResult({ tone: 'ok', message: `Preview ready. It shows ${SOURCE_WORDS[data.preview.source].toLowerCase()}.` });
     });
