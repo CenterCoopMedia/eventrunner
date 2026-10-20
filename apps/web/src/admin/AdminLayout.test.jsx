@@ -332,9 +332,9 @@ describe('the admin shell', () => {
     // Email log, issue #183, Change requests, issue #188, Organizations,
     // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
     // issue #195, Unpublished changes, issue #196, and Announcements,
-    // issue #199), Import records, and Data export, issue #329, every one a word. No
-    // icon rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(28);
+    // issue #199), Import records, Data export, issue #329, and Invoices,
+    // issue #208, every one a word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(29);
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
       'href',
@@ -407,7 +407,7 @@ describe('the admin shell', () => {
       'overview',
       'pages', 'content', 'updates', 'timeline', 'media', 'materials', 'versions', 'unpublished',
       'sessions', 'pitches', 'speakers', 'organizations',
-      'attendees', 'ticketing', 'badges',
+      'attendees', 'ticketing', 'invoices', 'badges',
       'announcements', 'live-updates', 'email-log',
       'import', 'feedback', 'change-requests', 'data-export',
       'settings',

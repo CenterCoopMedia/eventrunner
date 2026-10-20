@@ -70,6 +70,7 @@ export default defineConfig({
       'shared/email',
       'shared/readiness',
       'shared/speakerReadiness',
+      'shared/invoice',
     ],
   },
   build: {
