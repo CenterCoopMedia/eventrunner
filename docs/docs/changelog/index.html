@@ -664,6 +664,16 @@
           </ul>
           <h3 id="changed">Changed<a class="heading-anchor" href="#changed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The public address of the Pages site is one value, in <code>scripts/lib/pages-site.cjs</code>. The
+          documentation generator, the demo build, and the link checker read it, so the canonical and
+          social card URLs, the root-relative links, the demo&#39;s base, and the link checker&#39;s path mapping
+          change together. The committed default is still <code>https://centercoopmedia.github.io/eventrunner/</code>.
+          The <code>PAGES_BASE_URL</code> repository variable sets another address for the Pages workflow, for
+          example <code>https://docs.eventrunner.org/</code>, which serves from <code>/</code>. The workflow does not deploy
+          when the address and the URL Pages reports are not the same. <code>docs/DEPLOY_RUNBOOK.md</code> §10 gives
+          the order of the switch (#514).</li>
+          </ul>
+          <ul>
           <li>The static demo is no longer committed. <code>docs/demo/</code> is in <code>.gitignore</code>, and a new
           <code>Pages</code> workflow (<code>.github/workflows/pages.yml</code>) builds the demo on every push to <code>main</code> and
           deploys <code>docs/</code> with it to GitHub Pages. The demo URL stays <code>/eventrunner/demo/</code>. Feature pull

@@ -53,6 +53,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import pagesSiteModule from '../lib/pages-site.cjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, '..', '..');
@@ -73,7 +74,8 @@ export const DEFAULT_STYLES = Object.freeze([
 
 export const DEFAULT_MODES = Object.freeze(['light', 'dark']);
 export const DEFAULT_WIDTHS = Object.freeze([1440, 390]);
-export const DEFAULT_BASE_PATH = '/eventrunner/demo/';
+// The demo path under the committed site address (scripts/lib/pages-site.cjs).
+export const DEFAULT_BASE_PATH = pagesSiteModule.pagesSite({}).demoBase;
 export const DEFAULT_PORT = 8901;
 
 const CONTENT_TYPES = Object.freeze({

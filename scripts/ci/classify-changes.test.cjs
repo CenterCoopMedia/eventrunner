@@ -60,6 +60,15 @@ test('Pages generator paths select documentation checks and lint', () => {
   assert.deepEqual(selected(classifyPaths(['docs/docs/index.html'])), ['docs']);
 });
 
+test('the Pages site address selects both the documentation and the demo checks', () => {
+  for (const path of ['scripts/lib/pages-site.cjs', 'scripts/lib/pages-site.test.cjs']) {
+    const result = classifyPaths([path]);
+    assert.equal(result.mode, 'mixed', path);
+    assert.deepEqual(selected(result), ['docs', 'demo', 'lint', 'audit'], path);
+    assert.equal(result.jobs.e2e, false, path);
+  }
+});
+
 test('application and backend changes select their relevant suites', () => {
   const app = classifyPaths(['apps/web/src/App.jsx']);
   const backend = classifyPaths(['functions/src/core/auth.cjs']);

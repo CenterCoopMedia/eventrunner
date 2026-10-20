@@ -3,8 +3,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { pagesSite } = require('./lib/pages-site.cjs');
+
 const REPO_ROOT = path.resolve(__dirname, '..');
-const PAGES_BASE = '/eventrunner/';
 // Local task ledgers and agent state are not versioned project documentation.
 // Ignoring them keeps a developer checkout's result aligned with the clean
 // checkout that the documentation job evaluates in CI.
@@ -65,24 +66,46 @@ const GENERATED_PAGE_METADATA = [
   ['twitter:image:alt', /<meta\b(?=[^>]*\bname=['"]twitter:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
 ];
 
-// The landing page is hand-written, so nothing regenerates its head for it.
-// These are the tags a shared link actually needs and the one link that has
-// to reach the documentation site — the two things easiest to lose in an edit.
-const LANDING_PAGE_METADATA = [
-  ['canonical', /<link\b(?=[^>]*\brel=['"]canonical['"])(?=[^>]*\bhref=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/['"])[^>]*>/i],
-  ['og:title', /<meta\b(?=[^>]*\bproperty=['"]og:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
-  ['og:description', /<meta\b(?=[^>]*\bproperty=['"]og:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
-  ['og:type', /<meta\b(?=[^>]*\bproperty=['"]og:type['"])(?=[^>]*\bcontent=['"]website['"])[^>]*>/i],
-  ['og:url', /<meta\b(?=[^>]*\bproperty=['"]og:url['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/['"])[^>]*>/i],
-  ['og:image', /<meta\b(?=[^>]*\bproperty=['"]og:image['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/[^'"]+\.png['"])[^>]*>/i],
-  ...SOCIAL_IMAGE_METADATA,
-  ['twitter:card', /<meta\b(?=[^>]*\bname=['"]twitter:card['"])(?=[^>]*\bcontent=['"]summary_large_image['"])[^>]*>/i],
-  ['twitter:title', /<meta\b(?=[^>]*\bname=['"]twitter:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
-  ['twitter:description', /<meta\b(?=[^>]*\bname=['"]twitter:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
-  ['twitter:image', /<meta\b(?=[^>]*\bname=['"]twitter:image['"])(?=[^>]*\bcontent=['"]https:\/\/centercoopmedia\.github\.io\/eventrunner\/[^'"]+\.png['"])[^>]*>/i],
-  ['twitter:image:alt', /<meta\b(?=[^>]*\bname=['"]twitter:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
-  ['documentation entry point', /<a\b[^>]*\bhref=['"](?:\.\/|\/eventrunner\/)docs\/['"][^>]*>/i],
-];
+// The landing page is hand-written, so nothing but build-pages' address move
+// touches its head. These are the tags a shared link actually needs and the
+// one link that has to reach the documentation site — the two things easiest
+// to lose in an edit. The absolute URLs must name the configured site address
+// (scripts/lib/pages-site.cjs), so a site deployed for one address never
+// tells a crawler it lives at another.
+function landingPageMetadata(site) {
+  const url = escapeRegExp(site.url);
+  return [
+    ['canonical', new RegExp(`<link\\b(?=[^>]*\\brel=['"]canonical['"])(?=[^>]*\\bhref=['"]${url}['"])[^>]*>`, 'i')],
+    ['og:title', /<meta\b(?=[^>]*\bproperty=['"]og:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+    ['og:description', /<meta\b(?=[^>]*\bproperty=['"]og:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+    ['og:type', /<meta\b(?=[^>]*\bproperty=['"]og:type['"])(?=[^>]*\bcontent=['"]website['"])[^>]*>/i],
+    ['og:url', new RegExp(`<meta\\b(?=[^>]*\\bproperty=['"]og:url['"])(?=[^>]*\\bcontent=['"]${url}['"])[^>]*>`, 'i')],
+    ['og:image', new RegExp(`<meta\\b(?=[^>]*\\bproperty=['"]og:image['"])(?=[^>]*\\bcontent=['"]${url}[^'"]+\\.png['"])[^>]*>`, 'i')],
+    ...SOCIAL_IMAGE_METADATA,
+    ['twitter:card', /<meta\b(?=[^>]*\bname=['"]twitter:card['"])(?=[^>]*\bcontent=['"]summary_large_image['"])[^>]*>/i],
+    ['twitter:title', /<meta\b(?=[^>]*\bname=['"]twitter:title['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+    ['twitter:description', /<meta\b(?=[^>]*\bname=['"]twitter:description['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+    ['twitter:image', new RegExp(`<meta\\b(?=[^>]*\\bname=['"]twitter:image['"])(?=[^>]*\\bcontent=['"]${url}[^'"]+\\.png['"])[^>]*>`, 'i')],
+    ['twitter:image:alt', /<meta\b(?=[^>]*\bname=['"]twitter:image:alt['"])(?=[^>]*\bcontent=['"][^'"]+['"])[^>]*>/i],
+    ['documentation entry point', new RegExp(`<a\\b[^>]*\\bhref=['"](?:\\./|${escapeRegExp(site.base)})docs/['"][^>]*>`, 'i')],
+  ];
+}
+
+// A generated page states its own address and its social card's. Both must
+// sit under the configured site address: a docs/docs tree rendered for another
+// address (PAGES_BASE_URL set, build-pages not run) fails here before deploy.
+function generatedPageAddress(site) {
+  const docsUrl = escapeRegExp(site.docsUrl);
+  return [
+    ['canonical under the site address', new RegExp(`<link\\b(?=[^>]*\\brel=['"]canonical['"])(?=[^>]*\\bhref=['"]${docsUrl}[^'"]*['"])[^>]*>`, 'i')],
+    ['og:url under the site address', new RegExp(`<meta\\b(?=[^>]*\\bproperty=['"]og:url['"])(?=[^>]*\\bcontent=['"]${docsUrl}[^'"]*['"])[^>]*>`, 'i')],
+    ['og:image under the site address', new RegExp(`<meta\\b(?=[^>]*\\bproperty=['"]og:image['"])(?=[^>]*\\bcontent=['"]${escapeRegExp(site.url)}[^'"]+['"])[^>]*>`, 'i')],
+  ];
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function listFiles(root, predicate, relativeRoot = root) {
   const files = [];
@@ -98,7 +121,7 @@ function listFiles(root, predicate, relativeRoot = root) {
   return files.sort();
 }
 
-function localTargetPath(sourcePath, target, root) {
+function localTargetPath(sourcePath, target, root, pagesBase = pagesSite().base) {
   if (!target || target.startsWith('#')) return null;
   let decoded;
   try {
@@ -115,13 +138,16 @@ function localTargetPath(sourcePath, target, root) {
   if (!withoutFragment) return null;
   let candidate;
   if (withoutFragment.startsWith('/')) {
-    const pagesBaseWithoutSlash = PAGES_BASE.slice(0, -1);
-    if (withoutFragment !== pagesBaseWithoutSlash && !withoutFragment.startsWith(PAGES_BASE)) {
-      return { path: withoutFragment, error: `unsupported root-relative path (expected ${PAGES_BASE})` };
+    // A root-relative path is a URL on the published site: the part after the
+    // site's path base is a path under docs/. With a base of `/` (a custom
+    // domain) every root-relative path is one.
+    const pagesBaseWithoutSlash = pagesBase.slice(0, -1);
+    if (withoutFragment !== pagesBaseWithoutSlash && !withoutFragment.startsWith(pagesBase)) {
+      return { path: withoutFragment, error: `unsupported root-relative path (expected ${pagesBase})` };
     }
     const pagesPath = withoutFragment === pagesBaseWithoutSlash
       ? ''
-      : withoutFragment.slice(PAGES_BASE.length);
+      : withoutFragment.slice(pagesBase.length);
     candidate = path.resolve(root, 'docs', pagesPath);
   } else {
     candidate = path.resolve(
@@ -179,10 +205,10 @@ function isUnbuiltDeployTarget(candidate, root) {
   });
 }
 
-function checkLocalTargets(sourcePath, targets, root, htmlReferences = false) {
+function checkLocalTargets(sourcePath, targets, root, htmlReferences = false, pagesBase = pagesSite().base) {
   const errors = [];
   for (const target of targets) {
-    const resolved = localTargetPath(sourcePath, target, root);
+    const resolved = localTargetPath(sourcePath, target, root, pagesBase);
     if (!resolved) continue;
     if (!resolved.error && isUnbuiltDeployTarget(resolved.path, root)) continue;
     if (resolved.error) {
@@ -203,17 +229,17 @@ function targetExists(candidate, pagesRoute = false) {
   return !pagesRoute || !fs.statSync(candidate).isDirectory() || fs.existsSync(path.join(candidate, 'index.html'));
 }
 
-function checkMarkdownLinks(root) {
+function checkMarkdownLinks(root, site = pagesSite()) {
   const errors = [];
   for (const relativePath of listFiles(root, (file) => /\.mdx?$/.test(file))) {
     const sourcePath = path.join(root, relativePath);
     const text = fs.readFileSync(sourcePath, 'utf8');
-    errors.push(...checkLocalTargets(sourcePath, extractMarkdownTargets(text), root));
+    errors.push(...checkLocalTargets(sourcePath, extractMarkdownTargets(text), root, false, site.base));
   }
   return errors;
 }
 
-function checkPages(root) {
+function checkPages(root, site = pagesSite()) {
   const pagePath = path.join(root, 'docs', 'index.html');
   if (!fs.existsSync(pagePath)) return ['docs/index.html: missing Pages entrypoint'];
   const pagePaths = listFiles(root, (file) => {
@@ -222,7 +248,7 @@ function checkPages(root) {
   });
   const text = fs.readFileSync(pagePath, 'utf8');
   const errors = BASE_PAGE_METADATA
-    .concat(LANDING_PAGE_METADATA)
+    .concat(landingPageMetadata(site))
     .filter(([, expression]) => !expression.test(text))
     .map(([name]) => `docs/index.html: missing ${name}`);
   for (const relativePath of pagePaths) {
@@ -233,27 +259,34 @@ function checkPages(root) {
     // demo's public metadata is owned by the dedicated redesign tracked in #109.
     if (publicPath.startsWith(GENERATED_DOCS_PREFIX)) {
       errors.push(...BASE_PAGE_METADATA
-        .concat(GENERATED_PAGE_METADATA)
+        .concat(GENERATED_PAGE_METADATA, generatedPageAddress(site))
         .filter(([, expression]) => !expression.test(currentText))
         .map(([name]) => `${publicPath}: missing ${name}`));
     }
-    errors.push(...checkLocalTargets(currentPath, extractTargets(currentText, HTML_REFERENCE_RE), root, true));
+    errors.push(...checkLocalTargets(currentPath, extractTargets(currentText, HTML_REFERENCE_RE), root, true, site.base));
   }
   return errors;
 }
 
-function checkRepository(root = REPO_ROOT) {
-  return [...checkMarkdownLinks(root), ...checkPages(root)];
+function checkRepository(root = REPO_ROOT, site = pagesSite()) {
+  return [...checkMarkdownLinks(root, site), ...checkPages(root, site)];
 }
 
 function main(root = REPO_ROOT) {
-  const errors = checkRepository(root);
+  let site;
+  try {
+    site = pagesSite();
+  } catch (error) {
+    console.error(`documentation checks failed: ${error.message}`);
+    return 2;
+  }
+  const errors = checkRepository(root, site);
   if (errors.length > 0) {
     console.error('documentation checks failed:');
     for (const error of errors) console.error(`- ${error}`);
     return 1;
   }
-  console.log('documentation checks passed');
+  console.log(`documentation checks passed for ${site.url}`);
   return 0;
 }
 

@@ -125,6 +125,7 @@
               <li><a href="#7-rotating-access">7. Rotating access</a></li>
               <li><a href="#8-rolling-back-a-bad-deploy">8. Rolling back a bad deploy</a></li>
               <li><a href="#9-site-publisher-optional-per-client">9. Site publisher (optional, per client)</a></li>
+              <li><a href="#10-project-site-on-github-pages">10. Project site on GitHub Pages</a></li>
             </ul>
           </nav>
           <p>One-time setup an operator does per client deployment, before the first <code>workflow_dispatch</code> run of
@@ -919,6 +920,84 @@
           <p>The alternative — putting the snapshot refresh on a nightly schedule — is what phases 2–4 specified
           and costs a build a day whether or not anything changed (spec §8.4, §10 Q7). Nothing in this repo
           implements it: the refresh went straight from &quot;next deploy&quot; to this on-demand job.</p>
+          <h2 id="10-project-site-on-github-pages">10. Project site on GitHub Pages<a class="heading-anchor" href="#10-project-site-on-github-pages" aria-label="Link to this section">#</a></h2>
+          <p>This section is not per client. It covers the project&#39;s own site: the landing page, the
+          documentation under <code>docs/docs/</code>, and the static demo under <code>docs/demo/</code>.
+          <code>.github/workflows/pages.yml</code> builds the site and deploys it on every push to <code>main</code>.</p>
+          <p><strong>One value sets the address.</strong> <code>scripts/lib/pages-site.cjs</code> holds the public address of the site:
+          an https origin and a path base. <code>scripts/build-pages.cjs</code>, <code>scripts/build-demo.cjs</code>, and
+          <code>scripts/check-docs.cjs</code> read it. It sets the canonical and social card URLs, every root-relative
+          link, the demo&#39;s Vite base, and how the link checker maps a path to a file under <code>docs/</code>.</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Address</th><th>Path base</th><th>Where it comes from</th></tr>
+          </thead>
+          <tbody>
+          <tr><td><code>https://centercoopmedia.github.io/eventrunner/</code></td><td><code>/eventrunner/</code></td><td>the committed default</td></tr>
+          <tr><td><code>https://docs.eventrunner.org/</code></td><td><code>/</code></td><td>the <code>PAGES_BASE_URL</code> repository variable, after the switch below</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>The committed <code>docs/docs/</code> and the landing pages (<code>docs/index.html</code>, <code>docs/videos/index.html</code>) are
+          built for the committed default. When the <code>PAGES_BASE_URL</code> repository variable is set, the
+          workflow renders the pages again for that address before it builds the demo and checks the links.
+          The workflow commits nothing.</p>
+          <p><strong>The workflow does not deploy to a wrong address.</strong> Before it deploys, the workflow compares the
+          address with the URL that Pages reports. If they are not the same, the run fails and the site that
+          is live now stays live. The message names both addresses.</p>
+          <p><strong>The address and the domain change together.</strong> With a base of <code>/</code>, every link points at the
+          domain root. While the site is served at the github.io project path, those links break. A site
+          built for <code>/eventrunner/</code> breaks in the same way when it is served from the custom domain. Do the
+          steps below in this order.</p>
+          <h3 id="101-switch-the-site-to-docseventrunnerorg">10.1 Switch the site to docs.eventrunner.org<a class="heading-anchor" href="#101-switch-the-site-to-docseventrunnerorg" aria-label="Link to this section">#</a></h3>
+          <ol>
+          <li><strong>DNS.</strong> Add <code>CNAME docs → centercoopmedia.github.io</code> for <code>eventrunner.org</code>. On Cloudflare, set
+          the record to <strong>DNS only</strong> (grey cloud). If the record is proxied, GitHub cannot issue the
+          certificate. Wait until <code>dig +short docs.eventrunner.org CNAME</code> returns
+          <code>centercoopmedia.github.io.</code>.</li>
+          <li><strong>Optional: verify the domain.</strong> In the organization settings, go to Pages → Verified domains
+          and verify <code>eventrunner.org</code>. This prevents a domain takeover.</li>
+          <li><strong>Variable.</strong> Go to Settings → Secrets and variables → Actions → Variables. Add the repository
+          variable <code>PAGES_BASE_URL</code> with the value <code>https://docs.eventrunner.org/</code>. Until step 4, a Pages
+          run fails at the address check and deploys nothing. The live site does not change.</li>
+          <li><strong>Custom domain.</strong> Go to Settings → Pages → Custom domain. Enter <code>docs.eventrunner.org</code> and
+          save. With a workflow-deployed site, GitHub ignores a <code>CNAME</code> file in the artifact, so this
+          setting is the only place for the domain. From now until step 5 ends, the live site has broken
+          links, so do step 5 immediately. The DNS check can finish while step 5 runs.</li>
+          <li><strong>Deploy.</strong> Go to Actions → Pages → Run workflow, on <code>main</code>. The run renders the site for the
+          new address, checks every link, compares the address with the Pages URL, and deploys.</li>
+          <li><strong>HTTPS.</strong> When the DNS check passes and the certificate is issued, turn on &quot;Enforce HTTPS&quot; in
+          Settings → Pages.</li>
+          </ol>
+          <p>To check the result:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">curl -sI https://docs.eventrunner.org/ | head -1           # 200
+          curl -sI https://docs.eventrunner.org/demo/ | head -1      # 200
+          curl -sI https://docs.eventrunner.org/docs/ | head -1      # 200
+          curl -sI https://centercoopmedia.github.io/eventrunner/ | grep -i &#39;^location&#39;   # the new host
+          curl -s https://docs.eventrunner.org/ | grep canonical     # https://docs.eventrunner.org/
+          </code></pre>
+          <p>Open a documentation page and the demo, and make sure that the styles, fonts, favicon, and links
+          load from the new host.</p>
+          <p><strong>Later, in a pull request.</strong> When the domain works, make the custom domain the committed default:</p>
+          <ol>
+          <li>In <code>scripts/lib/pages-site.cjs</code>, set <code>DEFAULT_PAGES_BASE_URL = &#39;https://docs.eventrunner.org/&#39;</code>.
+          This is the one line to change.</li>
+          <li>Run <code>node scripts/build-pages.cjs</code>. It renders <code>docs/docs/</code> again and moves the landing pages to
+          the new address. Commit the output.</li>
+          <li>Update the tests that name the default address, and the links to the github.io address in
+          <code>README.md</code>, <code>docs/handbook/</code>, <code>RELEASING.md</code>, and <code>scripts/README.md</code>. The links still work
+          before this step, because GitHub redirects the github.io address to the custom domain, and the
+          generated pages already send a reader to the configured address.</li>
+          <li>After that pull request is merged, you can delete the <code>PAGES_BASE_URL</code> variable.</li>
+          </ol>
+          <p><strong>To go back</strong> to the github.io address, delete the custom domain in Settings → Pages. Then delete
+          the <code>PAGES_BASE_URL</code> variable, or set it to <code>https://centercoopmedia.github.io/eventrunner/</code>. Run
+          the Pages workflow again.</p>
+          <p>To see what an address changes, without writing a file:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PAGES_BASE_URL=https://docs.eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
+          node scripts/lib/pages-site.cjs                                                    # prints the address in use
+          </code></pre>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">

@@ -23,19 +23,30 @@ const {
   buildSite,
   buildTokensCss,
   compare,
+  compareLandingPages,
+  landingSiteUrl,
   linkResolver,
+  rebaseLandingPage,
   themeColorProblems,
   themeColorTags,
   internals,
 } = require('./build-pages.cjs');
-const { isUnbuiltDeployTarget } = require('./check-docs.cjs');
+const { isUnbuiltDeployTarget, localTargetPath } = require('./check-docs.cjs');
 const { renderMarkdown, renderInline, slugify, escapeHtml } = require('./lib/markdown-pages.cjs');
-const { DOCS_BASE, SECTIONS, pagesInOrder, routesBySource } = require('./lib/pages-manifest.cjs');
+const { SECTIONS, pagesInOrder, routesBySource } = require('./lib/pages-manifest.cjs');
+const { pagesSite, parsePagesBaseUrl } = require('./lib/pages-site.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = internals.OUTPUT_DIR;
 
-const site = buildSite();
+// The committed site is built for the committed default address, whatever
+// PAGES_BASE_URL the shell running these tests has.
+const DEFAULT_SITE = pagesSite({});
+const DOCS_BASE = DEFAULT_SITE.docsBase;
+// The custom domain #514 moves the site to. It serves from `/`.
+const CUSTOM_DOMAIN_SITE = parsePagesBaseUrl('https://docs.eventrunner.org/');
+
+const site = buildSite({ site: DEFAULT_SITE });
 const pages = pagesInOrder();
 
 function textOf(html) {
@@ -101,7 +112,7 @@ test('every internal link resolves to a generated page or an existing asset', ()
       if (!href.startsWith('/')) continue;
       const [target] = href.split('#');
       if (known.has(target)) continue;
-      const onDisk = path.join(ROOT, 'docs', target.replace('/eventrunner/', ''));
+      const onDisk = path.join(ROOT, 'docs', target.slice(DEFAULT_SITE.base.length));
       // The Pages workflow builds docs/demo before it deploys; a checkout
       // without that build cannot judge links into it.
       if (isUnbuiltDeployTarget(onDisk, ROOT)) continue;
@@ -119,8 +130,9 @@ test('every cross-page fragment points at a heading that exists', () => {
     headings.set(`${DOCS_BASE}${page.route}`, new Set(site.headingsByRoute.get(page.route).map((h) => h.slug)));
   }
   for (const [file, html] of site.files) {
-    for (const match of html.matchAll(/href="(\/eventrunner\/docs\/[^"]*)#([^"]+)"/g)) {
+    for (const match of html.matchAll(/href="([^"#]*)#([^"]+)"/g)) {
       const [, route, fragment] = match;
+      if (!route.startsWith(DOCS_BASE)) continue;
       if (!headings.has(route)) continue;
       assert.ok(
         headings.get(route).has(fragment),
@@ -217,7 +229,7 @@ test('every page carries the required metadata', () => {
     /<meta name="viewport"/,
     /<title>[^<]+<\/title>/,
     /<meta name="description" content="[^"]+">/,
-    /<link rel="canonical" href="https:\/\/centercoopmedia\.github\.io\/eventrunner\/docs\/[^"]*">/,
+    new RegExp(`<link rel="canonical" href="${DEFAULT_SITE.docsUrl.replaceAll('.', '\\.')}[^"]*">`),
     /<link rel="icon" type="image\/svg\+xml" href="[^"]+\.svg">/,
     /<meta property="og:type" content="[^"]+">/,
     /<meta property="og:title" content="[^"]+">/,
@@ -368,16 +380,16 @@ test('each page names the Markdown file it came from', () => {
 // ------------------------------------------------------- link rewriting
 
 test('a link to another published document becomes a route', () => {
-  const routes = routesBySource();
-  const resolve = linkResolver({ source: 'docs/handbook/faq.md', routes, departures: [], errors: [] });
+  const routes = routesBySource(DOCS_BASE);
+  const resolve = linkResolver({ source: 'docs/handbook/faq.md', routes, departures: [], errors: [], site: DEFAULT_SITE });
   assert.equal(resolve('for-clients.md'), `${DOCS_BASE}handbook/for-clients/`);
   assert.equal(resolve('../ROADMAP.md'), `${DOCS_BASE}roadmap/`);
   assert.equal(resolve('../ADMIN_GUIDE.md#speakers'), `${DOCS_BASE}admin-guide/#speakers`);
 });
 
 test('a blob URL for a published document becomes a route', () => {
-  const routes = routesBySource();
-  const resolve = linkResolver({ source: 'README.md', routes, departures: [], errors: [] });
+  const routes = routesBySource(DOCS_BASE);
+  const resolve = linkResolver({ source: 'README.md', routes, departures: [], errors: [], site: DEFAULT_SITE });
   assert.equal(
     resolve('https://github.com/CenterCoopMedia/eventrunner/blob/main/CONTRIBUTING.md'),
     `${DOCS_BASE}contributing/`,
@@ -388,7 +400,7 @@ test('a link that leaves the manifest is flagged and sent to GitHub', () => {
   const departures = [];
   const resolve = linkResolver({
     source: 'README.md',
-    routes: routesBySource(),
+    routes: routesBySource(DOCS_BASE),
     departures,
     errors: [],
   });
@@ -407,7 +419,7 @@ test('a link to a file that does not exist is an error, not a silent 404', () =>
   const errors = [];
   const resolve = linkResolver({
     source: 'README.md',
-    routes: routesBySource(),
+    routes: routesBySource(DOCS_BASE),
     departures: [],
     errors,
   });
@@ -419,7 +431,7 @@ test('a link to a file that does not exist is an error, not a silent 404', () =>
 test('external links, anchors, and site paths are left alone', () => {
   const resolve = linkResolver({
     source: 'README.md',
-    routes: routesBySource(),
+    routes: routesBySource(DOCS_BASE),
     departures: [],
     errors: [],
   });
@@ -642,7 +654,7 @@ test('the documentation social card is a real 1200x630 PNG', () => {
 
 test('every page points its social card at that image, with the declared size', () => {
   for (const [file, html] of site.files) {
-    assert.match(html, /<meta property="og:image" content="https:\/\/centercoopmedia\.github\.io\/eventrunner\/og-default\.png">/, file);
+    assert.ok(html.includes(`<meta property="og:image" content="${DEFAULT_SITE.url}og-default.png">`), file);
     assert.match(html, /<meta property="og:image:type" content="image\/png">/, file);
     assert.match(html, /<meta property="og:image:width" content="1200">/, file);
     assert.match(html, /<meta property="og:image:height" content="630">/, file);
@@ -921,5 +933,94 @@ test('a route that escapes the output directory is refused before anything is de
   assert.equal(
     internals.resolveOutputPath(OUTPUT_DIR, 'overview/index.html'),
     path.join(OUTPUT_DIR, 'overview', 'index.html'),
+  );
+});
+
+// ------------------------------------------------------------ site address
+
+test('the site renders for both bases: the project path and a custom domain at /', () => {
+  for (const address of [DEFAULT_SITE, CUSTOM_DOMAIN_SITE]) {
+    const built = buildSite({ site: address });
+    assert.deepEqual(built.errors, [], address.url);
+    for (const [file, html] of built.files) {
+      const label = `${address.url} ${file}`;
+      const route = file.replace(/index\.html$/, '');
+      assert.ok(html.includes(`<link rel="canonical" href="${address.docsUrl}${route}">`), label);
+      assert.ok(html.includes(`<meta property="og:url" content="${address.docsUrl}${route}">`), label);
+      assert.ok(html.includes(`<meta property="og:image" content="${address.url}og-default.png">`), label);
+      assert.ok(html.includes(`<meta name="twitter:image" content="${address.url}og-default.png">`), label);
+      assert.ok(html.includes(`<link rel="icon" type="image/svg+xml" href="${address.base}favicon.svg">`), label);
+      assert.ok(html.includes(`<a href="${address.demoBase}">Demo</a>`), label);
+      for (const match of html.matchAll(/(?:href|src)="(\/[^"]*)"/g)) {
+        const href = match[1];
+        assert.ok(href.startsWith(address.base), `${label}: ${href} is outside ${address.base}`);
+        // The same mapping the link checker applies on the deployed site.
+        const resolved = localTargetPath(path.join(OUTPUT_DIR, file), href, ROOT, address.base);
+        assert.equal(resolved.error, undefined, `${label}: ${href}`);
+        if (isUnbuiltDeployTarget(resolved.path, ROOT)) continue;
+        // Both addresses publish the same routes, so the committed tree answers for either.
+        assert.ok(fs.existsSync(resolved.path), `${label}: ${href} goes nowhere`);
+      }
+    }
+    if (address.base === '/') {
+      for (const [file, html] of built.files) {
+        assert.ok(!/(?:href|src)="\/eventrunner\//.test(html), `${file} still links under /eventrunner/`);
+      }
+    }
+  }
+});
+
+test('the landing pages move to the configured address and nothing else changes', () => {
+  const custom = buildSite({ site: CUSTOM_DOMAIN_SITE });
+  const landing = custom.landingPages.get('index.html');
+  assert.equal(landingSiteUrl(landing), CUSTOM_DOMAIN_SITE.url);
+  for (const tag of [
+    '<link rel="canonical" href="https://docs.eventrunner.org/">',
+    '<meta property="og:url" content="https://docs.eventrunner.org/">',
+    '<meta property="og:image" content="https://docs.eventrunner.org/social-preview.png">',
+    '<meta name="twitter:image" content="https://docs.eventrunner.org/social-preview.png">',
+  ]) {
+    assert.ok(landing.includes(tag), tag);
+  }
+  const videos = custom.landingPages.get('videos/index.html');
+  assert.ok(videos.includes('<link rel="canonical" href="https://docs.eventrunner.org/videos/">'));
+  for (const text of custom.landingPages.values()) {
+    assert.ok(!text.includes(DEFAULT_SITE.url), 'a landing page kept the old address');
+  }
+  // The move changes only the address: every other byte stays as written.
+  const committed = fs.readFileSync(path.join(ROOT, 'docs', 'index.html'), 'utf8');
+  assert.equal(rebaseLandingPage(landing, CUSTOM_DOMAIN_SITE.url, DEFAULT_SITE.url), committed);
+
+  // The committed landing pages are already at the committed default address.
+  assert.deepEqual(compareLandingPages(site.landingPages, path.join(ROOT, 'docs')), []);
+  assert.deepEqual(
+    compareLandingPages(custom.landingPages, path.join(ROOT, 'docs')),
+    ['index.html', 'videos/index.html'],
+  );
+});
+
+test('a landing page without a canonical address is an error', () => {
+  assert.equal(landingSiteUrl('<html><head></head></html>'), null);
+  assert.equal(landingSiteUrl('<link rel="canonical" href="http://insecure.example/">'), null);
+  assert.equal(
+    landingSiteUrl('<link rel="canonical" href="https://docs.example.org/">'),
+    'https://docs.example.org/',
+  );
+});
+
+test('a link to the github.io project address follows the configured address', () => {
+  const resolveFor = (address) => linkResolver({
+    source: 'README.md',
+    routes: routesBySource(address.docsBase),
+    departures: [],
+    errors: [],
+    site: address,
+  });
+  const legacy = 'https://centercoopmedia.github.io/eventrunner/demo/#/specimen';
+  assert.equal(resolveFor(DEFAULT_SITE)(legacy), legacy);
+  assert.equal(resolveFor(CUSTOM_DOMAIN_SITE)(legacy), 'https://docs.eventrunner.org/demo/#/specimen');
+  assert.equal(
+    resolveFor(CUSTOM_DOMAIN_SITE)('docs/handbook/faq.md'),
+    '/docs/handbook/faq/',
   );
 });

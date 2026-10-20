@@ -3,7 +3,8 @@
 
 /**
  * Static showcase build — the click-through demo published from GitHub Pages
- * at https://centercoopmedia.github.io/eventrunner/demo/.
+ * at `demo/` under the site address in scripts/lib/pages-site.cjs (today
+ * https://centercoopmedia.github.io/eventrunner/demo/).
  *
  * It is the ordinary `vite build` of apps/web with two switches thrown:
  *
@@ -38,12 +39,18 @@
  * snapshot, the same way deploy-client.yml's build job does for a real
  * client, rather than only the neutral fallback Vite copies from
  * apps/web/public/manifest.webmanifest. The demo's public URL is derived
- * from --base: DEMO_ORIGIN + base, since GitHub Pages serves it under a
- * subpath rather than a domain of its own.
+ * from --base: the site's origin + base, since GitHub Pages serves it under
+ * a subpath rather than a domain of its own.
+ *
+ * The default base and the origin both come from the Pages site address
+ * (PAGES_BASE_URL, or the committed default), so the demo moves with the
+ * documentation when the site moves to a custom domain (#514).
  *
  * Usage:
  *   node scripts/build-demo.cjs                     # build + sync
  *   node scripts/build-demo.cjs --base /other/path/ # different subpath
+ *   PAGES_BASE_URL=https://docs.example.org/ node scripts/build-demo.cjs
+ *                                                    # another site address
  *   node scripts/build-demo.cjs --out docs/demo     # different destination
  *   node scripts/build-demo.cjs --dry-run           # print the plan only
  *   node scripts/build-demo.cjs --check             # build twice to temp dirs,
@@ -70,17 +77,18 @@ const { spawnSync } = require('node:child_process');
 const { main: writeSiteFiles } = require('./write-site-files.cjs');
 const { demoSnapshot } = require('./lib/demo-event.cjs');
 const { main: checkBundleBudget } = require('./ci/bundle-budget.cjs');
+const { pagesSite } = require('./lib/pages-site.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const WEB_DIR = path.join(REPO_ROOT, 'apps', 'web');
 const DIST_DIR = path.join(WEB_DIR, 'dist');
 
-/** Pages project site root is /eventrunner/; the demo lives beside the docs. */
-const DEFAULT_BASE = '/eventrunner/demo/';
+/** The demo lives beside the docs, at `demo/` under the committed site address. */
+const DEFAULT_BASE = pagesSite({}).demoBase;
 const DEFAULT_OUT = path.join('docs', 'demo');
 
-/** Where GitHub Pages serves this repo from; the demo's own public URL is this plus --base. */
-const DEMO_ORIGIN = 'https://centercoopmedia.github.io';
+/** Where GitHub Pages serves this repo from by default; the demo's own public URL is this plus --base. */
+const DEMO_ORIGIN = pagesSite({}).origin;
 
 /**
  * Write sitemap.xml, robots.txt, and the manifest into the just-built
@@ -90,11 +98,11 @@ const DEMO_ORIGIN = 'https://centercoopmedia.github.io';
  * error" (exit 1): it is not a vite build failure (exit 4 already means
  * something specific) and not a `--check` drift finding.
  *
- * @param {{ base: string }} args
+ * @param {{ base: string, origin?: string }} args
  * @returns {Promise<void>}
  */
-async function writeDemoSiteFiles({ base }) {
-  const publicUrl = `${DEMO_ORIGIN}${base.replace(/\/+$/, '')}`;
+async function writeDemoSiteFiles({ base, origin = DEMO_ORIGIN }) {
+  const publicUrl = `${origin}${base.replace(/\/+$/, '')}`;
   const code = await writeSiteFiles(['--dist', DIST_DIR, '--public-url', publicUrl]);
   if (code !== 0) {
     console.error(`write-site-files failed while building the demo (exit ${code}).`);
@@ -156,8 +164,24 @@ const DEMO_FIREBASE_ENV = Object.freeze({
   VITE_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000000000',
 });
 
-function parseArgs(argv) {
-  const options = { base: DEFAULT_BASE, out: DEFAULT_OUT, dryRun: false, check: false };
+/**
+ * @param {string[]} argv
+ * @param {Record<string, string|undefined>} [env] reads PAGES_BASE_URL
+ */
+function parseArgs(argv, env = process.env) {
+  let site;
+  try {
+    site = pagesSite(env);
+  } catch (error) {
+    throw new UsageError(error.message);
+  }
+  const options = {
+    base: site.demoBase,
+    origin: site.origin,
+    out: DEFAULT_OUT,
+    dryRun: false,
+    check: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--dry-run') {
@@ -347,13 +371,13 @@ function compareDirs(expectedDir, actualDir) {
  * One demo build into `dir`, a scratch directory outside the repository.
  * Vite's own dist/ is the staging area, as in a normal build.
  */
-async function buildInto(base, dir) {
+async function buildInto(base, origin, dir) {
   runBuild({ base, dryRun: false });
   if (!fs.existsSync(DIST_DIR)) {
     console.error(`Expected build output at ${DIST_DIR}; it is not there.`);
     return 4;
   }
-  await writeDemoSiteFiles({ base });
+  await writeDemoSiteFiles({ base, origin });
   fs.cpSync(DIST_DIR, dir, { recursive: true });
   normalizeGeneratedHtml(dir);
   fs.rmSync(DIST_DIR, { recursive: true, force: true });
@@ -370,14 +394,14 @@ async function buildInto(base, dir) {
  * bundle budget on the result. Writes nothing to the working tree, so it
  * never touches a local docs/demo/ either.
  */
-async function runCheck({ base }) {
+async function runCheck({ base, origin = DEMO_ORIGIN }) {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'run-of-show-demo-check-'));
   const first = path.join(tmpRoot, 'first');
   const second = path.join(tmpRoot, 'second');
   try {
     console.log(`Building the demo twice in a scratch dir: ${tmpRoot}`);
     for (const dir of [first, second]) {
-      const code = await buildInto(base, dir);
+      const code = await buildInto(base, origin, dir);
       if (code !== 0) return code;
     }
 
@@ -446,11 +470,12 @@ async function main(argv) {
       console.error('--check and --dry-run are mutually exclusive.');
       return 2;
     }
-    return runCheck({ base: options.base });
+    return runCheck({ base: options.base, origin: options.origin });
   }
 
   console.log(`Demo build → ${path.relative(REPO_ROOT, options.outDir)}`);
   console.log(`  base: ${options.base}`);
+  console.log(`  origin: ${options.origin}`);
 
   runBuild(options);
 
@@ -468,7 +493,7 @@ async function main(argv) {
     return 4;
   }
 
-  await writeDemoSiteFiles({ base: options.base });
+  await writeDemoSiteFiles({ base: options.base, origin: options.origin });
 
   // Delete first: hashed asset names change every build, so a plain copy
   // would accumulate every past build's chunks forever.

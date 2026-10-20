@@ -197,7 +197,8 @@
           (<code>scripts/build-demo.cjs</code>) runs a demo-mode <code>vite build</code> of <code>apps/web</code> against the committed
           synthetic snapshot in <code>apps/web/src/generated/</code> and syncs the result into <code>docs/demo/</code>.
           <code>.github/workflows/pages.yml</code> runs it on every push to <code>main</code>, checks the result, and deploys
-          <code>docs/</code> with the demo to GitHub Pages at <code>https://centercoopmedia.github.io/eventrunner/demo/</code>.</p>
+          <code>docs/</code> with the demo to GitHub Pages at <code>demo/</code> under the site address, today
+          <code>https://centercoopmedia.github.io/eventrunner/demo/</code>.</p>
           <ul>
           <li><strong>Nothing to rebuild or commit before tagging.</strong> The demo on Pages is the build of the latest
           <code>main</code>. A pull request never commits <code>docs/demo/</code>, so two pull requests never conflict on its
@@ -213,13 +214,12 @@
           <li><strong>Pages deploys from the workflow.</strong> The repository&#39;s Pages source must be &quot;GitHub Actions&quot;
           (Settings → Pages). While it is still &quot;Deploy from a branch&quot;, <code>pages.yml</code> builds and checks the
           site and skips the deploy with a warning.</li>
-          <li><strong>The <code>--base</code> / rename caveat</strong>: <code>scripts/build-demo.cjs</code> defaults <code>--base</code> to
-          <code>/eventrunner/demo/</code>, matching this repo&#39;s current name and the Pages project path. Renaming the
-          repository, or moving the demo to a different Pages path, changes that URL: change the default
-          <code>--base</code> (and <code>--out</code> if the destination directory changes too), or every asset URL the built
-          <code>index.html</code> emits will 404 under the new address. Nothing checks this automatically: <code>--check</code>
-          only proves the build is reproducible and within budget at the <em>current</em> <code>--base</code>, not that the
-          <code>--base</code> is still correct.</li>
+          <li><strong>The site address</strong>: <code>scripts/build-demo.cjs</code> defaults <code>--base</code> to <code>demo/</code> under the Pages
+          site address in <code>scripts/lib/pages-site.cjs</code>, today <code>/eventrunner/demo/</code>. The documentation and
+          the link checker read the same value. A move to a custom domain or a repository rename changes
+          that one value: the <code>PAGES_BASE_URL</code> repository variable for a deploy, or the committed default.
+          The Pages workflow refuses to deploy when the address does not match the URL Pages reports. The
+          switch to <code>docs.eventrunner.org</code> is in <code>docs/DEPLOY_RUNBOOK.md</code> §10.</li>
           </ul>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/RELEASING.md"><code>RELEASING.md</code></a>. Edit the Markdown, not the HTML.</p>

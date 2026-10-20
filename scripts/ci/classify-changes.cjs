@@ -21,6 +21,13 @@ const DEMO_GENERATOR_PATHS = new Set([
   'scripts/build-demo.test.cjs',
 ]);
 
+// The Pages site address. Both generators read it: it decides the
+// documentation links and the demo's base, so a change selects both tiers.
+const PAGES_SITE_PATHS = new Set([
+  'scripts/lib/pages-site.cjs',
+  'scripts/lib/pages-site.test.cjs',
+]);
+
 const DOCS_GENERATOR_PATHS = new Set([
   'scripts/build-pages.cjs',
   'scripts/build-pages.test.cjs',
@@ -62,8 +69,12 @@ function isMarkdownPath(path) {
   return path.endsWith('.md') || path.endsWith('.mdx');
 }
 
+function isDemoGeneratorPath(path) {
+  return DEMO_GENERATOR_PATHS.has(path) || PAGES_SITE_PATHS.has(path);
+}
+
 function isDemoPath(path) {
-  return DEMO_GENERATOR_PATHS.has(path) || path.startsWith('docs/demo/');
+  return isDemoGeneratorPath(path) || path.startsWith('docs/demo/');
 }
 
 function isDocsGeneratorPath(path) {
@@ -71,7 +82,7 @@ function isDocsGeneratorPath(path) {
 }
 
 function isDocsPath(path) {
-  if (isDemoPath(path)) return false;
+  if (isDemoPath(path) && !PAGES_SITE_PATHS.has(path)) return false;
   return isDocsGeneratorPath(path) ||
     isMarkdownPath(path) ||
     path.startsWith('docs/') ||
@@ -166,7 +177,7 @@ function classifyPaths(input) {
     docs: paths.some(isDocsPath),
     copyDocs: paths.some(isCopyCheckedDocsPath),
     demo: paths.some(isDemoPath),
-    demoGenerator: paths.some((path) => DEMO_GENERATOR_PATHS.has(path)),
+    demoGenerator: paths.some(isDemoGeneratorPath),
     docsGenerator: paths.some(isDocsGeneratorPath),
     app: paths.some(isAppPath),
     backend: paths.some(isBackendPath),

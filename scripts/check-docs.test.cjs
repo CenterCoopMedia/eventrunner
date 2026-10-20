@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { checkMarkdownLinks, checkPages, checkRepository, localTargetPath } = require('./check-docs.cjs');
+const { parsePagesBaseUrl } = require('./lib/pages-site.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 
@@ -20,10 +21,14 @@ function withTempRoot(fn) {
 }
 
 const SITE = 'https://centercoopmedia.github.io/eventrunner/';
+// The two site addresses #514 moves between: the github.io project path, and
+// a custom domain that serves from `/`.
+const PROJECT_PATH_SITE = parsePagesBaseUrl(SITE);
+const CUSTOM_DOMAIN_SITE = parsePagesBaseUrl('https://docs.eventrunner.org/');
 
 // A generated page carrying the full public-metadata set, for the cases where
 // its presence is scaffolding rather than the thing under test.
-function generatedPage(title, canonical, prefix = '../..') {
+function generatedPage(title, canonical, prefix = '../..', site = SITE) {
   return [
     '<!doctype html><html lang="en"><head>',
     '<meta name="viewport" content="width=device-width">',
@@ -34,7 +39,7 @@ function generatedPage(title, canonical, prefix = '../..') {
     `<meta property="og:description" content="${title}">`,
     '<meta property="og:type" content="website">',
     `<meta property="og:url" content="${canonical}">`,
-    `<meta property="og:image" content="${SITE}og-default.png">`,
+    `<meta property="og:image" content="${site}og-default.png">`,
     '<meta property="og:image:type" content="image/png">',
     '<meta property="og:image:width" content="1200">',
     '<meta property="og:image:height" content="630">',
@@ -42,7 +47,7 @@ function generatedPage(title, canonical, prefix = '../..') {
     '<meta name="twitter:card" content="summary_large_image">',
     `<meta name="twitter:title" content="${title}">`,
     `<meta name="twitter:description" content="${title}">`,
-    `<meta name="twitter:image" content="${SITE}og-default.png">`,
+    `<meta name="twitter:image" content="${site}og-default.png">`,
     `<meta name="twitter:image:alt" content="${title}">`,
     '</head><body>',
   ].join('');
@@ -51,24 +56,24 @@ function generatedPage(title, canonical, prefix = '../..') {
 // A landing page that satisfies every check, so a test about something else
 // is not also re-asserting the metadata list. It brings the documentation hub
 // its entry-point link has to reach.
-function writeLanding(root, body = '') {
+function writeLanding(root, body = '', site = SITE) {
   fs.mkdirSync(path.join(root, 'docs', 'docs'), { recursive: true });
   fs.writeFileSync(path.join(root, 'docs', 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
   fs.writeFileSync(
     path.join(root, 'docs', 'docs', 'index.html'),
-    `${generatedPage('Documentation', `${SITE}docs/`, '..')}</body></html>`,
+    `${generatedPage('Documentation', `${site}docs/`, '..', site)}</body></html>`,
   );
   fs.writeFileSync(path.join(root, 'docs', 'index.html'), [
     '<!doctype html><html lang="en"><head>',
     '<meta name="viewport" content="width=device-width">',
     '<meta name="description" content="Event CMS"><title>Docs</title>',
     '<link rel="icon" type="image/svg+xml" href="favicon.svg">',
-    `<link rel="canonical" href="${SITE}">`,
+    `<link rel="canonical" href="${site}">`,
     '<meta property="og:type" content="website">',
     '<meta property="og:title" content="Event Runner">',
     '<meta property="og:description" content="Event CMS">',
-    `<meta property="og:url" content="${SITE}">`,
-    `<meta property="og:image" content="${SITE}og-default.png">`,
+    `<meta property="og:url" content="${site}">`,
+    `<meta property="og:image" content="${site}og-default.png">`,
     '<meta property="og:image:type" content="image/png">',
     '<meta property="og:image:width" content="1200">',
     '<meta property="og:image:height" content="630">',
@@ -76,7 +81,7 @@ function writeLanding(root, body = '') {
     '<meta name="twitter:card" content="summary_large_image">',
     '<meta name="twitter:title" content="Event Runner">',
     '<meta name="twitter:description" content="Event CMS">',
-    `<meta name="twitter:image" content="${SITE}og-default.png">`,
+    `<meta name="twitter:image" content="${site}og-default.png">`,
     '<meta name="twitter:image:alt" content="Event Runner">',
     '</head><body><a href="./docs/">Documentation</a>',
     body,
@@ -170,6 +175,67 @@ test('Pages checks map the Eventrunner base and scan generated HTML', () => {
   });
 });
 
+test('Pages checks map both site bases: the project path and a custom domain at /', () => {
+  for (const site of [PROJECT_PATH_SITE, CUSTOM_DOMAIN_SITE]) {
+    withTempRoot((root) => {
+      const generated = path.join(root, 'docs', 'docs', 'admin-guide', 'index.html');
+      const asset = path.join(root, 'docs', 'demo', 'assets', 'app.js');
+      fs.mkdirSync(path.dirname(generated), { recursive: true });
+      fs.mkdirSync(path.dirname(asset), { recursive: true });
+      fs.writeFileSync(asset, '');
+      writeLanding(root, `<a href="${site.docsBase}admin-guide/">Guide</a><a href="${site.base}">Home</a>`, site.url);
+      fs.writeFileSync(
+        generated,
+        `${generatedPage('Guide', `${site.docsUrl}admin-guide/`, '../..', site.url)}` +
+        `<script src="${site.demoBase}assets/app.js"></script></body></html>`,
+      );
+
+      assert.deepEqual(checkPages(root, site), [], site.url);
+      const resolved = localTargetPath(generated, `${site.docsBase}admin-guide/`, root, site.base);
+      assert.equal(resolved.error, undefined, site.url);
+      assert.equal(resolved.path, path.join(root, 'docs', 'docs', 'admin-guide'), site.url);
+      assert.equal(localTargetPath(generated, site.base, root, site.base).path, path.join(root, 'docs'), site.url);
+      assert.equal(
+        localTargetPath(generated, `${site.demoBase}assets/app.js`, root, site.base).path,
+        asset,
+        site.url,
+      );
+    });
+  }
+});
+
+test('a site built for one address fails the checks for the other', () => {
+  withTempRoot((root) => {
+    writeLanding(root, '<a href="/eventrunner/docs/">Docs</a>');
+
+    assert.deepEqual(checkPages(root, CUSTOM_DOMAIN_SITE), [
+      'docs/index.html: missing canonical',
+      'docs/index.html: missing og:url',
+      'docs/index.html: missing og:image',
+      'docs/index.html: missing twitter:image',
+      'docs/docs/index.html: missing canonical under the site address',
+      'docs/docs/index.html: missing og:url under the site address',
+      'docs/docs/index.html: missing og:image under the site address',
+      // Under `/`, the old project path is an ordinary path, and docs/ has no eventrunner/.
+      'docs/index.html: missing /eventrunner/docs/',
+    ]);
+  });
+  withTempRoot((root) => {
+    writeLanding(root, '<a href="/docs/">Docs</a>', CUSTOM_DOMAIN_SITE.url);
+
+    assert.deepEqual(checkPages(root, PROJECT_PATH_SITE), [
+      'docs/index.html: missing canonical',
+      'docs/index.html: missing og:url',
+      'docs/index.html: missing og:image',
+      'docs/index.html: missing twitter:image',
+      'docs/docs/index.html: missing canonical under the site address',
+      'docs/docs/index.html: missing og:url under the site address',
+      'docs/docs/index.html: missing og:image under the site address',
+      'docs/index.html: /docs/ (unsupported root-relative path (expected /eventrunner/))',
+    ]);
+  });
+});
+
 test('links into the deploy-built demo are checked only once a local build exists', () => {
   withTempRoot((root) => {
     writeLanding(root, '<a href="./demo/">Demo</a><a href="./demo/#/specimen">Specimen</a><a href="./missing/">Missing</a>');
@@ -212,6 +278,9 @@ test('generated documentation pages require complete public metadata while the i
       'docs/docs/guide/index.html: missing twitter:description',
       'docs/docs/guide/index.html: missing twitter:image',
       'docs/docs/guide/index.html: missing twitter:image:alt',
+      'docs/docs/guide/index.html: missing canonical under the site address',
+      'docs/docs/guide/index.html: missing og:url under the site address',
+      'docs/docs/guide/index.html: missing og:image under the site address',
     ]);
   });
 });
