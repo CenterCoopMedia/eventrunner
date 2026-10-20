@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Invoices, part 1 (#208). Staff write and save sponsor invoice drafts under
+  **Invoices**. Choosing an organization fills the name to bill and, when its tier names a
+  sponsor package, the first line. The totals change as staff type, in a live region, and
+  the server computes them again in minor units on every save; a total below zero is
+  refused. A save over a newer revision is refused. A draft has no number. Numbers come
+  with issue in a later release. **Invoice settings** hold the issuer, tax ID, payment
+  instructions and number prefix; staff read them and only an operator changes them. The
+  `invoices`, `invoice_counters` and `invoice_settings` collections are server-only, every
+  write refuses on a read-only demo, and each write records an audit row. ADR 0001 §4.2 is
+  amended to restore invoicing.
+
 - Live updates have a category and an audience: everyone, approved attendees and speakers,
   or speakers only. The Firestore rules enforce the audience. A signed-out reader and an
   approved attendee cannot get or list a speaker-only entry, and the card's queries carry the
