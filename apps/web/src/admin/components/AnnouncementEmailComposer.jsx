@@ -245,12 +245,11 @@ export default function AnnouncementEmailComposer() {
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
-  // The first audience is the default once the server lists them.
-  useEffect(() => {
-    if (history?.audiences?.length && !draft.audience) {
-      setDraft((current) => ({ ...current, audience: history.audiences[0].id }));
-    }
-  }, [history, draft.audience]);
+  // The first audience the server lists is the default. It is worked out
+  // while rendering, not stored by an effect, so the select, its hint and
+  // the preview request agree from the first render that has the list.
+  const audiences = history?.audiences ?? [];
+  const selectedAudience = draft.audience || audiences[0]?.id || '';
 
   useEffect(() => { if (preview) previewHeadingRef.current?.focus(); }, [preview]);
   useEffect(() => { if (confirming) confirmHeadingRef.current?.focus(); }, [confirming]);
@@ -273,12 +272,13 @@ export default function AnnouncementEmailComposer() {
     setError(null);
     setResult(null);
     try {
+      const chosen = { ...draft, audience: selectedAudience };
       const response = await call('previewAnnouncementEmail', {
-        draft: draftBody(draft),
-        audience: draft.audience,
+        draft: draftBody(chosen),
+        audience: chosen.audience,
         ...(retry ? { retryOf: retry.id } : {}),
       });
-      setPreview({ ...response, draft: { ...draft }, retryOf: retry?.id ?? null });
+      setPreview({ ...response, draft: chosen, retryOf: retry?.id ?? null });
       setConfirming(false);
     } catch (err) {
       setError(err);
@@ -404,9 +404,8 @@ export default function AnnouncementEmailComposer() {
 
   const channel = history?.channel;
   const providerManaged = channel?.mode === 'provider';
-  const audiences = history?.audiences ?? [];
   const audienceOptions = audiences.map((audience) => ({ value: audience.id, label: audience.label }));
-  const audienceHint = audiences.find((audience) => audience.id === draft.audience)?.description;
+  const audienceHint = audiences.find((audience) => audience.id === selectedAudience)?.description;
   const count = preview?.recipientCount ?? 0;
 
   return (
@@ -436,7 +435,7 @@ export default function AnnouncementEmailComposer() {
             ) : null}
             <SelectField
               label="Audience"
-              value={draft.audience}
+              value={selectedAudience}
               options={audienceOptions}
               hint={audienceHint}
               onChange={(value) => edit('audience', value)}
