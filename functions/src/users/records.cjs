@@ -51,7 +51,7 @@
  * Approve and revoke (approval.cjs) are not touched.
  */
 
-const { requireAdmin, resolveAdminTier } = require('../core/auth.cjs');
+const { requireAdmin, listedAdminTier } = require('../core/auth.cjs');
 const {
   sendError, badRequest, notFound, methodNotAllowed, internal,
 } = require('../core/errors.cjs');
@@ -320,9 +320,13 @@ async function readSignIn({ auth, uid }) {
   }
 }
 
-/** Whether either address is on either admin list of `bootstrap`. */
+/**
+ * Whether either address is on either admin list of `bootstrap`. A staff
+ * grant whose end time has passed still counts (issue #331): the address
+ * is still on the list, and only an operator takes it off.
+ */
 function holdsAdminAccess(bootstrap, emails) {
-  return emails.some((email) => email && resolveAdminTier(bootstrap, email) !== null);
+  return emails.some((email) => email && listedAdminTier(bootstrap, email) !== null);
 }
 
 /**

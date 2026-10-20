@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   New staff-tier endpoint `organizationRepresentatives`, new account
   endpoint `ownOrganizationProfile`, and two staff-readable collections,
   `organization_representatives` and `organization_edit_requests`.
+- Staff access with an end time (#331). On the Access page, an operator can set a time
+  when a staff grant ends, at most 90 days ahead, for a demo or a short engagement. The
+  server and the database rules check the end time on every request and refuse the
+  account from that moment. A new scheduled function, `endExpiredStaffAccess`, runs every
+  minute and takes ended grants off the access list, with one admin log row each by the
+  "system" actor, so a browser connection opened before the end time also loses access
+  within a minute. A sign-in token from before the end gives
+  no access after it. Operator access never ends, so the last operator cannot lose access
+  this way. An end time that cannot be read refuses the account. The table shows each end
+  time and marks an ended grant when the time passes, without a reload. The admin log records the old and the new end time.
+  Until the end time, the account is a full staff account and can edit and publish
+  content; an end time does not make it read-only.
 - Display sizes for uploaded images (#333). When an image lands in `cms-images/`,
   `branding/` or `speaker-photos/`, the new storage trigger `mediaImageSizes` writes WebP
   copies at each of 320, 640, 1280 and 1920 pixels that is narrower than the original, in

@@ -522,6 +522,21 @@ test('an admin grant made while the delete runs aborts it too', async () => {
   assert.ok(d.db.read('users', 'uid-ada'));
 });
 
+test('an account whose staff grant has ended is still an admin account: the delete is refused (issue 331)', async () => {
+  // The grant no longer works, but the address is still on the staff list.
+  // Only an operator removes it from the list; an attendee delete does not.
+  const db = await fullySeeded();
+  await db.collection('config').doc('bootstrap').set({
+    ...BOOTSTRAP_DOC,
+    staffEmails: [STAFF, 'ada@example.com'],
+    staffExpiry: { 'ada@example.com': new Date(T0.getTime() - 60_000) },
+  });
+  const res = await remove(deps(db));
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'admin-account');
+  assert.ok(db.read('users', 'uid-ada'));
+});
+
 test('refuses more claimed tickets than one transaction can release, naming the count', async () => {
   const db = await fullySeeded();
   for (let i = 0; i < MAX_RELEASED_CLAIMS; i += 1) {
