@@ -848,4 +848,42 @@ for (const backend of backends) {
     });
     assert.deepEqual(answer, { code: 200, body: { processed: 0, patched: 0 } });
   });
+
+  // Scheduled attendee reminders (#518) share this record. Only the
+  // schedule moves one on: a staff "Continue sending" would skip its quiet
+  // hours, its window and its approval.
+  t('a scheduled reminder send is marked in the history, and staff cannot continue it', async () => {
+    const h = await harness({ backend });
+    await h.db.collection('announcement_sends').doc('reminder-attendees-2026-12-01-7d').set({
+      status: 'sending',
+      audience: 'registered',
+      subject: 'See you in 7 days',
+      message: 'Soon.',
+      link: null,
+      mode: 'app',
+      receipt: 'r'.repeat(64),
+      recipients: [{ uid: 'a', email: 'ada@example.org' }],
+      total: 1,
+      nextIndex: 0,
+      counts: { sent: 0, failed: 0, uncertain: 0, skipped: 0, suppressed: 0 },
+      failures: [],
+      retryRecipients: [],
+      unsubscribeKey: 'ab'.repeat(32),
+      lease: null,
+      createdAt: new Date('2026-11-24T15:00:00Z'),
+      createdBy: { uid: null, email: null },
+      reminder: { schedule: 'attendees', windowKey: '2026-12-01-7d', offsetDays: 7 },
+    });
+    const list = await call(h.list);
+    const row = list.body.sends.find((send) => send.id === 'reminder-attendees-2026-12-01-7d');
+    assert.equal(row.scheduled, true);
+    assert.equal(row.createdBy, null);
+    const res = await call(h.send, { body: { sendId: 'reminder-attendees-2026-12-01-7d' } });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error.code, 'scheduled-send');
+    assert.equal(h.mail.length, 0);
+    const record = (await h.db.collection('announcement_sends').doc('reminder-attendees-2026-12-01-7d').get()).data();
+    assert.equal(record.lease, null);
+    assert.equal(record.nextIndex, 0);
+  });
 }

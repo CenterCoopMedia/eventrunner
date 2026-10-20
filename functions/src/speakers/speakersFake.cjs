@@ -7,9 +7,11 @@
  *
  * Supports exactly what the speakers modules use, and nothing more:
  *
- *   • doc get/set (with and without { merge })/delete and getAll;
- *   • `where('field','==',v)` and `where('speakerIds','array-contains',v)`
- *     queries with `.limit()`, readable both directly and through a
+ *   • doc get/set (with and without { merge })/create/update/delete and
+ *     getAll;
+ *   • `where('field','==',v)`, `where('speakerIds','array-contains',v)`,
+ *     `in` and `!=` queries with `.limit()` and `.select()`, readable both
+ *     directly and through a
  *     transaction (`tx.get(query)` — the Admin SDK affordance the atomic
  *     unlink is built on);
  *   • runTransaction, which BUFFERS its writes and applies them on commit,
@@ -50,6 +52,10 @@ function matches(data, filter) {
   if (filter.op === 'array-contains') {
     return Array.isArray(value) && value.includes(filter.value);
   }
+  // The scheduled attendee reminders resolve the announcement audience
+  // (announcements/audience.cjs), which reads with `in` and `!=`.
+  if (filter.op === 'in') return filter.value.includes(value);
+  if (filter.op === '!=') return value !== undefined && value !== null && value !== filter.value;
   return value === filter.value;
 }
 
@@ -79,6 +85,9 @@ function makeSpeakersDb(seed = {}) {
     } else if (op.type === 'create') {
       if (docs.has(op.id)) throw new Error(`ALREADY_EXISTS: document ${op.col}/${op.id} already exists`);
       docs.set(op.id, clone(op.data));
+    } else if (op.type === 'update') {
+      if (!docs.has(op.id)) throw new Error(`NOT_FOUND: no document to update: ${op.col}/${op.id}`);
+      docs.set(op.id, { ...docs.get(op.id), ...clone(op.data) });
     } else if (op.merge) {
       docs.set(op.id, mergeDeep(docs.get(op.id) || {}, op.data));
     } else {
@@ -110,6 +119,12 @@ function makeSpeakersDb(seed = {}) {
       },
       async set(data, opts = {}) {
         applyWrite({ type: 'set', col, id, data, merge: opts.merge === true });
+      },
+      async create(data) {
+        applyWrite({ type: 'create', col, id, data });
+      },
+      async update(data) {
+        applyWrite({ type: 'update', col, id, data });
       },
       async delete() {
         applyWrite({ type: 'delete', col, id });
@@ -160,6 +175,10 @@ function makeSpeakersDb(seed = {}) {
       orderBy(field, direction = 'asc') {
         return query(col, filters, limitN, { field, direction });
       },
+      // A field projection returns whole documents, as `select` below.
+      select() {
+        return query(col, filters, limitN, order);
+      },
       async get() {
         reads.push(`${col}?${filters.map((f) => `${f.field}${f.op}${f.value}`).join('&')}`);
         return runQuery(col, filters, limitN, order);
@@ -176,6 +195,12 @@ function makeSpeakersDb(seed = {}) {
       return {
         // An omitted id mirrors the Admin SDK's auto-id (admin_logs rows).
         doc: (id) => docRef(name, id === undefined ? randomBytes(10).toString('hex') : id),
+        // The email core's log row (sent_emails).
+        async add(data) {
+          const ref = docRef(name, randomBytes(10).toString('hex'));
+          await ref.set(data);
+          return ref;
+        },
         where: (field, op, value) => query(name, [{ field, op, value }], undefined),
         // Unfiltered collection reads — listSpeakerInvites with no speakerId
         // filter (functions/src/speakers/invites.cjs) orders and limits at
@@ -205,6 +230,9 @@ function makeSpeakersDb(seed = {}) {
         },
         set(ref, data, opts = {}) {
           ops.push({ type: 'set', col: ref._col, id: ref.id, data: clone(data), merge: opts.merge === true });
+        },
+        update(ref, data) {
+          ops.push({ type: 'update', col: ref._col, id: ref.id, data: clone(data) });
         },
         delete(ref) {
           ops.push({ type: 'delete', col: ref._col, id: ref.id });

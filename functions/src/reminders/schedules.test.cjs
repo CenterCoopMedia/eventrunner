@@ -77,7 +77,7 @@ test('only staff and operators reach the endpoint, by POST, with a known action 
   assert.equal((await call(db, { action: 'get' }, { token: 'stranger' })).statusCode, 403);
   assert.equal((await call(db, { action: 'get' }, { method: 'GET' })).statusCode, 405);
   assert.equal((await call(db, { action: 'send' })).statusCode, 400);
-  assert.equal((await call(db, { action: 'get', schedule: 'attendees' })).statusCode, 400);
+  assert.equal((await call(db, { action: 'get', schedule: 'organizers' })).statusCode, 400);
 });
 
 test('get: off by default, with the default offsets, send time and items', async () => {

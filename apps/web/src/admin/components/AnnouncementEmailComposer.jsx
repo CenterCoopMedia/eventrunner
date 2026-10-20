@@ -55,6 +55,9 @@ const recipients = (n) => plural(n, 'recipient', 'recipients');
 const STATUS_WORDS = Object.freeze({
   sent: { label: 'Sent', tone: 'ok' },
   sending: { label: 'Sending', tone: 'caution' },
+  // A scheduled attendee reminder that will send no more: its reminder day
+  // ended, or staff approved new wording (functions/src/reminders).
+  stopped: { label: 'Stopped', tone: 'caution' },
 });
 
 /** "Oct 19, 2026, 2:05 PM EDT" on the event clock, or the reader's own. */
@@ -83,6 +86,7 @@ export function countsSentence(send) {
   if (counts.skipped) parts.push(`${plural(counts.skipped, 'recipient was', 'recipients were')} already handled by an earlier call.`);
   if (counts.suppressed) parts.push(`${plural(counts.suppressed, 'address', 'addresses')} unsubscribed during the send.`);
   if (send.status === 'sending') parts.push(`${plural(Math.max(0, total - processed), 'address is', 'addresses are')} still to send.`);
+  if (send.status === 'stopped') parts.push(`${plural(Math.max(0, total - processed), 'address was', 'addresses were')} not sent.`);
   return parts.join(' ');
 }
 
@@ -150,9 +154,15 @@ function SendHistory({ sends, timeZone, onReuse, onRetry, onContinue, continuing
             <p className="font-admin-data text-admin-xs text-admin-ink-data">
               {send.audienceLabel}
               {when ? ` · ${when}` : ''}
+              {send.scheduled ? ' · Scheduled attendee reminder' : ''}
               {send.createdBy ? ` · ${send.createdBy}` : ''}
             </p>
             <p className="text-admin-sm text-admin-ink">{countsSentence(send)}</p>
+            {send.scheduled && send.status === 'sending' ? (
+              <p className="text-admin-sm text-admin-ink-secondary">
+                The schedule sends the rest in its next hourly run. It does not send in quiet hours or after this reminder day.
+              </p>
+            ) : null}
             {send.failures.length > 0 ? (
               <details className="text-admin-sm">
                 <summary className="admin-target cursor-pointer font-semibold text-admin-ink">
@@ -184,7 +194,7 @@ function SendHistory({ sends, timeZone, onReuse, onRetry, onContinue, continuing
                   {`Retry ${plural(send.retryCount, 'failed address', 'failed addresses')}`}
                 </button>
               ) : null}
-              {send.status === 'sending' ? (
+              {send.status === 'sending' && !send.scheduled ? (
                 <button
                   type="button"
                   className={linkButtonClass}
