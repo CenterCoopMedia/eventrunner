@@ -218,7 +218,8 @@ Organizers can announce, message, and bill, and attendees can talk to each other
 - [ ] Add the post composer and thread view (#206)
 - [ ] Add the notification inbox (#207)
 - [x] Add the invoice record and the admin invoice form (#208)
-- [x] Add invoice output and the invoice list (#209). Issue, the PDF, mark paid, void, duplicate and the export shipped. Emailing the PDF (part 4) shipped; the Stripe pay link (#519) follows.
+- [x] Add invoice output and the invoice list (#209). Issue, the PDF, mark paid, void, duplicate and the export shipped. Emailing the PDF (part 4) shipped.
+- [x] Pay an issued invoice by card through a Stripe link (#519), with an amendment to ADR 0004. Needs the Stripe provider; a real Stripe test rehearsal is still to run.
 
 ### M12: Speaker experience
 

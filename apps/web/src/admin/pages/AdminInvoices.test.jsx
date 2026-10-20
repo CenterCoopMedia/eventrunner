@@ -666,3 +666,141 @@ describe('emailing an invoice', () => {
     expect(screen.queryByRole('button', { name: 'Email invoice' })).toBeNull();
   });
 });
+
+describe('paying an invoice by card (issue 519)', () => {
+  const STRIPE = { available: true, reason: null, testMode: true };
+  const PAY_URL = 'https://checkout.stripe.com/c/pay/cs_test_0001#fragment';
+  const OPEN = {
+    linkId: 'pl_000000000000000000000001', status: 'open', sessionId: 'cs_test_0001', url: PAY_URL,
+    amount: 450000, currency: 'usd', livemode: false, createdAt: '2026-10-20T12:00:00.000Z', createdBy: 'admin-1',
+    expiresAt: '2099-10-21T15:30:00.000Z', closedAt: null, closedReason: null, stripeClosed: null,
+  };
+
+  it('says why there is no card link when Stripe is not set up, and offers none', async () => {
+    answers.get = {
+      invoice: { ...ISSUED, payLinks: [] }, canVoid: false,
+      cardPayments: { available: false, reason: 'Card payment links need Stripe. This site does not take card payments through Stripe.', testMode: false },
+    };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const card = screen.getByRole('region', { name: 'Pay by card' });
+    expect(within(card).getByText(/Card payment links need Stripe\./)).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Make a card payment link' })).toBeNull();
+  });
+
+  it('makes a link from the invoice alone and shows it with when it ends', async () => {
+    answers.get = { invoice: { ...ISSUED, payLinks: [] }, canVoid: false, cardPayments: STRIPE };
+    answers.createPayLink = () => response({ invoice: { ...ISSUED, payLinks: [OPEN] }, repeated: false, canVoid: false, cardPayments: STRIPE });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const card = screen.getByRole('region', { name: 'Pay by card' });
+    expect(within(card).getByText(/Stripe test mode/)).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole('button', { name: 'Make a card payment link' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({ action: 'createPayLink', invoiceId: ISSUED.id }));
+    const link = await within(card).findByRole('link', { name: /Open the card payment link/ });
+    expect(link.getAttribute('href') === PAY_URL).toBe(true);
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(within(card).getByText(/Works until/)).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: 'Make a card payment link' })).toBeNull();
+    expect(screen.getAllByText('Made a card payment link for INV-0004.').length).toBeGreaterThan(0);
+  });
+
+  it('states a refused link in place', async () => {
+    answers.get = { invoice: { ...ISSUED, payLinks: [] }, canVoid: false, cardPayments: STRIPE };
+    answers.createPayLink = () => response({ error: { code: 'stripe-unavailable', message: 'Stripe did not answer. Try again.' } }, 503);
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const card = screen.getByRole('region', { name: 'Pay by card' });
+    fireEvent.click(within(card).getByRole('button', { name: 'Make a card payment link' }));
+    expect(await within(card).findByText('Stripe did not answer. Try again.')).toBeInTheDocument();
+  });
+
+  it('shows a card payment through Stripe as Card (Stripe), with its Stripe payment id', async () => {
+    const payment = {
+      paidOn: '2026-10-20', method: 'card', via: 'stripe', note: '', recordedAt: '2026-10-20T12:00:00.000Z', recordedBy: null,
+      stripe: { sessionId: 'cs_test_0001', paymentIntentId: 'pi_test_0001' },
+    };
+    answers.get = { invoice: { ...ISSUED, status: 'paid', payment, payLinks: [{ ...OPEN, status: 'paid', url: null }] }, canVoid: false, cardPayments: STRIPE };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const record = screen.getByRole('region', { name: 'Invoice record' });
+    expect(within(record).getByText('Card (Stripe)')).toBeInTheDocument();
+    expect(within(record).getByText('pi_test_0001')).toBeInTheDocument();
+    expect(within(record).queryByRole('button', { name: 'Make a card payment link' })).toBeNull();
+  });
+
+  it('flags a card payment for review, and an operator closes it with a note', async () => {
+    const review = {
+      reviewId: 'rv_0000000000000000000000000001', code: 'invoice-void', sessionId: 'cs_test_0001', paymentIntentId: 'pi_test_0001',
+      amount: 450000, currency: 'usd', at: '2026-10-20T13:00:00.000Z', invoiceStatus: 'void', resolved: false, resolvedAt: null, note: '',
+    };
+    const voided = { ...ISSUED, status: 'void', voided: { reason: 'Wrong', from: 'issued', at: null, by: null }, payLinks: [], paymentReviews: [review], needsReview: true };
+    answers.get = { invoice: voided, canVoid: true, canReopen: true, cardPayments: STRIPE };
+    answers.resolvePaymentReview = (body) => response({
+      invoice: { ...voided, needsReview: false, paymentReviews: [{ ...review, resolved: true, note: body.note, resolvedAt: '2026-10-20T14:00:00.000Z' }] },
+      canVoid: true, canReopen: true, cardPayments: STRIPE,
+    });
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const panel = screen.getByRole('region', { name: 'A card payment needs review' });
+    expect(within(panel).getByText(/Stripe took \$4,500\.00 for this invoice after it was voided\./)).toBeInTheDocument();
+    expect(within(panel).getByText(/pi_test_0001/)).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Mark reviewed' }));
+    const note = await within(panel).findByLabelText('Review note', { exact: false });
+    await waitFor(() => expect(note).toHaveFocus());
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save review' }));
+    await waitFor(() => expect(note).toHaveAttribute('aria-invalid', 'true'));
+    expect(invoiceCalls().some((body) => body.action === 'resolvePaymentReview')).toBe(false);
+    fireEvent.change(note, { target: { value: 'Refunded in Stripe' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save review' }));
+    await waitFor(() => expect(invoiceCalls().at(-1)).toEqual({
+      action: 'resolvePaymentReview', invoiceId: ISSUED.id, reviewId: review.reviewId, note: 'Refunded in Stripe',
+    }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'A card payment needs review' })).toBeNull());
+    expect(screen.getByText(/Reviewed: Refunded in Stripe/)).toBeInTheDocument();
+  });
+
+  it('tells staff that an operator reviews a flagged payment', async () => {
+    const review = {
+      reviewId: 'rv_0000000000000000000000000001', code: 'currency-mismatch', sessionId: 'cs_test_0001', paymentIntentId: 'pi_test_0001',
+      amount: 450000, currency: 'cad', at: '2026-10-20T13:00:00.000Z', invoiceStatus: 'issued', resolved: false, resolvedAt: null, note: '',
+    };
+    answers.get = { invoice: { ...ISSUED, payLinks: [], paymentReviews: [review], needsReview: true }, canVoid: false, cardPayments: STRIPE };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const panel = screen.getByRole('region', { name: 'A card payment needs review' });
+    expect(within(panel).getByText(/in a different currency/)).toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: 'Mark reviewed' })).toBeNull();
+    expect(within(panel).getByText(/An operator reviews it\./)).toBeInTheDocument();
+  });
+
+  it('switches to the ended state and offers a new link when the open link runs out, without a reload', async () => {
+    const ending = { ...OPEN, expiresAt: new Date(Date.now() + 1500).toISOString() };
+    answers.get = { invoice: { ...ISSUED, payLinks: [ending] }, canVoid: false, cardPayments: STRIPE };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const card = screen.getByRole('region', { name: 'Pay by card' });
+    expect(within(card).getByRole('link', { name: /Open the card payment link/ })).toBeInTheDocument();
+    expect(await within(card).findByRole('button', { name: 'Make a card payment link' }, { timeout: 4000 })).toBeInTheDocument();
+    expect(within(card).queryByRole('link', { name: /Open the card payment link/ })).toBeNull();
+  });
+
+  it('keeps the amount of a flagged payment in a currency the formatter does not know', async () => {
+    const review = {
+      reviewId: 'rv_0000000000000000000000000002', code: 'currency-mismatch', sessionId: 'cs_test_0002', paymentIntentId: 'pi_test_0002',
+      amount: 450000, currency: 'jpy', at: '2026-10-20T13:00:00.000Z', invoiceStatus: 'issued', resolved: false, resolvedAt: null, note: '',
+    };
+    answers.get = { invoice: { ...ISSUED, payLinks: [], paymentReviews: [review], needsReview: true }, canVoid: false, cardPayments: STRIPE };
+    await renderAt(`/admin/invoices/${ISSUED.id}`);
+    await screen.findByRole('heading', { level: 1, name: 'INV-0004' }, { timeout: 5000 });
+    const panel = screen.getByRole('region', { name: 'A card payment needs review' });
+    expect(within(panel).getByText(/Stripe took 450000 JPY \(in the currency's smallest unit\) for this invoice in a different currency \(JPY\)\./)).toBeInTheDocument();
+  });
+
+  it('marks an invoice that needs review in the list', async () => {
+    answers.list = { invoices: [{ ...ISSUED, status: 'void', needsReview: true }], nextCursor: null };
+    await renderAt('/admin/invoices');
+    const table = await screen.findByRole('table', {}, { timeout: 5000 });
+    expect(within(table).getByText('Needs review')).toBeInTheDocument();
+  });
+});

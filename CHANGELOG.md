@@ -21,7 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   time and marks an ended grant. The admin log records the old and the new end time.
   Until the end time, the account is a full staff account and can edit and publish
   content; an end time does not make it read-only.
-
+- Invoices, part 5 (#519): pay an issued invoice by card through a Stripe link. When the
+  site's ticketing provider is Stripe and its account, mode and key are set, staff select
+  **Make a card payment link** on an issued invoice. The server builds a Stripe-hosted,
+  card-only Checkout Session from the frozen invoice: the invoice total, the invoice
+  currency, and the invoice number as the description. The browser sends only the invoice
+  id. The link works for 23 hours and one link is open at a time. It shows on the record,
+  prints on the PDF and goes in the invoice email while it works. Stripe's signed payment
+  event, read again from Stripe, marks the invoice paid with the method **Card (Stripe)**
+  and the Stripe ids, and writes the audit row and the delivery claim in the same
+  transaction, so a repeated event changes nothing. A payment after a void, after another
+  payment, through a closed link, for another amount or currency, or through an unknown
+  page is recorded on the invoice for review, logged, and raised to the operator, never
+  applied; a payment through an unknown page also closes every open link, and no new
+  link is made until an operator closes the review with a note, which also resolves its
+  alert. The paid date is the day of Stripe's event. Void and **Mark paid** close an open link
+  and ask Stripe to end it. Without Stripe the record says card links need Stripe. A
+  read-only demo refuses a link and ignores payment events. ADR 0004 gains an amendment
+  for this use of Stripe. `invoiceAdmin` binds `TICKETING_API_TOKEN` when the provider is
+  Stripe; no new function and no new webhook event type.
 - Saved announcement messages (#496, #203). On the Announcements page, staff save a
   subject, a message and a button under a name, then load one into a new, unsent email.
   The audience stays as set, and any preview goes away. A draft with unsaved changes asks

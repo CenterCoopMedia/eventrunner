@@ -44,7 +44,7 @@ const {
 } = require('./exportRecords.cjs');
 
 const { CURRENCY_EXPONENTS } = require('shared/ticketCommerce');
-const { INVOICE_STATUSES, PAYMENT_METHOD_WORDS } = require('shared/invoice');
+const { INVOICE_STATUSES, paymentMethodText } = require('shared/invoice');
 
 const ADMIN_LOGS = 'admin_logs';
 const ACTION = 'exportEventData';
@@ -295,7 +295,7 @@ const DATASETS = Object.freeze({
       { header: 'Tax', value: (row) => amount(row.totals.taxTotal, CURRENCY_EXPONENTS[row.currency]) },
       { header: 'Total', value: (row) => amount(row.totals.total, CURRENCY_EXPONENTS[row.currency]) },
       { header: 'Paid on', value: (row) => row.payment?.paidOn },
-      { header: 'Payment method', value: (row) => (row.payment ? PAYMENT_METHOD_WORDS[row.payment.method] : '') },
+      { header: 'Payment method', value: (row) => (row.payment ? paymentMethodText(row.payment) : '') },
       { header: 'Payment note', value: (row) => row.payment?.note },
       { header: 'Void reason', value: (row) => row.voided?.reason },
       { header: 'Copied from', value: (row) => row.duplicatedFrom?.number ?? row.duplicatedFrom?.invoiceId },

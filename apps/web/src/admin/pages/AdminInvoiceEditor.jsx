@@ -116,6 +116,8 @@ export default function AdminInvoiceEditor({ mode }) {
   const [prefillStatus, setPrefillStatus] = useState('');
   const [canVoid, setCanVoid] = useState(false);
   const [canReopen, setCanReopen] = useState(false);
+  // Whether this site makes Stripe card links (#519), from the server's answer.
+  const [cardPayments, setCardPayments] = useState(null);
   // The issue confirmation: null when closed, else { nextNumber, unsaved }.
   const [issueConfirm, setIssueConfirm] = useState(null);
   // A duplicate's new id, minted once per source so a retry after a lost
@@ -304,6 +306,7 @@ export default function AdminInvoiceEditor({ mode }) {
     setRevision(result.invoice.revision);
     setCanVoid(result.canVoid === true);
     setCanReopen(result.canReopen === true);
+    setCardPayments(result.cardPayments ?? null);
   }
 
   function clearError() {
@@ -394,6 +397,39 @@ export default function AdminInvoiceEditor({ mode }) {
       const result = await call('invoiceAdmin', { action: 'reopen', invoiceId, expectedRevision: revision, reason });
       applyInvoice(result);
       const message = `Reopened ${result.invoice.number}. The payment is kept under Earlier payments.`;
+      setStatus(message);
+      showToast(message, { announce: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** A Stripe card link (#519). The panel states a refusal in place, so this rethrows. */
+  async function createPayLink() {
+    setBusy('paylink');
+    clearError();
+    setStatus('');
+    try {
+      const result = await call('invoiceAdmin', { action: 'createPayLink', invoiceId });
+      applyInvoice(result);
+      const message = result.repeated
+        ? `The card payment link for ${result.invoice.number} is still open.`
+        : `Made a card payment link for ${result.invoice.number}.`;
+      setStatus(message);
+      showToast(message, { announce: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function resolveReview(reviewId, note) {
+    setBusy('review');
+    clearError();
+    setStatus('');
+    try {
+      const result = await call('invoiceAdmin', { action: 'resolvePaymentReview', invoiceId, reviewId, note });
+      applyInvoice(result);
+      const message = `Marked the card payment on ${result.invoice.number} reviewed.`;
       setStatus(message);
       showToast(message, { announce: false });
     } finally {
@@ -614,6 +650,9 @@ export default function AdminInvoiceEditor({ mode }) {
           onDuplicate={duplicate}
           onPreviewEmail={previewEmail}
           onSendEmail={sendEmail}
+          cardPayments={cardPayments}
+          onCreatePayLink={createPayLink}
+          onResolveReview={resolveReview}
         />
       ) : null}
 
