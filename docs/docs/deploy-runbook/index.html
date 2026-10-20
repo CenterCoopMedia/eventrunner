@@ -290,6 +290,14 @@
             --role=&quot;roles/firebaserules.firestoreServiceAgent&quot; \
             --condition=None
           </code></pre>
+          <p><strong>Storage triggers.</strong> <code>mediaImageSizes</code> and <code>mediaImageSizesCleanup</code> run on Cloud Storage events (issue #333). Eventarc delivers those events through Pub/Sub, so the Cloud Storage service agent must publish to Pub/Sub. The deploy service account cannot grant that role. Grant it once per project, before the first deploy that has these triggers:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">GCS_AGENT=&quot;$(gcloud storage service-agent --project=&lt;GCP_PROJECT_ID&gt;)&quot;
+          gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
+            --member=&quot;serviceAccount:${GCS_AGENT}&quot; \
+            --role=&quot;roles/pubsub.publisher&quot; \
+            --condition=None
+          </code></pre>
+          <p>Without it, the functions deploy fails to create these two triggers. The bucket in <code>EVENT_STORAGE_BUCKET</code> must be in the same location as <code>EVENT_FIREBASE_REGION</code>, or a multi-region that holds it (for example <code>US</code> for <code>us-central1</code>). Eventarc refuses a storage trigger in any other region.</p>
           <h2 id="3-github-environment">3. GitHub Environment<a class="heading-anchor" href="#3-github-environment" aria-label="Link to this section">#</a></h2>
           <p>Create the environment (repo Settings → Environments → New environment → name it exactly
           <code>&lt;CLIENT_ENV&gt;</code>), then set its variables and secrets. <strong>Every value below is a GitHub Environment

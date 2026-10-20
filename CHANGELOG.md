@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Display sizes for uploaded images (#333). When an image lands in `cms-images/`,
+  `branding/` or `speaker-photos/`, the new storage trigger `mediaImageSizes` writes WebP
+  copies 320, 640, 1280 and 1920 pixels wide in a `_sizes/` folder beside it, with a
+  `manifest.json` that records what it wrote or why it wrote nothing. It never enlarges,
+  turns the picture upright, and writes no EXIF, GPS, XMP or ICC data. It reads the bytes,
+  not the declared type, and refuses non-images, SVG, GIF, animated images, files over
+  5 MiB and images over 40 megapixels. The original is never changed. Speaker portraits,
+  the speaker page headshot, sponsor logos, the lead image and the event hero offer the
+  copies through `srcset` and `sizes`, with the original as `src`. If a copy fails to
+  load, the page drops the `srcset` and shows the original, so older uploads still show.
+  The second trigger, `mediaImageSizesCleanup`, deletes the copies when their original is
+  deleted. A lead or hero image picked from the media library now loads from Storage; it
+  was a relative link to the site before. Sponsor logos now fill their mark box. The
+  functions gain one dependency, `sharp` 0.35.5. A deploy needs one new IAM grant first
+  (`docs/DEPLOY_RUNBOOK.md`, section 2).
 - Saved announcement messages (#496, #203). On the Announcements page, staff save a
   subject, a message and a button under a name, then load one into a new, unsent email.
   The audience stays as set, and any preview goes away. A draft with unsaved changes asks

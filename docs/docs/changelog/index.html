@@ -118,6 +118,21 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Display sizes for uploaded images (#333). When an image lands in <code>cms-images/</code>,
+          <code>branding/</code> or <code>speaker-photos/</code>, the new storage trigger <code>mediaImageSizes</code> writes WebP
+          copies 320, 640, 1280 and 1920 pixels wide in a <code>_sizes/</code> folder beside it, with a
+          <code>manifest.json</code> that records what it wrote or why it wrote nothing. It never enlarges,
+          turns the picture upright, and writes no EXIF, GPS, XMP or ICC data. It reads the bytes,
+          not the declared type, and refuses non-images, SVG, GIF, animated images, files over
+          5 MiB and images over 40 megapixels. The original is never changed. Speaker portraits,
+          the speaker page headshot, sponsor logos, the lead image and the event hero offer the
+          copies through <code>srcset</code> and <code>sizes</code>, with the original as <code>src</code>. If a copy fails to
+          load, the page drops the <code>srcset</code> and shows the original, so older uploads still show.
+          The second trigger, <code>mediaImageSizesCleanup</code>, deletes the copies when their original is
+          deleted. A lead or hero image picked from the media library now loads from Storage; it
+          was a relative link to the site before. Sponsor logos now fill their mark box. The
+          functions gain one dependency, <code>sharp</code> 0.35.5. A deploy needs one new IAM grant first
+          (<code>docs/DEPLOY_RUNBOOK.md</code>, section 2).</li>
           <li>Saved announcement messages (#496, #203). On the Announcements page, staff save a
           subject, a message and a button under a name, then load one into a new, unsent email.
           The audience stays as set, and any preview goes away. A draft with unsaved changes asks
