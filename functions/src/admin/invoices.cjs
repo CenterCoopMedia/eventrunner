@@ -174,6 +174,27 @@ function timeOf(value) {
 }
 const SEND_STATUSES = new Set(['sending', 'sent', 'failed', 'uncertain']);
 /**
+ * A send reserved (`sending`) for longer than this is abandoned: the next
+ * send settles it by its claim (invoiceEmail.cjs), and it no longer blocks
+ * a status change.
+ */
+const SENDING_STALE_MS = 5 * 60 * 1000;
+
+/**
+ * Refuse a status change while an email of the invoice is reserved and not
+ * stale (#208 part 4). The send composed its email and PDF from the status
+ * the reservation checked; a payment, a void or a reopen in between would
+ * send the old state as if it were current. A reservation ends within the
+ * send request, or goes stale after SENDING_STALE_MS, so this never blocks
+ * for long.
+ */
+function refuseWhileSending(stored, at) {
+  const nowMs = at.getTime();
+  const busy = (Array.isArray(stored.sends) ? stored.sends : [])
+    .some((entry) => entry?.status === 'sending' && nowMs - timeOf(entry.at) < SENDING_STALE_MS);
+  if (busy) fail(409, 'conflict', 'This invoice is being emailed now. Try again in a minute, after the email is sent.');
+}
+/**
  * Each email of the invoice PDF (invoiceEmail.cjs), oldest first: who sent
  * it, when, to which addresses, how it ended and the provider's message id.
  * The addresses are cleaned on read like every invoice field.
@@ -468,6 +489,7 @@ async function markPaid({ db, actor, body, now }) {
     const { ref, stored } = await lockedInvoice(tx, db, id, expectedRevision);
     if (statusOf(stored) !== 'issued') fail(409, 'conflict', 'Only an issued invoice can be marked paid.');
     const at = now();
+    refuseWhileSending(stored, at);
     const verdict = validatePayment(body.payment, { today: invoiceDateIn(at, await eventTimeZone(tx, db)) });
     if (!verdict.ok) invalid('payment', verdict.issues);
     saved = {
@@ -502,6 +524,7 @@ async function voidInvoice({ db, actor, body, now }) {
     if (from === 'draft') fail(409, 'conflict', 'A draft has no number. Delete it instead of voiding it.');
     if (from === 'void') fail(409, 'conflict', 'This invoice is already void.');
     const at = now();
+    refuseWhileSending(stored, at);
     saved = {
       ...stored,
       status: 'void',
@@ -540,6 +563,7 @@ async function reopenInvoice({ db, actor, body, now }) {
       fail(409, 'conflict', 'Only a paid invoice can be reopened.');
     }
     const at = now();
+    refuseWhileSending(stored, at);
     const history = Array.isArray(stored.paymentHistory) ? stored.paymentHistory : [];
     saved = {
       ...stored,
@@ -756,5 +780,5 @@ module.exports = {
   createInvoiceAdminHandler,
   publicInvoice,
   get handlers() { return buildHandlers(); },
-  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings, InvoiceError, timeOf },
+  internals: { MAX_SCAN, MAX_PAGE, OPERATOR_ACTIONS, READ_ACTIONS, listInvoices, saveDraft, publicSettings, InvoiceError, timeOf, SENDING_STALE_MS },
 };
