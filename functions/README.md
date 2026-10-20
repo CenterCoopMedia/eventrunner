@@ -122,10 +122,12 @@ from every stored, returned or logged message.
 
 ## Scheduled reminders
 
-ADR 0006 and issue #518. `src/reminders/` holds two exports:
+ADR 0006 and issue #518. `src/reminders/` holds two exports. The rules every schedule shares
+(on, off or paused, the run lease, the pause, one run from the checks to the admin log) are in
+`src/reminders/scheduleCore.cjs`.
 
-- `reminderSchedules` (staff): one POST endpoint with an `action` and a `schedule` (only
-  `speakers` for now). `get` returns the settings, the state (on, off or paused), the next run
+- `reminderSchedules` (staff): one POST endpoint with an `action` and a `schedule` (`speakers`
+  or `attendees`; the attendee actions are in `src/reminders/attendeeActions.cjs`). `get` returns the settings, the state (on, off or paused), the next run
   and the last run. `save` checks and stores the offsets (1 to 6 whole days from 1 to 365), the
   send time (`HH:MM` on the event clock), the due date (RFC3339) and the items. `preview`
   renders one sample per offset and returns the wording version and a settings version.
@@ -144,12 +146,33 @@ ADR 0006 and issue #518. `src/reminders/` holds two exports:
   reservation transaction reads the schedule again (`reserve({ guard })`), so turning it off,
   pausing it or changing it stops the run before the next speaker. Speakers not tried get no
   ledger row. A fault part way keeps the sends already made in `lastRun` and the admin log. Wording that is not the approved version pauses the schedule, writes an `admin_logs`
-  row and tells the operator. A run that emails anyone writes one `admin_logs` row. The
-  attendee branch (#518, the third pull request) joins `BRANCHES` in `src/reminders/run.cjs`.
+  row and tells the operator. A run that emails anyone writes one `admin_logs` row.
+- The attendee branch (`src/reminders/attendeeSchedule.cjs`) reads
+  `reminder_schedules/attendees`: offsets (default 7 and 1 days), a send time, and a plain text
+  draft whose only placeholder is `{{days_until}}`. The anchor is the start of the first event
+  day. The server adds the facts: the start, the venue, and the ticket link (`/tickets/mine`
+  when `EVENT_TICKETING_PROVIDER=stripe`, `/dashboard` otherwise). Approval binds a wording
+  version (the draft, or `shipped:` and the shipped draft, with the announcement layout), a
+  settings version, and a facts version. The audience is `resolveAudience({ audience:
+  'registered' })`. It sends through `src/announcements/sendRunner.cjs`, the staff
+  announcement path: the announcement stream checked before any record and before each chunk,
+  both unsubscribe modes, the suppression check per chunk, and the send history. The send id is
+  fixed per window (`reminder-attendees-{window}`), and `reminder_ledger/attendees__{window}`
+  is created in the same transaction as `announcement_sends/{sendId}`, so the email core's
+  claim `announcement:{sendId}:{address hash}` sends each address once per window. Before each
+  chunk the run stops for quiet hours or a closed window, and the lease transaction reads the
+  schedule again (`takeLease({ guard })`). A record left by quiet hours is continued in the same
+  window. A record whose window closed, or that an earlier approval started, is marked
+  `stopped` and never continued; `sendAnnouncementEmail` refuses to continue a record with
+  `reminder` set. Changed wording or facts pause the schedule and tell the operator; a channel
+  that cannot send fails the run and tells the operator. The admin log row holds counts, never
+  addresses.
 
 Saving or resetting the speaker reminder wording (`speakerReminders`) pauses a schedule that
 is on when the new wording version differs from the approved one. Secrets: the mail
 provider's, and the operator webhook's when `EVENT_OPERATOR_NOTIFIER=webhook`.
+`reminderSchedules` also binds the mail provider's secrets: the attendee schedule reads the
+Postmark announcement stream before a preview or an approval.
 
 ## Stripe commerce
 

@@ -347,7 +347,7 @@ Saving or resetting the wording pauses scheduled reminders until you approve the
 
 ### Scheduled reminders
 
-Send speaker reminders on a schedule, before a due date. Open **Scheduled reminders** under Communications on the rail, or **Scheduled reminders** at the top of the Speaker reminders page. Staff and operators can use this page. The schedule is off until you preview it and approve it.
+Send reminders on a schedule: to speakers before a due date, and to attendees before the event starts. Open **Scheduled reminders** under Communications on the rail, or **Scheduled reminders** at the top of the Speaker reminders page. Staff and operators can use this page. Each schedule is off until you preview it and approve it. The speaker schedule is described first, then the attendee schedule.
 
 **Settings.** Under **Speakers**:
 
@@ -377,6 +377,42 @@ A paused schedule sends nothing. Preview, then approve to turn it on again. When
 **Next run.** The panel says when the next reminder goes, with the time zone named, which reminder day it is, and who it would reach. It names the speakers who wait on the 24-hour limit, and when they can get one. It also says what the last check did.
 
 **Turn off** stops the schedule. A check in progress stops before its next speaker. A pause or a settings change does the same. Nothing sends until you approve it again.
+
+#### Attendee reminders
+
+Under **Attendees**, the site emails registered attendees before the event starts: the days left, the start time, the place and their ticket link.
+
+**Who gets one.** The **Registered attendees** audience of the Announcements page: approved attendees and people who claimed a ticket. A revoked account, an address that unsubscribed, and an account with no usable address get none. Each address gets one copy.
+
+**Settings.**
+
+- **Days before the event**: One reminder for each number, from 1 to 365 days, at most six. The default is 7 and 1 days. The days count back from the start time of the first event day.
+- **Attendee send time**: The time of day each reminder goes, on the event's clock. The default is 10:00.
+- **Attendee reminder subject** and **Attendee reminder message**: Plain text. A blank line starts a new paragraph. `{{days_until}}` is the only placeholder. It becomes the days left when the reminder goes, for example "7 days" or "1 day". On the morning of the first event day it reads "less than a day". The server refuses any other placeholder and names it.
+
+Select **Save attendee settings** to store them. Wording the same as the shipped wording stays the shipped wording.
+
+**What the site adds.** After your message, the site adds the start date and time, the venue, and a button to the ticket link. They come from Event settings, and the panel shows them. The ticket link goes to **Your tickets** (`/tickets/mine`) when the site sells tickets through Stripe, and to the dashboard (`/dashboard`) otherwise. If the event has no venue, the reminder leaves the place out.
+
+**Sent as an announcement.** An attendee reminder goes the same way as announcement email. It goes on the announcement stream, with an unsubscribe link and one-click unsubscribe headers. An address that unsubscribed gets no reminder. An address that unsubscribes during a send gets no more of it. Each reminder day shows in the Announcements send history as a **Scheduled attendee reminder**. You cannot continue it from there; the schedule does. Set up the announcement stream and send a test announcement before you turn the attendee schedule on (see `docs/POSTMARK_PROVISIONING.md`, section 2a).
+
+**When.** The rules are the same as for speakers: calendar days at the send time, a missed check made up until the next reminder day starts, and nothing from 8:00 PM to 8:00 AM. A send that reaches 8:00 PM part way stops, and the next morning's check sends the rest. Nobody gets a second copy. A send cut off when the next reminder day starts shows **Stopped** in the history, and the rest of it is not sent.
+
+**At most one per reminder day.** Each address gets each reminder day's email once. A person who registers after a reminder day's email went out gets the next one. The days in the email are the days left when that reminder day's send began.
+
+**Preview, then approve.** Save, then select **Preview attendee reminders**. The page shows one sample for each reminder day, with the days left as they will read, the added facts, and an unsubscribe link that changes nothing. It says how many attendees it would reach and how many unsubscribed. Select **Approve and turn on attendee reminders** to turn the schedule on with that wording, those settings and those facts. If any of them changed after your preview, the server refuses. Preview again, then approve. If announcement email cannot be sent, for example because the announcement stream is not set up, the preview says why and you cannot approve.
+
+**Paused.** The attendee schedule pauses, and says why, in these cases:
+
+- Someone saves different wording or settings while it is on.
+- A deploy changes the shipped wording or the announcement email layout.
+- The event start, the venue or the ticket link changes in Event settings.
+
+A paused schedule sends nothing. Preview, then approve to turn it on again. When a check finds a change, it also tells the operator. If you approve new wording or new facts during a reminder day whose send has begun, the rest of that send stops. The next reminder day uses the new approval.
+
+**Next run.** The panel says when the next reminder goes, with the time zone named, which reminder day it is, and how many attendees it would reach. It does not list their addresses. It also says what the last check did.
+
+**Turn off attendee reminders** stops the schedule. A check in progress stops before its next group of 200 addresses.
 
 The schedule does nothing on a historical demo, and nothing after the last event day. Every approval, settings save, pause, and turn-off writes an admin log entry. Each check that emails anyone writes one admin log entry that names the speakers.
 
@@ -580,7 +616,7 @@ Any edit after the preview removes the preview, so you confirm only what you saw
 
 **Large audiences.** One send can reach at most 5,000 addresses. The site sends 200 addresses at a time and the page keeps going until the send is done, with a progress line. If you close the page part way, the send shows **Sending** in the history. Select **Continue sending** there. Nobody gets a second copy: Every recipient has a send-once key.
 
-**Email send history** lists the 20 most recent sends, newest first: the subject, the audience, the time on the event's clock, who sent it, and the counts. A failed address and the provider's reason are under **Failed addresses**. The list keeps the first 50; when there are more, it says so, and the Email log filtered by the source **Announcement** has every one. "Unknown result" means the provider did not confirm whether it accepted the message; the site does not resend it. **Use this message** loads a past send into the form as a new draft.
+**Email send history** lists the 20 most recent sends, newest first: the subject, the audience, the time on the event's clock, who sent it, and the counts. A failed address and the provider's reason are under **Failed addresses**. The list keeps the first 50; when there are more, it says so, and the Email log filtered by the source **Announcement** has every one. "Unknown result" means the provider did not confirm whether it accepted the message; the site does not resend it. **Use this message** loads a past send into the form as a new draft. A send from scheduled attendee reminders says **Scheduled attendee reminder** in place of a sender. Only the schedule continues it, so it has no **Continue sending**. **Stopped** means the schedule will send no more of it (see [Scheduled reminders](#scheduled-reminders)).
 
 **Retry failed addresses.** When the email provider is down or busy during a send, the addresses it could not take are kept. The history then offers **Retry N failed addresses**. It loads the message and limits the next preview and send to those addresses. Preview and confirm as usual. Each send can be retried once, so nobody gets two copies from two retries; if the retry also fails, retry from the retry's row. An address the provider refused for good (for example, an inactive address) and an unknown result are not retried. If a send stopped part way, **Continue sending** counts an address that failed before the stop as failed again, and offers it for a retry as usual. If it reports recipients "already handled by an earlier call", some of them may not have got the email: the site cannot tell, and it does not resend them. Each recipient's copy is also in the [Email log](#email-log) under the source **Announcement**, and each test under **Announcement test**.
 

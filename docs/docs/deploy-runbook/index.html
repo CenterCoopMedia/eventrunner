@@ -254,7 +254,10 @@
           The same role creates the job behind <code>runScheduledReminders</code> (<code>functions/src/reminders/run.cjs</code>,
           every 60 minutes, issue #518). That function binds the mail provider&#39;s secrets, and the operator
           webhook&#39;s when <code>EVENT_OPERATOR_NOTIFIER=webhook</code>, so the secret bindings in §2 cover it. It sends
-          nothing until staff approve a reminder schedule in the admin.</p>
+          nothing until staff approve a reminder schedule in the admin. Scheduled attendee reminders go on the announcement
+          stream: finish the Postmark Broadcasts stream (<code>docs/POSTMARK_PROVISIONING.md</code>, section 2a), set
+          <code>config/providers.email.announcementStream</code>, and send a test announcement before staff turn the
+          attendee schedule on. Until then the admin refuses to approve it and says why.</p>
           <p>Bind the deploy service account so <strong>only</strong> this repository, on <code>refs/heads/main</code>, may impersonate
           it — both conditions in one <code>principalSet</code>, via the combined attribute mapped in §1:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gcloud iam service-accounts add-iam-policy-binding &quot;${DEPLOY_SA_EMAIL}&quot; \

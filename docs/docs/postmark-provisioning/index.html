@@ -230,7 +230,9 @@
           with the Server Token before every send and before each chunk of a send. It refuses, with the
           reason, a missing, archived, or transactional stream, a stream with no unsubscribe handling, or
           a stream ID that equals the transactional one. No send or send-once claim happens before that
-          check passes.</p></li>
+          check passes. Scheduled attendee reminders (<strong>Scheduled reminders</strong> page) use the same
+          stream and the same check, before each reminder day&#39;s send and before each chunk of it. Send a
+          test announcement before staff turn them on.</p></li>
           <li><p>Register the delivery webhook on this stream too (section 5), with <strong>SubscriptionChange</strong> on as
           well, so a Postmark opt-out also becomes the application&#39;s suppression record and the next
           recipient count leaves that address out.</p></li>

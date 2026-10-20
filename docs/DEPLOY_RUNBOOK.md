@@ -145,7 +145,10 @@ role is not conditional the way `secretmanager.secretAccessor` is.
 The same role creates the job behind `runScheduledReminders` (`functions/src/reminders/run.cjs`,
 every 60 minutes, issue #518). That function binds the mail provider's secrets, and the operator
 webhook's when `EVENT_OPERATOR_NOTIFIER=webhook`, so the secret bindings in §2 cover it. It sends
-nothing until staff approve a reminder schedule in the admin.
+nothing until staff approve a reminder schedule in the admin. Scheduled attendee reminders go on the announcement
+stream: finish the Postmark Broadcasts stream (`docs/POSTMARK_PROVISIONING.md`, section 2a), set
+`config/providers.email.announcementStream`, and send a test announcement before staff turn the
+attendee schedule on. Until then the admin refuses to approve it and says why.
 
 Bind the deploy service account so **only** this repository, on `refs/heads/main`, may impersonate
 it — both conditions in one `principalSet`, via the combined attribute mapped in §1:

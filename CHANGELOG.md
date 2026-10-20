@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Scheduled attendee reminders (#518). A new **Attendees** panel on the **Scheduled
+  reminders** page emails registered attendees before the event starts (7 and 1 days by
+  default, at a send time on the event's clock). Staff write the subject and message in plain
+  text with one placeholder, `{{days_until}}`. The server adds the start, the venue and the
+  ticket link: `/tickets/mine` when tickets are sold through Stripe, `/dashboard` otherwise.
+  Staff preview one sample per reminder day, then approve the wording, the settings and the
+  facts together. It is off by default. Once an hour, `runScheduledReminders` sends it through
+  the announcement send path, so it goes on the announcement stream with the unsubscribe link,
+  leaves out every address that unsubscribed, and shows in the Announcements send history.
+  Each address gets each reminder day once. Quiet hours, a schedule change and the end of a
+  reminder day stop a send between groups of 200. A change to the wording, the settings, the
+  event start, the venue or the ticket link pauses the schedule until staff approve again.
+  Staff cannot continue a scheduled send from the Announcements page, and a send the schedule
+  will not finish shows **Stopped**.
 - Scheduled speaker reminders (#518). On the new **Scheduled reminders** page, staff set a
   due date for the speaker items, the days before it to send (14, 7 and 2 by default), a send
   time on the event's clock, and the items to name. They preview one sample per reminder day,

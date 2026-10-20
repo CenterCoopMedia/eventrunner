@@ -113,7 +113,9 @@ or an unsubscribe on an announcement cannot hold back a sign-in code.
    with the Server Token before every send and before each chunk of a send. It refuses, with the
    reason, a missing, archived, or transactional stream, a stream with no unsubscribe handling, or
    a stream ID that equals the transactional one. No send or send-once claim happens before that
-   check passes.
+   check passes. Scheduled attendee reminders (**Scheduled reminders** page) use the same
+   stream and the same check, before each reminder day's send and before each chunk of it. Send a
+   test announcement before staff turn them on.
 5. Register the delivery webhook on this stream too (section 5), with **SubscriptionChange** on as
    well, so a Postmark opt-out also becomes the application's suppression record and the next
    recipient count leaves that address out.

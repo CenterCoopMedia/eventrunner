@@ -118,6 +118,20 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Scheduled attendee reminders (#518). A new <strong>Attendees</strong> panel on the <strong>Scheduled
+          reminders</strong> page emails registered attendees before the event starts (7 and 1 days by
+          default, at a send time on the event&#39;s clock). Staff write the subject and message in plain
+          text with one placeholder, <code>{{days_until}}</code>. The server adds the start, the venue and the
+          ticket link: <code>/tickets/mine</code> when tickets are sold through Stripe, <code>/dashboard</code> otherwise.
+          Staff preview one sample per reminder day, then approve the wording, the settings and the
+          facts together. It is off by default. Once an hour, <code>runScheduledReminders</code> sends it through
+          the announcement send path, so it goes on the announcement stream with the unsubscribe link,
+          leaves out every address that unsubscribed, and shows in the Announcements send history.
+          Each address gets each reminder day once. Quiet hours, a schedule change and the end of a
+          reminder day stop a send between groups of 200. A change to the wording, the settings, the
+          event start, the venue or the ticket link pauses the schedule until staff approve again.
+          Staff cannot continue a scheduled send from the Announcements page, and a send the schedule
+          will not finish shows <strong>Stopped</strong>.</li>
           <li>Scheduled speaker reminders (#518). On the new <strong>Scheduled reminders</strong> page, staff set a
           due date for the speaker items, the days before it to send (14, 7 and 2 by default), a send
           time on the event&#39;s clock, and the items to name. They preview one sample per reminder day,
