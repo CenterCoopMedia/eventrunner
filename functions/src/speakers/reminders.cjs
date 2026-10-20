@@ -59,10 +59,13 @@
  *
  * Historical demos refuse every write here (send, saveTemplate,
  * resetTemplate) before anything is stored; core/demoWrites.cjs.
+ *
+ * The readiness read, the selection, the rendering and the reserve, send
+ * and stamp of one speaker live in reminderCore.cjs, so the reminder
+ * schedule (ADR 0006) uses the same rules as this endpoint.
  */
 
 const { requireAdmin } = require('../core/auth.cjs');
-const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const crypto = require('node:crypto');
 const { logAdminAction, isValidDocId } = require('../cms/store.cjs');
@@ -70,89 +73,48 @@ const { speakerDisplayName } = require('shared/speaker');
 const {
   READINESS_ITEMS,
   READINESS_ITEM_LABELS,
-  REMINDABLE_SPEAKER_STATUSES,
-  sessionsForSpeaker,
-  speakerReadiness,
   normalizeReadinessTopics,
 } = require('shared/speakerReadiness');
+const {
+  SPEAKERS,
+  REMINDERS,
+  TEMPLATE_ID,
+  REMINDER_COOLDOWN_MS,
+  SENDING_STALE_MS,
+  SHIPPED_WORDING,
+  SKIP_REASONS,
+  ReminderError,
+  fail,
+  isoOrNull,
+  wordingVersion,
+  loadReadinessStores,
+  readinessFor,
+  cooldownUntil,
+  remindableEntries,
+  reminderTokenValues,
+  renderReminder,
+  sortSelection,
+  loadReminderTemplate,
+  requireWritable,
+  sendOne,
+} = require('./reminderCore.cjs');
 
-const SPEAKERS = 'speakers';
-const SESSIONS = 'cmsSchedule';
-const MATERIALS = 'session_materials';
-const REMINDERS = 'speaker_reminders';
 const TEMPLATES = 'email_templates';
 const ADMIN_LOGS = 'admin_logs';
-const TEMPLATE_ID = 'speaker.reminder';
 
 /** Most speakers one preview or send may name. */
 const MAX_RECIPIENTS = 200;
-/** A speaker gets at most one reminder in this window. */
-const REMINDER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-/** A send still marked "sending" after this long is treated as abandoned. */
-const SENDING_STALE_MS = 10 * 60 * 1000;
 /** Longest saved subject, html or text body, in characters. */
 const MAX_TEMPLATE_FIELD_LENGTH = 100 * 1024;
 const BATCH_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const RECEIPT_RE = /^[0-9a-f]{64}$/;
-/** The wording version when no wording is saved. */
-const SHIPPED_WORDING = 'shipped';
 
 /** Export groups: which speakers a file holds. */
 const EXPORT_GROUPS = Object.freeze(['any', 'all', ...READINESS_ITEMS]);
 
-/** Why a chosen speaker gets no reminder, in staff words. */
-const SKIP_REASONS = Object.freeze({
-  'not-found': 'There is no speaker record with this id.',
-  'not-accepted': 'This speaker has not accepted an invitation.',
-  'no-email': 'This speaker has no email address.',
-  'nothing-missing': 'Nothing in the chosen items is missing.',
-  recent: 'This speaker was reminded less than 24 hours ago.',
-  'in-progress': 'A reminder to this speaker is being sent now.',
-});
-
 const REQUEST_ACTIONS = Object.freeze([
   'list', 'preview', 'send', 'export', 'template', 'saveTemplate', 'resetTemplate',
 ]);
-
-class ReminderError extends Error {
-  constructor(status, code, message) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
-
-function fail(status, code, message) {
-  throw new ReminderError(status, code, message);
-}
-
-function timestampMs(value) {
-  if (value == null) return NaN;
-  if (typeof value.toMillis === 'function') return value.toMillis();
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === 'string') return Date.parse(value);
-  if (typeof value === 'number') return value;
-  return NaN;
-}
-
-function isoOrNull(value) {
-  const ms = timestampMs(value);
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
-}
-
-function onceKeyFor(speakerId, batchId) {
-  return `speaker-reminder:${speakerId}:${batchId}`;
-}
-
-/**
- * Which wording a preview showed: 'shipped', or a digest of the saved
- * subject, html and text. A send must carry the same value.
- */
-function wordingVersion(override) {
-  if (!override) return SHIPPED_WORDING;
-  const fields = ['subject', 'html', 'text'].map((key) => (typeof override[key] === 'string' ? override[key] : null));
-  return crypto.createHash('sha256').update(JSON.stringify(fields), 'utf8').digest('hex').slice(0, 32);
-}
 
 /**
  * The digest a send must match: every message the preview showed, in order.
@@ -165,55 +127,6 @@ function reminderReceipt(messages) {
     messages: messages.map((m) => [m.speakerId, m.to, m.items, m.subject, m.html ?? null, m.text ?? null]),
   });
   return crypto.createHash('sha256').update(canonical, 'utf8').digest('hex');
-}
-
-function siteUrl(config) {
-  return String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
-}
-
-/**
- * The stores the readiness rule reads, once per request.
- *
- * @returns {Promise<{ speakers: Map<string, object>, sessions: object[],
- *   materialsBySession: Record<string, object[]>, reminders: Map<string, object> }>}
- */
-async function loadReadinessStores(db) {
-  const [speakerSnap, sessionSnap, materialSnap, reminderSnap] = await Promise.all([
-    db.collection(SPEAKERS).get(),
-    db.collection(SESSIONS).get(),
-    db.collection(MATERIALS).select('sessionId', 'reviewStatus').get(),
-    db.collection(REMINDERS).get(),
-  ]);
-  const speakers = new Map(speakerSnap.docs.map((doc) => [doc.id, doc.data()]));
-  const sessions = sessionSnap.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
-  const materialsBySession = {};
-  for (const doc of materialSnap.docs) {
-    const material = doc.data();
-    if (typeof material.sessionId !== 'string') continue;
-    (materialsBySession[material.sessionId] ??= []).push(material);
-  }
-  const reminders = new Map(reminderSnap.docs.map((doc) => [doc.id, doc.data()]));
-  return { speakers, sessions, materialsBySession, reminders };
-}
-
-function readinessFor(stores, speakerId, speaker) {
-  return speakerReadiness({
-    speaker,
-    sessions: sessionsForSpeaker(stores.sessions, speakerId),
-    materialsBySession: stores.materialsBySession,
-  });
-}
-
-/** The readiness items a speaker would be reminded about, within `topics`. */
-function itemsWithin(readiness, topics) {
-  return readiness.missing.filter((item) => topics.includes(item));
-}
-
-function cooldownUntil(state, nowMs) {
-  const last = timestampMs(state?.lastSentAt);
-  if (!Number.isFinite(last)) return null;
-  const until = last + REMINDER_COOLDOWN_MS;
-  return until > nowMs ? until : null;
 }
 
 /** One row of the staff list. */
@@ -233,66 +146,6 @@ function listRow(speakerId, speaker, stores, nowMs) {
   };
 }
 
-function remindableEntries(stores) {
-  return [...stores.speakers.entries()]
-    .filter(([, speaker]) => REMINDABLE_SPEAKER_STATUSES.includes(speaker?.status))
-    .map(([id, speaker]) => ({ id, speaker }));
-}
-
-/**
- * The token values for one speaker's reminder. Every value is plain text:
- * the renderer escapes them in the html body.
- */
-function reminderTokenValues({ config, speaker, readiness, items, actor }) {
-  const site = siteUrl(config);
-  const wants = (item) => items.includes(item);
-  return {
-    speaker_name: speakerDisplayName(speaker),
-    dashboard_url: site ? `${site}/speaker/dashboard` : '',
-    profile_url: site ? `${site}/speaker/profile` : '',
-    admin_contact_email: actor.email || config?.event?.legal?.supportEmail || '',
-    needs_bio: wants('bio') && readiness.bio ? 'yes' : '',
-    needs_headshot: wants('headshot') && readiness.headshot ? 'yes' : '',
-    description_sessions: wants('description')
-      ? readiness.descriptionSessions.map((session) => session.title).join('; ')
-      : '',
-    materials_sessions: wants('materials')
-      ? readiness.materialsSessions.map((session) => session.title).join('; ')
-      : '',
-  };
-}
-
-/**
- * Render one reminder: what send() is handed (`message`), and what the
- * provider receives (`delivered`, footer included) for the preview.
- */
-function renderReminder({ template, override, config, speaker, readiness, items, actor }) {
-  const { render } = require('../email/render.cjs');
-  const { withLegalFooter } = require('../email/send.cjs');
-  const tokenValues = reminderTokenValues({ config, speaker, readiness, items, actor });
-  const rendered = render({ template, override, tokenValues, config });
-  const link = tokenValues.dashboard_url;
-  if (!link || !(rendered.html || '').includes(link) || !(rendered.text || '').includes(link)) {
-    fail(409, 'not-ready', 'The reminder could not be prepared: The event has no public site address for the dashboard link.');
-  }
-  const delivered = withLegalFooter(rendered, config);
-  return {
-    message: {
-      to: speaker.email.trim(),
-      subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
-      tag: TEMPLATE_ID,
-      source: 'speaker-reminder',
-      storeRendered: rendered.storeRendered,
-      hasLegalFooterHtml: rendered.hasLegalFooterHtml,
-      hasLegalFooterText: rendered.hasLegalFooterText,
-    },
-    delivered: { subject: rendered.subject, html: delivered.html, text: delivered.text },
-    usedFallback: rendered.usedFallback,
-  };
-}
-
 /** @returns {{ speakerIds: string[], topics: string[] }} */
 function readSelection(body) {
   const raw = body?.speakerIds;
@@ -305,44 +158,6 @@ function readSelection(body) {
     fail(400, 'bad-request', `topics: Each entry must be one of ${READINESS_ITEMS.join(', ')}.`);
   }
   return { speakerIds, topics: normalizeReadinessTopics(body?.topics) };
-}
-
-/**
- * Who in a selection can get a reminder now, and why the rest cannot. The
- * cooldown is checked here for the preview and again, transactionally, by
- * send.
- */
-function sortSelection({ speakerIds, topics, stores, nowMs, checkCooldown = true }) {
-  const recipients = [];
-  const skipped = [];
-  for (const speakerId of speakerIds) {
-    const speaker = stores.speakers.get(speakerId);
-    const name = speaker ? speakerDisplayName(speaker) || speakerId : speakerId;
-    const skip = (reason) => skipped.push({ speakerId, name, reason, message: SKIP_REASONS[reason] });
-    if (!speaker) { skip('not-found'); continue; }
-    if (!REMINDABLE_SPEAKER_STATUSES.includes(speaker.status)) { skip('not-accepted'); continue; }
-    if (typeof speaker.email !== 'string' || !speaker.email.trim()) { skip('no-email'); continue; }
-    const readiness = readinessFor(stores, speakerId, speaker);
-    const items = itemsWithin(readiness, topics);
-    if (items.length === 0) { skip('nothing-missing'); continue; }
-    if (checkCooldown && cooldownUntil(stores.reminders.get(speakerId), nowMs)) { skip('recent'); continue; }
-    recipients.push({ speakerId, name, speaker, readiness, items });
-  }
-  return { recipients, skipped };
-}
-
-async function loadReminderTemplate(db, now) {
-  const { getDefaultTemplate, loadTemplate } = require('../email/templates.cjs');
-  const template = getDefaultTemplate(TEMPLATE_ID);
-  // Fresh: the preview must show wording saved a moment ago, and the send
-  // must use the wording the preview showed.
-  const { override } = await loadTemplate({ db, id: TEMPLATE_ID, now, fresh: true });
-  return { template, override };
-}
-
-async function requireWritable(db) {
-  const policy = await checkDemoWrites({ db });
-  if (!policy.ok) fail(policy.status, policy.code, policy.message);
 }
 
 // --- actions ---------------------------------------------------------------
@@ -407,56 +222,6 @@ async function prepareBatch({ db, getConfig, now, actor, selection }) {
     ...rendered.delivered,
   })));
   return { loaded, prepared, skipped, receipt };
-}
-
-/**
- * Reserve one speaker for one batch, or say why not.
- * @returns {Promise<{ ok: true, sentCount: number } | { ok: false, outcome: string, reason?: string }>}
- */
-async function reserve({ db, speakerId, batchId, items, actor, nowMs }) {
-  const ref = db.collection(REMINDERS).doc(speakerId);
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    let state = snap.exists ? snap.data() : {};
-    const attempt = timestampMs(state.lastAttemptAt);
-    if (state.lastStatus === 'sending' && Number.isFinite(attempt) && nowMs - attempt >= SENDING_STALE_MS
-      && typeof state.lastBatchId === 'string') {
-      // An abandoned send. The email core's claim for its batch says
-      // whether the mail may have gone; settle the record by it.
-      const { claimIdForOnceKey } = require('../email/send.cjs').internals;
-      const claim = await tx.get(db.collection('email_claims').doc(claimIdForOnceKey(onceKeyFor(speakerId, state.lastBatchId))));
-      const settled = claim.exists
-        ? {
-          lastStatus: 'sent',
-          lastSentAt: new Date(attempt),
-          lastSentBy: state.lastAttemptBy ?? null,
-          lastItems: Array.isArray(state.lastAttemptItems) ? state.lastAttemptItems : [],
-          sentCount: (Number.isInteger(state.sentCount) ? state.sentCount : 0) + 1,
-        }
-        : { lastStatus: 'failed' };
-      state = { ...state, ...settled };
-      tx.set(ref, settled, { merge: true });
-    }
-    if (state.lastBatchId === batchId) {
-      // Replays never send. What the first request did is the answer.
-      if (state.lastStatus === 'failed') return { ok: false, outcome: 'failed' };
-      if (state.lastStatus === 'uncertain') return { ok: false, outcome: 'uncertain' };
-      return { ok: false, outcome: 'already-sent' };
-    }
-    if (state.lastStatus === 'sending' && Number.isFinite(attempt) && nowMs - attempt < SENDING_STALE_MS) {
-      return { ok: false, outcome: 'skipped', reason: 'in-progress' };
-    }
-    if (cooldownUntil(state, nowMs)) return { ok: false, outcome: 'skipped', reason: 'recent' };
-    tx.set(ref, {
-      speakerId,
-      lastBatchId: batchId,
-      lastStatus: 'sending',
-      lastAttemptAt: new Date(nowMs),
-      lastAttemptBy: actor.email,
-      lastAttemptItems: items,
-    }, { merge: true });
-    return { ok: true, sentCount: Number.isInteger(state.sentCount) ? state.sentCount : 0 };
-  });
 }
 
 async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
@@ -525,43 +290,6 @@ async function sendAction({ db, getConfig, sendEmail, now, log, actor, body }) {
   }
 
   return { batchId, sent, alreadySent, skipped, failed, uncertain };
-}
-
-/**
- * Reserve, send and stamp one speaker's reminder.
- * @returns {Promise<{ outcome: 'sent' | 'already-sent' | 'failed' | 'uncertain' | 'skipped', reason?: string }>}
- */
-async function sendOne({ db, sendEmail, log, actor, batchId, recipient, rendered, nowMs }) {
-  const { speakerId, items } = recipient;
-  const reservation = await reserve({ db, speakerId, batchId, items, actor, nowMs });
-  if (!reservation.ok) return reservation;
-  let result;
-  try {
-    result = await sendEmail({ ...rendered.message, onceKey: onceKeyFor(speakerId, batchId) });
-  } catch (err) {
-    log.error('speaker.reminder send threw', err);
-    result = { status: 'failed' };
-  }
-  // A throw after the request left may still have delivered the mail: it
-  // counts as a reminder for the window, so no new batch sends a second one.
-  let outcome = 'failed';
-  if (result?.status === 'sent') outcome = 'sent';
-  else if (result?.ambiguous) outcome = 'uncertain';
-  try {
-    await db.collection(REMINDERS).doc(speakerId).set(outcome === 'failed'
-      ? { lastStatus: 'failed' }
-      : {
-        lastStatus: outcome,
-        lastSentAt: new Date(nowMs),
-        lastSentBy: actor.email,
-        lastItems: items,
-        sentCount: reservation.sentCount + 1,
-      }, { merge: true });
-  } catch (err) {
-    // The record stays at "sending"; reserve() settles it by the claim.
-    log.warn('speaker_reminders stamp failed', err);
-  }
-  return { outcome };
 }
 
 const CSV_HEADERS = Object.freeze([
