@@ -906,5 +906,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   base commit, as the path classifier already did, so a pull request cannot replace
   the scripts that decide those required checks. A pull request can still edit the
   workflow file itself; an independent check producer remains #259 (#354).
+- `scripts/ci/audit-exceptions.json` now records each open audit finding we cannot fix
+  yet, with its reason: three stream-json advisories under the pinned Firebase CLI, braces
+  under Tailwind CSS 3 (no fixed release), Quill 2.0.3's HTML export advisory (no fixed
+  release; the editor does not load the affected blots and cleans every export), and
+  GHSA-rj75-hqrm-r3gf on postcss-selector-parser, which the installed 6.1.5 already fixes
+  but the advisory still lists. The deploy runbook now says to run `firebase auth:import`
+  only on files you exported from your own project.
+- An audit exception now covers an advisory only up to the severity recorded for it. If an
+  advisory is later raised above that severity, the audit policy check fails again.
 
 The feature set itself is specified in [docs/adr/0001-event-platform-v1.md](docs/adr/0001-event-platform-v1.md). Ticketing (Eventbrite and manual/CSV adapters, registration approval, and the end-to-end test suite) has landed; release packaging and operator-documentation work is in progress.
