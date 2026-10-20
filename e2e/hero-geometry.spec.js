@@ -23,6 +23,10 @@ const SIDE_BY_SIDE_MIN = 640;
 // The smallest inner inset the copy may have from the hero's edge.
 const MIN_INSET = 12;
 const LONG_TITLE = 'The Fifteenth Annual Regional Convening of Community Newsrooms, Public Media Partners and Neighborhood Reporters';
+// A CMS action label with no space in it, longer than any copy column.
+const LONG_ACTION = 'Registrationforthefullprogrammeofsessionsworkshopsandreceptions';
+// The touch target every action keeps (interface guidelines, Accessibility).
+const TOUCH_TARGET = 44;
 
 /** Glyph boxes of every text run and control in the copy, and the boxes they sit in. */
 async function measureHero(page) {
@@ -45,20 +49,27 @@ async function measureHero(page) {
         range.setStart(node, match.index);
         range.setEnd(node, match.index + match[0].length);
         const lines = new Set([...range.getClientRects()].filter((rect) => rect.width > 0).map((rect) => Math.round(rect.top)));
-        if (lines.size > 1) brokenWords.push(match[0]);
+        if (lines.size > 1 && !node.parentElement.closest('a, button')) brokenWords.push(match[0]);
       }
     }
+    const controls = [];
     for (const control of copy.querySelectorAll('a, button')) {
       const rect = control.getBoundingClientRect();
-      if (rect.width > 0) boxes.push({ text: control.textContent.trim().slice(0, 40), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
+      if (rect.width > 0) {
+        boxes.push({ text: control.textContent.trim().slice(0, 40), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
+        controls.push({ text: control.textContent.trim().slice(0, 40), height: rect.height });
+      }
     }
     const heroRect = hero.getBoundingClientRect();
+    const copyRect = copy.getBoundingClientRect();
     const artRect = art ? art.getBoundingClientRect() : null;
     return {
       illustrated: hero.classList.contains('event-hero--illustrated'),
       hero: { left: heroRect.left, right: heroRect.right },
+      copy: { right: copyRect.right },
       art: artRect ? { left: artRect.left, top: artRect.top } : null,
       boxes,
+      controls,
       brokenWords,
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
@@ -88,6 +99,13 @@ function heroFaults(width, metrics, copy) {
   if (textLeft - metrics.hero.left < MIN_INSET) {
     faults.push(`copy starts ${round(textLeft - metrics.hero.left)}px from the hero's left edge`);
   }
+  // Nothing in the copy is cut off by the hero's own edge.
+  if (textRight > metrics.hero.right + 0.5) {
+    faults.push(`copy runs ${round(textRight - metrics.hero.right)}px past the hero's right edge`);
+  }
+  for (const control of metrics.controls) {
+    if (control.height < TOUCH_TARGET - 0.5) faults.push(`"${control.text}" is ${round(control.height)}px tall`);
+  }
   const sideBySide = metrics.illustrated && width >= SIDE_BY_SIDE_MIN;
   if (!sideBySide && metrics.hero.right - textRight < MIN_INSET) {
     faults.push(`copy ends ${round(metrics.hero.right - textRight)}px from the hero's right edge`);
@@ -98,6 +116,11 @@ function heroFaults(width, metrics, copy) {
     const furthest = metrics.boxes.reduce((last, box) => (box.right > last.right ? box : last));
     if (furthest.right > metrics.art.left) {
       faults.push(`"${furthest.text}" runs ${round(furthest.right - metrics.art.left)}px onto the photograph`);
+    }
+    // The copy column ends where the photograph starts: no strip of band
+    // between them, and no overlap.
+    if (Math.abs(metrics.copy.right - metrics.art.left) > 1) {
+      faults.push(`the copy column ends ${round(metrics.art.left - metrics.copy.right)}px before the photograph`);
     }
   } else if (metrics.illustrated && metrics.art.top < textBottom) {
     faults.push(`the phone photograph starts ${round(textBottom - metrics.art.top)}px above the end of the copy`);
@@ -189,6 +212,92 @@ test('hero copy keeps its inset and stays off the photograph in every style, mod
   }
 
   await testInfo.attach('hero-geometry.json', {
+    body: Buffer.from(`${JSON.stringify(report, null, 2)}\n`),
+    contentType: 'application/json',
+  });
+  expect(faults, `${faults.length} hero geometry faults`).toEqual([]);
+});
+
+// Three edge cases from review: the NC Local composition, an action label
+// with no space in it, and a reader whose root text size is 32px.
+test('hero copy meets the photograph, long actions wrap, and large root text is not clipped', async ({ page }, testInfo) => {
+  test.setTimeout(300_000);
+  const db = adminDb();
+  const themeRef = db.doc('config/theme');
+  const imageRef = db.collection('cmsContent').doc('hero__image');
+  const actionRef = db.collection('cmsContent').doc('hero__geometry_long_action');
+  const [themeSnap, imageSnap] = await Promise.all([themeRef.get(), imageRef.get()]);
+  const savedTheme = themeSnap.exists ? themeSnap.data() : null;
+  const savedImage = imageSnap.exists ? imageSnap.data() : null;
+  const report = [];
+  const faults = [];
+  const record = (label, width, found) => {
+    report.push({ label, width, faults: found });
+    for (const fault of found) faults.push(`${label} ${width}px: ${fault}`);
+  };
+
+  try {
+    // NC Local is the Newsroom style under a wrapper attribute that only the
+    // read-only historical demo sets. Its own rule must end the copy where
+    // the shared photograph starts, including hero widths below 704px.
+    await imageRef.set({
+      section: 'hero', field: 'image', blockType: 'image', url: '/hero/newsroom.webp',
+      alt: 'A wide photograph for the event hero.', visible: true, order: 2,
+    });
+    await themeRef.set({ ...savedTheme, preset: 'newsroom', mode: 'light' });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'newsroom');
+    await expect(page.locator('.event-hero--illustrated .event-hero__art')).toBeVisible();
+    await page.evaluate(() => document.querySelector('.page-surface').setAttribute('data-historical-demo', 'nclocal'));
+    for (const width of [640, 680, 720, 768, 1024, 1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      record('NC Local', width, heroFaults(width, await measureHero(page), 'normal'));
+    }
+
+    // A CMS action label with no space in it wraps inside its button, keeps
+    // the touch target, and stays in the copy column.
+    await actionRef.set({
+      section: 'hero', field: 'geometry_long_action', blockType: 'cta', label: LONG_ACTION,
+      url: '/schedule', style: 'primary', visible: true, order: 9,
+    });
+    for (const theme of THEMES) {
+      await imageRef.set({
+        section: 'hero', field: 'image', blockType: 'image', url: `/hero/${theme}.webp`,
+        alt: 'A wide photograph for the event hero.', visible: true, order: 2,
+      });
+      await themeRef.set({ ...savedTheme, preset: theme, mode: 'light' });
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto('/');
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await expect(page.locator('.event-hero--illustrated .event-hero__art')).toBeVisible();
+      await expect(page.getByRole('link', { name: LONG_ACTION })).toBeVisible();
+      for (const width of WIDTHS) {
+        await page.setViewportSize({ width, height: 900 });
+        record(`${theme} long action`, width, heroFaults(width, await measureHero(page), 'normal'));
+      }
+
+      // A 32px root text size (a browser default or text-only zoom) makes
+      // the 22rem column minimum wider than a 640px hero. The copy must stay
+      // inside the hero rather than be cut off by it.
+      await page.setViewportSize({ width: 640, height: 900 });
+      const largeText = await page.addStyleTag({ content: 'html { font-size: 32px !important; }' });
+      const metrics = await measureHero(page);
+      // Words break and the page header may scroll at this size; this case
+      // checks only that the hero keeps its copy whole and off the picture.
+      const found = heroFaults(640, { ...metrics, brokenWords: [], scrollWidth: metrics.clientWidth }, 'normal');
+      record(`${theme} 32px root text`, 640, found);
+      await largeText.evaluate((element) => element.remove());
+    }
+  } finally {
+    await actionRef.delete();
+    if (savedTheme) await themeRef.set(savedTheme);
+    else await themeRef.delete();
+    if (savedImage) await imageRef.set(savedImage);
+    else await imageRef.delete();
+  }
+
+  await testInfo.attach('hero-geometry-edge-cases.json', {
     body: Buffer.from(`${JSON.stringify(report, null, 2)}\n`),
     contentType: 'application/json',
   });

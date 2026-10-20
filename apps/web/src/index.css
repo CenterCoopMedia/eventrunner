@@ -34,12 +34,10 @@
   --hero-copy-border-inline-start: 0;
 }
 
-/* Keep the NC Local hero copy in the text column beside the photograph. */
-@media screen and (min-width: 640px) {
-  [data-historical-demo='nclocal'] .event-hero--illustrated .event-hero__copy {
-    inline-size: calc(100% - var(--hero-art-width) - var(--hero-inset-inline));
-  }
-}
+/* The NC Local copy column comes from the shared --hero-copy-column, which
+   reads the 50% photograph share above. A separate width here ended the copy
+   at 50% while the photograph started at the 22rem minimum, leaving a strip
+   of band between them on heroes narrower than 704px. */
 
 @layer base {
   :root {
@@ -2491,6 +2489,15 @@
     color: rgb(var(--color-text-secondary-rgb));
   }
   .event-hero__action { margin-block-start: var(--space-lg); gap: var(--space-md); }
+  /* An action label is CMS text. One with no space in it wraps inside its
+     button, which keeps its touch-target height, instead of pushing the
+     button past the copy column onto the photograph. */
+  .event-hero__copy :is(a, button) {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
   .event-hero__caption {
     position: absolute;
     inset: auto var(--space-sm) var(--space-sm) auto;
