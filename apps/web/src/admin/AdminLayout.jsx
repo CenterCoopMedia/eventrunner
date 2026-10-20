@@ -158,6 +158,7 @@ export const DOCKET = Object.freeze([
     items: [
       { to: 'attendees', label: 'Attendees', tier: 'staff' },
       { to: 'ticketing', label: 'Ticketing', tier: 'staff' },
+      { to: 'invoices', label: 'Invoices', tier: 'staff' },
       { to: 'badges', label: 'Badges', tier: 'staff' },
     ],
   },

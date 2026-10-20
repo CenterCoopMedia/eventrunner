@@ -19,9 +19,14 @@ Security and dependencies (Joe, 2026-10-19): 34 CodeQL alerts (s1, /home/user/wt
 non-breaking npm audit fix (PR #498); major upgrades as separate PRs: u1 vitest 5 + vite 8,
 u2 firebase-tools 15 (both dispatched), u3 firebase-admin 14 + react-router 7 (queued).
 
-Sponsorship invoicing (#208, #209) stays out: the proposals say it needs a
-separate discussion. Each build gets an adversarial review in the workflow;
-the director integrates onto the stack tip, regenerates, and opens stacked PRs.
+Sponsorship invoicing (#208, #209) is back in: the owner approved the spec on
+2026-10-20 (comment on #208). Five PRs, in order: 1 the invoice record, draft
+form and settings (#208, branch `joe/blissful-einstein-9qvtd1-30-invoice-record`);
+2 move the PDF helpers into `functions/src/pdf/kit.cjs`; 3 issue and numbering,
+the PDF, mark paid, void, duplicate, the export and docs (#209); 4 email the PDF
+as an attachment; 5 the Stripe pay link with an ADR 0004 amendment (#519).
+Each build gets an adversarial review in the workflow; the director integrates
+onto the stack tip, regenerates, and opens stacked PRs.
 
 ## 2026-10-19 (wave 2): burn down issues toward the NC Local launch
 

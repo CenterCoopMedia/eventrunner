@@ -1056,11 +1056,35 @@ The templates are therefore **provider-parameterized, not merely tokenized** —
 `posts`, `postReactions`, `reports`, `notifications`, `deleted_posts_audit` (social cut);
 `session_qa`, `session_qa_archive` and their message subcollections (chat cut);
 `broadcast_templates`, `broadcast_history`, `broadcast_queue`, `broadcast_drafts` (broadcast cut);
-`invoices`, `invoiceDesignConfigs`, `sponsorPackages` (invoicing cut — sponsor tiers move into
-`config/event` and `cmsOrganizations`); `renderedVideos` (video cut); `admin_requests` and its
+`invoiceDesignConfigs`, `sponsorPackages` (sponsor tiers move into `config/event` and
+`cmsOrganizations`; `invoices` was cut here and is restored by the amendment below);
+`renderedVideos` (video cut); `admin_requests` and its
 `activity` subcollection (operator triage pipeline stays private); `session_material_urls`,
 `session_material_counts` (§4.4); `magic_links` as a link store (retained only as the OTP challenge
 store under a new name); `admin_settings` (split into `config/*`).
+
+**Amendment, 2026-10-20: invoicing is restored.** The owner reopened sponsor invoicing for v1
+([#208](https://github.com/CenterCoopMedia/eventrunner/issues/208),
+[#209](https://github.com/CenterCoopMedia/eventrunner/issues/209); the approved spec is the
+2026-10-20 comment on #208). It comes back as three server-only collections, not as the old
+design-config store:
+
+- `invoices/{inv_…}`: one invoice. A bill-to block, lines, hand-entered tax and discount rows,
+  totals in minor units, a status (`draft`, `issued`, `paid`, `void`) and a revision. The server
+  computes the totals again on every save. A draft has no number.
+- `invoice_counters/current`: the number sequence. A number (`INV-0001`, with no gaps, per event
+  deployment) is assigned only when an invoice is issued, so a deleted draft leaves no gap.
+- `invoice_settings/current`: the issuer address, tax ID, payment instructions, number prefix and
+  fallback currency. It is not part of `config/event`, because anyone can read that document and
+  these settings hold bank details.
+
+The rules deny every client read and write on all three, for both admin tiers. Staff create,
+edit, issue, send and mark paid through the `invoiceAdmin` endpoint; only an operator voids,
+reopens a paid invoice, or changes the settings. Each write refuses on a read-only demo and writes
+its `admin_logs` row in the same transaction. `invoiceDesignConfigs` and `sponsorPackages` stay
+cut: the sponsor package block and `cmsOrganizations` supply what an invoice starts from. A Stripe
+pay link for an issued invoice needs its own amendment to ADR 0004
+([#519](https://github.com/CenterCoopMedia/eventrunner/issues/519)).
 
 `tickets/{externalId}` replaces the matched/unmatched pair with one document and a `claimedByUid`
 field. The current two-collection design forces a transactional cross-collection claim
@@ -2116,7 +2140,7 @@ exists only to compensate for infrastructure v1 does not have.
 | Travel / venue page | `src/pages/Travel.jsx` (548 lines) | `apps/web/src/pages/Travel.jsx` + `cmsPages/travel` | **changed** — every hardcoded Philadelphia fallback stripped (venue address `:29`, maps URL `:30`, Temple booking URL `:31`, the 4-hotel fixed array `:34-36`, the 3 SEPTA/PHL/parking transit cards `:260-368`, literal shuttle times `:216-238`, the named city-guide cross-link `:393`); fixed-arity groups become variable-length CMS lists; sections with no client content render nothing (§5.3) |
 | `Local.jsx`, `CampusMap.jsx` | ~1,900 lines | — | not ported — city-guide and campus-map content is covered by the `travel_local` section of the travel page |
 | Video generator, Remotion, `imageProxy` | ~13,900 lines | — | not ported |
-| Invoices | 2,352 + backend | — | not ported |
+| Invoices | 2,352 + backend | `apps/web/src/admin/pages/AdminInvoice*.jsx`, `functions/src/admin/invoices.cjs` | rebuilt, not ported (§4.2 amendment) |
 | Airtable sync | 4 exports + 6 scripts + `escapeAirtableFormula` | — | not ported. [ADR 0005](0005-airtable-pitch-intake.md) adds a read-only refresh for session pitch intake only |
 | Social layer | `posts`, `onPostCreated`, `deletePostWithAudit`, notifications | — | not ported |
 | Speaker chat / Q&A | 5 exports + lifecycle hooks | — | not ported |

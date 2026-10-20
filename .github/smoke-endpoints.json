@@ -118,6 +118,7 @@
     "updateAttendee",
     "deleteAttendee",
     "exportEventData",
-    "downloadEventPackage"
+    "downloadEventPackage",
+    "invoiceAdmin"
   ]
 }

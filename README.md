@@ -46,7 +46,7 @@ The reference implementation is the [2026 Collaborative Journalism Summit](https
 - Transactional email through a provider adapter (Postmark is the reference)
 - Announcement email from the admin panel to registered attendees, approved attendees, or speakers, with a preview, a test send, a confirmation of the recipient count, a separate broadcast stream, and one-click unsubscribe
 
-What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, invoicing, social feeds, and speaker chat stay out. Airtable is in scope for session pitch intake only: a read-only refresh from one approved table into the private review queue ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md)). Other Airtable sync stays out. Announcement email goes only to the event's attendees and speakers; it is not a marketing list tool.
+What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, social feeds, and speaker chat stay out. Sponsor invoicing was cut in the triage and is back in scope ([ADR 0001 §4.2 amendment](docs/adr/0001-event-platform-v1.md#42-collections-not-carried-over), [#208](https://github.com/CenterCoopMedia/eventrunner/issues/208)). Airtable is in scope for session pitch intake only: a read-only refresh from one approved table into the private review queue ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md)). Other Airtable sync stays out. Announcement email goes only to the event's attendees and speakers; it is not a marketing list tool.
 
 ## Operating model
 
