@@ -275,6 +275,10 @@ export default function AdminInvoiceEditor({ mode }) {
       setRevision(result.invoice.revision);
       setLoadedId(invoiceId);
       setStatus('Reloaded the saved invoice. Your unsaved changes were discarded.');
+      // A new form whose first answer was lost: the server saved the draft
+      // under this form's id, so the retry met its own save as a conflict.
+      // The draft now opens at its own address, as an edit.
+      if (mode === 'create') navigate(`${INVOICES_ROOT}/${encodeURIComponent(invoiceId)}`, { replace: true });
     } catch (err) {
       setError(err);
     }
@@ -363,7 +367,7 @@ export default function AdminInvoiceEditor({ mode }) {
       ) : null}
 
       <ServerErrorSummary error={error} errorRef={errorRef} title={errorTitle} />
-      {error?.code === 'conflict' && mode === 'edit' ? (
+      {error?.code === 'conflict' ? (
         <div>
           <button type="button" className={secondaryButtonClass} onClick={reload}>
             Reload the saved invoice

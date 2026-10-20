@@ -131,6 +131,49 @@ describe('the invoice list', () => {
   });
 });
 
+describe('the invoice list pages', () => {
+  const row = (index, status = 'draft') => ({
+    ...STORED, id: `inv_${String(index).padStart(20, '0')}`, status,
+    number: status === 'draft' ? null : `INV-${String(index).padStart(4, '0')}`,
+    billTo: { ...STORED.billTo, name: `Sponsor ${index}` },
+  });
+
+  it('drops a Show more answer that arrives after the filter changed', async () => {
+    let releaseOld;
+    answers.list = (body) => {
+      if (body.cursor === 'old-cursor') {
+        return new Promise((resolve) => {
+          releaseOld = () => resolve(response({ invoices: [row(9)], nextCursor: 'stale-cursor' }));
+        });
+      }
+      if (body.status === 'paid') return response({ invoices: [row(5, 'paid')], nextCursor: null });
+      return response({ invoices: [row(1)], nextCursor: 'old-cursor' });
+    };
+    await renderAt('/admin/invoices');
+    await screen.findByRole('link', { name: 'Draft for Sponsor 1' }, { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: 'Show more invoices' }));
+    await waitFor(() => expect(invoiceCalls().some((body) => body.cursor === 'old-cursor')).toBe(true));
+    fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'paid' } });
+    expect(await screen.findByRole('link', { name: 'INV-0005' })).toBeInTheDocument();
+    await act(async () => releaseOld());
+    expect(screen.queryByRole('link', { name: 'Draft for Sponsor 9' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Draft for Sponsor 1' })).toBeNull();
+    // The new filter has no further page, and the old answer's cursor is not taken.
+    expect(screen.queryByRole('button', { name: /Show more|Show older/ })).toBeNull();
+  });
+
+  it('keeps paging when a scan found no match but more invoices remain', async () => {
+    answers.list = (body) => (body.cursor === 'older'
+      ? response({ invoices: [row(2)], nextCursor: null })
+      : response({ invoices: [], nextCursor: 'older' }));
+    await renderAt('/admin/invoices?q=sponsor');
+    expect(await screen.findByText(/No matches in the newest 250 invoices/, {}, { timeout: 5000 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show older invoices' }));
+    expect(await screen.findByRole('link', { name: 'Draft for Sponsor 2' })).toBeInTheDocument();
+    expect(invoiceCalls().at(-1)).toEqual({ action: 'list', limit: 25, search: 'sponsor', cursor: 'older' });
+  });
+});
+
 describe('the invoice editor', () => {
   it('fills a new draft from an organization and its package, shows live totals, and saves minor units', async () => {
     adminRows.set('cmsOrganizations', [{ id: 'example-press', name: 'Example Press', tier: 'Presenting', order: 1 }]);
@@ -214,6 +257,25 @@ describe('the invoice editor', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('The invoice changed since you opened it.');
     expect(invoiceCalls().find((body) => body.action === 'saveDraft').expectedRevision).toBe(3);
     expect(screen.getByRole('button', { name: 'Reload the saved invoice' })).toBeInTheDocument();
+  });
+
+  it('recovers a new draft the server already saved when a retry meets a conflict', async () => {
+    let savedId = null;
+    answers.saveDraft = (body) => {
+      savedId = body.invoiceId;
+      return response({ error: { code: 'conflict', message: 'The invoice changed since you opened it. Reload it before saving.' } }, 409);
+    };
+    answers.get = (body) => response({ invoice: { ...STORED, id: body.invoiceId, revision: 1, notes: 'Saved before the answer was lost.' } });
+    await renderAt('/admin/invoices/new/invoice');
+    await screen.findByRole('heading', { level: 1, name: 'New invoice' }, { timeout: 5000 });
+    fireEvent.change(screen.getByLabelText('Name to bill'), { target: { value: 'Example Press' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The invoice changed since you opened it.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reload the saved invoice' }));
+    await waitFor(() => expect(currentPath).toBe(`/admin/invoices/${savedId}`));
+    expect(invoiceCalls().at(-1)).toEqual({ action: 'get', invoiceId: savedId });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Draft for Example Press' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Notes')).toHaveValue('Saved before the answer was lost.');
   });
 
   it('opens an invoice that is not a draft read-only', async () => {

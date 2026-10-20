@@ -7,7 +7,7 @@
 // the server over the invoice number, the bill-to name, contact and email,
 // and the reference. One page examines a bounded window of invoices, so
 // "Show more" continues the same filter from where the last page stopped.
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { formatMoney } from 'shared/invoice';
 import { useAdminApi } from '../adminApi.js';
@@ -43,6 +43,9 @@ export function readStatusFilter(value) {
   return STATUS_FILTERS.some((filter) => filter.value === value) ? value : '';
 }
 
+/** One request reads at most this many invoices (functions/src/admin/invoices.cjs MAX_SCAN). */
+export const INVOICES_PER_SCAN = 250;
+
 /** "Showing 3 invoices." The noun agrees with the count. */
 export function invoiceCountLine(count, more) {
   const noun = count === 1 ? 'invoice' : 'invoices';
@@ -65,6 +68,12 @@ export default function AdminInvoicesList() {
   const [nextCursor, setNextCursor] = useState(null);
   const [error, setError] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // How many pages the current filter has read, for the empty state.
+  const [scans, setScans] = useState(0);
+  // A filter change starts a new generation. An answer from an older one,
+  // such as a Show more still in flight when the filter changed, is
+  // dropped, so its rows and its cursor never join the new list.
+  const generationRef = useRef(0);
   const statusId = useId();
   const searchId = useId();
 
@@ -74,24 +83,27 @@ export default function AdminInvoicesList() {
   }, [call, status, search]);
 
   useEffect(() => {
-    let active = true;
+    generationRef.current += 1;
+    const generation = generationRef.current;
+    const current = () => generation === generationRef.current;
     setRows(null);
+    setNextCursor(null);
     setError(null);
+    setLoadingMore(false);
+    setScans(0);
     load()
       .then((result) => {
-        if (!active) return;
+        if (!current()) return;
         setRows(result.invoices ?? []);
         setNextCursor(result.nextCursor ?? null);
+        setScans(1);
       })
       .catch((err) => {
-        if (active) {
+        if (current()) {
           setRows([]);
           setError(err);
         }
       });
-    return () => {
-      active = false;
-    };
   }, [load]);
 
   useEffect(() => {
@@ -108,18 +120,34 @@ export default function AdminInvoicesList() {
   }
 
   async function showMore() {
+    const generation = generationRef.current;
+    const current = () => generation === generationRef.current;
     setLoadingMore(true);
     setError(null);
     try {
       const result = await load({ cursor: nextCursor });
-      setRows((current) => [...(current ?? []), ...(result.invoices ?? [])]);
+      if (!current()) return;
+      setRows((rowsNow) => [...(rowsNow ?? []), ...(result.invoices ?? [])]);
       setNextCursor(result.nextCursor ?? null);
+      setScans((count) => count + 1);
     } catch (err) {
-      setError(err);
+      if (current()) setError(err);
     } finally {
-      setLoadingMore(false);
+      if (current()) setLoadingMore(false);
     }
   }
+
+  const showMoreButton = (label) => (
+    <button
+      type="button"
+      className={secondaryButtonClass}
+      disabled={loadingMore}
+      aria-busy={loadingMore || undefined}
+      onClick={showMore}
+    >
+      {loadingMore ? 'Loading…' : label}
+    </button>
+  );
 
   const filtered = Boolean(status || search);
   const tableRows = (rows ?? []).map((invoice) => ({
@@ -219,7 +247,15 @@ export default function AdminInvoicesList() {
       {rows === null ? (
         <AdminLoadingState label="Loading invoices…" />
       ) : rows.length === 0 ? (
-        filtered ? (
+        filtered && nextCursor ? (
+          // One read found no match, and older invoices are still unread.
+          // The search goes on from where it stopped; it is not over.
+          <AdminEmptyState
+            title="No matches yet"
+            description={`No matches in the newest ${INVOICES_PER_SCAN * Math.max(scans, 1)} invoices. Older invoices are not searched yet.`}
+            action={showMoreButton('Show older invoices')}
+          />
+        ) : filtered ? (
           <AdminEmptyState
             title="No invoices match"
             description={`There are no ${filterWords(status, search)}.`}
@@ -265,19 +301,7 @@ export default function AdminInvoicesList() {
             rows={tableRows}
             tableClassName="min-w-[40rem]"
           />
-          {nextCursor ? (
-            <div>
-              <button
-                type="button"
-                className={secondaryButtonClass}
-                disabled={loadingMore}
-                aria-busy={loadingMore || undefined}
-                onClick={showMore}
-              >
-                {loadingMore ? 'Loading…' : 'Show more invoices'}
-              </button>
-            </div>
-          ) : null}
+          {nextCursor ? <div>{showMoreButton('Show more invoices')}</div> : null}
         </>
       )}
       {rows !== null && rows.length === 0 && !filtered && error ? (

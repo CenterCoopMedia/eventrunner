@@ -426,7 +426,7 @@ To remove a draft, open it and select **Delete this draft**. Only a draft can be
 
 ### Find an invoice
 
-The list shows the newest invoices first, with the status as a word: **Draft**, **Issued**, **Paid** or **Void**. Use **Status** to show one status, and **Search** to find an invoice by its number, the name or email it is billed to, or its reference. **Show more invoices** continues the same search.
+The list shows the newest invoices first, with the status as a word: **Draft**, **Issued**, **Paid** or **Void**. Use **Status** to show one status, and **Search** to find an invoice by its number, the name or email it is billed to, or its reference. **Show more invoices** continues the same search. One search reads 250 invoices at a time. When those hold no match and older invoices remain, the page says so; select **Show older invoices** to search on.
 
 ### Invoice settings
 
