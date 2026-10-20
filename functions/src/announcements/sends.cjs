@@ -42,7 +42,10 @@
  * same failures again and still lists the transient ones for a retry.
  *
  * The send record, the lease and the chunk itself live in sendRunner.cjs,
- * so the attendee reminder schedule (ADR 0006) sends the same way.
+ * so the attendee reminder schedule (ADR 0006) sends the same way. A
+ * record the schedule made (`reminder` set) shows in the history, but
+ * only the schedule moves it on: a staff "Continue sending" would skip the
+ * schedule's quiet hours, its window and its approval, so it is refused.
  */
 
 const crypto = require('node:crypto');
@@ -100,6 +103,7 @@ function summarize(id, data, nowMs) {
     failures: Array.isArray(data.failures) ? data.failures : [],
     createdAt: toMillis(data.createdAt),
     createdBy: data.createdBy?.email || null,
+    scheduled: Boolean(data.reminder),
     completedAt: toMillis(data.completedAt),
     busy: leaseUntil !== null && leaseUntil > nowMs,
     retryCount: Array.isArray(data.retryRecipients) ? data.retryRecipients.length : 0,
@@ -380,6 +384,8 @@ function createSendAnnouncementEmailHandler(deps) {
       if (!existing.exists) {
         const started = await startSend({ deps, gate, body: req.body, sendId, nowMs: now() });
         if (started.error) return sendError(res, ...started.error);
+      } else if (existing.data()?.reminder) {
+        return sendError(res, 409, 'scheduled-send', 'Scheduled attendee reminders send this email. Only the schedule continues it.');
       } else if (req.body?.receipt !== undefined && req.body.receipt !== existing.data()?.receipt) {
         // A second confirmation under the same identity must be the same send.
         return sendError(res, 409, 'send-conflict', 'This send already exists with different content. Preview the email again.');

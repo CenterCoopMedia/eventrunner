@@ -4,9 +4,25 @@
  * The send record and its chunks: what an announcement send does once a
  * caller has decided to send (issue #518). sends.cjs is the staff caller;
  * it checks the request, the preview and the receipt, then uses these.
- * The attendee reminder schedule (ADR 0006) will be the second caller, so
- * a scheduled email gets the same suppression check, unsubscribe modes,
- * stream re-check, send-once keys and send history as a staff send.
+ * The attendee reminder schedule (reminders/attendeeSchedule.cjs, ADR
+ * 0006) is the second caller, so a scheduled email gets the same
+ * suppression check, unsubscribe modes, stream re-check, send-once keys
+ * and send history as a staff send.
+ *
+ * The schedule adds two things a staff send does not need, both optional:
+ *
+ *   guard  `{ ref, check(data) }`: a document read inside the transaction
+ *          that creates the record or takes a chunk lease, and a check that
+ *          returns a reason to stop, or null. A stop writes nothing. The
+ *          schedule reads its own settings again this way before the
+ *          record and before every chunk, as the speaker schedule does in
+ *          reserve().
+ *   also   `{ ref, data }`: a document created in the same transaction as
+ *          the record (the schedule's ledger row).
+ *
+ * A record the schedule will not continue (its window closed, or staff
+ * approved new wording) is marked `stopped` by markStopped(). No caller
+ * sends from a stopped record.
  *
  * The rules (bounded chunks, no queue, the lease, retries of transient
  * failures) are described in sends.cjs.
@@ -60,6 +76,7 @@ function isAlreadyExists(err) {
  */
 async function startSendRecord({
   db, sendId, nowMs, audience, draft, rendered, channel, receipt, recipients, retryOf = null, createdBy,
+  extra = {}, guard = null, also = null,
 }) {
   const record = {
     status: 'sending',
@@ -89,6 +106,7 @@ async function startSendRecord({
     updatedAt: new Date(nowMs),
     completedAt: null,
     createdBy,
+    ...extra,
   };
   const ref = db.collection(SENDS).doc(sendId);
   try {
@@ -108,6 +126,20 @@ async function startSendRecord({
       if (refused) {
         return { error: [409, refused, 'The failed addresses of this send were already sent again. Retry from that later send instead.'] };
       }
+    } else if (guard || also) {
+      const outcome = await db.runTransaction(async (tx) => {
+        // Every read comes before the first write in a transaction.
+        const mine = await tx.get(ref);
+        const alsoSnap = also ? await tx.get(also.ref) : null;
+        const guardSnap = guard ? await tx.get(guard.ref) : null;
+        if (mine.exists || alsoSnap?.exists) return { existing: true };
+        const stop = guard ? guard.check(guardSnap.exists ? guardSnap.data() : null) : null;
+        if (stop) return { stopped: stop };
+        tx.create(ref, record);
+        if (also) tx.create(also.ref, also.data);
+        return null;
+      });
+      if (outcome) return outcome;
     } else {
       await ref.create(record);
     }
@@ -118,20 +150,42 @@ async function startSendRecord({
   return { record };
 }
 
-/** Take the chunk lease, or report why not. */
-async function takeLease({ db, sendId, nowMs }) {
+/** Take the chunk lease, or report why not. `guard` is described above. */
+async function takeLease({ db, sendId, nowMs, guard = null }) {
   const ref = db.collection(SENDS).doc(sendId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
+    const guardSnap = guard ? await tx.get(guard.ref) : null;
     if (!snap.exists) return { missing: true };
     const data = snap.data();
     if (data.status !== 'sending') return { done: true, data };
+    const stop = guard ? guard.check(guardSnap.exists ? guardSnap.data() : null) : null;
+    if (stop) return { stopped: stop, data };
     const until = toMillis(data.lease?.until);
     if (until !== null && until > nowMs) return { busy: true, data };
     const token = crypto.randomUUID();
     const start = data.nextIndex || 0;
     tx.update(ref, { lease: { token, until: new Date(nowMs + LEASE_MS) }, updatedAt: new Date(nowMs) });
     return { token, start, data };
+  });
+}
+
+/**
+ * Mark a record that is still sending as `stopped`: nothing more is sent
+ * from it. A record that finished, or holds a live chunk lease, is left as
+ * it is.
+ *
+ * @returns {Promise<boolean>} whether this call stopped it
+ */
+async function markStopped({ db, sendId, nowMs, reason }) {
+  const ref = db.collection(SENDS).doc(sendId);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.data()?.status !== 'sending') return false;
+    const until = toMillis(snap.data().lease?.until);
+    if (until !== null && until > nowMs) return false;
+    tx.update(ref, { status: 'stopped', stoppedReason: reason, lease: null, updatedAt: new Date(nowMs) });
+    return true;
   });
 }
 
@@ -255,6 +309,7 @@ module.exports = {
   isTransientFailure,
   startSendRecord,
   takeLease,
+  markStopped,
   releaseLease,
   runChunk,
 };
