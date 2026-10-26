@@ -1107,6 +1107,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Update `body-parser` to 2.4.0 for Functions and 1.20.9 for the Firebase CLI,
+  `sanitize-html` to 2.18.1, and `@fastify/busboy` to 3.2.4 in both lockfiles.
+  These updates fix compressed-request denial of service, nested iframe stack
+  overflow, and multipart-header injection. Update the CLI's `fast-uri` to 3.1.9
+  for its URI parsing security fixes. Existing dependency ranges accept all
+  transitive updates; no override or Firebase CLI upgrade is required.
+
 - The CI gate and DCO jobs now load their verifier scripts from the pull request's
   base commit, as the path classifier already did, so a pull request cannot replace
   the scripts that decide those required checks. A pull request can still edit the
