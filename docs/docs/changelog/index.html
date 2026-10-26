@@ -1264,6 +1264,14 @@
           </ul>
           <h3 id="security">Security<a class="heading-anchor" href="#security" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Update <code>body-parser</code> to 2.4.0 for Functions and 1.20.9 for the Firebase CLI,
+          <code>sanitize-html</code> to 2.18.1, and <code>@fastify/busboy</code> to 3.2.4 in both lockfiles.
+          These updates fix compressed-request denial of service, nested iframe stack
+          overflow, and multipart-header injection. Update the CLI&#39;s <code>fast-uri</code> to 3.1.9
+          for its URI parsing security fixes. Existing dependency ranges accept all
+          transitive updates; no override or Firebase CLI upgrade is required.</li>
+          </ul>
+          <ul>
           <li>The CI gate and DCO jobs now load their verifier scripts from the pull request&#39;s
           base commit, as the path classifier already did, so a pull request cannot replace
           the scripts that decide those required checks. A pull request can still edit the
