@@ -27,11 +27,11 @@ detail; the short version, because it drives what these fixtures look like:
    the parsed query (`{ query: { token } }`). `webhooks-list-current.json` holds the placeholder
    `token=fixture-placeholder`, which a test swaps for its own secret. #79 must confirm that
    Eventbrite keeps the query string when it delivers.
-2. **Delivery id.** Eventbrite's webhook payload carries no per-delivery identifier, so the
-   adapter derives one as `sha256(rawBody)`. `webhook-order-updated.json` and
-   `webhook-order-updated-2.json` are deliberately two DIFFERENT bodies about the same order, to
-   exercise "two distinct deliveries collapse onto one queue row, not onto one delivery claim"
-   (spec §3.3).
+2. **Delivery id.** Eventbrite's webhook payload carries no per-delivery identifier.
+   Each authenticated receipt gets a random UUID, including byte-identical notifications:
+   the same body can describe a later state change. Work still coalesces by order in the
+   sync queue. The end-to-end test repeats an identical body around an API-side refund
+   and checks that the ticket and entitlement are updated.
 3. **Resource URL shape.** The first fixtures model `api_url` as the ORDER resource path
    (`/v3/events/{eventId}/orders/{orderId}/`) for every action. Eventbrite's documentation shows
    `/v3/orders/{orderId}/` for `order.*` and `/v3/events/{eventId}/attendees/{attendeeId}/` for
@@ -77,3 +77,4 @@ detail; the short version, because it drives what these fixtures look like:
 | `webhooks-list-page-1.json` | First page of the webhook list, `pagination.has_more_items: true` |
 | `webhooks-list-current.json` | Same call — one subscription already registered at the callback URL under test with every handled action |
 | `webhook-create-response.json` | `POST /organizations/{id}/webhooks/` response |
+
