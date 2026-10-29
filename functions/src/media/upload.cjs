@@ -508,6 +508,13 @@ async function storeSpeakerPhoto({
   return { path };
 }
 
+// A non-expiring budget bounds abandoned objects as well as processing work.
+// This server-only collection is covered by firestore.rules' deny-all fallback.
+// Charge before storage, including failed saves: an ambiguous storage failure
+// may already have created an object. Deletion must not replenish the budget.
+// Operators may reset a budget only after auditing/removing abandoned objects.
+const SPEAKER_PHOTO_UPLOAD_LIMIT = 100;
+
 /**
  * `speakerPhotoUpload`: POST a base64 image for a speaker's headshot.
  *
@@ -542,7 +549,7 @@ function createSpeakerPhotoUploadHandler({
     if (!decoded?.uid) return sendError(res, 401, 'unauthorized', 'Authentication required.');
 
     const speakerId = typeof req.body?.speakerId === 'string' ? req.body.speakerId.trim() : '';
-    if (!speakerId) return badRequest(res, 'speakerId: required');
+    if (!speakerId || speakerId.includes('/')) return badRequest(res, 'speakerId: required, without slashes');
 
     let isAdmin = false;
     const email = typeof decoded.email === 'string' ? decoded.email.trim().toLowerCase() : '';
@@ -581,6 +588,18 @@ function createSpeakerPhotoUploadHandler({
 
     let stored;
     try {
+      const budgetRef = db.collection('speaker_photo_upload_budgets').doc(speakerId);
+      const reserved = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(budgetRef);
+        const count = snap.exists ? snap.data().count : 0;
+        // Corrupt counters fail closed rather than silently resetting a budget.
+        if (!Number.isSafeInteger(count) || count < 0 || count >= SPEAKER_PHOTO_UPLOAD_LIMIT) return false;
+        tx.set(budgetRef, { count: count + 1 });
+        return true;
+      });
+      if (!reserved) {
+        return sendError(res, 429, 'photo-upload-limit', 'Photo upload limit reached. Contact an event organizer.');
+      }
       stored = await storeSpeakerPhoto({
         bucket,
         speakerId,
