@@ -516,12 +516,18 @@ describe('staff access with an end time', () => {
   });
 
   it('the same tier and the same end time again is said in place and asks nothing', async () => {
-    await renderPage({ list: TEMP_LIST });
-    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'demo@example.org' } });
-    fireEvent.change(screen.getByLabelText('Access ends (optional)'), { target: { value: localValue(ENDS) } });
-    fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
-    expect(screen.getByText(`demo@example.org already has staff access until ${formatEndTime(ENDS)}.`)).toBeInTheDocument();
-    expect(screen.queryByRole('region')).toBeNull();
+    // ENDS is a fixed instant; hold the clock before it so the end time stays in the future.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-10-20T12:00:00Z') });
+    try {
+      await renderPage({ list: TEMP_LIST });
+      fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'demo@example.org' } });
+      fireEvent.change(screen.getByLabelText('Access ends (optional)'), { target: { value: localValue(ENDS) } });
+      fireEvent.click(screen.getByRole('button', { name: 'Grant access' }));
+      expect(screen.getByText(`demo@example.org already has staff access until ${formatEndTime(ENDS)}.`)).toBeInTheDocument();
+      expect(screen.queryByRole('region')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('making a temporary staff account an operator says the end time goes', async () => {
