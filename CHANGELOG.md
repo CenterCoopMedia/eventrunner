@@ -663,6 +663,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ticket-based grants read the live automatic-approval setting in the same transaction
+  as the grant. Turning automatic approval off reconciles existing ticket-derived
+  approvals back to `ticketed` for staff review, preserving valid tickets, explicit
+  admin approvals, and terminal revocations. The new `onApprovalPolicyWritten` trigger
+  handles retries and delayed policy events (#570).
+
 - Public schedule PDFs share one build and reuse it for up to 60 seconds, including
   concurrent requests. A failed speaker read now rejects the build; failed builds use
   the same refresh cooldown. Builds read only referenced speakers and refuse more than
