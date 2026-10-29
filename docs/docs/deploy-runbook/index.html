@@ -442,11 +442,12 @@
           <code>--force</code> also accepts Firebase CLI&#39;s default Artifact Registry cleanup policy: container images
           older than one day are deleted. This is build-artifact retention only; it does not change deployed
           Functions or event data.</p>
-          <p><strong>Case 2: new retry-enabled handlers.</strong> On every other run, the script also discovers the local
+          <p><strong>Case 2: New retry policies.</strong> On every other run, the script also discovers the local
           Functions with the pinned <code>firebase-tools</code> runtime, the same discovery that <code>firebase deploy</code> runs.
-          A discovery failure stops the deploy. A retry-enabled handler is new when the inventory has no
-          Function with the same id in the same region. For new handlers only, the script runs one targeted
-          deploy first and logs the names it creates:</p>
+          A discovery failure stops the deploy. A retry policy is new when the Function is absent or its
+          deployed trigger has retry disabled. Existing Functions qualify only with the same platform,
+          codebase and trigger identity, including filters and document paths. An omitted trigger region
+          inherits the existing region. The script first runs one targeted deploy and logs its targets:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npx firebase deploy --only functions:&lt;id&gt;[,functions:&lt;id&gt;...] \
             --project &lt;GCP_PROJECT_ID&gt; --non-interactive --force
           </code></pre>
@@ -455,25 +456,23 @@
           migration, and other protected changes. The script refuses the targeted deploy, and deploys
           nothing, in these cases:</p>
           <ul>
-          <li>A Function with the same id exists in another region. That is a migration, not a new handler.</li>
-          <li>A selector also matches a deployed Function. Firebase matches <code>functions:&lt;id&gt;</code> against the
+          <li>A Function with the same id exists outside the declared target regions.</li>
+          <li>A selector also matches a deployed Function outside the intended creates or retry upgrades.
+          Firebase matches <code>functions:&lt;id&gt;</code> against the
           dash-separated parts of each id, so <code>functions:foo</code> also selects <code>foo-bar</code>.</li>
-          <li>A selector also matches a local Function that is not a new retry handler.</li>
+          <li>A selector also matches a local Function outside the intended retry-policy targets.</li>
           <li>A retry setting or a retry handler&#39;s region is not a literal value.</li>
           </ul>
-          <p>With these checks, the targeted plan contains creates only. <code>--force</code> cannot approve deletion or
-          unsafe migration of an existing Function. The targeted deploy can also accept other prompts for
+          <p>With these checks, the targeted plan contains only creates and retry upgrades with unchanged
+          trigger identity. It cannot delete or recreate a Function. The targeted deploy can also accept other prompts for
           the new handlers: their min-instances cost, an API they need, and a missing Artifact Registry
           cleanup policy. A client deployment that already deploys without <code>--force</code> already has a cleanup
           policy.</p>
           <p>Retry-enabled event handlers can retry failed executions for up to seven days, so they must remain
           idempotent. Review every new retry handler for idempotency before it merges.</p>
-          <p><strong>Retry enabled on an existing Function.</strong> Case 2 covers handlers that do not exist yet. If a change
-          turns on retry for a Function that is already deployed, the full deploy still stops at the
-          retry-policy prompt. Do not add blanket <code>--force</code> to the workflow. Deploy that one Function by name
-          with <code>--force</code> from a clean checkout of the reviewed commit, with the same deploy credentials and
-          the same <code>functions/.env.&lt;GCP_PROJECT_ID&gt;</code> content as the workflow. Do this only when the same
-          change does not also change the Function&#39;s trigger. Then rerun the workflow.</p>
+          <p><strong>Retry enabled on an existing Function.</strong> Case 2 accepts this automatically only when the
+          normalized trigger identity is unchanged. A changed event type, filter, path, platform or codebase
+          stops before deployment. Review that migration separately; do not add blanket <code>--force</code>.</p>
           <p><strong>Recover a partial first Functions deploy.</strong> If the first bootstrap creates some Functions and then
           fails, read the failed run and repair its original API, permission, quota, or provider-configuration
           failure. Keep the commit, <code>EVENT_FIREBASE_REGION</code>, and GitHub Environment provider settings

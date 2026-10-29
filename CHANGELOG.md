@@ -663,6 +663,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Function deployments accept retry upgrades through targeted deploys while
+  retaining safeguards against deletion, trigger changes and selector collisions.
+
 - External self-service ticket lookups share persistent limits of five attempts per
   account per fixed minute and 100 attempts per deployment per fixed hour. Refusals
   return a retry time, and an unavailable budget stops the lookup before contacting
