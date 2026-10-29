@@ -122,6 +122,14 @@ Before live sales, the launch record must contain:
 
 After approval, check **Publish the catalog**, save while paused, and use **Review reopening sales → Reopen new sales** with the release reason. Verify that **Get tickets** in the site header/home leads to `/tickets`, that the published offer and totals are correct, and that the workspace identifies **Live payments**. A test deployment identifies **Test mode**. Missing/unpublished catalogs, paused sales, closed windows, and exhausted capacity prevent new eligible purchases. These indicators do not replace the merchant's readiness decision.
 
+### Public free-ticket limits
+
+Public checkouts share a cumulative free-seat budget per event and verified purchaser email: the smaller of 20 seats and the current **Maximum tickets per order**. Every zero-price seat counts, including free seats in a mixed paid order. Each free recipient email may occur only once across new public orders for the event. The existing five-new-orders-per-hour limit also applies. Retries of an existing order do not spend either budget.
+
+Budget and recipient guards commit with the inventory reservation. They do not expire with the hourly window, account deletion, payment expiry, or refunds. A failed paid checkout containing free seats therefore still spends that allocation; an organizer must review exceptions and may issue an audited comp. Comps bypass the public limits and still obey event capacity. The guards contain hashes of normalized email identities in their IDs and remain in the private inventory collection; do not delete them as routine cleanup.
+
+These guards start with orders created after this change. Previously issued tickets remain valid and are not backfilled or reclaimed. Review existing allocations before reopening an event affected by abuse. The limits bound repeat allocation by one verified email; they do not prove recipient acceptance or prevent an attacker with many independently verified addresses. Recipient confirmation and broader abuse detection remain follow-up work.
+
 ## 6. Support the payment and the attendee separately
 
 In **Orders**, use **Find a purchaser or order**, **Payment state**, **Refund state**, and **Search orders**. Open an order reference for **Order details**. In **Admission tickets**, use **Find an attendee or ticket** and the ticket/claim/check-in filters. **Load more orders** and **Load more tickets** continue the submitted filters; edit and submit a search to start a different result set.
