@@ -508,6 +508,13 @@ async function storeSpeakerPhoto({
   return { path };
 }
 
+// A non-expiring budget bounds abandoned objects as well as processing work.
+// This server-only collection is covered by firestore.rules' deny-all fallback.
+// Charge before storage, including failed saves: an ambiguous storage failure
+// may already have created an object. Deletion must not replenish the budget.
+// Operators may reset a budget only after auditing/removing abandoned objects.
+const SPEAKER_PHOTO_UPLOAD_LIMIT = 100;
+
 /**
  * `speakerPhotoUpload`: POST a base64 image for a speaker's headshot.
  *
@@ -527,13 +534,6 @@ async function storeSpeakerPhoto({
  * uses for attendee photos (an object with no record pointing at it is
  * cheap and invisible; a saved path with no object is a broken image).
  */
-// A non-expiring budget bounds abandoned objects as well as processing work.
-// This server-only collection is covered by firestore.rules' deny-all fallback.
-// Charge before storage, including failed saves: an ambiguous storage failure
-// may already have created an object. Deletion must not replenish the budget.
-// Operators may reset a budget only after auditing/removing abandoned objects.
-const SPEAKER_PHOTO_UPLOAD_LIMIT = 100;
-
 function createSpeakerPhotoUploadHandler({
   db,
   bucket,
