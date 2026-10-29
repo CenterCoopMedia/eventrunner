@@ -663,6 +663,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Public schedule PDFs share one build and reuse it for up to 60 seconds, including
+  concurrent requests. A failed speaker read now rejects the build; failed builds use
+  the same refresh cooldown. Builds read only referenced speakers and refuse more than
+  1,000 visible sessions or 2,000 referenced speakers. Schedule and speaker edits can
+  take up to 60 seconds to appear (#568).
+
 - Eventbrite reconciles every authenticated notification, including repeated bodies
   that accompany a later refund or cancellation. Notifications for an order still
   share one pending queue row, while each receipt gets its own identifier (#567).

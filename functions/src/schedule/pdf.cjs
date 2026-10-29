@@ -374,48 +374,93 @@ async function buildSchedulePdf({
 const { methodNotAllowed, notFound, sendError, internal } = require('../core/errors.cjs');
 const { requireAttendeeAccess } = require('../core/auth.cjs');
 
+// Public generation has one cache slot and one in-flight build per container.
+// The deployment keeps this handler alive between requests and caps instances.
+const PUBLIC_PDF_TTL_MS = 60 * 1000;
+const MAX_PUBLIC_SESSIONS = 1000;
+const MAX_PUBLIC_SPEAKERS = 2000;
+const PUBLIC_PDF_OPTIONS = Object.freeze({
+  maxInstances: 1,
+  concurrency: 20,
+  cpu: 1,
+  memory: '256MiB',
+  timeoutSeconds: 60,
+});
+
+/** Read only referenced speakers, with bounded parallelism and total reads. */
+async function publicSpeakerNames(db, sessions) {
+  const ids = [...new Set(sessions.flatMap((s) =>
+    Array.isArray(s.speakerIds) ? s.speakerIds : [],
+  ).filter((id) => typeof id === 'string' && id.length > 0 && !id.includes('/')))];
+  if (ids.length > MAX_PUBLIC_SPEAKERS) throw new Error('Public PDF speaker budget exceeded.');
+  const names = Object.create(null);
+  for (let offset = 0; offset < ids.length; offset += 50) {
+    const docs = await Promise.all(ids.slice(offset, offset + 50).map((id) =>
+      db.collection('speakers').doc(id).get(),
+    ));
+    for (const doc of docs) {
+      const name = doc.exists ? deriveApprovedSpeakerName(doc.data()) : '';
+      if (name) names[doc.id] = name;
+    }
+  }
+  return names;
+}
+
 /**
+ * Public artifact cache, independent of request headers/query parameters.
+ * Config changes invalidate the single slot; schedule/speaker edits appear
+ * within one minute of the next request. Failed builds also consume the
+ * refresh budget, so an outage cannot turn every GET into a database scan.
+ *
  * @param {{ db: FirebaseFirestore.Firestore, getConfig: () => Promise<object>,
- *           log?: Pick<Console, 'error'> }} deps
+ *           now?: () => number, log?: Pick<Console, 'error'> }} deps
  */
-function createBuildSchedulePdfHandler({ db, getConfig, log = console }) {
+function createBuildSchedulePdfHandler({ db, getConfig, now = Date.now, log = console }) {
+  let cached = null;
+  let inFlight = null;
+  let retryAt = 0;
+
   return async function handler(req, res) {
+    res.set('Cache-Control', 'no-store');
     if (req.method !== 'GET') return methodNotAllowed(res, ['GET']);
 
-    const config = await getConfig();
-    if (config?.features?.schedulePdf !== true) {
-      return notFound(res, 'The schedule PDF is not enabled for this event.');
-    }
-
     try {
-      const [sessionsSnap, speakersSnap] = await Promise.all([
-        db.collection('cmsSchedule').where('visible', '==', true).get(),
-        // Best-effort: no speaker directory is populated in every
-        // deployment yet (the speaker tranche, PR #74, is a parallel branch
-        // not yet merged here) — an empty or missing collection just means
-        // no speaker line is printed. deriveApprovedSpeakerName further
-        // requires status === 'approved', so an invited-but-not-yet-approved
-        // speaker record is silently skipped the same way.
-        db.collection('speakers').get().catch(() => ({ docs: [] })),
-      ]);
-      const sessions = sessionsSnap.docs.map((d) => d.data());
-      const speakerNamesById = {};
-      for (const d of speakersSnap.docs) {
-        const name = deriveApprovedSpeakerName(d.data());
-        if (name) speakerNamesById[d.id] = name;
+      const config = await getConfig();
+      if (config?.features?.schedulePdf !== true) {
+        return notFound(res, 'The schedule PDF is not enabled for this event.');
+      }
+      const key = JSON.stringify([config.event, config.theme]);
+      let artifact = cached?.key === key && now() < cached.expiresAt ? cached : null;
+      if (!artifact) {
+        if ((inFlight && inFlight.key !== key) || (!inFlight && now() < retryAt)) {
+          res.set('Retry-After', String(Math.max(1, Math.ceil((retryAt - now()) / 1000))));
+          return sendError(res, 429, 'resource-exhausted', 'The schedule PDF is refreshing. Try again shortly.');
+        }
+        if (!inFlight) {
+          retryAt = now() + PUBLIC_PDF_TTL_MS;
+          const promise = (async () => {
+            const snap = await db.collection('cmsSchedule').where('visible', '==', true)
+              .limit(MAX_PUBLIC_SESSIONS + 1).get();
+            if (snap.docs.length > MAX_PUBLIC_SESSIONS) throw new Error('Public PDF session budget exceeded.');
+            const sessions = snap.docs.map((doc) => doc.data());
+            const speakerNamesById = await publicSpeakerNames(db, sessions);
+            const bytes = await buildSchedulePdf({
+              event: config.event, theme: config.theme, sessions, speakerNamesById,
+            });
+            cached = { key, bytes: Buffer.from(bytes), expiresAt: now() + PUBLIC_PDF_TTL_MS };
+            return cached;
+          })().finally(() => { inFlight = null; });
+          inFlight = { key, promise };
+        }
+        artifact = await inFlight.promise;
       }
 
-      const bytes = await buildSchedulePdf({
-        event: config.event,
-        theme: config.theme,
-        sessions,
-        speakerNamesById,
-      });
-
       res.status(200);
+      const seconds = Math.max(0, Math.floor((artifact.expiresAt - now()) / 1000));
+      res.set('Cache-Control', `public, max-age=0, s-maxage=${seconds}, must-revalidate`);
       res.set('Content-Type', 'application/pdf');
       res.set('Content-Disposition', 'inline; filename="schedule.pdf"');
-      res.send(Buffer.from(bytes));
+      res.send(artifact.bytes);
     } catch (err) {
       log.error('buildSchedulePdf failed', err);
       internal(res, 'The schedule PDF could not be generated.');
@@ -518,9 +563,11 @@ function buildHandlers() {
     await handler(req, res);
   };
 
+  let publicHandler;
   return {
-    buildSchedulePdf: onRequest({ region }, withCors(async (req, res) => {
-      await createBuildSchedulePdfHandler(buildDeps())(req, res);
+    buildSchedulePdf: onRequest({ region, ...PUBLIC_PDF_OPTIONS }, withCors(async (req, res) => {
+      publicHandler ||= createBuildSchedulePdfHandler(buildDeps());
+      await publicHandler(req, res);
     }, ['GET'])),
     buildMySchedulePdf: onRequest({ region }, withCors(async (req, res) => {
       await createBuildMySchedulePdfHandler(buildDeps())(req, res);
@@ -536,6 +583,10 @@ module.exports = {
     return buildHandlers();
   },
   internals: {
+    PUBLIC_PDF_TTL_MS,
+    MAX_PUBLIC_SESSIONS,
+    MAX_PUBLIC_SPEAKERS,
+    PUBLIC_PDF_OPTIONS,
     DEFAULT_COLORS,
     hexToRgb01,
     resolveThemeColors,
