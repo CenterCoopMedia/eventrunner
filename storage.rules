@@ -2,15 +2,9 @@ rules_version = '2';
 
 // v1 Storage rules per docs/adr/0001-event-platform-v1.md §8.5.
 //
-// The shape of the boundary: exactly one namespace accepts a client write —
-// `profile-photos/{uid}/**`, and only from its owner, only an image, only
-// under 2 MiB. Every other admin- or speaker-authored upload path is
-// server-authorized: the client posts to `mediaUpload`
-// (functions/src/media/upload.cjs), which verifies the caller's ID token
-// against config/bootstrap.adminEmails and writes the object through the
-// Admin SDK — which bypasses these rules by design. The role check is a
-// verified token on the server, never a React conditional (§8.5).
-//
+// Profile photos are decoded and re-encoded by profilePhotoUpload before
+// publication. All uploads are server-authorized; clients may only delete
+// their own profile photos. Legacy unvalidated photos fail closed.
 // Reads are split into `get` and `list`, and only `get` is granted. Public
 // rendering needs exactly one thing — fetch THIS object by its known path —
 // and the site knows those paths from Firestore. `list` is the enumeration
@@ -46,48 +40,19 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // A matching uid is not a live account. The delete sweep removes
-    // users/{uid}. A still-valid ID token must not upload a new photo
-    // afterwards (issue #349). An operator grants
+    // The delete sweep removes users/{uid}. Public reads and owner deletes
+    // both require that account to exist. An operator grants
     // roles/firebaserules.firestoreServiceAgent to the Cloud Storage for
     // Firebase service agent once per project. The deploy does not.
     function accountExists(userId) {
       return firestore.exists(/databases/(default)/documents/users/$(userId));
     }
 
-    // Image types the product accepts everywhere a client may upload.
-    // SVG is NOT on the list on purpose: an SVG served from the bucket is a
-    // script-execution surface, and a user-supplied one would be stored XSS.
-    // The seeded branding placeholders are SVG, but those arrive through the
-    // Admin SDK (scripts/lib/branding.cjs), never through this rule.
-    function isAllowedImage() {
-      return request.resource != null
-        && request.resource.contentType is string
-        && request.resource.contentType.matches('image/(png|jpeg|webp)');
-    }
-
-    function underSizeLimit(maxBytes) {
-      return request.resource != null && request.resource.size < maxBytes;
-    }
-
-    // --- attendee-owned uploads --------------------------------------------
-    // The ONLY client-writable namespace. Owner-bound by uid path segment:
-    // `request.auth.uid == userId` is what keeps one signed-in attendee from
-    // overwriting another's photo (§8.5). Public read because the photo is
-    // rendered on `users_public` profile cards, which are anonymously
-    // readable when the owner chose `profileVisibility: 'public'`.
-    //
-    // Delete is stated separately from write: on a delete `request.resource`
-    // is null, so the size/content-type predicate that guards writes would
-    // evaluate false and lock an owner out of removing their own photo. The
-    // grant is the same principal and the same object either way.
+    // Profile originals are never stored. Only the authenticated upload
+    // endpoint may create validated, bounded WebP objects.
     match /profile-photos/{userId}/{allPaths=**} {
-      allow get: if true;
-      allow list: if false;
-      allow write: if isOwner(userId)
-        && accountExists(userId)
-        && underSizeLimit(2 * 1024 * 1024)
-        && isAllowedImage();
+      allow get: if resource.metadata.profilePhotoValidated == 'v1' && accountExists(userId);
+      allow list, create, update: if false;
       allow delete: if isOwner(userId) && accountExists(userId);
     }
 

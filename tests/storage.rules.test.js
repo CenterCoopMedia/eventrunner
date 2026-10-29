@@ -1,9 +1,8 @@
 // Storage rules tests, run against the emulator via `npm run test:rules`.
 // Pins the v1 rules from docs/adr/0001-event-platform-v1.md §8.5:
 //
-//   • `profile-photos/{uid}/**` is the ONLY client-writable namespace, and
-//     only for its owner, only while users/{uid} exists, only for an image,
-//     only under 2 MiB;
+//   • `profile-photos/{uid}/**` allows reads of server-validated output and
+//     owner deletes while users/{uid} exists; all client uploads are denied;
 //   • `cms-images/`, `branding/`, and `speaker-photos/` are fetchable but
 //     never writable by a client — their writers are admin-gated functions
 //     using the Admin SDK, which bypasses these rules;
@@ -26,14 +25,11 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, setDoc } from "firebase/firestore";
+import { deleteDoc, doc, setDoc } from "firebase/firestore";
 import { deleteObject, getBytes, listAll, ref, uploadBytes } from "firebase/storage";
 
 const OWNER = "attendee-1";
 const OTHER = "attendee-2";
-
-/** A 2 MiB budget with a little headroom either side of the rule's limit. */
-const TWO_MIB = 2 * 1024 * 1024;
 
 /** The server's inclusive cap for one session material. */
 const NINE_MIB = 9 * 1024 * 1024;
@@ -80,7 +76,7 @@ beforeAll(async () => {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const storage = context.storage();
     for (const path of SEEDED) {
-      await uploadBytes(ref(storage, path), bytes(), { contentType: "image/png" });
+      await uploadBytes(ref(storage, path), bytes(), { contentType: "image/png", customMetadata: { profilePhotoValidated: "v1" } });
     }
     await setDoc(doc(context.firestore(), "users", OWNER), { registrationStatus: "approved" });
   });
@@ -90,82 +86,47 @@ afterAll(async () => {
   await testEnv?.cleanup();
 });
 
-describe("profile-photos/{uid} — the one client-writable namespace", () => {
-  it("lets the owner write their own photo", async () => {
-    await assertSucceeds(put(asUser(OWNER), `profile-photos/${OWNER}/avatar.png`));
+describe("profile photos — trusted output only", () => {
+  it("denies owner writes, including a forged validation stamp", async () => {
+    await assertFails(put(asUser(OWNER), `profile-photos/${OWNER}/new.png`));
+    await assertFails(uploadBytes(ref(asUser(OWNER), `profile-photos/${OWNER}/avatar.png`), bytes(), {
+      contentType: "image/webp", customMetadata: { profilePhotoValidated: "v1" },
+    }));
   });
-
-  it("lets the owner write into a nested path under their own prefix", async () => {
-    await assertSucceeds(put(asUser(OWNER), `profile-photos/${OWNER}/thumbs/small.png`));
-  });
-
-  it("denies writing another user's photo — the hole §8.5 names", async () => {
+  it("denies writing another user's photo", async () => {
     await assertFails(put(asUser(OTHER), `profile-photos/${OWNER}/avatar.png`));
   });
-
   it("denies an unauthenticated write", async () => {
     await assertFails(put(anon(), `profile-photos/${OWNER}/avatar.png`));
   });
-
-  it("denies a photo at or over the 2 MiB cap", async () => {
-    await assertFails(
-      put(asUser(OWNER), `profile-photos/${OWNER}/huge.png`, { size: TWO_MIB }),
-    );
-  });
-
-  it("allows a photo just under the 2 MiB cap", async () => {
-    await assertSucceeds(
-      put(asUser(OWNER), `profile-photos/${OWNER}/big.png`, { size: TWO_MIB - 1024 }),
-    );
-  });
-
-  it("allows jpeg and webp", async () => {
-    await assertSucceeds(
-      put(asUser(OWNER), `profile-photos/${OWNER}/a.jpg`, { contentType: "image/jpeg" }),
-    );
-    await assertSucceeds(
-      put(asUser(OWNER), `profile-photos/${OWNER}/a.webp`, { contentType: "image/webp" }),
-    );
-  });
-
-  it("denies a non-image content type", async () => {
-    await assertFails(
-      put(asUser(OWNER), `profile-photos/${OWNER}/a.pdf`, { contentType: "application/pdf" }),
-    );
-  });
-
-  it("denies image/svg+xml — a stored SVG is a script-execution surface", async () => {
-    await assertFails(
-      put(asUser(OWNER), `profile-photos/${OWNER}/a.svg`, { contentType: "image/svg+xml" }),
-    );
-  });
-
-  it("denies a content type that merely contains an allowed one", async () => {
-    // matches() is a full-string match; this pins that it stays one.
-    await assertFails(
-      put(asUser(OWNER), `profile-photos/${OWNER}/a.png`, {
-        contentType: "application/image/png",
-      }),
-    );
-  });
-
-  it("is publicly readable", async () => {
+  it("reads validated output anonymously", async () => {
     await assertSucceeds(getBytes(ref(anon(), `profile-photos/${OWNER}/avatar.png`)));
   });
-
-  it("lets the owner delete their own photo", async () => {
+  it("refuses a validated object written after account removal", async () => {
+    const gone = "deleted-late";
+    const path = `profile-photos/${gone}/late/photo.webp`;
     await testEnv.withSecurityRulesDisabled(async (context) => {
-      await uploadBytes(ref(context.storage(), `profile-photos/${OWNER}/gone.png`), bytes(), {
-        contentType: "image/png",
+      const account = doc(context.firestore(), "users", gone);
+      await setDoc(account, { registrationStatus: "approved" });
+      await deleteDoc(account);
+      await uploadBytes(ref(context.storage(), path), bytes(), {
+        contentType: "image/webp", customMetadata: { profilePhotoValidated: "v1" },
       });
     });
-    await assertSucceeds(deleteObject(ref(asUser(OWNER), `profile-photos/${OWNER}/gone.png`)));
+    await assertFails(getBytes(ref(anon(), path)));
+    await assertFails(deleteObject(ref(asUser(gone), path)));
   });
-
-  it("denies deleting another user's photo", async () => {
+  it("refuses unvalidated originals but permits owner cleanup", async () => {
+    const path = `profile-photos/${OWNER}/legacy.png`;
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await uploadBytes(ref(context.storage(), path), bytes(), { contentType: "image/png" });
+    });
+    await assertFails(getBytes(ref(anon(), path)));
+    await assertSucceeds(deleteObject(ref(asUser(OWNER), path)));
+  });
+  it("denies another owner's delete", async () => {
     await assertFails(deleteObject(ref(asUser(OTHER), `profile-photos/${OWNER}/avatar.png`)));
   });
-
   it("denies a matching uid whose account document is gone", async () => {
     const gone = "deleted-1";
     await testEnv.withSecurityRulesDisabled(async (context) => {

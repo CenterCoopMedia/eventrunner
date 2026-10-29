@@ -1,26 +1,20 @@
-// The attendee photo field: the one client-side upload in the product.
-//
-// Pinned here: a cropped photo stays local until the profile save releases
-// it. commit() uploads to the owner's own prefix through the Storage SDK
-// (not the admin endpoints) and reports the PATH upward. A second commit
-// reuses that object. The field deletes a staged object only when the save
-// did not keep it. It refuses a file storage.rules would refuse before
-// spending the upload — including one of EXACTLY the cap, since the rule
-// is a strict `<`.
+// A cropped photo stays local until the profile save commits it through the
+// authenticated upload endpoint. A second commit reuses the returned path;
+// rollback deletes the staged object. The client rejects invalid files early.
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { chooseAndApplyCrop, installPhotoCropStubs, uninstallPhotoCropStubs } from '../../test/photoCropStubs.js';
 import { BRAND_UTILITY_PREFIX } from '../../test/retiredUtilityNames.js';
+import { auth } from '../../firebase.js';
 
-const uploadBytes = vi.fn(async () => ({}));
+const uploadRequest = vi.fn();
 const deleteObject = vi.fn(async () => {});
 
 vi.mock('firebase/storage', () => ({
   getStorage: vi.fn(() => ({})),
   connectStorageEmulator: vi.fn(),
   ref: vi.fn((_storage, path) => ({ path })),
-  uploadBytes: (...args) => uploadBytes(...args),
   deleteObject: (...args) => deleteObject(...args),
   getDownloadURL: vi.fn(async ({ path }) => `https://example.test/${path}`),
 }));
@@ -28,12 +22,22 @@ vi.mock('firebase/storage', () => ({
 const { default: ProfilePhotoField } = await import('./ProfilePhotoField.jsx');
 
 beforeEach(() => {
-  uploadBytes.mockClear();
+  uploadRequest.mockReset();
+  uploadRequest.mockImplementation(async () => ({
+    ok: true,
+    json: async () => ({ path: `profile-photos/attendee-1/server-${uploadRequest.mock.calls.length}/photo.webp` }),
+  }));
+  vi.stubGlobal('fetch', uploadRequest);
+  vi.stubEnv('VITE_FUNCTIONS_ORIGIN', 'https://functions.example.test');
+  auth.currentUser = { uid: 'attendee-1', getIdToken: vi.fn(async () => 'test-id-token') };
   deleteObject.mockClear();
   installPhotoCropStubs();
 });
 
 afterEach(() => {
+  delete auth.currentUser;
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   uninstallPhotoCropStubs();
 });
 
@@ -103,31 +107,36 @@ describe('ProfilePhotoField', () => {
     await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
 
     expect(screen.getByAltText('Your new profile photo')).toBeInTheDocument();
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
     expect(ref.current.hasPending()).toBe(true);
 
     const first = await ref.current.commit();
-    expect(first).toMatch(/^profile-photos\/attendee-1\/[0-9a-f-]{36}\/photo\.png$/);
+    expect(first).toBe('profile-photos/attendee-1/server-1/photo.webp');
+    expect(uploadRequest).toHaveBeenCalledWith('https://functions.example.test/profilePhotoUpload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-id-token' },
+      body: JSON.stringify({ data: 'Y3JvcA==' }),
+    });
     expect(first).not.toBe('profile-photos/attendee-1/photo.png');
     expect(onChange).toHaveBeenCalledWith(first);
     expect(ref.current.hasPending()).toBe(true);
 
     const second = await ref.current.commit();
     expect(second).toBe(first);
-    expect(uploadBytes).toHaveBeenCalledTimes(1);
+    expect(uploadRequest).toHaveBeenCalledTimes(1);
 
     ref.current.release();
     expect(ref.current.hasPending()).toBe(false);
   });
 
-  it('refuses a type the rules refuse, without uploading', async () => {
+  it('refuses an unsupported type, without uploading', async () => {
     const onChange = vi.fn();
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={onChange} />);
     pick(new File(['x'], 'me.svg', { type: 'image/svg+xml' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/PNG, JPEG, WEBP/);
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -139,17 +148,17 @@ describe('ProfilePhotoField', () => {
     pick(big);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/limit is under 2\.0 MB/);
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
   });
 
-  it('refuses a file of exactly 2 MiB — the rule is a strict less-than', async () => {
+  it('refuses a file of exactly 2 MiB — the endpoint uses a strict less-than', async () => {
     render(<ProfilePhotoField uid="attendee-1" value="" onChange={vi.fn()} />);
     const exact = new File([''], 'exact.png', { type: 'image/png' });
     Object.defineProperty(exact, 'size', { value: 2 * 1024 * 1024 });
     pick(exact);
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
   });
 
   it('clears the path on remove but deletes nothing before the save', async () => {
@@ -169,7 +178,11 @@ describe('ProfilePhotoField', () => {
   });
 
   it('reports a failed upload rather than pretending it worked', async () => {
-    uploadBytes.mockRejectedValueOnce(new Error('permission denied'));
+    uploadRequest.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: async () => ({ error: { code: 'forbidden', message: 'permission denied' } }),
+    });
     const onChange = vi.fn();
     const ref = createRef();
     render(<ProfilePhotoField ref={ref} uid="attendee-1" value="" onChange={onChange} />);
@@ -190,11 +203,11 @@ describe('ProfilePhotoField', () => {
     expect(
       await screen.findByRole('application', { name: /position the crop/i }),
     ).toBeInTheDocument();
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(await screen.findByLabelText(/Upload a photo/)).toBeInTheDocument();
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -208,7 +221,7 @@ describe('ProfilePhotoField', () => {
     expect(onPendingChange).toHaveBeenLastCalledWith(false);
 
     await chooseAndApplyCrop(new File(['y'], 'me.png', { type: 'image/png' }), /your profile photo/);
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
     expect(onPendingChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -223,14 +236,14 @@ describe('ProfilePhotoField', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'None' }));
     expect(onChange).toHaveBeenCalledWith('');
     expect(ref.current.hasPending()).toBe(false);
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
 
     view.rerender(<ProfilePhotoField ref={ref} uid="attendee-1" value="" onChange={onChange} />);
     await chooseAndApplyCrop(new File(['y'], 'me.png', { type: 'image/png' }), /your profile photo/);
     fireEvent.click(screen.getByRole('radio', { name: 'Default avatar 01' }));
     expect(onChange).toHaveBeenCalledWith('default-avatars/avatar-01.svg');
     expect(ref.current.hasPending()).toBe(false);
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
   });
 
   it('retries the same staged object when its delete fails, and uploads again once it is gone', async () => {
@@ -242,14 +255,14 @@ describe('ProfilePhotoField', () => {
     deleteObject.mockRejectedValueOnce(Object.assign(new Error('network'), { code: 'storage/retry-limit-exceeded' }));
     await expect(ref.current.discard()).rejects.toThrow(/network/);
     expect(await ref.current.commit()).toBe(staged);
-    expect(uploadBytes).toHaveBeenCalledTimes(1);
+    expect(uploadRequest).toHaveBeenCalledTimes(1);
 
     deleteObject.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'storage/object-not-found' }));
     await ref.current.discard();
     expect(ref.current.hasPending()).toBe(true);
     const again = await ref.current.commit();
     expect(again).not.toBe(staged);
-    expect(uploadBytes).toHaveBeenCalledTimes(2);
+    expect(uploadRequest).toHaveBeenCalledTimes(2);
   });
 
   it('drops an unsaved crop without deleting a stored object', async () => {
@@ -264,20 +277,19 @@ describe('ProfilePhotoField', () => {
     await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
     fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
     expect(onChange).toHaveBeenCalledWith('');
-    expect(uploadBytes).not.toHaveBeenCalled();
+    expect(uploadRequest).not.toHaveBeenCalled();
     expect(deleteObject).not.toHaveBeenCalled();
   });
 
-  it('uploads when randomUUID is missing', async () => {
+  it('uses the server path when browser randomUUID is missing', async () => {
     const real = globalThis.crypto;
     vi.stubGlobal('crypto', { subtle: real.subtle, getRandomValues: real.getRandomValues?.bind(real) });
     try {
       const ref = createRef();
       render(<ProfilePhotoField ref={ref} uid="attendee-1" value="" onChange={vi.fn()} />);
       await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
-      await ref.current.commit();
-      const path = uploadBytes.mock.calls.at(-1)[0].path;
-      expect(path).toMatch(/^profile-photos\/attendee-1\/[A-Za-z0-9]+\/photo\.png$/);
+      const path = await ref.current.commit();
+      expect(path).toBe('profile-photos/attendee-1/server-1/photo.webp');
       expect(path).not.toBe('profile-photos/attendee-1/photo.png');
     } finally {
       vi.unstubAllGlobals();

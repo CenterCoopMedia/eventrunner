@@ -1,13 +1,5 @@
-// The attendee's own photo — the one upload in the product that does NOT go
-// through a function.
-//
-// `profile-photos/{uid}/**` is owner-bound in storage.rules (§8.5), so the
-// browser uploads straight to the bucket and the rules are the boundary: the
-// uid in the path must equal the uid on the token, the object must be a
-// png/jpeg/webp, and it must be under 2 MiB. Routing an attendee photo
-// through the admin-gated media endpoints would need an admin, which is
-// exactly backwards.
-//
+// Profile photos pass through authenticated server decoding and bounded
+// WebP re-encoding before publication. The chosen file stays local until Save.
 // The cropped file stays in the browser until the profile save succeeds.
 // `profile-photos` allows a public read, so an upload before save would
 // publish a photo the attendee has not kept (issues 363 and 372). The save
@@ -160,7 +152,7 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
     const problem = checkFile(file, {
       types: PROFILE_PHOTO_TYPES,
       maxBytes: PROFILE_PHOTO_MAX_BYTES,
-      // storage.rules refuses a file of EXACTLY the cap (`size < 2 MiB`).
+      // The upload endpoint refuses a file of exactly 2 MiB.
       exclusive: true,
     });
     if (problem) {

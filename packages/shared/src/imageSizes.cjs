@@ -19,8 +19,8 @@
  * fixed folder beside it, and no lookup is needed to find them.
  *
  * Out of scope on purpose: flat seeded branding (it ships in the site
- * bundle), SVG and GIF (vector or animated), profile-photos (a client
- * upload namespace), session-materials (closed to public reads), and
+ * bundle), SVG and GIF (vector or animated), profile-photos (already bounded
+ * to 512 pixels by its upload endpoint), session-materials (closed to public reads), and
  * exports.
  *
  * WHERE THE SIZES LIVE. `{folder}/_sizes/{generation}/{width}.webp`,

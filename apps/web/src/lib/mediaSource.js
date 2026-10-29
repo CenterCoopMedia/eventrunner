@@ -4,19 +4,16 @@
 //
 // Nothing here loads the Storage SDK. Everything below is string work and
 // file validation, which is all a page needs to SHOW media, so this module is
-// safe for Layout and every public route to import. The two calls that do
-// need the SDK — an attendee's own photo upload and delete — live in
+// safe for Layout and every public route to import. The one call that does
+// need the SDK — deleting an attendee's own photo — lives in
 // lib/photoUpload.js, which only the lazy /profile route imports
 // (docs/performance/public-bundle-budget.md).
 //
-// Two upload paths, because storage.rules grants exactly one of them to a
-// client (spec §8.5):
+// All uploads are server-authorized (spec §8.5):
 //
-//   • PROFILE PHOTOS go straight to the bucket. `profile-photos/{uid}/**` is
-//     owner-bound in the rules, so the browser can PUT there itself and the
-//     rules — not this file — are what stop one attendee overwriting
-//     another's photo. The checks below are courtesy: they turn a rules
-//     rejection into a sentence someone can act on, before a byte is sent.
+//   • PROFILE PHOTOS are posted to `profilePhotoUpload`, which verifies the
+//     attendee's token, decodes the image, and stores bounded WebP output.
+//     The checks below explain invalid files before a byte is sent.
 //   • EVERYTHING ELSE (cms-images, branding) is server-authorized: the file
 //     is base64-encoded and POSTed to `mediaUpload`, which verifies the
 //     admin token and writes through the Admin SDK. A client SDK upload to
@@ -35,16 +32,16 @@
 // public link regardless of what the rules say later — and every future
 // Admin-SDK writer would have to remember to mint one. Instead this module
 // builds the token-free media URL, which the Storage service serves subject
-// to the rules. `allow get: if true` on the public namespaces is what makes
-// it work for anonymous visitors, `session-materials/` stays closed, and a
-// thumbnail costs no metadata round trip.
+// to the rules. Public namespaces allow anonymous reads; profile photos also
+// require the server's validation stamp. `session-materials/` stays closed,
+// and a thumbnail costs no metadata round trip.
 import { imageSizePaths, readImageSizeManifest } from 'shared/imageSizes';
 import { isMediaLibraryPath, storageObjectPath } from 'shared/venue';
 import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
 import { bundledDemoAssetUrl } from './bundledAssets.js';
 
-/** Mirrors storage.rules for `profile-photos/{uid}/**` — keep in step. */
+/** Mirrors functions/src/media/profilePhoto.cjs input limits. */
 export const PROFILE_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
 export const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 
