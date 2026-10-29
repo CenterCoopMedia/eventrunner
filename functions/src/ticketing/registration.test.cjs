@@ -130,7 +130,7 @@ test('a self-service claim writes the ticket, claims it, and advances the accoun
 });
 
 test('autoApproveTicketHolders approves with approvalSource ticket, never admin (§3.4)', async () => {
-  const db = seededDb();
+  const db = seededDb({ 'config/features': { autoApproveTicketHolders: true } });
   const res = makeRes();
 
   await verifyHandler({
@@ -372,13 +372,21 @@ test('two concurrent claims on one ticket cannot both win', async () => {
 });
 
 test('a refund between the ticket claim and account update cannot grant admission', async () => {
-  const db = seededDb({ 'tickets/tkt-1': fakeTicket() });
+  const db = seededDb({
+    'config/features': { autoApproveTicketHolders: true },
+    'tickets/tkt-1': fakeTicket(),
+  });
+  // The claim commits first; refund before the separate account transaction.
+  const runTransaction = db.runTransaction.bind(db);
+  let calls = 0;
+  db.runTransaction = async (fn) => {
+    if (++calls === 2) {
+      await db.collection('tickets').doc('tkt-1').set({ status: 'refunded' }, { merge: true });
+    }
+    return runTransaction(fn);
+  };
   const result = await claimTicketsForUser({
     db, uid: 'uid-ada', email: 'attendee@example.com', externalIds: ['tkt-1'], now: () => T0,
-    getConfig: async () => {
-      await db.collection('tickets').doc('tkt-1').set({ status: 'refunded' }, { merge: true });
-      return { features: { autoApproveTicketHolders: true } };
-    },
   });
   assert.deepEqual(result.claimed, ['tkt-1']);
   assert.equal(result.registrationStatus, 'pending');
@@ -387,7 +395,10 @@ test('a refund between the ticket claim and account update cannot grant admissio
 });
 
 test('a refund concurrent with the account update forces a fresh valid-ticket check', async () => {
-  const db = seededDb({ 'tickets/tkt-1': { ...fakeTicket(), claimedByUid: 'uid-ada' } });
+  const db = seededDb({
+    'config/features': { autoApproveTicketHolders: true },
+    'tickets/tkt-1': { ...fakeTicket(), claimedByUid: 'uid-ada' },
+  });
   db.beforeCommit = async () => {
     await db.collection('tickets').doc('tkt-1').set({ status: 'refunded' }, { merge: true });
   };

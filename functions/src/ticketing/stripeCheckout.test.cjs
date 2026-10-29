@@ -50,6 +50,7 @@ function response() {
 
 function setup({ catalogPatch = {}, seed = {}, create } = {}) {
   const db = makeFakeDb({
+    'config/features': { autoApproveTicketHolders: true },
     'config/event': { name: 'Example event', historicalDemo: false },
     'ticket_catalog/current': catalog(catalogPatch),
     'users/uid-ada': { registrationStatus: 'pending', approvalSource: null },

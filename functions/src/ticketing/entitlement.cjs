@@ -83,7 +83,7 @@ function affectedUids(before, after) {
  *     hasAdminGrant  = users/{uid}.approvalSource == 'admin'
  *     entitled       = hasValidTicket || hasAdminGrant
  *
- * `entitled === false` is the ONLY thing that may move a `ticketed` or
+ * `entitled === false` is the only thing that may move a `ticketed` or
  * `approved` user to `revoked`, and every edge it writes is checked against
  * the shared transition table first, so this module can never invent a
  * transition the table does not have. Three consequences worth naming,
@@ -98,6 +98,9 @@ function affectedUids(before, after) {
  *   • Auto-approval writes `approvalSource: 'ticket'`, NEVER `'admin'`:
  *     only an explicit organizer decision may survive a refund.
  *
+ * Disabling automatic approval returns ticket-derived approvals to `ticketed`
+ * for staff review; it does not revoke the ticket or an explicit admin grant.
+ *
  * ONE deliberate departure from a literal reading, and it is a narrowing:
  * when the user is not entitled but still holds a `pending_info` ticket, the
  * account is HELD at its current state instead of being revoked.
@@ -110,22 +113,15 @@ function affectedUids(before, after) {
  * here waits for evidence (`refunded`/`cancelled`, or no claimed ticket at
  * all), never absence of it.
  *
- * @param {{ db: object, uid: string, getConfig?: () => Promise<object>,
+ * @param {{ db: object, uid: string,
  *           now?: () => Date }} deps
  * @returns {Promise<{ uid: string, action: 'updated'|'unchanged'|'held'|'missing',
  *                     registrationStatus: string|null, approvalSource: string|null }>}
  */
-async function recomputeEntitlement({ db, uid, getConfig, now = () => new Date() }) {
+async function recomputeEntitlement({ db, uid, now = () => new Date() }) {
   if (typeof uid !== 'string' || uid.length === 0) {
     return { uid: '', action: 'missing', registrationStatus: null, approvalSource: null };
   }
-
-  // Read the feature flag OUTSIDE the transaction, as the claim path does
-  // (registration.cjs applyTicketClaimToUser): `config/features` is a
-  // cached read, it does not fire this trigger, and it can only ever widen
-  // access — a stale read cannot revoke anybody.
-  const config = typeof getConfig === 'function' ? await getConfig() : null;
-  const autoApprove = config?.features?.autoApproveTicketHolders === true;
 
   const userRef = db.collection(USERS).doc(uid);
   const claimed = db.collection(TICKETS).where('claimedByUid', '==', uid);
@@ -144,6 +140,8 @@ async function recomputeEntitlement({ db, uid, getConfig, now = () => new Date()
     if (!userSnap.exists) {
       return { uid, action: 'missing', registrationStatus: null, approvalSource: null };
     }
+    const features = await tx.get(db.collection('config').doc('features'));
+    const autoApprove = features.data()?.autoApproveTicketHolders === true;
     const validSnap = await tx.get(validQuery);
     const data = userSnap.data() || {};
     const current = data.registrationStatus ?? null;
@@ -154,6 +152,14 @@ async function recomputeEntitlement({ db, uid, getConfig, now = () => new Date()
 
     let next = current;
     let nextSource = approvalSource;
+
+    // A ticket remains valid when automatic approval is disabled, but it no
+    // longer supplies staff approval. Explicit admin grants remain intact.
+    if (!autoApprove && approvalSource === 'ticket' &&
+        isValidTransition(current, 'ticketed', 'auto_approval_disabled')) {
+      next = 'ticketed';
+      nextSource = null;
+    }
 
     if (entitled) {
       // A claimed ticket is what makes a pending account `ticketed`; the
@@ -169,9 +175,11 @@ async function recomputeEntitlement({ db, uid, getConfig, now = () => new Date()
       const undecidedSnap = await tx.get(undecidedQuery);
       const hasUndecidedTicket = undecidedSnap.empty === true ? false : undecidedSnap.size > 0;
       if (hasUndecidedTicket) {
-        return { uid, action: 'held', registrationStatus: current, approvalSource };
+        if (next === current) {
+          return { uid, action: 'held', registrationStatus: current, approvalSource };
+        }
       }
-      if (isValidTransition(current, 'revoked', 'entitlement_lost')) {
+      if (!hasUndecidedTicket && isValidTransition(current, 'revoked', 'entitlement_lost')) {
         next = 'revoked';
         // The grant that is gone stops being recorded. `approvalSource` says
         // which source GRANTED access (§3.4); with no grant left there is
@@ -206,18 +214,18 @@ async function recomputeEntitlement({ db, uid, getConfig, now = () => new Date()
  * Failures are rethrown, not swallowed: a recomputation that did not happen
  * leaves an account's access wrong, and the retry is the recovery.
  *
- * @param {{ db: object, getConfig?: () => Promise<object>, now?: () => Date,
+ * @param {{ db: object, now?: () => Date,
  *           log?: { error: Function } }} deps
  * @returns {(change: { before?: object|null, after?: object|null }) =>
  *   Promise<{ recomputed: Array<object> }>}
  */
-function createOnTicketWritten({ db, getConfig, now = () => new Date(), log = console }) {
+function createOnTicketWritten({ db, now = () => new Date(), log = console }) {
   return async function onTicketWritten({ before = null, after = null } = {}) {
     const uids = affectedUids(before, after);
     const recomputed = [];
     for (const uid of uids) {
       try {
-        recomputed.push(await recomputeEntitlement({ db, uid, getConfig, now }));
+        recomputed.push(await recomputeEntitlement({ db, uid, now }));
       } catch (err) {
         // Name the account before rethrowing: the retry is automatic, but an
         // operator reading logs needs to know whose entitlement is stale.
@@ -229,12 +237,47 @@ function createOnTicketWritten({ db, getConfig, now = () => new Date(), log = co
   };
 }
 
-/** Deployable exports (spec §1.3 ticketing/): onTicketWritten. */
+/**
+ * Policy events are wake-ups only. Each account re-reads current policy and
+ * grants transactionally, so retries, delayed events, and admin decisions
+ * made during the sweep cannot overwrite newer authorization state.
+ */
+function createOnApprovalPolicyWritten({ db, now = () => new Date() }) {
+  return async function onApprovalPolicyWritten({ after = null } = {}) {
+    if (after?.autoApproveTicketHolders === true) return;
+    let cursor = null;
+    while (true) {
+      let query = db.collection(USERS).where('approvalSource', '==', 'ticket')
+        .orderBy('__name__').limit(100);
+      if (cursor !== null) query = query.startAfter(cursor);
+      const page = await query.get();
+      if (page.empty) return;
+      for (const account of page.docs) {
+        await recomputeEntitlement({ db, uid: account.id, now });
+      }
+      cursor = page.docs[page.docs.length - 1].id;
+    }
+  };
+}
+
+/** Deployable exports: ticket and approval-policy reconciliation triggers. */
 function buildHandlers() {
   const { onDocumentWritten } = require('firebase-functions/v2/firestore');
   const region = (process.env.EVENT_FIREBASE_REGION || '').trim() || 'us-central1';
 
   return {
+    onApprovalPolicyWritten: onDocumentWritten({
+      region,
+      retry: true,
+      timeoutSeconds: 540,
+      document: 'config/features',
+    }, async (event) => {
+      const { getDb } = require('../core/firestore.cjs');
+      const after = event.data?.after;
+      await createOnApprovalPolicyWritten({ db: getDb() })({
+        after: after?.exists ? after.data() : null,
+      });
+    }),
     onTicketWritten: onDocumentWritten({
       region,
       // Same crash-recovery model as the projection triggers: a dropped
@@ -244,13 +287,12 @@ function buildHandlers() {
       document: 'tickets/{externalId}',
     }, async (event) => {
       const { getDb } = require('../core/firestore.cjs');
-      const { getEventConfig } = require('../core/config.cjs');
       const db = getDb();
       const before = event.data?.before;
       const after = event.data?.after;
       // The snapshots are used ONLY to identify the affected accounts — the
       // handler re-reads every value it acts on.
-      await createOnTicketWritten({ db, getConfig: () => getEventConfig({ db }) })({
+      await createOnTicketWritten({ db })({
         before: before && before.exists ? before.data() : null,
         after: after && after.exists ? after.data() : null,
       });
@@ -261,6 +303,7 @@ function buildHandlers() {
 module.exports = {
   recomputeEntitlement,
   createOnTicketWritten,
+  createOnApprovalPolicyWritten,
   get handlers() {
     return buildHandlers();
   },

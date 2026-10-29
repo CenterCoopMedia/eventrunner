@@ -27,6 +27,7 @@ const TRANSITIONS = [
   { from: 'pending', to: 'ticketed', triggers: ['ticket_claimed'] },
   { from: 'ticketed', to: 'approved', triggers: ['admin_approval', 'auto_approve'] },
   { from: 'pending', to: 'approved', triggers: ['admin_approval'] },
+  { from: 'approved', to: 'ticketed', triggers: ['auto_approval_disabled'] },
   { from: 'approved', to: 'revoked', triggers: ['admin_revocation', 'entitlement_lost'] },
   { from: 'ticketed', to: 'revoked', triggers: ['admin_revocation', 'entitlement_lost'] },
   { from: 'revoked', to: 'approved', triggers: ['admin_reapproval'] },
@@ -41,7 +42,7 @@ const TRANSITIONS = [
  * @param {string} to - proposed status
  * @param {string} trigger - one of: 'account_created', 'ticket_claimed',
  *   'admin_approval', 'auto_approve', 'admin_revocation',
- *   'entitlement_lost', 'admin_reapproval'
+ *   'entitlement_lost', 'admin_reapproval', 'auto_approval_disabled'
  * @returns {boolean}
  */
 function isValidTransition(from, to, trigger) {
