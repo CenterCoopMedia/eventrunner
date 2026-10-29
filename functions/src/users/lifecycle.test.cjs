@@ -130,8 +130,12 @@ test('deleting the auth account deletes the account document', async () => {
   const result = await createOnUserDeleted({ db })({ uid: 'u1' });
   assert.equal(result.deleted, true);
   assert.equal(db.docs.has('users/u1'), false);
-  // The projection goes with it via syncUserPublic, which the delete fires.
-  assert.deepEqual(db.writes, [{ type: 'delete', path: 'users/u1' }]);
+  assert.equal(db.docs.has('users_public/u1'), false);
+  assert.deepEqual(db.writes, [
+    { type: 'delete', path: 'users/u1' },
+    { type: 'delete', path: 'users_public/u1' },
+    { type: 'delete', path: 'schedule_shares/u1' },
+  ]);
 });
 
 test('a deleted account with no document still has its projection and public schedule removed', async () => {
@@ -243,4 +247,37 @@ test('onUserCreated retries unavailable policy without writing and recovers afte
   assert.deepEqual(db.writes, []);
   db.docs.set('config/event', { historicalDemo: false });
   assert.deepEqual(await create({ uid: 'u1' }), { created: true });
+});
+
+test('Auth deletion retries public cleanup after the account document is gone', async () => {
+  const db = fakeDb({
+    'users/u1': { uid: 'u1' },
+    'users_public/u1': { displayName: 'Rae' },
+    'schedule_shares/u1': { scheduleVisibility: 'public' },
+  });
+  const collection = db.collection.bind(db);
+  let fail = true;
+  db.collection = (name) => {
+    const col = collection(name);
+    const doc = col.doc.bind(col);
+    col.doc = (uid) => {
+      const ref = doc(uid);
+      const remove = ref.delete.bind(ref);
+      ref.delete = async () => {
+        if (name === 'users_public' && fail) {
+          fail = false;
+          throw new Error('transient cleanup failure');
+        }
+        return remove();
+      };
+      return ref;
+    };
+    return col;
+  };
+  const remove = createOnUserDeleted({ db });
+  await assert.rejects(remove({ uid: 'u1' }), /transient cleanup failure/);
+  assert.equal(db.docs.has('users/u1'), false);
+  await remove({ uid: 'u1' });
+  assert.equal(db.docs.has('users_public/u1'), false);
+  assert.equal(db.docs.has('schedule_shares/u1'), false);
 });
