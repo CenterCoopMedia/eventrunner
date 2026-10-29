@@ -465,9 +465,9 @@
           </ul>
           <p>With these checks, the targeted plan contains only creates and retry upgrades with unchanged
           trigger identity. It cannot delete or recreate a Function. The targeted deploy can also accept other prompts for
-          the new handlers: their min-instances cost, an API they need, and a missing Artifact Registry
-          cleanup policy. A client deployment that already deploys without <code>--force</code> already has a cleanup
-          policy.</p>
+          the targeted creates and retry upgrades: their min-instances cost, an API they need, and a missing
+          Artifact Registry cleanup policy. A client deployment that already deploys without <code>--force</code>
+          already has a cleanup policy.</p>
           <p>Retry-enabled event handlers can retry failed executions for up to seven days, so they must remain
           idempotent. Review every new retry handler for idempotency before it merges.</p>
           <p><strong>Retry enabled on an existing Function.</strong> Case 2 accepts this automatically only when the

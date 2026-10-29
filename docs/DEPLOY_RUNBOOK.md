@@ -392,9 +392,9 @@ nothing, in these cases:
 
 With these checks, the targeted plan contains only creates and retry upgrades with unchanged
 trigger identity. It cannot delete or recreate a Function. The targeted deploy can also accept other prompts for
-the new handlers: their min-instances cost, an API they need, and a missing Artifact Registry
-cleanup policy. A client deployment that already deploys without `--force` already has a cleanup
-policy.
+the targeted creates and retry upgrades: their min-instances cost, an API they need, and a missing
+Artifact Registry cleanup policy. A client deployment that already deploys without `--force`
+already has a cleanup policy.
 
 Retry-enabled event handlers can retry failed executions for up to seven days, so they must remain
 idempotent. Review every new retry handler for idempotency before it merges.
