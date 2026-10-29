@@ -975,6 +975,7 @@
           <tr><td><code>pending</code></td><td><code>ticketed</code></td><td>a <code>tickets</code> doc is claimed by this uid (webhook match, sync match, or self-service claim)</td></tr>
           <tr><td><code>ticketed</code></td><td><code>approved</code></td><td>admin approval, <strong>or</strong> automatically when <code>config/features.autoApproveTicketHolders</code> is true</td></tr>
           <tr><td><code>pending</code></td><td><code>approved</code></td><td>admin approval (the only path when ticketing provider is <code>none</code>)</td></tr>
+          <tr><td><code>approved</code></td><td><code>ticketed</code></td><td>automatic approval disabled for a ticket-derived grant (<code>auto_approval_disabled</code>)</td></tr>
           <tr><td><code>approved</code> | <code>ticketed</code></td><td><code>revoked</code></td><td>admin revocation, or <strong>no valid claimed ticket remains</strong> (see below)</td></tr>
           <tr><td><code>revoked</code></td><td><code>approved</code></td><td>admin re-approval</td></tr>
           </tbody>
@@ -997,6 +998,12 @@
           <code>&#39;admin&#39;</code> for <code>approveUser</code>, <code>&#39;ticket&#39;</code> for the <code>autoApproveTicketHolders</code> path. An admin revocation
           is explicit and separate: it clears <code>approvalSource</code> and sets <code>revoked</code> directly, so it is never
           undone by a later ticket sync.</p>
+          <p>Ticket claim and entitlement grant transactions read <code>config/features</code> directly, so a policy
+          change forces a concurrent grant to retry. When automatic approval is disabled, the retrying
+          <code>onApprovalPolicyWritten</code> trigger reconciles ticket-derived approvals using current policy for
+          each account. Valid tickets remain valid; explicit admin approvals and terminal revocations
+          are preserved. Deploy this trigger with the grant changes. If automatic approval is already
+          disabled at deployment, save <code>config/features</code> once afterward to reconcile existing grants.</p>
           <p><code>hasAttendeeAccess(profile, config)</code> returns true for <code>approved</code>, for <code>profile.speakerId != null</code>,
           and for admins. That predicate — not a status-string list — gates bookmarking, directory listing,
           materials access, and the personal schedule. Legacy <code>registered</code> / <code>confirmed</code> / <code>ticket_only</code>

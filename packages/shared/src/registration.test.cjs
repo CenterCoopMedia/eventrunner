@@ -21,6 +21,7 @@ test('every allowed transition in the spec table', () => {
     ['pending', 'ticketed', 'ticket_claimed'],
     ['ticketed', 'approved', 'admin_approval'],
     ['ticketed', 'approved', 'auto_approve'],
+    ['approved', 'ticketed', 'auto_approval_disabled'],
     ['pending', 'approved', 'admin_approval'],
     ['approved', 'revoked', 'admin_revocation'],
     ['approved', 'revoked', 'entitlement_lost'],

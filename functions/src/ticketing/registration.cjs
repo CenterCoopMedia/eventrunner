@@ -46,13 +46,11 @@ const MAX_ORDER_NUMBER_LEN = 128;
  * Every edge is checked against the shared transition table so the server
  * and the frontend cannot disagree about what the state machine allows.
  *
- * @param {{ db: object, uid: string, getConfig?: () => Promise<object>,
+ * @param {{ db: object, uid: string,
  *           now?: () => Date }} deps
  * @returns {Promise<{ registrationStatus: string|null, changed: boolean }>}
  */
-async function applyTicketClaimToUser({ db, uid, getConfig, now = () => new Date() }) {
-  const config = typeof getConfig === 'function' ? await getConfig() : null;
-  const autoApprove = config?.features?.autoApproveTicketHolders === true;
+async function applyTicketClaimToUser({ db, uid, now = () => new Date() }) {
   const ref = db.collection(USERS).doc(uid);
 
   return db.runTransaction(async (tx) => {
@@ -66,6 +64,10 @@ async function applyTicketClaimToUser({ db, uid, getConfig, now = () => new Date
     const validTickets = await tx.get(db.collection(TICKETS)
       .where('claimedByUid', '==', uid).where('status', '==', 'valid').limit(1));
     if (validTickets.empty) return { registrationStatus: current, changed: false };
+
+    // Authorization policy belongs in the transaction read set, never the TTL cache.
+    const features = await tx.get(db.collection('config').doc('features'));
+    const autoApprove = features.data()?.autoApproveTicketHolders === true;
 
     let next = current;
     const patch = { updatedAt: now() };

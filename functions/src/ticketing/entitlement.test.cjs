@@ -32,8 +32,11 @@ function ticket(overrides = {}) {
   };
 }
 
-const recompute = (db, getConfig = autoApproveOff, uid = 'uid-ada') =>
-  recomputeEntitlement({ db, uid, getConfig, now: () => T0 });
+const recompute = async (db, getConfig = autoApproveOff, uid = 'uid-ada') => {
+  // Policy is persisted, just as the admin settings save persists it.
+  await db.collection('config').doc('features').set((await getConfig()).features);
+  return recomputeEntitlement({ db, uid, now: () => T0 });
+};
 
 // ---------------------------------------------------------------------------
 // The §3.4 recomputation matrix.
@@ -232,7 +235,10 @@ test('a claim that moves recomputes BOTH accounts', async () => {
 });
 
 test('a replayed delivery is a no-op — the second run writes nothing', async () => {
-  const db = makeFakeDb({ 'users/uid-ada': user(), 'tickets/tkt-1': ticket() });
+  const db = makeFakeDb({
+    'config/features': { autoApproveTicketHolders: true },
+    'users/uid-ada': user(), 'tickets/tkt-1': ticket(),
+  });
   const trigger = createOnTicketWritten({ db, getConfig: autoApproveOn, now: () => T0, log: QUIET });
   const event = { before: null, after: { claimedByUid: 'uid-ada' } };
 

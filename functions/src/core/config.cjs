@@ -50,6 +50,8 @@ let cache = null; // { loadedAt, value }
 
 /**
  * Load the Tier B config docs, cached per container.
+ * Authorization grants must read their policy documents in their own
+ * transaction; this display/config cache is not an authorization source.
  *
  * @param {{ db: FirebaseFirestore.Firestore, env?: Record<string, string|undefined>,
  *           now?: () => number, forceRefresh?: boolean }} deps
