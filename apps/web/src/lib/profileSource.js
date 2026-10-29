@@ -28,7 +28,7 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { SELF_EDITABLE_PROFILE_FIELDS } from 'shared/profile';
+import { SELF_EDITABLE_PROFILE_FIELDS, validateProfileBounds } from 'shared/profile';
 import { db } from '../firebase.js';
 import { subscribeWithRetry } from './retrySubscription.js';
 import { IS_DEMO } from './demoMode.js';
@@ -89,6 +89,7 @@ export function saveOwnProfile(uid, fields) {
       payload[key] = fields[key];
     }
   }
+  validateProfileBounds(payload);
   payload.updatedAt = serverTimestamp();
   return updateDoc(doc(db, USERS, uid), payload);
 }

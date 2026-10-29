@@ -118,6 +118,14 @@
           <h2 id="unreleased">[Unreleased]<a class="heading-anchor" href="#unreleased" aria-label="Link to this section">#</a></h2>
           <h3 id="security">Security<a class="heading-anchor" href="#security" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Attendee profiles now enforce text, photo-path, and social-handle size limits
+          before saving or publishing directory entries (#569). Public projections also
+          bound older or server-written data. Oversized account fields must be shortened
+          before further edits; existing public projections need the trusted refresh only
+          if an operator finds entries above these limits. Unchanged legacy social maps
+          still permit edits and privacy withdrawal; new or modified maps must meet every
+          bound. Text validation runs before photo upload, preserving the local crop when
+          an oversized field needs correction.</li>
           <li>Profile photo uploads now have per-account limits: Four reserved or retained
           objects below 2 MiB each and ten upload attempts in each fixed one-hour window,
           anchored at its first attempt (#572). Later upload requests reclaim expired,

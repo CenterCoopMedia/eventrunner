@@ -188,3 +188,34 @@ test('isProfileComplete needs a display name and a valid visibility', () => {
   assert.equal(isProfileComplete(user({ profileVisibility: null })), false);
   assert.equal(isProfileComplete(null), false);
 });
+
+const { PROFILE_TEXT_LIMITS, validateProfileBounds } = require('./profile.cjs');
+
+test('profile text accepts the boundary and rejects overflow before a write', () => {
+  for (const [field, max] of Object.entries(PROFILE_TEXT_LIMITS)) {
+    assert.doesNotThrow(() => validateProfileBounds({ [field]: 'a'.repeat(max) }));
+    assert.throws(() => validateProfileBounds({ [field]: 'a'.repeat(max + 1) }));
+    const pub = buildPublicProfile(user({ [field]: 'a'.repeat(900000) }), BADGES_CONFIG);
+    assert.equal(pub[field].length, max);
+  }
+});
+
+test('social handles bound every key and value as well as the count', () => {
+  const handles = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`site-${i}`, 'x'.repeat(512)]));
+  assert.doesNotThrow(() => validateProfileBounds({ socialHandles: handles }));
+  for (const invalid of [
+    { ...handles, extra: 'x' }, { ['k'.repeat(65)]: 'x' },
+    { site: 'x'.repeat(513) }, { site: { url: 'x' } }, { '': 'x' },
+  ]) assert.throws(() => validateProfileBounds({ socialHandles: invalid }));
+  const pub = buildPublicProfile(user({ socialHandles: {
+    ...handles, extra: 'x', ['k'.repeat(65)]: 'x', huge: 'x'.repeat(900000),
+  } }), BADGES_CONFIG);
+  assert.deepEqual(pub.socialHandles, handles);
+  assert.ok(Buffer.byteLength(JSON.stringify(pub)) < 8000);
+});
+
+test('oversized photo paths are rejected and never projected', () => {
+  const photoPath = `profile-photos/u1/${'a'.repeat(512)}`;
+  assert.throws(() => validateProfileBounds({ photoPath }));
+  assert.equal(buildPublicProfile(user({ uid: 'u1', photoPath }), BADGES_CONFIG).photoPath, null);
+});

@@ -60,6 +60,13 @@ describe('subscribeOwnProfile', () => {
 });
 
 describe('saveOwnProfile', () => {
+  it('rejects oversized fields without issuing a Firestore write', () => {
+    for (const fields of [{ bio: 'a'.repeat(2001) }, { socialHandles: { site: 'a'.repeat(513) } }]) {
+      expect(() => saveOwnProfile('u1', fields)).toThrow();
+    }
+    expect(updateDocMock).not.toHaveBeenCalled();
+  });
+
   it('sends only the self-editable fields', async () => {
     await saveOwnProfile('u1', {
       displayName: 'Rae',

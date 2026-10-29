@@ -24,7 +24,7 @@
 // could reach (expansion record §3.3).
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { PROFILE_VISIBILITIES } from 'shared/profile';
+import { PROFILE_VISIBILITIES, PROFILE_TEXT_LIMITS, validateProfileBounds } from 'shared/profile';
 import {
   MAX_CUSTOM_BADGE_LENGTH,
   MAX_CUSTOM_BADGES,
@@ -268,6 +268,14 @@ export default function Profile() {
     setSaving(true);
     let uploadedPath = null;
     try {
+      const profileText = {
+        displayName: form.displayName.trim(),
+        pronouns: form.pronouns.trim(),
+        jobTitle: form.jobTitle.trim(),
+        organization: form.organization.trim(),
+        bio: form.bio.trim(),
+      };
+      validateProfileBounds(profileText);
       let photoPath = form.photoPath ? form.photoPath : null;
       if (photoRef.current?.hasPending()) {
         try {
@@ -279,11 +287,7 @@ export default function Profile() {
         photoPath = uploadedPath;
       }
       await saveProfile({
-        displayName: form.displayName.trim(),
-        pronouns: form.pronouns.trim(),
-        jobTitle: form.jobTitle.trim(),
-        organization: form.organization.trim(),
-        bio: form.bio.trim(),
+        ...profileText,
         profileVisibility: form.profileVisibility,
         badges: form.badges,
         ...(features.customBadges === true && customBadgesChanged ? { customBadges } : {}),
@@ -348,6 +352,7 @@ export default function Profile() {
           </label>
           <input
             id="displayName"
+            maxLength={PROFILE_TEXT_LIMITS.displayName}
             ref={nameRef}
             className={`mt-2xs ${inputClass}`}
             value={form.displayName}
@@ -370,6 +375,7 @@ export default function Profile() {
             </label>
             <input
               id="pronouns"
+              maxLength={PROFILE_TEXT_LIMITS.pronouns}
               className={`mt-2xs ${inputClass}`}
               value={form.pronouns}
               onChange={(e) => setField('pronouns', e.target.value)}
@@ -381,6 +387,7 @@ export default function Profile() {
             </label>
             <input
               id="jobTitle"
+              maxLength={PROFILE_TEXT_LIMITS.jobTitle}
               className={`mt-2xs ${inputClass}`}
               value={form.jobTitle}
               onChange={(e) => setField('jobTitle', e.target.value)}
@@ -395,6 +402,7 @@ export default function Profile() {
           </label>
           <input
             id="organization"
+            maxLength={PROFILE_TEXT_LIMITS.organization}
             className={`mt-2xs ${inputClass}`}
             value={form.organization}
             onChange={(e) => setField('organization', e.target.value)}
@@ -408,6 +416,7 @@ export default function Profile() {
           </label>
           <textarea
             id="bio"
+            maxLength={PROFILE_TEXT_LIMITS.bio}
             rows={4}
             className={`mt-2xs ${inputClass}`}
             value={form.bio}
