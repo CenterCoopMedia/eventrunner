@@ -636,6 +636,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Firebase Hosting pages deny iframe embedding to protect admin actions from
+  clickjacking, including entry through `/index.html` and later navigation to admin
+  routes. The framing policy also applies to public pages (#561).
+
 - The event hero no longer puts its title, intro or buttons on the photograph. From 640px
   up, the copy has its own column and the photograph fills the rest, in every site style.
   The column is at least 22rem or half the hero, so a style that asks for a wide
