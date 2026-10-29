@@ -894,6 +894,7 @@ server gate cannot diverge (today `canBookmarkSessions()` in `UserProfileContext
 | `pending` | `ticketed` | a `tickets` doc is claimed by this uid (webhook match, sync match, or self-service claim) |
 | `ticketed` | `approved` | admin approval, **or** automatically when `config/features.autoApproveTicketHolders` is true |
 | `pending` | `approved` | admin approval (the only path when ticketing provider is `none`) |
+| `approved` | `ticketed` | automatic approval disabled for a ticket-derived grant (`auto_approval_disabled`) |
 | `approved` \| `ticketed` | `revoked` | admin revocation, or **no valid claimed ticket remains** (see below) |
 | `revoked` | `approved` | admin re-approval |
 
@@ -917,6 +918,13 @@ elsewhere in the order must not silently reverse it. `users/{uid}.approvalSource
 `'admin'` for `approveUser`, `'ticket'` for the `autoApproveTicketHolders` path. An admin revocation
 is explicit and separate: it clears `approvalSource` and sets `revoked` directly, so it is never
 undone by a later ticket sync.
+
+Ticket claim and entitlement grant transactions read `config/features` directly, so a policy
+change forces a concurrent grant to retry. When automatic approval is disabled, the retrying
+`onApprovalPolicyWritten` trigger reconciles ticket-derived approvals using current policy for
+each account. Valid tickets remain valid; explicit admin approvals and terminal revocations
+are preserved. Deploy this trigger with the grant changes. If automatic approval is already
+disabled at deployment, save `config/features` once afterward to reconcile existing grants.
 
 `hasAttendeeAccess(profile, config)` returns true for `approved`, for `profile.speakerId != null`,
 and for admins. That predicate — not a status-string list — gates bookmarking, directory listing,
