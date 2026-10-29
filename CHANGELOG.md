@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Attendee profiles now enforce text, photo-path, and social-handle size limits
+  before saving or publishing directory entries (#569). Public projections also
+  bound older or server-written data. Oversized account fields must be shortened
+  before further edits; existing public projections need the trusted refresh only
+  if an operator finds entries above these limits. Unchanged legacy social maps
+  still permit edits and privacy withdrawal; new or modified maps must meet every
+  bound. Text validation runs before photo upload, preserving the local crop when
+  an oversized field needs correction.
 - Profile photo uploads now have per-account limits: Four reserved or retained
   objects below 2 MiB each and ten upload attempts in each fixed one-hour window,
   anchored at its first attempt (#572). Later upload requests reclaim expired,

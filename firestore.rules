@@ -237,8 +237,8 @@ service cloud.firestore {
     // Badge IDs are not checked against config/badges here: rules cannot
     // read that document for a list-membership test cheaply, and there is
     // no per-element loop in this rules language to type-check each entry
-    // of a variable-length list the way `socialHandles` is only checked
-    // "is map" and not per-key (§4.5). Full membership + per-category
+    // of a variable-length list (§4.5). Social handles use an explicit
+    // ten-entry bound with per-key checks below. Full membership + per-category
     // maxPicks enforcement happens where it CAN read the live config: the
     // syncUserPublic trigger rewrites users_public.badges to the
     // intersection with the configured set (packages/shared/src/badges.cjs,
@@ -330,20 +330,47 @@ service cloud.firestore {
     function validPhotoPath(userId) {
       let path = request.resource.data.get('photoPath', null);
       return path == null
-        || (path is string && (isDefaultAvatar(path)
+        || (path is string && path.size() <= 512 && (isDefaultAvatar(path)
           || (isOwnProfilePhoto(userId, path)
             && (path == resource.data.get('photoPath', null) || allocatedProfilePhoto(userId, path)))));
     }
 
+    // Map keys are bounded individually; a count cap alone still permits
+    // a single near-document-sized label or value. Keep these limits in
+    // sync with packages/shared/src/profile.cjs.
+    function validSocialEntry(handles, keys, index) {
+      return keys.size() <= index || (keys[index].size() > 0
+        && keys[index].size() <= 64
+        && handles[keys[index]] is string
+        && handles[keys[index]].size() <= 512);
+    }
+
+    function validSocialHandles() {
+      let handles = request.resource.data.get('socialHandles', {});
+      let keys = handles.keys();
+      return handles is map && keys.size() <= 10
+        && validSocialEntry(handles, keys, 0)
+        && validSocialEntry(handles, keys, 1)
+        && validSocialEntry(handles, keys, 2)
+        && validSocialEntry(handles, keys, 3)
+        && validSocialEntry(handles, keys, 4)
+        && validSocialEntry(handles, keys, 5)
+        && validSocialEntry(handles, keys, 6)
+        && validSocialEntry(handles, keys, 7)
+        && validSocialEntry(handles, keys, 8)
+        && validSocialEntry(handles, keys, 9);
+    }
+
     function validSelfProfileTypes(userId) {
       let d = request.resource.data;
-      return d.get('displayName', '') is string
-        && d.get('pronouns', '') is string
-        && d.get('bio', '') is string
-        && d.get('organization', '') is string
-        && d.get('jobTitle', '') is string
+      return d.get('displayName', '') is string && d.get('displayName', '').size() <= 160
+        && d.get('pronouns', '') is string && d.get('pronouns', '').size() <= 80
+        && d.get('bio', '') is string && d.get('bio', '').size() <= 2000
+        && d.get('organization', '') is string && d.get('organization', '').size() <= 200
+        && d.get('jobTitle', '') is string && d.get('jobTitle', '').size() <= 200
         && validPhotoPath(userId)
-        && d.get('socialHandles', {}) is map
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['socialHandles'])
+            || validSocialHandles())
         && validBadgesList()
         && validCustomBadgesList()
         && (d.get('updatedAt', null) == null || d.get('updatedAt', null) is timestamp)

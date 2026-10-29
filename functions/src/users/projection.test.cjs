@@ -339,3 +339,18 @@ test('a failed photo delete still leaves the new public path in place', async ()
   assert.equal(db.docs.get('users_public/u1').photoPath, nextPath);
   assert.equal(errors.length, 1);
 });
+
+test('refresh replaces oversized legacy public profiles with bounded projections', async () => {
+  const oversized = userDoc({ bio: 'x'.repeat(900000), socialHandles: { site: 'x'.repeat(20000) } });
+  const db = fakeDb({
+    'config/badges': BADGES_CONFIG,
+    'users/u1': oversized,
+    'users_public/u1': oversized,
+  });
+  const refresh = createRefreshUserPublicBadges({ db });
+  await refresh();
+  const pub = db.docs.get('users_public/u1');
+  assert.equal(pub.bio.length, 2000);
+  assert.deepEqual(pub.socialHandles, {});
+  assert.ok(Buffer.byteLength(JSON.stringify(pub)) < 4000);
+});

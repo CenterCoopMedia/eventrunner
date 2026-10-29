@@ -340,6 +340,32 @@ describe('Profile', () => {
 describe('the profile photo lifecycle', () => {
   const withPhoto = { ...SEEDED_PROFILE, photoPath: 'profile-photos/u1/old.png' };
 
+  it('keeps a pending photo local while legacy text is oversized and allows a corrected retry', async () => {
+    installPhotoCropStubs();
+    try {
+      profileValue = { profile: { ...withPhoto, bio: 'x'.repeat(2001) }, status: 'ready', needsProfileSetup: false };
+      renderPage();
+      fireEvent.change(screen.getByLabelText('Replace photo'), {
+        target: { files: [new File(['x'], 'me.png', { type: 'image/png' })] },
+      });
+      fireEvent.click(await screen.findByRole('button', { name: 'Use this crop' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+      await waitFor(() => expect(showToastMock).toHaveBeenCalled());
+      expect(uploadProfilePhotoMock).not.toHaveBeenCalled();
+      expect(saveProfileMock).not.toHaveBeenCalled();
+      expect(deleteOwnPhotoMock).not.toHaveBeenCalled();
+      expect(screen.getByAltText('Your new profile photo')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('About you'), { target: { value: 'A corrected bio.' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+      await waitFor(() => expect(saveProfileMock).toHaveBeenCalledTimes(1));
+      expect(uploadProfilePhotoMock).toHaveBeenCalledTimes(1);
+      expect(saveProfileMock.mock.calls[0][0].bio).toBe('A corrected bio.');
+    } finally {
+      uninstallPhotoCropStubs();
+    }
+  });
+
   it('deletes nothing when a removal is never saved', async () => {
     profileValue = { profile: withPhoto, status: 'ready', needsProfileSetup: false };
     renderPage();

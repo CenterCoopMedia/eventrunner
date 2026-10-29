@@ -28,6 +28,42 @@
 
 const { validateBadgeSelection, validateCustomBadges } = require('./badges.cjs');
 
+// Mirrored in firestore.rules. Bound both SDK writes and server projections.
+const PROFILE_TEXT_LIMITS = Object.freeze({
+  displayName: 160, pronouns: 80, bio: 2000, organization: 200, jobTitle: 200,
+});
+const MAX_PHOTO_PATH_LENGTH = 512;
+const MAX_SOCIAL_HANDLES = 10;
+const MAX_SOCIAL_KEY_LENGTH = 64;
+const MAX_SOCIAL_VALUE_LENGTH = 512;
+
+function validSocialEntry(key, value) {
+  return key.length > 0 && key.length <= MAX_SOCIAL_KEY_LENGTH
+    && typeof value === 'string' && value.length <= MAX_SOCIAL_VALUE_LENGTH;
+}
+
+/** Reject oversized edits before sending them; rules remain authoritative. */
+function validateProfileBounds(fields) {
+  for (const [field, max] of Object.entries(PROFILE_TEXT_LIMITS)) {
+    if (Object.hasOwn(fields, field)
+      && (typeof fields[field] !== 'string' || fields[field].length > max)) {
+      throw new Error(`${field} must be text of at most ${max} characters.`);
+    }
+  }
+  if (fields.photoPath != null
+    && (typeof fields.photoPath !== 'string' || fields.photoPath.length > MAX_PHOTO_PATH_LENGTH)) {
+    throw new Error('Profile photo path is too long.');
+  }
+  if (Object.hasOwn(fields, 'socialHandles')) {
+    const handles = fields.socialHandles;
+    if (!handles || typeof handles !== 'object' || Array.isArray(handles)
+      || Object.keys(handles).length > MAX_SOCIAL_HANDLES
+      || Object.entries(handles).some(([key, value]) => !validSocialEntry(key, value))) {
+      throw new Error('Use at most 10 social handles with labels up to 64 and values up to 512 characters.');
+    }
+  }
+}
+
 /** Profile/directory visibility vocabulary (§4.1, renamed from scheduleVisibility). */
 const PROFILE_VISIBILITIES = ['public', 'attendees_only', 'private'];
 
@@ -115,7 +151,7 @@ const DEFAULT_AVATAR_PATHS = new Set([
  * @returns {boolean}
  */
 function isPublishablePhotoPath(uid, path) {
-  if (typeof path !== 'string' || typeof uid !== 'string' || uid.length === 0 || uid.includes('/')) {
+  if (typeof path !== 'string' || path.length > MAX_PHOTO_PATH_LENGTH || typeof uid !== 'string' || uid.length === 0 || uid.includes('/')) {
     return false;
   }
   if (DEFAULT_AVATAR_PATHS.has(path)) return true;
@@ -193,11 +229,12 @@ function buildPublicProfile(user, badgesConfig, features = null, uid = null) {
   // the account document another way (a hand-edited doc, a future
   // server-side writer) would otherwise be handed to React as a child and
   // crash the directory for every visitor. Belt and braces, cheap.
-  for (const field of ['displayName', 'pronouns', 'bio', 'organization', 'jobTitle']) {
+  for (const [field, max] of Object.entries(PROFILE_TEXT_LIMITS)) {
     if (typeof out[field] !== 'string') {
       if (out[field] === undefined && field !== 'displayName') continue;
       out[field] = '';
     }
+    if (typeof out[field] === 'string') out[field] = out[field].slice(0, max);
   }
   if (typeof out.photoPath !== 'string') {
     if (out.photoPath !== undefined) out.photoPath = null;
@@ -211,10 +248,12 @@ function buildPublicProfile(user, badgesConfig, features = null, uid = null) {
     out.socialHandles = {};
   } else {
     out.socialHandles = Object.fromEntries(
-      Object.entries(out.socialHandles).filter(([, v]) => typeof v === 'string'),
+      Object.entries(out.socialHandles)
+        .filter(([key, value]) => validSocialEntry(key, value))
+        .slice(0, MAX_SOCIAL_HANDLES),
     );
   }
-  out.speakerId = typeof source.speakerId === 'string' && source.speakerId ? source.speakerId : null;
+  out.speakerId = typeof source.speakerId === 'string' && source.speakerId.length <= 128 && source.speakerId ? source.speakerId : null;
 
   // Free-text custom badges (issue #176) are re-validated at projection
   // time — the word list and the caps are checked where the config is
@@ -233,6 +272,12 @@ function buildPublicProfile(user, badgesConfig, features = null, uid = null) {
 }
 
 module.exports = {
+  PROFILE_TEXT_LIMITS,
+  MAX_PHOTO_PATH_LENGTH,
+  MAX_SOCIAL_HANDLES,
+  MAX_SOCIAL_KEY_LENGTH,
+  MAX_SOCIAL_VALUE_LENGTH,
+  validateProfileBounds,
   PROFILE_VISIBILITIES,
   DEFAULT_PROFILE_VISIBILITY,
   SELF_EDITABLE_PROFILE_FIELDS,

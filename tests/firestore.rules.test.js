@@ -3,7 +3,7 @@
 // public config (minus config/bootstrap), visibility-gated published CMS
 // collections, admin-only drafts and bookkeeping, deny-all everywhere else.
 import { readFileSync } from "node:fs";
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertFails,
   assertSucceeds,
@@ -1205,6 +1205,56 @@ describe("users account documents (spec §3.4)", () => {
     await assertFails(updateDoc(ref, { photoPath: "profile-photos/approved-1/photo.png" }));
     await assertFails(updateDoc(ref, { photoPath: "profile-photos/pending-1/../../approved-1/photo.png" }));
     await assertFails(updateDoc(ref, { photoPath: "demo/speakers/marisol-reyes.webp" }));
+  });
+
+  it("allows legacy social handles to stay unchanged during edits or privacy withdrawal", async () => {
+    const uid = "legacy-social";
+    const legacy = Object.fromEntries(Array.from({ length: 11 }, (_, index) => [`site-${index}`, "x".repeat(513)]));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "users", uid), {
+        displayName: "Legacy attendee", badges: [], profileVisibility: "public", socialHandles: legacy,
+      });
+    });
+    const ref = doc(attendee(uid), "users", uid);
+    await assertSucceeds(updateDoc(ref, { displayName: "Updated attendee" }));
+    await assertSucceeds(updateDoc(ref, { profileVisibility: "private" }));
+    const saved = (await getDoc(ref)).data();
+    expect(saved.socialHandles).toEqual(legacy);
+    expect(saved.profileVisibility).toBe("private");
+    await assertFails(updateDoc(ref, { socialHandles: { ...legacy, extra: "new" } }));
+    await assertSucceeds(updateDoc(ref, { socialHandles: { site: "valid" } }));
+  });
+
+  it("bounds profile text and every social handle entry on direct SDK writes", async () => {
+    const ref = doc(attendee("pending-1"), "users/pending-1");
+    for (const [field, max] of Object.entries({
+      displayName: 160, pronouns: 80, bio: 2000, organization: 200, jobTitle: 200,
+    })) {
+      await assertSucceeds(updateDoc(ref, { [field]: "a".repeat(max) }));
+      await assertFails(updateDoc(ref, { [field]: "a".repeat(max + 1) }));
+      await assertSucceeds(updateDoc(ref, { [field]: "Rae" }));
+    }
+    const handles = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`site-${i}`, "x".repeat(512)]));
+    await assertSucceeds(updateDoc(ref, { socialHandles: handles }));
+    // Overflow in the last slot must be checked too.
+    await assertFails(updateDoc(ref, { socialHandles: { ...handles, "site-9": "x".repeat(513) } }));
+    for (const invalid of [
+      { ...handles, extra: "x" }, { ["k".repeat(65)]: "x" },
+      { site: "x".repeat(513) }, { site: { url: "x" } },
+    ]) await assertFails(updateDoc(ref, { socialHandles: invalid }));
+    await assertSucceeds(updateDoc(ref, { socialHandles: { ["k".repeat(64)]: "x" } }));
+    await assertSucceeds(updateDoc(ref, { socialHandles: {} }));
+    const prefix = "profile-photos/pending-1/bounded/";
+    for (const [length, verdict] of [[512, assertSucceeds], [513, assertFails]]) {
+      const path = prefix + "a".repeat(length - prefix.length);
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), "profile_photo_uploads/pending-1"), {
+          slots: { bounded: { path, state: "ready", expiresAtMs: Date.now() + 3600000 } },
+        });
+      });
+      await verdict(updateDoc(ref, { photoPath: path }));
+    }
+    await assertSucceeds(updateDoc(ref, { photoPath: null }));
   });
 
   it("allows the same fields with the right types", async () => {
