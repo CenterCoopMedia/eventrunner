@@ -5,7 +5,9 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 const pdf = require('./pdf.cjs');
 const { makeFakeDb } = require('../cms/firestoreFake.cjs');
-const { PUBLIC_PDF_TTL_MS, MAX_PUBLIC_SESSIONS, MAX_PUBLIC_SPEAKERS } = pdf.internals;
+const PUBLIC_PDF_TTL_MS = 60 * 1000;
+const MAX_PUBLIC_SESSIONS = 1000;
+const MAX_PUBLIC_SPEAKERS = 2000;
 
 function response() {
   return {
