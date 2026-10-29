@@ -375,6 +375,29 @@ test('the upsert is idempotent and never unclaims a ticket', async () => {
   assert.deepEqual(ticket.updatedAt, later);
 });
 
+for (const terminal of ['refunded', 'cancelled']) {
+  for (const incoming of ['valid', 'pending_info']) {
+    test(`an unversioned ${incoming} sync preserves a stored ${terminal} status`, async () => {
+      const db = makeFakeDb({ 'tickets/tkt-1': {
+        ...fakeTicket({ status: terminal }), claimedByUid: 'uid-1', claimedAt: T0,
+      } });
+      await upsertTickets({ db, tickets: [fakeTicket({ status: incoming })], providerName: 'eventbrite', log: QUIET });
+      assert.equal(db.read('tickets', 'tkt-1').status, terminal);
+      assert.equal(db.read('tickets', 'tkt-1').claimedByUid, 'uid-1');
+      assert.deepEqual(db.read('tickets', 'tkt-1').claimedAt, T0);
+    });
+  }
+}
+
+test('a refund racing a valid upsert commit is preserved on transaction retry', async () => {
+  const db = makeFakeDb({ 'tickets/tkt-1': fakeTicket() });
+  db.beforeCommit = async () => {
+    await db.collection('tickets').doc('tkt-1').set({ status: 'refunded' }, { merge: true });
+  };
+  await upsertTickets({ db, tickets: [fakeTicket()], providerName: 'eventbrite', log: QUIET });
+  assert.equal(db.read('tickets', 'tkt-1').status, 'refunded');
+});
+
 test('normalizeTicket refuses an unkeyable record and buckets unknown statuses', () => {
   assert.equal(internals.normalizeTicket({ email: 'a@b.c' }, 'manual'), null);
   assert.equal(internals.normalizeTicket({ externalId: '../x' }, 'manual'), null);
