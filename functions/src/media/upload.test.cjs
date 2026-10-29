@@ -949,3 +949,45 @@ test('speakerPhotoUpload and speakerPhotoDelete answer 500 and write nothing whe
   assert.equal(del.body.error.code, 'internal');
   assert.deepEqual(bucket.deleted, []);
 });
+
+
+test('speaker photo budget stops repeated abandoned uploads across handler instances', async () => {
+  const db = speakerWorld();
+  const bucket = fakeBucket();
+  const body = { speakerId: 'rae', contentType: 'image/png', data: PNG };
+  for (let i = 0; i < 100; i += 1) {
+    const res = fakeRes();
+    await createSpeakerPhotoUploadHandler(speakerAuthDeps(db, bucket))(post(body), res);
+    assert.equal(res.statusCode, 200);
+  }
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(db, bucket))(post(body), res);
+  assert.equal(res.statusCode, 429);
+  assert.equal(bucket.objects.size, 100);
+});
+
+test('photo budget applies to admins and fails closed on invalid counters', async () => {
+  for (const count of [100, -1, '0']) {
+    const db = makeFakeDb({ 'speaker_photo_upload_budgets/rae': { count } });
+    const bucket = fakeBucket();
+    const res = fakeRes();
+    await createSpeakerPhotoUploadHandler(deps(db, bucket))(
+      post({ speakerId: 'rae', contentType: 'image/png', data: PNG }), res,
+    );
+    assert.equal(res.statusCode, 429);
+    assert.equal(bucket.objects.size, 0);
+  }
+});
+
+test('storage failures consume a reservation and budget failures never reach storage', async () => {
+  const db = speakerWorld();
+  const body = { speakerId: 'rae', contentType: 'image/png', data: PNG };
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(db, fakeBucket({ failSave: true })))(post(body), fakeRes());
+  assert.equal((await db.collection('speaker_photo_upload_budgets').doc('rae').get()).data().count, 1);
+  db.runTransaction = async () => { throw new Error('unavailable'); };
+  const bucket = fakeBucket();
+  const res = fakeRes();
+  await createSpeakerPhotoUploadHandler(speakerAuthDeps(db, bucket))(post(body), res);
+  assert.equal(res.statusCode, 500);
+  assert.equal(bucket.objects.size, 0);
+});
