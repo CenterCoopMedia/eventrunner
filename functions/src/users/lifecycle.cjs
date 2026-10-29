@@ -135,11 +135,9 @@ async function removeRepresentativeAccess({ db, uid }) {
  * A deleted Firebase Auth account whose `users/{uid}` document survives is
  * a profile nobody can sign in to, edit, or remove — and its `users_public`
  * projection stays readable in the directory forever. Deleting the account
- * document is enough in the normal case: syncUserPublic sees the delete and
- * removes the profile projection, and syncScheduleShare removes the shared
- * schedule. When there is no account document to delete (a sign-in that
- * never seeded, or a document already removed), neither trigger fires, so
- * the profile and the shared schedule are removed here. Issue #350.
+ * document and both public projections are removed directly. Cleanup does
+ * not depend on downstream trigger delivery; retries also remove projections
+ * when the account document is already absent.
  * Organization representative access goes in either case (issue #334).
  *
  * @param {{ db: object, log?: { error: Function } }} deps
@@ -157,11 +155,10 @@ function createOnUserDeleted({ db, log = console }) {
     const existing = await userRef.get();
     if (existing.exists) {
       await userRef.delete();
-      return { deleted: true };
     }
     await db.collection(USERS_PUBLIC).doc(uid).delete();
     await db.collection(SCHEDULE_SHARES).doc(uid).delete();
-    return { deleted: false };
+    return { deleted: existing.exists };
   };
 }
 
