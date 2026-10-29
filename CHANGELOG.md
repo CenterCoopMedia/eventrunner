@@ -663,6 +663,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Speaker photo uploads reserve a non-expiring budget before storage and stop after
+  100 attempts per speaker, including administrator uploads. Failed or ambiguous saves
+  consume reservations, and deleting photos leaves the budget in place. Operators
+  must audit abandoned objects before resetting a budget (#573).
+
 - Ticket-based grants read the live automatic-approval setting in the same transaction
   as the grant. Turning automatic approval off reconciles existing ticket-derived
   approvals back to `ticketed` for staff review, preserving valid tickets, explicit

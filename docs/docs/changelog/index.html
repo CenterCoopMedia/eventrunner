@@ -791,6 +791,12 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Speaker photo uploads reserve a non-expiring budget before storage and stop after
+          100 attempts per speaker, including administrator uploads. Failed or ambiguous saves
+          consume reservations, and deleting photos leaves the budget in place. Operators
+          must audit abandoned objects before resetting a budget (#573).</li>
+          </ul>
+          <ul>
           <li>Ticket-based grants read the live automatic-approval setting in the same transaction
           as the grant. Turning automatic approval off reconciles existing ticket-derived
           approvals back to <code>ticketed</code> for staff review, preserving valid tickets, explicit
