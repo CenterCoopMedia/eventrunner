@@ -764,6 +764,11 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Public profile updates retry after transient failures. Deleting an Auth account
+          directly removes its public profile and shared schedule, including when a previous
+          cleanup attempt already removed the account document (#562).</li>
+          </ul>
+          <ul>
           <li>Firebase Hosting pages deny iframe embedding to protect admin actions from
           clickjacking, including entry through <code>/index.html</code> and later navigation to admin
           routes. The framing policy also applies to public pages (#561).</li>
