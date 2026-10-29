@@ -316,10 +316,23 @@ service cloud.firestore {
         && (parts.size() == 3 || (parts[3].size() > 0 && parts[3] != '..'));
     }
 
+    // Only a ready, unexpired allocation can become a NEW reference.
+    // Keep an existing photo (including legacy paths) editable after expiry.
+    function allocatedProfilePhoto(userId, path) {
+      let parts = path.split('/');
+      let ledger = get(/databases/$(database)/documents/profile_photo_uploads/$(userId)).data;
+      let slot = ledger.slots.get(parts[2], {});
+      return slot.get('path', '') == path
+        && slot.get('state', '') == 'ready'
+        && slot.get('expiresAtMs', 0) > request.time.toMillis();
+    }
+
     function validPhotoPath(userId) {
       let path = request.resource.data.get('photoPath', null);
       return path == null
-        || (path is string && (isDefaultAvatar(path) || isOwnProfilePhoto(userId, path)));
+        || (path is string && (isDefaultAvatar(path)
+          || (isOwnProfilePhoto(userId, path)
+            && (path == resource.data.get('photoPath', null) || allocatedProfilePhoto(userId, path)))));
     }
 
     function validSelfProfileTypes(userId) {
@@ -678,6 +691,8 @@ service cloud.firestore {
     // Server-only collections, named explicitly so a future edit cannot
     // open them by accident via a broader match.
     match /auth_challenges/{docId} { allow read, write: if false; }
+    match /profile_photo_uploads/{userId} { allow read, write: if false; }
+
     match /auth_rate_limits/{docId} { allow read, write: if false; }
     match /auth_send_ceiling/{docId} { allow read, write: if false; }
     match /sent_emails/{docId} { allow read, write: if false; }

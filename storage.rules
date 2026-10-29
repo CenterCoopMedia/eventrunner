@@ -2,9 +2,10 @@ rules_version = '2';
 
 // v1 Storage rules per docs/adr/0001-event-platform-v1.md §8.5.
 //
-// Profile photos are decoded and re-encoded by profilePhotoUpload before
-// publication. All uploads are server-authorized; clients may only delete
-// their own profile photos. Legacy unvalidated photos fail closed.
+// All uploads are server-authorized. profilePhotoUpload verifies a live
+// account, enforces a per-account object/byte budget and upload rate, and
+// writes through the Admin SDK. Client rules cannot enforce cumulative cost.
+//
 // Reads are split into `get` and `list`, and only `get` is granted. Public
 // rendering needs exactly one thing — fetch THIS object by its known path —
 // and the site knows those paths from Firestore. `list` is the enumeration
@@ -48,8 +49,8 @@ service firebase.storage {
       return firestore.exists(/databases/(default)/documents/users/$(userId));
     }
 
-    // Profile originals are never stored. Only the authenticated upload
-    // endpoint may create validated, bounded WebP objects.
+    // Owners may delete their own objects, but only the bounded server
+    // upload endpoint may allocate them. Public cards fetch known paths.
     match /profile-photos/{userId}/{allPaths=**} {
       allow get: if resource.metadata.profilePhotoValidated == 'v1' && accountExists(userId);
       allow list, create, update: if false;

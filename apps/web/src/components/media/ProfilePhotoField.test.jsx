@@ -116,7 +116,7 @@ describe('ProfilePhotoField', () => {
     expect(uploadRequest).toHaveBeenCalledWith('https://functions.example.test/profilePhotoUpload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-id-token' },
-      body: JSON.stringify({ data: 'Y3JvcA==' }),
+      body: JSON.stringify({ contentType: 'image/png', data: 'Y3JvcA==' }),
     });
     expect(first).not.toBe('profile-photos/attendee-1/photo.png');
     expect(onChange).toHaveBeenCalledWith(first);
@@ -262,6 +262,32 @@ describe('ProfilePhotoField', () => {
     expect(ref.current.hasPending()).toBe(true);
     const again = await ref.current.commit();
     expect(again).not.toBe(staged);
+    expect(uploadRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it('cleans an expired staged photo before uploading again and retains it when cleanup fails', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+    uploadRequest.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ path: 'profile-photos/attendee-1/expired/photo.webp', expiresAtMs: 20_000 }),
+    });
+    const ref = createRef();
+    render(<ProfilePhotoField ref={ref} uid="attendee-1" value="" onChange={vi.fn()} />);
+    await chooseAndApplyCrop(new File(['x'], 'me.png', { type: 'image/png' }), /your profile photo/);
+    const staged = await ref.current.commit();
+
+    // A failed profile save asks the field to discard its staged upload.
+    deleteObject.mockRejectedValueOnce(new Error('network'));
+    await expect(ref.current.discard()).rejects.toThrow('network');
+    clock.mockReturnValue(20_000);
+    deleteObject.mockRejectedValueOnce(new Error('network'));
+    await expect(ref.current.commit()).rejects.toThrow('network');
+    expect(uploadRequest).toHaveBeenCalledTimes(1);
+    expect(deleteObject).toHaveBeenLastCalledWith({ path: staged });
+
+    const fresh = await ref.current.commit();
+    expect(fresh).not.toBe(staged);
+    expect(deleteObject).toHaveBeenCalledTimes(3);
     expect(uploadRequest).toHaveBeenCalledTimes(2);
   });
 

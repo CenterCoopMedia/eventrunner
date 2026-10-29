@@ -12,7 +12,8 @@
 // All uploads are server-authorized (spec §8.5):
 //
 //   • PROFILE PHOTOS are posted to `profilePhotoUpload`, which verifies the
-//     attendee's token, decodes the image, and stores bounded WebP output.
+//     attendee's live account, upload rate, and retained object quota, decodes
+//     the image, and stores bounded WebP output.
 //     The checks below explain invalid files before a byte is sent.
 //   • EVERYTHING ELSE (cms-images, branding) is server-authorized: the file
 //     is base64-encoded and POSTed to `mediaUpload`, which verifies the
@@ -41,7 +42,7 @@ import { storageBucketName, storageDownloadOrigin } from '../firebase.js';
 import { IS_DEMO } from './demoMode.js';
 import { bundledDemoAssetUrl } from './bundledAssets.js';
 
-/** Mirrors functions/src/media/profilePhoto.cjs input limits. */
+/** Mirrors functions/src/users/photos.cjs input limits. */
 export const PROFILE_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
 export const PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 

@@ -1,5 +1,6 @@
-// Profile photos pass through authenticated server decoding and bounded
-// WebP re-encoding before publication. The chosen file stays local until Save.
+// Profile photos use a bounded server upload endpoint. The browser keeps
+// the cropped file local until Save; the saved photo is never overwritten.
+//
 // The cropped file stays in the browser until the profile save succeeds.
 // `profile-photos` allows a public read, so an upload before save would
 // publish a photo the attendee has not kept (issues 363 and 372). The save
@@ -35,6 +36,7 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
   // discards it in the same turn, before a re-render can publish state.
   const pendingFileRef = useRef(null);
   const stagedPathRef = useRef(null);
+  const stagedExpiryRef = useRef(null);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -57,8 +59,9 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
     setPendingFile(file);
   }
 
-  function rememberStaged(path) {
+  function rememberStaged(path, expiresAtMs = null) {
     stagedPathRef.current = path;
+    stagedExpiryRef.current = Number.isFinite(expiresAtMs) ? expiresAtMs : null;
   }
 
   const dropLocal = useCallback(() => {
@@ -114,16 +117,21 @@ const ProfilePhotoField = forwardRef(function ProfilePhotoField({ uid, value, on
     async commit() {
       const file = pendingFileRef.current;
       if (!file) return null;
-      if (stagedPathRef.current) {
-        onChange(stagedPathRef.current);
-        return stagedPathRef.current;
+      const staged = stagedPathRef.current;
+      if (staged && (stagedExpiryRef.current === null || stagedExpiryRef.current > Date.now())) {
+        onChange(staged);
+        return staged;
       }
       setBusy(true);
       onPendingChange?.(true);
       setError(null);
       try {
-        const { path } = await uploadProfilePhoto({ uid, file });
-        rememberStaged(path);
+        if (staged) {
+          await deleteOwnPhoto(staged);
+          rememberStaged(null);
+        }
+        const { path, expiresAtMs } = await uploadProfilePhoto({ uid, file });
+        rememberStaged(path, expiresAtMs);
         onChange(path);
         return path;
       } catch (error) {

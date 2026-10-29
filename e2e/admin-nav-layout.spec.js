@@ -67,8 +67,7 @@ test('the rail folds and hides by keyboard, and remembers it', async ({ page }) 
   const railBox = await page.locator('.admin-rail').boundingBox();
   expect(railBox.width).toBeLessThan(120);
   expect((await page.locator('#admin-content').boundingBox()).width).toBeGreaterThan(wideMain + 100);
-  // Under reduced motion nothing moves: the change is instant. The global
-  // reduce block clamps any duration to a hundredth of a millisecond.
+  // The global reduce block disables transitions, so the width changes immediately.
   const motion = await page.locator('.admin-rail').evaluate((element) => getComputedStyle(element).transitionDuration);
   expect(Number.parseFloat(motion)).toBeLessThanOrEqual(0.0001);
 
