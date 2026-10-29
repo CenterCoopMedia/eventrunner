@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Profile photos are decoded on the server, checked against byte and pixel limits,
+  and re-encoded as metadata-free WebP images within 512 × 512 before publication
+  (#565). Direct client uploads are denied. Legacy photos require re-uploading;
+  profile cards show initials until then. Deploy the function before or alongside
+  the client and Storage rules. Attendees with an older open tab must reload before
+  uploading a replacement photo. Public reads also require a live account, so a
+  late upload after account removal stays inaccessible if its cleanup fails.
+
 ### Added
 
 - Change request progress and outcome emails (#330). A signed-in sender reads their own

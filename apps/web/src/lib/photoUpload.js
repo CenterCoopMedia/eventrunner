@@ -1,34 +1,9 @@
-// The two calls that need the Firebase Storage SDK, kept in their own module
-// so the SDK stays out of the chunk every visitor downloads.
-//
-// This is a route boundary, not a bookkeeping one. Reading media does not
-// touch the Storage service at all: lib/mediaSource.js builds object URLs as
-// strings from the bucket name (see its header for why getDownloadURL is not
-// used), which is what every page — Layout's logo included — actually needs.
-// WRITING is different, and only one surface writes: an attendee replacing or
-// removing their own photo on /profile. That route is already lazy, so
-// importing the SDK from here and nowhere else moves roughly 34 kB out of the
-// initial graph (docs/performance/public-bundle-budget.md).
-//
-// `profile-photos/{uid}/**` is owner-bound in storage.rules (§8.5): the uid in
-// the path must equal the uid on the token. The checks in mediaSource's
-// checkFile() are a courtesy that turns a rules rejection into a sentence
-// someone can act on; the rules are the boundary.
-import { connectStorageEmulator, deleteObject, getStorage, ref, uploadBytes } from 'firebase/storage';
-import { app, useEmulators } from '../firebase.js';
-import { PROFILE_PHOTO_MAX_BYTES, PROFILE_PHOTO_TYPES, checkFile } from './mediaSource.js';
+import { callAdminEndpoint } from '../admin/adminApi.js';
+import { connectStorageEmulator, deleteObject, getStorage, ref } from 'firebase/storage';
+import { app, auth, useEmulators } from '../firebase.js';
+import { PROFILE_PHOTO_MAX_BYTES, PROFILE_PHOTO_TYPES, checkFile, fileToBase64 } from './mediaSource.js';
 
 let client = null;
-
-/**
- * A fresh object id. `randomUUID` needs a secure context; the fallback is
- * the same shape mintUpdateId and newSubmissionKey use when it is absent.
- */
-function newPhotoObjectId() {
-  const cryptoObj = globalThis.crypto;
-  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') return cryptoObj.randomUUID();
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
-}
 
 /** The Storage client, made on first use so importing this module is cheap. */
 function storageClient() {
@@ -40,7 +15,7 @@ function storageClient() {
 }
 
 /**
- * Upload an attendee's own photo directly to their owner-bound prefix.
+ * Upload through trusted decoding; only the bounded WebP is stored.
  * Each choice gets a new object id. The saved profile still points at the
  * previous object, and that object stays the public photo until the save
  * writes the new path. A fixed name would replace the public photo while
@@ -56,11 +31,13 @@ export async function uploadProfilePhoto({ uid, file }) {
     exclusive: true,
   });
   if (problem) throw new Error(problem);
-  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  const id = newPhotoObjectId();
-  const path = `profile-photos/${uid}/${id}/photo.${extension}`;
-  await uploadBytes(ref(storageClient(), path), file, { contentType: file.type });
-  return { path };
+  if (!auth.currentUser || auth.currentUser.uid !== uid) throw new Error('not signed in');
+  const payload = await callAdminEndpoint(
+    'profilePhotoUpload',
+    { data: await fileToBase64(file) },
+    () => auth.currentUser.getIdToken(),
+  );
+  return { path: payload.path };
 }
 
 /**

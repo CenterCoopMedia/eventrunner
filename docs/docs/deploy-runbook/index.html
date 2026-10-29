@@ -286,7 +286,7 @@
           is <code>&lt;CLIENT_ENV&gt;</code> unless the run&#39;s ref is <code>main</code>, independent of both the WIF condition and the
           in-workflow check. Combine it with <strong>Required reviewers</strong> on the same screen for any client where a
           human should see a dispatch before it runs.</p>
-          <p><strong>Storage rules and the account document.</strong> <code>storage.rules</code> calls <code>firestore.exists</code> on a profile photo write. Grant this role once per project, before the first deploy in §5. The deploy job does not grant it.</p>
+          <p><strong>Storage rules and the account document.</strong> <code>storage.rules</code> calls <code>firestore.exists</code> on public profile photo reads and owner deletes. Grant this role once per project, before the first deploy in §5. Without it, uploaded profile photos cannot load and cards fall back to initials. The deploy job does not grant it.</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PROJECT_NUMBER=&quot;$(gcloud projects describe &lt;GCP_PROJECT_ID&gt; --format=&#39;value(projectNumber)&#39;)&quot;
           gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
             --member=&quot;serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-firebasestorage.iam.gserviceaccount.com&quot; \

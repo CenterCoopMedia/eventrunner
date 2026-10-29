@@ -130,14 +130,13 @@ function referencedByBranding(references) {
  * authorization it enforces are the only things standing between a public
  * `get: if true` namespace and an arbitrary write.
  *
- * SVG is excluded, same reasoning as storage.rules' `isAllowedImage()` for
- * the one client-writable namespace (profile-photos): an SVG served from
- * the bucket is a script-execution surface, and unlike `branding/` there is
- * no seeded placeholder here that needs the format.
+ * SVG is excluded: an SVG served from the bucket is a script-execution
+ * surface, and unlike `branding/` there is no seeded placeholder here that
+ * needs the format.
  */
 const SPEAKER_PHOTO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp']);
 
-/** Mirrors storage.rules' `profile-photos` cap — the same class of asset. */
+/** Matches profilePhoto.cjs's input cap for the same class of asset. */
 const SPEAKER_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 
 /** Base64 with optional padding, nothing else. */

@@ -186,7 +186,7 @@ is `<CLIENT_ENV>` unless the run's ref is `main`, independent of both the WIF co
 in-workflow check. Combine it with **Required reviewers** on the same screen for any client where a
 human should see a dispatch before it runs.
 
-**Storage rules and the account document.** `storage.rules` calls `firestore.exists` on a profile photo write. Grant this role once per project, before the first deploy in §5. The deploy job does not grant it.
+**Storage rules and the account document.** `storage.rules` calls `firestore.exists` on public profile photo reads and owner deletes. Grant this role once per project, before the first deploy in §5. Without it, uploaded profile photos cannot load and cards fall back to initials. The deploy job does not grant it.
 
 ```sh
 PROJECT_NUMBER="$(gcloud projects describe <GCP_PROJECT_ID> --format='value(projectNumber)')"

@@ -14,6 +14,7 @@ const cmsPublish = require('./src/cms/publish.cjs');
 const cmsPendingCounts = require('./src/cms/pendingCounts.cjs');
 const cmsUpdates = require('./src/cms/updates.cjs');
 const cmsOrganizationRepresentatives = require('./src/cms/organizationRepresentatives.cjs');
+const profilePhoto = require('./src/media/profilePhoto.cjs');
 const mediaUpload = require('./src/media/upload.cjs');
 const mediaMetadata = require('./src/media/metadata.cjs');
 const mediaUsage = require('./src/media/usage.cjs');
@@ -86,6 +87,7 @@ module.exports = {
   ...cmsPendingCounts.handlers,
   ...cmsUpdates.handlers,
   ...cmsOrganizationRepresentatives.handlers,
+  ...profilePhoto.handlers,
   ...mediaUpload.handlers,
   ...mediaMetadata.handlers,
   ...mediaUsage.handlers,

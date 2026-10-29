@@ -27,8 +27,8 @@ export const db = getFirestore(app);
 // Storage has NO client here on purpose (docs/performance/public-bundle-budget.md).
 // Nothing a visitor sees on first paint talks to the Storage service: the
 // media URLs on every page are built as strings from the bucket name below,
-// and the only calls that need the SDK are one attendee's own photo upload
-// and delete on /profile. So the Storage client is created inside
+// and the only call that needs the SDK is deleting an attendee's own photo
+// on /profile. So the Storage client is created inside
 // lib/photoUpload.js, which that route alone imports, and the ~34 kB SDK
 // rides in the /profile chunk instead of the chunk every visitor downloads.
 // `useEmulators` is exported for the same reason: the emulator wiring for
