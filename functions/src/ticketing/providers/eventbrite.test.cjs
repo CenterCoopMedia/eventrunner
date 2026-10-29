@@ -156,8 +156,7 @@ test('verifyWebhook: a delivery with no signature header and the URL secret is v
   assert.equal(result.valid, true);
   assert.equal(result.eventType, 'order.placed');
   assert.equal(result.resourceId, 'ord-2001');
-  assert.equal(result.deliveryId, internals.deliveryIdFor(d.rawBody));
-  assert.equal(result.deliveryId.length, 64); // sha256 hex
+  assert.match(result.deliveryId, /^[0-9a-f-]{36}$/);
 });
 
 test('verifyWebhook: missing URL secret → invalid, never an oracle (issue 356)', async () => {
@@ -251,14 +250,14 @@ test('verifyWebhook: two distinct deliveries about the same order get different 
   assert.equal(ra.valid, true);
   assert.equal(rb.valid, true);
   assert.equal(ra.resourceId, rb.resourceId, 'same order');
-  assert.notEqual(ra.deliveryId, rb.deliveryId, 'different bytes -> different delivery id');
+  assert.notEqual(ra.deliveryId, rb.deliveryId, 'separate receipts -> different delivery id');
 });
 
-test('verifyWebhook: a byte-identical retry produces the SAME deliveryId (dedup collapses it)', async () => {
+test('verifyWebhook: byte-identical notifications get separate receipt IDs', async () => {
   const p = provider();
   const r1 = await verify(p, 'webhook-order-placed.json');
   const r2 = await verify(p, 'webhook-order-placed.json');
-  assert.equal(r1.deliveryId, r2.deliveryId);
+  assert.notEqual(r1.deliveryId, r2.deliveryId);
 });
 
 test('verifyWebhook: order.refunded folds into eventType order.updated (judgment call 4)', async () => {
@@ -292,7 +291,7 @@ test('verifyWebhook: wrong-event delivery → valid: false, reason: wrong_event 
 function assertIgnored(result, label) {
   assert.equal(result.valid, true, `${label}: authenticated`);
   assert.equal(result.resourceId, null, `${label}: no order to fetch`);
-  assert.equal(result.deliveryId.length, 64);
+  assert.equal(result.deliveryId.length, 36);
 }
 
 test('verifyWebhook: malformed JSON with the right secret is acknowledged and ignored, not refused (review fix 6)', async () => {

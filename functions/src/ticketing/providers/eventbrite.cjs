@@ -43,13 +43,12 @@
  *    captured body must be sanitized before it is kept anywhere. #79 must
  *    confirm that Eventbrite keeps the query string when it delivers.
  * 2. DELIVERY ID. Eventbrite's webhook payload carries no per-delivery
- *    identifier. The dedup key `ticket_webhook_deliveries/{deliveryId}`
- *    (§3.3 step 2) needs one, so this adapter derives it as
- *    `sha256(rawBody)` — a byte-identical retry of the same notification
- *    collapses (the intended dedup behavior), while a distinct
- *    notification about the same order (different bytes) gets its own id
- *    and is processed, collapsing onto the same `orderId` queue row per
- *    §3.3's "not a collision" note.
+ *    identifier. Independent state changes can have byte-identical bodies,
+ *    so a content hash cannot safely suppress retries. Each authenticated
+ *    receipt gets a random UUID; ticket_sync_queue still coalesces work by
+ *    orderId and advances its generation for every notification. Retries
+ *    may cause another authoritative read, which is safe and preserves
+ *    later refunds and cancellations.
  * 3. RESOURCE URL SHAPE. `api_url` references the changed resource, and
  *    the resource kind varies by action. Eventbrite's documentation shows
  *    `/v3/orders/{orderId}/` for `order.*` and
@@ -239,11 +238,6 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(da, db);
 }
 
-/** @param {Buffer} rawBody @returns {string} a content-derived delivery id (judgment call 2) */
-function deliveryIdFor(rawBody) {
-  return crypto.createHash('sha256').update(rawBody).digest('hex');
-}
-
 /**
  * The self-service claim page (issue #33): `/ticket/claim`, reserved in
  * `shared/routing` alongside `/speaker/accept`. Same helper as
@@ -419,7 +413,7 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       // is acknowledged with no order (the handler answers 200 +
       // not_actionable), never refused: a 401 would make Eventbrite retry
       // it for days.
-      const deliveryId = deliveryIdFor(rawBody);
+      const deliveryId = crypto.randomUUID();
       const ignored = (eventType = 'unknown') => ({ valid: true, deliveryId, eventType, resourceId: null });
 
       let body;
@@ -693,7 +687,6 @@ module.exports = {
     endpointUrlFor,
     endpointKey,
     safeEqual,
-    deliveryIdFor,
     claimUrl,
   },
 };

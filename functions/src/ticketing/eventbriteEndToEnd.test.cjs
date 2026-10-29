@@ -95,9 +95,8 @@ test('synthetic Eventbrite webhook run: order.placed → queued → fetched → 
   await webhookHandler(signedWebhookRequest('webhook-order-placed.json'), res1);
   assert.equal(res1.statusCode, 200);
   assert.equal(res1.body.enqueued, true);
-  assert.ok(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(
-    Buffer.from(JSON.stringify(fixture('webhook-order-placed.json')), 'utf8'),
-  )));
+  const firstReceipt = db.read('ticket_sync_queue', 'ord-2001').lastDeliveryId;
+  assert.ok(db.read('ticket_webhook_deliveries', firstReceipt));
   const queueRowAfterWebhook = db.read('ticket_sync_queue', 'ord-2001');
   assert.equal(queueRowAfterWebhook.status, 'pending');
 
@@ -107,9 +106,9 @@ test('synthetic Eventbrite webhook run: order.placed → queued → fetched → 
   await webhookHandler(signedWebhookRequest('webhook-order-updated.json'), res2);
   assert.equal(res2.statusCode, 200);
   assert.equal(res2.body.enqueued, true, 'a distinct delivery about the same order still enqueues');
-  assert.equal(db.read('ticket_sync_queue', 'ord-2001').lastDeliveryId, eventbriteInternals.deliveryIdFor(
-    Buffer.from(JSON.stringify(fixture('webhook-order-updated.json')), 'utf8'),
-  ));
+  const secondReceipt = db.read('ticket_sync_queue', 'ord-2001').lastDeliveryId;
+  assert.notEqual(secondReceipt, firstReceipt);
+  assert.ok(db.read('ticket_webhook_deliveries', secondReceipt));
 
   // 3. First drain: the provider still reports the order as processing —
   // no tickets yet, row stays pending for a retry (§3.3 step 3).
@@ -197,6 +196,47 @@ test('synthetic Eventbrite webhook run: a refund revokes entitlement, no valid t
   assert.equal(entitlement.approvalSource, null, 'a ticket-sourced approval does not survive its own refund (§3.4)');
 });
 
+test('identical Eventbrite notifications reconcile a later refund and revoke ticket access', async () => {
+  const db = makeFakeDb({
+    'users/uid-ada': { registrationStatus: 'pending', approvalSource: null },
+  });
+  const getConfig = async () => ({ features: { autoApproveTicketHolders: false } });
+  const order = structuredClone(fixture('order-complete.json'));
+  let reads = 0;
+  const provider = createEventbriteProvider({
+    env: { TICKETING_API_TOKEN: TOKEN, TICKETING_WEBHOOK_SECRET: SECRET, EVENT_TICKETING_EVENT_ID: 'evt-1' },
+    fetchImpl: async () => { reads += 1; return { status: 200, json: async () => order }; },
+    getConfig,
+  });
+  const handler = createTicketingWebhookHandler({ db, provider, log: QUIET });
+  const request = signedWebhookRequest('webhook-order-updated.json');
+  const first = makeRes();
+  await handler(request, first);
+  assert.equal(first.body.enqueued, true);
+  const retry = makeRes();
+  const firstReceipt = db.read('ticket_sync_queue', 'ord-2001').lastDeliveryId;
+  await handler(request, retry);
+  assert.equal(retry.body.enqueued, true);
+  const pending = await db.collection('ticket_sync_queue').get();
+  assert.equal(pending.size, 1, 'identical pending deliveries coalesce by order');
+  assert.equal(pending.docs[0].data().generation, 2);
+  assert.notEqual(pending.docs[0].data().lastDeliveryId, firstReceipt);
+  await drainTicketSyncQueue({ db, provider, log: QUIET });
+  await claimTicketsForUser({ db, uid: 'uid-ada', email: 'ada.lovelace@example.com', externalIds: ['att-5001'], getConfig });
+  assert.equal((await recomputeEntitlement({ db, uid: 'uid-ada', getConfig })).registrationStatus, 'ticketed');
+
+  // The notification is byte-identical; only authoritative API state changes.
+  order.attendees[0].refunded = true;
+  const second = makeRes();
+  await handler(request, second);
+  assert.equal(second.statusCode, 200);
+  assert.equal(second.body.enqueued, true, 'a later identical body must re-arm reconciliation');
+  await drainTicketSyncQueue({ db, provider, log: QUIET });
+  assert.equal(reads, 2);
+  assert.equal(db.read('tickets', 'att-5001').status, 'refunded');
+  assert.equal((await recomputeEntitlement({ db, uid: 'uid-ada', getConfig })).registrationStatus, 'revoked');
+});
+
 test('a wrong-event delivery is acknowledged and ignored, never enqueued (§3.3 step 1)', async () => {
   const db = makeFakeDb();
   const provider = createEventbriteProvider({
@@ -231,7 +271,7 @@ test('a delivery with a missing or wrong URL secret never reaches the transactio
     assert.deepEqual(res.body, { error: { code: 'unauthorized', message: 'Verification failed.' } });
   }
   assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
-  assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(rawBody)), undefined);
+  assert.equal((await db.collection('ticket_webhook_deliveries').get()).size, 0);
 });
 
 test('a forged delivery with the secret cannot inject ticket data: tickets come only from the API re-fetch (issue 356)', async () => {
@@ -283,7 +323,7 @@ test('an authenticated delivery in an unknown shape is acknowledged and ignored,
     }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.ignored, 'not_actionable');
-    assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(rawBody)), undefined);
+    assert.equal((await db.collection('ticket_webhook_deliveries').get()).size, 0);
   }
   assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
 });
@@ -333,6 +373,6 @@ test('an attendee delivery whose attendee is not readable yet answers 500 and wr
   const res = makeRes();
   await createTicketingWebhookHandler({ db, provider, log: QUIET })(req, res);
   assert.equal(res.statusCode, 500);
-  assert.equal(db.read('ticket_webhook_deliveries', eventbriteInternals.deliveryIdFor(req.rawBody)), undefined);
+  assert.equal((await db.collection('ticket_webhook_deliveries').get()).size, 0);
   assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
 });

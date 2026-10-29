@@ -74,16 +74,14 @@ sandbox:
 
 ### 2. Delivery id
 
-- **Capture:** trigger the exact same order-update notification twice if possible (or watch for
-  Eventbrite's own retry behavior on a slow-responding endpoint) and compare the two raw request
-  bodies byte for byte.
-- **Sanitize:** this is about body *identity*, not content, so you can hash both bodies
-  (`sha256sum`) locally without sanitizing them for this specific check.
-- **Diff against:** `webhook-order-updated.json` and `webhook-order-updated-2.json` model "two
-  distinct deliveries, different bytes, same `orderId`" — confirm real retries of the *same*
-  notification are byte-identical (so `sha256(rawBody)` dedup works as intended), and that two
-  genuinely different notifications about the same order differ in bytes, as those two fixtures
-  assume.
+- **Capture:** Observe authenticated order-update notifications for the same order before and
+  after an API-side state change. Include a byte-identical retry if Eventbrite sends one.
+- **Sanitize:** Keep only sanitized order and receipt identifiers. Do not retain raw request
+  bodies or callback URLs containing the webhook secret.
+- **Check:** Each authenticated receipt gets a different random UUID. Pending notifications
+  share one order queue row and advance its generation. After a completed reconciliation,
+  another notification re-arms an authoritative API read even when its body is byte-identical.
+  Confirm the resulting ticket status and entitlement follow the current API state.
 
 ### 3. `api_url` shape
 
