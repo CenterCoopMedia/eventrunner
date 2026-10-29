@@ -115,6 +115,11 @@ function normalizeTicket(record, providerName) {
  * (registration.cjs) either happens entirely before or entirely after this
  * write — Firestore aborts and re-runs the loser.
  *
+ * Provider snapshots have no ordering metadata. Once a refund or
+ * cancellation is stored, a later-arriving valid or pending snapshot
+ * cannot restore access or hold ticket-derived revocation. Check inside
+ * the transaction so a racing terminal write also survives a retry.
+ *
  * @param {{ db: object, ticket: object, now?: () => Date }} deps
  * @returns {Promise<{ action: 'created'|'updated' }>}
  */
@@ -135,7 +140,10 @@ async function upsertTicket({ db, ticket, now = () => new Date(), respectDemoPol
       });
       return { action: 'created' };
     }
-    tx.set(ref, { ...ticket, updatedAt: at }, { merge: true });
+    const currentStatus = snap.data()?.status;
+    const terminal = (status) => status === 'refunded' || status === 'cancelled';
+    const status = terminal(currentStatus) && !terminal(ticket.status) ? currentStatus : ticket.status;
+    tx.set(ref, { ...ticket, status, updatedAt: at }, { merge: true });
     return { action: 'updated' };
   });
 }

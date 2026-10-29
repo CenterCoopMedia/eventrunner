@@ -636,6 +636,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Refunded and cancelled tickets keep their stored status when a delayed order lookup,
+  provider sync or CSV import reports them as valid or awaiting information (#563).
+  A concurrent refund also survives a transaction retry.
+
 - Public profile updates retry after transient failures. Deleting an Auth account
   directly removes its public profile and shared schedule, including when a previous
   cleanup attempt already removed the account document (#562).

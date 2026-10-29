@@ -18,6 +18,8 @@ const {
   applyTicketClaimToUser,
 } = require('./registration.cjs');
 const { createFakeTicketingProvider, fakeTicket } = require('./ticketingFake.cjs');
+const { upsertTickets } = require('./sync.cjs');
+const { recomputeEntitlement } = require('./entitlement.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
 const T0 = new Date('2026-08-20T10:00:00.000Z');
@@ -78,6 +80,40 @@ const claimReq = (token, body = { orderNumber: 'ord-1' }) => ({
   headers: token ? { authorization: `Bearer ${token}` } : {},
   body,
 });
+
+for (const status of ['refunded', 'cancelled']) {
+  for (const claimed of [false, true]) {
+    test(`a delayed valid lookup cannot undo ${status} on a ${claimed ? 'claimed' : 'unclaimed'} ticket`, async () => {
+      const db = seededDb({
+        'tickets/tkt-1': { ...fakeTicket(), provider: 'eventbrite',
+          claimedByUid: claimed ? 'uid-ada' : null, claimedAt: claimed ? T0 : null },
+        'users/uid-ada': { uid: 'uid-ada', registrationStatus: claimed ? 'approved' : 'pending',
+          approvalSource: claimed ? 'ticket' : null },
+      });
+      let entered;
+      let release;
+      const reading = new Promise((resolve) => { entered = resolve; });
+      const snapshot = new Promise((resolve) => { release = resolve; });
+      const provider = createFakeTicketingProvider();
+      provider.lookupByOrderNumber = async () => { entered(); return snapshot; };
+      const config = async () => ({ features: { autoApproveTicketHolders: true } });
+      const res = makeRes();
+      const request = verifyHandler({ db, provider, config })(claimReq('ada'), res);
+      await reading;
+      await upsertTickets({ db, tickets: [fakeTicket({ status })], providerName: provider.name, log: QUIET });
+      release([fakeTicket()]);
+      await request;
+
+      assert.equal(res.statusCode, 404);
+      assert.equal(db.read('tickets', 'tkt-1').status, status);
+      assert.equal(db.read('tickets', 'tkt-1').claimedByUid, claimed ? 'uid-ada' : null);
+      await recomputeEntitlement({ db, uid: 'uid-ada', getConfig: config });
+      const user = db.read('users', 'uid-ada');
+      assert.equal(user.registrationStatus, claimed ? 'revoked' : 'pending');
+      assert.equal(user.approvalSource, null);
+    });
+  }
+}
 
 test('a self-service claim writes the ticket, claims it, and advances the account', async () => {
   const db = seededDb();
