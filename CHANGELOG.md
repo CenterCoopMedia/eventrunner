@@ -663,6 +663,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Public Stripe checkouts cap cumulative free tickets per event and verified purchaser
+  email at the smaller of 20 and the catalog's per-order limit. Free recipient addresses
+  receive one allocation per event across public orders. Mixed paid orders use the same
+  budget, which persists across hourly resets, refunds, and account recreation. Retries
+  and audited organizer comps keep their existing behavior (#566).
+
 - Reduced motion now disables transitions, so hiding the admin menu changes its
   width immediately instead of starting a short width transition.
 
