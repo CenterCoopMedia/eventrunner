@@ -366,11 +366,12 @@ unreachable region. A failed or partial inventory stops the deploy.
 older than one day are deleted. This is build-artifact retention only; it does not change deployed
 Functions or event data.
 
-**Case 2: new retry-enabled handlers.** On every other run, the script also discovers the local
+**Case 2: New retry policies.** On every other run, the script also discovers the local
 Functions with the pinned `firebase-tools` runtime, the same discovery that `firebase deploy` runs.
-A discovery failure stops the deploy. A retry-enabled handler is new when the inventory has no
-Function with the same id in the same region. For new handlers only, the script runs one targeted
-deploy first and logs the names it creates:
+A discovery failure stops the deploy. A retry policy is new when the Function is absent or its
+deployed trigger has retry disabled. Existing Functions qualify only with the same platform,
+codebase and trigger identity, including filters and document paths. An omitted trigger region
+inherits the existing region. The script first runs one targeted deploy and logs its targets:
 
 ```sh
 npx firebase deploy --only functions:<id>[,functions:<id>...] \
@@ -382,27 +383,25 @@ so Firebase does not ask again. Firebase continues to stop for function deletion
 migration, and other protected changes. The script refuses the targeted deploy, and deploys
 nothing, in these cases:
 
-- A Function with the same id exists in another region. That is a migration, not a new handler.
-- A selector also matches a deployed Function. Firebase matches `functions:<id>` against the
+- A Function with the same id exists outside the declared target regions.
+- A selector also matches a deployed Function outside the intended creates or retry upgrades.
+  Firebase matches `functions:<id>` against the
   dash-separated parts of each id, so `functions:foo` also selects `foo-bar`.
-- A selector also matches a local Function that is not a new retry handler.
+- A selector also matches a local Function outside the intended retry-policy targets.
 - A retry setting or a retry handler's region is not a literal value.
 
-With these checks, the targeted plan contains creates only. `--force` cannot approve deletion or
-unsafe migration of an existing Function. The targeted deploy can also accept other prompts for
-the new handlers: their min-instances cost, an API they need, and a missing Artifact Registry
-cleanup policy. A client deployment that already deploys without `--force` already has a cleanup
-policy.
+With these checks, the targeted plan contains only creates and retry upgrades with unchanged
+trigger identity. It cannot delete or recreate a Function. The targeted deploy can also accept other prompts for
+the targeted creates and retry upgrades: their min-instances cost, an API they need, and a missing
+Artifact Registry cleanup policy. A client deployment that already deploys without `--force`
+already has a cleanup policy.
 
 Retry-enabled event handlers can retry failed executions for up to seven days, so they must remain
 idempotent. Review every new retry handler for idempotency before it merges.
 
-**Retry enabled on an existing Function.** Case 2 covers handlers that do not exist yet. If a change
-turns on retry for a Function that is already deployed, the full deploy still stops at the
-retry-policy prompt. Do not add blanket `--force` to the workflow. Deploy that one Function by name
-with `--force` from a clean checkout of the reviewed commit, with the same deploy credentials and
-the same `functions/.env.<GCP_PROJECT_ID>` content as the workflow. Do this only when the same
-change does not also change the Function's trigger. Then rerun the workflow.
+**Retry enabled on an existing Function.** Case 2 accepts this automatically only when the
+normalized trigger identity is unchanged. A changed event type, filter, path, platform or codebase
+stops before deployment. Review that migration separately; do not add blanket `--force`.
 
 **Recover a partial first Functions deploy.** If the first bootstrap creates some Functions and then
 fails, read the failed run and repair its original API, permission, quota, or provider-configuration

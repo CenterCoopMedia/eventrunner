@@ -10,11 +10,11 @@
  * except on a bootstrap run whose complete inventory (read through the same
  * pinned firebase-tools backend as functions:list) is empty.
  *
- * On any other run, a retry-enabled function that is in the source but not
- * in the complete inventory is created first by a forced deploy that names
- * only those functions. The script refuses that step if a selector would
- * also reach a deployed function or another local function, so the forced
- * plan holds creates only. The full deploy then runs without --force.
+ * On any other run, functions that newly enable retry are deployed first
+ * with --force and explicit selectors. Existing functions qualify only
+ * when their platform, codebase and trigger identity are unchanged. The
+ * selectors must reach only intended creates or retry upgrades, without
+ * deletions or trigger recreation. The full deploy runs without --force.
  *
  * After the full deploy, the script reads the complete inventory again and
  * fails unless every local function is there in each of its regions.
@@ -25,6 +25,7 @@
  */
 
 const { spawnSync } = require('node:child_process');
+const { isDeepStrictEqual } = require('node:util');
 const fs = require('node:fs');
 const path = require('node:path');
 const { requireAuth } = require('firebase-tools/lib/requireAuth.js');
@@ -139,24 +140,59 @@ async function discoverLocalFunctions(projectId, {
     }
     const regions = literalRegions(endpoint);
     if (retry && !regions) throw new Error(`${id} has no literal deploy region`);
-    return { id, retry, regions };
+    return {
+      id, retry, regions, platform: endpoint.platform,
+      eventTrigger: functionsBuild.isEventTriggered(endpoint) ? endpoint.eventTrigger : null,
+    };
   }).sort((a, b) => a.id.localeCompare(b.id));
 }
 
 const label = ({ id, region }) => `${id}(${region})`;
 
+function triggerIdentity(trigger, inheritedRegion) {
+  const identity = { ...trigger };
+  delete identity.retry;
+  for (const field of ['eventFilters', 'eventFilterPathPatterns']) {
+    if (identity[field] && Object.keys(identity[field]).length === 0) delete identity[field];
+  }
+  // The pinned CLI retains an unspecified trigger region when filters match.
+  if (!identity.region && inheritedRegion) identity.region = inheritedRegion;
+  return identity;
+}
+
+function needsRetryAcceptance(existing, localFunction) {
+  if (!existing) return true;
+  if (functionsBackend.isEventTriggered(existing) && existing.eventTrigger.retry === true) return false;
+  const sameDeployment = ['gcfv1', 'gcfv2'].includes(localFunction.platform)
+    && existing.platform === localFunction.platform
+    && (existing.codebase || functionsProjectConfig.DEFAULT_CODEBASE) === functionsProjectConfig.DEFAULT_CODEBASE;
+  const sameTrigger = functionsBackend.isEventTriggered(existing)
+    && existing.eventTrigger.retry === false
+    && typeof localFunction.eventTrigger?.eventType === 'string'
+    && isDeepStrictEqual(
+      triggerIdentity(existing.eventTrigger),
+      triggerIdentity(localFunction.eventTrigger, existing.eventTrigger.region),
+    );
+  if (!sameDeployment || !sameTrigger) {
+    throw new Error(`cannot safely enable retries for deployed function ${label(existing)}: `
+      + 'platform, codebase or trigger identity differs');
+  }
+  return true;
+}
+
 /**
- * Find the retry-enabled local functions that the complete inventory does
- * not hold, by id and region, and prove that a selector naming each of
- * them reaches nothing else. Throws when a forced targeted deploy would
- * update, migrate, or delete any function.
+ * Find new retry policies by id/region using the pinned backend's boolean
+ * eventTrigger.retry, including unchanged existing triggers. Prove each
+ * selector reaches only these creates/upgrades, never collateral functions.
  */
 function planNewRetryFunctions(inventory, localFunctions, config) {
-  const deployedKeys = new Set(inventory.map(label));
+  const deployedByKey = new Map(inventory.map((fn) => [label(fn), fn]));
   const newRetry = localFunctions
     .filter((fn) => fn.retry)
-    .flatMap((fn) => fn.regions.map((region) => ({ id: fn.id, region })))
-    .filter((fn) => !deployedKeys.has(label(fn)));
+    .flatMap((fn) => fn.regions.map((region) => ({ ...fn, region })))
+    .filter((fn) => needsRetryAcceptance(deployedByKey.get(label(fn)), fn))
+    .map(({ id, region }) => ({ id, region }));
+  const targetKeys = new Set(newRetry.map(label));
   const ids = [...new Set(newRetry.map((fn) => fn.id))].sort();
   if (ids.length === 0) return { functions: [], selectors: [] };
 
@@ -164,7 +200,7 @@ function planNewRetryFunctions(inventory, localFunctions, config) {
   const filters = ids.flatMap((id) => parseFunctionSelector(id, config));
   const matches = (endpoint) => filters.some((filter) => endpointMatchesFilter(endpoint, filter));
 
-  const deployedHits = inventory.filter(matches);
+  const deployedHits = inventory.filter((fn) => matches(fn) && !targetKeys.has(label(fn)));
   if (deployedHits.length > 0) {
     throw new Error(`a forced deploy of ${selectors.join(',')} would also change deployed `
       + `function(s): ${deployedHits.map(label).join(', ')}`);
@@ -241,18 +277,18 @@ async function main({
     try {
       plan = planNewRetryFunctions(inventory, localFunctions, readConfig());
     } catch (error) {
-      log.error(reportFailure('deploy-functions: refusing a forced deploy of new retry functions', {}, error));
+      log.error(reportFailure('deploy-functions: refusing a forced deploy of retry policies', {}, error));
       return 1;
     }
     if (plan.selectors.length > 0) {
-      log.log('deploy-functions: creating new retry function(s) with a targeted --force deploy: '
+      log.log('deploy-functions: accepting new retry policies with a targeted --force deploy: '
         + plan.functions.map(label).join(', '));
       const targeted = run([
         'firebase', 'deploy', '--only', plan.selectors.join(','),
         '--project', projectId, '--non-interactive', '--force',
       ], { stdio: 'inherit' });
       if (failed(targeted)) {
-        log.error(reportFailure('deploy-functions: targeted deploy of new retry functions failed', targeted));
+        log.error(reportFailure('deploy-functions: targeted deploy of retry policies failed', targeted));
         return deployFailure(targeted);
       }
     }
