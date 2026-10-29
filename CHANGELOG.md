@@ -636,6 +636,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Public profile updates retry after transient failures. Deleting an Auth account
+  directly removes its public profile and shared schedule, including when a previous
+  cleanup attempt already removed the account document (#562).
+
 - Firebase Hosting pages deny iframe embedding to protect admin actions from
   clickjacking, including entry through `/index.html` and later navigation to admin
   routes. The framing policy also applies to public pages (#561).

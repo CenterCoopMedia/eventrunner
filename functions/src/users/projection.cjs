@@ -241,6 +241,7 @@ function buildHandlers() {
   return {
     syncUserPublic: onDocumentWritten({
       region,
+      retry: true,
       document: 'users/{uid}',
     }, async (event) => {
       const { getDb } = require('../core/firestore.cjs');
