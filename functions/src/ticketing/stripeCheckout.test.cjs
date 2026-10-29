@@ -468,31 +468,31 @@ test('free orders have a per-purchaser hourly ceiling and old retries spend no q
   const { deps, db, advance } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Full event pass', unitAmount: 0, capacity: 100 }] } });
   const first = await checkout(deps);
   for (let i = 2; i <= 5; i += 1) {
-    assert.equal((await checkout(deps, request({ requestId: `checkout-request-000${i}` }))).statusCode, 200);
+    assert.equal((await checkout(deps, freeRequest(`checkout-request-000${i}`, 1))).statusCode, 200);
   }
   const retry = await checkout(deps);
   assert.equal(retry.statusCode, 200);
   assert.equal(retry.body.orderId, first.body.orderId);
-  const denied = await checkout(deps, request({ requestId: 'checkout-request-0006' }));
+  const denied = await checkout(deps, freeRequest('checkout-request-0006', 1));
   assert.equal(denied.statusCode, 429);
   assert.equal(denied.body.error.code, 'rate-limited');
   assert.equal(denied.body.error.retryAfterSeconds, 3600);
   assert.equal(denied.headers['Retry-After'], '3600');
   assert.equal(db.ids('ticket_orders').length, 5);
   assert.equal(db.read('ticket_inventory', 'current').sold, 5);
-  assert.equal((await checkout(deps, request({ requestId: 'checkout-request-0006' }), 'bob')).statusCode, 200);
+  assert.equal((await checkout(deps, freeRequest('checkout-request-0006', 1, 'bob-other'), 'bob')).statusCode, 200);
   advance(3600000);
-  assert.equal((await checkout(deps, request({ requestId: 'checkout-request-0006' }))).statusCode, 200);
+  assert.equal((await checkout(deps, freeRequest('checkout-request-0006', 1))).statusCode, 200);
 });
 
 test('concurrent last-quota free orders consume one slot and failed selections do not spend it', async () => {
   const { deps, db } = setup({ catalogPatch: { ticketTypes: [{ id: 'general', name: 'Full event pass', unitAmount: 0, capacity: 100 }] } });
-  for (let i = 1; i <= 4; i += 1) await checkout(deps, request({ requestId: `checkout-request-000${i}` }));
+  for (let i = 1; i <= 4; i += 1) await checkout(deps, freeRequest(`checkout-request-000${i}`, 1));
   const invalid = await checkout(deps, request({ requestId: 'checkout-request-bad0', lines: [{ ticketTypeId: 'unknown', quantity: 1, attendees: [PERSON] }] }));
   assert.equal(invalid.statusCode, 409);
   const results = await Promise.all([
-    checkout(deps, request({ requestId: 'checkout-request-0005' })),
-    checkout(deps, request({ requestId: 'checkout-request-0006' })),
+    checkout(deps, freeRequest('checkout-request-0005', 1)),
+    checkout(deps, freeRequest('checkout-request-0006', 1)),
   ]);
   assert.deepEqual(results.map((result) => result.statusCode).sort(), [200, 429]);
   assert.equal(db.ids('ticket_orders').length, 5);
@@ -818,4 +818,90 @@ test('an in-flight API response cannot regress a webhook-confirmed paid order', 
   assert.equal(result.body.status, 'paid');
   assert.equal(db.read('ticket_orders', result.body.orderId).stripeSessionId, 'cs_test_confirmed');
   assert.equal(db.read('ticket_inventory', 'current').sold, 1);
+});
+
+function freeRequest(requestId, quantity, prefix = requestId) {
+  return request({ requestId, lines: [{ ticketTypeId: 'general', quantity,
+    attendees: Array.from({ length: quantity }, (_, i) => ({ ...PERSON, email: `${prefix}-${i}@example.com` })),
+  }] });
+}
+
+const FREE_CATALOG = { ticketTypes: [{ id: 'general', name: 'Free pass', unitAmount: 0, capacity: 100 }] };
+
+test('permanent free seat budget stops repeated maximum orders after the hourly window and account recreation', async () => {
+  const { deps, db, advance } = setup({ catalogPatch: FREE_CATALOG });
+  const body = freeRequest('free-budget-first-0001', 20);
+  const first = await checkout(deps, body);
+  assert.equal(first.statusCode, 200);
+  const writes = db.writes.length;
+  const denied = await checkout(deps, freeRequest('free-budget-next-0002', 20));
+  assert.equal(denied.statusCode, 403);
+  assert.equal(denied.body.error.code, 'free-seat-limit');
+  assert.equal(db.writes.length, writes);
+  advance(3600001);
+  assert.equal((await checkout(deps, freeRequest('free-budget-next-0003', 1))).statusCode, 403);
+  assert.equal((await checkout(deps, body)).body.orderId, first.body.orderId);
+  await db.collection('users').doc('recreated-user').set({});
+  await assert.rejects(reserveCommerceOrder({ ...deps, actor: { uid: 'recreated-user', email: 'ADA@EXAMPLE.COM' },
+    request: freeRequest('free-budget-next-0004', 1) }), { code: 'free-seat-limit' });
+  assert.equal(db.read('ticket_inventory', 'current').sold, 20);
+  assert.equal(db.ids('tickets').length, 20);
+});
+
+test('concurrent free orders cannot exceed remaining seat budget and rejected inventory spends no budget', async () => {
+  const { deps, db } = setup({ catalogPatch: FREE_CATALOG });
+  assert.equal((await checkout(deps, freeRequest('free-budget-initial1', 19))).statusCode, 200);
+  const results = await Promise.all([
+    checkout(deps, freeRequest('free-budget-racing01', 1)),
+    checkout(deps, freeRequest('free-budget-racing02', 1)),
+  ]);
+  assert.deepEqual(results.map((res) => res.statusCode).sort(), [200, 403]);
+  assert.equal(db.read('ticket_inventory', 'current').sold, 20);
+  const other = setup({ catalogPatch: { ...FREE_CATALOG, capacity: 1 } });
+  assert.equal((await checkout(other.deps, freeRequest('free-budget-too-big', 2))).statusCode, 409);
+  assert.equal(other.db.ids('ticket_inventory').length, 0);
+  assert.equal((await checkout(other.deps, freeRequest('free-budget-valid01', 1))).statusCode, 200);
+});
+
+test('duplicate free recipients are rejected within and across orders and purchasers without disclosing ownership', async () => {
+  const { deps, db } = setup({ catalogPatch: FREE_CATALOG });
+  const duplicate = request({ lines: [{ ticketTypeId: 'general', quantity: 2,
+    attendees: [PERSON, { ...PERSON, email: 'ADA@EXAMPLE.COM' }] }] });
+  assert.equal((await checkout(deps, duplicate)).body.error.code, 'duplicate-free-recipient');
+  assert.equal(db.ids('tickets').length, 0);
+  const first = await checkout(deps);
+  const writes = db.writes.length;
+  const denied = await checkout(deps, request({ requestId: 'free-duplicate-other' }), 'bob');
+  assert.equal(denied.body.error.code, 'duplicate-free-recipient');
+  assert.equal(JSON.stringify(denied.body).includes(first.body.orderId), false);
+  assert.equal(db.writes.length, writes);
+});
+
+test('free seats in mixed paid orders spend the same budget and malformed counters fail closed', async () => {
+  const { deps, db } = setup({ catalogPatch: { ticketTypes: [
+    ...FREE_CATALOG.ticketTypes,
+    { id: 'student', name: 'Paid pass', unitAmount: 1000, capacity: 100 },
+  ] } });
+  assert.equal((await checkout(deps, freeRequest('mixed-budget-first01', 20))).statusCode, 200);
+  const mixed = freeRequest('mixed-budget-second1', 1);
+  mixed.lines.push({ ticketTypeId: 'student', quantity: 1, attendees: [PERSON] });
+  assert.equal((await checkout(deps, mixed)).body.error.code, 'free-seat-limit');
+  const budgetId = db.ids('ticket_inventory').find((id) => id.startsWith('free_budget_'));
+  await db.collection('ticket_inventory').doc(budgetId).set({ allocated: -1 });
+  assert.equal((await checkout(deps, freeRequest('mixed-budget-corrupt', 1))).statusCode, 503);
+});
+
+test('the catalog can lower the cumulative free budget and duplicates cannot hide in another type', async () => {
+  const { deps, db } = setup({ catalogPatch: { maxPerOrder: 2, ticketTypes: [
+    ...FREE_CATALOG.ticketTypes,
+    { id: 'student', name: 'Other free pass', unitAmount: 0, capacity: 100 },
+  ] } });
+  const duplicate = request({ lines: [
+    { ticketTypeId: 'general', quantity: 1, attendees: [PERSON] },
+    { ticketTypeId: 'student', quantity: 1, attendees: [PERSON] },
+  ] });
+  assert.equal((await checkout(deps, duplicate)).body.error.code, 'duplicate-free-recipient');
+  assert.equal((await checkout(deps, freeRequest('catalog-budget-first', 2))).statusCode, 200);
+  assert.equal((await checkout(deps, freeRequest('catalog-budget-next1', 1))).body.error.code, 'free-seat-limit');
+  assert.equal(db.read('ticket_inventory', 'current').sold, 2);
 });

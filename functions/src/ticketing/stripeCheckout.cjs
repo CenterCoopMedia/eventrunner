@@ -18,6 +18,7 @@ const ATTEMPT_LEASE_MS = 30 * 1000;
 const RETRY_BACKOFF_MS = 5 * 1000;
 const PURCHASER_WINDOW_MS = 60 * 60 * 1000;
 const MAX_PURCHASER_ORDERS = 5;
+const MAX_PUBLIC_FREE_SEATS = 20;
 
 function assertWritableEvent(event) {
   if (!event || typeof event !== 'object' || Array.isArray(event)
@@ -225,6 +226,34 @@ async function reserveCommerceOrder({
     if (paid) requirePaymentCredentials(provider);
     const publicUrl = paid ? configuredPublicUrl(config, env) : null;
     const seats = makeSeats(id, priced.lines, request);
+    // These private, durable allocation records deliberately outlive the hourly
+    // order window and user profiles. A new request ID or recreated account
+    // with the same verified email must not replenish permanent free inventory.
+    const freeSeats = comp ? [] : seats.filter((seat) => priced.lines[seat.lineIndex].unitAmount === 0);
+    let freeBudgetRef;
+    let freeBudget;
+    let recipientRefs = [];
+    if (freeSeats.length) {
+      const email = actor.email.trim().toLowerCase();
+      freeBudgetRef = db.collection(INVENTORY).doc(`free_budget_${orderIdFor(scope.eventId, email).slice(4)}`);
+      const recipients = freeSeats.map((seat) => seat.email.trim().toLowerCase());
+      if (new Set(recipients).size !== recipients.length) {
+        throw new CommerceError('duplicate-free-recipient', 'Each free ticket needs a different attendee email.', 400);
+      }
+      recipientRefs = recipients.map((recipient) => db.collection(INVENTORY).doc(`free_recipient_${orderIdFor(scope.eventId, recipient).slice(4)}`));
+      const [budgetSnap, ...recipientSnaps] = await tx.getAll(freeBudgetRef, ...recipientRefs);
+      const allocated = budgetSnap.exists ? budgetSnap.data().allocated : 0;
+      if (!Number.isSafeInteger(allocated) || allocated < 0) {
+        throw new CommerceError('inventory-invalid', 'This checkout needs organizer review.', 503);
+      }
+      if (allocated + freeSeats.length > Math.min(MAX_PUBLIC_FREE_SEATS, catalog.maxPerOrder)) {
+        throw new CommerceError('free-seat-limit', 'You have reached the free ticket limit for this event. Contact the organizer for help.', 403);
+      }
+      if (recipientSnaps.some((snap) => snap.exists)) {
+        throw new CommerceError('duplicate-free-recipient', 'An attendee already has a free ticket allocation. Contact the organizer for help.');
+      }
+      freeBudget = { allocated: allocated + freeSeats.length, updatedAt: at };
+    }
     const order = {
       id, orderId: id, provider: 'stripe', ...scope,
       attemptId, source, purchaserUid: actor.uid, purchaserEmail: actor.email,
@@ -251,6 +280,10 @@ async function reserveCommerceOrder({
       stripeSessionId: null, requestFingerprint: fingerprint,
       createdAt: at, updatedAt: at, lastTriedAt: null, leaseUntil: null, retryNotBefore: null,
     };
+    if (freeBudgetRef) {
+      tx.set(freeBudgetRef, freeBudget);
+      for (const ref of recipientRefs) tx.create(ref, { orderId: id, createdAt: at });
+    }
     tx.create(orderRef, order);
     tx.create(attemptRef, attempt);
     tx.set(inventoryRef, { ...inventory, updatedAt: at });

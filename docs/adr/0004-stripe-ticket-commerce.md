@@ -59,6 +59,8 @@ pricing authority. Completed orders retain their captured descriptions and amoun
 | `ticket_catalog/current` | Validated, revisioned offer and commercial terms; operator writes only. |
 | `ticket_inventory/current` | Atomic event/type held and sold counters scoped to the event. |
 | `ticket_inventory/purchaser_<hash>` | Purchaser's active order and bounded new-order rate window; not queued work. |
+| `ticket_inventory/free_budget_<hash>` | Cumulative public free-seat allocation per event and verified purchaser email. |
+| `ticket_inventory/free_recipient_<hash>` | Durable public free-seat uniqueness guard per event and attendee email. |
 | `ticket_orders/{orderId}` | Immutable purchase snapshot, attendee assignments, merchant/mode, payment/refund facts, and stable ticket IDs. |
 | `ticket_payment_attempts/{attemptId}` | Frozen Checkout request, order-linked idempotency key, creation outcome, and recovery lease. |
 | `tickets/{externalId}` | One stable admission per seat; claim, validity, and check-in remain distinct from financial state. |
