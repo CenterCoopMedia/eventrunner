@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Profile photo uploads now have per-account limits: Four reserved or retained
+  objects below 2 MiB each and ten upload attempts in each fixed one-hour window,
+  anchored at its first attempt (#572). Later upload requests reclaim expired,
+  unused allocations after one hour; failed writes and
+  deletes retain their reservations until cleanup succeeds. Deploy the compatible
+  function, rules, and client together. Retrying an expired staged upload first
+  deletes it before uploading again. A failed cleanup after account removal can
+  leave an inaccessible object for operator cleanup. Cached or downloaded public
+  images cannot be recalled; the existing cache lifetime is one hour.
 - Profile photos are decoded on the server, checked against byte and pixel limits,
   and re-encoded as metadata-free WebP images within 512 × 512 before publication
   (#565). Direct client uploads are denied. Legacy photos require re-uploading;

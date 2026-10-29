@@ -23,53 +23,10 @@ async function renderProfilePhoto(buffer, sharp = require('sharp')) {
     .webp({ quality: 80 }).toBuffer();
 }
 
-function createProfilePhotoUploadHandler({
-  db, bucket, auth, render = renderProfilePhoto,
-  verify = (...args) => require('../core/auth.cjs').verifyAuthToken(...args),
-  newId = () => require('node:crypto').randomUUID(),
-  log = console,
-}) {
-  return async (req, res) => {
-    const error = (status, code, message) => res.status(status).json({ error: { code, message } });
-    if (req.method !== 'POST') {
-      res.set('Allow', 'POST');
-      return error(405, 'method-not-allowed', 'Use POST.');
-    }
-    const caller = await verify({ auth }, req);
-    if (!caller?.uid) return error(401, 'unauthorized', 'Authentication required.');
-    if (!(await db.collection('users').doc(caller.uid).get()).exists) {
-      return error(403, 'forbidden', 'A live account is required.');
-    }
-    const data = req.body?.data;
-    // Bound the encoded input before allocating its decoded buffer.
-    if (typeof data !== 'string' || !data.length
-      || data.length > 4 * Math.ceil(MAX_BYTES / 3)
-      || data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
-      return error(400, 'invalid-image', 'Choose a photo under 2 MiB.');
-    }
-    let output;
-    try {
-      output = await render(Buffer.from(data, 'base64'));
-    } catch {
-      return error(400, 'invalid-image', 'Choose a still PNG, JPEG or WebP under 2 MiB and 40 megapixels.');
-    }
-    const path = `profile-photos/${caller.uid}/${newId()}/photo.webp`;
-    try {
-      await bucket.file(path).save(output, {
-        resumable: false,
-        contentType: 'image/webp',
-        metadata: {
-          contentType: 'image/webp',
-          cacheControl: 'public, max-age=3600',
-          metadata: { profilePhotoValidated: 'v1' },
-        },
-      });
-    } catch (err) {
-      log.error('profilePhotoUpload failed', err);
-      return error(500, 'internal', 'The photo could not be uploaded.');
-    }
-    return res.status(200).json({ path });
-  };
+function createProfilePhotoUploadHandler(deps) {
+  return require('../users/photos.cjs').createProfilePhotoUploadHandler({
+    render: renderProfilePhoto, ...deps,
+  });
 }
 
 function buildHandlers() {

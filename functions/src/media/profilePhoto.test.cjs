@@ -2,6 +2,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const sharp = require('sharp');
+const { makeFakeDb } = require('../cms/firestoreFake.cjs');
 const { renderProfilePhoto, createProfilePhotoUploadHandler } = require('./profilePhoto.cjs');
 
 test('re-encodes valid small images too, strips metadata and bounds dimensions', async () => {
@@ -30,7 +31,7 @@ function setup({ caller = { uid: 'owner' }, exists = true, render = renderProfil
   const writes = [];
   const handler = createProfilePhotoUploadHandler({
     verify: async () => caller,
-    db: { collection: () => ({ doc: () => ({ get: async () => ({ exists }) }) }) },
+    db: makeFakeDb(exists ? { 'users/owner': { photoPath: null } } : {}),
     bucket: { file: (path) => ({ save: async (buffer, options) => writes.push({ path, buffer, options }) }) },
     newId: () => 'fresh', render,
   });

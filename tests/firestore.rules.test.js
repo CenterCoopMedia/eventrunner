@@ -1174,9 +1174,33 @@ describe("users account documents (spec §3.4)", () => {
 
   it("allows this account's photo and a default avatar, and refuses another attendee's photo", async () => {
     const ref = doc(attendee("pending-1"), "users/pending-1");
-    await assertSucceeds(updateDoc(ref, { photoPath: "profile-photos/pending-1/photo.png" }));
+    await assertFails(updateDoc(ref, { photoPath: "profile-photos/pending-1/photo.png" }));
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'profile_photo_uploads/pending-1'), {
+        slots: { 'fresh-id': { path: 'profile-photos/pending-1/fresh-id/photo.png',
+          state: 'ready', expiresAtMs: Date.now() + 3600000 } },
+      });
+    });
     await assertSucceeds(updateDoc(ref, { photoPath: "profile-photos/pending-1/fresh-id/photo.png" }));
+    // Expiry blocks NEW references, but must not lock an existing profile.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'profile_photo_uploads/pending-1'), {
+        slots: { 'fresh-id': { path: 'profile-photos/pending-1/fresh-id/photo.png',
+          state: 'deleting', expiresAtMs: 0 } },
+      });
+    });
+    await assertSucceeds(updateDoc(ref, { bio: 'Still editable' }));
+    await assertFails(updateDoc(doc(attendee('pending-1'), 'profile_photo_uploads/pending-1'), { count: 0 }));
     await assertSucceeds(updateDoc(ref, { photoPath: "default-avatars/avatar-01.svg" }));
+    await assertFails(updateDoc(ref, { photoPath: 'profile-photos/pending-1/fresh-id/photo.png' }));
+    for (const [state, expiresAtMs] of [['ready', 0], ['uploading', Date.now() + 3600000], ['deleting', Date.now() + 3600000]]) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), 'profile_photo_uploads/pending-1'), {
+          slots: { 'fresh-id': { path: 'profile-photos/pending-1/fresh-id/photo.png', state, expiresAtMs } },
+        });
+      });
+      await assertFails(updateDoc(ref, { photoPath: 'profile-photos/pending-1/fresh-id/photo.png' }));
+    }
     await assertSucceeds(updateDoc(ref, { photoPath: null }));
     await assertFails(updateDoc(ref, { photoPath: "profile-photos/approved-1/photo.png" }));
     await assertFails(updateDoc(ref, { photoPath: "profile-photos/pending-1/../../approved-1/photo.png" }));

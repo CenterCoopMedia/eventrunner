@@ -278,6 +278,7 @@ async function fullySeeded(overrides = {}) {
     'change_requests/cr-ada-1': { message: 'Fix the map.', status: 'new', uid: 'uid-ada', email: 'ada@example.com' },
     'change_requests/cr-ada-2': { message: 'Add a room.', status: 'done', uid: 'uid-ada', email: 'ada@example.com' },
     'change_requests/cr-bo-1': { message: 'Keep me.', status: 'new', uid: 'uid-bo', email: 'bo@example.com' },
+    'profile_photo_uploads/uid-ada': { slots: {}, count: 2 },
     'change_request_rate_limits/uid-ada': { requests: [T0.getTime()], updatedAt: T0 },
     'change_request_rate_limits/uid-bo': { requests: [T0.getTime()], updatedAt: T0 },
     // Organization representative access and a queued edit each (issue #334).
@@ -348,7 +349,7 @@ test('the per-account store list is one named constant the delete reads', () => 
     PER_ACCOUNT_STORES.map((store) => store.collection ?? store.subcollection ?? store.prefix),
     [
       'users_public', 'schedule_shares', 'organization_representatives', 'tickets', 'bookmarks',
-      'sessionNotes', 'profile-photos', 'change_requests', 'change_request_rate_limits',
+      'sessionNotes', 'profile-photos', 'profile_photo_uploads', 'change_requests', 'change_request_rate_limits',
       'organization_edit_requests',
     ],
   );
@@ -368,7 +369,7 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
     ok: true,
     uid: 'uid-ada',
     removed: {
-      tickets: 1, bookmarks: 2, notes: 1, photos: 2, changeRequests: 2, changeRequestLimits: 1, organizationEdits: 1,
+      tickets: 1, bookmarks: 2, notes: 1, photos: 2, photoUploads: 1, changeRequests: 2, changeRequestLimits: 1, organizationEdits: 1,
     },
   });
   // Out of the directory, and no longer a representative.
@@ -387,6 +388,7 @@ test('a delete removes every per-account store, lowers counts to no less than 0,
   assert.equal(bucket.files.has('profile-photos/uid-ada/photo-small.jpg'), false);
   assert.deepEqual(db.ids('change_requests'), ['cr-bo-1']);
   assert.equal(db.read('change_request_rate_limits', 'uid-ada'), undefined);
+  assert.equal(db.read('profile_photo_uploads', 'uid-ada'), undefined);
   // The ticket record stays; its claim is released.
   assert.deepEqual(db.read('tickets', 'tkt-1'), {
     email: 'ada@example.com', status: 'valid', claimedByUid: null, claimedAt: null, updatedAt: T0,
@@ -691,7 +693,7 @@ test('the sweep clears more than one page of every store, a page at a time', asy
 
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   assert.deepEqual(res.body.removed, {
-    tickets: 0, bookmarks: 250, notes: 450, photos: 501, changeRequests: 450, changeRequestLimits: 0,
+    tickets: 0, bookmarks: 250, notes: 450, photos: 501, photoUploads: 0, changeRequests: 450, changeRequestLimits: 0,
     organizationEdits: 0,
   });
   assert.deepEqual(db.ids('change_requests'), []);

@@ -1,8 +1,8 @@
 // Storage rules tests, run against the emulator via `npm run test:rules`.
 // Pins the v1 rules from docs/adr/0001-event-platform-v1.md §8.5:
 //
-//   • `profile-photos/{uid}/**` allows reads of server-validated output and
-//     owner deletes while users/{uid} exists; all client uploads are denied;
+//   • `profile-photos/{uid}/**` refuses all client allocation; owners of
+//     live accounts can still delete their own objects;
 //   • `cms-images/`, `branding/`, and `speaker-photos/` are fetchable but
 //     never writable by a client — their writers are admin-gated functions
 //     using the Admin SDK, which bypasses these rules;
@@ -30,6 +30,9 @@ import { deleteObject, getBytes, listAll, ref, uploadBytes } from "firebase/stor
 
 const OWNER = "attendee-1";
 const OTHER = "attendee-2";
+
+/** A 2 MiB budget with a little headroom either side of the rule's limit. */
+const TWO_MIB = 2 * 1024 * 1024;
 
 /** The server's inclusive cap for one session material. */
 const NINE_MIB = 9 * 1024 * 1024;
@@ -86,20 +89,66 @@ afterAll(async () => {
   await testEnv?.cleanup();
 });
 
-describe("profile photos — trusted output only", () => {
-  it("denies owner writes, including a forged validation stamp", async () => {
-    await assertFails(put(asUser(OWNER), `profile-photos/${OWNER}/new.png`));
-    await assertFails(uploadBytes(ref(asUser(OWNER), `profile-photos/${OWNER}/avatar.png`), bytes(), {
-      contentType: "image/webp", customMetadata: { profilePhotoValidated: "v1" },
-    }));
+describe("profile-photos/{uid} — server-authorized allocation", () => {
+  it("denies an owner overwriting their own photo", async () => {
+    await assertFails(put(asUser(OWNER), `profile-photos/${OWNER}/avatar.png`));
   });
-  it("denies writing another user's photo", async () => {
+
+  it("denies an owner allocating arbitrary fresh descendants", async () => {
+    await assertFails(put(asUser(OWNER), `profile-photos/${OWNER}/thumbs/small.png`));
+  });
+
+  it("denies writing another user's photo — the hole §8.5 names", async () => {
     await assertFails(put(asUser(OTHER), `profile-photos/${OWNER}/avatar.png`));
   });
+
   it("denies an unauthenticated write", async () => {
     await assertFails(put(anon(), `profile-photos/${OWNER}/avatar.png`));
   });
-  it("reads validated output anonymously", async () => {
+
+  it("denies a photo at or over the 2 MiB cap", async () => {
+    await assertFails(
+      put(asUser(OWNER), `profile-photos/${OWNER}/huge.png`, { size: TWO_MIB }),
+    );
+  });
+
+  it("denies direct allocation even below the 2 MiB cap", async () => {
+    await assertFails(
+      put(asUser(OWNER), `profile-photos/${OWNER}/big.png`, { size: TWO_MIB - 1024 }),
+    );
+  });
+
+  it("denies direct JPEG and WebP allocation", async () => {
+    await assertFails(
+      put(asUser(OWNER), `profile-photos/${OWNER}/a.jpg`, { contentType: "image/jpeg" }),
+    );
+    await assertFails(
+      put(asUser(OWNER), `profile-photos/${OWNER}/a.webp`, { contentType: "image/webp" }),
+    );
+  });
+
+  it("denies a non-image content type", async () => {
+    await assertFails(
+      put(asUser(OWNER), `profile-photos/${OWNER}/a.pdf`, { contentType: "application/pdf" }),
+    );
+  });
+
+  it("denies image/svg+xml — a stored SVG is a script-execution surface", async () => {
+    await assertFails(
+      put(asUser(OWNER), `profile-photos/${OWNER}/a.svg`, { contentType: "image/svg+xml" }),
+    );
+  });
+
+  it("denies a content type that merely contains an allowed one", async () => {
+    // matches() is a full-string match; this pins that it stays one.
+    await assertFails(
+      put(asUser(OWNER), `profile-photos/${OWNER}/a.png`, {
+        contentType: "application/image/png",
+      }),
+    );
+  });
+
+  it("is publicly readable", async () => {
     await assertSucceeds(getBytes(ref(anon(), `profile-photos/${OWNER}/avatar.png`)));
   });
   it("refuses a validated object written after account removal", async () => {
@@ -116,17 +165,35 @@ describe("profile photos — trusted output only", () => {
     await assertFails(getBytes(ref(anon(), path)));
     await assertFails(deleteObject(ref(asUser(gone), path)));
   });
-  it("refuses unvalidated originals but permits owner cleanup", async () => {
+
+  it("lets the owner delete their own photo", async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await uploadBytes(ref(context.storage(), `profile-photos/${OWNER}/gone.png`), bytes(), {
+        contentType: "image/png",
+      });
+    });
+    await assertSucceeds(deleteObject(ref(asUser(OWNER), `profile-photos/${OWNER}/gone.png`)));
+  });
+
+  it("denies a forged validation stamp on client allocation", async () => {
+    await assertFails(uploadBytes(ref(asUser(OWNER), `profile-photos/${OWNER}/forged.webp`), bytes(), {
+      contentType: 'image/webp', customMetadata: { profilePhotoValidated: 'v1' },
+    }));
+  });
+
+  it("refuses legacy originals but still permits owner cleanup", async () => {
     const path = `profile-photos/${OWNER}/legacy.png`;
     await testEnv.withSecurityRulesDisabled(async (context) => {
-      await uploadBytes(ref(context.storage(), path), bytes(), { contentType: "image/png" });
+      await uploadBytes(ref(context.storage(), path), bytes(), { contentType: 'image/png' });
     });
     await assertFails(getBytes(ref(anon(), path)));
     await assertSucceeds(deleteObject(ref(asUser(OWNER), path)));
   });
-  it("denies another owner's delete", async () => {
+
+  it("denies deleting another user's photo", async () => {
     await assertFails(deleteObject(ref(asUser(OTHER), `profile-photos/${OWNER}/avatar.png`)));
   });
+
   it("denies a matching uid whose account document is gone", async () => {
     const gone = "deleted-1";
     await testEnv.withSecurityRulesDisabled(async (context) => {

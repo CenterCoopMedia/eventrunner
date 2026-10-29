@@ -1,7 +1,10 @@
-import { callAdminEndpoint } from '../admin/adminApi.js';
+// Profile allocation is server-mediated and bounded per account. Keep the
+// Storage SDK lazy for owner deletes; reads still use token-free URLs.
 import { connectStorageEmulator, deleteObject, getStorage, ref } from 'firebase/storage';
 import { app, auth, useEmulators } from '../firebase.js';
 import { PROFILE_PHOTO_MAX_BYTES, PROFILE_PHOTO_TYPES, checkFile, fileToBase64 } from './mediaSource.js';
+
+import { callAdminEndpoint } from '../admin/adminApi.js';
 
 let client = null;
 
@@ -14,16 +17,7 @@ function storageClient() {
   return client;
 }
 
-/**
- * Upload through trusted decoding; only the bounded WebP is stored.
- * Each choice gets a new object id. The saved profile still points at the
- * previous object, and that object stays the public photo until the save
- * writes the new path. A fixed name would replace the public photo while
- * the form is still open.
- *
- * @param {{ uid: string, file: File }} args
- * @returns {Promise<{ path: string }>}
- */
+/** Upload a fresh object without changing the saved public photo. */
 export async function uploadProfilePhoto({ uid, file }) {
   const problem = checkFile(file, {
     types: PROFILE_PHOTO_TYPES,
@@ -31,13 +25,11 @@ export async function uploadProfilePhoto({ uid, file }) {
     exclusive: true,
   });
   if (problem) throw new Error(problem);
-  if (!auth.currentUser || auth.currentUser.uid !== uid) throw new Error('not signed in');
-  const payload = await callAdminEndpoint(
-    'profilePhotoUpload',
-    { data: await fileToBase64(file) },
-    () => auth.currentUser.getIdToken(),
-  );
-  return { path: payload.path };
+  const user = auth.currentUser;
+  if (!user || user.uid !== uid) throw new Error('Sign in again to upload your photo.');
+  const data = await fileToBase64(file);
+  const payload = await callAdminEndpoint('profilePhotoUpload', { contentType: file.type, data }, () => user.getIdToken());
+  return { path: payload.path, expiresAtMs: payload.expiresAtMs };
 }
 
 /**
