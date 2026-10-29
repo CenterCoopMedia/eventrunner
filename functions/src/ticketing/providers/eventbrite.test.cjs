@@ -963,4 +963,3 @@ test('getRegistrationPrompt: the label stays this provider’s own, not the clie
   assert.equal(prompt.ctaLabel, 'Get your ticket');
   assert.equal(prompt.ctaUrl, 'https://eventbrite.com/e/demo');
 });
-

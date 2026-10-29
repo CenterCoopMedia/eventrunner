@@ -376,4 +376,3 @@ test('an attendee delivery whose attendee is not readable yet answers 500 and wr
   assert.equal((await db.collection('ticket_webhook_deliveries').get()).size, 0);
   assert.equal(db.read('ticket_sync_queue', 'ord-2001'), undefined);
 });
-

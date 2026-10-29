@@ -77,4 +77,3 @@ detail; the short version, because it drives what these fixtures look like:
 | `webhooks-list-page-1.json` | First page of the webhook list, `pagination.has_more_items: true` |
 | `webhooks-list-current.json` | Same call — one subscription already registered at the callback URL under test with every handled action |
 | `webhook-create-response.json` | `POST /organizations/{id}/webhooks/` response |
-

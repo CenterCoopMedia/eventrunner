@@ -791,6 +791,11 @@
           </ul>
           <h3 id="fixed">Fixed<a class="heading-anchor" href="#fixed" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Eventbrite reconciles every authenticated notification, including repeated bodies
+          that accompany a later refund or cancellation. Notifications for an order still
+          share one pending queue row, while each receipt gets its own identifier (#567).</li>
+          </ul>
+          <ul>
           <li>Public Stripe checkouts cap cumulative free tickets per event and verified purchaser
           email at the smaller of 20 and the catalog&#39;s per-order limit. Free recipient addresses
           receive one allocation per event across public orders. Mixed paid orders use the same

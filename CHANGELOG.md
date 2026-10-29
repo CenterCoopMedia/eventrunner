@@ -663,6 +663,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Eventbrite reconciles every authenticated notification, including repeated bodies
+  that accompany a later refund or cancellation. Notifications for an order still
+  share one pending queue row, while each receipt gets its own identifier (#567).
+
 - Public Stripe checkouts cap cumulative free tickets per event and verified purchaser
   email at the smaller of 20 and the catalog's per-order limit. Free recipient addresses
   receive one allocation per event across public orders. Mixed paid orders use the same
