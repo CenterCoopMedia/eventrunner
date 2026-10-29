@@ -979,6 +979,21 @@ test('photo budget applies to admins and fails closed on invalid counters', asyn
   }
 });
 
+test('concurrent speaker photo uploads share the last reservation', async () => {
+  const db = speakerWorld();
+  await db.collection('speaker_photo_upload_budgets').doc('rae').set({ count: 99 });
+  const bucket = fakeBucket();
+  const body = { speakerId: 'rae', contentType: 'image/png', data: PNG };
+  const results = await Promise.all([0, 1].map(async () => {
+    const res = fakeRes();
+    await createSpeakerPhotoUploadHandler(speakerAuthDeps(db, bucket))(post(body), res);
+    return res.statusCode;
+  }));
+  assert.deepEqual(results.sort(), [200, 429]);
+  assert.equal((await db.collection('speaker_photo_upload_budgets').doc('rae').get()).data().count, 100);
+  assert.equal(bucket.objects.size, 1);
+});
+
 test('storage failures consume a reservation and budget failures never reach storage', async () => {
   const db = speakerWorld();
   const body = { speakerId: 'rae', contentType: 'image/png', data: PNG };
