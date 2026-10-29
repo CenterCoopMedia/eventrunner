@@ -315,6 +315,62 @@ test('lookupByOrderNumber is preferred when the provider offers it', async () =>
   assert.equal(provider.calls.fetchOrder.length, 0);
 });
 
+test('external lookups share a five-attempt user budget across handler instances', async () => {
+  const db = seededDb();
+  const provider = createFakeTicketingProvider();
+  for (let i = 0; i < 5; i += 1) {
+    const res = makeRes();
+    await verifyHandler({ db, provider })(claimReq('ada'), res);
+    assert.equal(res.statusCode, 404);
+  }
+  const denied = makeRes();
+  await verifyHandler({ db, provider })(claimReq('ada'), denied);
+  assert.equal(denied.statusCode, 429);
+  assert.equal(denied.headers['Retry-After'], '60');
+  assert.equal(denied.body.error.code, 'resource-exhausted');
+  assert.equal(provider.calls.lookupByOrderNumber.length, 5);
+  assert.equal(provider.calls.fetchOrder.length, 0);
+  assert.equal(db.read('ticketLookupBudgets', 'global').count, 5);
+});
+
+test('the shared hourly ceiling stops a fresh user before spending provider quota', async () => {
+  const db = seededDb({ 'ticketLookupBudgets/global': { start: T0.getTime(), count: 100 } });
+  const provider = createFakeTicketingProvider();
+  const res = makeRes();
+  await verifyHandler({ db, provider })(claimReq('ada'), res);
+  assert.equal(res.statusCode, 429);
+  assert.equal(res.headers['Retry-After'], '3600');
+  assert.equal(res.body.error.code, 'resource-exhausted');
+  assert.equal(provider.calls.lookupByOrderNumber.length, 0);
+  assert.equal(provider.calls.fetchOrder.length, 0);
+  assert.equal(db.writes.length, 0);
+});
+
+test('a budget transaction failure returns unavailable without spending provider quota', async () => {
+  const db = seededDb();
+  db.beforeCommit = async () => { throw new Error('offline'); };
+  const provider = createFakeTicketingProvider();
+  const res = makeRes();
+  await verifyHandler({ db, provider })(claimReq('ada'), res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.error.code, 'unavailable');
+  assert.equal(provider.calls.lookupByOrderNumber.length, 0);
+  assert.equal(provider.calls.fetchOrder.length, 0);
+  assert.equal(db.writes.length, 0);
+});
+
+test('manual order lookups do not consume the external provider budget', async () => {
+  const db = seededDb();
+  const provider = createFakeTicketingProvider({ name: 'manual' });
+  for (let i = 0; i < 6; i += 1) {
+    const res = makeRes();
+    await verifyHandler({ db, provider })(claimReq('ada'), res);
+    assert.equal(res.statusCode, 404);
+  }
+  assert.equal(provider.calls.lookupByOrderNumber.length, 6);
+  assert.equal(db.read('ticketLookupBudgets', 'global'), undefined);
+});
+
 test('claimTicket refuses a ticket held by someone else or addressed elsewhere', async () => {
   const db = makeFakeDb({
     'tickets/held': { ...fakeTicket({ externalId: 'held' }), claimedByUid: 'uid-bob' },

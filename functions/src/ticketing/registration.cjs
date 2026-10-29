@@ -220,6 +220,23 @@ function createTicketingVerifyOrderHandler({ db, provider, auth, getConfig, now 
       return;
     }
 
+    // Reject before spending shared external-provider credentials.
+    if (provider.name !== 'manual') {
+      try {
+        const { acquireLookupBudget } = require('./lookupBudget.cjs');
+        const budget = await acquireLookupBudget({ db, uid: decoded.uid, now });
+        if (!budget.allowed) {
+          res.set('Retry-After', String(budget.retryAfter));
+          res.status(429).json({ error: { code: 'resource-exhausted', message: 'Too many ticket lookups. Try again later.' } });
+          return;
+        }
+      } catch (err) {
+        log.error('ticketing: lookup budget unavailable', err);
+        res.status(503).json({ error: { code: 'unavailable', message: 'Ticket lookup is temporarily unavailable.' } });
+        return;
+      }
+    }
+
     let found = null;
     try {
       found = await lookupOrder({ provider, orderNumber, email });

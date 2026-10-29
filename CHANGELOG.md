@@ -663,6 +663,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- External self-service ticket lookups share persistent limits of five attempts per
+  account per fixed minute and 100 attempts per deployment per fixed hour. Refusals
+  return a retry time, and an unavailable budget stops the lookup before contacting
+  the provider. Manual ticket lookups, webhooks and reconciliation keep their existing
+  paths (#574).
+
 - Speaker photo uploads reserve a non-expiring budget before storage and stop after
   100 attempts per speaker, including administrator uploads. Failed or ambiguous saves
   consume reservations, and deleting photos leaves the budget in place. Operators
