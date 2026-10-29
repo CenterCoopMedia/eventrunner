@@ -168,6 +168,8 @@ test('public PDF: deployed wrapper preserves the handler and enforces runtime ca
   const handlers = pdf.handlers;
   assert.equal(options[0].maxInstances, 1);
   assert.equal(options[0].concurrency, 20);
+  assert.equal(options[0].cpu, 1);
+  assert.equal(options[0].memory, '256MiB');
   assert.equal(options[0].timeoutSeconds, 60);
   for (let i = 0; i < 3; i += 1) {
     const res = response();
