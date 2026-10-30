@@ -1047,8 +1047,9 @@ function validateTheme(theme) {
  * Category ids unique, badge ids unique across all categories, maxPicks a
  * positive integer, and the total a user could ever have stored at once
  * bounded by MAX_TOTAL_BADGES.
+ * An optional customBadgeBlockList must be an array of strings.
  *
- * That last check exists because `firestore.rules` caps a stored `badges`
+ * The total cap check exists because `firestore.rules` caps a stored `badges`
  * array at MAX_TOTAL_BADGES entries (it cannot read this config to check
  * membership, so it can only bound the array's size) — without this check
  * an operator could configure e.g. one category with maxPicks 41, the
@@ -1069,6 +1070,17 @@ function validateBadgesConfig(badges) {
   }
   if (!Array.isArray(badges.categories)) {
     return { ok: false, errors: ['badges.categories: must be an array'] };
+  }
+  if (badges.customBadgeBlockList !== undefined) {
+    if (!Array.isArray(badges.customBadgeBlockList)) {
+      errors.push('badges.customBadgeBlockList: must be an array');
+    } else {
+      badges.customBadgeBlockList.forEach((word, i) => {
+        if (typeof word !== 'string') {
+          errors.push(`badges.customBadgeBlockList[${i}]: must be a string`);
+        }
+      });
+    }
   }
   const categoryIds = new Set();
   const badgeIds = new Set();

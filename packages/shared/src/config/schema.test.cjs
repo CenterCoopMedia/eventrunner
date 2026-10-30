@@ -935,6 +935,30 @@ test('validateBadgesConfig enforces unique ids and positive maxPicks', () => {
   assert.equal(validateBadgesConfig(null).ok, false);
 });
 
+test('validateBadgesConfig requires an array for an optional custom badge blocklist', () => {
+  assert.equal(validateBadgesConfig({ categories: [] }).ok, true);
+  for (const customBadgeBlockList of [[], ['testword', 'café', '']]) {
+    assert.equal(validateBadgesConfig({ categories: [], customBadgeBlockList }).ok, true);
+  }
+  for (const customBadgeBlockList of ['testword', null, false, {}]) {
+    const result = validateBadgesConfig({ categories: [], customBadgeBlockList });
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.includes('badges.customBadgeBlockList: must be an array'));
+  }
+});
+
+test('validateBadgesConfig rejects non-string custom badge blocklist entries', () => {
+  const result = validateBadgesConfig({
+    categories: [],
+    customBadgeBlockList: ['testword', 42, null],
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.errors, [
+    'badges.customBadgeBlockList[1]: must be a string',
+    'badges.customBadgeBlockList[2]: must be a string',
+  ]);
+});
+
 test('validateBadgesConfig rejects a config whose maximum selectable total exceeds MAX_TOTAL_BADGES', () => {
   // One category alone over the cap.
   const oneCategoryOver = validateBadgesConfig({
