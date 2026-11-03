@@ -273,7 +273,8 @@
           after debugging a cryptic failure.</p>
           <h3 id="7-first-operator-then-a-second">7. First operator, then a second<a class="heading-anchor" href="#7-first-operator-then-a-second" aria-label="Link to this section">#</a></h3>
           <p>The first operator (from <code>--admin</code> above, or <code>config/bootstrap.adminEmails</code>) signs in and confirms
-          the admin panel loads. Then, from <strong>admin Settings → Access</strong>, grant a second operator — do not
+          the admin panel loads. Point them at <strong>Set up your event</strong> on the rail: it shows every row of
+          <code>--check</code> (§4) as a step, says which steps are theirs, and links to the screen for each. Then, from <strong>admin Settings → Access</strong>, grant a second operator — do not
           leave <code>config/bootstrap</code> as a single point of failure for a client who could lose access to one
           inbox. <code>--check</code> (§6) requires at least two operator accounts for exactly this reason; staff
           accounts do not count, because a staff account cannot restore anyone&#39;s access. Grant the client&#39;s
@@ -285,8 +286,9 @@
           policy-dependent clause marked <code>[Client legal review required]</code>. While that flag is set, the admin
           panel shows a persistent banner and the public pages carry a visible notice. There is no script for
           this step — it is a human sign-off: the client&#39;s counsel reviews the seeded pages (edited in the
-          admin Content editor like any other page) and an admin clears <code>legal.reviewRequired</code> from <strong>admin
-          Settings</strong> once they&#39;re comfortable. Nothing in the platform ever asserts another organization&#39;s
+          admin Content editor like any other page) and an operator clears <code>legal.reviewRequired</code> from <strong>admin
+          → Set up your event</strong> once they&#39;re comfortable (a confirmation box, then <strong>Mark the review
+          complete</strong>). Nothing in the platform ever asserts another organization&#39;s
           terms on the client&#39;s behalf; the templates are a starting point, not a finished document.</p>
           <h2 id="4-readiness-gating---check">4. Readiness gating (<code>--check</code>)<a class="heading-anchor" href="#4-readiness-gating---check" aria-label="Link to this section">#</a></h2>
           <p>Once every item above is done (or deliberately attested), confirm launch readiness read-only:</p>

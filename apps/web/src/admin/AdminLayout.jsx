@@ -126,7 +126,12 @@ export const DOCKET = Object.freeze([
   {
     id: 'lead',
     label: null,
-    items: [{ to: 'overview', label: 'Overview', tier: 'staff' }],
+    items: [
+      { to: 'overview', label: 'Overview', tier: 'staff' },
+      // The launch checklist (ADR 0007 §6). Staff read it; the steps that
+      // need an operator say so on the page.
+      { to: 'setup', label: 'Set up your event', tier: 'staff' },
+    ],
   },
   {
     id: 'content',

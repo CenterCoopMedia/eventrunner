@@ -1,7 +1,7 @@
 # ADR 0007: Client console for self-serve onboarding and provisioning
 
 **Date:** 2026-11-03  
-**Status:** Proposed. Needs owner acceptance before implementation starts.  
+**Status:** Accepted by the owner on 2026-11-03.  
 **Amends:** [ADR 0001 §2](0001-event-platform-v1.md) operating model. The model stays one Firebase project per event. This record adds a way to request, approve and create those projects.
 
 ## Context
@@ -27,7 +27,7 @@ server (2026-11-03).
 ### 1. A separate console project
 
 The console is a new small app in its own Firebase project, owned by CCM (working id
-`eventrunner-console`). It is not deployed to any client project, and no client project reads from
+`eventrunner-console`), at `console.eventrunner.org`. It is not deployed to any client project, and no client project reads from
 it. Code lives in `console/` with its own `firebase.json`, rules, web app and functions, so the
 client deploy (`deploy-client.yml`) never ships it.
 
@@ -126,9 +126,19 @@ Steps that stay manual, and why:
 
 A new admin page, **Set up your event** (`/admin/setup`), shows the launch-readiness rows from
 `shared/readiness` as a checklist. Each row says who does it (you or CCM), its state, and a link to
-the screen that clears it: Settings → Access for the second operator, Event settings, Ticketing,
-the sender DNS records to add, and the legal review switch. It replaces no existing check:
-`init-event.cjs --check` stays the gate. The overview links to the page until every row is met.
+the screen that clears it: Settings → Access for the second operator, Branding, Content, Event
+settings and Ticketing. It replaces no existing check: `init-event.cjs --check` stays the gate.
+The page reads the rows from `webMcpCheckEventReadiness`, which already runs that policy for
+staff, so no new endpoint is needed. That check now reads the config fresh, not from the
+five-minute container cache, so a step shows Done as soon as the server sees the change. It is on the rail under Overview. The overview does not call
+the check, so its figures load as before.
+
+The page also holds the legal sign-off. An operator confirms that counsel approved both pages, and
+the page saves `legal.reviewRequired: false` through `updateEventConfig`. Before this page, no
+admin screen wrote that field, although the onboarding docs said Settings did.
+
+The page names the deploying organization "the hosting team", not CCM, because the code is
+white-label.
 
 This stage does not depend on the console. It helps any client, including one onboarded by hand.
 
@@ -152,9 +162,16 @@ This stage does not depend on the console. It helps any client, including one on
   deploy workflows.
 - Moving existing clients into the console.
 
-## Open questions for the owner
+## Owner answers (2026-11-03)
 
-1. Console address: `start.eventrunner.org` or another name.
-2. The GCP folder and billing account that client projects go into.
-3. Whether NC Local goes through the console, or is provisioned by hand from the demo (#516) and uses
-   only the stage 2 checklist.
+1. Console address: `console.eventrunner.org`.
+2. NC Local goes through the console as its first real user. The console must be proved in a test
+   folder before NC Local uses it (P8 in `tasks/todo.md`).
+
+3. Legal: CCM's legal review cleared this project (owner report, 2026-11-03). This covers the
+   console and its intake of client contact data. It does not replace the per-event legal review
+   step: each client's counsel still approves that event's privacy policy and terms.
+
+## Open question
+
+The GCP folder and the billing account that client projects go into.

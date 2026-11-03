@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Set up your event** (`/admin/setup`, ADR 0007): the launch-readiness rows
+  as a checklist in the admin panel. Each step says who does it (the client,
+  the hosting team, or both), its state from the server, and the screen that
+  completes it. An operator can now mark the legal review complete there.
+  Before this, no admin screen cleared `legal.reviewRequired`, although the
+  docs said Settings did. `init-event.cjs --check` stays the launch gate.
+  The readiness check (`webMcpCheckEventReadiness`) now reads the config fresh,
+  not from the five-minute container cache, so a saved step shows at once.
+
 - Change request progress and outcome emails (#330). A signed-in sender reads their own
   requests on **Your change requests** (`/profile/change-requests`): the status, the
   history of status changes, and, once a request is done or declined, the reply and the

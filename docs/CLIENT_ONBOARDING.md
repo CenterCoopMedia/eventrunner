@@ -177,7 +177,8 @@ after debugging a cryptic failure.
 ### 7. First operator, then a second
 
 The first operator (from `--admin` above, or `config/bootstrap.adminEmails`) signs in and confirms
-the admin panel loads. Then, from **admin Settings → Access**, grant a second operator — do not
+the admin panel loads. Point them at **Set up your event** on the rail: it shows every row of
+`--check` (§4) as a step, says which steps are theirs, and links to the screen for each. Then, from **admin Settings → Access**, grant a second operator — do not
 leave `config/bootstrap` as a single point of failure for a client who could lose access to one
 inbox. `--check` (§6) requires at least two operator accounts for exactly this reason; staff
 accounts do not count, because a staff account cannot restore anyone's access. Grant the client's
@@ -191,8 +192,9 @@ Not numbered in §5.6 (it's set at seed time, not checked off separately), but i
 policy-dependent clause marked `[Client legal review required]`. While that flag is set, the admin
 panel shows a persistent banner and the public pages carry a visible notice. There is no script for
 this step — it is a human sign-off: the client's counsel reviews the seeded pages (edited in the
-admin Content editor like any other page) and an admin clears `legal.reviewRequired` from **admin
-Settings** once they're comfortable. Nothing in the platform ever asserts another organization's
+admin Content editor like any other page) and an operator clears `legal.reviewRequired` from **admin
+→ Set up your event** once they're comfortable (a confirmation box, then **Mark the review
+complete**). Nothing in the platform ever asserts another organization's
 terms on the client's behalf; the templates are a starting point, not a finished document.
 
 ## 4. Readiness gating (`--check`)

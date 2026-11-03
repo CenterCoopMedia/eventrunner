@@ -6,20 +6,29 @@ Spec: [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md) (prop
 Owner choices (2026-11-03): two stages; self-serve sign-up with automatic
 provisioning; the form submits to a server. First client: NC Local.
 
-Status: plan written. Waiting for owner approval of ADR 0007. No code yet.
+Status: owner accepted ADR 0007 (2026-11-03). Console at
+console.eventrunner.org. NC Local goes through the console, so P4 to P8
+must finish before NC Local's project is made. P1 to P3 are on PR #581.
+Legal: the owner reports that CCM's legal review cleared this project
+(2026-11-03). Each event's own privacy policy and terms still need the
+client's sign-off on the setup page.
 
 Each phase is one pull request, in this order. Each phase runs lint, the unit
 suites, the rules suite and E2E where it touches them, and gets an
 adversarial review before it merges.
 
-- [ ] P1 Spec: ADR 0007 and this plan (this branch).
-- [ ] P2 Shared: move the pure answer builder from `scripts/lib/answers.cjs`
+- [x] P1 Spec: ADR 0007 and this plan (this branch).
+- [x] P2 Shared: move the pure answer builder from `scripts/lib/answers.cjs`
       to `packages/shared/src/answers.cjs` (+ `.mjs` shim). No behaviour
       change; `init-event` tests stay green. Refresh the functions lockfile hash.
-- [ ] P3 Admin setup checklist (`/admin/setup`): readiness rows from
-      `shared/readiness`, owner (you or CCM), state, and a link per row; an
-      overview link until all rows are met. Web unit tests and one E2E.
-      Docs: ADMIN_GUIDE, CLIENT_ONBOARDING §3, handbook for-clients.
+- [x] P3 Admin setup checklist (`/admin/setup`): rows from
+      `webMcpCheckEventReadiness`, owner (you, hosting team, both), state, a
+      link per row, and the operator legal sign-off (no screen wrote
+      `legal.reviewRequired` before). On the rail under Overview; no overview
+      call. Web unit tests and `e2e/admin-setup.spec.js`. The E2E found
+      that the readiness check read a five-minute config cache; it now reads
+      fresh (test first). Docs: ADMIN_GUIDE, CLIENT_ONBOARDING §3, handbook
+      for-clients, CHANGELOG.
 - [ ] P4 Console foundation: `console/` with `firebase.json`, rules,
       Vite web app, functions; sign-up (Google, email link), verified email,
       operators allowlist. Rules tests on the emulator.
@@ -37,7 +46,7 @@ adversarial review before it merges.
       billing, provisioner service account, GitHub App) and a live proof in a
       test folder. Needs the owner's cloud credentials.
 
-Blocked on the owner: ADR acceptance and the three open questions in ADR 0007.
+Blocked on the owner: the GCP folder and billing account (ADR 0007), for P7 and P8.
 
 ## 2026-10-19 (wave 3): deliver every promise in the NC Local proposals
 

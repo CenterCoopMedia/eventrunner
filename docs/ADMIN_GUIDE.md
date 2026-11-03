@@ -35,6 +35,26 @@ An operator grants and revokes access on the Access page (below). At least one o
 
 Staff access can end at a set time, for example for a demo account. Until that time, the account is a full staff account. It can edit and publish content like any staff account. An end time does not make an account read-only. There is no read-only tier.
 
+## Set up your event: The launch checklist
+
+Open **Set up your event**, under **Overview** on the rail. It lists the steps that must be done before the site goes live:
+
+| Step | Who does it | Where |
+| --- | --- | --- |
+| Add a second operator | You | Settings → Access |
+| Upload your logos | You | Settings → Branding |
+| Replace the placeholder text | You | Content |
+| Approve the privacy policy and terms | You | Content, then this page |
+| Verify your email domain | You and the hosting team | Your DNS, then the hosting team |
+| Connect ticket sales | The hosting team | Ticketing shows the result |
+| Turn on Google sign-in | The hosting team | Nothing to do in the admin panel |
+
+Each step shows **Done** or **To do**. The server decides the state. It uses the same check that the hosting team runs before launch. Select **Check again** after you finish a step.
+
+**Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens **Set up your event**, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Mark the review complete**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
+
+When every step is done, tell the hosting team. They run the launch check and publish the site.
+
 ## Set the site up: Six steps
 
 This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.
