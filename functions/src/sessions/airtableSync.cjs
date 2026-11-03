@@ -37,6 +37,7 @@ const { createHash } = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { internals: { readSubmission } } = require('./pitches.cjs');
+const { IMPORT_FIELDS, readImportedExtras } = require('shared/pitchForm');
 const { AirtableError, readAirtableSource, listAirtableRecords, redact } = require('./airtableClient.cjs');
 
 const PITCHES = 'session_pitches';
@@ -110,10 +111,24 @@ function mapRecord(record, fieldMap) {
     const key = pitch.message.split(':')[0];
     return { ok: false, externalId, reason: 'invalid-field', field: fieldMap[key] || key };
   }
+  // The stepper fields, only those the operator mapped, so an unmapped
+  // field never overwrites what staff or a CSV import stored.
+  const extraSource = { organization: pitch.organization };
+  for (const key of IMPORT_FIELDS) {
+    if (!fieldMap[key]) continue;
+    const value = cellText(fields[fieldMap[key]]);
+    if (value === undefined) return { ok: false, externalId, reason: 'invalid-field', field: fieldMap[key] };
+    extraSource[key] = value ?? '';
+  }
+  const extra = readImportedExtras(extraSource, { email: normalized });
+  if (!extra.ok) {
+    const key = extra.field.split('.')[0];
+    return { ok: false, externalId, reason: 'invalid-field', field: fieldMap[key] || key };
+  }
   return {
     ok: true,
     externalId,
-    row: { email: normalized, title: pitch.title, description: pitch.description, organization: pitch.organization, format: pitch.format },
+    row: { email: normalized, title: pitch.title, description: pitch.description, organization: pitch.organization, format: pitch.format, ...extra.extras },
   };
 }
 
@@ -178,7 +193,9 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
         });
         return;
       }
-      const changed = CONTENT_KEYS.filter((key) => (stored[key] ?? null) !== row[key]);
+      // The legacy fields always, and each mapped stepper field the row carries.
+      const keys = [...CONTENT_KEYS, ...Object.keys(row).filter((key) => !CONTENT_KEYS.includes(key))];
+      const changed = keys.filter((key) => JSON.stringify(stored[key] ?? null) !== JSON.stringify(row[key] ?? null));
       const flagged = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);
       if (changed.length) {
         local.updated += 1;

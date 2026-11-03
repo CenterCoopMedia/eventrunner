@@ -34,4 +34,26 @@ describe('reviewed pitch CSV contract', () => {
     expect(csv).toContain('"Text, ""quoted"""');
     expect(csv).not.toMatch(/PRIVATE-|privateNotes|reviewedBy|uid/);
   });
+
+  // ADR 0008 §2: the stepper's columns come in when the file has them, and
+  // an export writes the same names so it imports again.
+  it('reads the optional stepper columns and leaves them out when absent', () => {
+    const text = 'externalId,email,title,description,organization,format,consent,summary,lengthMinutes,leadName,presenter_1_name,presenter_1_email\n'
+      + 'id,one@example.test,T,D,,Panel,true,One line.,60,Ada,Bo,bo@example.test';
+    expect(readPitchCsv(text)[0]).toMatchObject({ summary: 'One line.', lengthMinutes: '60', leadName: 'Ada', presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test' });
+    expect(Object.keys(readPitchCsv(headers + 'id,one@example.test,T,D,,,true')[0])).not.toContain('summary');
+  });
+
+  it('exports the stepper columns and the presenters under the import names', () => {
+    const csv = pitchQueueCsv([{ id: 'p1', email: 'ada@example.test', title: 'T', description: 'D', status: 'new', lengthMinutes: 60,
+      presenters: [{ name: 'Ada', email: 'ada@example.test', role: 'Editor', lead: true }, { name: 'Bo', email: 'bo@example.test', lead: false }] }]);
+    const [head, line] = csv.trim().split('\r\n');
+    const columns = head.split(',').map((name) => name.replace(/"/g, ''));
+    const cells = line.split(',').map((value) => value.replace(/"/g, ''));
+    const value = (name) => cells[columns.indexOf(name)];
+    expect(columns).toEqual(expect.arrayContaining(['summary', 'lengthMinutes', 'leadName', 'presenter_4_role']));
+    expect([value('lengthMinutes'), value('leadName'), value('leadRole'), value('presenter_1_name'), value('presenter_1_email'), value('presenter_2_name')])
+      .toEqual(['60', 'Ada', 'Editor', 'Bo', 'bo@example.test', '']);
+    expect(csv).not.toMatch(/privateNotes|reviewedBy|uid/);
+  });
 });

@@ -324,7 +324,100 @@ function readPresenters(stored) {
   }];
 }
 
+/** The stepper fields an import may carry beside the seven legacy columns. */
+const IMPORT_FIELDS = Object.freeze([
+  'summary', 'lengthMinutes', 'track', 'audienceLevel', 'leadName', 'leadRole', 'accessNeeds', 'notes',
+]);
+const PRESENTER_COLUMN_RE = /^presenter_([1-4])_(name|email|organization|role)$/;
+
+/** `presenter_1_name` … `presenter_4_role`, in column order. */
+const PRESENTER_COLUMNS = Object.freeze([1, 2, 3, 4].flatMap((n) => ['name', 'email', 'organization', 'role'].map((f) => `presenter_${n}_${f}`)));
+
+function readLevel(value) {
+  const text = String(value).trim().toLowerCase();
+  if (!text) return null;
+  const level = AUDIENCE_LEVELS.find((entry) => entry.id === text || entry.label.toLowerCase() === text);
+  return level ? level.id : value;
+}
+
+/**
+ * The stepper fields of an imported row (a CSV line or an Airtable record),
+ * ADR 0008 §2. Only the fields the row carries come back, so a file with the
+ * legacy columns alone imports exactly as before.
+ *
+ * An outside form names its own choices, so a format, length or track is
+ * not held to the call's lists: a length is any whole number of minutes in
+ * range, and a track is any short text. An audience level may be its id or
+ * its label. The lead presenter's name is optional here; an imported pitch
+ * has no account to take it from.
+ *
+ * @param {object} source the row, with the legacy fields as well
+ * @param {{ email: string }} context the row's (lead) email
+ * @returns {{ ok: true, extras: object } | { ok: false, field: string, message: string }}
+ */
+function readImportedExtras(source, { email }) {
+  const input = isPlainObject(source) ? source : {};
+  const present = IMPORT_FIELDS.filter((field) => input[field] !== undefined && input[field] !== null);
+  const presenterRows = [];
+  for (const [key, value] of Object.entries(input)) {
+    const match = key.match(PRESENTER_COLUMN_RE);
+    if (!match || value === undefined || value === null) continue;
+    const index = Number(match[1]) - 1;
+    presenterRows[index] = { ...(presenterRows[index] || {}), [match[2]]: value };
+  }
+  const coPresenters = presenterRows.filter((row) => row && Object.values(row).some((v) => String(v).trim()));
+  if (!present.length && !coPresenters.length) return { ok: true, extras: {} };
+
+  const rawLength = input.lengthMinutes;
+  const length = rawLength === undefined || rawLength === null || String(rawLength).trim() === ''
+    ? null : (/^\d+$/.test(String(rawLength).trim()) ? Number(String(rawLength).trim()) : Number.NaN);
+  if (Number.isNaN(length) || (length !== null && (length < MIN_LENGTH_MINUTES || length > MAX_LENGTH_MINUTES))) {
+    return { ok: false, field: 'lengthMinutes', message: `lengthMinutes: a whole number of minutes from ${MIN_LENGTH_MINUTES} to ${MAX_LENGTH_MINUTES}.` };
+  }
+  const track = typeof input.track === 'string' ? input.track.trim() : input.track;
+  if (track !== undefined && track !== null && (typeof track !== 'string' || track.length > LIMITS.track)) {
+    return { ok: false, field: 'track', message: `track: at most ${LIMITS.track} characters.` };
+  }
+  const candidate = {
+    ...input,
+    title: input.title ?? 'x',
+    description: input.description ?? 'x',
+    lengthMinutes: length,
+    track: track || null,
+    audienceLevel: input.audienceLevel === undefined || input.audienceLevel === null ? null : readLevel(input.audienceLevel),
+    presenters: coPresenters,
+  };
+  const options = { formats: [], lengths: length === null ? [] : [length], tracks: track ? [track] : [], maxCoPresenters: MAX_CO_PRESENTERS };
+  const fields = ['summary', 'audienceLevel', 'leadRole', 'accessNeeds', 'notes', 'lengthMinutes', 'track', 'presenters'];
+  const checked = checkPitch(candidate, { options, submitterEmail: email, fields });
+  const leadName = typeof input.leadName === 'string' ? input.leadName.trim() : '';
+  if (input.leadName !== undefined && input.leadName !== null && (typeof input.leadName !== 'string' || leadName.length > LIMITS.name)) {
+    return { ok: false, field: 'leadName', message: `leadName: at most ${LIMITS.name} characters.` };
+  }
+  if (!checked.ok) {
+    const [field, message] = Object.entries(checked.errors)[0];
+    return { ok: false, field, message: `${field}: ${message}` };
+  }
+  const extras = {};
+  for (const field of present) {
+    if (field === 'leadName' || field === 'leadRole') continue;
+    extras[field] = checked.pitch[field] ?? null;
+  }
+  if (present.includes('leadName') || present.includes('leadRole') || coPresenters.length) {
+    extras.presenters = presenterList({
+      leadName: leadName || null,
+      leadRole: checked.pitch.leadRole ?? null,
+      organization: typeof input.organization === 'string' && input.organization.trim() ? input.organization.trim() : null,
+      presenters: checked.pitch.presenters,
+    }, email);
+  }
+  return { ok: true, extras };
+}
+
 module.exports = {
+  IMPORT_FIELDS,
+  PRESENTER_COLUMNS,
+  readImportedExtras,
   LIMITS,
   MAX_CO_PRESENTERS,
   MAX_OPTIONS,

@@ -14,7 +14,8 @@ const TOKEN = 'pat' + 'FAKEfake000000.' + '1'.repeat(64);
 const ENV = { EVENT_AIRTABLE_ENABLED: 'true', AIRTABLE_API_TOKEN: TOKEN };
 const BASE = 'appAAAAAAAAAAAAAA';
 const TABLE = 'tblBBBBBBBBBBBBBB';
-const fieldMap = { externalId: null, email: 'Email', title: 'Title', description: 'Description', organization: 'Organization', format: 'Format', consent: 'Consent' };
+// The stepper fields are optional and unmapped here (ADR 0008 §2).
+const fieldMap = { externalId: null, email: 'Email', title: 'Title', description: 'Description', organization: 'Organization', format: 'Format', consent: 'Consent', summary: null, lengthMinutes: null, track: null, audienceLevel: null, leadName: null, leadRole: null, accessNeeds: null, notes: null };
 const sourceDoc = { enabled: true, baseId: BASE, table: TABLE, view: null, fieldMap, scheduleMinutes: 0 };
 const bootstrap = { adminEmails: ['operator@example.test'], staffEmails: ['staff@example.test'] };
 const T0 = Date.parse('2026-10-20T14:00:00.000Z');
@@ -394,4 +395,18 @@ test('staff and operators refresh; others are refused; failures and limits answe
   assert.equal(failed.body.error.code, 'not-found');
   await db.collection('session_pitch_sync').doc('airtable').set({ running: { startedAt: new Date(tick) } });
   assert.equal((await invoke(createRefreshAirtableHandler, { db, env: ENV, now: () => tick }, 'staff', {})).statusCode, 409);
+});
+
+test('a mapped stepper field comes in, and an unmapped one is left out of the row', () => {
+  const map = { ...fieldMap, summary: 'Summary', lengthMinutes: 'Minutes', audienceLevel: 'Audience', leadName: 'Lead' };
+  const mapped = mapRecord(record(1, { Summary: 'One line.', Minutes: 45, Audience: 'Everyone', Lead: 'Ada' }), map);
+  assert.equal(mapped.ok, true, JSON.stringify(mapped));
+  assert.equal(mapped.row.summary, 'One line.');
+  assert.equal(mapped.row.lengthMinutes, 45);
+  assert.equal(mapped.row.audienceLevel, 'everyone');
+  assert.equal(mapped.row.presenters[0].name, 'Ada');
+  assert.equal('track' in mapped.row, false);
+  assert.equal('summary' in mapRecord(record(1), fieldMap).row, false);
+  const bad = mapRecord(record(1, { Minutes: 'long' }), { ...fieldMap, lengthMinutes: 'Minutes' });
+  assert.deepEqual([bad.ok, bad.reason, bad.field], [false, 'invalid-field', 'Minutes']);
 });

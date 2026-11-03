@@ -1,6 +1,9 @@
 import pitchForm from './pitchForm.cjs';
 
 export const {
+  IMPORT_FIELDS,
+  PRESENTER_COLUMNS,
+  readImportedExtras,
   LIMITS,
   MAX_CO_PRESENTERS,
   MAX_OPTIONS,

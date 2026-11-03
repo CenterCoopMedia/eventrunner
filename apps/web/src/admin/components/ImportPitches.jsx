@@ -1,7 +1,7 @@
 // The reviewed CSV import of session pitches. Moved from the pitch page to
 // its own page (/admin/pitches/import) so the queue holds the queue alone.
 import { useEffect, useRef, useState } from 'react';
-import { PITCH_COLUMNS, readPitchCsv } from '../pitchCsv.js';
+import { OPTIONAL_PITCH_COLUMNS, PITCH_COLUMNS, readPitchCsv } from '../pitchCsv.js';
 import { Panel, SaveStatus, TextField, CheckboxField, ServerErrorSummary, primaryButtonClass } from './formControls.jsx';
 
 export default function ImportPitches({ call }) {
@@ -35,7 +35,7 @@ export default function ImportPitches({ call }) {
   }
   return <Panel title="Import proposals from CSV" description="Bring proposals from another form into the private queue. Nothing is published or emailed.">
     <form onSubmit={importRows} className="space-y-sm">
-      <p className="break-words text-admin-sm text-admin-ink-secondary">Required headers: {PITCH_COLUMNS.join(', ')}. Other columns are ignored. Keep the original source IDs. Consent must be true (or checked, from an Airtable checkbox), with evidence in the source form.</p>
+      <p className="break-words text-admin-sm text-admin-ink-secondary">Required headers: {PITCH_COLUMNS.join(', ')}. Optional headers carry the pitch form’s other answers: {OPTIONAL_PITCH_COLUMNS.slice(0, 8).join(', ')}, and presenter_1_name, presenter_1_email, presenter_1_organization, presenter_1_role up to presenter_4. An exported file has the same headers. Other columns are ignored. Keep the original source IDs. Consent must be true (or checked, from an Airtable checkbox), with evidence in the source form.</p>
       <ServerErrorSummary error={error} errorRef={errorRef} />
       <fieldset disabled={busy} className="space-y-sm">
         <TextField label="Source name" value={source} onChange={(v) => { setSource(v); setReviewed(false); }} required maxLength={80} pattern="[A-Za-z0-9_-]+" hint="A stable name for the original form. Reuse it for retries." />

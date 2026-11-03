@@ -57,6 +57,14 @@ The settings are stored in `session_pitch_sources/airtable`. Only operators can 
 | Organization (optional) | Single line text | Up to 200 characters. |
 | Format (optional) | Single line text, single select or multiple select | Up to 120 characters. A multiple select is joined with commas. |
 | External ID (optional) | Any text field | Leave it empty to use the Airtable record ID. Do not change it after the first refresh: a new ID makes a new pitch. |
+| Summary (optional) | Single line text | Up to 300 characters. |
+| Length in minutes (optional) | Number or single line text | A whole number from 5 to 480, such as `45`. It need not be one of the call's lengths. |
+| Track (optional) | Single line text or single select | Up to 120 characters. It need not be one of the call's tracks. |
+| Audience (optional) | Single select or single line text | `Everyone`, `New to the topic`, `Some experience` or `Experienced practitioners`, or the ids `everyone`, `beginner`, `intermediate`, `advanced`. |
+| Lead presenter name and role (optional) | Single line text | Up to 120 characters each. The record's email is the lead presenter's. |
+| Access needs, notes (optional) | Long text | Up to 2,000 characters each. |
+
+A refresh writes only the fields you map. An unmapped field keeps what staff or a CSV import stored. Co-presenters are not mapped from Airtable, because each needs four fields; bring them in with the CSV import (`presenter_1_name` …).
 
 The names must match the Airtable field names exactly, including capitals and spaces. Each pitch field takes a different Airtable field. The refresh asks Airtable for the mapped fields only, so other columns stay in Airtable. A number becomes text. An attachment, a linked record or another object is refused with the reason "Required text missing or too long".
 
@@ -330,16 +338,18 @@ With **At a set date and time**, a deadline is required. A cleared deadline does
 
 ### Reviewed CSV import and private export
 
-Expand **Import proposals from CSV**. Use a stable source name and these headers. Other columns are ignored. A header name must not repeat:
+Open **Import pitches**. Use a stable source name and these headers. Other columns are ignored. A header name must not repeat:
 
 ```csv
 externalId,email,title,description,organization,format,consent
 example-1,presenter@example.test,Reporting together,A practical workshop.,Example newsroom,Workshop,true
 ```
 
+A file may also contain the pitch form's other answers: `summary`, `lengthMinutes`, `track`, `audienceLevel`, `leadName`, `leadRole`, `accessNeeds`, `notes`, and up to four co-presenters as `presenter_1_name`, `presenter_1_email`, `presenter_1_organization`, `presenter_1_role` through `presenter_4_role`. A file without these columns imports as before. An outside form's lengths and tracks need not match the call's lists. A co-presenter needs a name and a valid email. A re-import with a changed co-presenter is a change and blocks the batch, like any other changed field.
+
 Each file contains 1–50 proposals and is smaller than 512 KB. Keep original external IDs. Each row needs consent evidenced in the original form; never infer it from a nonempty field. `consent` must be `true` or `checked` (Airtable's export of a ticked checkbox). Review every displayed row, check the consent acknowledgement, then choose **Import reviewed proposals**. The server validates every row before storing any. A repeated source and external ID with identical content is unchanged. Changed content under the same source ID blocks the complete batch; reconcile it before retrying. The CSV import keeps this rule because a file does not show which copy is current. Use the [Airtable refresh](#refresh-pitches-from-airtable) for records that change after the first import. Imported records are private, have no Firebase identity, and begin with a new decision. Import does not send mail, and an imported pitch never gets a receipt. Staff can send an imported pitch's decision email. It goes to the address in the CSV, which nobody verified, so the preview says so (see [Pitch emails](#pitch-emails)).
 
-**Export the shown pitches** downloads only the current filtered proposals. It includes contact emails; keep the file private. It excludes private review notes, auth UIDs, and reviewer identities. Spreadsheet formulas are escaped. No CSV is stored on a public URL.
+**Export the shown pitches** downloads only the current filtered proposals, with the same optional columns as the import (the lead presenter as `leadName` and `leadRole`), so an export can be imported again. It includes contact emails; keep the file private. It excludes private review notes, auth UIDs, and reviewer identities. Spreadsheet formulas are escaped. No CSV is stored on a public URL.
 
 ### Explicit draft conversion
 
