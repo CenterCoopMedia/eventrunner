@@ -97,6 +97,7 @@ const submit = (overrides = {}) => call(createSubmitSessionPitchHandler, 'submit
   description: 'A practical session about shared reporting.',
   organization: 'Example newsroom',
   format: 'Panel',
+  leadName: 'Pat Submitter',
   submissionKey: KEY,
   consent: true,
   ...overrides,

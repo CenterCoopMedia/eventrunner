@@ -84,6 +84,7 @@
     "updateFeedbackStatus",
     "submitSessionPitch",
     "updatePitchCall",
+    "updatePitchFormOptions",
     "reviewSessionPitch",
     "importSessionPitches",
     "convertSessionPitch",
