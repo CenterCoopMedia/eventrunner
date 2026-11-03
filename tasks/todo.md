@@ -1,5 +1,26 @@
 # Session task list
 
+## 2026-11-03: registration, pitch and speaker steppers
+
+Spec: [ADR 0008](../docs/adr/0008-registration-and-pitch-steppers.md)
+(proposed). Owner choices: standard questions plus 10 custom; answers in a
+checkout stepper; speakers through pitches and invites; promo codes in.
+Order is set by NC Local's launch: pitch call and early-bird tickets first.
+
+- [ ] R1 Stepper component (public and admin), interface guideline
+      section; move the admin setup page onto it.
+- [ ] R2 Pitch stepper: five steps, presenters, staff lists for format,
+      length and track; schema, rules, CSV and Airtable mapping, export.
+- [ ] R3 Accept a pitch: a speaker per presenter, dedupe by email, invite
+      in one action; speaker profile stepper; `speaker.confirmation`.
+- [ ] R4 Registration questions: `config/registration_form`, admin editor
+      with preview, `shared/registrationForm`, private `ticket_answers`,
+      rules, attendee record, export columns, counts summary.
+- [ ] R5 Checkout stepper (Stripe) and "Complete your registration"
+      (Eventbrite, manual, none); `attendee.approved` email.
+- [ ] R6 Promo codes (ADR 0004 amendment), with concurrency tests.
+- [ ] R7 Registration import in `/admin/import`; speaker logistics export.
+
 ## 2026-11-03: client onboarding, account creation and provisioning
 
 Spec: [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md),
