@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Complete your registration** (`/registration`, ADR 0008 §5): a signed-in
+  attendee answers the registration questions, one step per valid ticket,
+  then Review. The dashboard reminds them until every ticket has answers.
+  With no ticketing provider, answers are kept for the account
+  (`ticket_answers/account-{uid}`). Approving an attendee now sends
+  `attendee.approved` once per account. `registration` is a reserved page
+  path.
 - Registration answers (ADR 0008 §4): `saveTicketAnswers` stores one
   attendee's answers per ticket in the private `ticket_answers`, checked
   against the form revision they answered. The ticket holder can save until

@@ -45,6 +45,7 @@ test('isReservedPathSegment matches only reserved segments', () => {
   assert.equal(isReservedPathSegment('updates'), true);
   assert.equal(isReservedPathSegment('ticket'), true);
   assert.equal(isReservedPathSegment('tickets'), true);
+  assert.equal(isReservedPathSegment('registration'), true);
   assert.equal(isReservedPathSegment('scholarships'), false);
   assert.equal(isReservedPathSegment(''), false);
 });

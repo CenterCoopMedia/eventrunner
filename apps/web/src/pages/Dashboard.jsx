@@ -24,6 +24,7 @@ import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import LiveUpdatesCard from '../components/LiveUpdatesCard.jsx';
 import ProfileSidebar from '../components/ProfileSidebar.jsx';
+import RegistrationReminderCard from '../components/RegistrationReminderCard.jsx';
 import MySessionsCard from '../components/dashboard/MySessionsCard.jsx';
 import ResourceCards from '../components/dashboard/ResourceCards.jsx';
 import { primaryActionClass } from '../components/controlClasses.js';
@@ -76,6 +77,8 @@ export default function Dashboard() {
           reason the reader came. LiveUpdatesCard renders nothing when the
           event has no feed, so an event without updates shows one card. */}
       <div className="mt-xl grid items-start gap-lg lg:grid-cols-2">
+        {/* Draws nothing unless questions are still unanswered (ADR 0008 §5). */}
+        <RegistrationReminderCard />
         <MySessionsCard />
         <ProfileSidebar />
         {features.liveUpdates ? (

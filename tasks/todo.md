@@ -46,7 +46,7 @@ path (R2c, R3) comes before registration.
         summary, deletion with the account, archive exclusion. Stacked on
         R4a. The attendee's own form comes with R5.
 - [ ] R5 Checkout stepper and "Complete your registration", in two stacked PRs:
-  - [ ] R5a `/registration` (Questions per ticket → Review) for every
+  - [x] R5a `/registration` (Questions per ticket → Review) for every
         provider; with no tickets (provider `none`) answers are keyed
         `ticket_answers/account-{uid}`. Dashboard reminder until answered.
         `attendee.approved` email once per account on admin approval.
