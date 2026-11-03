@@ -154,3 +154,15 @@ test('sameValue compares by value, whatever the order of keys in a map', () => {
   assert.equal(sameValue(null, undefined), true);
   assert.equal(sameValue([1, 2], [2, 1]), false, 'list order still counts');
 });
+
+const { speakerCandidates } = require('./pitchForm.cjs');
+
+test('speaker candidates are the presenters, lead first, with a repeated address kept once', () => {
+  const stored = { presenters: [
+    { name: 'Ada', email: 'ada@example.org', lead: true },
+    { name: 'Bo', email: 'bo@example.org', lead: false },
+    { name: 'Bo again', email: 'BO@example.org', lead: false },
+  ] };
+  assert.deepEqual(speakerCandidates(stored).map((p) => p.name), ['Ada', 'Bo']);
+  assert.deepEqual(speakerCandidates({ email: 'old@example.org' }).map((p) => p.email), ['old@example.org']);
+});

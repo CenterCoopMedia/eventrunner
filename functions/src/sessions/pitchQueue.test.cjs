@@ -135,3 +135,100 @@ test('an unchanged re-import stays unchanged after Firestore returns the present
   await db.collection('session_pitches').doc(id).update({ presenters: reordered });
   assert.deepEqual((await send(body)).body, { imported: 0, unchanged: 1 });
 });
+
+// ADR 0008 §3: one speaker per presenter, linked by email, invited at once.
+const CONFIG = {
+  event: { name: 'Example Summit', days: [{ id: 'day-one', date: '2027-05-13' }], sender: { email: 's@example.org', name: 'Example Summit' },
+    legal: { postalAddressHtml: 'Example Org<br>1 Main St', supportEmail: 'help@example.org' } },
+  theme: { colors: { primary: 'BRAND', ink: 'INK' } },
+  tierA: { publicUrl: 'https://summit.example.org' },
+  bootstrap,
+};
+const presenters = [
+  { name: 'Ada Reporter', email: 'speaker@example.test', organization: 'Example News', role: 'Editor', lead: true },
+  { name: 'Bo Writer', email: 'bo@example.test', organization: null, role: null, lead: false },
+  { name: 'Cy Known', email: 'cy@example.test', organization: null, role: null, lead: false },
+];
+const team = { ...conversion, speakers: [
+  { firstName: 'Ada', lastName: 'Reporter' }, { firstName: 'Bo', lastName: 'Writer' }, null,
+] };
+function teamDb(extra = {}) {
+  return makeFakeDb({
+    'config/bootstrap': bootstrap,
+    'config/event': { days: [{ id: 'day-one' }] },
+    'session_pitches/proposal': { ...row, presenters, status: 'accepted', reviewRevision: 1 },
+    'speakers/cy-known': { firstName: 'Cy', lastName: 'Known', slug: 'cy-known', email: 'cy@example.test', status: 'approved' },
+    ...extra,
+  });
+}
+async function convertWith(db, body, { sendResult = { status: 'sent', providerMessageId: 'm1' } } = {}) {
+  const sent = [];
+  const res = { statusCode: null, body: null, headers: {},
+    set(name, value) { this.headers[name] = value; return this; },
+    status(code) { this.statusCode = code; return this; },
+    json(value) { this.body = value; return this; },
+  };
+  await createQueueHandler({
+    db, auth, getConfig: async () => CONFIG, now: () => 1_800_000_000_000, log: { error() {}, warn() {} },
+    sendEmail: async (message) => { sent.push(message); return sendResult; },
+  }, 'convert')({ method: 'POST', headers: { authorization: 'Bearer staff' }, body }, res);
+  return { res, sent };
+}
+
+test('conversion makes one speaker per new presenter and links a presenter who is already a speaker', async () => {
+  const db = teamDb();
+  const { res, sent } = await convertWith(db, team);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.speakerIds, ['pitch-proposal', 'pitch-proposal-2', 'cy-known']);
+  assert.deepEqual(res.body.createdSpeakerIds, ['pitch-proposal', 'pitch-proposal-2']);
+  assert.equal(res.body.speakerId, 'pitch-proposal', 'the lead stays first, for old readers');
+  assert.deepEqual(db.read('cmsSchedule_drafts', 'pitch-proposal').speakerIds, ['pitch-proposal', 'pitch-proposal-2', 'cy-known']);
+  const lead = db.read('speakers', 'pitch-proposal');
+  assert.deepEqual([lead.firstName, lead.lastName, lead.email, lead.organization, lead.jobTitle, lead.status], ['Ada', 'Reporter', 'speaker@example.test', 'Example News', 'Editor', 'draft']);
+  assert.equal(db.read('speakers', 'pitch-proposal-2').email, 'bo@example.test');
+  assert.equal(db.read('speakers', 'cy-known').status, 'approved', 'a linked speaker is not changed');
+  assert.equal(db.read('speakers', 'cy-known').firstName, 'Cy', 'a linked speaker needs no name');
+  assert.deepEqual(res.body.invites, []);
+  assert.equal(sent.length, 0, 'no invite without the box');
+});
+
+test('the invite box sends the speaker invite to each new speaker in the same action', async () => {
+  const db = teamDb();
+  const { res, sent } = await convertWith(db, { ...team, invite: true });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.deepEqual(res.body.invites, [
+    { speakerId: 'pitch-proposal', email: 'speaker@example.test', sent: true },
+    { speakerId: 'pitch-proposal-2', email: 'bo@example.test', sent: true },
+  ]);
+  assert.deepEqual(sent.map((m) => [m.to, m.tag]), [['speaker@example.test', 'speaker.invite'], ['bo@example.test', 'speaker.invite']]);
+  assert.equal(db.read('speakers', 'pitch-proposal').status, 'invited');
+  assert.equal(db.read('speakers', 'cy-known').status, 'approved');
+  // A retry replays the conversion and sends nothing again.
+  const again = await convertWith(db, { ...team, invite: true });
+  assert.equal(again.res.body.replayed, true);
+  assert.equal(again.sent.length, 0);
+});
+
+test('a failed invite keeps the drafts and says which presenter was not invited', async () => {
+  const db = teamDb();
+  const { res } = await convertWith(db, { ...team, invite: true }, { sendResult: { status: 'failed' } });
+  assert.equal(res.statusCode, 200);
+  assert.equal(db.read('speakers', 'pitch-proposal').status, 'invited', 'the invitation is recorded; Resend mints a new one');
+  assert.deepEqual(res.body.invites.map((i) => [i.speakerId, i.sent]), [['pitch-proposal', false], ['pitch-proposal-2', false]]);
+  assert.match(res.body.invites[0].message, /could not be emailed/);
+});
+
+test('conversion refuses names that do not match the presenters, and a one-speaker body still works', async () => {
+  const db = teamDb();
+  const short = await convertWith(db, { ...team, speakers: team.speakers.slice(0, 2) });
+  assert.equal(short.res.statusCode, 409);
+  assert.equal(short.res.body.error.code, 'presenters-changed');
+  const blank = await convertWith(db, { ...team, speakers: [team.speakers[0], null, null] });
+  assert.equal(blank.res.statusCode, 400);
+  assert.match(blank.res.body.error.message, /speakers\.1/);
+  assert.equal(db.read('speakers', 'pitch-proposal'), undefined);
+  const solo = queueDb();
+  const legacy = await convertWith(solo, conversion);
+  assert.equal(legacy.res.statusCode, 200);
+  assert.deepEqual(legacy.res.body.speakerIds, ['pitch-proposal']);
+});

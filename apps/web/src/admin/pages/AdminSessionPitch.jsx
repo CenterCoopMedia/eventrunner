@@ -19,7 +19,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
 import { subscribePitchCall } from '../../lib/pitchSource.js';
+import { speakerCandidates } from 'shared/pitchForm';
 import { useAdminApi } from '../adminApi.js';
+import { useAdminSpeakers } from '../useAdminSpeakers.js';
+import { conversionMessage, splitName } from '../pitchConversion.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { PITCH_STATUS_LABELS, PITCH_STATUS_TONES, pitchRevision } from '../pitchStatus.js';
 import PitchDetails from '../components/PitchDetails.jsx';
@@ -40,34 +43,61 @@ const DECISIONS = Object.freeze([
 
 function ConvertToDrafts({ pitch, call, disabled, onConverted }) {
   const { eventConfig: event } = useEventConfig();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const { speakers, loading: speakersLoading } = useAdminSpeakers();
+  const candidates = speakerCandidates(pitch);
+  const [names, setNames] = useState(() => candidates.map((presenter) => splitName(presenter.name)));
   const [dayId, setDayId] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [invite, setInvite] = useState(true);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  async function convert(event) {
-    event.preventDefault();
-    if (busy || disabled || !confirmed) return;
+  // The server links a presenter whose email is already on a speaker.
+  const known = (presenter) => (presenter.email ? speakers.find((speaker) => speaker.email === presenter.email.toLowerCase()) : null) ?? null;
+  const setName = (index, part, value) => setNames((previous) => previous.map((pair, i) => (i === index ? (part === 0 ? [value, pair[1]] : [pair[0], value]) : pair)));
+  async function convert(submitEvent) {
+    submitEvent.preventDefault();
+    if (busy || disabled || !confirmed || speakersLoading) return;
     setBusy(true); setError(null);
     try {
-      const response = await call('convertSessionPitch', { id: pitch.id, expectedRevision: pitchRevision(pitch), firstName, lastName, dayId, startTime, endTime });
+      const response = await call('convertSessionPitch', {
+        id: pitch.id, expectedRevision: pitchRevision(pitch), dayId, startTime, endTime, invite,
+        speakers: candidates.map((presenter, index) => (known(presenter) ? null : { firstName: names[index][0], lastName: names[index][1] })),
+      });
       onConverted(response);
     } catch (err) { setError(err); } finally { setBusy(false); }
   }
   return (
     <form onSubmit={convert} className="space-y-sm">
-      <p className="text-admin-sm text-admin-ink-secondary">Confirm the proposed speaker and time. This creates a hidden session draft and an unapproved speaker. It sends no invite or email.</p>
+      <p className="text-admin-sm text-admin-ink-secondary">Confirm each presenter and the time. This creates a hidden session draft and an unapproved speaker for each new presenter. A presenter who is already a speaker is linked, not copied.</p>
       <ServerErrorSummary error={error} />
       <fieldset disabled={busy} className="space-y-sm">
-        <div className="grid gap-sm sm:grid-cols-2"><TextField label="Speaker first name" value={firstName} onChange={setFirstName} required maxLength={100} /><TextField label="Speaker last name" value={lastName} onChange={setLastName} required maxLength={100} /></div>
+        <ul aria-label="Presenters" className="space-y-sm">
+          {candidates.map((presenter, index) => {
+            const speaker = known(presenter);
+            const label = presenter.lead ? 'Lead presenter' : `Co-presenter ${index}`;
+            return (
+              <li key={presenter.email || index} className="space-y-xs">
+                <p className="text-admin-sm"><span className="font-medium">{label}</span> <span className="text-admin-ink-secondary">{presenter.email || 'No email'}</span></p>
+                {speaker ? (
+                  <p className="text-admin-sm text-admin-ink-secondary">Already a speaker: {speaker.displayName}. This pitch links to that record and sends that speaker no invite.</p>
+                ) : (
+                  <div className="grid gap-sm sm:grid-cols-2">
+                    <TextField label={`${label} first name`} value={names[index][0]} onChange={(value) => setName(index, 0, value)} required maxLength={100} />
+                    <TextField label={`${label} last name`} value={names[index][1]} onChange={(value) => setName(index, 1, value)} required maxLength={100} />
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
         <SelectField label="Event day" value={dayId} onChange={setDayId} required options={[{ value: '', label: 'Choose a day' }, ...(event.days || []).map((day) => ({ value: day.id, label: day.label || day.date || day.id }))]} />
         <div className="grid gap-sm sm:grid-cols-2"><TextField label="Start time" type="time" value={startTime} onChange={setStartTime} required /><TextField label="End time" type="time" value={endTime} onChange={setEndTime} required /></div>
-        <CheckboxField label="I reviewed the proposal, speaker identity, consent, and time. Create private drafts only." checked={confirmed} onChange={setConfirmed} />
+        <CheckboxField label="Invite the presenters now" hint="Each new speaker gets the speaker invite email, to make an account and fill in a profile. Linked speakers get nothing." checked={invite} onChange={setInvite} />
+        <CheckboxField label="I reviewed the proposal, the presenters, consent, and the time." checked={confirmed} onChange={setConfirmed} />
       </fieldset>
-      <button className={secondaryButtonClass} disabled={busy || disabled || !confirmed}>{busy ? 'Creating…' : 'Create reviewed drafts'}</button>
+      <button className={secondaryButtonClass} disabled={busy || disabled || !confirmed || speakersLoading}>{busy ? 'Creating…' : 'Create reviewed drafts'}</button>
     </form>
   );
 }
@@ -191,7 +221,11 @@ function PitchReview({ initial, current, call, settings }) {
         <Panel title="Drafts from this pitch">
           <div className="flex flex-wrap gap-sm">
             <Link to={`/admin/sessions/${created.sessionId}`} className={secondaryButtonClass}>Review session draft</Link>
-            <Link to={`/admin/speakers/${created.speakerId}`} className={secondaryButtonClass}>Review speaker draft</Link>
+            {(Array.isArray(created.speakerIds) ? created.speakerIds : [created.speakerId]).map((speakerId, index, all) => (
+              <Link key={speakerId} to={`/admin/speakers/${speakerId}`} className={secondaryButtonClass}>
+                {all.length === 1 ? 'Review speaker draft' : `Review speaker ${index + 1}`}
+              </Link>
+            ))}
           </div>
         </Panel>
       ) : baseline.status === 'accepted' ? (
@@ -203,7 +237,7 @@ function PitchReview({ initial, current, call, settings }) {
             disabled={conflict}
             onConverted={(response) => {
               setBaseline((previous) => ({ ...previous, conversion: response, reviewRevision: response.revision }));
-              setResult('Private drafts created. Review both editors before publication.');
+              setResult(conversionMessage(response));
             }}
           />
         </Panel>

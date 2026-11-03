@@ -143,13 +143,14 @@ test('a pitch converted by convertSessionPitch names its session and speaker in 
   // A pitch as submitSessionPitch stores it, after one accepting review.
   seed['session_pitches/pitch-2'] = {
     title: 'Open records', description: 'Requests that work.', organization: 'Weekly', format: 'Talk',
-    consent: { version: 'session-pitch-review-v1', at: T0 }, uid: 'uid-cy', email: 'cy@example.com',
+    // A presenter who is not yet a speaker, so the conversion makes one.
+    consent: { version: 'session-pitch-review-v1', at: T0 }, uid: 'uid-dana', email: 'dana@example.com',
     status: 'accepted', reviewRevision: 1, privateNotes: null, createdAt: T0, reviewedAt: T0, reviewedBy: STAFF,
   };
   const db = makeFakeDb(seed);
   const convert = createQueueHandler({ db, auth, getConfig: async () => config(), now: () => T0.getTime(), log: QUIET }, 'convert');
   const converted = await run(convert, 'staff', {
-    id: 'pitch-2', expectedRevision: 1, firstName: 'Cy', lastName: 'Park', dayId: 'day-1', startTime: '15:00', endTime: '16:00',
+    id: 'pitch-2', expectedRevision: 1, firstName: 'Dana', lastName: 'Park', dayId: 'day-1', startTime: '15:00', endTime: '16:00',
   });
   assert.equal(converted.statusCode, 200, JSON.stringify(converted.body));
   const sections = ['program', 'speakers', 'pitches'];

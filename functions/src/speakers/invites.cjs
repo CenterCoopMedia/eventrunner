@@ -767,28 +767,17 @@ function createResendSpeakerInviteHandler({ db, auth, getConfig, sendEmail, now 
 }
 
 /** Shared body of the send and resend handlers. */
-async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, actor, mode }) {
-  const rawType = req.body?.inviteType;
-  const inviteType = rawType === undefined || rawType === null || rawType === ''
-    ? DEFAULT_INVITE_TYPE
-    : rawType;
-
-  let minted;
-  try {
-    minted = await applyMintInvite({
-      db, speakerId: req.body?.speakerId, inviteType, mode, actor, now,
-    });
-  } catch (err) {
-    log.error(`${mode === 'send' ? 'sendSpeakerInvite' : 'resendSpeakerInvite'} failed`, err);
-    return internal(res, 'The invitation could not be created.');
-  }
-  if (!minted.ok) {
-    if (minted.status === 404) return notFound(res, minted.message);
-    if (minted.retryAfterMs) {
-      res.set('Retry-After', String(Math.ceil(minted.retryAfterMs / 1000)));
-    }
-    return sendError(res, minted.status, minted.code, minted.message);
-  }
+/**
+ * Mint one invitation and email it: the shared core of the Speakers page's
+ * Send and Resend, and of "Invite the presenters now" when a pitch becomes
+ * drafts (ADR 0008 §3).
+ *
+ * @returns {Promise<{ ok: true, minted: object } |
+ *   { ok: false, stage: 'mint'|'send', status: number, code: string, message: string, retryAfterMs?: number }>}
+ */
+async function inviteSpeaker({ db, getConfig, sendEmail, speakerId, inviteType, mode, actor, now, log }) {
+  const minted = await applyMintInvite({ db, speakerId, inviteType, mode, actor, now });
+  if (!minted.ok) return { ...minted, stage: 'mint' };
 
   await logAdminAction({
     db,
@@ -836,15 +825,14 @@ async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, act
 
   if (!sent.ok) {
     // The invitation is already durable and the token is live; the admin
-    // list shows it with no `sentAt`, and Resend mints a fresh one. Saying
-    // so beats a bare 502 that leaves an organizer guessing whether to
-    // press the button again.
-    return sendError(
-      res,
-      502,
-      sent.code,
-      `${sent.message} The invitation is recorded but shows as not delivered until an email goes out.`,
-    );
+    // list shows it with no `sentAt`, and Resend mints a fresh one.
+    return {
+      ok: false,
+      stage: 'send',
+      status: 502,
+      code: sent.code,
+      message: `${sent.message} The invitation is recorded but shows as not delivered until an email goes out.`,
+    };
   }
 
   try {
@@ -857,11 +845,36 @@ async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, act
     // undelivered in the admin list.
     log.warn('speaker_invites sentAt stamp failed', err);
   }
+  return { ok: true, minted };
+}
+
+async function runInviteSend({ db, getConfig, sendEmail, now, log, req, res, actor, mode }) {
+  const rawType = req.body?.inviteType;
+  const inviteType = rawType === undefined || rawType === null || rawType === ''
+    ? DEFAULT_INVITE_TYPE
+    : rawType;
+
+  let result;
+  try {
+    result = await inviteSpeaker({
+      db, getConfig, sendEmail, speakerId: req.body?.speakerId, inviteType, mode, actor, now, log,
+    });
+  } catch (err) {
+    log.error(`${mode === 'send' ? 'sendSpeakerInvite' : 'resendSpeakerInvite'} failed`, err);
+    return internal(res, 'The invitation could not be created.');
+  }
+  if (!result.ok) {
+    if (result.status === 404) return notFound(res, result.message);
+    if (result.retryAfterMs) {
+      res.set('Retry-After', String(Math.ceil(result.retryAfterMs / 1000)));
+    }
+    return sendError(res, result.status, result.code, result.message);
+  }
 
   res.status(200).json({
-    speakerId: minted.speakerId,
+    speakerId: result.minted.speakerId,
     status: 'invited',
-    expiresAt: minted.expiresAt.toISOString(),
+    expiresAt: result.minted.expiresAt.toISOString(),
   });
 }
 
@@ -1096,6 +1109,7 @@ function buildHandlers() {
 
 module.exports = {
   applyMintInvite,
+  inviteSpeaker,
   applyCancelInvite,
   applyAcceptInvite,
   resolveInvite,
