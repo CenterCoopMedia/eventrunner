@@ -42,7 +42,7 @@ const {
   readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
 } = require('shared/pitch');
 const {
-  checkPitch, presenterList, readPitchFormOptions, validatePitchFormOptions,
+  checkPitch, presenterList, readPitchFormOptions, sameValue, validatePitchFormOptions,
 } = require('shared/pitchForm');
 
 const MAX_TITLE_LENGTH = 160;
@@ -205,9 +205,8 @@ function samePitch(stored, actor, pitch) {
       && (stored.format ?? null) === (pitch.format ?? null);
   }
   const expected = proposalOf(pitch, actor.email);
-  return Object.entries(expected).every(([key, value]) => (
-    JSON.stringify(stored[key] ?? null) === JSON.stringify(value)
-  ));
+  // By value: Firestore may return a presenter map's keys in another order.
+  return Object.entries(expected).every(([key, value]) => sameValue(stored[key], value));
 }
 
 function auditRow({ action, docPath, actor, at, details }) {

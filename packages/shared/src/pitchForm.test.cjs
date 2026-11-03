@@ -109,3 +109,14 @@ test('the stored presenter list starts with the lead, and an old pitch reads as 
     { name: null, email: 'old@example.org', organization: 'Org', role: null, lead: true },
   ]);
 });
+
+const { sameValue } = require('./pitchForm.cjs');
+
+test('sameValue compares by value, whatever the order of keys in a map', () => {
+  const written = [{ name: 'Ada', email: 'a@example.org', organization: null, role: null, lead: true }];
+  const readBack = [{ email: 'a@example.org', lead: true, name: 'Ada', organization: null, role: null }];
+  assert.equal(sameValue(written, readBack), true);
+  assert.equal(sameValue(written, [{ ...readBack[0], name: 'Bo' }]), false);
+  assert.equal(sameValue(null, undefined), true);
+  assert.equal(sameValue([1, 2], [2, 1]), false, 'list order still counts');
+});
