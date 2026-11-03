@@ -362,6 +362,22 @@ describe('AdminSessionPitch decisions, notes and edits', () => {
     expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
   });
 
+  it('keeps format as free text in the edit form when the call lists no formats', () => {
+    openPitch({ ...PITCH, status: 'new', format: 'Panel' });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit pitch' }));
+    expect(screen.getByRole('textbox', { name: 'Format' })).toHaveValue('Panel');
+    expect(screen.queryByRole('combobox', { name: 'Format' })).toBeNull();
+  });
+
+  it('clears the draft-creation confirmation when the current version is loaded', () => {
+    openPitch({ ...PITCH, status: 'accepted' });
+    fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed the proposal/ }));
+    expect(screen.getByRole('checkbox', { name: /I reviewed the proposal/ })).toBeChecked();
+    push('session_pitches', [{ ...PITCH, status: 'accepted', reviewRevision: 3, title: 'Changed by someone else' }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Load the current version' }));
+    expect(screen.getByRole('checkbox', { name: /I reviewed the proposal/ })).not.toBeChecked();
+  });
+
   it('says so for an address with no pitch', () => {
     collections.session_pitches = [];
     renderAt('/admin/pitches/no-such-pitch');

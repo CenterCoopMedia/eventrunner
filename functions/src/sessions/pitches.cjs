@@ -42,7 +42,7 @@ const {
   readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
 } = require('shared/pitch');
 const {
-  checkPitch, presenterList, readPitchFormOptions, readPresenters, validatePitchFormOptions,
+  IMPORT_FIELDS, checkPitch, presenterList, readPitchFormOptions, readPresenters, validatePitchFormOptions,
 } = require('shared/pitchForm');
 
 const MAX_TITLE_LENGTH = 160;
@@ -136,6 +136,18 @@ function readFormSubmission(body, { options, email }) {
     return { ok: false, field, message: `${field}: ${message}` };
   }
   return { ok: true, ...checked.pitch, submissionKey };
+}
+
+/** The call's lists, widened to hold a body's own choices (a stored pitch's retry). */
+function widenedOptions(options, body) {
+  const source = body && typeof body === 'object' ? body : {};
+  const add = (list, value) => (value === undefined || value === null || value === '' || list.includes(value) ? list : [...list, value]);
+  return {
+    formats: options.formats.length ? add(options.formats, source.format) : [],
+    lengths: add(options.lengths, source.lengthMinutes),
+    tracks: add(options.tracks, source.track),
+    maxCoPresenters: 4,
+  };
 }
 
 /** The proposal fields a replay must repeat exactly. */
@@ -306,8 +318,19 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
       log.error('submitSessionPitch could not read the call', err);
       return internal(res, 'The session pitch could not be saved. Try again.');
     }
-    const pitch = readFormSubmission(req.body, { options, email });
-    if (!pitch.ok) return badRequest(res, pitch.message);
+    let pitch = readFormSubmission(req.body, { options, email });
+    if (!pitch.ok) {
+      // A retry of a pitch already stored must still land after staff take
+      // one of its choices off a list, or it could never get its answer. So
+      // a refused body is checked again against the lists widened by its own
+      // choices, and only when this account and key already hold a pitch.
+      // storePitch then replays it, or refuses changed answers with 409.
+      const stored = await db.collection(PITCHES).doc(pitchIdFor(decoded.uid, String(req.body?.submissionKey ?? ''))).get().catch(() => null);
+      if (stored?.exists && SUBMISSION_KEY_RE.test(String(req.body?.submissionKey ?? ''))) {
+        pitch = readFormSubmission(req.body, { options: widenedOptions(options, req.body), email });
+      }
+      if (!pitch.ok) return badRequest(res, pitch.message);
+    }
 
     let result;
     try {
@@ -521,6 +544,14 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
         tx.update(ref, {
           ...next,
           ...(stored.submitted ? {} : { submitted: { ...before, at: stored.createdAt ?? null } }),
+          // A pitch from Airtable that predates sourceValues gets them now,
+          // from the values before this edit, so the next refresh does not
+          // read the correction as a change to undo.
+          ...(stored.source === 'airtable' && !stored.sourceValues
+            ? { sourceValues: Object.fromEntries(['email', 'title', 'description', 'organization', 'format', ...IMPORT_FIELDS, 'presenters']
+              .filter((key) => ['email', 'title', 'description', 'organization', 'format'].includes(key) || stored[key] !== undefined)
+              .map((key) => [key, stored[key] ?? null])) }
+            : {}),
           reviewRevision: nextRevision,
           editedAt: at,
           editedBy: gate.email,

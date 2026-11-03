@@ -241,6 +241,17 @@ describe('the pitch stepper', () => {
     expect(screen.queryByRole('combobox', { name: 'Length' })).toBeNull();
   });
 
+  it('lets the reader move on when staff removed a question the reader had answered', async () => {
+    pitchCall = { ...NATIVE, formOptions: { formats: [], lengths: [], tracks: [], maxCoPresenters: 0 } };
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title: 'T', description: 'D', leadName: 'Ada', lengthMinutes: 45, track: 'Old',
+      presenters: [{ name: 'Bo', email: 'bo@example.org' }] }));
+    renderPitch('/pitch/format');
+    next();
+    await waitFor(() => expect(location.pathname).toBe('/pitch/presenters'));
+    next();
+    await waitFor(() => expect(location.pathname).toBe('/pitch/access'));
+  });
+
   it('hides co-presenters when the call takes one presenter per pitch', () => {
     pitchCall = { ...WITH_LISTS, formOptions: { ...WITH_LISTS.formOptions, maxCoPresenters: 0 } };
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ title: 'T', description: 'D' }));

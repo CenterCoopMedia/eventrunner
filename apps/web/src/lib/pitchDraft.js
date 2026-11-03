@@ -45,9 +45,15 @@ function shapeOf(value) {
   return draft;
 }
 
+// Reading `sessionStorage` itself can throw (a SecurityError when the
+// browser blocks site data), so the lookup is inside each try, never in a
+// default argument.
+const tabStorage = (storage) => storage ?? globalThis.sessionStorage;
+
 /** The saved draft, a carried-over one-page draft, or a blank pitch. */
-export function restorePitch(storage = globalThis.sessionStorage) {
+export function restorePitch(given) {
   try {
+    const storage = tabStorage(given);
     const current = shapeOf(JSON.parse(storage.getItem(DRAFT_KEY)));
     if (current) return current;
     const legacy = shapeOf(JSON.parse(storage.getItem(LEGACY_KEY)));
@@ -60,24 +66,32 @@ export function restorePitch(storage = globalThis.sessionStorage) {
 }
 
 /** @returns {boolean} false when the browser refused the write */
-export function savePitch(draft, storage = globalThis.sessionStorage) {
+export function savePitch(draft, given) {
   try {
-    storage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    tabStorage(given).setItem(DRAFT_KEY, JSON.stringify(draft));
     return true;
   } catch {
     return false;
   }
 }
 
-export function clearPitch(storage = globalThis.sessionStorage) {
-  try { storage.removeItem(DRAFT_KEY); } catch { /* nothing to clear */ }
+export function clearPitch(given) {
+  try { tabStorage(given).removeItem(DRAFT_KEY); } catch { /* nothing to clear */ }
 }
 
 /**
  * The body the server reads: trimmed text, empty choices as null, and
  * co-presenters without their local row ids.
+ *
+ * A question the call no longer asks sends no answer. When staff empty the
+ * length or track list, or allow no co-presenters, after the reader answered,
+ * the control is gone, and a stale answer would fail a check the reader has
+ * no control to fix. With no format list, format is free text, so it stays.
+ *
+ * @param {object} draft
+ * @param {{ lengths: number[], tracks: string[], maxCoPresenters: number }} [options]
  */
-export function submissionOf(draft) {
+export function submissionOf(draft, options) {
   const text = (value) => (typeof value === 'string' ? value.trim() : '');
   const orNull = (value) => text(value) || null;
   return {
@@ -86,12 +100,12 @@ export function submissionOf(draft) {
     description: text(draft.description),
     organization: orNull(draft.organization),
     format: orNull(draft.format),
-    lengthMinutes: draft.lengthMinutes === '' ? null : Number(draft.lengthMinutes),
-    track: orNull(draft.track),
+    lengthMinutes: draft.lengthMinutes === '' || (options && !options.lengths.length) ? null : Number(draft.lengthMinutes),
+    track: options && !options.tracks.length ? null : orNull(draft.track),
     audienceLevel: orNull(draft.audienceLevel),
     leadName: text(draft.leadName),
     leadRole: orNull(draft.leadRole),
-    presenters: draft.presenters.map((row) => ({
+    presenters: (options && options.maxCoPresenters === 0 ? [] : draft.presenters).map((row) => ({
       name: text(row.name), email: text(row.email), organization: orNull(row.organization), role: orNull(row.role),
     })),
     accessNeeds: orNull(draft.accessNeeds),

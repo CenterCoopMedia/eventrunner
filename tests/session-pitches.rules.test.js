@@ -555,6 +555,16 @@ describe('pitch stepper fields (ADR 0008 §2)', () => {
     expect((await db.collection('session_pitches').get()).empty).toBe(true);
   });
 
+  it('still replays a stored pitch after staff remove its choice, and refuses that choice on a new pitch', async () => {
+    expect((await submit(full())).statusCode).toBe(201);
+    await db.collection('config').doc('pitch_call').set({ formOptions: { ...OPTIONS, formats: ['Panel'], maxCoPresenters: 0 } }, { merge: true });
+    const replay = await submit(full());
+    expect(replay.statusCode).toBe(201);
+    expect(replay.body.id).toBe(PITCH_ID);
+    expect((await submit(full({ submissionKey: 'pitch-key-000002' }))).statusCode).toBe(400);
+    expect((await db.collection('session_pitches').get()).size).toBe(1);
+  });
+
   it('lets only an operator save the option lists, audits it, and keeps them across a call update', async () => {
     const next = { formats: [' Talk '], lengths: [45, 15], tracks: [], maxCoPresenters: 1 };
     expect((await updateOptions({ formOptions: next }, 'staff')).statusCode).toBe(403);
@@ -634,6 +644,14 @@ describe('staff edits of a pitch', () => {
     expect(unchanged.body.changed).toEqual([]);
     expect((await db.collection('session_pitches').doc(PITCH_ID).get()).data().reviewRevision).toBe(0);
     expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited({ format: 'Lightning talk' }) })).statusCode).toBe(200);
+  });
+
+  it('records the Airtable values before the first edit of an older Airtable pitch', async () => {
+    await db.collection('session_pitches').doc('airtable-old').set({ ...pitch(), source: 'airtable', email: SUBMITTER_EMAIL, status: 'new', reviewRevision: 0 });
+    expect((await editPitch({ id: 'airtable-old', expectedRevision: 0, pitch: edited() })).statusCode).toBe(200);
+    const stored = (await db.collection('session_pitches').doc('airtable-old').get()).data();
+    expect(stored.title).toBe('Corrected title');
+    expect(stored.sourceValues).toMatchObject({ title: pitch().title, description: pitch().description, format: 'Panel' });
   });
 
   it('makes an open review of the old text conflict', async () => {

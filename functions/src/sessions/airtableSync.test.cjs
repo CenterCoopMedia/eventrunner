@@ -410,3 +410,25 @@ test('a mapped stepper field comes in, and an unmapped one is left out of the ro
   const bad = mapRecord(record(1, { Minutes: 'long' }), { ...fieldMap, lengthMinutes: 'Minutes' });
   assert.deepEqual([bad.ok, bad.reason, bad.field], [false, 'invalid-field', 'Minutes']);
 });
+
+test('a refresh keeps a staff correction while the Airtable record is unchanged, and takes a real source change', async () => {
+  const db = makeDb();
+  const api = fakeAirtable([record(1)]);
+  tick = later();
+  await run(db, api);
+  const id = pitchIdFor(recId(1));
+  const created = pitch(db, 1);
+  assert.equal(created.sourceValues.title, created.title, 'the first refresh records what Airtable sent');
+  // Staff correct the title (editSessionPitch), keeping the source values.
+  await db.collection('session_pitches').doc(id).update({ title: 'Corrected by staff', submitted: { title: created.title }, reviewRevision: 1 });
+  tick = later();
+  const same = await run(db, api);
+  assert.equal(same.counts.unchanged, 1);
+  assert.equal(pitch(db, 1).title, 'Corrected by staff');
+  api.rows = [record(1, { Title: 'Changed in Airtable' })];
+  tick = later();
+  const moved = await run(db, api);
+  assert.equal(moved.counts.updated, 1);
+  assert.equal(pitch(db, 1).title, 'Changed in Airtable');
+  assert.equal(pitch(db, 1).sourceValues.title, 'Changed in Airtable');
+});

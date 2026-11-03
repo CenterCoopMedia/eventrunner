@@ -190,12 +190,20 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
           sourceUpdatedAt: null,
           sourceRemovedAt: null,
           sourceConsentMissingAt: null,
+          // What Airtable sent, so a later refresh can tell a source change
+          // from a staff correction (editSessionPitch).
+          sourceValues: row,
         });
         return;
       }
-      // The legacy fields always, and each mapped stepper field the row carries.
+      // Compare with what Airtable sent last, not with the pitch: a staff
+      // correction changes the pitch, not the source. A pitch stored before
+      // sourceValues existed compares with itself, as it always did. The
+      // legacy fields always count, and each mapped stepper field the row
+      // carries; values compare as JSON so a presenter list compares by value.
+      const baseline = stored.sourceValues && typeof stored.sourceValues === 'object' ? stored.sourceValues : stored;
       const keys = [...CONTENT_KEYS, ...Object.keys(row).filter((key) => !CONTENT_KEYS.includes(key))];
-      const changed = keys.filter((key) => JSON.stringify(stored[key] ?? null) !== JSON.stringify(row[key] ?? null));
+      const changed = keys.filter((key) => JSON.stringify(baseline[key] ?? null) !== JSON.stringify(row[key] ?? null));
       const flagged = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);
       if (changed.length) {
         local.updated += 1;
@@ -206,6 +214,7 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
           reviewRevision: revision + 1,
           sourceUpdatedAt: at,
           sourceChangedFields: changed,
+          sourceValues: row,
           sourceRemovedAt: null,
           sourceConsentMissingAt: null,
         });
