@@ -11,6 +11,9 @@ const CATALOG = { schemaVersion: 1, revision: 1, published: true, salesPaused: f
 const PUBLIC = { provider: 'stripe', mode: 'test', salesEnabled: true, catalogRevision: CATALOG.revision, currency: 'usd', maxPerOrder: 4, refundPolicy: CATALOG.refundPolicy, taxTreatment: 'inclusive', ticketTypes: [TYPE] };
 const TICKET = { externalId: 'opaque-browser-seat-1', id: 'opaque-browser-seat-1', orderId: 'browser-order-1', ticketTypeId: 'general', ticketClass: 'General admission', firstName: 'Synthetic', lastName: 'Attendee', email: 'browser-attendee@example.test', status: 'valid', claimedByUid: null, claimedByMe: false, checkedInAt: null };
 const ORDER = { id: 'browser-order-1', orderId: 'browser-order-1', purchaserEmail: ADMIN_EMAIL, status: 'paid', paymentStatus: 'succeeded', currency: 'usd', subtotalAmount: 2500, totalAmount: 2500, createdAt: '2026-01-01T12:00:00Z', refundStatus: 'none', refundedAmount: 0, lines: [{ ticketTypeId: 'general', name: TYPE.name, quantity: 1, unitAmount: 2500, lineAmount: 2500 }] };
+// The registration questions the purchase walks through (ADR 0008 §5).
+const REGISTRATION_FORM = { standard: { organization: { enabled: true, required: true } }, custom: [], revision: 7 };
+const ORGANIZATION = 'Synthetic Newsroom';
 const EVIDENCE = path.resolve('test-results/admin-visual-evidence');
 const HEADERS = { 'access-control-allow-origin': APP_BASE_URL, 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'authorization, content-type, x-firebase-appcheck' };
 
@@ -38,11 +41,18 @@ async function assertPageFits(page, label) {
 
 test.describe.serial('Stripe ticketing browser contracts', () => {
   let originalEvent;
+  let originalForm;
   test.beforeAll(async () => {
     originalEvent = (await adminDb().doc('config/event').get()).data();
     await adminDb().doc('config/event').set({ ...originalEvent, historicalDemo: false });
+    originalForm = (await adminDb().doc('config/registration_form').get()).data() ?? null;
+    await adminDb().doc('config/registration_form').set(REGISTRATION_FORM);
   });
-  test.afterAll(async () => { if (originalEvent) await adminDb().doc('config/event').set(originalEvent); });
+  test.afterAll(async () => {
+    if (originalEvent) await adminDb().doc('config/event').set(originalEvent);
+    if (originalForm) await adminDb().doc('config/registration_form').set(originalForm);
+    else await adminDb().doc('config/registration_form').delete();
+  });
 
   test('the header and home lead offer tickets only once a catalog is published', async ({ page }) => {
     // The shape the public catalog read answers before staff publish a catalog.
@@ -83,13 +93,24 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await page.goto('/tickets');
     await expect(page.getByLabel('Quantity — General admission')).toBeVisible();
     await page.getByLabel('Quantity — General admission').selectOption('1');
-    // The submit stays usable. Its validation gives keyboard focus to the
-    // first attendee field rather than leaving a silent disabled control.
-    await page.getByRole('button', { name: 'Continue to Stripe — $25.00' }).click();
+    await page.getByRole('button', { name: 'Next: Attendees' }).click();
+    await expect(page).toHaveURL(/\/tickets\?step=attendees$/);
+    // Next stays usable. Its validation gives keyboard focus to the first
+    // attendee field rather than leaving a silent disabled control.
+    await page.getByRole('button', { name: 'Next: Questions' }).click();
     await expect(page.getByLabel('First name', { exact: true })).toBeFocused();
     await page.getByLabel('First name', { exact: true }).fill(TICKET.firstName);
     await page.getByLabel('Last name', { exact: true }).fill(TICKET.lastName);
     await page.getByLabel('Attendee email', { exact: true }).fill(TICKET.email);
+    await page.getByRole('button', { name: 'Next: Questions' }).click();
+    await expect(page.getByRole('group', { name: `Ticket 1: ${TYPE.name} for ${TICKET.firstName} ${TICKET.lastName}` })).toBeVisible();
+    await page.getByRole('button', { name: 'Next: Review' }).click();
+    await expect(page.getByLabel('Organization (required)')).toBeFocused();
+    await page.getByLabel('Organization (required)').fill(ORGANIZATION);
+    await assertPageFits(page, 'Questions step');
+    await screenshot(page, 'stripe-purchase-questions');
+    await page.getByRole('button', { name: 'Next: Review' }).click();
+    await expect(page.getByText(ORGANIZATION, { exact: true })).toBeVisible();
     await page.getByRole('checkbox', { name: 'I have read and accept the refund policy' }).check();
     for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }], ['narrow', { width: 320, height: 800 }]]) {
       await page.setViewportSize(viewport);
@@ -106,6 +127,8 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('heading', { name: 'We are confirming your order' })).toBeVisible();
     expect(checkoutBodies).toHaveLength(2);
     expect(checkoutBodies[0].catalogRevision).toBe(CATALOG.revision);
+    expect(checkoutBodies[0].formRevision).toBe(REGISTRATION_FORM.revision);
+    expect(checkoutBodies[0].lines[0].attendees).toEqual([{ firstName: TICKET.firstName, lastName: TICKET.lastName, email: TICKET.email, answers: { organization: ORGANIZATION } }]);
     expect(checkoutBodies[1]).toEqual({ requestId: checkoutBodies[0].requestId, resume: true });
     expect(checkoutBodies[0]).not.toHaveProperty('unitAmount');
     expect(checkoutBodies[0].lines[0]).not.toHaveProperty('unitAmount');
@@ -168,13 +191,20 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByText('Choose at least one ticket to continue.')).toBeVisible();
     await expect(page.getByText(/No payment is required/)).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Reserve tickets|Continue to Stripe/ })).toHaveCount(0);
-    await screenshot(page, 'stripe-empty-cart-mobile', page.locator('section').filter({ hasText: 'Review your total' }));
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await screenshot(page, 'stripe-empty-cart-mobile', page.locator('section').filter({ hasText: 'Choose your tickets' }));
+    await page.getByRole('button', { name: 'Next: Attendees' }).click();
     await expect(page.getByRole('alert')).toHaveText('Choose at least one ticket.');
     await expect(page.getByRole('alert')).toBeFocused();
     await page.getByLabel('Quantity — General admission').selectOption('1');
     await expect(page.getByText('Choose at least one ticket to continue.')).toHaveCount(0);
     await expect(page.getByText('Choose at least one ticket.', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Total for 1 ticket: $25.00')).toBeVisible();
+    await page.getByRole('button', { name: 'Next: Attendees' }).click();
+    await page.getByLabel('First name', { exact: true }).fill(TICKET.firstName);
+    await page.getByLabel('Attendee email', { exact: true }).fill(TICKET.email);
+    await page.getByRole('button', { name: 'Next: Questions' }).click();
+    await page.getByLabel('Organization (required)').fill(ORGANIZATION);
+    await page.getByRole('button', { name: 'Next: Review' }).click();
     await expect(page.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeVisible();
   });
 

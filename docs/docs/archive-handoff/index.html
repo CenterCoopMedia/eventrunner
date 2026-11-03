@@ -214,7 +214,7 @@
           <li>Agree a retention period with the client before the handoff, and write it in the handoff record.</li>
           <li>Store the package, the managed export and the Storage copy with access control. Do not send any of them as an open link.</li>
           <li>When a person asks to be deleted after the export, delete the account in <strong>Attendees</strong>, and remove the person from every copy of the package and the backup, or delete those copies.</li>
-          <li>Registration answers (<code>ticket_answers</code>) and speaker logistics (<code>speaker_logistics</code>) hold diet, access and travel needs. They are not in the package. They are deleted with each account, and with the Firebase project. If the client needs catering or access counts after the event, export them from <strong>Attendees</strong> before the handoff.</li>
+          <li>Registration answers (<code>ticket_answers</code>) and speaker logistics (<code>speaker_logistics</code>) hold diet, access and travel needs. They are not in the package. They are deleted with each account, and with the Firebase project. Answers given at Stripe checkout for a seat nobody has claimed yet wait on the order (<code>ticket_orders</code>) and are deleted with the project. If the client needs catering or access counts after the event, export them from <strong>Attendees</strong> before the handoff.</li>
           <li>When the retention period ends, delete the archive bucket, every downloaded package, and, when the contract ends, the Firebase project.</li>
           </ul>
           <h2 id="handoff-record">Handoff record<a class="heading-anchor" href="#handoff-record" aria-label="Link to this section">#</a></h2>

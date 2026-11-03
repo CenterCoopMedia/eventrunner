@@ -145,6 +145,11 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The Stripe ticket page is now steps: Tickets, Attendees, Questions (when
+          the registration form asks any), Review, then Pay (ADR 0008 §5). Answers
+          for each attendee are checked when the order is reserved, held on that
+          seat, and moved to the attendee&#39;s own <code>ticket_answers</code> record when they
+          claim the ticket. Giving a seat to a different email drops its answers.</li>
           <li><strong>Complete your registration</strong> (<code>/registration</code>, ADR 0008 §5): a signed-in
           attendee answers the registration questions, one step per valid ticket,
           then Review. The dashboard reminds them until every ticket has answers.

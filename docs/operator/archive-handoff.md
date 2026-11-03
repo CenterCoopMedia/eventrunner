@@ -117,7 +117,7 @@ To take the site offline instead, export first, then disable Hosting (`firebase 
 - Agree a retention period with the client before the handoff, and write it in the handoff record.
 - Store the package, the managed export and the Storage copy with access control. Do not send any of them as an open link.
 - When a person asks to be deleted after the export, delete the account in **Attendees**, and remove the person from every copy of the package and the backup, or delete those copies.
-- Registration answers (`ticket_answers`) and speaker logistics (`speaker_logistics`) hold diet, access and travel needs. They are not in the package. They are deleted with each account, and with the Firebase project. If the client needs catering or access counts after the event, export them from **Attendees** before the handoff.
+- Registration answers (`ticket_answers`) and speaker logistics (`speaker_logistics`) hold diet, access and travel needs. They are not in the package. They are deleted with each account, and with the Firebase project. Answers given at Stripe checkout for a seat nobody has claimed yet wait on the order (`ticket_orders`) and are deleted with the project. If the client needs catering or access counts after the event, export them from **Attendees** before the handoff.
 - When the retention period ends, delete the archive bucket, every downloaded package, and, when the contract ends, the Firebase project.
 
 ## Handoff record
