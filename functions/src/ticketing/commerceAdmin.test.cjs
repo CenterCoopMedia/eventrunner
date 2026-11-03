@@ -112,6 +112,19 @@ test('claimed identity cannot be transferred through the attendee correction for
   assert.equal((await db.collection('ticket_orders').doc('order-1').get()).data().seats[0].firstName, 'Corrected');
 });
 
+test('a seat given to another person loses the first person\'s registration answers; a name fix keeps them', async () => {
+  const db = dbFor();
+  const orderRef = db.collection('ticket_orders').doc('order-1');
+  const order = (await orderRef.get()).data();
+  await orderRef.update({ seats: order.seats.map((seat) => (seat.externalId === 'ticket-1' ? { ...seat, answers: { accessNeeds: 'Step-free stage.' } } : seat)) });
+  const base = { action: 'updateAttendee', ticketId: 'ticket-1', firstName: 'Corrected', lastName: 'Guest', reason: 'Correction' };
+  assert.equal((await call(admin(db), { ...base, email: ticket.email })).statusCode, 200);
+  const seatOf = async () => (await orderRef.get()).data().seats.find((seat) => seat.externalId === 'ticket-1');
+  assert.deepEqual((await seatOf()).answers, { accessNeeds: 'Step-free stage.' }, 'same person, same answers');
+  assert.equal((await call(admin(db), { ...base, email: 'someone-else@example.org' })).statusCode, 200);
+  assert.equal(Object.hasOwn(await seatOf(), 'answers'), false, 'answers never pass to a new holder');
+});
+
 test('check-in is atomic under concurrent scans and only writes one admission audit', async () => {
   const db = dbFor();
   const handler = checkIn(db);

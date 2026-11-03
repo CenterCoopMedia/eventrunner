@@ -252,8 +252,15 @@ async function correctAttendee({ db, provider, actor, body, now }) {
     }
     const changes = { email, firstName, lastName };
     tx.update(ref, { ...changes, updatedAt: now() });
+    // A new email is a new person: registration answers given for the first
+    // one (ADR 0008 §5) never pass to them. A name fix keeps the answers.
+    const newHolder = email !== ticket.email;
     tx.update(orderRef, {
-      seats: (order.seats || []).map((seat) => seat.externalId === ticketId ? { ...seat, ...changes } : seat),
+      seats: (order.seats || []).map((seat) => {
+        if (seat.externalId !== ticketId) return seat;
+        const { answers, ...rest } = seat;
+        return newHolder || answers === undefined ? { ...rest, ...changes } : { ...rest, answers, ...changes };
+      }),
       updatedAt: now(),
     });
     audit(tx, logRef, { action: 'attendee-corrected', actor, now, orderId, ticketIds: [ticketId], reason });

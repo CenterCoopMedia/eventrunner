@@ -906,3 +906,110 @@ test('the catalog can lower the cumulative free budget and duplicates cannot hid
   assert.equal((await checkout(deps, freeRequest('catalog-budget-next1', 1))).body.error.code, 'free-seat-limit');
   assert.equal(db.read('ticket_inventory', 'current').sold, 2);
 });
+
+// ADR 0008 §5: answers given at checkout wait on the order's seats until claim.
+const FORM = {
+  standard: { organization: { enabled: true, required: false }, dietary: { enabled: true, required: false } },
+  custom: [], revision: 2,
+};
+const ANSWERS = { organization: ' Gazette ', dietary: { choices: ['Vegan'] } };
+const CHECKED = { organization: 'Gazette', dietary: { choices: ['Vegan'], other: null } };
+const answered = (patch = {}, answers = ANSWERS) => request({
+  formRevision: 2,
+  lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [{ ...PERSON, answers }, { ...PERSON, email: BOB.email }] }],
+  ...patch,
+});
+
+test('checkout answers are checked against the live form and held only on the order seats', async () => {
+  const { deps, db, calls } = setup({ seed: { 'config/registration_form': FORM } });
+  const res = await checkout(deps, answered());
+  assert.equal(res.statusCode, 200);
+  const order = db.read('ticket_orders', res.body.orderId);
+  assert.deepEqual(order.seats[0].answers, CHECKED);
+  assert.equal(Object.hasOwn(order.seats[1], 'answers'), false);
+  assert.equal(order.registrationFormRevision, 2);
+  assert.deepEqual(order.registrationQuestions.map((question) => question.id), ['organization', 'dietary']);
+  // Never sent to Stripe or stored on the payment attempt.
+  assert.equal(JSON.stringify(calls[0].params).includes('Gazette'), false);
+  assert.equal(JSON.stringify(db.read('ticket_payment_attempts', order.attemptId)).includes('Gazette'), false);
+});
+
+test('checkout without answers needs no registration form and adds no answer fields', async () => {
+  const { deps, db } = setup();
+  const res = await checkout(deps);
+  const order = db.read('ticket_orders', res.body.orderId);
+  assert.equal(Object.hasOwn(order, 'registrationFormRevision'), false);
+  assert.equal(Object.hasOwn(order, 'registrationQuestions'), false);
+  assert.equal(Object.hasOwn(order.seats[0], 'answers'), false);
+});
+
+test('checkout answers against a changed form are refused before anything is reserved', async () => {
+  for (const body of [answered({ formRevision: 1 }), (({ formRevision, ...rest }) => rest)(answered())]) {
+    const { deps, db, calls } = setup({ seed: { 'config/registration_form': FORM } });
+    const res = await checkout(deps, body);
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.error.code, 'form-changed');
+    assert.match(res.body.error.message, /questions changed/);
+    assert.equal(db.ids('ticket_orders').length, 0);
+    assert.equal(db.read('ticket_inventory', 'current'), undefined);
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('invalid checkout answers are refused by seat and question', async () => {
+  const { deps, db } = setup({ seed: { 'config/registration_form': FORM } });
+  const res = await checkout(deps, request({ formRevision: 2, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
+    PERSON, { ...PERSON, email: BOB.email, answers: { jobTitle: 'Editor', organization: 'x'.repeat(201) } },
+  ] }] }));
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.message,
+    'lines.0.attendees.1.answers.jobTitle: This question is no longer asked.; lines.0.attendees.1.answers.organization: Use at most 200 characters.');
+  assert.equal(db.ids('ticket_orders').length, 0);
+});
+
+test('blank checkout answers leave the seat to be answered later', async () => {
+  const { deps, db } = setup({ seed: { 'config/registration_form': FORM } });
+  const res = await checkout(deps, answered({}, { organization: '  ' }));
+  const order = db.read('ticket_orders', res.body.orderId);
+  assert.equal(Object.hasOwn(order.seats[0], 'answers'), false);
+  assert.deepEqual(order.registrationQuestions, []);
+});
+
+test('a retry with different answers is a different request and cannot reuse the request ID', async () => {
+  const { deps, db, calls } = setup({ seed: { 'config/registration_form': FORM } });
+  const first = await checkout(deps, answered());
+  const same = await checkout(deps, answered());
+  assert.equal(same.body.orderId, first.body.orderId);
+  const changed = await checkout(deps, answered({}, { ...ANSWERS, organization: 'Ledger' }));
+  assert.equal(changed.statusCode, 409);
+  assert.equal(changed.body.error.code, 'idempotency-conflict');
+  assert.equal(calls.length, 1);
+  assert.equal(db.read('ticket_orders', first.body.orderId).seats[0].answers.organization, 'Gazette');
+});
+
+test('free orders and comps hold answers the same way and the claim moves them to the attendee record', async () => {
+  const { deps, db } = setup({
+    seed: { 'config/registration_form': FORM },
+    catalogPatch: { ticketTypes: [{ id: 'general', name: 'Full event pass', unitAmount: 0, capacity: 100 }] },
+  });
+  const res = await checkout(deps, answered());
+  assert.equal(res.body.status, 'free');
+  const ticketId = res.body.ticketIds[0];
+  assert.equal(JSON.stringify(db.read('tickets', ticketId)).includes('Gazette'), false);
+  await claimTicketsForUser({ ...deps, uid: ADA.uid, email: ADA.email, externalIds: [ticketId] });
+  const record = db.read('ticket_answers', ticketId);
+  assert.deepEqual(record.answers, CHECKED);
+  assert.equal(record.uid, ADA.uid);
+  assert.equal(Object.hasOwn(db.read('ticket_orders', res.body.orderId).seats[0], 'answers'), false);
+
+  const comp = await createCompOrder({
+    ...deps, actorUid: 'organizer-uid', ticketTypeId: 'general', attendees: [{ ...PERSON, email: 'cy@example.com', answers: ANSWERS }],
+    requestId: 'organizer-comp-0002', reason: 'Speaker guest', formRevision: 2,
+  });
+  assert.deepEqual(comp.order.seats[0].answers, CHECKED);
+  assert.equal(comp.order.registrationFormRevision, 2);
+  await assert.rejects(createCompOrder({
+    ...deps, actorUid: 'organizer-uid', ticketTypeId: 'general', attendees: [{ ...PERSON, email: 'di@example.com', answers: ANSWERS }],
+    requestId: 'organizer-comp-0003', reason: 'Speaker guest', formRevision: 1,
+  }), (err) => err.code === 'form-changed' && err.status === 409);
+});

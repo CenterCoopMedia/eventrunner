@@ -11,7 +11,7 @@ const {
   internals: { SECTION_IDS, SECTIONS, FORMAT, SCHEMA_VERSION, readPackageRequest, EXCLUDED },
 } = require('./eventPackage.cjs');
 const { readEventPackage, verifyEventPackage } = require('./eventPackageReader.cjs');
-const { isSecretKey, scrub } = require('./exportRecords.cjs');
+const { admissionRecord, isSecretKey, orderRecord, scrub } = require('./exportRecords.cjs');
 const { ADMIN, STAFF, BOOTSTRAP_DOC, FORBIDDEN, FORBIDDEN_VALUES, exportSeed } = require('./exportFixture.cjs');
 
 const QUIET = { warn() {}, error() {}, info() {} };
@@ -380,4 +380,17 @@ test('scrub removes credential keys at any depth and keeps design tokens', () =>
   assert.deepEqual(scrub({ a: { b: [{ accessToken: 'x', keep: 1 }] }, at: new Date(0) }), {
     a: { b: [{ keep: 1 }] }, at: '1970-01-01T00:00:00.000Z',
   });
+});
+
+test('records: answers held on an order seat at checkout never leave in the order or admission export', () => {
+  const seat = { externalId: 'ord_x_0_0', email: 'ada@example.com', answers: { accessNeeds: 'Step-free seating near the aisle' } };
+  const order = orderRecord('ord_x', {
+    provider: 'stripe', seats: [seat], registrationFormRevision: 2,
+    registrationQuestions: [{ id: 'accessNeeds', name: 'Access needs', kind: 'long_text', choices: [] }], ticketIds: ['ord_x_0_0'],
+  });
+  const admission = admissionRecord('ord_x_0_0', { ...seat, orderId: 'ord_x' });
+  for (const record of [order, admission]) {
+    assert.equal(JSON.stringify(record).includes('Step-free'), false);
+    assert.equal(Object.hasOwn(record, 'seats') || Object.hasOwn(record, 'answers'), false);
+  }
 });

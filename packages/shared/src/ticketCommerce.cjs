@@ -14,6 +14,9 @@ const TYPE_ID = /^[a-z][a-z0-9_-]{0,47}$/;
 const REQUEST_ID = /^[a-zA-Z0-9_-]{16,100}$/;
 const ORDER_ID = /^ord_[a-f0-9]{40}$/;
 const RESERVED_IDS = new Set(['constructor', 'prototype', '__proto__']);
+// Registration answers ride on the order until the attendee claims the
+// ticket; a cap keeps one seat from bloating the order document.
+const MAX_ANSWERS_BYTES = 16 * 1024;
 
 function isTicketTypeId(value) {
   return typeof value === 'string' && TYPE_ID.test(value) && !RESERVED_IDS.has(value);
@@ -142,9 +145,9 @@ function normalizeAttendee(input) {
 function validateCheckoutRequest(input) {
   const issue = (message) => ({ ok: false, value: null, issues: [{ path: 'checkout', message }] });
   if (!input || typeof input !== 'object' || Array.isArray(input)) return issue('A checkout request is required.');
-  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume', 'catalogRevision'].includes(key))) return issue('Checkout accepts catalog acceptance, ticket selections, and attendee assignments only.');
+  if (Object.keys(input).some((key) => !['requestId', 'orderId', 'lines', 'resume', 'catalogRevision', 'formRevision'].includes(key))) return issue('Checkout accepts catalog acceptance, ticket selections, and attendee assignments only.');
   if (input.resume === true) {
-    if (input.lines !== undefined || Object.hasOwn(input, 'catalogRevision')) return issue('Resume uses the saved ticket selections and accepted terms.');
+    if (input.lines !== undefined || Object.hasOwn(input, 'catalogRevision') || Object.hasOwn(input, 'formRevision')) return issue('Resume uses the saved ticket selections and accepted terms.');
     if (!Object.hasOwn(input, 'requestId') && isCommerceOrderId(input.orderId)) {
       return { ok: true, value: { orderId: input.orderId, resume: true }, issues: [] };
     }
@@ -160,25 +163,60 @@ function validateCheckoutRequest(input) {
   // The reservation transaction requires it only for a new public order.
   const hasRevision = Object.hasOwn(input, 'catalogRevision');
   if (hasRevision && !integer(input.catalogRevision, 0, Number.MAX_SAFE_INTEGER)) return issue('Review the current ticket prices and terms before starting this order.');
+  // The registration form revision the answers were given against; the
+  // reservation compares it with the live form.
+  const hasFormRevision = Object.hasOwn(input, 'formRevision');
+  if (hasFormRevision && !integer(input.formRevision, 0, Number.MAX_SAFE_INTEGER)) return issue('Reload the page to see the current registration questions.');
   if (!Array.isArray(input.lines) || input.lines.length < 1 || input.lines.length > MAX_TICKET_TYPES) return issue('Choose at least one ticket type.');
   const seen = new Set();
   const lines = [];
   let seatCount = 0;
-  for (const line of input.lines) {
+  for (const [lineIndex, line] of input.lines.entries()) {
     if (!line || typeof line !== 'object' || Array.isArray(line)
         || Object.keys(line).some((key) => !['ticketTypeId', 'quantity', 'attendees'].includes(key))) return issue('A ticket selection contains unsupported fields.');
     if (!isTicketTypeId(line.ticketTypeId) || seen.has(line.ticketTypeId)) return issue('Select each ticket type only once.');
     if (!integer(line.quantity, 1, MAX_ORDER_SEATS)) return issue('Choose a whole-number ticket quantity.');
     if (!Array.isArray(line.attendees) || line.attendees.length !== line.quantity) return issue('Assign a name and email to every ticket.');
-    const attendees = line.attendees.map(normalizeAttendee);
-    if (attendees.some((person) => !person)) return issue('Every ticket needs a valid attendee name and email.');
+    const attendees = [];
+    for (const [seatIndex, source] of line.attendees.entries()) {
+      const hasAnswers = source && typeof source === 'object' && Object.hasOwn(source, 'answers');
+      const answers = hasAnswers ? source.answers : undefined;
+      if (hasAnswers) {
+        const path = `lines.${lineIndex}.attendees.${seatIndex}.answers`;
+        if (!answers || typeof answers !== 'object' || Array.isArray(answers)) {
+          return { ok: false, value: null, issues: [{ path, message: 'Answers must be an object of question answers.' }] };
+        }
+        // Bytes, not characters: TextEncoder exists in browsers and Node alike.
+        if (new TextEncoder().encode(JSON.stringify(answers)).length > MAX_ANSWERS_BYTES) {
+          return { ok: false, value: null, issues: [{ path, message: 'These answers are too long.' }] };
+        }
+      }
+      let identity = source;
+      if (hasAnswers) {
+        identity = { ...source };
+        delete identity.answers;
+      }
+      const person = normalizeAttendee(identity);
+      if (!person) return issue('Every ticket needs a valid attendee name and email.');
+      // Answers are kept as given; the server checks them against the form.
+      // No key without answers, so existing request fingerprints do not change.
+      attendees.push(hasAnswers ? { ...person, answers } : person);
+    }
     seatCount += line.quantity;
     seen.add(line.ticketTypeId);
     lines.push({ ticketTypeId: line.ticketTypeId, quantity: line.quantity, attendees });
   }
   if (seatCount > MAX_ORDER_SEATS) return issue(`An order can contain at most ${MAX_ORDER_SEATS} tickets.`);
   lines.sort((a, b) => a.ticketTypeId.localeCompare(b.ticketTypeId));
-  return { ok: true, value: { requestId: input.requestId, lines, ...(hasRevision ? { catalogRevision: input.catalogRevision } : {}) }, issues: [] };
+  return {
+    ok: true,
+    value: {
+      requestId: input.requestId, lines,
+      ...(hasRevision ? { catalogRevision: input.catalogRevision } : {}),
+      ...(hasFormRevision ? { formRevision: input.formRevision } : {}),
+    },
+    issues: [],
+  };
 }
 
 function isSalesWindowOpen(object, at = new Date()) {
@@ -189,7 +227,7 @@ function isSalesWindowOpen(object, at = new Date()) {
 }
 
 module.exports = {
-  MAX_TICKET_TYPES, MAX_ORDER_SEATS, MAX_CAPACITY, MAX_AMOUNT,
+  MAX_TICKET_TYPES, MAX_ORDER_SEATS, MAX_CAPACITY, MAX_AMOUNT, MAX_ANSWERS_BYTES,
   CURRENCY_EXPONENTS, CURRENCY_MINIMUMS, TAX_TREATMENTS,
   isTicketTypeId, isCommerceRequestId, isCommerceOrderId, normalizeAttendee,
   validateTicketCatalog, validateCheckoutRequest, isSalesWindowOpen,

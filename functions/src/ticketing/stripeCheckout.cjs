@@ -4,6 +4,7 @@
 const {
   CURRENCY_EXPONENTS, validateTicketCatalog, validateCheckoutRequest, isCommerceRequestId, isCommerceOrderId, isSalesWindowOpen,
 } = require('shared/ticketCommerce');
+const { answeredQuestions, checkAnswers, readRegistrationForm } = require('shared/registrationForm');
 const { verifyAuthToken } = require('../core/auth.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, methodNotAllowed } = require('../core/errors.cjs');
@@ -32,6 +33,29 @@ function catalogValue(snap) {
   const result = validateTicketCatalog(snap?.exists ? snap.data() : null);
   if (!result.ok) throw new CommerceError('ticketing-unavailable', 'Ticket sales are not configured.', 503);
   return result.value;
+}
+
+/**
+ * Answers given at checkout (ADR 0008 §5), checked against the live form.
+ * Returns the checked answers per seat (null when a seat has none to keep).
+ */
+function checkSeatAnswers(request, form) {
+  if (request.formRevision !== form.revision) {
+    throw new CommerceError('form-changed', 'The registration questions changed. Reload the page to see the current questions.', 409);
+  }
+  const errors = [];
+  const perSeat = request.lines.map((line, lineIndex) => line.attendees.map((person, seatIndex) => {
+    if (person.answers === undefined) return null;
+    const checked = checkAnswers(person.answers, form);
+    if (!checked.ok) {
+      for (const [id, message] of Object.entries(checked.errors)) errors.push(`lines.${lineIndex}.attendees.${seatIndex}.answers.${id}: ${message}`);
+      return null;
+    }
+    // All blank: nothing to hold, so the attendee answers later at /registration.
+    return Object.keys(checked.answers).length ? checked.answers : null;
+  }));
+  if (errors.length) throw new CommerceError('invalid-checkout', errors.join('; '), 400);
+  return perSeat;
 }
 
 function requirePaymentCredentials(provider) {
@@ -192,10 +216,14 @@ async function reserveCommerceOrder({
     // work: nobody drains it. Reading the referenced order means a completed
     // or released checkout does not need a second cleanup write to unlock it.
     const purchaserRef = db.collection(INVENTORY).doc(`purchaser_${orderIdFor(actor.uid, 'inventory').slice(4)}`);
-    const [catalogSnap, inventorySnap, purchaserSnap] = await Promise.all([
+    const hasAnswers = request.lines.some((line) => line.attendees.some((person) => person.answers !== undefined));
+    // The form joins the read set only when answers came, so a question edit
+    // racing this reservation retries it against the new form.
+    const [catalogSnap, inventorySnap, purchaserSnap, formSnap] = await Promise.all([
       tx.get(db.collection(CATALOG).doc(CURRENT)),
       tx.get(inventoryRef),
       comp ? Promise.resolve(null) : tx.get(purchaserRef),
+      hasAnswers ? tx.get(db.collection('config').doc('registration_form')) : Promise.resolve(null),
     ]);
     const catalog = catalogValue(catalogSnap);
     // The catalog is in this transaction's read set. A concurrent price or
@@ -204,6 +232,8 @@ async function reserveCommerceOrder({
     if (!comp && request.catalogRevision !== catalog.revision) {
       throw new CommerceError('catalog-changed', 'Ticket prices or terms have changed. Review the updated catalog before continuing.');
     }
+    const form = hasAnswers ? readRegistrationForm(formSnap.exists ? formSnap.data() : null) : null;
+    const seatAnswers = hasAnswers ? checkSeatAnswers(request, form) : null;
     if (purchaserSnap?.exists) {
       const previousId = purchaserSnap.data()?.orderId;
       if (!isCommerceOrderId(previousId)) throw new CommerceError('inventory-invalid', 'This checkout needs organizer review.', 503);
@@ -225,7 +255,11 @@ async function reserveCommerceOrder({
     const paid = priced.totalAmount > 0;
     if (paid) requirePaymentCredentials(provider);
     const publicUrl = paid ? configuredPublicUrl(config, env) : null;
-    const seats = makeSeats(id, priced.lines, request);
+    // makeSeats copies each attendee as given; keep only the checked answers.
+    const seats = makeSeats(id, priced.lines, request).map(({ answers: _given, ...seat }) => {
+      const answers = seatAnswers?.[seat.lineIndex]?.[seat.seatIndex];
+      return answers ? { ...seat, answers } : seat;
+    });
     // These private, durable allocation records deliberately outlive the hourly
     // order window and user profiles. A new request ID or recreated account
     // with the same verified email must not replenish permanent free inventory.
@@ -269,6 +303,12 @@ async function reserveCommerceOrder({
       refundStatus: 'none', refundedAmount: 0,
       createdAt: at, updatedAt: at,
       ...(comp ? { compReason: reason, compedByUid: actor.uid } : {}),
+      // The questions as the purchaser saw them, copied with each seat's
+      // answers to ticket_answers when that attendee claims the ticket.
+      ...(hasAnswers ? {
+        registrationFormRevision: form.revision,
+        registrationQuestions: answeredQuestions(form, Object.assign({}, ...seats.map((seat) => seat.answers || {}))),
+      } : {}),
     };
     const inventory = reserveInventory({
       inventory: inventorySnap.data(), catalog, lines: order.lines, eventId: scope.eventId, state: order.inventoryState,
@@ -430,11 +470,14 @@ function checkoutResponse(order) {
   };
 }
 
-async function createCompOrder({ db, provider, getConfig, actorUid, ticketTypeId, attendees, requestId, reason, now, env }) {
+async function createCompOrder({ db, provider, getConfig, actorUid, ticketTypeId, attendees, requestId, reason, formRevision, now, env }) {
   if (typeof actorUid !== 'string' || !actorUid || typeof reason !== 'string' || !reason.trim() || reason.trim().length > 500) {
     throw new CommerceError('invalid-comp', 'An organizer and a reason of at most 500 characters are required.', 400);
   }
-  const parsed = validateCheckoutRequest({ requestId, lines: [{ ticketTypeId, quantity: attendees?.length, attendees }] });
+  const parsed = validateCheckoutRequest({
+    requestId, lines: [{ ticketTypeId, quantity: attendees?.length, attendees }],
+    ...(formRevision === undefined ? {} : { formRevision }),
+  });
   if (!parsed.ok) throw new CommerceError('invalid-comp', parsed.issues[0].message, 400);
   const result = await reserveCommerceOrder({
     db, provider, getConfig, actor: { uid: actorUid, email: null }, request: parsed.value,

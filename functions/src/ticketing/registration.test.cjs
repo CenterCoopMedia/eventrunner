@@ -414,6 +414,65 @@ test('claimTicket refuses a ticket that is not valid, and does not auto-approve'
   }
 });
 
+// ADR 0008 §5: answers given at checkout wait on the order's seat until claim.
+const ORDER_ID = `ord_${'a'.repeat(40)}`;
+const QUESTIONS = [
+  { id: 'organization', name: 'Organization', kind: 'short_text', choices: [] },
+  { id: 'dietary', name: 'Dietary needs', kind: 'dietary', choices: ['Vegan'] },
+];
+function orderDb(extra = {}) {
+  return seededDb({
+    [`tickets/${ORDER_ID}_0_0`]: fakeTicket({ externalId: `${ORDER_ID}_0_0`, orderId: ORDER_ID }),
+    [`tickets/${ORDER_ID}_0_1`]: fakeTicket({ externalId: `${ORDER_ID}_0_1`, orderId: ORDER_ID, email: 'bob@example.com' }),
+    [`ticket_orders/${ORDER_ID}`]: {
+      id: ORDER_ID, registrationFormRevision: 4, registrationQuestions: QUESTIONS,
+      seats: [
+        { externalId: `${ORDER_ID}_0_0`, email: 'attendee@example.com', answers: { organization: 'Gazette' } },
+        { externalId: `${ORDER_ID}_0_1`, email: 'bob@example.com', answers: { dietary: { choices: ['Vegan'], other: null } } },
+      ],
+    },
+    ...extra,
+  });
+}
+
+test('claimTicket moves the seat answers from the order to the attendee answer record', async () => {
+  const db = orderDb();
+  const result = await claimTicket({ db, externalId: `${ORDER_ID}_0_0`, uid: 'uid-ada', email: 'attendee@example.com', now: () => T0 });
+  assert.deepEqual(result, { claimed: true });
+  const record = db.read('ticket_answers', `${ORDER_ID}_0_0`);
+  assert.deepEqual(record, {
+    ticketId: `${ORDER_ID}_0_0`, uid: 'uid-ada', answers: { organization: 'Gazette' }, formRevision: 4,
+    questions: [QUESTIONS[0]], ticketStatus: 'valid', updatedAt: T0, updatedBy: 'checkout',
+  });
+  const order = db.read('ticket_orders', ORDER_ID);
+  assert.equal(Object.hasOwn(order.seats[0], 'answers'), false);
+  assert.equal(order.seats[0].email, 'attendee@example.com');
+  // Another attendee's answers wait for their own claim.
+  assert.deepEqual(order.seats[1].answers, { dietary: { choices: ['Vegan'], other: null } });
+  assert.equal(order.registrationFormRevision, 4);
+});
+
+test('claimTicket keeps an existing answer record but still clears the seat answers', async () => {
+  const mine = { ticketId: `${ORDER_ID}_0_0`, uid: 'uid-ada', answers: { organization: 'Ledger' }, formRevision: 5, updatedBy: 'attendee@example.com' };
+  const db = orderDb({ [`ticket_answers/${ORDER_ID}_0_0`]: mine });
+  await claimTicket({ db, externalId: `${ORDER_ID}_0_0`, uid: 'uid-ada', email: 'attendee@example.com', now: () => T0 });
+  assert.deepEqual(db.read('ticket_answers', `${ORDER_ID}_0_0`), mine);
+  assert.equal(Object.hasOwn(db.read('ticket_orders', ORDER_ID).seats[0], 'answers'), false);
+});
+
+test('a refused claim moves no answers, and a seat without answers makes no record', async () => {
+  const db = orderDb();
+  const refused = await claimTicket({ db, externalId: `${ORDER_ID}_0_1`, uid: 'uid-ada', email: 'attendee@example.com', now: () => T0 });
+  assert.equal(refused.reason, 'email_mismatch');
+  assert.equal(db.read('ticket_answers', `${ORDER_ID}_0_1`), undefined);
+  assert.ok(db.read('ticket_orders', ORDER_ID).seats[1].answers);
+
+  const bare = orderDb({ [`ticket_orders/${ORDER_ID}`]: { id: ORDER_ID, seats: [{ externalId: `${ORDER_ID}_0_0` }] } });
+  assert.deepEqual(await claimTicket({ db: bare, externalId: `${ORDER_ID}_0_0`, uid: 'uid-ada', email: 'attendee@example.com' }), { claimed: true });
+  assert.equal(bare.read('ticket_answers', `${ORDER_ID}_0_0`), undefined);
+  assert.deepEqual(bare.read('ticket_orders', ORDER_ID).seats, [{ externalId: `${ORDER_ID}_0_0` }]);
+});
+
 test('two concurrent claims on one ticket cannot both win', async () => {
   const db = makeFakeDb({ 'tickets/tkt-1': fakeTicket() });
   // Bob's claim commits between Ada's read and her commit; the read set
