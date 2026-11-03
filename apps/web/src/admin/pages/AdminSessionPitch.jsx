@@ -81,6 +81,9 @@ function PitchReview({ initial, current, call, settings }) {
   const [error, setError] = useState(null);
   const [editError, setEditError] = useState(null);
   const [result, setResult] = useState('');
+  // Bumped by "Load the current version": the draft-creation form starts
+  // again, so a confirmation given for the old proposal never carries over.
+  const [loads, setLoads] = useState(0);
   const errorRef = useRef(null);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
   const conflict = !current || pitchRevision(current) !== pitchRevision(baseline) || current.status !== baseline.status;
@@ -116,7 +119,7 @@ function PitchReview({ initial, current, call, settings }) {
   }
   function reload() {
     if (!current || busy) return;
-    setBaseline(current); setNotes(current.privateNotes || ''); setEditing(false); setError(null); setResult('Current version loaded.');
+    setBaseline(current); setNotes(current.privateNotes || ''); setEditing(false); setError(null); setLoads((n) => n + 1); setResult('Current version loaded.');
   }
 
   // After an own save the live row catches up; show it, so the answers are current.
@@ -194,6 +197,7 @@ function PitchReview({ initial, current, call, settings }) {
       ) : baseline.status === 'accepted' ? (
         <Panel title="Create session and speaker drafts">
           <ConvertToDrafts
+            key={loads}
             pitch={baseline}
             call={call}
             disabled={conflict}

@@ -646,6 +646,14 @@ describe('staff edits of a pitch', () => {
     expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited({ format: 'Lightning talk' }) })).statusCode).toBe(200);
   });
 
+  it('records the Airtable values before the first edit of an older Airtable pitch', async () => {
+    await db.collection('session_pitches').doc('airtable-old').set({ ...pitch(), source: 'airtable', email: SUBMITTER_EMAIL, status: 'new', reviewRevision: 0 });
+    expect((await editPitch({ id: 'airtable-old', expectedRevision: 0, pitch: edited() })).statusCode).toBe(200);
+    const stored = (await db.collection('session_pitches').doc('airtable-old').get()).data();
+    expect(stored.title).toBe('Corrected title');
+    expect(stored.sourceValues).toMatchObject({ title: pitch().title, description: pitch().description, format: 'Panel' });
+  });
+
   it('makes an open review of the old text conflict', async () => {
     expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited() })).statusCode).toBe(200);
     const stale = await review({ id: PITCH_ID, status: 'accepted', expectedStatus: 'new', expectedRevision: 0 });

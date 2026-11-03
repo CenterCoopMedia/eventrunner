@@ -70,7 +70,9 @@ let rowCount = 0;
 export default function PitchEditForm({ pitch, settings, onSave, onCancel, busy, error }) {
   const [form, setForm] = useState(() => formOf(pitch));
   const options = readPitchFormOptions(settings);
-  const formats = withStored(options.formats, pitch.format);
+  // A choice list only when the call sets one; with none, format is free
+  // text on the server too, so staff can correct it here.
+  const formats = options.formats.length ? withStored(options.formats, pitch.format) : [];
   const lengths = withStored(options.lengths, pitch.lengthMinutes);
   const tracks = withStored(options.tracks, pitch.track);
   const maxCo = Math.max(options.maxCoPresenters, Math.max(0, readPresenters(pitch).length - 1));

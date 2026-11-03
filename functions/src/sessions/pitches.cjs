@@ -544,6 +544,12 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
         tx.update(ref, {
           ...next,
           ...(stored.submitted ? {} : { submitted: { ...before, at: stored.createdAt ?? null } }),
+          // A pitch from Airtable that predates sourceValues gets them now,
+          // from the values before this edit, so the next refresh does not
+          // read the correction as a change to undo.
+          ...(stored.source === 'airtable' && !stored.sourceValues
+            ? { sourceValues: { email: stored.email ?? null, title: stored.title ?? null, description: stored.description ?? null, organization: stored.organization ?? null, format: stored.format ?? null } }
+            : {}),
           reviewRevision: nextRevision,
           editedAt: at,
           editedBy: gate.email,
