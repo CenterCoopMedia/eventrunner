@@ -232,3 +232,25 @@ test('conversion refuses names that do not match the presenters, and a one-speak
   assert.equal(legacy.res.statusCode, 200);
   assert.deepEqual(legacy.res.body.speakerIds, ['pitch-proposal']);
 });
+
+test('a name confirmed for one presenter is never used for another', async () => {
+  const db = teamDb();
+  // Staff replaced Bo with Dee after the dialog was filled in: same count.
+  await db.collection('session_pitches').doc('proposal').update({ presenters: [presenters[0], { ...presenters[1], name: 'Dee New', email: 'dee@example.test' }, presenters[2]] });
+  const stale = await convertWith(db, { ...team, invite: true, speakers: [
+    { email: 'speaker@example.test', firstName: 'Ada', lastName: 'Reporter' },
+    { email: 'bo@example.test', firstName: 'Bo', lastName: 'Writer' },
+    { email: 'cy@example.test' },
+  ] });
+  assert.equal(stale.res.statusCode, 409);
+  assert.equal(stale.res.body.error.code, 'presenters-changed');
+  assert.equal(stale.sent.length, 0);
+  assert.equal(db.read('speakers', 'pitch-proposal-2'), undefined);
+  const fresh = await convertWith(db, { ...team, speakers: [
+    { email: 'speaker@example.test', firstName: 'Ada', lastName: 'Reporter' },
+    { email: 'DEE@example.test', firstName: 'Dee', lastName: 'New' },
+    { email: 'cy@example.test' },
+  ] });
+  assert.equal(fresh.res.statusCode, 200, JSON.stringify(fresh.res.body));
+  assert.equal(db.read('speakers', 'pitch-proposal-2').firstName, 'Dee');
+});

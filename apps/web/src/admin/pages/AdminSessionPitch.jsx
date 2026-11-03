@@ -22,7 +22,7 @@ import { subscribePitchCall } from '../../lib/pitchSource.js';
 import { speakerCandidates } from 'shared/pitchForm';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
-import { conversionMessage, splitName } from '../pitchConversion.js';
+import { conversionMessage, presentersKey, splitName } from '../pitchConversion.js';
 import { subscribeAdminCollection } from '../adminSource.js';
 import { PITCH_STATUS_LABELS, PITCH_STATUS_TONES, pitchRevision } from '../pitchStatus.js';
 import PitchDetails from '../components/PitchDetails.jsx';
@@ -63,7 +63,10 @@ function ConvertToDrafts({ pitch, call, disabled, onConverted }) {
     try {
       const response = await call('convertSessionPitch', {
         id: pitch.id, expectedRevision: pitchRevision(pitch), dayId, startTime, endTime, invite,
-        speakers: candidates.map((presenter, index) => (known(presenter) ? null : { firstName: names[index][0], lastName: names[index][1] })),
+        // Each name carries its email; the server refuses one that no longer matches.
+        speakers: candidates.map((presenter, index) => (known(presenter)
+          ? { email: presenter.email }
+          : { email: presenter.email, firstName: names[index][0], lastName: names[index][1] })),
       });
       onConverted(response);
     } catch (err) { setError(err); } finally { setBusy(false); }
@@ -230,9 +233,11 @@ function PitchReview({ initial, current, call, settings }) {
         </Panel>
       ) : baseline.status === 'accepted' ? (
         <Panel title="Create session and speaker drafts">
+          {/* The saved proposal, so a staff edit to the presenters shows here;
+              a change to them starts the names and confirmation again. */}
           <ConvertToDrafts
-            key={loads}
-            pitch={baseline}
+            key={`${loads}:${presentersKey(shown)}`}
+            pitch={shown}
             call={call}
             disabled={conflict}
             onConverted={(response) => {

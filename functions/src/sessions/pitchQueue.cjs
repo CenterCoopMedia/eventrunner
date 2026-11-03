@@ -66,10 +66,10 @@ async function importPitches({ db, actor, body, at }) {
   });
 }
 
-// The names staff confirmed, one per presenter in the stored order. A body
-// from before presenters (firstName and lastName alone) names the lead. A
-// presenter who is already a speaker needs no name (null), because that
-// speaker is linked, not made.
+// The names staff confirmed, one per presenter in the stored order, each as
+// { email, firstName, lastName }. A body from before presenters (firstName
+// and lastName alone) names the lead. A presenter who is already a speaker
+// needs no name ({ email } or null), because that speaker is linked, not made.
 function readSpeakerNames(body) {
   const names = Array.isArray(body?.speakers) ? body.speakers : [{ firstName: body?.firstName, lastName: body?.lastName }];
   if (names.length < 1 || names.length > 5) fail(400, 'bad-request', 'speakers: Review 1-5 speaker names.');
@@ -105,7 +105,11 @@ async function convertPitch({ db, actor, body, now, at }) {
     if (pitch.conversion) return { ...pitch.conversion, replayed: true };
     if (pitch.status !== 'accepted' || revisionOf(pitch) !== expectedRevision) fail(409, 'status-conflict', 'The pitch changed or is not accepted. Reload the review before creating drafts.');
     const presenters = speakerCandidates(pitch);
-    if (presenters.length !== names.length) fail(409, 'presenters-changed', 'The presenters changed. Reload the review before creating drafts.');
+    // Each confirmed name carries its presenter's email, so a name staff
+    // confirmed for one person is never given to another after an edit.
+    const stale = presenters.length !== names.length || names.some((name, index) => typeof name?.email === 'string'
+      && name.email.trim().toLowerCase() !== (presenters[index].email || '').toLowerCase());
+    if (stale) fail(409, 'presenters-changed', 'The presenters changed. Reload the review before creating drafts.');
     const event = await tx.get(db.collection('config').doc('event'));
     if (!(event.data()?.days || []).some((day) => day.id === dayId)) fail(400, 'bad-request', 'dayId: Choose a configured event day.');
 

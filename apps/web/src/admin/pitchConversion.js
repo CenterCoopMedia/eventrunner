@@ -1,4 +1,10 @@
 // Helpers for turning an accepted pitch into drafts (ADR 0008 §3).
+import { speakerCandidates } from 'shared/pitchForm';
+
+/** Changes whenever a presenter is added, removed, reordered or renamed. */
+export function presentersKey(pitch) {
+  return JSON.stringify(speakerCandidates(pitch).map((presenter) => [presenter.email || '', presenter.name || '']));
+}
 
 /** "Mary Ann Smith" → ["Mary Ann", "Smith"]: a start for staff to check. */
 export function splitName(name) {
