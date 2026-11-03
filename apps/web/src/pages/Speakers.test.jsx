@@ -62,6 +62,13 @@ describe('Speakers', () => {
     expect(screen.getByText('Community reporter.')).toBeInTheDocument();
   });
 
+  it('shows each speaker pronouns under the name, outside the heading', () => {
+    speakers = [{ ...PROJECTED, pronouns: 'they/them' }];
+    renderSpeakers();
+    expect(screen.getByRole('heading', { level: 2, name: 'Rae Okonkwo' })).toBeInTheDocument();
+    expect(screen.getByText('they/them')).toBeInTheDocument();
+  });
+
   it('renders a speaker with no affiliation or bio without empty lines', () => {
     speakers = [{ ...PROJECTED, organization: '', jobTitle: '', bio: '' }];
     const { container } = renderSpeakers();

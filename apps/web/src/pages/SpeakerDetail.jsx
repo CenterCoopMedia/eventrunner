@@ -142,6 +142,9 @@ export default function SpeakerDetail() {
             {text(speaker.displayName)}
           </h1>
         </div>
+        {text(speaker.pronouns) ? (
+          <p className="mt-2xs text-body text-text-secondary">{text(speaker.pronouns)}</p>
+        ) : null}
         {affiliation ? (
           <p className="mt-2xs font-data text-caption text-text-secondary">{affiliation}</p>
         ) : null}

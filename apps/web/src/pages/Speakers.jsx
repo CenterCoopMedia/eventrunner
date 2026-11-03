@@ -129,6 +129,9 @@ export default function Speakers() {
                           {speaker.displayName}
                         </Link>
                       </h2>
+                      {typeof speaker.pronouns === 'string' && speaker.pronouns.trim() ? (
+                        <p className="mt-3xs text-caption text-text-secondary">{speaker.pronouns.trim()}</p>
+                      ) : null}
                       {/* The credit line as a specimen label (visual story,
                           Field Guide, moment 2): the shelf reads as the
                           plates of a collection rather than a grid of

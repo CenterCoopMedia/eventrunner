@@ -187,6 +187,30 @@ describe('SpeakerProfile', () => {
     expect(screen.queryByRole('button', { name: 'Submit profile' })).not.toBeInTheDocument();
   });
 
+  it('saves a step left by the step list before it submits, so Review never shows an unsaved answer as sent', async () => {
+    renderPage('/speaker/profile/bio');
+    fireEvent.change(await screen.findByLabelText('Biography'), { target: { value: 'Edited, then left by the list.' } });
+    fireEvent.click(screen.getAllByRole('link', { name: /Review/ })[0]);
+    expect(await screen.findByRole('heading', { level: 2, name: 'Review' })).toBeInTheDocument();
+    expect(updateOwnSpeakerProfileMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit profile' }));
+    await waitFor(() => expect(submitOwnSpeakerProfileMock).toHaveBeenCalledTimes(1));
+    expect(updateOwnSpeakerProfileMock).toHaveBeenCalledTimes(1);
+    expect(updateOwnSpeakerProfileMock.mock.calls[0][0].fields).toEqual({ bio: 'Edited, then left by the list.', headshotPath: null });
+    // The save came first.
+    expect(updateOwnSpeakerProfileMock.mock.invocationCallOrder[0]).toBeLessThan(submitOwnSpeakerProfileMock.mock.invocationCallOrder[0]);
+  });
+
+  it('sends a speaker back to About you when a blank name would be submitted', async () => {
+    renderPage('/speaker/profile/about');
+    fireEvent.change(await screen.findByLabelText('First name'), { target: { value: '' } });
+    fireEvent.click(screen.getAllByRole('link', { name: /Review/ })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit profile' }));
+    expect(await screen.findByText('Enter the name you want printed on the programme.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'About you' })).toBeInTheDocument();
+    expect(submitOwnSpeakerProfileMock).not.toHaveBeenCalled();
+  });
+
   it('shows a submitted profile as submitted, with no second submit', async () => {
     getOwnSpeakerProfileMock.mockResolvedValue({ ...SEEDED_SPEAKER, profileSubmittedAt: '2026-11-01T14:00:00.000Z' });
     renderPage('/speaker/profile/review');

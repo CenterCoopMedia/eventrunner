@@ -66,6 +66,18 @@ describe('SpeakerDetail', () => {
     expect(screen.getByText('@rae')).toBeInTheDocument();
   });
 
+  it('shows the speaker pronouns under the name, and nothing when there are none', () => {
+    speakers = [{ ...PROJECTED, pronouns: 'she/her' }];
+    scheduleData = [];
+    renderAt('/speakers/rae-okonkwo');
+    expect(screen.getByRole('heading', { level: 1, name: 'Rae Okonkwo' })).toBeInTheDocument();
+    expect(screen.getByText('she/her')).toBeInTheDocument();
+    cleanup();
+    speakers = [{ ...PROJECTED, pronouns: '' }];
+    renderAt('/speakers/rae-okonkwo');
+    expect(screen.queryByText('she/her')).not.toBeInTheDocument();
+  });
+
   it('404s for an unknown slug', () => {
     speakers = [PROJECTED];
     scheduleData = [];

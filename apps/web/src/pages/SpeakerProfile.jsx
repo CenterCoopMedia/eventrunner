@@ -314,27 +314,30 @@ export default function SpeakerProfile() {
         : [{ label: '', handle: '' }],
     }));
 
-  /** Save the open step. @returns {Promise<boolean>} true when it saved */
-  async function saveStep() {
-    if (step.slug === 'about' && (form.firstName.trim().length === 0 || form.lastName.trim().length === 0)) {
+  /**
+   * Save one step's answers when they changed. An unchanged step is not
+   * sent. @returns {Promise<boolean>} false when the step needs a fix first
+   */
+  async function saveSlug(slug) {
+    if (slug === 'about' && (form.firstName.trim().length === 0 || form.lastName.trim().length === 0)) {
       setNameError('Enter the name you want printed on the programme.');
       nameRef.current?.focus();
       return false;
     }
-    setNameError(null);
-    const key = stepPayloadKey(step.slug, form, logistics);
-    if (savedPayloadsRef.current[step.slug] === key) return true;
-    if (step.slug === 'logistics') {
+    if (slug === 'about') setNameError(null);
+    const key = stepPayloadKey(slug, form, logistics);
+    if (savedPayloadsRef.current[slug] === key) return true;
+    if (slug === 'logistics') {
       await saveOwnSpeakerLogistics({ user, speakerId, logistics });
       savedPayloadsRef.current.logistics = key;
       setSavedNote('Saved. Only the organizers see these answers.');
       return true;
     }
-    const fields = fieldsFor(step.slug, form);
+    const fields = fieldsFor(slug, form);
     const result = await updateOwnSpeakerProfile({ user, speakerId, fields });
-    savedPayloadsRef.current[step.slug] = key;
+    savedPayloadsRef.current[slug] = key;
     const staged = result?.staged === true;
-    if (step.slug === 'bio') {
+    if (slug === 'bio') {
       // Deferred photo cleanup (issue #22 review findings P1-2 / P2-3): the
       // upload already landed at a fresh path, so the only object left to
       // remove is the one this save just SUPERSEDED — and only when it is
@@ -364,7 +367,7 @@ export default function SpeakerProfile() {
     if (saving) return;
     setSaving(true);
     try {
-      if (!(await saveStep())) return;
+      if (!(await saveSlug(step.slug))) return;
       setSaved((previous) => (previous.includes(step.slug) ? previous : [...previous, step.slug]));
       navigate(hrefFor(SPEAKER_STEPS[current + 1]));
     } catch (err) {
@@ -378,6 +381,15 @@ export default function SpeakerProfile() {
     if (saving) return;
     setSaving(true);
     try {
+      // A step left by Back or the step list keeps its edits only on this
+      // page, and Review shows them. Save every changed step first, so what
+      // is submitted is what Review showed.
+      for (const slug of STEP_SAVES) {
+        if (!(await saveSlug(slug))) {
+          navigate(hrefFor(SPEAKER_STEPS.find((item) => item.slug === slug)));
+          return;
+        }
+      }
       const result = await submitOwnSpeakerProfile({ user, speakerId });
       setSubmitted(new Date().toISOString());
       setSavedNote(result?.emailed
