@@ -1,5 +1,44 @@
 # Session task list
 
+## 2026-11-03: client onboarding, account creation and provisioning
+
+Spec: [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md) (proposed).
+Owner choices (2026-11-03): two stages; self-serve sign-up with automatic
+provisioning; the form submits to a server. First client: NC Local.
+
+Status: plan written. Waiting for owner approval of ADR 0007. No code yet.
+
+Each phase is one pull request, in this order. Each phase runs lint, the unit
+suites, the rules suite and E2E where it touches them, and gets an
+adversarial review before it merges.
+
+- [ ] P1 Spec: ADR 0007 and this plan (this branch).
+- [ ] P2 Shared: move the pure answer builder from `scripts/lib/answers.cjs`
+      to `packages/shared/src/answers.cjs` (+ `.mjs` shim). No behaviour
+      change; `init-event` tests stay green. Refresh the functions lockfile hash.
+- [ ] P3 Admin setup checklist (`/admin/setup`): readiness rows from
+      `shared/readiness`, owner (you or CCM), state, and a link per row; an
+      overview link until all rows are met. Web unit tests and one E2E.
+      Docs: ADMIN_GUIDE, CLIENT_ONBOARDING §3, handbook for-clients.
+- [ ] P4 Console foundation: `console/` with `firebase.json`, rules,
+      Vite web app, functions; sign-up (Google, email link), verified email,
+      operators allowlist. Rules tests on the emulator.
+- [ ] P5 Intake form: seven steps, draft autosave, shared validation,
+      `submitApplication` with rate limits, audit rows and operator email.
+      Web unit, rules and handler tests; E2E for one full application.
+- [ ] P6 Operator review: list, read, request changes, decline, approve
+      with project id, billing account, region and environment name; spam
+      delete; 90-day retention job for withdrawn and declined applications.
+- [ ] P7 Provisioner: `scripts/provision-client.cjs` idempotent steps
+      against injected GCP and GitHub clients (fakes in tests),
+      `provision-client.yml` with WIF, status written back to the console,
+      dispatch from approval through a GitHub App token.
+- [ ] P8 Operator runbook: one-time console setup (project, folder,
+      billing, provisioner service account, GitHub App) and a live proof in a
+      test folder. Needs the owner's cloud credentials.
+
+Blocked on the owner: ADR acceptance and the three open questions in ADR 0007.
+
 ## 2026-10-19 (wave 3): deliver every promise in the NC Local proposals
 
 Joe set the three October 19 proposal PDFs (self-serve, supported, full
