@@ -144,3 +144,36 @@ Rules written after user corrections. Read at session start.
 - Do not run several full test suites at once on this machine. They starve
   each other and cause false timing failures. Run heavy commands one at a
   time under `flock /tmp/eventrunner-heavy.lock`.
+
+## 2026-11-03: a client-facing flow has no keys, files or DNS by default
+
+- The first onboarding design asked the operator to collect provider keys
+  and asked clients to add DNS records. Joe wants a commercial-platform
+  experience: OAuth buttons for every account, a working subdomain and sender
+  by default, and no copy, paste, download or file sending. For any flow a
+  client sees, design the zero-configuration path first, and offer custom
+  domains or other technical steps only as optional upgrades with an
+  automatic check.
+
+## 2026-11-03: a new rail link changes a count in the E2E specs too
+
+- Adding "Set up your event" to the docket broke `e2e/theme-responsive.spec.js`,
+  which pins the rail's link count, after the unit tests were fixed. When a
+  change adds a link, banner or block to every admin page, grep `e2e/` as
+  well as `apps/web/src` for the count or the words it changes.
+
+## 2026-11-03: give times in Eastern time
+
+- A status message gave a check-in time in UTC. Joe works in Eastern time.
+  Give every time in a message in Eastern time (EST or EDT, as the date
+  needs), not UTC.
+
+## 2026-11-03: multi-step work is a stepper, not a long page
+
+- The setup checklist shipped as one long page. Joe asked for steppers or
+  multipage forms instead. Any flow with several steps (setup, registration,
+  pitches, onboarding) shows one step at a time, at its own address, with a
+  step list, Back and Next. This settles the open question in
+  `docs/plans/2026-09-09-cjs-parity-gap.md` (keep one form or add steps) in
+  favour of steps. Ask questions for Joe through AskUserQuestion, never in
+  chat text (he had to remind me again on this date).

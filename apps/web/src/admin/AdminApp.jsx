@@ -44,6 +44,7 @@ const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.j
 const AdminReminderSchedules = lazy(() => import('./pages/AdminReminderSchedules.jsx'));
 const AdminSpeakerMail = lazy(() => import('./pages/AdminSpeakerMail.jsx'));
 const AdminOverview = lazy(() => import('./pages/AdminOverview.jsx'));
+const AdminSetup = lazy(() => import('./pages/AdminSetup.jsx'));
 const AdminSessionsList = lazy(() => import('./pages/AdminSessionsList.jsx'));
 const AdminSessionEditor = lazy(() => import('./pages/AdminSessionEditor.jsx'));
 // Event settings is the largest page in this area — the whole config/event
@@ -162,6 +163,14 @@ export default function AdminApp() {
           <Route
             path="overview"
             element={<DeferredAdminPage label="overview"><AdminOverview /></DeferredAdminPage>}
+          />
+          <Route
+            path="setup"
+            element={<DeferredAdminPage label="setup steps"><AdminSetup /></DeferredAdminPage>}
+          />
+          <Route
+            path="setup/:stepSlug"
+            element={<DeferredAdminPage label="setup steps"><AdminSetup /></DeferredAdminPage>}
           />
           <Route path="pitches" element={<DeferredAdminPage label="session pitches"><AdminSessionPitches /></DeferredAdminPage>} />
           <Route path="pages" element={<AdminPagesList />} />

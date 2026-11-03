@@ -126,7 +126,12 @@ export const DOCKET = Object.freeze([
   {
     id: 'lead',
     label: null,
-    items: [{ to: 'overview', label: 'Overview', tier: 'staff' }],
+    items: [
+      { to: 'overview', label: 'Overview', tier: 'staff' },
+      // The launch checklist (ADR 0007 §6). Staff read it; the steps that
+      // need an operator say so on the page.
+      { to: 'setup', label: 'Set up your event', tier: 'staff' },
+    ],
   },
   {
     id: 'content',
@@ -468,9 +473,14 @@ function AdminDesk() {
   const [tour, setTour] = useState(null);
   const takeTourRef = useRef(null);
   const mobileMenuRef = useRef(null);
+  // The first-visit run waits while the reader is on "Set up your event"
+  // (ADR 0007 §7): a new client opens there from the welcome email, and the
+  // checklist, not the tour, is what they came for. The tour opens on the
+  // next admin page. A run the reader started (run > 0) is never closed here.
+  const onSetup = /^\/admin\/setup(\/|$)/.test(pathname);
   useEffect(() => {
-    setTour(readTourDone(uid) ? null : 0);
-  }, [uid]);
+    setTour((run) => (run !== null && run > 0 ? run : readTourDone(uid) || onSetup ? null : 0));
+  }, [uid, onSetup]);
   useEffect(() => {
     if (wide || !mobileDocketOpen) return undefined;
     // The sheet owns the phone viewport while it is open. Lock the document

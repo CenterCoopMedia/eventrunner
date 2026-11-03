@@ -333,9 +333,9 @@ describe('the admin shell', () => {
     // issue #192, Updates, issue #190, Timeline, issue #194, Version history,
     // issue #195, Unpublished changes, issue #196, and Announcements,
     // issue #199), Import records, Data export, issue #329, Invoices, issue
-    // #208, and Scheduled reminders, issue #518, every one a word. No icon
-    // rail, no glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(30);
+    // #208, Scheduled reminders, issue #518, and Set up your event, ADR 0007,
+    // every one a word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(31);
     expect(screen.getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('href', '/admin/reminders');
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
@@ -406,7 +406,7 @@ describe('the admin shell', () => {
       DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.to);
     expect(byTier('operator')).toEqual(['features', 'branding', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
-      'overview',
+      'overview', 'setup',
       'pages', 'content', 'updates', 'timeline', 'media', 'materials', 'versions', 'unpublished',
       'sessions', 'pitches', 'speakers', 'organizations',
       'attendees', 'ticketing', 'invoices', 'badges',
@@ -511,7 +511,7 @@ describe('the admin shell', () => {
       'operations',
       'settings',
     ]);
-    expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview']);
+    expect(staffDocket[0].items.map((item) => item.to)).toEqual(['overview', 'setup']);
     expect(staffDocket.at(-1).items.map((item) => item.to)).toEqual(['settings']);
     expect(docketForTier('operator')).toEqual(DOCKET);
     expect(docketForTier(null)).toEqual([]);

@@ -132,7 +132,10 @@ function createDiagnosticHandler({ db, auth, getConfig, log = console }, name, r
 
 async function readEventReadiness({ db, getConfig }) {
   const [config, seeded] = await Promise.all([
-    getConfig(),
+    // Fresh, not the container cache (core/config.cjs, five minutes): the
+    // setup page (ADR 0007 §6) checks again right after a save, and a launch
+    // check must not report a state that has already changed.
+    getConfig({ forceRefresh: true }),
     db.collection('cmsContent').where('seeded', '==', true).get(),
   ]);
   const rows = evaluateReadiness({
@@ -350,7 +353,7 @@ function buildHandlers() {
     return {
       db,
       auth: getAuth(),
-      getConfig: () => getEventConfig({ db }),
+      getConfig: (options = {}) => getEventConfig({ db, forceRefresh: options.forceRefresh === true }),
       now: () => new Date(),
       log: console,
     };

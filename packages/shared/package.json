@@ -26,6 +26,7 @@
     "./page": { "require": "./src/page.cjs", "import": "./src/page.mjs" },
     "./venue": { "require": "./src/venue.cjs", "import": "./src/venue.mjs" },
     "./update": { "require": "./src/update.cjs", "import": "./src/update.mjs" },
+    "./answers": { "require": "./src/answers.cjs", "import": "./src/answers.mjs" },
     "./readiness": { "require": "./src/readiness.cjs", "import": "./src/readiness.mjs" },
     "./speakerReadiness": { "require": "./src/speakerReadiness.cjs", "import": "./src/speakerReadiness.mjs" },
     "./announcement": { "require": "./src/announcement.cjs", "import": "./src/announcement.mjs" },

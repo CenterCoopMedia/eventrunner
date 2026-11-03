@@ -117,6 +117,7 @@
             <ul>
               <li><a href="#find-your-way-the-tour">Find your way: The tour</a></li>
               <li><a href="#who-can-do-what-operator-and-staff">Who can do what: Operator and staff</a></li>
+              <li><a href="#set-up-your-event-the-launch-checklist">Set up your event: The launch checklist</a></li>
               <li><a href="#set-the-site-up-six-steps">Set the site up: Six steps</a></li>
               <li><a href="#launch-early-with-tickets-and-pitches-only">Launch early with tickets and pitches only</a></li>
               <li><a href="#settings-branding">Settings → Branding</a></li>
@@ -176,6 +177,28 @@
           <p>Event settings are staff work because dates, venue, places, tracks, the register link, and social handles are content. Two things in there stay with the operator. The sender block: Staff can read the sender email, the sender name, and the reply-to address, and cannot change any of the three, because that is the email identity the deployment was verified against. The social sharing image (<code>seo.defaultOgImagePath</code>): It is branding, and only an operator changes it. A staff save that would change either is refused and the field is named.</p>
           <p>An operator grants and revokes access on the Access page (below). At least one operator must always remain, and the server refuses a change that would leave none.</p>
           <p>Staff access can end at a set time, for example for a demo account. Until that time, the account is a full staff account. It can edit and publish content like any staff account. An end time does not make an account read-only. There is no read-only tier.</p>
+          <h2 id="set-up-your-event-the-launch-checklist">Set up your event: The launch checklist<a class="heading-anchor" href="#set-up-your-event-the-launch-checklist" aria-label="Link to this section">#</a></h2>
+          <p>Open <strong>Set up your event</strong>, under <strong>Overview</strong> on the rail. It is a stepper: one step at a time, with the list of every step beside it (on a phone, select <strong>Show all steps</strong>). It opens on the first step that is not done. <strong>Back</strong> and <strong>Next</strong> move between steps, and each step has its own address, for example <code>/admin/setup/logos</code>. These are the steps that must be done before the site goes live:</p>
+          <div class="table-scroll" data-scroll-region data-scroll-label="Table">
+          <table>
+          <thead>
+          <tr><th>Step</th><th>Who does it</th><th>Where</th></tr>
+          </thead>
+          <tbody>
+          <tr><td>Add a second operator</td><td>You</td><td>Settings → Access</td></tr>
+          <tr><td>Upload your logos</td><td>You</td><td>Settings → Branding</td></tr>
+          <tr><td>Replace the placeholder text</td><td>You</td><td>Content</td></tr>
+          <tr><td>Approve the privacy policy and terms</td><td>You</td><td>The privacy policy in Content, then this page</td></tr>
+          <tr><td>Set up your event email</td><td>You and the hosting team</td><td>The hosting team tells you if anything is needed from you</td></tr>
+          <tr><td>Connect ticket sales</td><td>The hosting team</td><td>Ticketing shows the result</td></tr>
+          <tr><td>Turn on Google sign-in</td><td>The hosting team</td><td>Nothing to do in the admin panel</td></tr>
+          </tbody>
+          </table>
+          </div>
+          <p>Each step shows <strong>Done</strong> or <strong>To do</strong>. The server decides the state. It uses the same check that the hosting team runs before launch. Select <strong>Check again</strong> after you finish a step.</p>
+          <p><strong>Approve the privacy policy and terms.</strong> The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens the <strong>Approve the privacy policy and terms</strong> step, ticks <strong>Our counsel reviewed and approved the privacy policy and the terms</strong>, and selects <strong>Mark the review complete</strong>. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.</p>
+          <p>The first-visit tour of the admin panel does not open over this page. It opens on the next admin page you visit.</p>
+          <p>When every step is done, tell the hosting team. They run the launch check and publish the site.</p>
           <h2 id="set-the-site-up-six-steps">Set the site up: Six steps<a class="heading-anchor" href="#set-the-site-up-six-steps" aria-label="Link to this section">#</a></h2>
           <p>This is the whole visual setup, start to finish. It takes about twenty minutes and you do it once.</p>
           <ol>

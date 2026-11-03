@@ -28,6 +28,12 @@ What v1 does not include is in the [triage record](https://github.com/CenterCoop
 - Whether tickets are Eventbrite, a spreadsheet, or neither
 - A sender address on **your** domain (for login codes). We will ask you to add SPF, DKIM, and a DMARC policy. Without that, emailed codes get quarantined.
 
+## After your site is made
+
+Your first operator signs in to the admin panel and opens **Set up your event**. It lists every step before launch, who does it, and where to do it. Some steps are yours, for example a second operator, your logos, and the legal review of the privacy policy and terms. The hosting team does the others.
+
+Never send a provider key or password through the site or in a public thread. The hosting team asks for them directly.
+
 ## How to start
 
 Open a [General](https://github.com/CenterCoopMedia/eventrunner/discussions/new?category=general) thread or email info@collaborativejournalism.org. Do not send an attendee list to GitHub.
