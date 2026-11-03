@@ -154,3 +154,10 @@ Rules written after user corrections. Read at session start.
   client sees, design the zero-configuration path first, and offer custom
   domains or other technical steps only as optional upgrades with an
   automatic check.
+
+## 2026-11-03: a new rail link changes a count in the E2E specs too
+
+- Adding "Set up your event" to the docket broke `e2e/theme-responsive.spec.js`,
+  which pins the rail's link count, after the unit tests were fixed. When a
+  change adds a link, banner or block to every admin page, grep `e2e/` as
+  well as `apps/web/src` for the count or the words it changes.
