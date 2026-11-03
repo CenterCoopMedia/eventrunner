@@ -48,6 +48,7 @@ const {
   MAX_SOCIAL_LABEL_LENGTH,
 } = require('./config/index.cjs');
 const { safeUrlHref } = require('./urlSafety.cjs');
+const { isEmailAddress } = require('./email.cjs');
 
 /** Feature toggles default false except the first four (spec §2.2). */
 const DEFAULT_ON_FEATURES = Object.freeze(['schedule', 'speakers', 'sponsors', 'attendeeDirectory']);
@@ -178,14 +179,25 @@ function parseSocialHandles(raw) {
  */
 function parseEmailList(raw) {
   const parts = String(raw).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-  const bad = parts.filter((p) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p));
+  const bad = parts.filter((p) => !isEmailAddress(p));
   if (bad.length > 0) return new Error(`not email addresses: ${bad.join(', ')}`);
   return [...new Set(parts)];
 }
 
-/** @param {object} target @param {string} path dotted @param {*} value */
+/** Path segments that would reach an object's prototype. */
+const FORBIDDEN_PATH_PARTS = Object.freeze(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Write `value` at a dotted path, making plain objects on the way. A
+ * segment that names a prototype key is refused, because a path can come
+ * from a caller of this shared module and must never reach Object.prototype.
+ *
+ * @param {object} target @param {string} path dotted @param {*} value
+ */
 function setPath(target, path, value) {
   const parts = path.split('.');
+  const forbidden = parts.find((part) => FORBIDDEN_PATH_PARTS.includes(part));
+  if (forbidden !== undefined) throw new Error(`setPath: the path segment "${forbidden}" is not allowed`);
   let node = target;
   for (const part of parts.slice(0, -1)) {
     if (typeof node[part] !== 'object' || node[part] === null) node[part] = {};
@@ -511,7 +523,7 @@ function buildConfigDocs({ answers, tierA, baseTheme, now = Date.now }) {
   }
   for (const [label, list] of [['adminEmails', adminEmails], ['staffEmails', staffEmails]]) {
     for (const email of list) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!isEmailAddress(email)) {
         errors.push(`${label}: "${email}" is not an email address`);
       }
     }
