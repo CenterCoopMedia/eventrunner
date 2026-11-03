@@ -811,6 +811,15 @@ service cloud.firestore {
     match /ticket_webhook_deliveries/{deliveryId} { allow read, write: if false; }
     match /ticket_sync_queue/{orderId} { allow read, write: if false; }
 
+    // ticket_answers/{ticketId}: one attendee's registration answers (ADR
+    // 0008 §4), including diet and access needs. Staff read them, and the
+    // account that holds the ticket reads its own (`uid`). Never public, and
+    // every write is saveTicketAnswers (ticketing/ticketAnswers.cjs).
+    match /ticket_answers/{ticketId} {
+      allow read: if isAdmin() || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow write: if false;
+    }
+
     // Native checkout keeps financial records, immutable price snapshots,
     // purchaser reservation pointers, and catalog authority behind handlers.
     // Even an organizer browser must use the live role-checked HTTP API.

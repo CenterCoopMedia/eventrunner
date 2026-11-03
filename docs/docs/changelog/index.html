@@ -145,6 +145,13 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Registration answers (ADR 0008 §4): <code>saveTicketAnswers</code> stores one
+          attendee&#39;s answers per ticket in the private <code>ticket_answers</code>, checked
+          against the form revision they answered. The ticket holder can save until
+          registration closes; staff at any time. The Attendees page counts diet,
+          access and photo answers and shows each attendee&#39;s own; the attendee
+          export adds one <code>Answer: …</code> column per question. Answers are deleted with
+          the account and left out of the archive package.</li>
           <li><strong>Settings → Registration form</strong> (operators): turn on the standard
           attendee questions (organization, job title, dietary needs, access needs,
           photo consent, directory listing), make them required, and write up to 10

@@ -59,6 +59,8 @@ const ADMIN_READABLE = [
   { path: "speakers/spk-tier", tier: "admin" },
   // A speaker's private logistics answers (ADR 0008 §3): staff only.
   { path: "speaker_logistics/spk-tier", tier: "admin" },
+  // Registration answers (ADR 0008 §4): staff, plus the ticket holder below.
+  { path: "ticket_answers/t-tier", tier: "admin" },
   { path: "feedback/f-tier", tier: "admin" },
   { path: "change_requests/cr-tier", tier: "admin" },
   // Change request email settings (issue #330): staff see whether the
@@ -189,6 +191,7 @@ beforeAll(async () => {
       status: "draft",
       uid: null,
     });
+    await setDoc(doc(db, "ticket_answers/t-tier"), { ticketId: "t-tier", uid: "tier-holder", answers: {} });
     await setDoc(doc(db, "speaker_logistics/spk-tier"), {
       speakerId: "spk-tier",
       travel: "Train",
@@ -1571,6 +1574,21 @@ describe("speakers canonical store and speakers_public projection (spec §4.3)",
     await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { uid: "attendee-1" }));
     await assertFails(deleteDoc(doc(admin(), "speakers/spk-1")));
     await assertFails(setDoc(doc(nonAdmin(), "speakers/spk-1"), { firstName: "Hijacked" }));
+  });
+
+  it("lets the ticket holder read their own registration answers, never another's, and refuses every client write", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "ticket_answers/t-ada"), { ticketId: "t-ada", uid: "attendee-ada", answers: { accessNeeds: "Step-free stage." } });
+      await setDoc(doc(ctx.firestore(), "ticket_answers/t-unclaimed"), { ticketId: "t-unclaimed", uid: null, answers: {} });
+    });
+    await assertSucceeds(getDoc(doc(attendee("attendee-ada"), "ticket_answers/t-ada")));
+    await assertFails(getDoc(doc(attendee("attendee-bo"), "ticket_answers/t-ada")));
+    await assertFails(getDoc(doc(attendee("attendee-bo"), "ticket_answers/t-unclaimed")));
+    await assertFails(getDoc(doc(anon(), "ticket_answers/t-ada")));
+    await assertFails(getDocs(collection(attendee("attendee-ada"), "ticket_answers")));
+    await assertSucceeds(getDoc(doc(admin(), "ticket_answers/t-ada")));
+    await assertFails(setDoc(doc(attendee("attendee-ada"), "ticket_answers/t-ada"), { uid: "attendee-ada", answers: {} }));
+    await assertFails(setDoc(doc(admin(), "ticket_answers/t-ada"), { uid: "attendee-ada", answers: {} }));
   });
 
   it("keeps a speaker's logistics from everyone but staff, the speaker included, and refuses every client write", async () => {

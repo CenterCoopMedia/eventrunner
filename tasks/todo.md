@@ -37,12 +37,14 @@ path (R2c, R3) comes before registration.
   - [x] Submit: `speaker.profile_received`, sent once per speaker.
   - [x] Tests: shared validation, handler, web page, E2E invite → accept →
         steps → submit → email; docs and changelog.
-- [ ] R4 Registration questions, in two stacked PRs:
+- [x] R4 Registration questions, in two stacked PRs:
   - [x] R4a `shared/registrationForm` (form and answer checks),
         `config/registration_form` saved by `updateRegistrationForm` with a
         revision guard, and Settings → Registration form with a preview.
-  - [ ] R4b private `ticket_answers`, rules, the attendee's own save,
-        attendee record, export columns, counts summary, retention.
+  - [x] R4b private `ticket_answers`, rules, the attendee's own save
+        (`saveTicketAnswers`), attendee record, export columns, counts
+        summary, deletion with the account, archive exclusion. Stacked on
+        R4a. The attendee's own form comes with R5.
 - [ ] R5 Checkout stepper (Stripe) and "Complete your registration"
       (Eventbrite, manual, none); `attendee.approved` email.
 - [ ] R6 Promo codes (ADR 0004 amendment), with concurrency tests.

@@ -58,6 +58,7 @@ test('the attendee sees the standard questions that are on, in order, then the c
     ['organization', true], ['dietary', false], ['directoryListing', false], ['q_shirt', true], ['q_topics', false],
   ]);
   assert.equal(questions.find((q) => q.id === 'dietary').sensitive, true);
+  assert.deepEqual(questions.map((q) => q.name), ['Organization', 'Dietary needs', 'Attendee directory', 'T-shirt size', 'Topics']);
   assert.ok(questions.find((q) => q.id === 'dietary').choices.includes('Other'));
   // Every standard question has a short name for staff.
   const { STANDARD_QUESTIONS } = require('./registrationForm.cjs');
@@ -87,4 +88,32 @@ test('answers are checked against the form, trimmed, and an answer to a removed 
   // Optional questions may be left blank, and a blank answer is not stored.
   const blank = checkAnswers({ organization: 'Org', q_shirt: 'S', q_topics: [] }, form);
   assert.deepEqual(blank, { ok: true, answers: { organization: 'Org', q_shirt: 'S' } });
+});
+
+const { answerText, summarizeAnswers } = require('./registrationForm.cjs');
+
+test('an answer reads as plain text for staff and the export', () => {
+  const questions = activeQuestions(validateRegistrationForm({ ...FORM, standard: { ...FORM.standard, photoConsent: { enabled: true } } }).form);
+  const byId = Object.fromEntries(questions.map((q) => [q.id, q]));
+  assert.equal(answerText(byId.dietary, { choices: ['Vegan', 'Other'], other: 'Low sodium' }), 'Vegan; Other: Low sodium');
+  assert.equal(answerText(byId.directoryListing, 'attendees_only'), 'List me only for other attendees');
+  assert.equal(answerText(byId.photoConsent, false), 'No');
+  assert.equal(answerText(byId.q_topics, ['Revenue', 'Audience']), 'Revenue; Audience');
+  assert.equal(answerText(byId.organization, undefined), '');
+});
+
+test('the counts summary tallies diet, access and photo answers for planning', () => {
+  const form = validateRegistrationForm({ standard: { dietary: { enabled: true }, accessNeeds: { enabled: true }, photoConsent: { enabled: true } } }).form;
+  const summary = summarizeAnswers([
+    { answers: { dietary: { choices: ['Vegan'], other: null }, accessNeeds: 'Step-free stage.', photoConsent: true } },
+    { answers: { dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, photoConsent: false } },
+    { answers: {} },
+  ], form);
+  assert.deepEqual(summary, {
+    total: 3,
+    dietary: { answered: 2, choices: { Vegan: 2, Other: 1 }, other: ['Low sodium'] },
+    accessNeeds: { answered: 1 },
+    photoConsent: { yes: 1, no: 1 },
+  });
+  assert.deepEqual(summarizeAnswers([], emptyForm()), { total: 0 });
 });

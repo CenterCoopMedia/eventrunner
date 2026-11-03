@@ -4,11 +4,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 let rowsCallback;
+// One callback per collection: `users` drives the rows, `ticket_answers`
+// the registration answers (ADR 0008 §4).
+const collectionCallbacks = {};
 vi.mock('../adminSource.js', () => ({
-  subscribeAdminCollection: (_name, onNext) => {
-    rowsCallback = onNext;
+  subscribeAdminCollection: (name, onNext) => {
+    collectionCallbacks[name] = onNext;
+    if (name === 'users') rowsCallback = onNext;
     return () => {};
   },
+}));
+let formCallback;
+vi.mock('../../lib/registrationFormSource.js', () => ({
+  subscribeRegistrationForm: (onNext) => { formCallback = onNext; return () => {}; },
 }));
 
 const callMock = vi.fn();
@@ -298,6 +306,29 @@ describe('AdminAttendees record and delete', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete this account' }));
     await act(async () => { await Promise.resolve(); });
   }
+
+  it('summarizes diet, access and photo answers, and shows each attendee their own answers', () => {
+    render(<AdminAttendees />);
+    pushRows([row(), row({ id: 'uid-bo', displayName: 'Bo Reyes', email: 'bo@example.com' })]);
+    expect(screen.queryByRole('heading', { name: 'Registration answers' })).toBeNull();
+    act(() => {
+      formCallback({ revision: 1, standard: { dietary: { enabled: true }, accessNeeds: { enabled: true }, photoConsent: { enabled: true } }, custom: [] });
+      collectionCallbacks.ticket_answers([
+        { id: 't-ada', uid: row().id, answers: { dietary: { choices: ['Vegan'], other: null }, accessNeeds: 'Step-free stage.', photoConsent: true } },
+        { id: 't-bo', uid: 'uid-bo', answers: { dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, photoConsent: false } },
+      ]);
+    });
+    const summary = within(screen.getByRole('heading', { level: 2, name: 'Registration answers' }).closest('section'));
+    expect(summary.getByText('Vegan: 2')).toBeInTheDocument();
+    expect(summary.getByText('Other: Low sodium')).toBeInTheDocument();
+    expect(summary.getByText(/1 attendee told you about access needs/)).toBeInTheDocument();
+    expect(summary.queryByText('Step-free stage.')).toBeNull();
+    expect(summary.getByText('Yes: 1. No: 1.')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit record' })[0]);
+    const answers = within(screen.getByRole('region', { name: 'Registration answers' }));
+    expect(answers.getByText('Step-free stage.')).toBeInTheDocument();
+    expect(answers.getByText('Access needs (private)')).toBeInTheDocument();
+  });
 
   it('shows past attendance as a meta line on the row face', () => {
     render(<AdminAttendees />);

@@ -137,6 +137,10 @@ const PER_ACCOUNT_STORES = Object.freeze([
     phase: 'sweep', kind: 'owned', collection: 'organization_edit_requests', field: 'submittedByUid',
     key: 'organizationEdits',
   },
+  // Registration answers (ADR 0008 §4), which hold diet and access needs.
+  // saveTicketAnswers checks the ticket's claim in its transaction, and the
+  // directory phase clears that claim, so no answer lands after this sweep.
+  { phase: 'sweep', kind: 'owned', collection: 'ticket_answers', field: 'uid', key: 'registrationAnswers' },
 ]);
 
 /** Firestore's per-transaction write ceiling. */

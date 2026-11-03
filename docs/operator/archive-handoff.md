@@ -43,7 +43,7 @@ An operator selects **Download event data package** on the **Data export** page.
 
 **Live records only.** Every file in the package, CSV files included, holds the live version of each record. A draft that was never published, and a newer draft of a live record, are not in it. A hidden live record is in it: `visible` is `false` in its JSON record, and **Hidden** is `yes` in its CSV row. Before you send the package to a third party, check the hidden records. The staff spreadsheets differ: they show drafts, with their state.
 
-**What the package never holds.** `config/bootstrap` (the admin allowlist), `config/providers`, drafts and version history, the admin log, sign-in codes, rate limits, the sent mail log, invite tokens, webhook deliveries, the ticket sync queue, payment attempts, raw provider payloads, and every credential. Credentials live in Secret Manager, not in Firestore. The manifest lists each excluded collection with its reason.
+**What the package never holds.** `config/bootstrap` (the admin allowlist), `config/providers`, drafts and version history, the admin log, registration answers and speaker logistics (diet, access and travel needs), sign-in codes, rate limits, the sent mail log, invite tokens, webhook deliveries, the ticket sync queue, payment attempts, raw provider payloads, and every credential. Credentials live in Secret Manager, not in Firestore. The manifest lists each excluded collection with its reason.
 
 **Delivery.** The zip goes from the server to the operator's browser only. The server writes no copy to Firestore or Storage, so there is no link to share by mistake. The server writes the admin log entry before it sends the file. If the entry cannot be written, the server sends nothing.
 
@@ -117,6 +117,7 @@ To take the site offline instead, export first, then disable Hosting (`firebase 
 - Agree a retention period with the client before the handoff, and write it in the handoff record.
 - Store the package, the managed export and the Storage copy with access control. Do not send any of them as an open link.
 - When a person asks to be deleted after the export, delete the account in **Attendees**, and remove the person from every copy of the package and the backup, or delete those copies.
+- Registration answers (`ticket_answers`) and speaker logistics (`speaker_logistics`) hold diet, access and travel needs. They are not in the package. They are deleted with each account, and with the Firebase project. If the client needs catering or access counts after the event, export them from **Attendees** before the handoff.
 - When the retention period ends, delete the archive bucket, every downloaded package, and, when the contract ends, the Firebase project.
 
 ## Handoff record

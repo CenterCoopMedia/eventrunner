@@ -65,6 +65,7 @@ const ticketingWebhook = require('./src/ticketing/webhook.cjs');
 const ticketingSync = require('./src/ticketing/sync.cjs');
 const ticketingRegistration = require('./src/ticketing/registration.cjs');
 const ticketingRegistrationForm = require('./src/ticketing/registrationForm.cjs');
+const ticketingAnswers = require('./src/ticketing/ticketAnswers.cjs');
 const ticketingCsvImport = require('./src/ticketing/csvImport.cjs');
 const ticketingEntitlement = require('./src/ticketing/entitlement.cjs');
 const ticketingRegistrationPrompt = require('./src/ticketing/registrationPrompt.cjs');
@@ -142,6 +143,7 @@ module.exports = {
   ...ticketingSync.handlers,
   ...ticketingRegistration.handlers,
   ...ticketingRegistrationForm.handlers,
+  ...ticketingAnswers.handlers,
   ...ticketingCsvImport.handlers,
   ...ticketingEntitlement.handlers,
   ...ticketingRegistrationPrompt.handlers,

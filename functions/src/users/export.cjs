@@ -32,6 +32,7 @@
  */
 
 const { buildPublicProfile } = require('shared/profile');
+const { activeQuestions, answerText } = require('shared/registrationForm');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, badRequest, methodNotAllowed, internal } = require('../core/errors.cjs');
 const {
@@ -62,6 +63,8 @@ class ExportTooLargeError extends Error {
 
 /** Firestore's getAll batch size. */
 const READ_CHUNK = 500;
+/** Firestore's ceiling on an `in` query's values. */
+const IN_CHUNK = 30;
 
 /** The attendees page's status filter values (AdminAttendees.jsx STATUS_FILTERS). */
 const STATUS_FILTER_VALUES = Object.freeze(['all', 'pending', 'ticketed', 'approved', 'revoked']);
@@ -191,14 +194,37 @@ function buildCsv(users, config) {
   return joinCsv(lines);
 }
 
-/** The header line. */
-function csvHeader() {
-  return EXPORT_COLUMNS.map((column) => escapeCell(column.header)).join(',');
+/**
+ * The header line. `questions` are the registration questions the form
+ * asks (ADR 0008 §4); each is one column after the account's own fields,
+ * headed "Answer: …" so it is never mistaken for one of them.
+ */
+function csvHeader(questions = []) {
+  return [...EXPORT_COLUMNS.map((column) => column.header), ...questions.map((question) => `Answer: ${question.name}`)]
+    .map(escapeCell).join(',');
 }
 
 /** One account's line: the exported cells only, escaped and quoted. */
-function csvLine(user, config) {
-  return exportRow(user, config).map(escapeCell).join(',');
+function csvLine(user, config, questions = [], answers = {}) {
+  return [...exportRow(user, config), ...questions.map((question) => answerText(question, answers[question.id]))]
+    .map(escapeCell).join(',');
+}
+
+/**
+ * The registration answers of these accounts, by uid. An account that holds
+ * more than one ticket shows the answers of its first ticket by id.
+ */
+async function answersByUid(db, uids) {
+  const byUid = new Map();
+  for (let start = 0; start < uids.length; start += IN_CHUNK) {
+    const snap = await db.collection('ticket_answers').where('uid', 'in', uids.slice(start, start + IN_CHUNK)).get();
+    const docs = [...snap.docs].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    for (const doc of docs) {
+      const record = doc.data() || {};
+      if (!byUid.has(record.uid) && record.answers && typeof record.answers === 'object') byUid.set(record.uid, record.answers);
+    }
+  }
+  return byUid;
 }
 
 /** The byte-order mark, the lines, CRLF line ends. */
@@ -279,19 +305,23 @@ function readExportRequest(body) {
  * @throws {ExportTooLargeError}
  */
 async function buildExport({ db, uids, config, maxBytes = MAX_EXPORT_BYTES }) {
-  const lines = [csvHeader()];
+  const formSnap = await db.collection('config').doc('registration_form').get();
+  const questions = activeQuestions(formSnap.exists ? formSnap.data() : null);
+  const lines = [csvHeader(questions)];
   // The byte-order mark, the header and its line end.
   let bytes = Buffer.byteLength(joinCsv(lines));
   let skipped = 0;
   for (let start = 0; start < uids.length; start += READ_CHUNK) {
-    const refs = uids.slice(start, start + READ_CHUNK).map((uid) => db.collection(USERS).doc(uid));
+    const chunk = uids.slice(start, start + READ_CHUNK);
+    const refs = chunk.map((uid) => db.collection(USERS).doc(uid));
     const snaps = await db.getAll(...refs);
+    const answers = questions.length ? await answersByUid(db, chunk) : new Map();
     for (const snap of snaps) {
       if (!snap.exists) {
         skipped += 1;
         continue;
       }
-      const line = csvLine(snap.data() || {}, config);
+      const line = csvLine(snap.data() || {}, config, questions, answers.get(snap.id) ?? {});
       bytes += Buffer.byteLength(line) + 2;
       if (bytes > maxBytes) throw new ExportTooLargeError(maxBytes);
       lines.push(line);

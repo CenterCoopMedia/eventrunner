@@ -88,6 +88,7 @@
     "updatePitchCall",
     "updatePitchFormOptions",
     "updateRegistrationForm",
+    "saveTicketAnswers",
     "editSessionPitch",
     "reviewSessionPitch",
     "importSessionPitches",

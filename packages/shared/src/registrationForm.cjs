@@ -201,6 +201,7 @@ function activeQuestions(form) {
     .filter((question) => read.standard[question.id].enabled)
     .map((question) => ({
       id: question.id,
+      name: question.name,
       kind: question.kind,
       label: question.label,
       help: question.help || '',
@@ -210,7 +211,7 @@ function activeQuestions(form) {
         : question.kind === 'directory' ? DIRECTORY_CHOICES.map((choice) => choice.label) : [],
       standard: true,
     }));
-  const custom = read.custom.map((question) => ({ ...question, choices: [...question.choices], sensitive: false, standard: false }));
+  const custom = read.custom.map((question) => ({ ...question, name: question.label, choices: [...question.choices], sensitive: false, standard: false }));
   return [...standard, ...custom];
 }
 
@@ -283,7 +284,58 @@ function checkAnswers(source, form) {
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, answers };
 }
 
+/** One stored answer as plain text, for the attendee record and the export. */
+function answerText(question, value) {
+  if (value === undefined || value === null) return '';
+  switch (question?.kind) {
+    case 'yes_no': return value === true ? 'Yes' : value === false ? 'No' : '';
+    case 'directory': return DIRECTORY_CHOICES.find((choice) => choice.id === value)?.label ?? '';
+    case 'dietary': {
+      if (!isPlainObject(value) || !Array.isArray(value.choices)) return '';
+      return value.choices.map((choice) => (choice === 'Other' && value.other ? `Other: ${value.other}` : choice)).join('; ');
+    }
+    case 'many_choices': return Array.isArray(value) ? value.join('; ') : '';
+    default: return typeof value === 'string' ? value : '';
+  }
+}
+
+/**
+ * Counts for catering and access planning, from stored answer records
+ * (`{ answers }`). Only the questions the form asks are counted. Access
+ * needs are counted, never quoted: staff read them one by one on each
+ * attendee's record.
+ */
+function summarizeAnswers(records, form) {
+  const read = readRegistrationForm(form);
+  const list = Array.isArray(records) ? records : [];
+  const summary = { total: list.length };
+  const answersOf = (record) => (isPlainObject(record?.answers) ? record.answers : {});
+  if (read.standard.dietary.enabled) {
+    const dietary = { answered: 0, choices: {}, other: [] };
+    for (const record of list) {
+      const value = answersOf(record).dietary;
+      if (!isPlainObject(value) || !Array.isArray(value.choices) || !value.choices.length) continue;
+      dietary.answered += 1;
+      for (const choice of value.choices) if (DIETARY_CHOICES.includes(choice)) dietary.choices[choice] = (dietary.choices[choice] ?? 0) + 1;
+      if (typeof value.other === 'string' && value.other) dietary.other.push(value.other);
+    }
+    summary.dietary = dietary;
+  }
+  if (read.standard.accessNeeds.enabled) {
+    summary.accessNeeds = { answered: list.filter((record) => typeof answersOf(record).accessNeeds === 'string' && answersOf(record).accessNeeds).length };
+  }
+  if (read.standard.photoConsent.enabled) {
+    summary.photoConsent = {
+      yes: list.filter((record) => answersOf(record).photoConsent === true).length,
+      no: list.filter((record) => answersOf(record).photoConsent === false).length,
+    };
+  }
+  return summary;
+}
+
 module.exports = {
+  answerText,
+  summarizeAnswers,
   MAX_CUSTOM_QUESTIONS,
   MAX_CHOICES,
   LIMITS,
