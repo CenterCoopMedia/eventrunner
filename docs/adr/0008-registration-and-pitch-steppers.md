@@ -81,7 +81,13 @@ admin panel (the admin setup page moves onto it).
 - The invited speaker completes a **speaker profile stepper** (`/speaker/profile`): About you
   (name, pronouns, title, organization) → Bio and photo → Links → Logistics (travel, access needs,
   audio and video needs; private to staff) → Review. Accepting the invite opens it.
-- `speaker.confirmation` is sent when a speaker submits the profile.
+- ~~`speaker.confirmation` is sent when a speaker submits the profile.~~ Amended by the owner on
+  2026-11-03: a submitted profile sends a new email, `speaker.profile_received`, once per speaker.
+  `speaker.confirmation` names a confirmed time and room, so it stays for a later staff action that
+  confirms a session.
+- The Logistics answers live in a separate record, `speaker_logistics/{speakerId}`, that only staff
+  can read (owner choice, 2026-11-03). The public speaker copy is built from `speakers`, so these
+  answers cannot reach it.
 
 ### 4. Attendee registration questions
 

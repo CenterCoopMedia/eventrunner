@@ -57,6 +57,8 @@ const ADMIN_READABLE = [
   { path: "users/pending-1", tier: "admin" },
   { path: "users_public/private-profile", tier: "admin" },
   { path: "speakers/spk-tier", tier: "admin" },
+  // A speaker's private logistics answers (ADR 0008 §3): staff only.
+  { path: "speaker_logistics/spk-tier", tier: "admin" },
   { path: "feedback/f-tier", tier: "admin" },
   { path: "change_requests/cr-tier", tier: "admin" },
   // Change request email settings (issue #330): staff see whether the
@@ -186,6 +188,12 @@ beforeAll(async () => {
       email: "tier@example.com",
       status: "draft",
       uid: null,
+    });
+    await setDoc(doc(db, "speaker_logistics/spk-tier"), {
+      speakerId: "spk-tier",
+      travel: "Train",
+      accessNeeds: null,
+      avNeeds: null,
     });
     await setDoc(doc(db, "feedback/f-tier"), {
       message: "Tier fixture.",
@@ -1563,6 +1571,18 @@ describe("speakers canonical store and speakers_public projection (spec §4.3)",
     await assertFails(updateDoc(doc(admin(), "speakers/spk-1"), { uid: "attendee-1" }));
     await assertFails(deleteDoc(doc(admin(), "speakers/spk-1")));
     await assertFails(setDoc(doc(nonAdmin(), "speakers/spk-1"), { firstName: "Hijacked" }));
+  });
+
+  it("keeps a speaker's logistics from everyone but staff, the speaker included, and refuses every client write", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "speaker_logistics/spk-1"), { speakerId: "spk-1", travel: "Train", accessNeeds: "Step-free stage", avNeeds: null });
+    });
+    await assertFails(getDoc(doc(anon(), "speaker_logistics/spk-1")));
+    await assertFails(getDoc(doc(nonAdmin(), "speaker_logistics/spk-1")));
+    await assertFails(getDoc(doc(attendee("speaker-1"), "speaker_logistics/spk-1")));
+    await assertSucceeds(getDoc(doc(admin(), "speaker_logistics/spk-1")));
+    await assertFails(setDoc(doc(admin(), "speaker_logistics/spk-1"), { travel: "Car" }));
+    await assertFails(setDoc(doc(attendee("speaker-1"), "speaker_logistics/spk-1"), { travel: "Car" }));
   });
 
   it("allows anyone to read the public projection", async () => {

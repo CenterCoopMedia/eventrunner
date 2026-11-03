@@ -155,6 +155,9 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
       'listSpeakerInvites',
       'onSpeakerWritten',
       'resendSpeakerInvite',
+      // The profile steps' Logistics save (ADR 0008 §3,
+      // speakers/profileSteps.cjs): writes speaker_logistics, never speakers.
+      'saveOwnSpeakerLogistics',
       'sendSpeakerInvite',
       // Staff wording of the invite and acceptance mail (issue #204,
       // speakers/mailTemplates.cjs): read, preview, save, reset.
@@ -164,6 +167,9 @@ test('the tri-sync trigger set and the drift detector do not exist', () => {
       // Staff reminders to accepted speakers about missing items
       // (speakers/reminders.cjs): list, preview, send, export, wording.
       'speakerReminders',
+      // The profile steps' Review submit (speakers/profileSteps.cjs):
+      // stamps profileSubmittedAt and sends speaker.profile_received once.
+      'submitOwnSpeakerProfile',
       'updateOwnSpeakerProfile',
       'updateSpeaker',
       'validateSpeakerInvite',

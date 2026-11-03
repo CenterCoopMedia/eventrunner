@@ -30,6 +30,9 @@ const {
 const { sendError, badRequest, notFound, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { logAdminAction, isValidDocId, isAlreadyExistsError } = require('../cms/store.cjs');
 const { validateSpeaker, SELF_EDITABLE_SPEAKER_FIELDS } = require('shared/speaker');
+const { readLogistics } = require('shared/speakerLogistics');
+
+const SPEAKER_LOGISTICS = 'speaker_logistics';
 const { generateSpeakerSlug } = require('shared/slug');
 const { readLinkedUser } = require('./lifecycle.cjs');
 
@@ -435,6 +438,7 @@ function buildOwnSpeakerView(speaker, speakerId) {
     // in apps/web/src/pages/SpeakerProfile.jsx).
     firstName: typeof speaker.firstName === 'string' ? speaker.firstName : '',
     lastName: typeof speaker.lastName === 'string' ? speaker.lastName : '',
+    pronouns: typeof speaker.pronouns === 'string' ? speaker.pronouns : '',
     slug: typeof speaker.slug === 'string' ? speaker.slug : '',
     bio: typeof speaker.bio === 'string' ? speaker.bio : '',
     headshotPath: typeof speaker.headshotPath === 'string' && speaker.headshotPath
@@ -452,7 +456,16 @@ function buildOwnSpeakerView(speaker, speakerId) {
     pendingEdits: isPlainObject(speaker.pendingEdits) && Object.keys(speaker.pendingEdits).length > 0
       ? { ...speaker.pendingEdits }
       : null,
+    // When the speaker last submitted the profile steps (ADR 0008 §3), or
+    // null. Written only by speakers/profileSteps.cjs.
+    profileSubmittedAt: isoOf(speaker.profileSubmittedAt),
   };
+}
+
+function isoOf(value) {
+  if (value instanceof Date) return value.toISOString();
+  if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
+  return null;
 }
 
 /**
@@ -517,7 +530,10 @@ async function applyGetOwnSpeakerProfile({ db, speakerId, uid, isAdmin }) {
   if (!snap.exists) {
     return { ok: false, status: 404, code: 'not-found', message: `No speaker with id "${speakerId}".` };
   }
-  return { ok: true, speaker: buildOwnSpeakerView(stored, speakerId) };
+  // The private logistics answers (ADR 0008 §3) come back with the
+  // profile so the steps can show them. They are never in speakers_public.
+  const logistics = await db.collection(SPEAKER_LOGISTICS).doc(speakerId).get();
+  return { ok: true, speaker: buildOwnSpeakerView(stored, speakerId), logistics: readLogistics(logistics.exists ? logistics.data() : null) };
 }
 
 /**
@@ -798,7 +814,7 @@ function createGetOwnSpeakerProfileHandler({ db, auth, getConfig, log = console 
       return internal(res, 'Your speaker profile could not be loaded.');
     }
     if (!result.ok) return sendError(res, result.status, result.code, result.message);
-    res.status(200).json({ speaker: result.speaker });
+    res.status(200).json({ speaker: result.speaker, logistics: result.logistics });
   };
 }
 
@@ -1029,6 +1045,6 @@ module.exports = {
   },
   internals: {
     SPEAKERS, SPEAKER_SLUGS, newSpeakerDefaults, findSlugOwner, gateAdminPost,
-    gateSpeakerSelfOrAdmin, buildOwnSpeakerView, isOwnHeadshotPath,
+    gateSpeakerSelfOrAdmin, buildOwnSpeakerView, isOwnHeadshotPath, callerOwnsSpeaker,
   },
 };

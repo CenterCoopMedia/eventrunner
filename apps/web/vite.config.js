@@ -52,6 +52,7 @@ export default defineConfig({
       'shared/eventDateTime',
       'shared/pitch',
       'shared/pitchForm',
+      'shared/speakerLogistics',
       'shared/registration',
       'shared/announcement',
       'shared/richText',

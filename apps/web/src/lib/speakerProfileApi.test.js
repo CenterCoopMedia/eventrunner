@@ -6,6 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteSpeakerPhoto,
   getOwnSpeakerProfile,
+  loadOwnSpeakerProfile,
+  saveOwnSpeakerLogistics,
+  submitOwnSpeakerProfile,
   updateOwnSpeakerProfile,
   uploadSpeakerPhoto,
 } from './speakerProfileApi.js';
@@ -29,6 +32,25 @@ describe('getOwnSpeakerProfile', () => {
     expect(String(url)).toMatch(/\/getOwnSpeakerProfile$/);
     expect(init.headers.Authorization).toBe('Bearer id-token');
     expect(JSON.parse(init.body)).toEqual({ speakerId: 'rae' });
+  });
+});
+
+describe('the profile steps calls (ADR 0008 §3)', () => {
+  it('loads the record with its logistics, and an old server reads as no logistics', async () => {
+    fetch.mockResolvedValueOnce(response(200, { speaker: { speakerId: 'rae' }, logistics: { travel: 'Car' } }));
+    expect(await loadOwnSpeakerProfile({ user, speakerId: 'rae' })).toEqual({ speaker: { speakerId: 'rae' }, logistics: { travel: 'Car' } });
+    fetch.mockResolvedValueOnce(response(200, { speaker: { speakerId: 'rae' } }));
+    expect((await loadOwnSpeakerProfile({ user, speakerId: 'rae' })).logistics).toBeNull();
+  });
+
+  it('saves logistics and submits through their own endpoints', async () => {
+    fetch.mockResolvedValueOnce(response(200, { speakerId: 'rae' }));
+    await saveOwnSpeakerLogistics({ user, speakerId: 'rae', logistics: { travel: 'Car' } });
+    expect(String(fetch.mock.calls[0][0])).toMatch(/\/saveOwnSpeakerLogistics$/);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ speakerId: 'rae', logistics: { travel: 'Car' } });
+    fetch.mockResolvedValueOnce(response(200, { submitted: true, emailed: true }));
+    expect(await submitOwnSpeakerProfile({ user, speakerId: 'rae' })).toEqual({ submitted: true, emailed: true });
+    expect(String(fetch.mock.calls[1][0])).toMatch(/\/submitOwnSpeakerProfile$/);
   });
 });
 

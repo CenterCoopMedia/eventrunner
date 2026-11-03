@@ -1,17 +1,12 @@
 // Speaker self-service profile wizard (spec §4.3, §9 "Speaker profile
 // wizard", issue #22) — /speaker/profile.
 //
-// One form, not a multi-step flow: SELF_EDITABLE_SPEAKER_FIELDS (shared/
-// speaker) is seven fields — name, bio, headshot, organization, jobTitle,
-// socialHandles — the same size class Profile.jsx's single-form attendee
-// editor handles, and interface-guidelines.md's ergonomics bar ("don't make
-// people click Next for no reason") argues against paging seven fields
-// across steps. `stipend`/`diversity` steps the legacy wizard carried are
-// NOT here: no config namespace in this port defines them as toggleable
-// (docs/adr/0001 §2 lists no such flag), so adding UI for fields the server
-// would reject as unknown speaker fields would promise something this
-// deployment cannot save. A client that needs them gets a follow-up ADR
-// entry, not a guess encoded here.
+// Five steps (ADR 0008 §3): About you → Bio and photo → Links → Logistics
+// → Review, at /speaker/profile/:stepSlug. Each Next saves that step, so a
+// speaker who stops halfway keeps what they wrote. Logistics answers go to
+// a staff-only record through saveOwnSpeakerLogistics; Review submits once
+// through submitOwnSpeakerProfile, which sends speaker.profile_received.
+// The fields live in components/speaker/SpeakerProfileFields.jsx.
 //
 // The linked account (`users/{uid}.speakerId`) says WHICH speaker record is
 // "mine"; the canonical values come from getOwnSpeakerProfile, because the
@@ -26,7 +21,7 @@
 // stays a control label above its own input — the eyebrow ban's one named
 // exception (§2.4).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { SELF_EDITABLE_SPEAKER_FIELDS } from 'shared/speaker';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useProfile } from '../contexts/ProfileContext.jsx';
@@ -34,13 +29,21 @@ import { useToast } from '../contexts/ToastContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import SignInPanel from '../components/SignInPanel.jsx';
-import SpeakerPhotoField from '../components/media/SpeakerPhotoField.jsx';
+import { StepHeading, StepList, StepPager, resolveStep, useStepHeadingFocus } from '../components/forms/Stepper.jsx';
+import SpeakerProfileFields, { SPEAKER_STEPS } from '../components/speaker/SpeakerProfileFields.jsx';
 import {
   deleteSpeakerPhoto,
-  getOwnSpeakerProfile,
+  loadOwnSpeakerProfile,
+  saveOwnSpeakerLogistics,
+  submitOwnSpeakerProfile,
   updateOwnSpeakerProfile,
 } from '../lib/speakerProfileApi.js';
-import { inputClass, primaryActionClass } from '../components/controlClasses.js';
+import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
+import { useMediaQuery, WIDE_VIEWPORT } from '../lib/viewport.js';
+
+const hrefFor = (step) => `/speaker/profile/${step.slug}`;
+const STEP_SAVES = Object.freeze(['about', 'bio', 'links', 'logistics']);
+const BLANK_LOGISTICS = Object.freeze({ travel: '', accessNeeds: '', avNeeds: '' });
 
 const STATUS_COPY = {
   draft: null,
@@ -87,28 +90,73 @@ function rowsToHandles(rows) {
   return out;
 }
 
+
+/** Logistics as the server stores them: trimmed, with empty answers as null. */
+function logisticsPayload(logistics) {
+  const out = {};
+  for (const [key, value] of Object.entries(logistics)) out[key] = value.trim() || null;
+  return out;
+}
+
+/** What a step would send, as text, to tell a changed step from an unchanged one. */
+function stepPayloadKey(slug, form, logistics) {
+  return JSON.stringify(slug === 'logistics' ? logisticsPayload(logistics) : fieldsFor(slug, form));
+}
+
+/** The fields one step saves through updateOwnSpeakerProfile. */
+function fieldsFor(slug, form) {
+  let fields = {};
+  if (slug === 'about') {
+    fields = {
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      pronouns: form.pronouns.trim(),
+      organization: form.organization.trim(),
+      jobTitle: form.jobTitle.trim(),
+    };
+  } else if (slug === 'bio') {
+    fields = { bio: form.bio.trim(), headshotPath: form.headshotPath ? form.headshotPath : null };
+  } else if (slug === 'links') {
+    fields = { socialHandles: rowsToHandles(form.socialRows) };
+  }
+  // A static guard against this page drifting from the server's allowlist:
+  // every key above is already on SELF_EDITABLE_SPEAKER_FIELDS.
+  for (const key of Object.keys(fields)) {
+    if (!SELF_EDITABLE_SPEAKER_FIELDS.includes(key)) delete fields[key];
+  }
+  return fields;
+}
+
 export default function SpeakerProfile() {
   const { user } = useAuth();
   const { profile, status: accountStatus } = useProfile();
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const { stepSlug } = useParams();
+  const wide = useMediaQuery(WIDE_VIEWPORT);
+  const headingRef = useStepHeadingFocus(stepSlug);
   const speakerId = profile?.speakerId ?? null;
 
   const [load, setLoad] = useState({ status: 'loading', speaker: null, error: null });
   const [form, setForm] = useState(null);
+  const [logistics, setLogisticsState] = useState(BLANK_LOGISTICS);
+  const [saved, setSaved] = useState([]);
+  const [savedNote, setSavedNote] = useState('');
+  const [submitted, setSubmitted] = useState(null);
   const [nameError, setNameError] = useState(null);
   const [saving, setSaving] = useState(false);
   const nameRef = useRef(null);
+  // What each step last saved (or loaded with). Next on an unchanged step
+  // moves on without a save, so an approved speaker walking through the
+  // steps queues no empty edit for staff to review.
+  const savedPayloadsRef = useRef({});
 
   // Guards against a stale response landing after the identity it was
   // fetched for has changed (issue #22 review finding P2-9) — a signed-in
   // speaker signing out and a different one signing in inside the same
   // mounted page, or the linked speakerId changing under it. Each call to
-  // loadProfile (mount, retry, post-save refresh) claims the next id;
-  // a response only applies if it is still the most recent claim when it
-  // resolves. Effect-cleanup alone would not cover the "Try again" button
-  // or the post-save refresh, both of which call loadProfile directly
-  // rather than through the effect, so the guard lives in the request
-  // itself.
+  // loadProfile (mount, retry) claims the next id; a response only applies
+  // if it is still the most recent claim when it resolves.
   const requestIdRef = useRef(0);
 
   // Photo cleanup bookkeeping (issue #22 review findings P1-2 / P2-3).
@@ -116,19 +164,18 @@ export default function SpeakerProfile() {
   // .uploadSpeakerPhoto), so choosing a file never touches the live public
   // object — but that means a superseded upload needs an explicit deferred
   // delete once a save no longer points at it, the same rule
-  // ProfilePhotoField follows for attendee photos. Two refs, captured at
-  // LOAD time (before any edit) and read again at SAVE time:
+  // ProfilePhotoField follows for attendee photos. Two refs:
   //   • livePhotoPathRef  — speakers.headshotPath as currently PUBLISHED
   //     (or about-to-publish, pre-approval). NEVER deleted from here — an
   //     approved speaker's queued edit does not touch this object until an
   //     organizer applies it (functions/src/speakers/profile.cjs deletes
   //     the superseded live object itself, once it actually stops being
   //     live).
-  //   • photoBaselineRef  — the EFFECTIVE path the form started from this
-  //     load (a queued pendingEdits.headshotPath if one exists, else the
-  //     live value). Safe to delete once superseded, UNLESS it equals the
-  //     live path AND the save result says the edit is staged. That flag
-  //     comes from the server, not from the status read at load.
+  //   • photoBaselineRef  — the EFFECTIVE path the form last saved (a
+  //     queued pendingEdits.headshotPath if one exists, else the live
+  //     value). Safe to delete once superseded, UNLESS it equals the live
+  //     path AND the save result says the edit is staged. That flag comes
+  //     from the server, not from the status read at load.
   const livePhotoPathRef = useRef(null);
   const photoBaselineRef = useRef(null);
 
@@ -136,20 +183,32 @@ export default function SpeakerProfile() {
     if (!user || !speakerId) return;
     const requestId = ++requestIdRef.current;
     setLoad({ status: 'loading', speaker: null, error: null });
-    getOwnSpeakerProfile({ user, speakerId })
-      .then((speaker) => {
+    loadOwnSpeakerProfile({ user, speakerId })
+      .then(({ speaker, logistics: stored }) => {
         if (requestIdRef.current !== requestId) return; // superseded by a newer request
         const effective = { ...speaker, ...(speaker.pendingEdits ?? {}) };
         setLoad({ status: 'ready', speaker, error: null });
-        setForm({
+        const loadedForm = {
           firstName: effective.firstName ?? '',
           lastName: effective.lastName ?? '',
+          pronouns: effective.pronouns ?? '',
           bio: effective.bio ?? '',
           organization: effective.organization ?? '',
           jobTitle: effective.jobTitle ?? '',
           headshotPath: effective.headshotPath ?? '',
           socialRows: handlesToRows(effective.socialHandles),
-        });
+        };
+        const loadedLogistics = {
+          travel: stored?.travel ?? '',
+          accessNeeds: stored?.accessNeeds ?? '',
+          avNeeds: stored?.avNeeds ?? '',
+        };
+        setForm(loadedForm);
+        setLogisticsState(loadedLogistics);
+        savedPayloadsRef.current = Object.fromEntries(
+          STEP_SAVES.map((slug) => [slug, stepPayloadKey(slug, loadedForm, loadedLogistics)]),
+        );
+        setSubmitted(speaker.profileSubmittedAt ?? null);
         livePhotoPathRef.current = speaker.headshotPath ?? null;
         photoBaselineRef.current = effective.headshotPath ?? null;
       })
@@ -167,12 +226,7 @@ export default function SpeakerProfile() {
     // SignInPanel mounts INLINE rather than navigating to /signin (issue
     // #22 review finding P2-11): AuthContext's `user` flips truthy the
     // moment sign-in completes, which re-renders this same component past
-    // this branch — no redirect, no return-path state to lose. Navigating
-    // to /signin instead would need a return-path mechanism AND would need
-    // to be coordinated with ProfileSetupRedirect, which claims '/' and
-    // '/signin' as its post-sign-in landing spots and would otherwise
-    // hijack a brand-new account to /profile before it ever reached this
-    // page. Staying on /speaker/profile the whole time sidesteps both.
+    // this branch — no redirect, no return-path state to lose.
     return (
       <article className="mx-auto max-w-md">
         <h1 className="font-heading text-h1 font-semibold text-text-primary">Sign in to continue</h1>
@@ -231,239 +285,186 @@ export default function SpeakerProfile() {
     );
   }
 
+  const { index: current, unknown } = resolveStep(SPEAKER_STEPS, stepSlug, 0);
+  if (unknown) return <Navigate to="/speaker/profile" replace />;
+  const step = SPEAKER_STEPS[current];
+  const review = step.slug === 'review';
+  const steps = SPEAKER_STEPS.map((item) => ({
+    ...item,
+    state: item.slug !== 'review' && (saved.includes(item.slug) || submitted) ? 'done' : 'todo',
+  }));
+
   const statusNote = STATUS_COPY[load.speaker.status] ?? null;
   const hasPendingEdits = Boolean(load.speaker.pendingEdits);
 
-  const setField = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-
+  const setField = (key, value) => setForm((previous) => ({ ...previous, [key]: value }));
+  const setLogistics = (key, value) => setLogisticsState((previous) => ({ ...previous, [key]: value }));
   const setSocialRow = (index, key, value) =>
-    setForm((current) => ({
-      ...current,
-      socialRows: current.socialRows.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
+    setForm((previous) => ({
+      ...previous,
+      socialRows: previous.socialRows.map((row, i) => (i === index ? { ...row, [key]: value } : row)),
     }));
-
   const addSocialRow = () =>
-    setForm((current) => ({ ...current, socialRows: [...current.socialRows, { label: '', handle: '' }] }));
-
+    setForm((previous) => ({ ...previous, socialRows: [...previous.socialRows, { label: '', handle: '' }] }));
   const removeSocialRow = (index) =>
-    setForm((current) => ({
-      ...current,
-      socialRows: current.socialRows.length > 1
-        ? current.socialRows.filter((_, i) => i !== index)
+    setForm((previous) => ({
+      ...previous,
+      socialRows: previous.socialRows.length > 1
+        ? previous.socialRows.filter((_, i) => i !== index)
         : [{ label: '', handle: '' }],
     }));
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (form.firstName.trim().length === 0 || form.lastName.trim().length === 0) {
+  /**
+   * Save one step's answers when they changed. An unchanged step is not
+   * sent. @returns {Promise<boolean>} false when the step needs a fix first
+   */
+  async function saveSlug(slug) {
+    if (slug === 'about' && (form.firstName.trim().length === 0 || form.lastName.trim().length === 0)) {
       setNameError('Enter the name you want printed on the programme.');
       nameRef.current?.focus();
-      return;
+      return false;
     }
-    setNameError(null);
-    setSaving(true);
-    try {
-      const fields = {
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        bio: form.bio.trim(),
-        organization: form.organization.trim(),
-        jobTitle: form.jobTitle.trim(),
-        headshotPath: form.headshotPath ? form.headshotPath : null,
-        socialHandles: rowsToHandles(form.socialRows),
-      };
-      // Sent exactly against SELF_EDITABLE_SPEAKER_FIELDS — a static guard
-      // against this form ever drifting from the server's allowlist, not a
-      // filter the user can trigger: every key above is already on the list.
-      for (const key of Object.keys(fields)) {
-        if (!SELF_EDITABLE_SPEAKER_FIELDS.includes(key)) delete fields[key];
-      }
-      const result = await updateOwnSpeakerProfile({ user, speakerId, fields });
-
+    if (slug === 'about') setNameError(null);
+    const key = stepPayloadKey(slug, form, logistics);
+    if (savedPayloadsRef.current[slug] === key) return true;
+    if (slug === 'logistics') {
+      await saveOwnSpeakerLogistics({ user, speakerId, logistics });
+      savedPayloadsRef.current.logistics = key;
+      setSavedNote('Saved. Only the organizers see these answers.');
+      return true;
+    }
+    const fields = fieldsFor(slug, form);
+    const result = await updateOwnSpeakerProfile({ user, speakerId, fields });
+    savedPayloadsRef.current[slug] = key;
+    const staged = result?.staged === true;
+    if (slug === 'bio') {
       // Deferred photo cleanup (issue #22 review findings P1-2 / P2-3): the
       // upload already landed at a fresh path, so the only object left to
       // remove is the one this save just SUPERSEDED — and only when it is
-      // safe to. See the refs' own comments above for why the live path is
-      // excluded from a staged save.
+      // safe to. The server says whether this save is queued; the status
+      // from load can be stale, and a stale "not approved" would delete the
+      // live photo.
       const previousPath = photoBaselineRef.current;
       const newPath = fields.headshotPath;
-      // The server says whether this save is queued. The status from load
-      // can be stale, and a stale "not approved" would delete the live photo.
-      const wasStaged = result?.staged === true;
-      const changed = previousPath !== newPath;
-      const safeToDelete = changed && previousPath && (!wasStaged || previousPath !== livePhotoPathRef.current);
+      const safeToDelete = previousPath !== newPath && previousPath && (!staged || previousPath !== livePhotoPathRef.current);
       if (safeToDelete) {
         try {
           await deleteSpeakerPhoto({ user, speakerId, path: previousPath });
         } catch {
-          // Best-effort, same as ProfilePhotoField's deferred delete: an
-          // orphaned object costs a little storage, not a broken profile.
+          // Best-effort: an orphaned object costs a little storage, not a broken profile.
         }
       }
+      photoBaselineRef.current = newPath;
+      if (!staged) livePhotoPathRef.current = newPath;
+    }
+    setSavedNote(staged
+      ? 'Saved for review. An organizer reviews changes before they replace your public profile.'
+      : 'Saved.');
+    return true;
+  }
 
-      showToast(
-        result?.staged
-          ? 'Changes submitted. An organizer reviews them before they replace your public profile.'
-          : 'Speaker profile saved.',
-      );
-      loadProfile();
+  async function goNext() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (!(await saveSlug(step.slug))) return;
+      setSaved((previous) => (previous.includes(step.slug) ? previous : [...previous, step.slug]));
+      navigate(hrefFor(SPEAKER_STEPS[current + 1]));
     } catch (err) {
-      showToast(err?.message || 'Your speaker profile could not be saved.', { tone: 'error' });
+      showToast(err?.message || 'This step could not be saved. Your answers are still here.', { tone: 'error' });
     } finally {
       setSaving(false);
     }
-  };
+  }
+
+  async function submit() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // A step left by Back or the step list keeps its edits only on this
+      // page, and Review shows them. Save every changed step first, so what
+      // is submitted is what Review showed.
+      for (const slug of STEP_SAVES) {
+        if (!(await saveSlug(slug))) {
+          navigate(hrefFor(SPEAKER_STEPS.find((item) => item.slug === slug)));
+          return;
+        }
+      }
+      const result = await submitOwnSpeakerProfile({ user, speakerId });
+      setSubmitted(new Date().toISOString());
+      setSavedNote(result?.emailed
+        ? 'Profile submitted. We emailed you a note that we have it.'
+        : 'Profile submitted.');
+    } catch (err) {
+      showToast(err?.message || 'Your profile could not be submitted. Your answers are saved.', { tone: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const submitControl = submitted ? (
+    <p role="status" className="font-data text-caption text-text-secondary">
+      Submitted. Changes you save are kept; you do not need to submit again.
+    </p>
+  ) : (
+    <button type="button" className={primaryActionClass} onClick={submit} disabled={saving} aria-busy={saving || undefined}>
+      {saving ? 'Submitting…' : 'Submit profile'}
+    </button>
+  );
 
   return (
-    <article className="mx-auto max-w-2xl">
-      <h1 className="font-heading text-h1 font-semibold text-text-primary">Your speaker profile</h1>
-      <p className="mt-xs max-w-prose text-body text-text-secondary">
-        This is what appears on the public programme once an organizer approves it.
-      </p>
-      {statusNote ? (
-        <p role="status" className="mt-md border-hairline border-rule-hairline bg-surface-alt px-sm py-xs font-data text-caption text-text-primary">
-          {statusNote.text}
+    <article className="mx-auto max-w-5xl space-y-lg">
+      <header className="max-w-prose space-y-xs">
+        <h1 className="font-heading text-h1 font-semibold text-text-primary">Your speaker profile</h1>
+        <p className="text-body text-text-secondary">
+          This is what appears on the public programme once an organizer approves it. Each step saves when you move on.
         </p>
-      ) : null}
-      {hasPendingEdits ? (
-        <p role="status" className="mt-xs border-hairline border-warning/40 bg-warning/10 px-sm py-xs font-data text-caption text-warning">
-          {PENDING_EDITS_NOTE}
-        </p>
-      ) : null}
-
-      <form className="mt-xl space-y-lg" onSubmit={handleSubmit} noValidate>
-        <SpeakerPhotoField
-          user={user}
-          speakerId={speakerId}
-          value={form.headshotPath}
-          onChange={(path) => setField('headshotPath', path)}
-        />
-
-        <div className="grid gap-lg sm:grid-cols-2">
-          <div>
-            <label htmlFor="firstName" className="block font-semibold text-text-primary">
-              First name
-            </label>
-            <input
-              id="firstName"
-              ref={nameRef}
-              className={`mt-2xs ${inputClass}`}
-              value={form.firstName}
-              onChange={(e) => setField('firstName', e.target.value)}
-              aria-invalid={nameError ? 'true' : undefined}
-              aria-describedby={nameError ? 'speaker-name-error' : undefined}
-              autoComplete="given-name"
-            />
-          </div>
-          <div>
-            <label htmlFor="lastName" className="block font-semibold text-text-primary">
-              Last name
-            </label>
-            <input
-              id="lastName"
-              className={`mt-2xs ${inputClass}`}
-              value={form.lastName}
-              onChange={(e) => setField('lastName', e.target.value)}
-              aria-invalid={nameError ? 'true' : undefined}
-              aria-describedby={nameError ? 'speaker-name-error' : undefined}
-              autoComplete="family-name"
-            />
-          </div>
-        </div>
-        {nameError ? (
-          <p id="speaker-name-error" role="alert" className="font-data text-caption text-danger">
-            {nameError}
+        {statusNote ? (
+          <p role="status" className="border-hairline border-rule-hairline bg-surface-alt px-sm py-xs font-data text-caption text-text-primary">
+            {statusNote.text}
           </p>
         ) : null}
-
-        <div className="grid gap-lg sm:grid-cols-2">
-          <div>
-            <label htmlFor="jobTitle" className="block font-semibold text-text-primary">
-              Role
-            </label>
-            <input
-              id="jobTitle"
-              className={`mt-2xs ${inputClass}`}
-              value={form.jobTitle}
-              onChange={(e) => setField('jobTitle', e.target.value)}
-              autoComplete="organization-title"
-            />
-          </div>
-          <div>
-            <label htmlFor="organization" className="block font-semibold text-text-primary">
-              Organization
-            </label>
-            <input
-              id="organization"
-              className={`mt-2xs ${inputClass}`}
-              value={form.organization}
-              onChange={(e) => setField('organization', e.target.value)}
-              autoComplete="organization"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="bio" className="block font-semibold text-text-primary">
-            Biography
-          </label>
-          <textarea
-            id="bio"
-            rows={5}
-            className={`mt-2xs ${inputClass}`}
-            value={form.bio}
-            onChange={(e) => setField('bio', e.target.value)}
+        {hasPendingEdits ? (
+          <p role="status" className="border-hairline border-warning/40 bg-warning/10 px-sm py-xs font-data text-caption text-warning">
+            {PENDING_EDITS_NOTE}
+          </p>
+        ) : null}
+      </header>
+      <div className="grid items-start gap-lg lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+        <StepList steps={steps} current={current} hrefFor={hrefFor} wide={wide} label="Speaker profile steps" />
+        <section className="min-w-0 space-y-md border-hairline border-rule-hairline bg-surface-alt p-md sm:p-lg" aria-labelledby="speaker-step-heading">
+          <StepHeading index={current} total={SPEAKER_STEPS.length} title={step.title} headingRef={headingRef} headingId="speaker-step-heading" />
+          {savedNote ? <p role="status" className="font-data text-caption text-text-secondary">{savedNote}</p> : null}
+          <form noValidate className="space-y-lg" onSubmit={(e) => { e.preventDefault(); if (review) submit(); else goNext(); }}>
+            <fieldset disabled={saving} className="min-w-0 space-y-lg">
+              <SpeakerProfileFields
+                slug={step.slug}
+                form={form}
+                setField={setField}
+                nameError={nameError}
+                nameRef={nameRef}
+                user={user}
+                speakerId={speakerId}
+                setSocialRow={setSocialRow}
+                addSocialRow={addSocialRow}
+                removeSocialRow={removeSocialRow}
+                logistics={logistics}
+                setLogistics={setLogistics}
+                socialHandles={rowsToHandles(form.socialRows)}
+              />
+            </fieldset>
+          </form>
+          <StepPager
+            previous={SPEAKER_STEPS[current - 1]}
+            next={review ? null : SPEAKER_STEPS[current + 1]}
+            hrefFor={hrefFor}
+            backClass={secondaryActionClass}
+            nextClass={primaryActionClass}
+            onNext={goNext}
+            last={review ? submitControl : null}
           />
-        </div>
-
-        <fieldset>
-          <legend className="font-semibold text-text-primary">Social links</legend>
-          <div className="mt-xs space-y-xs">
-            {form.socialRows.map((row, index) => (
-              <div key={index} className="flex flex-wrap items-center gap-xs">
-                <label className="sr-only" htmlFor={`social-label-${index}`}>
-                  Platform
-                </label>
-                <input
-                  id={`social-label-${index}`}
-                  className={`${inputClass} w-32`}
-                  placeholder="Platform, e.g. twitter"
-                  value={row.label}
-                  onChange={(e) => setSocialRow(index, 'label', e.target.value)}
-                />
-                <label className="sr-only" htmlFor={`social-handle-${index}`}>
-                  Handle or URL
-                </label>
-                <input
-                  id={`social-handle-${index}`}
-                  className={`${inputClass} flex-1`}
-                  placeholder="@you or a full URL"
-                  value={row.handle}
-                  onChange={(e) => setSocialRow(index, 'handle', e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="touch-target rounded-brand px-sm py-xs font-data text-caption text-text-secondary underline hover:bg-surface-alt"
-                  onClick={() => removeSocialRow(index)}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="touch-target mt-xs inline-flex items-center rounded-brand border-hairline border-rule-hairline px-sm py-xs font-data text-caption font-semibold text-text-primary hover:bg-surface-alt"
-            onClick={addSocialRow}
-          >
-            + Add another link
-          </button>
-        </fieldset>
-
-        <button type="submit" className={primaryActionClass} disabled={saving}>
-          {saving ? 'Saving…' : 'Save speaker profile'}
-        </button>
-      </form>
+        </section>
+      </div>
     </article>
   );
 }

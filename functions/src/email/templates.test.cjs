@@ -96,6 +96,8 @@ test('listTemplateIds includes account, speaker, claim, and native ticket confir
     'speaker.accepted',
     'speaker.confirmation',
     'speaker.invite',
+    // ADR 0008 §3: a submitted speaker profile.
+    'speaker.profile_received',
     // Staff reminders to accepted speakers (speakers/reminders.cjs).
     'speaker.reminder',
     // §6.3 phase 4: could not be finished before the provider that
@@ -136,6 +138,7 @@ test('required tokens match the spec', () => {
   assert.deepEqual(getDefaultTemplate('speaker.accepted').requiredTokens, ['profile_wizard_url']);
   assert.deepEqual(getDefaultTemplate('speaker.confirmation').requiredTokens, ['session_title']);
   assert.deepEqual(getDefaultTemplate('speaker.reminder').requiredTokens, ['dashboard_url']);
+  assert.deepEqual(getDefaultTemplate('speaker.profile_received').requiredTokens, ['profile_url']);
   // Every provider-parameterized field on the ticket.* pair can legitimately
   // be absent (§3.5 `action: 'await_approval'` sends no CTA at all), so
   // neither template requires one.

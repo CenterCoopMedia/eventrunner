@@ -224,3 +224,13 @@ test('fieldsAllowed still rejects a genuinely unknown field, and server-owned fi
   const serverOwned = validateSpeaker({ approvedAt: 1 }, { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS });
   assert.match(serverOwned.errors[0], /read-only — server-owned/);
 });
+
+test('pronouns are a short public field a speaker may set', () => {
+  const ok = validateSpeaker({ pronouns: 'they/them' }, { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS });
+  assert.deepEqual(ok, { ok: true, fields: { pronouns: 'they/them' } });
+  const long = validateSpeaker({ pronouns: 'x'.repeat(81) }, { partial: true, fieldsAllowed: SELF_EDITABLE_SPEAKER_FIELDS });
+  assert.equal(long.ok, false);
+  assert.match(long.errors[0], /^pronouns: must be at most 80/);
+  assert.equal(buildPublicSpeaker({ firstName: 'A', lastName: 'B', pronouns: ' she/her ' }).pronouns, 'she/her');
+  assert.equal(buildPublicSpeaker({ firstName: 'A', lastName: 'B' }).pronouns, '');
+});

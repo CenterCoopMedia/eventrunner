@@ -341,6 +341,8 @@ The canonical speaker list, with each record's pipeline status and the entry poi
 
 **Pending-edits review.** A speaker can propose changes to their own profile after accepting an invite. Those queue rather than landing on the live record, until an admin approves them. Review and approve (or reject) from the speaker's row — the queued fields are named right there, so you are never approving a change blind.
 
+**What a speaker fills in.** An accepted speaker completes their profile at `/speaker/profile` in five steps: About you (name, pronouns, role, organization), Bio and photo, Links, Logistics, and Review. Each step saves when they move on. The Logistics answers (travel, access needs, audio and video needs) are kept in a separate staff-only record and are never published. They appear on the speaker's edit page under **Logistics**, with the time the speaker submitted the profile. The first submit sends the speaker one email, "We have your speaker profile", which says an organizer reviews it. That email does not confirm a time or a room.
+
 **Create/edit form.** Every field except the account link and the invite token is editable here. Those two move together in a single server-side transaction as part of the invite/accept pipeline and are never part of an admin payload, by design: A leaked value there is rejected by name on the server, not silently accepted.
 
 One speaker record is the source of truth. If a name is wrong in three places on the public site, fix the speaker record — do not patch each place it appears.

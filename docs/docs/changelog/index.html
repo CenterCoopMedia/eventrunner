@@ -145,6 +145,13 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The speaker profile is now five steps at <code>/speaker/profile</code>: About you,
+          Bio and photo, Links, Logistics, and Review. Each step saves when the
+          speaker moves on. Speakers can add pronouns, which show on the public
+          speaker page. Travel, access, and audio and video answers go to a new
+          staff-only record (<code>speaker_logistics</code>), shown on the speaker&#39;s admin page
+          and never published. The first submit sends <code>speaker.profile_received</code>
+          once (ADR 0008 §3, as amended).</li>
           <li>Accepting a pitch into drafts now makes one draft speaker per presenter.
           A presenter whose email is already on a speaker is linked, not copied. The
           convert dialog has <strong>Invite the presenters now</strong>, on by default, which sends

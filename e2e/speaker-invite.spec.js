@@ -13,7 +13,7 @@
 // profile wizard) runs through the real /speaker/accept page.
 import { test, expect } from '@playwright/test';
 import {
-  adminIdToken, adminDb, callFunction, mailFileSize, waitForInviteToken, waitForOtpCode,
+  adminIdToken, adminDb, callFunction, mailFileSize, waitForInviteToken, waitForOtpCode, waitForTaggedMail,
 } from './helpers.mjs';
 
 test.describe.serial('Speaker invite -> accept -> wizard', () => {
@@ -81,5 +81,35 @@ test.describe.serial('Speaker invite -> accept -> wizard', () => {
     expect(speakerDoc.uid).toBeTruthy();
     const userDoc = (await adminDb().collection('users').doc(speakerDoc.uid).get()).data();
     expect(userDoc.speakerId).toBe(speakerId);
+
+    // The profile steps (ADR 0008 §3): each Next saves its step.
+    const stepHeading = (name) => page.getByRole('heading', { level: 2, name, exact: true });
+    await expect(stepHeading('About you')).toBeVisible();
+    await page.getByLabel('Pronouns (optional)').fill('they/them');
+    await page.getByRole('button', { name: 'Next: Bio and photo' }).click();
+    await expect(stepHeading('Bio and photo')).toBeVisible();
+    await page.getByLabel('Biography').fill('Reports on local government.');
+    await page.getByRole('button', { name: 'Next: Links' }).click();
+    await expect(stepHeading('Links')).toBeVisible();
+    await page.getByRole('button', { name: 'Next: Logistics' }).click();
+    await expect(stepHeading('Logistics')).toBeVisible();
+    await page.getByLabel('Travel (optional)').fill('Train from Newark.');
+    await page.getByLabel('Audio and video needs (optional)').fill('A clip-on microphone.');
+    await page.getByRole('button', { name: 'Next: Review' }).click();
+    await expect(stepHeading('Review')).toBeVisible();
+    await expect(page.getByText('Train from Newark.')).toBeVisible();
+    const submitSince = mailFileSize();
+    await page.getByRole('button', { name: 'Submit profile' }).click();
+    await expect(page.getByText('Profile submitted. We emailed you a note that we have it.')).toBeVisible();
+
+    const received = await waitForTaggedMail(submitSince, speakerEmail, 'speaker.profile_received');
+    expect(received.text).toContain('/speaker/profile');
+    expect(received.text).not.toMatch(/confirmed/i);
+    const profiled = (await adminDb().collection('speakers').doc(speakerId).get()).data();
+    expect(profiled).toMatchObject({ pronouns: 'they/them', bio: 'Reports on local government.' });
+    expect(profiled.profileSubmittedAt).toBeTruthy();
+    expect(profiled.travel).toBeUndefined();
+    const logistics = (await adminDb().collection('speaker_logistics').doc(speakerId).get()).data();
+    expect(logistics).toMatchObject({ travel: 'Train from Newark.', accessNeeds: null, avNeeds: 'A clip-on microphone.' });
   });
 });

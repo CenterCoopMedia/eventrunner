@@ -24,8 +24,19 @@ Owner decision (2026-11-03): NC Local waits for the console, and the pitch
 path (R2c, R3) comes before registration.
 - [x] R3a Accept a pitch: a speaker per presenter, linked by email, invite
       in one action. Stacked on R2c.
-- [ ] R3b Speaker profile stepper (`/speaker/profile`) and
-      `speaker.confirmation` on profile submit. Stacked on R3a.
+- [x] R3b Speaker profile stepper (`/speaker/profile`) and an email on
+      profile submit. Stacked on R3a. Owner choices (2026-11-03): a new
+      `speaker.profile_received` email; logistics in `speaker_logistics/{id}`.
+  - [x] Steps: About you (name, pronouns, title, organization) → Bio and
+        photo → Links → Logistics (travel, access needs, audio and video
+        needs; staff only) → Review and submit. Reuse `components/forms/Stepper`.
+  - [x] Pronouns: a new self-editable public field in `shared/speaker`, in
+        the public projection and the speaker page.
+  - [x] Logistics: `speaker_logistics/{id}`, never in `speakers_public`;
+        shown to staff on the speaker's admin page; rules tests.
+  - [x] Submit: `speaker.profile_received`, sent once per speaker.
+  - [x] Tests: shared validation, handler, web page, E2E invite → accept →
+        steps → submit → email; docs and changelog.
 - [ ] R4 Registration questions: `config/registration_form`, admin editor
       with preview, `shared/registrationForm`, private `ticket_answers`,
       rules, attendee record, export columns, counts summary.

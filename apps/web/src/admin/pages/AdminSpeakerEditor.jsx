@@ -20,8 +20,11 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ADMIN_SETTABLE_STATUSES } from 'shared/speaker';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useEventConfig } from '../../contexts/EventConfigContext.jsx';
+import { toMillis } from '../versionHistory.js';
 import { useToast } from '../../contexts/ToastContext.jsx';
 import SpeakerPhotoField from '../../components/media/SpeakerPhotoField.jsx';
+import SpeakerLogisticsPanel from '../components/SpeakerLogisticsPanel.jsx';
 import { useAdminApi } from '../adminApi.js';
 import { useAdminSpeakers } from '../useAdminSpeakers.js';
 import {
@@ -86,6 +89,7 @@ function speakerRecordState(speaker) {
 const EMPTY = {
   firstName: '',
   lastName: '',
+  pronouns: '',
   slug: '',
   email: '',
   bio: '',
@@ -104,6 +108,7 @@ function toForm(speaker) {
   return {
     firstName: speaker.firstName ?? '',
     lastName: speaker.lastName ?? '',
+    pronouns: speaker.pronouns ?? '',
     slug: speaker.slug ?? '',
     email: speaker.email ?? '',
     bio: speaker.bio ?? '',
@@ -131,6 +136,7 @@ function toPayload(form, { includeStatus, includeHeadshot = true }) {
   const payload = {
     firstName: form.firstName,
     lastName: form.lastName,
+    pronouns: form.pronouns,
     slug: form.slug,
     email: form.email.trim() === '' ? null : form.email.trim(),
     bio: form.bio,
@@ -146,6 +152,12 @@ function toPayload(form, { includeStatus, includeHeadshot = true }) {
   return payload;
 }
 
+/** A Firestore time as an ISO string, or null. */
+function toIsoOrNull(value) {
+  const ms = toMillis(value);
+  return ms == null ? null : new Date(ms).toISOString();
+}
+
 // Where every exit from the editor goes. The editor's route is a sibling of
 // the list under the admin layout, so a relative '..' is the admin index,
 // not the list.
@@ -158,6 +170,8 @@ export default function AdminSpeakerEditor({ mode }) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { speakers, loading, findSpeaker } = useAdminSpeakers();
+  const { eventConfig } = useEventConfig();
+  const eventTimeZone = eventConfig?.timezone;
 
   const speaker = mode === 'edit' ? findSpeaker(speakerId) : null;
   const [form, setForm] = useState(() => toForm(null));
@@ -351,6 +365,16 @@ export default function AdminSpeakerEditor({ mode }) {
           description="Everything here appears on the public speaker directory."
           className="admin-editor-card--primary"
         >
+          <div className="mb-sm">
+            <TextField
+              label="Pronouns"
+              hint="Optional. Shown with the name, for example she/her."
+              value={form.pronouns}
+              onChange={(value) => set({ pronouns: value })}
+              maxLength={80}
+              error={errorFor('pronouns')}
+            />
+          </div>
           <div className="grid gap-sm sm:grid-cols-2">
             <TextField
               label="Job title"
@@ -450,6 +474,9 @@ export default function AdminSpeakerEditor({ mode }) {
             </div>
           ) : null}
         </Panel>
+        {mode === 'edit' && speaker ? (
+          <SpeakerLogisticsPanel speakerId={speaker.id} submittedAt={toIsoOrNull(speaker.profileSubmittedAt)} timeZone={eventTimeZone} />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-xs">
