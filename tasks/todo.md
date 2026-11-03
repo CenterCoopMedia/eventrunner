@@ -2,8 +2,8 @@
 
 ## 2026-11-03: registration, pitch and speaker steppers
 
-Spec: [ADR 0008](../docs/adr/0008-registration-and-pitch-steppers.md)
-(proposed). Owner choices: standard questions plus 10 custom; answers in a
+Spec: [ADR 0008](../docs/adr/0008-registration-and-pitch-steppers.md),
+accepted, one PR per part. Owner choices: standard questions plus 10 custom; answers in a
 checkout stepper; speakers through pitches and invites; promo codes in.
 Order is set by NC Local's launch: pitch call and early-bird tickets first.
 

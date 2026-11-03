@@ -1,7 +1,7 @@
 # ADR 0008: Registration, session pitch and speaker steppers
 
 **Date:** 2026-11-03  
-**Status:** Proposed. Owner choices recorded below; the plan needs owner approval before code.  
+**Status:** Accepted by the owner on 2026-11-03, with one pull request per part (R1 to R7 in `tasks/todo.md`).  
 **Amends:** [ADR 0004](0004-stripe-ticket-commerce.md) (promo codes), and the open question in [the parity plan](../plans/2026-09-09-cjs-parity-gap.md) on steps versus one form: multi-step flows are steppers.
 
 ## Context
