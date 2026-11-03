@@ -72,7 +72,7 @@ describe('tourSteps', () => {
   it('names no operator section to a staff admin', () => {
     const steps = tourSteps(docketForTier('staff'));
     const named = steps.flatMap((step) => step.items ?? []);
-    for (const operatorOnly of ['Features', 'Branding', 'Access', 'System errors']) {
+    for (const operatorOnly of ['Registration form', 'Features', 'Branding', 'Access', 'System errors']) {
       expect(named).not.toContain(operatorOnly);
     }
     expect(steps.find((step) => step.id === 'settings').items).toEqual(['Event']);

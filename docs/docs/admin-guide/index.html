@@ -145,6 +145,7 @@
               <li><a href="#system-errors">System errors</a></li>
               <li><a href="#data-export">Data export</a></li>
               <li><a href="#settings-event-settings">Settings → Event settings</a></li>
+              <li><a href="#settings-registration-form">Settings → Registration form</a></li>
               <li><a href="#settings-features">Settings → Features</a></li>
               <li><a href="#settings-badges">Settings → Badges</a></li>
               <li><a href="#settings-access">Settings → Access</a></li>
@@ -917,6 +918,14 @@
           <p>Select <strong>Add milestone</strong>. Focus moves to the new row&#39;s name field. Each milestone has a name, at most 80 characters, and a date. An event can list 20 milestones; at 20, <strong>Add milestone</strong> does nothing and says so until you remove one. <strong>Remove milestone</strong> moves focus to the milestone that takes its place, or to the one before it when you removed the last, or to <strong>Add milestone</strong> when none is left. A milestone goes when you save. A milestone with no name or no date is refused when you save, and focus moves to the field that needs it.</p>
           <p><strong>Registration goal</strong> is in the <strong>Registration</strong> panel: The number of approved attendees you are aiming for. Anyone can read it. The Overview sets the approved count against it, as a sentence and a bar. Leave it empty for no goal. It must be a whole number from 1 to 1,000,000; the server refuses anything else and names the field.</p>
           <p>With no milestones and no goal, the Overview shows no milestone panel at all.</p>
+          <h2 id="settings-registration-form">Settings → Registration form<a class="heading-anchor" href="#settings-registration-form" aria-label="Link to this section">#</a></h2>
+          <p>Operators only. This page sets the questions each attendee answers when they register (ADR 0008 §4). The editor is on the left and a preview of the attendee&#39;s view is on the right; the preview follows every change before you save, and <strong>Check answers</strong> runs the same check the server will. The site&#39;s own style applies on the live page.</p>
+          <ul>
+          <li><strong>Standard questions</strong> have fixed wording: organization, job title, dietary needs (choices plus Other), access needs, photo consent, and the attendee directory. Turn on the ones you need and make any of them required. Dietary and access answers are private to staff. The directory answer sets the attendee&#39;s profile visibility.</li>
+          <li><strong>Your questions</strong>: up to 10, each a short answer, long answer, one choice, several choices, or yes or no. A question has a label (up to 200 characters), optional help text (up to 300), and for a choice question 2 to 20 choices, one per line. Move up and Move down set the order; attendees see your questions after the standard ones.</li>
+          <li><strong>Saving</strong> checks the whole form first and names any mistake on its field. Each save raises the revision shown under the title. If someone else saved after you opened the page, the save is refused and the page offers the current version; your unsaved changes stay on the page until you load it.</li>
+          </ul>
+          <p>The questions are stored in <code>config/registration_form</code>, which anyone can read, because they are what every attendee is shown. Attendees answer them during checkout and on <strong>Complete your registration</strong> (R4b and R5).</p>
           <h2 id="settings-features">Settings → Features<a class="heading-anchor" href="#settings-features" aria-label="Link to this section">#</a></h2>
           <p>Feature flags, wired to a <strong>whole-document replace</strong> — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form&#39;s key list comes from the same shared schema the server validates against.</p>
           <p><code>changeRequests</code> turns on the change request form in the footer and on the Change requests page. It is off by default. See <a href="#change-requests">Change requests</a>.</p>

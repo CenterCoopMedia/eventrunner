@@ -192,6 +192,9 @@ export const DOCKET = Object.freeze([
     label: 'Settings',
     items: [
       { to: 'settings', label: 'Event', tier: 'staff' },
+      // The questions attendees answer (ADR 0008 §4). An operator sets them,
+      // so they sit with the other operator settings.
+      { to: 'registration-form', label: 'Registration form', tier: 'operator' },
       { to: 'features', label: 'Features', tier: 'operator' },
       { to: 'branding', label: 'Branding', tier: 'operator' },
       { to: 'access', label: 'Access', tier: 'operator' },

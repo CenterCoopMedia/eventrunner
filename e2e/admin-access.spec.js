@@ -132,7 +132,7 @@ test.describe.serial('admin tiers and the Access page', () => {
     for (const label of ['Overview', 'Pages', 'Sessions', 'Speakers', 'Attendees', 'Materials', 'Event']) {
       await expect(nav.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
-    for (const label of ['Features', 'Branding', 'Access', 'System errors']) {
+    for (const label of ['Registration form', 'Features', 'Branding', 'Access', 'System errors']) {
       await expect(nav.getByRole('link', { name: label, exact: true })).toHaveCount(0);
     }
     await expect(page.locator('[data-admin-tier="staff"]')).toHaveText('Staff');
