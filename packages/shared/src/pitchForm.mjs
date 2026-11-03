@@ -1,6 +1,7 @@
 import pitchForm from './pitchForm.cjs';
 
 export const {
+  sameValue,
   LIMITS,
   MAX_CO_PRESENTERS,
   MAX_OPTIONS,

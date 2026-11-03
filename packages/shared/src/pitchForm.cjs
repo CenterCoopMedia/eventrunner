@@ -324,7 +324,27 @@ function readPresenters(stored) {
   }];
 }
 
+/**
+ * Whether two stored values are the same, by value. Firestore does not keep
+ * the order in which a map's keys were written, so a replay or a re-import
+ * that compared JSON text would see a presenter list read back from the
+ * database as changed. Keys are compared sorted; list order still counts.
+ * null and undefined are the same (a field that is absent or empty).
+ */
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  }
+  return value === undefined ? null : value;
+}
+
+function sameValue(a, b) {
+  return JSON.stringify(canonical(a ?? null)) === JSON.stringify(canonical(b ?? null));
+}
+
 module.exports = {
+  sameValue,
   LIMITS,
   MAX_CO_PRESENTERS,
   MAX_OPTIONS,
