@@ -95,7 +95,7 @@ export default function SessionPitch() {
   const modeKnown = IS_DEMO || Boolean(settings);
   const options = readPitchFormOptions(settings);
   const email = user?.emailVerified ? user.email : null;
-  const body = submissionOf(draft);
+  const body = submissionOf(draft, options);
   const stepErrors = (slug) => checkPitch(body, { options, submitterEmail: email, fields: STEP_FIELDS[slug] }).errors;
   const firstOpen = FORM_STEPS.findIndex((step) => Object.keys(stepErrors(step.slug)).length > 0);
   const steps = PITCH_STEPS.map((step, index) => {
