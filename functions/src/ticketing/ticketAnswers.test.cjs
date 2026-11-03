@@ -181,3 +181,15 @@ test('a staff member at an event with no tickets answers for their own account, 
   const closed = await save(db, 'staff', { account: true, formRevision: 4, answers: ANSWERS }, { ...NONE, event: CLOSED_EVENT });
   assert.equal(closed.body.error.code, 'registration-closed');
 });
+
+test('a real ticket whose id starts with "account-" still follows its refunds; only account records are skipped', async () => {
+  const db = world({
+    'tickets/account-123': { externalId: 'account-123', status: 'refunded', claimedByUid: 'ada' },
+    'ticket_answers/account-123': { ticketId: 'account-123', uid: 'ada', answers: {}, ticketStatus: 'valid' },
+    'ticket_answers/account-ada': { ticketId: null, account: true, uid: 'ada', answers: {}, ticketStatus: 'valid' },
+  });
+  assert.deepEqual(await syncAnswerStatus({ db, ticketId: 'account-123' }), { changed: true });
+  assert.equal(db.read('ticket_answers', 'account-123').ticketStatus, 'refunded');
+  assert.deepEqual(await syncAnswerStatus({ db, ticketId: 'account-ada' }), { changed: false });
+  assert.equal(db.read('ticket_answers', 'account-ada').ticketStatus, 'valid');
+});
