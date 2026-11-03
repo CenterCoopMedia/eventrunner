@@ -2,51 +2,49 @@
 
 ## 2026-11-03: client onboarding, account creation and provisioning
 
-Spec: [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md) (proposed).
-Owner choices (2026-11-03): two stages; self-serve sign-up with automatic
-provisioning; the form submits to a server. First client: NC Local.
+Spec: [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md),
+accepted 2026-11-03. Console at console.eventrunner.org. NC Local goes
+through the console, so P4 to P10 must finish before NC Local's site is made.
+P1 to P3 are on PR #581. Legal: the owner reports that CCM's legal review
+cleared this project. Each event's own privacy policy and terms still need
+the client's sign-off on the setup page.
 
-Status: owner accepted ADR 0007 (2026-11-03). Console at
-console.eventrunner.org. NC Local goes through the console, so P4 to P8
-must finish before NC Local's project is made. P1 to P3 are on PR #581.
-Legal: the owner reports that CCM's legal review cleared this project
-(2026-11-03). Each event's own privacy policy and terms still need the
-client's sign-off on the setup page.
+Revised 2026-11-03: the owner wants a commercial-platform experience. No
+keys, files or DNS for the client. Stripe Connect (Standard), Eventbrite
+OAuth with an event picker, a `<name>.eventrunner.org` address and sender by
+default, team invites. ADR 0007 rewritten; ADR 0004 amended.
 
-Each phase is one pull request, in this order. Each phase runs lint, the unit
-suites, the rules suite and E2E where it touches them, and gets an
-adversarial review before it merges.
+Each phase is one pull request after #581, in this order. Each phase runs
+lint, the unit suites, the rules suite and E2E where it touches them, and
+gets an adversarial review before it merges.
 
-- [x] P1 Spec: ADR 0007 and this plan (this branch).
-- [x] P2 Shared: move the pure answer builder from `scripts/lib/answers.cjs`
-      to `packages/shared/src/answers.cjs` (+ `.mjs` shim). No behaviour
-      change; `init-event` tests stay green. Refresh the functions lockfile hash.
-- [x] P3 Admin setup checklist (`/admin/setup`): rows from
-      `webMcpCheckEventReadiness`, owner (you, hosting team, both), state, a
-      link per row, and the operator legal sign-off (no screen wrote
-      `legal.reviewRequired` before). On the rail under Overview; no overview
-      call. Web unit tests and `e2e/admin-setup.spec.js`. The E2E found
-      that the readiness check read a five-minute config cache; it now reads
-      fresh (test first). Docs: ADMIN_GUIDE, CLIENT_ONBOARDING §3, handbook
-      for-clients, CHANGELOG.
-- [ ] P4 Console foundation: `console/` with `firebase.json`, rules,
-      Vite web app, functions; sign-up (Google, email link), verified email,
-      operators allowlist. Rules tests on the emulator.
-- [ ] P5 Intake form: seven steps, draft autosave, shared validation,
-      `submitApplication` with rate limits, audit rows and operator email.
-      Web unit, rules and handler tests; E2E for one full application.
-- [ ] P6 Operator review: list, read, request changes, decline, approve
-      with project id, billing account, region and environment name; spam
-      delete; 90-day retention job for withdrawn and declined applications.
-- [ ] P7 Provisioner: `scripts/provision-client.cjs` idempotent steps
-      against injected GCP and GitHub clients (fakes in tests),
-      `provision-client.yml` with WIF, status written back to the console,
-      dispatch from approval through a GitHub App token.
-- [ ] P8 Operator runbook: one-time console setup (project, folder,
-      billing, provisioner service account, GitHub App) and a live proof in a
-      test folder. Needs the owner's cloud credentials.
+- [x] P1 Spec: ADR 0007 and this plan.
+- [x] P2 Shared: `shared/answers` (one validator for console and CLI).
+- [x] P3 Admin setup checklist (`/admin/setup`), the legal sign-off, and
+      the fresh readiness read (found by `e2e/admin-setup.spec.js`).
+- [ ] P4 Console foundation: `console/` app and functions; sign-up with
+      Google, Microsoft, email link; organizations; team invites with Owner and
+      Editor; operators allowlist; rules tests; favicon and social metadata.
+- [ ] P5 Guided setup: seven steps, autosave, web-address availability,
+      shared validation, review and submit with rate limits, status page,
+      client emails. Web unit, rules, handler and E2E tests.
+- [ ] P6 Connections: Stripe Connect OAuth and Eventbrite OAuth with the
+      event picker; tokens to console Secret Manager only; state binding;
+      disconnect. Tests against fake OAuth servers.
+- [ ] P7 Operator review: queue, read, request changes, decline, approve
+      with defaults from console settings; spam delete; 90-day retention.
+- [ ] P8 Provisioner: `scripts/provision-client.cjs` idempotent steps
+      (project, Hosting subdomain + DNS, authorized domains, Postmark server
+      and domain + DNS, tokens and webhooks, GitHub Environment, dispatches,
+      init) against injected fakes; `provision-client.yml`; GitHub App dispatch.
+- [ ] P9 Optional upgrades in the admin: custom web address and custom
+      sender domain with **Check now** and a scheduled check.
+- [ ] P10 Operator runbook for the one-time setup and a live proof in a test
+      folder with Stripe and Eventbrite test accounts. Needs the owner.
 
-Blocked on the owner: the GCP folder and billing account (ADR 0007), for P7 and P8.
+Blocked on the owner for P6, P8 and P10: the five prerequisites in ADR 0007
+(GCP folder and billing, Stripe platform, Eventbrite app, DNS zone with an API,
+Postmark account token). P4, P5, P7 and P9 can start now.
 
 ## 2026-10-19 (wave 3): deliver every promise in the NC Local proposals
 

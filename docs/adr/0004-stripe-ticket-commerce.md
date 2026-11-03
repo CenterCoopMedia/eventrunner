@@ -301,7 +301,41 @@ and amount mismatches, an unknown Session, signature and account spoofing, and t
 read-only demo. The separately authorized Stripe sandbox rehearsal must add a real
 invoice payment, a payment after void, and an expired link before live use.
 
-## Provider references
+## Amendment 2026-11-03: connect with Stripe
+
+[ADR 0007](0007-client-console-self-serve-onboarding.md) lets a client connect Stripe with a
+button. This replaces the operator pasting the organizer's secret key. It changes how the key
+arrives, not who owns the money.
+
+**What stays.** The organizer owns the account, the receipts, refunds, disputes, payouts and
+customer support. Charges are made on the organizer's account. Event Runner takes no platform
+fee and does not route funds, use destination charges, or use Stripe Invoices.
+
+**What changes.** CCM holds one Stripe platform account with Connect (Standard accounts). The
+client selects **Connect with Stripe** in the console and approves on Stripe's page. Stripe's
+OAuth answer gives the connected account ID and an access token that acts on that one account.
+
+- `EVENT_STRIPE_ACCOUNT_ID` is the connected account ID from the OAuth answer.
+- `TICKETING_API_TOKEN` is that account's access token, moved by the provisioner into the event
+  project's Secret Manager. The provider is unchanged: `GET /v1/account` with this token answers
+  the connected account, so the existing account check holds.
+- The provisioner creates the webhook endpoint on the connected account with that token, for the
+  event types this provider handles, and stores its signing secret as `TICKETING_WEBHOOK_SECRET`.
+
+**Why a per-account token, not the platform key with a `Stripe-Account` header.** The platform
+key can act on every connected account. Each event runs in its own project, so a platform key in
+every project would let one compromised project reach every client's Stripe account. A
+per-account token limits a leak to one client. If Stripe withdraws OAuth access tokens, the
+change is a provider change to the platform key in a separate service that only the hosting team
+controls, with a new amendment.
+
+**Disconnect.** A client who revokes Event Runner in Stripe invalidates the token. Checkout then
+fails closed with the existing account-mismatch error, and the setup checklist shows ticketing as
+not met until the client connects again.
+
+**Test mode.** The console connects in test mode first when the operator asks for a rehearsal,
+and in live mode for the launch. `EVENT_STRIPE_MODE` follows the mode of the token.
+
 
 - [Checkout fulfillment](https://docs.stripe.com/checkout/fulfillment?payment-ui=stripe-hosted)
 - [Webhook signatures, retries, and event ordering](https://docs.stripe.com/webhooks)

@@ -144,3 +144,13 @@ Rules written after user corrections. Read at session start.
 - Do not run several full test suites at once on this machine. They starve
   each other and cause false timing failures. Run heavy commands one at a
   time under `flock /tmp/eventrunner-heavy.lock`.
+
+## 2026-11-03: a client-facing flow has no keys, files or DNS by default
+
+- The first onboarding design asked the operator to collect provider keys
+  and asked clients to add DNS records. Joe wants a commercial-platform
+  experience: OAuth buttons for every account, a working subdomain and sender
+  by default, and no copy, paste, download or file sending. For any flow a
+  client sees, design the zero-configuration path first, and offer custom
+  domains or other technical steps only as optional upgrades with an
+  automatic check.
