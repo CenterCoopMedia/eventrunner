@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A shared stepper (`components/forms/Stepper.jsx`, ADR 0008 §1): the step
+  list, the step heading and Back and Next, in the public and admin tiers.
+  The admin setup page uses it, and the specimen book draws it. The
+  interface guidelines gain a Steppers section.
+
 - **Set up your event** (`/admin/setup`, ADR 0007): the launch-readiness rows
   as a stepper in the admin panel, one step at a time at its own address
   (`/admin/setup/<step>`), with the step list beside it. Each step says who does it (the client,

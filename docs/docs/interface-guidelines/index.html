@@ -121,6 +121,7 @@
               <li><a href="#headers">Headers</a></li>
               <li><a href="#the-base-and-the-theme">The base and the theme</a></li>
               <li><a href="#user-interface">User interface</a></li>
+              <li><a href="#steppers">Steppers</a></li>
               <li><a href="#interaction-states">Interaction states</a></li>
               <li><a href="#animation">Animation</a></li>
               <li><a href="#typography">Typography</a></li>
@@ -236,6 +237,16 @@
           <li>Prioritize optical alignment over geometric alignment.</li>
           <li>Add a <code>1px</code> outline to images, offset by <code>-1px</code>: Black at 8% opacity in light mode, white at 8% in dark mode.</li>
           <li>Portraits and avatars are square on the brand radius (<code>rounded-brand</code>), never a circle (<code>rounded-full</code>) — a circular crop is a generic-template tell.</li>
+          </ul>
+          <h2 id="steppers">Steppers<a class="heading-anchor" href="#steppers" aria-label="Link to this section">#</a></h2>
+          <p>A flow with three or more groups of work is a stepper, not one long page: setup, registration, checkout, a session pitch, a speaker profile (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0008-registration-and-pitch-steppers.md">ADR 0008</a> §1). One form with one or two groups stays one form. Build it from <code>components/forms/Stepper.jsx</code>; do not draw a second stepper.</p>
+          <ul>
+          <li><strong>One step per page, at its own address</strong> (<code>/pitch/presenters</code>). Back, reload and a link from an email land on that step.</li>
+          <li><strong>The step list</strong> gives every step its number (a tick when done), its title and its state as a word: <strong>Done</strong>, <strong>To do</strong> or <strong>Not started</strong>. The open step carries <code>aria-current=&quot;step&quot;</code>, the leading-edge marker and the bold weight, never colour alone. A step that cannot open yet is text, not a link. On a wide screen the list sits beside the step; on a narrow one it folds into one line, &quot;Step 2 of 5. Show all steps&quot;, above the step. Only one list is in the document.</li>
+          <li><strong>The step heading</strong> is an <code>h2</code> under the line &quot;Step 2 of 5&quot;. A move to another step puts the focus on it; the first load does not move the focus.</li>
+          <li><strong>Back and Next</strong> sit under the step. Next names the step it opens (&quot;Next: Presenters&quot;). In a form, Next checks only the current step; a failed check stays on the step, lists the errors and focuses the first field. Next is never disabled for a validation state.</li>
+          <li><strong>Review is the last step</strong> of a form: every answer by step, each group with an <strong>Edit</strong> link to its step. Submit is only there.</li>
+          <li>Answers save as the reader types (session storage when signed out, a server draft when signed in).</li>
           </ul>
           <h2 id="interaction-states">Interaction states<a class="heading-anchor" href="#interaction-states" aria-label="Link to this section">#</a></h2>
           <p>Every control and every interactive row defines these ten states, in both modes, on both surfaces. A state is a word, an ink change, a weight change, or a rule change. <strong>A state is never colour alone and never a pill.</strong> The public shapes carry them through one shared class string (<code>components/controlClasses.js</code>); the admin carries them through <code>admin/components/formControls.jsx</code>. Neither imports the other.</p>
