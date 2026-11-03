@@ -169,12 +169,15 @@ function createSaveTicketAnswersHandler({ db, auth, getConfig, providerName = nu
  * change. A deleted ticket reads as cancelled.
  */
 async function syncAnswerStatus({ db, ticketId }) {
-  // Account answers (an event with no tickets) have no ticket to follow.
-  if (!isValidDocId(ticketId) || ticketId.startsWith(ACCOUNT_PREFIX)) return { changed: false };
+  if (!isValidDocId(ticketId)) return { changed: false };
   return db.runTransaction(async (tx) => {
     const answersRef = db.collection(ANSWERS).doc(ticketId);
     const [ticketSnap, answersSnap] = await Promise.all([tx.get(db.collection('tickets').doc(ticketId)), tx.get(answersRef)]);
     if (!answersSnap.exists) return { changed: false };
+    // Account answers (an event with no tickets) have no ticket to follow.
+    // Told by the record's own field, not the id: a CSV import may give a
+    // real ticket an id that starts with "account-".
+    if (answersSnap.data().account === true) return { changed: false };
     const status = ticketSnap.exists && typeof ticketSnap.data().status === 'string' ? ticketSnap.data().status : 'cancelled';
     if (answersSnap.data().ticketStatus === status) return { changed: false };
     tx.update(answersRef, { ticketStatus: status });

@@ -161,6 +161,26 @@ describe('CompleteRegistration', () => {
     expect(saveMock).toHaveBeenLastCalledWith(expect.objectContaining({ formRevision: 3, answers: { organization: 'Acme' } }));
   });
 
+  it('keeps reading a saved answer with its own question after the form changes', async () => {
+    currentForm = { standard: {}, custom: [{ id: 'q_guest', kind: 'yes_no', label: 'Bringing a guest?', help: '', choices: [], required: true }], revision: 2 };
+    saveMock
+      .mockImplementationOnce(({ ticketId, answers, formRevision }) => Promise.resolve({ ticketId, answers, formRevision }))
+      .mockRejectedValueOnce(apiError('form-changed', 'The questions changed.'));
+    renderAt();
+    fireEvent.click(await screen.findByLabelText('Yes'));
+    fireEvent.click(screen.getByRole('button', { name: /Next: Ticket: Student/ }));
+    await screen.findByRole('heading', { name: 'Ticket: Student for Bo Lee' });
+    fireEvent.click(screen.getByLabelText('No'));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
+    expect(await screen.findByText(/The questions changed while you were answering/)).toBeInTheDocument();
+    // The organizer made the same question short text.
+    act(() => formListener({ standard: {}, custom: [{ id: 'q_guest', kind: 'short_text', label: 'Guest name', help: '', choices: [], required: false }], revision: 3 }));
+    fireEvent.click(screen.getByRole('link', { name: /Review/ }));
+    await screen.findByRole('heading', { name: 'Review' });
+    // Ticket 1's saved yes still reads as Yes, not as "Not answered".
+    expect(screen.getByText('Yes')).toBeInTheDocument();
+  });
+
   it('turns read-only once registration has closed', async () => {
     provider = 'none';
     records['account-u1'] = { answers: { organization: 'Acme' }, formRevision: 2 };

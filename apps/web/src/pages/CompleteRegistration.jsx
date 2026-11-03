@@ -11,7 +11,7 @@
 // form and keeps every answer whose question is still asked.
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
-import { activeQuestions, answerText, checkAnswers, readRegistrationForm } from 'shared/registrationForm';
+import { activeQuestions, answerText, answeredQuestions, checkAnswers, readRegistrationForm } from 'shared/registrationForm';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import LoadingState from '../components/LoadingState.jsx';
@@ -208,7 +208,10 @@ export default function CompleteRegistration() {
       const result = await saveRegistrationAnswers({
         user, ticketId: target.ticketId, account: target.account, formRevision, answers: checked.answers,
       });
-      data.setSaved(target.id, { answers: result?.answers ?? checked.answers, formRevision: result?.formRevision ?? formRevision });
+      const answers = result?.answers ?? checked.answers;
+      // Keep the questions as answered, as the stored record does, so Review
+      // still reads this answer if the form changes later on this page.
+      data.setSaved(target.id, { answers, formRevision: result?.formRevision ?? formRevision, questions: answeredQuestions(form, answers) });
       setErrors((previous) => ({ ...previous, [target.id]: {} }));
       setNotice('');
       navigate(hrefFor(steps[current + 1]));
