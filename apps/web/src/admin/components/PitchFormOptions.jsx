@@ -1,0 +1,113 @@
+// The pitch form's option lists (ADR 0008 §2): the formats, lengths and
+// tracks the public pitch stepper offers, and how many co-presenters one
+// pitch may name. Operator-only, like the rest of the call. An empty list
+// hides its field on the public form.
+//
+// Each list is a text area with one choice per line: the plainest control
+// that holds an ordered list and is easy to paste into. The check is
+// shared/pitchForm validatePitchFormOptions, the same rule the server runs,
+// so a refusal is shown here before the save, in the server's own words.
+import { useEffect, useState } from 'react';
+import {
+  MAX_CO_PRESENTERS, MAX_OPTIONS, readPitchFormOptions, validatePitchFormOptions,
+} from 'shared/pitchForm';
+import {
+  Notice, Panel, SaveStatus, SelectField, TextAreaField, primaryButtonClass,
+} from './formControls.jsx';
+
+const lines = (list) => list.join('\n');
+const labelsOf = (raw) => raw.split('\n').map((line) => line.trim()).filter(Boolean);
+
+/**
+ * Minutes, one per line. A line that is not a whole number stays in the
+ * list as NaN, so the shared check names it instead of dropping it.
+ */
+const minutesOf = (raw) => labelsOf(raw).map((line) => (/^\d+$/.test(line) ? Number(line) : Number.NaN));
+
+function formOf(options) {
+  return {
+    formats: lines(options.formats),
+    lengths: lines(options.lengths.map(String)),
+    tracks: lines(options.tracks),
+    maxCoPresenters: String(options.maxCoPresenters),
+  };
+}
+
+const CO_PRESENTER_CHOICES = Array.from({ length: MAX_CO_PRESENTERS + 1 }, (_, n) => ({
+  value: String(n),
+  label: n === 0 ? 'None: one presenter per pitch' : `Up to ${n}`,
+}));
+
+/**
+ * @param {{ settings: object|null, call: (name: string, body: object) => Promise<object> }} props
+ *   `settings` is the live config/pitch_call document.
+ */
+export default function PitchFormOptions({ settings, call }) {
+  const saved = readPitchFormOptions(settings);
+  const savedKey = JSON.stringify(saved);
+  const [form, setForm] = useState(() => formOf(saved));
+  const [baseline, setBaseline] = useState(savedKey);
+  const [errors, setErrors] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState('');
+  const [serverError, setServerError] = useState(null);
+
+  // A save from another tab replaces the form only while this one is unchanged.
+  useEffect(() => {
+    if (savedKey === baseline) return;
+    setForm((current) => (JSON.stringify(current) === JSON.stringify(formOf(JSON.parse(baseline)))
+      ? formOf(JSON.parse(savedKey)) : current));
+    setBaseline(savedKey);
+  }, [savedKey, baseline]);
+
+  const edit = (field) => (value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors([]);
+    setResult('');
+  };
+
+  async function save(event) {
+    event.preventDefault();
+    if (busy) return;
+    const formOptions = {
+      formats: labelsOf(form.formats),
+      lengths: minutesOf(form.lengths),
+      tracks: labelsOf(form.tracks),
+      maxCoPresenters: Number(form.maxCoPresenters),
+    };
+    const checked = validatePitchFormOptions(formOptions);
+    if (!checked.ok) {
+      setErrors(checked.errors);
+      return;
+    }
+    setBusy(true);
+    setServerError(null);
+    try {
+      await call('updatePitchFormOptions', { formOptions: checked.options });
+      setResult('Pitch form options saved.');
+    } catch (err) {
+      setServerError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title="Pitch form options" description={`The choices people pick from on the pitch form. Write one choice per line, at most ${MAX_OPTIONS} per list. An empty list hides its question.`}>
+      <form onSubmit={save} className="space-y-sm" noValidate>
+        {errors.length ? <Notice tone="error" message={errors.join(' ')} /> : null}
+        {serverError ? <Notice tone="error" message={serverError.message} /> : null}
+        <fieldset disabled={busy} className="grid gap-sm md:grid-cols-3">
+          <TextAreaField label="Formats" rows={5} value={form.formats} onChange={edit('formats')} hint="For example: Panel, Workshop, Lightning talk." />
+          <TextAreaField label="Lengths in minutes" rows={5} value={form.lengths} onChange={edit('lengths')} hint="Whole minutes, for example 30 or 60." />
+          <TextAreaField label="Tracks" rows={5} value={form.tracks} onChange={edit('tracks')} hint="Leave empty if the event has no tracks." />
+        </fieldset>
+        <SelectField label="Co-presenters per pitch" value={form.maxCoPresenters} onChange={edit('maxCoPresenters')} options={CO_PRESENTER_CHOICES} hint="The person who pitches is always the lead presenter." />
+        <button type="submit" className={primaryButtonClass} aria-busy={busy || undefined} aria-disabled={busy || undefined}>
+          {busy ? 'Saving…' : 'Save pitch form options'}
+        </button>
+        {result ? <SaveStatus message={result} /> : null}
+      </form>
+    </Panel>
+  );
+}

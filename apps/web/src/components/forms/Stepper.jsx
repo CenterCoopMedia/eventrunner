@@ -122,7 +122,7 @@ export function StepList({ steps, current, hrefFor, wide, label = 'Steps', tier 
   return (
     <details className={`stepper-fold${tierClass(tier)}`}>
       <summary className="stepper-fold-summary">
-        Step {current + 1} of {steps.length}. Show all steps
+        Show all {steps.length} steps
       </summary>
       {list}
     </details>

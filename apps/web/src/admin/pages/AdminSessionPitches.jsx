@@ -15,6 +15,8 @@ import { sameCallSettings } from '../pitchCallSettings.js';
 import { PITCH_COLUMNS, readPitchCsv, pitchQueueCsv } from '../pitchCsv.js';
 import { PitchEmailSettings, PitchEmailDelivery } from '../components/PitchEmails.jsx';
 import AirtablePitchSync from './AirtablePitchSync.jsx';
+import PitchDetails from '../components/PitchDetails.jsx';
+import PitchFormOptions from '../components/PitchFormOptions.jsx';
 import PitchSourceMarkers from './PitchSourceMarkers.jsx';
 import AdminPageHeader, { AdminEmptyState, AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
 import { Panel, Notice, SaveStatus, TextField, TextAreaField, SelectField, CheckboxField,
@@ -211,8 +213,7 @@ function PitchReview({ initial, current, call }) {
   return <Panel title={baseline.title} description="Private proposal details and review.">
     <div className="space-y-md [overflow-wrap:anywhere]">
       <div className="flex flex-wrap gap-sm"><StatusBadge tone={tones[baseline.status]}>{labels[baseline.status]}</StatusBadge><p className="break-all text-admin-sm">{baseline.email}</p></div>
-      <p className="text-admin-sm text-admin-ink-secondary">{baseline.organization || 'No organization'} · {baseline.format || 'No format'}</p>
-      <p className="whitespace-pre-wrap break-words">{baseline.description}</p>
+      <PitchDetails pitch={baseline} />
       <p className="text-admin-sm text-admin-ink-secondary">Consent: {baseline.consent ? 'Recorded for organizer review' : 'Not recorded by the legacy API; verify before using this proposal.'}</p>
       <PitchSourceMarkers row={current || baseline} detailed timeZone={event.timezone} />
       {conflict ? <><Notice tone="caution" message="This pitch changed. Your unsaved notes remain below. Copy them before loading the current review." /><button className={secondaryButtonClass} onClick={reload} disabled={busy || !current}>Load current review</button></> : null}
@@ -268,6 +269,7 @@ export default function AdminSessionPitches() {
     <AdminPageHeader title="Session pitches" description="Review private proposals. Saving a decision does not send an email or publish event content." actions={<button className={secondaryButtonClass} disabled={!rows || Boolean(listError)} onClick={() => saveTextFile('session-pitches.csv', pitchQueueCsv(shown))}>Export filtered queue</button>} />
     <p className="text-admin-sm text-admin-ink-secondary"><Link to="/pitch" className={rowTitleLinkClass}>Open public pitch form</Link>. CSV contains contact details: Keep the downloaded file private. Review notes are excluded.</p>
     {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the call for sessions</summary><PitchCallSettings settings={settings} call={call} timeZone={eventConfig?.timezone} /></details> : null}
+    {isOperator && settings && !configError ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage the pitch form</summary><PitchFormOptions settings={settings} call={call} /></details> : null}
     {isOperator && noticeSettings ? <details><summary className="min-h-admin-control cursor-pointer font-semibold">Manage pitch emails</summary><PitchEmailSettings settings={noticeSettings} call={call} /></details> : null}
     {configError ? <Notice tone="caution" message="Cannot check call settings. Reconnecting…" /> : null}
     <AirtablePitchSync call={call} isOperator={isOperator} />

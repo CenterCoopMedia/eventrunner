@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The session pitch form is a five-step stepper (ADR 0008 §2): the session
+  (title, one-line summary, description), its format, length, track and
+  audience, the presenters (the lead and up to four co-presenters), access
+  needs and notes, then review and submit. Staff set the format, length and
+  track choices and the co-presenter limit under **Manage the pitch form**
+  (`updatePitchFormOptions`). The review panel shows every new field. A pitch
+  from before reads as one lead presenter. The submit limit is now 96 KB.
+
 - A shared stepper (`components/forms/Stepper.jsx`, ADR 0008 §1): the step
   list, the step heading and Back and Next, in the public and admin tiers.
   The admin setup page uses it, and the specimen book draws it. The

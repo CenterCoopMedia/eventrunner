@@ -145,6 +145,15 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The session pitch form is a five-step stepper (ADR 0008 §2): the session
+          (title, one-line summary, description), its format, length, track and
+          audience, the presenters (the lead and up to four co-presenters), access
+          needs and notes, then review and submit. Staff set the format, length and
+          track choices and the co-presenter limit under <strong>Manage the pitch form</strong>
+          (<code>updatePitchFormOptions</code>). The review panel shows every new field. A pitch
+          from before reads as one lead presenter. The submit limit is now 96 KB.</li>
+          </ul>
+          <ul>
           <li>A shared stepper (<code>components/forms/Stepper.jsx</code>, ADR 0008 §1): the step
           list, the step heading and Back and Next, in the public and admin tiers.
           The admin setup page uses it, and the specimen book draws it. The

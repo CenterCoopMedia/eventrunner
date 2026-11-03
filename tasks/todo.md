@@ -9,8 +9,12 @@ Order is set by NC Local's launch: pitch call and early-bird tickets first.
 
 - [x] R1 Stepper component (public and admin), interface guideline
       section; move the admin setup page onto it. Stacked on #581.
-- [ ] R2 Pitch stepper: five steps, presenters, staff lists for format,
-      length and track; schema, rules, CSV and Airtable mapping, export.
+- [x] R2 Pitch stepper: five steps, presenters, staff lists for format,
+      length and track, `updatePitchFormOptions`, review panel. Stacked on R1.
+      Server drafts across devices are not built; the draft stays in tab
+      storage, as before.
+- [ ] R2c CSV import, Airtable mapping and queue export for the new pitch
+      fields and presenters.
 - [ ] R3 Accept a pitch: a speaker per presenter, dedupe by email, invite
       in one action; speaker profile stepper; `speaker.confirmation`.
 - [ ] R4 Registration questions: `config/registration_form`, admin editor

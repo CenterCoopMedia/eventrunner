@@ -18,6 +18,7 @@ const require = createRequire(import.meta.url);
 const {
   createSubmitSessionPitchHandler,
   createUpdatePitchCallHandler,
+  createUpdatePitchFormOptionsHandler,
   createReviewSessionPitchHandler,
   internals: {
     MAX_DESCRIPTION_LENGTH,
@@ -85,6 +86,7 @@ function pitch(overrides = {}) {
     description: 'A practical session about durable local reporting partnerships.',
     organization: 'Example newsroom',
     format: 'Panel',
+    leadName: 'Pat Submitter',
     submissionKey: KEY,
     consent: true,
     ...overrides,
@@ -109,6 +111,10 @@ async function submit(body = pitch(), token = 'submitter', now = () => T0) {
 
 async function updateCall(body, token = 'operator', now = () => T0) {
   return call(createUpdatePitchCallHandler, token, body, { now });
+}
+
+async function updateOptions(body, token = 'operator', now = () => T0) {
+  return call(createUpdatePitchFormOptionsHandler, token, body, { now });
 }
 
 async function review(body, token = 'staff', now = () => T0 + 1000) {
@@ -399,7 +405,7 @@ describe('pitch submission', () => {
       expect((await submit(body)).statusCode).toBe(201);
     }
     expect((await db.collection('session_pitches').get()).size).toBe(2);
-    expect((await submit(pitch({ padding: 'x'.repeat(40 * 1024) }))).statusCode).toBe(413);
+    expect((await submit(pitch({ padding: 'x'.repeat(96 * 1024) }))).statusCode).toBe(413);
   });
 
   it('records newly supplied consent on a legacy replay without changing review or rate-limit state', async () => {
@@ -464,6 +470,121 @@ describe('pitch submission', () => {
     expect((await submit(pitch({ submissionKey: 'pitch-after-deadline' }), 'submitter', afterDeadline)).statusCode).toBe(404);
     expect((await submit(pitch(), 'submitter', afterDeadline)).statusCode).toBe(201);
     expect((await db.collection('session_pitches').get()).size).toBe(1);
+  });
+});
+
+describe('pitch stepper fields (ADR 0008 §2)', () => {
+  const OPTIONS = { formats: ['Panel', 'Workshop'], lengths: [30, 60], tracks: ['Audience'], maxCoPresenters: 2 };
+  const full = (overrides = {}) => pitch({
+    summary: 'One line.',
+    format: 'Workshop',
+    lengthMinutes: 60,
+    track: 'Audience',
+    audienceLevel: 'beginner',
+    leadRole: 'Editor',
+    presenters: [{ name: 'Bo Writer', email: 'BO@example.test', organization: 'Partner', role: 'Reporter' }],
+    accessNeeds: 'Step-free stage.',
+    notes: 'Morning slot.',
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    await db.collection('config').doc('pitch_call').set({ enabled: true, closesAt: CLOSES_AT, formOptions: OPTIONS });
+  });
+
+  it('stores every step and the presenters, lead first, from the verified sign-in', async () => {
+    const response = await submit(full());
+    expect(response.statusCode).toBe(201);
+    const stored = (await db.collection('session_pitches').doc(PITCH_ID).get()).data();
+    expect(stored).toMatchObject({
+      summary: 'One line.',
+      format: 'Workshop',
+      lengthMinutes: 60,
+      track: 'Audience',
+      audienceLevel: 'beginner',
+      accessNeeds: 'Step-free stage.',
+      notes: 'Morning slot.',
+      presenters: [
+        { name: 'Pat Submitter', email: SUBMITTER_EMAIL, organization: 'Example newsroom', role: 'Editor', lead: true },
+        { name: 'Bo Writer', email: 'bo@example.test', organization: 'Partner', role: 'Reporter', lead: false },
+      ],
+    });
+    // A replay with the same answers lands; a changed co-presenter conflicts.
+    expect((await submit(full())).statusCode).toBe(201);
+    expect((await submit(full({ presenters: [{ name: 'Someone else', email: 'bo@example.test' }] }))).statusCode).toBe(409);
+  });
+
+  it('replays a stored pitch whose presenter maps came back with their keys in another order', async () => {
+    expect((await submit(full())).statusCode).toBe(201);
+    const ref = db.collection('session_pitches').doc(PITCH_ID);
+    const stored = (await ref.get()).data();
+    const sorted = stored.presenters.map((p) => Object.fromEntries(Object.keys(p).sort().reverse().map((k) => [k, p[k]])));
+    await ref.update({ presenters: sorted });
+    expect((await submit(full())).statusCode).toBe(201);
+  });
+
+  it('refuses a choice the staff lists do not offer, a missing lead name, and too many co-presenters', async () => {
+    for (const body of [
+      full({ format: 'Keynote' }),
+      full({ lengthMinutes: 45 }),
+      full({ track: 'Revenue' }),
+      full({ audienceLevel: 'expert' }),
+      full({ leadName: ' ' }),
+      full({ presenters: [{ name: 'A', email: 'a@example.test' }, { name: 'B', email: 'b@example.test' }, { name: 'C', email: 'c@example.test' }] }),
+      full({ presenters: [{ name: 'Me', email: SUBMITTER_EMAIL }] }),
+    ]) {
+      const response = await submit(body);
+      expect(response.statusCode, JSON.stringify(body)).toBe(400);
+    }
+    expect((await db.collection('session_pitches').get()).empty).toBe(true);
+  });
+
+  it('refuses a pitch whose choice the operator removed while it was being sent', async () => {
+    const original = db.runTransaction.bind(db);
+    let changed = false;
+    db.runTransaction = async (fn) => {
+      if (!changed) {
+        changed = true;
+        await db.collection('config').doc('pitch_call').set({ formOptions: { ...OPTIONS, formats: ['Panel'] } }, { merge: true });
+      }
+      return original(fn);
+    };
+    try {
+      const response = await submit(full());
+      expect(response.statusCode).toBe(409);
+      expect(response.body.error.code).toBe('form-changed');
+    } finally {
+      db.runTransaction = original;
+    }
+    expect((await db.collection('session_pitches').get()).empty).toBe(true);
+  });
+
+  it('still replays a stored pitch after staff remove its choice, and refuses that choice on a new pitch', async () => {
+    expect((await submit(full())).statusCode).toBe(201);
+    await db.collection('config').doc('pitch_call').set({ formOptions: { ...OPTIONS, formats: ['Panel'], maxCoPresenters: 0 } }, { merge: true });
+    const replay = await submit(full());
+    expect(replay.statusCode).toBe(201);
+    expect(replay.body.id).toBe(PITCH_ID);
+    expect((await submit(full({ submissionKey: 'pitch-key-000002' }))).statusCode).toBe(400);
+    expect((await db.collection('session_pitches').get()).size).toBe(1);
+  });
+
+  it('lets only an operator save the option lists, audits it, and keeps them across a call update', async () => {
+    const next = { formats: [' Talk '], lengths: [45, 15], tracks: [], maxCoPresenters: 1 };
+    expect((await updateOptions({ formOptions: next }, 'staff')).statusCode).toBe(403);
+    expect((await updateOptions({ formOptions: { ...next, lengths: [1] } })).statusCode).toBe(400);
+    const saved = await updateOptions({ formOptions: next });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.body.formOptions).toEqual({ formats: ['Talk'], lengths: [15, 45], tracks: [], maxCoPresenters: 1 });
+    expect((await db.collection('admin_logs').where('action', '==', 'updatePitchFormOptions').get()).size).toBe(1);
+
+    expect((await updateCall({ enabled: false, closesAt: CLOSES_AT })).statusCode).toBe(200);
+    const stored = (await db.collection('config').doc('pitch_call').get()).data();
+    expect(stored.enabled).toBe(false);
+    expect(stored.formOptions).toEqual({ formats: ['Talk'], lengths: [15, 45], tracks: [], maxCoPresenters: 1 });
+    // The list is public, like the rest of the call, and only the server writes it.
+    await assertSucceeds(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'config/pitch_call')));
+    await assertFails(setDoc(doc(operatorClient(), 'config/pitch_call'), { formOptions: {} }));
   });
 });
 

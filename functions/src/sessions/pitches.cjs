@@ -10,7 +10,10 @@
  * reject stale status and private-note edits.
  *
  * Pitch rows are private and server-written. The public config/pitch_call
- * document contains only `{ enabled, closesAt, externalFormUrl }`. A null
+ * document contains only `{ enabled, closesAt, externalFormUrl, formOptions }`.
+ * `formOptions` holds the staff lists the pitch stepper offers (formats,
+ * lengths, tracks, the co-presenter limit; ADR 0008 §2), and only
+ * `updatePitchFormOptions` writes it. A null
  * `closesAt` means the call has no deadline; staff close it by hand. A set
  * `externalFormUrl` sends people to another form (for example, Airtable),
  * and this API then refuses native submissions so one call never has two
@@ -38,6 +41,9 @@ const SUBMISSION_KEY_RE = /^[A-Za-z0-9_-]{8,128}$/;
 const {
   readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
 } = require('shared/pitch');
+const {
+  checkPitch, presenterList, readPitchFormOptions, sameValue, validatePitchFormOptions,
+} = require('shared/pitchForm');
 
 const MAX_TITLE_LENGTH = 160;
 const MAX_DESCRIPTION_LENGTH = 5000;
@@ -46,8 +52,9 @@ const MAX_FORMAT_LENGTH = 120;
 const MAX_PRIVATE_NOTES_LENGTH = 5000;
 const MAX_BODY_BYTES = 16 * 1024;
 // JSON can escape one UTF-16 code unit as six bytes. Cover every valid
-// field at its character limit, plus the key and object framing.
-const MAX_SUBMISSION_BODY_BYTES = 40 * 1024;
+// field of the pitch stepper at its character limit (about 13,000
+// characters with four co-presenters), plus the keys and object framing.
+const MAX_SUBMISSION_BODY_BYTES = 96 * 1024;
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const CLOSED_MESSAGE = 'Session pitch submissions are closed.';
@@ -109,6 +116,56 @@ function readSubmission(body) {
   };
 }
 
+/**
+ * The pitch stepper's submission (ADR 0008 §2), checked by the same rule
+ * the browser steps run (shared/pitchForm). The first failing field is
+ * returned as `field: message`, the shape every handler here answers with.
+ *
+ * @param {object} body
+ * @param {{ options: object, email: string }} context
+ */
+function readFormSubmission(body, { options, email }) {
+  const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  const submissionKey = source.submissionKey;
+  if (typeof submissionKey !== 'string' || !SUBMISSION_KEY_RE.test(submissionKey)) {
+    return { ok: false, message: 'submissionKey: must be 8-128 characters of [A-Za-z0-9_-].' };
+  }
+  const checked = checkPitch(source, { options, submitterEmail: email });
+  if (!checked.ok) {
+    const [field, message] = Object.entries(checked.errors)[0];
+    return { ok: false, field, message: `${field}: ${message}` };
+  }
+  return { ok: true, ...checked.pitch, submissionKey };
+}
+
+/** The call's lists, widened to hold a body's own choices (a stored pitch's retry). */
+function widenedOptions(options, body) {
+  const source = body && typeof body === 'object' ? body : {};
+  const add = (list, value) => (value === undefined || value === null || value === '' || list.includes(value) ? list : [...list, value]);
+  return {
+    formats: options.formats.length ? add(options.formats, source.format) : [],
+    lengths: add(options.lengths, source.lengthMinutes),
+    tracks: add(options.tracks, source.track),
+    maxCoPresenters: 4,
+  };
+}
+
+/** The proposal fields a replay must repeat exactly. */
+function proposalOf(pitch, email) {
+  return {
+    title: pitch.title,
+    summary: pitch.summary ?? null,
+    description: pitch.description,
+    organization: pitch.organization ?? null,
+    format: pitch.format ?? null,
+    lengthMinutes: pitch.lengthMinutes ?? null,
+    track: pitch.track ?? null,
+    audienceLevel: pitch.audienceLevel ?? null,
+    presenters: presenterList(pitch, email),
+    accessNeeds: pitch.accessNeeds ?? null,
+    notes: pitch.notes ?? null,
+  };
+}
 
 function rateLimitWindow(stored, nowMs) {
   const requests = (Array.isArray(stored) ? stored : [])
@@ -138,11 +195,18 @@ function rateLimitIdFor(uid) {
 }
 
 function samePitch(stored, actor, pitch) {
-  return stored.uid === actor.uid
-    && stored.title === pitch.title
-    && stored.description === pitch.description
-    && (stored.organization ?? null) === pitch.organization
-    && (stored.format ?? null) === pitch.format;
+  if (stored.uid !== actor.uid) return false;
+  // A pitch stored before the stepper (no presenter list) replays on the
+  // four fields it was stored with, so a retry from that time still lands.
+  if (!Array.isArray(stored.presenters)) {
+    return stored.title === pitch.title
+      && stored.description === pitch.description
+      && (stored.organization ?? null) === (pitch.organization ?? null)
+      && (stored.format ?? null) === (pitch.format ?? null);
+  }
+  const expected = proposalOf(pitch, actor.email);
+  // By value: Firestore may return a presenter map's keys in another order.
+  return Object.entries(expected).every(([key, value]) => sameValue(stored[key], value));
 }
 
 function auditRow({ action, docPath, actor, at, details }) {
@@ -201,6 +265,11 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
     if (!isPitchCallOpen(call, nowMs) || readPitchFormUrl(call?.externalFormUrl)) {
       return { outcome: 'closed' };
     }
+    // The handler checked the pitch against the lists it read first. An
+    // operator who changed a list since then makes this read the new one,
+    // and a choice that is no longer offered is refused, not stored.
+    const recheck = checkPitch(pitch, { options: readPitchFormOptions(call), submitterEmail: actor.email });
+    if (!recheck.ok) return { outcome: 'form-changed' };
 
     const window = rateLimitWindow(limitSnap.exists ? limitSnap.data()?.requests : null, nowMs);
     if (window.limited) return { outcome: 'limited', retryAfterMs: window.retryAfterMs };
@@ -209,10 +278,7 @@ async function storePitch({ db, actor, pitch, now = Date.now }) {
     // Reads stay ahead of the writes below, as transactions require.
     const receipt = await automaticReceipt({ db, tx, pitchId: id, email: actor.email, at });
     tx.create(pitchRef, {
-      title: pitch.title,
-      description: pitch.description,
-      organization: pitch.organization,
-      format: pitch.format,
+      ...proposalOf(pitch, actor.email),
       ...(pitch.consent ? { consent: { version: 'session-pitch-review-v1', at } } : {}),
       uid: actor.uid,
       email: actor.email,
@@ -243,8 +309,27 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
       return sendError(res, 413, 'payload-too-large', 'The session pitch is too large.');
     }
 
-    const pitch = readSubmission(req.body);
-    if (!pitch.ok) return badRequest(res, pitch.message);
+    let options;
+    try {
+      const callSnap = await db.collection('config').doc('pitch_call').get();
+      options = readPitchFormOptions(callSnap.exists ? callSnap.data() : null);
+    } catch (err) {
+      log.error('submitSessionPitch could not read the call', err);
+      return internal(res, 'The session pitch could not be saved. Try again.');
+    }
+    let pitch = readFormSubmission(req.body, { options, email });
+    if (!pitch.ok) {
+      // A retry of a pitch already stored must still land after staff take
+      // one of its choices off a list, or it could never get its answer. So
+      // a refused body is checked again against the lists widened by its own
+      // choices, and only when this account and key already hold a pitch.
+      // storePitch then replays it, or refuses changed answers with 409.
+      const stored = await db.collection(PITCHES).doc(pitchIdFor(decoded.uid, String(req.body?.submissionKey ?? ''))).get().catch(() => null);
+      if (stored?.exists && SUBMISSION_KEY_RE.test(String(req.body?.submissionKey ?? ''))) {
+        pitch = readFormSubmission(req.body, { options: widenedOptions(options, req.body), email });
+      }
+      if (!pitch.ok) return badRequest(res, pitch.message);
+    }
 
     let result;
     try {
@@ -255,6 +340,9 @@ function createSubmitSessionPitchHandler({ db, auth, getConfig, sendEmail, now =
     }
 
     if (result.outcome === 'closed') return notFound(res, CLOSED_MESSAGE);
+    if (result.outcome === 'form-changed') {
+      return sendError(res, 409, 'form-changed', 'The organizers changed the pitch form. Reload the page and check your choices.');
+    }
     if (result.outcome === 'changed') {
       return sendError(res, 409, 'conflict', 'submissionKey: already used for a different session pitch.');
     }
@@ -315,12 +403,13 @@ function createUpdatePitchCallHandler({ db, auth, getConfig, now = Date.now, log
     const callRef = db.collection('config').doc('pitch_call');
     try {
       await db.runTransaction(async (tx) => {
-        if (keepFormUrl) {
-          const stored = await tx.get(callRef);
-          externalFormUrl = readPitchFormUrl(stored.exists ? stored.data()?.externalFormUrl : null);
-        }
+        const stored = await tx.get(callRef);
+        const storedCall = stored.exists ? stored.data() : null;
+        if (keepFormUrl) externalFormUrl = readPitchFormUrl(storedCall?.externalFormUrl);
         const at = new Date(now());
-        tx.set(callRef, { enabled, closesAt, externalFormUrl });
+        // The form option lists have their own endpoint; this save keeps them.
+        const formOptions = storedCall?.formOptions;
+        tx.set(callRef, { enabled, closesAt, externalFormUrl, ...(formOptions ? { formOptions } : {}) });
         tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
           action: 'updatePitchCall',
           docPath: PITCH_CALL_PATH,
@@ -334,6 +423,44 @@ function createUpdatePitchCallHandler({ db, auth, getConfig, now = Date.now, log
       return internal(res, 'The session pitch call could not be saved.');
     }
     return res.status(200).json({ enabled, closesAt, externalFormUrl });
+  };
+}
+
+/**
+ * The pitch stepper's option lists (ADR 0008 §2): formats, lengths in
+ * minutes, tracks, and the co-presenter limit. Operator-only, like the rest
+ * of the call. It merges into config/pitch_call, so the call's state stays.
+ */
+function createUpdatePitchFormOptionsHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+  return async function updatePitchFormOptions(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'operator' });
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    if (bodyBytes(req.body) > MAX_BODY_BYTES) {
+      return sendError(res, 413, 'payload-too-large', 'The form options are too large.');
+    }
+    const checked = validatePitchFormOptions(req.body?.formOptions);
+    if (!checked.ok) return badRequest(res, checked.errors.join(' '));
+    const formOptions = checked.options;
+    const callRef = db.collection('config').doc('pitch_call');
+    try {
+      await db.runTransaction(async (tx) => {
+        await tx.get(callRef);
+        const at = new Date(now());
+        tx.set(callRef, { formOptions }, { merge: true });
+        tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
+          action: 'updatePitchFormOptions',
+          docPath: PITCH_CALL_PATH,
+          actor: gate,
+          at,
+          details: { formOptions },
+        }));
+      });
+    } catch (err) {
+      log.error('updatePitchFormOptions failed', err);
+      return internal(res, 'The pitch form options could not be saved.');
+    }
+    return res.status(200).json({ formOptions });
   };
 }
 
@@ -462,6 +589,7 @@ function buildHandlers() {
   return {
     submitSessionPitch: expose(createSubmitSessionPitchHandler, { secrets }),
     updatePitchCall: expose(createUpdatePitchCallHandler),
+    updatePitchFormOptions: expose(createUpdatePitchFormOptionsHandler),
     reviewSessionPitch: expose(createReviewSessionPitchHandler),
     sendSessionPitchNotice: expose(createSendSessionPitchNoticeHandler, { secrets }),
     savePitchNoticeSettings: expose(createSavePitchNoticeSettingsHandler),
@@ -471,6 +599,7 @@ function buildHandlers() {
 module.exports = {
   createSubmitSessionPitchHandler,
   createUpdatePitchCallHandler,
+  createUpdatePitchFormOptionsHandler,
   createReviewSessionPitchHandler,
   get handlers() { return buildHandlers(); },
   internals: {
@@ -489,6 +618,8 @@ module.exports = {
     CLOSED_MESSAGE,
     readClosesAt,
     readSubmission,
+    readFormSubmission,
+    proposalOf,
     rateLimitWindow,
     pitchIdFor,
     rateLimitIdFor,

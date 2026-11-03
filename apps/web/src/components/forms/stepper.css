@@ -8,7 +8,7 @@
    page loads this file in a lazy chunk, after adminWorkspace.css. */
 :where(.stepper-list, .stepper-fold, .stepper-heading, .stepper-pager) {
   --stepper-ground: var(--color-surface-rgb);
-  --stepper-ground-current: var(--color-accent-soft-rgb);
+  --stepper-ground-current: var(--color-surface-alt-rgb);
   --stepper-rule: var(--rule-hairline-rgb);
   --stepper-rule-control: var(--color-border-control-rgb);
   --stepper-current: var(--color-accent-rgb);
