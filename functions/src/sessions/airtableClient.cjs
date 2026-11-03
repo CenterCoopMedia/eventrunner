@@ -24,7 +24,11 @@ const CONTROL_RE = /[\u0000-\u001f\u007f]/;
 const LOOPBACK_ORIGIN_RE = /^http:\/\/(127\.0\.0\.1|localhost):\d{2,5}$/;
 const MAX_NAME_LENGTH = 100;
 
-const FIELD_KEYS = Object.freeze(['externalId', 'email', 'title', 'description', 'organization', 'format', 'consent']);
+// The last eight are the pitch stepper's single-value fields (ADR 0008 §2),
+// all optional. Co-presenters are not mapped from Airtable: each would need
+// four fields per person; import them with a CSV file instead.
+const FIELD_KEYS = Object.freeze(['externalId', 'email', 'title', 'description', 'organization', 'format', 'consent',
+  'summary', 'lengthMinutes', 'track', 'audienceLevel', 'leadName', 'leadRole', 'accessNeeds', 'notes']);
 const REQUIRED_FIELD_KEYS = Object.freeze(['email', 'title', 'description', 'consent']);
 const SCHEDULE_MINUTES = Object.freeze([0, 15, 60]);
 

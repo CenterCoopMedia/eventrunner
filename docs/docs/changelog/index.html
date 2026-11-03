@@ -145,6 +145,14 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The session pitch CSV import, export and Airtable refresh carry the pitch
+          stepper&#39;s fields (ADR 0008 §2). The import reads optional <code>summary</code>,
+          <code>lengthMinutes</code>, <code>track</code>, <code>audienceLevel</code>, <code>leadName</code>, <code>leadRole</code>,
+          <code>accessNeeds</code>, <code>notes</code> and <code>presenter_1_name</code> … <code>presenter_4_role</code> columns;
+          a file without them imports as before. The export writes the same columns.
+          Airtable maps the eight single-value fields; co-presenters come by CSV.</li>
+          </ul>
+          <ul>
           <li>Session pitches in the admin match the list idiom of Speakers: the queue
           at <code>/admin/pitches</code> with a count and header actions, one pitch at
           <code>/admin/pitches/&lt;id&gt;</code> with <strong>Accept</strong>, <strong>Decline</strong> and <strong>Mark in review</strong>

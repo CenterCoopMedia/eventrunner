@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The session pitch CSV import, export and Airtable refresh carry the pitch
+  stepper's fields (ADR 0008 §2). The import reads optional `summary`,
+  `lengthMinutes`, `track`, `audienceLevel`, `leadName`, `leadRole`,
+  `accessNeeds`, `notes` and `presenter_1_name` … `presenter_4_role` columns;
+  a file without them imports as before. The export writes the same columns.
+  Airtable maps the eight single-value fields; co-presenters come by CSV.
+
 - Session pitches in the admin match the list idiom of Speakers: the queue
   at `/admin/pitches` with a count and header actions, one pitch at
   `/admin/pitches/<id>` with **Accept**, **Decline** and **Mark in review**

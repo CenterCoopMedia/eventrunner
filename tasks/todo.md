@@ -16,8 +16,12 @@ Order is set by NC Local's launch: pitch call and early-bird tickets first.
 - [x] R2b Admin pitch pages in the house style: queue, one pitch with
       decision buttons, notes and staff edits (`editSessionPitch`), settings
       and import pages. Stacked on R2.
-- [ ] R2c CSV import, Airtable mapping and queue export for the new pitch
-      fields and presenters.
+- [x] R2c CSV import, Airtable mapping and queue export for the new pitch
+      fields and presenters. Stacked on R2b. Airtable co-presenters are not
+      mapped (CSV only).
+
+Owner decision (2026-11-03): NC Local waits for the console, and the pitch
+path (R2c, R3) comes before registration.
 - [ ] R3 Accept a pitch: a speaker per presenter, dedupe by email, invite
       in one action; speaker profile stepper; `speaker.confirmation`.
 - [ ] R4 Registration questions: `config/registration_form`, admin editor

@@ -37,6 +37,7 @@ const { createHash } = require('node:crypto');
 const { requireAdmin } = require('../core/auth.cjs');
 const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { internals: { readSubmission } } = require('./pitches.cjs');
+const { IMPORT_FIELDS, readImportedExtras, readPresenters, sameValue } = require('shared/pitchForm');
 const { AirtableError, readAirtableSource, listAirtableRecords, redact } = require('./airtableClient.cjs');
 
 const PITCHES = 'session_pitches';
@@ -110,11 +111,60 @@ function mapRecord(record, fieldMap) {
     const key = pitch.message.split(':')[0];
     return { ok: false, externalId, reason: 'invalid-field', field: fieldMap[key] || key };
   }
+  // The stepper fields, only those the operator mapped, so an unmapped
+  // field never overwrites what staff or a CSV import stored.
+  const extraSource = { organization: pitch.organization };
+  for (const key of IMPORT_FIELDS) {
+    if (!fieldMap[key]) continue;
+    const value = cellText(fields[fieldMap[key]]);
+    if (value === undefined) return { ok: false, externalId, reason: 'invalid-field', field: fieldMap[key] };
+    extraSource[key] = value ?? '';
+  }
+  const extra = readImportedExtras(extraSource, { email: normalized });
+  if (!extra.ok) {
+    const key = extra.field.split('.')[0];
+    return { ok: false, externalId, reason: 'invalid-field', field: fieldMap[key] || key };
+  }
+  // The lead's name and role travel as their own fields, not as a presenter
+  // list: Airtable knows only the lead, so a refresh must change the lead
+  // and keep every co-presenter a CSV import or staff added (applyChunk).
+  const { presenters: _lead, ...extras } = extra.extras;
+  for (const key of ['leadName', 'leadRole']) {
+    if (fieldMap[key]) extras[key] = typeof extraSource[key] === 'string' && extraSource[key].trim() ? extraSource[key].trim() : null;
+  }
   return {
     ok: true,
     externalId,
-    row: { email: normalized, title: pitch.title, description: pitch.description, organization: pitch.organization, format: pitch.format },
+    row: { email: normalized, title: pitch.title, description: pitch.description, organization: pitch.organization, format: pitch.format, ...extras },
   };
+}
+
+const LEAD_KEYS = Object.freeze(['leadName', 'leadRole']);
+
+/** A row's pitch fields: everything but the lead's name and role. */
+function pitchFieldsOf(row) {
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !LEAD_KEYS.includes(key)));
+}
+
+/**
+ * The stored presenter list with the mapped lead fields applied. The lead's
+ * email follows the record; co-presenters and an unmapped field stay.
+ */
+function presentersWithLead(stored, row) {
+  const [lead, ...rest] = readPresenters(stored ?? { email: row.email, organization: row.organization });
+  return [{
+    ...lead,
+    email: row.email,
+    ...('leadName' in row ? { name: row.leadName } : {}),
+    ...('leadRole' in row ? { role: row.leadRole } : {}),
+    lead: true,
+  }, ...rest];
+}
+
+/** What a pitch stored before sourceValues reads as, for the comparison. */
+function legacyBaseline(stored) {
+  const [lead] = readPresenters(stored);
+  return { ...stored, leadName: lead?.name ?? null, leadRole: lead?.role ?? null };
 }
 
 function sameAirtable(stored, current) {
@@ -157,10 +207,12 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
         return;
       }
       const row = entry.mapped.row;
+      const hasLead = LEAD_KEYS.some((key) => key in row);
       if (!stored) {
         local.created += 1;
         tx.create(refs[i], {
-          ...row,
+          ...pitchFieldsOf(row),
+          ...(hasLead ? { presenters: presentersWithLead(null, row) } : {}),
           source: SOURCE_NAME,
           externalId: entry.externalId,
           airtable,
@@ -183,15 +235,19 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
       }
       // Compare with what Airtable sent last, not with the pitch: a staff
       // correction changes the pitch, not the source. A pitch stored before
-      // sourceValues existed compares with itself, as it always did.
-      const baseline = stored.sourceValues && typeof stored.sourceValues === 'object' ? stored.sourceValues : stored;
-      const changed = CONTENT_KEYS.filter((key) => (baseline[key] ?? null) !== row[key]);
+      // sourceValues existed compares with itself, as it always did. The
+      // legacy fields always count, and each mapped stepper field the row
+      // carries; values compare as JSON so a presenter list compares by value.
+      const baseline = stored.sourceValues && typeof stored.sourceValues === 'object' ? stored.sourceValues : legacyBaseline(stored);
+      const keys = [...CONTENT_KEYS, ...Object.keys(row).filter((key) => !CONTENT_KEYS.includes(key))];
+      const changed = keys.filter((key) => !sameValue(baseline[key], row[key]));
       const flagged = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);
       if (changed.length) {
         local.updated += 1;
         const revision = Number.isSafeInteger(stored.reviewRevision) ? stored.reviewRevision : 0;
         tx.update(refs[i], {
-          ...row,
+          ...pitchFieldsOf(row),
+          ...(hasLead ? { presenters: presentersWithLead(stored, row) } : {}),
           ...track,
           reviewRevision: revision + 1,
           sourceUpdatedAt: at,

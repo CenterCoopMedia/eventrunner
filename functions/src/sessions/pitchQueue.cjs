@@ -6,6 +6,7 @@ const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId, writeDraft } = require('../cms/store.cjs');
 const { validateSessionShape, validateSessionStructure } = require('../schedule/sessions.cjs');
 const { internals: { readSubmission, MAX_BODY_BYTES } } = require('./pitches.cjs');
+const { readImportedExtras, sameValue } = require('shared/pitchForm');
 
 const hash = (text) => createHash('sha256').update(text).digest('hex');
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -27,9 +28,13 @@ function readImport(body) {
     if (!externalId || externalId.length > 128 || ids.has(externalId)) return { error: `Row ${index + 1}: A unique externalId (at most 128 characters) is required.` };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return { error: `Row ${index + 1}: A valid email is required.` };
     if (row?.consent !== true || !pitch.ok) return { error: `Row ${index + 1}: ${pitch.ok ? 'consent: Must be true and evidenced in the source form.' : pitch.message}` };
+    // The pitch stepper's fields (ADR 0008 §2), only when the row has them,
+    // so a file with the legacy columns alone imports exactly as before.
+    const extra = readImportedExtras(row, { email });
+    if (!extra.ok) return { error: `Row ${index + 1}: ${extra.message}` };
     ids.add(externalId);
     rows.push({ id: hash(`import\0${source}\0${externalId}`), source, externalId, email,
-      title: pitch.title, description: pitch.description, organization: pitch.organization, format: pitch.format });
+      title: pitch.title, description: pitch.description, organization: pitch.organization, format: pitch.format, ...extra.extras });
   }
   return { rows };
 }
@@ -45,7 +50,9 @@ async function importPitches({ db, actor, body, at }) {
       if (!snap.exists) return;
       const stored = snap.data();
       const incoming = parsed.rows[i];
-      if (Object.keys(incoming).filter((key) => key !== 'id').some((key) => stored[key] !== incoming[key])) fail(409, 'import-conflict', `Row ${i + 1}: This source ID already exists with different content.`);
+      // By value: a presenter list read back from Firestore may hold its
+      // keys in another order than the one it was written in.
+      if (Object.keys(incoming).filter((key) => key !== 'id').some((key) => !sameValue(stored[key], incoming[key]))) fail(409, 'import-conflict', `Row ${i + 1}: This source ID already exists with different content.`);
     });
     parsed.rows.forEach(({ id: _id, ...row }, i) => {
       if (snaps[i].exists) return;

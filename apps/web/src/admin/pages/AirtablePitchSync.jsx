@@ -18,8 +18,18 @@ const FIELDS = [
   { key: 'organization', label: 'Organization field (optional)' },
   { key: 'format', label: 'Format field (optional)' },
   { key: 'externalId', label: 'External ID field (optional)', hint: 'Leave empty to use the Airtable record ID. Do not change this after the first refresh.' },
+  // The pitch stepper's fields (ADR 0008 §2). Co-presenters come by CSV only.
+  { key: 'summary', label: 'Summary field (optional)' },
+  { key: 'lengthMinutes', label: 'Length in minutes field (optional)', hint: 'A number field, or text such as 45.' },
+  { key: 'track', label: 'Track field (optional)' },
+  { key: 'audienceLevel', label: 'Audience field (optional)', hint: 'Everyone, New to the topic, Some experience, or Experienced practitioners.' },
+  { key: 'leadName', label: 'Lead presenter name field (optional)' },
+  { key: 'leadRole', label: 'Lead presenter role field (optional)' },
+  { key: 'accessNeeds', label: 'Access needs field (optional)' },
+  { key: 'notes', label: 'Notes to the organizers field (optional)' },
 ];
-const DEFAULT_MAP = { email: 'email', title: 'title', description: 'description', consent: 'consent', organization: 'organization', format: 'format', externalId: '' };
+const DEFAULT_MAP = { email: 'email', title: 'title', description: 'description', consent: 'consent', organization: 'organization', format: 'format', externalId: '',
+  summary: '', lengthMinutes: '', track: '', audienceLevel: '', leadName: '', leadRole: '', accessNeeds: '', notes: '' };
 const SCHEDULES = [
   { value: '0', label: 'Off. Staff refresh by hand.' },
   { value: '15', label: 'Every 15 minutes' },

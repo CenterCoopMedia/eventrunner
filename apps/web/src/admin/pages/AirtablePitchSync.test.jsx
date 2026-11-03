@@ -137,7 +137,7 @@ describe('Airtable connection settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save Airtable settings' }));
     await waitFor(() => expect(call).toHaveBeenCalledWith('updateAirtablePitchSource', {
       enabled: true, baseId: 'appAAAAAAAAAAAAAA', table: 'tblBBBBBBBBBBBBBB', view: null, scheduleMinutes: 60,
-      fieldMap: { email: 'email', title: 'title', description: 'description', consent: 'consent', organization: 'organization', format: 'format', externalId: null },
+      fieldMap: { email: 'email', title: 'title', description: 'description', consent: 'consent', organization: 'organization', format: 'format', externalId: null, summary: null, lengthMinutes: null, track: null, audienceLevel: null, leadName: null, leadRole: null, accessNeeds: null, notes: null },
     }));
     expect(await screen.findByText('Airtable settings saved. Refresh to check the connection.')).toBeInTheDocument();
     // The saved document arrives through the live listener. The form stays

@@ -14,7 +14,8 @@ const TOKEN = 'pat' + 'FAKEfake000000.' + '1'.repeat(64);
 const ENV = { EVENT_AIRTABLE_ENABLED: 'true', AIRTABLE_API_TOKEN: TOKEN };
 const BASE = 'appAAAAAAAAAAAAAA';
 const TABLE = 'tblBBBBBBBBBBBBBB';
-const fieldMap = { externalId: null, email: 'Email', title: 'Title', description: 'Description', organization: 'Organization', format: 'Format', consent: 'Consent' };
+// The stepper fields are optional and unmapped here (ADR 0008 §2).
+const fieldMap = { externalId: null, email: 'Email', title: 'Title', description: 'Description', organization: 'Organization', format: 'Format', consent: 'Consent', summary: null, lengthMinutes: null, track: null, audienceLevel: null, leadName: null, leadRole: null, accessNeeds: null, notes: null };
 const sourceDoc = { enabled: true, baseId: BASE, table: TABLE, view: null, fieldMap, scheduleMinutes: 0 };
 const bootstrap = { adminEmails: ['operator@example.test'], staffEmails: ['staff@example.test'] };
 const T0 = Date.parse('2026-10-20T14:00:00.000Z');
@@ -396,6 +397,22 @@ test('staff and operators refresh; others are refused; failures and limits answe
   assert.equal((await invoke(createRefreshAirtableHandler, { db, env: ENV, now: () => tick }, 'staff', {})).statusCode, 409);
 });
 
+test('a mapped stepper field comes in, and an unmapped one is left out of the row', () => {
+  const map = { ...fieldMap, summary: 'Summary', lengthMinutes: 'Minutes', audienceLevel: 'Audience', leadName: 'Lead' };
+  const mapped = mapRecord(record(1, { Summary: 'One line.', Minutes: 45, Audience: 'Everyone', Lead: 'Ada' }), map);
+  assert.equal(mapped.ok, true, JSON.stringify(mapped));
+  assert.equal(mapped.row.summary, 'One line.');
+  assert.equal(mapped.row.lengthMinutes, 45);
+  assert.equal(mapped.row.audienceLevel, 'everyone');
+  // The lead travels as its own field; applyChunk merges it into the list.
+  assert.equal(mapped.row.leadName, 'Ada');
+  assert.equal('presenters' in mapped.row, false);
+  assert.equal('track' in mapped.row, false);
+  assert.equal('summary' in mapRecord(record(1), fieldMap).row, false);
+  const bad = mapRecord(record(1, { Minutes: 'long' }), { ...fieldMap, lengthMinutes: 'Minutes' });
+  assert.deepEqual([bad.ok, bad.reason, bad.field], [false, 'invalid-field', 'Minutes']);
+});
+
 test('a refresh keeps a staff correction while the Airtable record is unchanged, and takes a real source change', async () => {
   const db = makeDb();
   const api = fakeAirtable([record(1)]);
@@ -416,4 +433,31 @@ test('a refresh keeps a staff correction while the Airtable record is unchanged,
   assert.equal(moved.counts.updated, 1);
   assert.equal(pitch(db, 1).title, 'Changed in Airtable');
   assert.equal(pitch(db, 1).sourceValues.title, 'Changed in Airtable');
+});
+
+test('a mapped lead name updates the lead only, and keeps the co-presenters and an unmapped lead role', async () => {
+  const db = makeDb({ 'session_pitch_sources/airtable': { ...sourceDoc, fieldMap: { ...fieldMap, leadName: 'Lead' } } });
+  const api = fakeAirtable([record(1, { Lead: 'Ada' })]);
+  const runWith = () => run(db, api);
+  tick = later();
+  await runWith();
+  const id = pitchIdFor(recId(1));
+  const created = pitch(db, 1);
+  assert.equal(created.presenters[0].name, 'Ada');
+  // Staff add a co-presenter and the lead's role on the pitch.
+  const lead = { ...created.presenters[0], role: 'Editor' };
+  await db.collection('session_pitches').doc(id).update({
+    presenters: [lead, { name: 'Bo', email: 'bo@example.test', organization: null, role: null, lead: false }],
+  });
+  api.rows = [record(1, { Lead: 'Ada Reporter' })];
+  tick = later();
+  const moved = await runWith();
+  assert.equal(moved.counts.updated, 1);
+  const after = pitch(db, 1).presenters;
+  assert.deepEqual(after.map((p) => [p.name, p.role, p.lead]), [['Ada Reporter', 'Editor', true], ['Bo', null, false]]);
+  // Unchanged after that: no new write, no revision bump.
+  const revision = pitch(db, 1).reviewRevision;
+  tick = later();
+  assert.equal((await runWith()).counts.unchanged, 1);
+  assert.equal(pitch(db, 1).reviewRevision, revision);
 });

@@ -42,7 +42,7 @@ const {
   readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
 } = require('shared/pitch');
 const {
-  checkPitch, presenterList, readPitchFormOptions, readPresenters, sameValue, validatePitchFormOptions,
+  IMPORT_FIELDS, checkPitch, presenterList, readPitchFormOptions, readPresenters, sameValue, validatePitchFormOptions,
 } = require('shared/pitchForm');
 
 const MAX_TITLE_LENGTH = 160;
@@ -547,7 +547,9 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
           // from the values before this edit, so the next refresh does not
           // read the correction as a change to undo.
           ...(stored.source === 'airtable' && !stored.sourceValues
-            ? { sourceValues: { email: stored.email ?? null, title: stored.title ?? null, description: stored.description ?? null, organization: stored.organization ?? null, format: stored.format ?? null } }
+            ? { sourceValues: Object.fromEntries(['email', 'title', 'description', 'organization', 'format', ...IMPORT_FIELDS, 'presenters']
+              .filter((key) => ['email', 'title', 'description', 'organization', 'format'].includes(key) || stored[key] !== undefined)
+              .map((key) => [key, stored[key] ?? null])) }
             : {}),
           reviewRevision: nextRevision,
           editedAt: at,

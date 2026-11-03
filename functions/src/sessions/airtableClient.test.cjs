@@ -11,7 +11,8 @@ const TOKEN = 'pat' + 'FAKEfake000000.' + '0'.repeat(64);
 const BASE = 'appAAAAAAAAAAAAAA';
 const TABLE = 'tblBBBBBBBBBBBBBB';
 const VIEW = 'viwCCCCCCCCCCCCCC';
-const fieldMap = { externalId: null, email: 'Email', title: 'Title', description: 'Description', organization: 'Organization', format: 'Format', consent: 'Consent' };
+// The stepper fields are optional and unmapped here (ADR 0008 §2).
+const fieldMap = { externalId: null, email: 'Email', title: 'Title', description: 'Description', organization: 'Organization', format: 'Format', consent: 'Consent', summary: null, lengthMinutes: null, track: null, audienceLevel: null, leadName: null, leadRole: null, accessNeeds: null, notes: null };
 const source = { enabled: true, baseId: BASE, table: TABLE, view: VIEW, fieldMap, scheduleMinutes: 0 };
 const rec = (n) => ({ id: `rec${String(n).padStart(14, '0')}`, fields: { Title: `Pitch ${n}` } });
 

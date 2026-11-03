@@ -110,6 +110,40 @@ test('the stored presenter list starts with the lead, and an old pitch reads as 
   ]);
 });
 
+const { readImportedExtras, PRESENTER_COLUMNS } = require('./pitchForm.cjs');
+
+test('an import with the legacy columns alone carries no stepper fields', () => {
+  assert.deepEqual(readImportedExtras({ title: 'T', description: 'D', organization: 'Org', format: 'Panel' }, { email: 'a@example.org' }), { ok: true, extras: {} });
+});
+
+test('an import carries the stepper fields it has, with outside choices and a label for the audience', () => {
+  const result = readImportedExtras({
+    title: 'T', description: 'D', organization: 'Org',
+    summary: ' One line. ', lengthMinutes: '45', track: 'Any track', audienceLevel: 'Some experience',
+    leadName: 'Ada', presenter_1_name: 'Bo', presenter_1_email: 'BO@example.org', presenter_2_name: '', presenter_2_email: '',
+  }, { email: 'ada@example.org' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.extras, {
+    summary: 'One line.',
+    lengthMinutes: 45,
+    track: 'Any track',
+    audienceLevel: 'intermediate',
+    presenters: [
+      { name: 'Ada', email: 'ada@example.org', organization: 'Org', role: null, lead: true },
+      { name: 'Bo', email: 'bo@example.org', organization: null, role: null, lead: false },
+    ],
+  });
+  assert.equal(PRESENTER_COLUMNS.length, 16);
+});
+
+test('an import with a bad length, audience or co-presenter is refused by field', () => {
+  assert.equal(readImportedExtras({ lengthMinutes: 'an hour' }, { email: 'a@example.org' }).field, 'lengthMinutes');
+  assert.equal(readImportedExtras({ audienceLevel: 'experts' }, { email: 'a@example.org' }).field, 'audienceLevel');
+  const co = readImportedExtras({ presenter_1_name: 'Bo', presenter_1_email: 'nope' }, { email: 'a@example.org' });
+  assert.equal(co.ok, false);
+  assert.equal(co.field, 'presenters.0.email');
+});
+
 const { sameValue } = require('./pitchForm.cjs');
 
 test('sameValue compares by value, whatever the order of keys in a map', () => {
