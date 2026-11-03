@@ -128,6 +128,21 @@ test('readiness reuses the launch policy and returns only check state', async ()
   assert.doesNotMatch(JSON.stringify(result), /private@example\.org/);
 });
 
+test('readiness reads the config fresh, not from the container cache', async () => {
+  // The setup page (ADR 0007 §6) checks again right after a save. A cached
+  // config (core/config.cjs, five minutes) would show the old state.
+  const db = makeFakeDb(seed());
+  const calls = [];
+  await internals.readEventReadiness({
+    db,
+    getConfig: async (options) => {
+      calls.push(options);
+      return config();
+    },
+  });
+  assert.deepEqual(calls, [{ forceRefresh: true }]);
+});
+
 test('the current-page diagnostic uses the route-owned id and bounds validator issues', async () => {
   const db = makeFakeDb(seed());
   const result = await internals.readCurrentPageDraft({ db }, { pageId: 'home' });
