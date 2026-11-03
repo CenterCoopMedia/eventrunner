@@ -161,3 +161,9 @@ Rules written after user corrections. Read at session start.
   which pins the rail's link count, after the unit tests were fixed. When a
   change adds a link, banner or block to every admin page, grep `e2e/` as
   well as `apps/web/src` for the count or the words it changes.
+
+## 2026-11-03: give times in Eastern time
+
+- A status message gave a check-in time in UTC. Joe works in Eastern time.
+  Give every time in a message in Eastern time (EST or EDT, as the date
+  needs), not UTC.
