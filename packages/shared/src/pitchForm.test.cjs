@@ -143,3 +143,14 @@ test('an import with a bad length, audience or co-presenter is refused by field'
   assert.equal(co.ok, false);
   assert.equal(co.field, 'presenters.0.email');
 });
+
+const { sameValue } = require('./pitchForm.cjs');
+
+test('sameValue compares by value, whatever the order of keys in a map', () => {
+  const written = [{ name: 'Ada', email: 'a@example.org', organization: null, role: null, lead: true }];
+  const readBack = [{ email: 'a@example.org', lead: true, name: 'Ada', organization: null, role: null }];
+  assert.equal(sameValue(written, readBack), true);
+  assert.equal(sameValue(written, [{ ...readBack[0], name: 'Bo' }]), false);
+  assert.equal(sameValue(null, undefined), true);
+  assert.equal(sameValue([1, 2], [2, 1]), false, 'list order still counts');
+});

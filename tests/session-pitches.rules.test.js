@@ -519,6 +519,15 @@ describe('pitch stepper fields (ADR 0008 §2)', () => {
     expect((await submit(full({ presenters: [{ name: 'Someone else', email: 'bo@example.test' }] }))).statusCode).toBe(409);
   });
 
+  it('replays a stored pitch whose presenter maps came back with their keys in another order', async () => {
+    expect((await submit(full())).statusCode).toBe(201);
+    const ref = db.collection('session_pitches').doc(PITCH_ID);
+    const stored = (await ref.get()).data();
+    const sorted = stored.presenters.map((p) => Object.fromEntries(Object.keys(p).sort().reverse().map((k) => [k, p[k]])));
+    await ref.update({ presenters: sorted });
+    expect((await submit(full())).statusCode).toBe(201);
+  });
+
   it('refuses a choice the staff lists do not offer, a missing lead name, and too many co-presenters', async () => {
     for (const body of [
       full({ format: 'Keynote' }),

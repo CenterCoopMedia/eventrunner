@@ -42,7 +42,7 @@ const {
   readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
 } = require('shared/pitch');
 const {
-  IMPORT_FIELDS, checkPitch, presenterList, readPitchFormOptions, readPresenters, validatePitchFormOptions,
+  IMPORT_FIELDS, checkPitch, presenterList, readPitchFormOptions, readPresenters, sameValue, validatePitchFormOptions,
 } = require('shared/pitchForm');
 
 const MAX_TITLE_LENGTH = 160;
@@ -205,9 +205,8 @@ function samePitch(stored, actor, pitch) {
       && (stored.format ?? null) === (pitch.format ?? null);
   }
   const expected = proposalOf(pitch, actor.email);
-  return Object.entries(expected).every(([key, value]) => (
-    JSON.stringify(stored[key] ?? null) === JSON.stringify(value)
-  ));
+  // By value: Firestore may return a presenter map's keys in another order.
+  return Object.entries(expected).every(([key, value]) => sameValue(stored[key], value));
 }
 
 function auditRow({ action, docPath, actor, at, details }) {
@@ -536,7 +535,7 @@ function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, lo
         }
         const next = proposalOf(checked.pitch, leadEmail);
         const before = storedProposal(stored);
-        const changed = EDITABLE_FIELDS.filter((field) => JSON.stringify(before[field]) !== JSON.stringify(next[field]));
+        const changed = EDITABLE_FIELDS.filter((field) => !sameValue(before[field], next[field]));
         if (changed.length === 0) return { outcome: 'unchanged', revision: currentRevision };
 
         const at = new Date(now());
