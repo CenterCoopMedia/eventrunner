@@ -21,6 +21,8 @@ import {
   CheckboxField, Notice, Panel, SaveStatus, ServerErrorSummary, fieldHintClass, primaryButtonClass, secondaryButtonClass,
 } from '../components/formControls.jsx';
 
+const FORM_ID = 'registration-form-editor';
+
 /** The stored form as editor state: custom choices as one line each. */
 function toDraft(stored) {
   const form = readRegistrationForm(stored);
@@ -101,12 +103,14 @@ export default function AdminRegistrationForm() {
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-md [overflow-wrap:anywhere]" noValidate>
+    <div className="flex flex-col gap-md [overflow-wrap:anywhere]">
       <AdminPageHeader
         title="Registration form"
         identifiers={`Revision ${draft.revision}`}
         description="The questions each attendee answers when they register. Answers about diet and access are private to staff."
-        actions={<button type="submit" className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save registration form'}</button>}
+        // The editor form is named here: the preview sits outside it, so Enter
+        // in a preview answer can never save the form.
+        actions={<button type="submit" form={FORM_ID} className={primaryButtonClass} disabled={busy || conflict || !dirty}>{busy ? 'Saving…' : 'Save registration form'}</button>}
       />
       {listError ? <Notice tone="caution" message="Cannot load the saved form. Reconnecting; it may be out of date." /> : null}
       {conflict ? (
@@ -119,6 +123,7 @@ export default function AdminRegistrationForm() {
       {result ? <SaveStatus message={result} /> : null}
 
       <div className="grid items-start gap-md xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <form id={FORM_ID} onSubmit={save} noValidate className="min-w-0">
         <fieldset disabled={busy} className="flex min-w-0 flex-col gap-md">
           <Panel title="Standard questions" description="Fixed wording. Ask the ones you need, and make any of them required.">
             <ul className="flex flex-col gap-sm">
@@ -165,11 +170,12 @@ export default function AdminRegistrationForm() {
             ) : <p className={fieldHintClass}>No questions of your own yet.</p>}
           </Panel>
         </fieldset>
+        </form>
 
         <Panel title="Preview" description="What an attendee sees, from the unsaved form. Try an answer and check it.">
           <RegistrationFormPreview form={form} />
         </Panel>
       </div>
-    </form>
+    </div>
   );
 }

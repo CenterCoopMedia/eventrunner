@@ -90,7 +90,8 @@ export default function RegistrationFormPreview({ form }) {
     setErrors(result.ok ? {} : result.errors);
   }
   return (
-    // A section, not a form: the preview sits inside the editor's form.
+    // A section, not a form. The page keeps it outside the editor's form, so
+    // Enter in an answer never submits the editor.
     <section className="flex flex-col gap-md" aria-label="Preview of the attendee's questions">
       <p className={fieldHintClass}>
         Each attendee on a ticket answers these. Answers about diet and access are private to staff. Nothing you enter here is saved.

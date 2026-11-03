@@ -93,6 +93,16 @@ describe('AdminRegistrationForm', () => {
     expect(screen.getByRole('checkbox', { name: 'Ask: Job title' })).not.toBeChecked();
   });
 
+  it('never saves the form when Enter is pressed in a preview answer', async () => {
+    callMock.mockResolvedValue({ revision: 3 });
+    await renderPage();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ask: Job title' }));
+    const answer = preview().getByLabelText('Organization (required)');
+    expect(answer.closest('form')).toBeNull();
+    fireEvent.submit(answer);
+    expect(callMock).not.toHaveBeenCalled();
+  });
+
   it('runs the shared answer check in the preview', async () => {
     await renderPage();
     fireEvent.click(preview().getByRole('button', { name: 'Check answers' }));
