@@ -28,17 +28,41 @@ async function shot(page, name) {
   await page.screenshot({ path: path.join(evidence, name + '.png'), animations: 'disabled' });
 }
 
-test('pitch entries survive sign-in, keyboard validation, a lost response, and reload', async ({ page }) => {
+async function nextStep(page, heading) {
+  await page.getByRole('button', { name: /^Next:/ }).click();
+  await expect(page.getByRole('heading', { level: 2, name: heading, exact: true })).toBeFocused();
+}
+
+test('pitch entries survive the steps, sign-in, keyboard validation, a lost response, and reload', async ({ page }) => {
   page.on('pageerror', (err) => console.error('Browser error:', err.message));
   const db = adminDb();
   await ensureUser(email);
   await page.goto('/pitch');
   await expect(page.getByRole('heading', { name: 'Pitch a session' })).toBeVisible();
   await expect(page.getByText('Submissions are open', { exact: true })).toBeVisible();
+  await expect(page.getByText('Step 1 of 5')).toBeVisible();
+
+  // Next checks the open step only, and keeps the reader on it.
+  await page.getByRole('button', { name: /^Next:/ }).click();
+  await expect(page.getByLabel('Session title', { exact: true })).toBeFocused();
+  await expect(page).toHaveURL(/\/pitch$/);
   await page.getByLabel('Session title', { exact: true }).fill(fixture.title);
   await page.getByLabel('Session description', { exact: true }).fill(fixture.description);
-  await page.getByLabel('Organization (optional)').fill(fixture.organization);
+  await nextStep(page, 'Format');
+  await expect(page).toHaveURL(/\/pitch\/format$/);
   await page.getByLabel('Format (optional)').fill(fixture.format);
+  await nextStep(page, 'Presenters');
+  await page.getByLabel('Your name').fill('Synthetic presenter');
+  await page.getByLabel('Your organization (optional)').fill(fixture.organization);
+  await nextStep(page, 'Access and notes');
+  await nextStep(page, 'Review and submit');
+
+  // A reload keeps the answers and the step.
+  await page.reload();
+  await expect(page).toHaveURL(/\/pitch\/review$/);
+  await expect(page.getByText(fixture.description)).toBeVisible();
+
+  // Sign-in on the Review step keeps every answer.
   await page.getByRole('checkbox', { name: /I agree that organizers/ }).check();
   const since = mailFileSize();
   await page.getByLabel('Email address', { exact: true }).fill(email);
@@ -46,23 +70,16 @@ test('pitch entries survive sign-in, keyboard validation, a lost response, and r
   await page.getByLabel('Six-digit code').fill(await waitForOtpCode(since, email));
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Submit pitch' })).toBeEnabled();
-  await expect(page.getByLabel('Session title', { exact: true })).toHaveValue(fixture.title);
-  await page.getByLabel('Session title', { exact: true }).fill('');
-  await page.getByLabel('Session description', { exact: true }).fill('');
-  await page.getByRole('button', { name: 'Submit pitch' }).click();
-  await expect(page.getByLabel('Session title', { exact: true })).toBeFocused();
-  await page.getByLabel('Session title', { exact: true }).press('R');
-  await expect(page.getByLabel('Session title', { exact: true })).toBeFocused();
-  await page.getByLabel('Session title', { exact: true }).fill(fixture.title);
-  await page.getByLabel('Session description', { exact: true }).fill(fixture.description);
-  await page.reload();
-  await expect(page.getByRole('button', { name: 'Submit pitch' })).toBeEnabled();
-  await expect(page.getByLabel('Session description', { exact: true })).toHaveValue(fixture.description);
+  await expect(page.getByText(`Submitting as ${email}`)).toBeVisible();
+  await expect(page.getByText(fixture.title, { exact: true })).toBeVisible();
+
   for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]]) {
     await page.setViewportSize(viewport);
     await shot(page, 'form-after-' + name);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
+  await page.setViewportSize({ width: 1280, height: 800 });
+
   // One committed request loses its answer. The next request must replay it.
   const receiptSince = mailFileSize();
   await page.route('**/submitSessionPitch', async (route) => {
@@ -73,7 +90,6 @@ test('pitch entries survive sign-in, keyboard validation, a lost response, and r
   });
   await page.getByRole('button', { name: 'Submit pitch' }).click();
   await expect(page.getByText(/Your entries are still here. Retry/)).toBeVisible();
-  await expect(page.getByLabel('Session title', { exact: true })).toHaveValue(fixture.title);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Submit pitch' })).toBeEnabled();
   await page.getByRole('button', { name: 'Submit pitch' }).click();
@@ -81,7 +97,12 @@ test('pitch entries survive sign-in, keyboard validation, a lost response, and r
   await expect(page.getByRole('heading', { name: 'Your pitch is saved' }).locator('..')).toBeFocused();
   const submitted = await db.collection('session_pitches').where('email', '==', email).get();
   expect(submitted.size).toBe(1);
-  expect(submitted.docs[0].data()).toMatchObject({ ...fixture, status: 'new', consent: { version: 'session-pitch-review-v1' } });
+  expect(submitted.docs[0].data()).toMatchObject({
+    ...fixture,
+    status: 'new',
+    consent: { version: 'session-pitch-review-v1' },
+    presenters: [{ name: 'Synthetic presenter', email, organization: fixture.organization, role: null, lead: true }],
+  });
   // Issue #324: one receipt for the stored pitch, although the form sent it twice.
   const receipt = await waitForTaggedMail(receiptSince, email, 'pitch.receipt');
   expect(receipt.text).toContain(`We received “${fixture.title}”.`);
@@ -91,7 +112,8 @@ test('pitch entries survive sign-in, keyboard validation, a lost response, and r
   expect((await callFunction('convertSessionPitch', {}, token)).status).toBe(403);
   expect((await callFunction('importSessionPitches', {}, token)).status).toBe(403);
   await page.getByRole('button', { name: 'Pitch another session' }).click();
-  await expect(page.getByLabel('Session title', { exact: true })).toBeFocused();
+  await expect(page.getByRole('heading', { level: 2, name: 'Your session', exact: true })).toBeFocused();
+  await expect(page.getByLabel('Session title', { exact: true })).toHaveValue('');
   await db.collection('session_pitches').doc(submitted.docs[0].id).delete();
 });
 
@@ -224,7 +246,7 @@ test('closed call retains entries and six themes work in both modes', async ({ p
   await page.getByLabel('Session title', { exact: true }).fill('Keep my idea');
   await adminDb().collection('config').doc('pitch_call').set({ enabled: true, closesAt: '2000-01-01T00:00:00Z' });
   await expect(page.getByText('Submissions are closed', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Submit pitch' })).toBeDisabled();
+  await expect(page.getByText('Submissions are closed. You cannot submit a pitch now.', { exact: false })).toBeVisible();
   await expect(page.getByLabel('Session title', { exact: true })).toHaveValue('Keep my idea');
   // Use the live theme owner so each preset and mode reaches the form.
   for (const style of ['civic', 'newsroom', 'broadsheet', 'atlas', 'field-guide', 'zine']) {

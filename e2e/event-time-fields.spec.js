@@ -277,7 +277,7 @@ test.describe.serial('event-time fields', () => {
     const submitterUid = await ensureUser('e2e-no-deadline-submitter@example.test');
     const token = await idTokenFor(submitterUid);
     const keys = [`no-deadline-${Date.now()}-a`, `no-deadline-${Date.now()}-b`];
-    const body = (submissionKey) => ({ title: 'A session with no deadline', description: 'Synthetic pitch for the no-deadline check.', organization: null, format: null, submissionKey, consent: true });
+    const body = (submissionKey) => ({ title: 'A session with no deadline', description: 'Synthetic pitch for the no-deadline check.', organization: null, format: null, leadName: 'Synthetic submitter', submissionKey, consent: true });
     try {
       expect((await callFunction('submitSessionPitch', body(keys[0]), token)).status).toBe(201);
 
@@ -290,7 +290,7 @@ test.describe.serial('event-time fields', () => {
       await page.keyboard.press('Enter');
       await expect.poll(async () => (await ref.get()).data()).toEqual({ enabled: false, closesAt: null, externalFormUrl: null });
       await expect(visitor.getByText('Submissions are closed', { exact: true })).toBeVisible();
-      await expect(visitor.getByRole('button', { name: 'Submit pitch' })).toBeDisabled();
+      await expect(visitor.getByText('Submissions are closed. You cannot submit a pitch now.', { exact: false })).toBeVisible();
       expect((await callFunction('submitSessionPitch', body(keys[1]), token)).status).toBe(404);
     } finally {
       await visitor.close();

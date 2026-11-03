@@ -2,11 +2,12 @@
 
 Session pitch intake is a private server workflow. A caller needs a verified Firebase sign-in. A ticket and attendee approval are not required.
 
-The public `config/pitch_call` document contains only three fields:
+The public `config/pitch_call` document contains only four fields:
 
 - `enabled`: A Boolean.
 - `closesAt`: An RFC3339 date and time, or `null` for a call with no deadline.
 - `externalFormUrl`: An https address of an external form, or `null`. Older documents without this field use this site's form.
+- `formOptions`: The choices the pitch form offers (`formats`, `lengths` in minutes, `tracks`) and `maxCoPresenters`. A missing field means no lists and up to four co-presenters. Only `updatePitchFormOptions` writes it, and `updatePitchCall` keeps it.
 
 The call is closed when the document is missing or malformed, when `enabled` is false, or when `closesAt` has passed. A call with `closesAt: null` has no deadline: it stays open until an operator saves `enabled: false`. A document with no `closesAt` field at all is malformed, so it reads as closed. Operators set all three fields through `updatePitchCall`. Clients cannot write the document directly.
 
@@ -119,6 +120,23 @@ All endpoints use `POST`, the configured Functions region, the normal CORS allow
 
 The server stores the closing time as a canonical UTC RFC3339 value. `"closesAt": null` saves a call with no deadline. A missing, blank or malformed `closesAt` is refused with `400`; only an explicit `null` means no deadline. `externalFormUrl` must be empty, `null` or an https address of 2,048 characters or fewer. An empty string or `null` saves `null` and selects this site's form. A request without the field keeps the stored form, so a deadline-only update cannot reopen native intake. The response returns all three stored fields. It writes the configuration and its `admin_logs` row in one transaction. The public configuration does not store an operator uid or email.
 
+### Set the pitch form options
+
+`updatePitchFormOptions` requires operator access.
+
+```json
+{
+  "formOptions": {
+    "formats": ["Panel", "Workshop"],
+    "lengths": [30, 60],
+    "tracks": ["Revenue", "Audience"],
+    "maxCoPresenters": 3
+  }
+}
+```
+
+Each list holds at most 20 choices. A format or track has a name of 1 to 80 characters, and no name is listed twice (case does not matter). A length is a whole number of minutes from 5 to 480. `maxCoPresenters` is 0 to 4. A wrong value is refused by name with `400`; nothing is cut or dropped. The server merges `formOptions` into `config/pitch_call` and writes an `admin_logs` row in the same transaction. An empty list hides its question on the public form.
+
 ### Submit a pitch
 
 `submitSessionPitch` accepts any verified Firebase sign-in.
@@ -126,15 +144,26 @@ The server stores the closing time as a canonical UTC RFC3339 value. `"closesAt"
 ```json
 {
   "title": "Building durable local reporting partnerships",
+  "summary": "Shared reporting that outlasts one news cycle.",
   "description": "A practical discussion of shared reporting and distribution workflows.",
   "organization": "Example newsroom",
   "format": "Panel",
+  "lengthMinutes": 60,
+  "track": "Audience",
+  "audienceLevel": "beginner",
+  "leadName": "Pat Example",
+  "leadRole": "Editor",
+  "presenters": [{ "name": "Sam Example", "email": "sam@example.org", "organization": null, "role": "Reporter" }],
+  "accessNeeds": null,
+  "notes": null,
   "submissionKey": "one-client-generated-key-per-form",
   "consent": true
 }
 ```
 
-`consent: true` records agreement to organizer storage, review, and contact. The stored consent includes its version and submission time. `title` and `description` are required, with limits of 160 and 5,000 characters. `organization` and `format` are optional, with limits of 200 and 120 characters. `submissionKey` must contain 8 to 128 letters, numbers, underscores, or hyphens. The submission payload limit is 40 KB, which covers all valid fields at their character limits, including Unicode and JSON escapes. The server stores the uid and normalized email from the verified token. It checks token revocation, so a disabled or deleted Firebase account cannot submit with an unexpired token. It ignores identity and review fields in the request body.
+The check is `shared/pitchForm` `checkPitch`, the same rule each step of the public form runs. `consent: true` records agreement to organizer storage, review, and contact. The stored consent includes its version and submission time. `title`, `description` and `leadName` (the person who pitches) are required, with limits of 160, 5,000 and 120 characters. Everything else is optional: `summary` (300), `organization` (200), `leadRole` (120), `accessNeeds` and `notes` (2,000 each). `format`, `lengthMinutes` and `track` must name one of the call's choices when the call lists them; with no format list, `format` is free text of up to 120 characters. `audienceLevel` is `everyone`, `beginner`, `intermediate` or `advanced`. `presenters` lists up to `maxCoPresenters` co-presenters, each with a name and a valid email that is not the submitter's or another co-presenter's. The server stores `presenters` with the lead first (`lead: true`, the verified email). Co-presenters get no email. `submissionKey` must contain 8 to 128 letters, numbers, underscores, or hyphens. The submission payload limit is 96 KB, which covers all valid fields at their character limits, including Unicode and JSON escapes.
+
+If an operator removes a choice while a pitch is on its way, the server reads the new list in the same transaction and refuses the pitch with `409 form-changed`. The page asks the visitor to reload and check the choice. A pitch stored before these fields existed has no `presenters`; readers treat its submitter as the one lead presenter, and a retry of it replays on its original four fields. The server stores the uid and normalized email from the verified token. It checks token revocation, so a disabled or deleted Firebase account cannot submit with an unexpired token. It ignores identity and review fields in the request body.
 
 Keep the same `submissionKey` while retrying one unchanged form. The server derives the stored record id from the verified uid and the key. An unchanged retry returns the original id and does not spend another rate-limit slot. A retry of a legacy proposal without consent stores the newly supplied consent and its time before returning success; it keeps the original proposal time and review revision. Changed content with the same account and key returns `409 conflict`. A different account has its own key namespace.
 
@@ -279,11 +308,15 @@ Deleting an attendee account does not delete its submitted pitches. A pitch rema
 
 Before deploying this version, check existing CMS pages and page drafts at `/pitch` and below it. Content generation and the site artifact build block deployment if any such page exists, including a hidden page or an unpublished draft. Rename and publish those pages through the CMS first. This check does not move or delete content.
 
-The public `/pitch` route uses the event branding and theme. Visitors can write before signing in. Google or an emailed code verifies their email without a ticket. The form retains entries and the retry key in browser tab storage through sign-in, reloads, and request failures. It clears the stored draft after a confirmed submission. Browser storage failure leaves entries available while the page stays open.
+The public `/pitch` route uses the event branding and theme. It is a stepper (ADR 0008): **Your session**, **Format**, **Presenters**, **Access and notes**, then **Review and submit**, each at its own address (`/pitch/session` … `/pitch/review`). **Next** checks only the open step and keeps the visitor on it until it passes. A later step does not open before the steps above it pass; an address that names one opens the first step that needs work. The Review step lists every answer with an **Edit** link to its step, the consent box, and sign-in. Visitors write before signing in. Google or an emailed code verifies their email without a ticket. The form keeps entries, the current step and the retry key in browser tab storage through sign-in, reloads, and request failures. It clears the stored draft after a confirmed submission. A draft from the one-page form is carried into the stepper once. Browser storage failure leaves entries available while the page stays open.
 
-The form requires a title, description, and organizer-review consent. Organization and format are optional. It displays the deadline in the visitor's timezone. A call with no deadline shows no date and no countdown. It says there is no set deadline. A missing, malformed, expired, or unreadable call keeps submission unavailable. Configure the deployment's consent and retention policy before opening intake; this acknowledgement does not grant permission to publish a proposal.
+The form requires a title, description, the lead presenter's name, and organizer-review consent. The other fields are optional. The Format step shows a choice list for each list the call sets, and a free-text format when it sets none. It displays the deadline in the visitor's timezone. A call with no deadline shows no date and no countdown. It says there is no set deadline. A missing, malformed, expired, or unreadable call keeps submission unavailable. Configure the deployment's consent and retention policy before opening intake; this acknowledgement does not grant permission to publish a proposal.
 
 Open **Session pitches** at `/admin/pitches`. Staff can search by title, email, or organization, filter by decision, and open each proposal. Save notes and the chosen decision explicitly. A concurrent edit disables saving and keeps your unsaved notes visible. Copy your notes before choosing **Load current review**, then reconcile them with the current revision. Saving a decision sends no email. Send the acceptance or decline email from the pitch after you save the decision (see [Pitch emails](#pitch-emails)).
+
+The review panel shows every answer: the summary, format, length, track, audience, the presenters with the lead first, access needs and notes. A field the visitor left empty reads **Not given**.
+
+Operators can expand **Manage the pitch form** to set the choices the form offers: formats, lengths in minutes and tracks, one per line, and how many co-presenters one pitch may name. An empty list hides its question. The page checks the lists with the server's rule before it saves.
 
 Operators can expand **Manage the call for sessions** and save an enabled state, a deadline and where people pitch.
 

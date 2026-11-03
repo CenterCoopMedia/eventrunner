@@ -120,6 +120,7 @@ export function AppRoutes() {
         <Route path="updates" element={<DeferredPage component={Updates} label="updates" />} />
         <Route path="updates/:id" element={<DeferredPage component={UpdateDetail} label="update" />} />
         <Route path="pitch" element={<DeferredPage component={SessionPitch} label="session pitch" />} />
+        <Route path="pitch/:stepSlug" element={<DeferredPage component={SessionPitch} label="session pitch" />} />
         <Route path="signin" element={<DeferredPage component={Login} label="sign in" />} />
         {/* Speaker invite acceptance (issue #21). Singular `speaker`, and
             reserved in shared/routing alongside the plural directory route:

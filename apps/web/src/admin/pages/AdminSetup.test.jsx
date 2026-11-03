@@ -129,7 +129,7 @@ describe('the setup stepper', () => {
     expect(items[1]).toHaveAttribute('aria-current', 'step');
     expect(items.filter((link) => link.hasAttribute('aria-current'))).toHaveLength(1);
     // On a narrow screen the list folds into one line above the step.
-    expect(screen.getByText('Step 2 of 7. Show all steps')).toBeInTheDocument();
+    expect(screen.getByText('Show all 7 steps')).toBeInTheDocument();
   });
 
   it('moves between steps by address, and puts the focus on the new step', async () => {

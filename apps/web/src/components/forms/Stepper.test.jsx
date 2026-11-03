@@ -46,7 +46,7 @@ describe('StepList', () => {
 
   it('folds into one line on a narrow screen, with one list in the document', () => {
     renderList({ wide: false });
-    expect(screen.getByText('Step 2 of 3. Show all steps').tagName).toBe('SUMMARY');
+    expect(screen.getByText('Show all 3 steps').tagName).toBe('SUMMARY');
     expect(screen.getAllByRole('list')).toHaveLength(1);
   });
 
