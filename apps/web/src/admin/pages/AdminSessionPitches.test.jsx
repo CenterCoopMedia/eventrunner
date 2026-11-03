@@ -3,7 +3,7 @@
 // server would read it as "no external form" and reopen native intake.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 let pitchCall;
 const call = vi.fn();
@@ -23,13 +23,27 @@ vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
 
 import { PITCH_NOTICE_DEFAULTS } from 'shared/pitch';
 import AdminSessionPitches from './AdminSessionPitches.jsx';
+import AdminSessionPitch from './AdminSessionPitch.jsx';
+import AdminPitchSettings from './AdminPitchSettings.jsx';
+
+/** The pitch pages at their admin addresses (ADR 0008, admin review). */
+function renderAt(path) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/admin/pitches" element={<AdminSessionPitches />} />
+        <Route path="/admin/pitches/settings" element={<AdminPitchSettings />} />
+        <Route path="/admin/pitches/:pitchId" element={<AdminSessionPitch />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 const CLOSES_AT = '2027-01-31T23:59:59-05:00';
 const FORM = 'https://airtable.com/appExample/shrExample';
 
 function open() {
-  render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-  fireEvent.click(screen.getByText('Manage the call for sessions'));
+  renderAt('/admin/pitches/settings');
 }
 
 beforeEach(() => {
@@ -105,8 +119,7 @@ const PITCH = {
 function openPitch(row) {
   collections.session_pitches = [row];
   pitchCall = { enabled: true, closesAt: CLOSES_AT, externalFormUrl: null };
-  render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-  fireEvent.click(screen.getByRole('button', { name: row.title }));
+  renderAt(`/admin/pitches/${row.id}`);
 }
 
 describe('AdminSessionPitches email settings', () => {
@@ -114,8 +127,7 @@ describe('AdminSessionPitches email settings', () => {
     collections.session_pitch_settings = [{ id: 'notices', revision: 3, receiptMode: 'automatic', templates: { 'pitch.declined': { subject: 'Custom decline', wording: 'Custom words.' } } }];
     call.mockResolvedValueOnce({ revision: 4 });
     pitchCall = { enabled: true, closesAt: CLOSES_AT, externalFormUrl: null };
-    render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-    fireEvent.click(screen.getByText('Manage pitch emails'));
+    renderAt('/admin/pitches/settings');
     expect(screen.getByLabelText('Decline email subject')).toHaveValue('Custom decline');
     expect(screen.getByLabelText('Receipt subject')).toHaveValue(PITCH_NOTICE_DEFAULTS['pitch.receipt'].subject);
     fireEvent.change(screen.getByLabelText('Receipts'), { target: { value: 'manual' } });
@@ -140,8 +152,7 @@ describe('AdminSessionPitches email settings conflict', () => {
   it('keeps unsaved wording and refuses to save over another operator’s settings', async () => {
     collections.session_pitch_settings = [{ id: 'notices', revision: 1, receiptMode: 'automatic', templates: {} }];
     pitchCall = { enabled: true, closesAt: CLOSES_AT, externalFormUrl: null };
-    render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-    fireEvent.click(screen.getByText('Manage pitch emails'));
+    renderAt('/admin/pitches/settings');
     fireEvent.change(screen.getByLabelText('Receipt wording'), { target: { value: 'My unsaved words.' } });
     push('session_pitch_settings', [{ id: 'notices', revision: 2, receiptMode: 'manual', templates: {} }]);
     expect(screen.getByLabelText('Receipt wording')).toHaveValue('My unsaved words.');
@@ -251,5 +262,109 @@ describe('AdminSessionPitches decision email', () => {
     openPitch({ ...PITCH, uid: null, status: 'in_review' });
     expect(screen.queryByText(/Prepare the/)).toBeNull();
     expect(screen.queryByText('Prepare a receipt')).toBeNull();
+  });
+});
+
+// ADR 0008, admin review: the queue in the list idiom, and one pitch with
+// decision buttons, separate notes, and staff edits.
+const QUEUE = [
+  { ...PITCH, id: 'p-new', title: 'Newest pitch', status: 'new', format: 'Workshop', lengthMinutes: 60, createdAt: new Date('2026-11-02T10:00:00Z'),
+    presenters: [{ name: 'Ada', email: 'presenter@example.test', lead: true }, { name: 'Bo', email: 'bo@example.test', lead: false }] },
+  { ...PITCH, id: 'p-old', title: 'Older pitch', status: 'rejected', createdAt: new Date('2026-11-01T10:00:00Z'), submitted: { title: 'Old' } },
+];
+
+describe('AdminSessionPitches queue', () => {
+  it('lists every pitch newest first with its decision, detail line and Review link, and counts them in the title band', () => {
+    collections.session_pitches = QUEUE;
+    renderAt('/admin/pitches');
+    expect(screen.getByText('2 pitches')).toBeInTheDocument();
+    const list = screen.getByRole('list', { name: 'Session pitches' });
+    const items = list.querySelectorAll(':scope > li');
+    expect([...items].map((item) => item.querySelector('a').textContent)).toEqual(['Newest pitch', 'Older pitch']);
+    expect(items[0]).toHaveTextContent('New');
+    expect(items[0]).toHaveTextContent('presenter@example.test · Workshop · 60 min · 2 presenters');
+    expect(items[1]).toHaveTextContent('Declined');
+    expect(items[1]).toHaveTextContent('Edited by staff');
+    expect(screen.getByRole('link', { name: 'Review Newest pitch' })).toHaveAttribute('href', '/admin/pitches/p-new');
+    expect(screen.getByRole('link', { name: 'Call settings' })).toHaveAttribute('href', '/admin/pitches/settings');
+    expect(screen.getByRole('link', { name: 'Import pitches' })).toHaveAttribute('href', '/admin/pitches/import');
+  });
+
+  it('filters by decision and searches presenter names', () => {
+    collections.session_pitches = QUEUE;
+    renderAt('/admin/pitches');
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'rejected' } });
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2.');
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'all' } });
+    fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'bo' } });
+    expect(screen.getByRole('status')).toHaveTextContent('Showing 1 of 2.');
+    expect(screen.getByRole('link', { name: 'Newest pitch' })).toBeInTheDocument();
+  });
+
+  it('says so when there are no pitches yet', () => {
+    renderAt('/admin/pitches');
+    expect(screen.getByText('No pitches yet')).toBeInTheDocument();
+  });
+});
+
+describe('AdminSessionPitch decisions, notes and edits', () => {
+  it('saves a decision with one press, without notes, and offers the other decisions', async () => {
+    openPitch({ ...PITCH, status: 'new' });
+    expect(screen.getByRole('heading', { level: 1, name: PITCH.title })).toBeInTheDocument();
+    const group = screen.getByRole('group', { name: 'Decision' });
+    expect([...group.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Accept', 'Decline', 'Mark in review']);
+    call.mockResolvedValueOnce({ id: PITCH.id, status: 'accepted', revision: 3 });
+    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    expect(await screen.findByText('Accepted. No email was sent.')).toBeInTheDocument();
+    expect(call).toHaveBeenCalledWith('reviewSessionPitch', { id: PITCH.id, status: 'accepted', expectedStatus: 'new', expectedRevision: 2 });
+  });
+
+  it('saves private notes on their own, keeping the decision', async () => {
+    openPitch({ ...PITCH, status: 'in_review' });
+    fireEvent.change(screen.getByLabelText('Private review notes'), { target: { value: 'Strong fit.' } });
+    call.mockResolvedValueOnce({ id: PITCH.id, status: 'in_review', revision: 3 });
+    fireEvent.click(screen.getByRole('button', { name: 'Save notes' }));
+    expect(await screen.findByText('Notes saved.')).toBeInTheDocument();
+    expect(call).toHaveBeenCalledWith('reviewSessionPitch', { id: PITCH.id, status: 'in_review', privateNotes: 'Strong fit.', expectedStatus: 'in_review', expectedRevision: 2 });
+  });
+
+  it('edits the proposal and sends the corrected fields with the revision it read', async () => {
+    openPitch({ ...PITCH, status: 'new', presenters: [{ name: 'Ada', email: PITCH.email, organization: null, role: null, lead: true }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit pitch' }));
+    expect(screen.getByText(/The lead’s email is the submitter’s and cannot change/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Reporting together, revised' } });
+    call.mockResolvedValueOnce({ id: PITCH.id, revision: 3, changed: ['title'] });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Changes saved. The submitted copy is kept. No email was sent.')).toBeInTheDocument();
+    const [name, body] = call.mock.calls.at(-1);
+    expect(name).toBe('editSessionPitch');
+    expect(body).toMatchObject({ id: PITCH.id, expectedRevision: 2, pitch: { title: 'Reporting together, revised', leadName: 'Ada', description: 'A workshop.', presenters: [] } });
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull();
+  });
+
+  it('keeps the edit open with the server reason when the edit is refused', async () => {
+    openPitch({ ...PITCH, status: 'new' });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit pitch' }));
+    call.mockRejectedValueOnce(new Error('leadName: Enter your name.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('leadName: Enter your name.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+  });
+
+  it('stops every control when the live pitch moves on, and offers the current version', () => {
+    openPitch({ ...PITCH, status: 'new' });
+    push('session_pitches', [{ ...PITCH, status: 'in_review', reviewRevision: 3 }]);
+    expect(screen.getByText(/This pitch changed since you opened it/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit pitch' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Load the current version' }));
+    expect(screen.getByText('Current version loaded.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
+  });
+
+  it('says so for an address with no pitch', () => {
+    collections.session_pitches = [];
+    renderAt('/admin/pitches/no-such-pitch');
+    expect(screen.getByText('No such pitch')).toBeInTheDocument();
   });
 });

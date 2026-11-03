@@ -39,6 +39,9 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // sessions list, so its figures and panels stay out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
+const AdminSessionPitch = lazy(() => import('./pages/AdminSessionPitch.jsx'));
+const AdminPitchSettings = lazy(() => import('./pages/AdminPitchSettings.jsx'));
+const AdminPitchImport = lazy(() => import('./pages/AdminPitchImport.jsx'));
 const AdminSpeakerReminders = lazy(() => import('./pages/AdminSpeakerReminders.jsx'));
 // Scheduled reminders (issue #518): one screen behind one link.
 const AdminReminderSchedules = lazy(() => import('./pages/AdminReminderSchedules.jsx'));
@@ -173,6 +176,9 @@ export default function AdminApp() {
             element={<DeferredAdminPage label="setup steps"><AdminSetup /></DeferredAdminPage>}
           />
           <Route path="pitches" element={<DeferredAdminPage label="session pitches"><AdminSessionPitches /></DeferredAdminPage>} />
+          <Route path="pitches/settings" element={<DeferredAdminPage label="pitch call settings"><AdminPitchSettings /></DeferredAdminPage>} />
+          <Route path="pitches/import" element={<DeferredAdminPage label="pitch import"><AdminPitchImport /></DeferredAdminPage>} />
+          <Route path="pitches/:pitchId" element={<DeferredAdminPage label="session pitch"><AdminSessionPitch /></DeferredAdminPage>} />
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />
           <Route path="pages/:pageId" element={<AdminPageEditor mode="edit" />} />

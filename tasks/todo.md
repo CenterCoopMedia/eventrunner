@@ -13,6 +13,9 @@ Order is set by NC Local's launch: pitch call and early-bird tickets first.
       length and track, `updatePitchFormOptions`, review panel. Stacked on R1.
       Server drafts across devices are not built; the draft stays in tab
       storage, as before.
+- [x] R2b Admin pitch pages in the house style: queue, one pitch with
+      decision buttons, notes and staff edits (`editSessionPitch`), settings
+      and import pages. Stacked on R2.
 - [ ] R2c CSV import, Airtable mapping and queue export for the new pitch
       fields and presenters.
 - [ ] R3 Accept a pitch: a speaker per presenter, dedupe by email, invite

@@ -42,7 +42,7 @@ const {
   readClosesAt, readPitchDeadline, readPitchFormUrl, isPitchCallOpen,
 } = require('shared/pitch');
 const {
-  checkPitch, presenterList, readPitchFormOptions, validatePitchFormOptions,
+  checkPitch, presenterList, readPitchFormOptions, readPresenters, validatePitchFormOptions,
 } = require('shared/pitchForm');
 
 const MAX_TITLE_LENGTH = 160;
@@ -442,6 +442,111 @@ function createUpdatePitchFormOptionsHandler({ db, auth, getConfig, now = Date.n
   };
 }
 
+/** The proposal fields a staff edit may change, in the order the audit names them. */
+const EDITABLE_FIELDS = Object.freeze([
+  'title', 'summary', 'description', 'organization', 'format', 'lengthMinutes', 'track',
+  'audienceLevel', 'presenters', 'accessNeeds', 'notes',
+]);
+
+/** A stored pitch's proposal, for the first-edit copy and the change list. */
+function storedProposal(stored) {
+  const proposal = {};
+  for (const field of EDITABLE_FIELDS) {
+    proposal[field] = field === 'presenters' ? readPresenters(stored) : (stored[field] ?? null);
+  }
+  return proposal;
+}
+
+/**
+ * A staff edit of a pitch's proposal (ADR 0008, admin review). The edit is
+ * checked like a new pitch, with one difference: a format, length or track
+ * the pitch already holds stays allowed after staff take it off the list,
+ * so correcting a typo never forces a second change. The lead presenter's
+ * email is the submitter's and cannot change; their name and role can.
+ *
+ * The first edit keeps a copy of the pitch as submitted (`submitted`), so
+ * what the person sent is never lost. The edit raises the review revision,
+ * so an open review of the old text conflicts. It sends no email.
+ */
+function createEditSessionPitchHandler({ db, auth, getConfig, now = Date.now, log = console }) {
+  return async function editSessionPitch(req, res) {
+    if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
+    const gate = await requireAdmin({ auth, db, getConfig }, req, { tier: 'staff' });
+    if (!gate.ok) return sendError(res, gate.status, gate.code, gate.message);
+    if (bodyBytes(req.body) > MAX_SUBMISSION_BODY_BYTES) {
+      return sendError(res, 413, 'payload-too-large', 'The edit is too large.');
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    if (!isValidDocId(body.id)) return badRequest(res, 'id: must be a session pitch id.');
+    if (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 0) {
+      return badRequest(res, 'expectedRevision: must be a non-negative whole number.');
+    }
+    const source = body.pitch && typeof body.pitch === 'object' && !Array.isArray(body.pitch) ? body.pitch : null;
+    if (!source) return badRequest(res, 'pitch: must be an object.');
+
+    const ref = db.collection(PITCHES).doc(body.id);
+    const callRef = db.collection('config').doc('pitch_call');
+    let outcome;
+    try {
+      outcome = await db.runTransaction(async (tx) => {
+        const [snap, callSnap] = await Promise.all([tx.get(ref), tx.get(callRef)]);
+        if (!snap.exists) return { outcome: 'missing' };
+        const stored = snap.data() || {};
+        const currentRevision = Number.isSafeInteger(stored.reviewRevision) ? stored.reviewRevision : 0;
+        if (currentRevision !== body.expectedRevision) return { outcome: 'conflict' };
+
+        const listed = readPitchFormOptions(callSnap.exists ? callSnap.data() : null);
+        const keep = (list, value) => (value === null || value === undefined || list.includes(value) ? list : [...list, value]);
+        const options = {
+          ...listed,
+          formats: listed.formats.length ? keep(listed.formats, stored.format) : [],
+          lengths: keep(listed.lengths, stored.lengthMinutes),
+          tracks: keep(listed.tracks, stored.track),
+          maxCoPresenters: Math.max(listed.maxCoPresenters, Math.max(0, readPresenters(stored).length - 1)),
+        };
+        const leadEmail = readPresenters(stored)[0]?.email ?? stored.email ?? null;
+        const fields = [...EDITABLE_FIELDS.filter((field) => field !== 'presenters'), 'leadName', 'leadRole', 'presenters'];
+        const checked = checkPitch(source, { options, submitterEmail: leadEmail, fields });
+        if (!checked.ok) {
+          const [field, message] = Object.entries(checked.errors)[0];
+          return { outcome: 'invalid', message: `${field}: ${message}` };
+        }
+        const next = proposalOf(checked.pitch, leadEmail);
+        const before = storedProposal(stored);
+        const changed = EDITABLE_FIELDS.filter((field) => JSON.stringify(before[field]) !== JSON.stringify(next[field]));
+        if (changed.length === 0) return { outcome: 'unchanged', revision: currentRevision };
+
+        const at = new Date(now());
+        const nextRevision = currentRevision + 1;
+        tx.update(ref, {
+          ...next,
+          ...(stored.submitted ? {} : { submitted: { ...before, at: stored.createdAt ?? null } }),
+          reviewRevision: nextRevision,
+          editedAt: at,
+          editedBy: gate.email,
+        });
+        tx.set(db.collection(ADMIN_LOGS).doc(), auditRow({
+          action: 'editSessionPitch',
+          docPath: `${PITCHES}/${body.id}`,
+          actor: gate,
+          at,
+          details: { changed, fromRevision: currentRevision, toRevision: nextRevision },
+        }));
+        return { outcome: 'updated', revision: nextRevision, changed };
+      });
+    } catch (err) {
+      log.error('editSessionPitch failed', err);
+      return internal(res, 'The session pitch edit could not be saved.');
+    }
+    if (outcome.outcome === 'missing') return notFound(res, 'No such session pitch.');
+    if (outcome.outcome === 'conflict') {
+      return sendError(res, 409, 'status-conflict', 'The session pitch changed. Refresh and try again.');
+    }
+    if (outcome.outcome === 'invalid') return badRequest(res, outcome.message);
+    return res.status(200).json({ id: body.id, revision: outcome.revision, changed: outcome.changed ?? [] });
+  };
+}
+
 function readReview(body) {
   const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
   if (!isValidDocId(source.id)) return { ok: false, message: 'id: must be a session pitch id.' };
@@ -568,6 +673,7 @@ function buildHandlers() {
     submitSessionPitch: expose(createSubmitSessionPitchHandler, { secrets }),
     updatePitchCall: expose(createUpdatePitchCallHandler),
     updatePitchFormOptions: expose(createUpdatePitchFormOptionsHandler),
+    editSessionPitch: expose(createEditSessionPitchHandler),
     reviewSessionPitch: expose(createReviewSessionPitchHandler),
     sendSessionPitchNotice: expose(createSendSessionPitchNoticeHandler, { secrets }),
     savePitchNoticeSettings: expose(createSavePitchNoticeSettingsHandler),
@@ -578,6 +684,7 @@ module.exports = {
   createSubmitSessionPitchHandler,
   createUpdatePitchCallHandler,
   createUpdatePitchFormOptionsHandler,
+  createEditSessionPitchHandler,
   createReviewSessionPitchHandler,
   get handlers() { return buildHandlers(); },
   internals: {

@@ -21,16 +21,16 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => 
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
 
 import AdminSessionPitches from './AdminSessionPitches.jsx';
+import AdminPitchSettings from './AdminPitchSettings.jsx';
 
 const STORED = '2027-02-01T04:59:59.000Z';
 const dateField = () => screen.getByLabelText('Deadline Date');
 const timeField = () => screen.getByLabelText('Deadline Time');
 const saveButton = () => screen.getByRole('button', { name: 'Save call settings' });
 
+// The call settings live on /admin/pitches/settings (ADR 0008, admin review).
 function open() {
-  const view = render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-  fireEvent.click(screen.getByText('Manage the call for sessions'));
-  return view;
+  return render(<MemoryRouter><AdminPitchSettings /></MemoryRouter>);
 }
 
 beforeEach(() => {
@@ -239,14 +239,18 @@ describe('AdminSessionPitches deadline', () => {
 
   it('shows the call settings to operators only', () => {
     operator = false;
+    render(<MemoryRouter><AdminPitchSettings /></MemoryRouter>);
+    expect(screen.getByText('Only operators can change these settings. Ask an operator to open or close the call.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Accept session pitches')).toBeNull();
+    cleanup();
     render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-    expect(screen.queryByText('Manage the call for sessions')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Call settings' })).toBeNull();
   });
 
   it('aligns the filter and search fields on their inputs at wide widths', () => {
     render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-    const row = screen.getByLabelText('Filter by decision').closest('.grid');
-    expect(row).toContainElement(screen.getByLabelText('Search pitches'));
+    const row = screen.getByLabelText('Decision').closest('.grid');
+    expect(row).toContainElement(screen.getByLabelText('Search'));
     expect(row.className).toMatch(/\bsm:items-end\b/);
   });
 });
