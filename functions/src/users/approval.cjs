@@ -9,6 +9,9 @@
  *   revokeUser   POST { uid } — admin-gated. Moves the account to `revoked`
  *                and CLEARS `approvalSource`.
  *
+ * approveUser also emails the attendee `attendee.approved` once, after the
+ * approval commits; a failed send never fails the approval.
+ *
  * These are the two edges of the §3.4 table no ticket can produce, and the
  * `approvalSource` they write is what makes the recomputation in
  * `ticketing/entitlement.cjs` behave correctly afterwards:
@@ -114,6 +117,8 @@ async function applyApproveUser({ db, uid, now = () => new Date() }) {
       registrationStatus: 'approved',
       approvalSource: 'admin',
       previousStatus: current,
+      // For the approval email, so it needs no second read.
+      account: { email: data.email ?? null, displayName: data.displayName ?? '' },
     };
   });
 }
@@ -170,6 +175,53 @@ async function applyRevokeUser({ db, uid, now = () => new Date() }) {
   });
 }
 
+/** The values of attendee.approved; `registration_url` is empty when the form asks nothing. */
+function approvedValues({ config, account, asksQuestions }) {
+  const site = String(config?.tierA?.publicUrl || '').replace(/\/+$/, '');
+  const name = typeof account.displayName === 'string' ? account.displayName.trim() : '';
+  return {
+    attendee_name: name || 'there',
+    dashboard_url: site ? `${site}/dashboard` : '',
+    registration_url: site && asksQuestions ? `${site}/registration` : '',
+  };
+}
+
+/**
+ * Email the attendee that they are approved (ADR 0008 §5). Only when the
+ * status moved to approved: a re-pin of a ticket approval or a replay
+ * sends nothing, and the onceKey keeps a later re-approval quiet too.
+ * Returns whether a message went out.
+ */
+async function sendAttendeeApproved({ db, sendEmail, getConfig, uid, result, now }) {
+  if (!sendEmail || result.previousStatus === 'approved' || !result.account) return false;
+  const to = typeof result.account.email === 'string' ? result.account.email.trim() : '';
+  if (!to) return false;
+  const { render } = require('../email/render.cjs');
+  const { getDefaultTemplate, loadTemplate } = require('../email/templates.cjs');
+  const { activeQuestions } = require('shared/registrationForm');
+  const config = await getConfig();
+  const formSnap = await db.collection('config').doc('registration_form').get();
+  const asksQuestions = activeQuestions(formSnap.exists ? formSnap.data() : null).length > 0;
+  const tokenValues = approvedValues({ config, account: result.account, asksQuestions });
+  if (!tokenValues.dashboard_url) return false;
+  const { override } = await loadTemplate({ db, id: 'attendee.approved', now: () => now().getTime() });
+  const rendered = render({ template: getDefaultTemplate('attendee.approved'), override, tokenValues, config });
+  const sent = await sendEmail({
+    to,
+    subject: rendered.subject,
+    html: rendered.html,
+    text: rendered.text,
+    tag: 'attendee.approved',
+    source: 'attendee-approval',
+    // Once per account, whatever happens to the approval later.
+    onceKey: `attendee-approved:${uid}`,
+    storeRendered: rendered.storeRendered,
+    hasLegalFooterHtml: rendered.hasLegalFooterHtml,
+    hasLegalFooterText: rendered.hasLegalFooterText,
+  });
+  return sent?.status === 'sent';
+}
+
 /**
  * Shared handler body for the two actions — same gate, same validation,
  * same audit row, so the pair cannot drift apart.
@@ -179,7 +231,7 @@ async function applyRevokeUser({ db, uid, now = () => new Date() }) {
  * @param {{ db: object, auth: object, getConfig: () => Promise<object>,
  *           now?: () => Date, log?: object }} deps
  */
-function createApprovalHandler({ action, apply }, { db, auth, getConfig, now = () => new Date(), log = console }) {
+function createApprovalHandler({ action, apply, notify }, { db, auth, getConfig, sendEmail, now = () => new Date(), log = console }) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
@@ -208,19 +260,31 @@ function createApprovalHandler({ action, apply }, { db, auth, getConfig, now = (
     // doing. Best-effort, same contract as everywhere else.
     await logAdminAction({ db, action, docPath: `${USERS}/${uid}`, actor: verdict, now, log });
 
-    res.status(200).json({
+    const body = {
       ok: true,
       uid,
       changed: result.changed,
       registrationStatus: result.registrationStatus,
       approvalSource: result.approvalSource,
-    });
+    };
+    if (notify) {
+      body.emailed = false;
+      if (result.changed) {
+        try {
+          body.emailed = await notify({ db, sendEmail, getConfig, uid, result, now });
+        } catch (err) {
+          // The approval stands; the email is a courtesy.
+          log.error(`${action} email failed`, err);
+        }
+      }
+    }
+    res.status(200).json(body);
   };
 }
 
 /** @param {object} deps */
 function createApproveUserHandler(deps) {
-  return createApprovalHandler({ action: 'approveUser', apply: applyApproveUser }, deps);
+  return createApprovalHandler({ action: 'approveUser', apply: applyApproveUser, notify: sendAttendeeApproved }, deps);
 }
 
 /** @param {object} deps */
@@ -247,11 +311,22 @@ function buildHandlers() {
     const { getEventConfig } = require('../core/config.cjs');
     const { getAuth } = require('firebase-admin/auth');
     const db = getDb();
-    return { db, auth: getAuth(), getConfig: () => getEventConfig({ db }) };
+    const getConfig = () => getEventConfig({ db });
+    // Built on first use, so a missing email provider fails only a send.
+    const sendEmail = (message) => {
+      const { createEmailCore } = require('../email/send.cjs');
+      const { getEmailProvider } = require('../email/providers/index.cjs');
+      return createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig }).send(message);
+    };
+    return { db, auth: getAuth(), getConfig, sendEmail };
   };
+  const { defineSecret } = require('firebase-functions/params');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
+  // Only approveUser sends mail, so only it is bound to the provider's secrets.
+  const secrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
 
   return {
-    approveUser: onRequest({ region }, withCors(async (req, res) => {
+    approveUser: onRequest({ region, secrets }, withCors(async (req, res) => {
       await createApproveUserHandler(buildAdminDeps())(req, res);
     })),
     revokeUser: onRequest({ region }, withCors(async (req, res) => {
@@ -268,5 +343,5 @@ module.exports = {
   get handlers() {
     return buildHandlers();
   },
-  internals: { readUid, USERS, MAX_UID_LEN },
+  internals: { readUid, approvedValues, USERS, MAX_UID_LEN },
 };

@@ -78,6 +78,8 @@ test.beforeEach(() => resetTemplateCacheForTest());
 test('listTemplateIds includes account, speaker, claim, and native ticket confirmations', () => {
   assert.deepEqual(listTemplateIds().sort(), [
     'account.welcome',
+    // ADR 0008 §5: an organizer approved an attendee.
+    'attendee.approved',
     'auth.otp',
     // Issue #330: change request notices, fixed wording.
     'changeRequest.declined',
@@ -126,6 +128,8 @@ test('storeRendered flags match the spec', () => {
   assert.equal(getDefaultTemplate('speaker.confirmation').storeRendered, true);
   // A reminder carries no credential, so the email log keeps its body.
   assert.equal(getDefaultTemplate('speaker.reminder').storeRendered, true);
+  // The approval email carries links, never a credential.
+  assert.equal(getDefaultTemplate('attendee.approved').storeRendered, true);
   // Neither ticket.* mail carries a bearer credential.
   assert.equal(getDefaultTemplate('ticket.get_ticket').storeRendered, true);
   assert.equal(getDefaultTemplate('ticket.claim_prompt').storeRendered, true);
@@ -139,6 +143,8 @@ test('required tokens match the spec', () => {
   assert.deepEqual(getDefaultTemplate('speaker.confirmation').requiredTokens, ['session_title']);
   assert.deepEqual(getDefaultTemplate('speaker.reminder').requiredTokens, ['dashboard_url']);
   assert.deepEqual(getDefaultTemplate('speaker.profile_received').requiredTokens, ['profile_url']);
+  // registration_url is optional: empty when the form asks no questions.
+  assert.deepEqual(getDefaultTemplate('attendee.approved').requiredTokens, ['dashboard_url']);
   // Every provider-parameterized field on the ticket.* pair can legitimately
   // be absent (§3.5 `action: 'await_approval'` sends no CTA at all), so
   // neither template requires one.

@@ -28,13 +28,13 @@ function world(extra = {}) {
     ...extra,
   });
 }
-async function save(db, token, body, { event = OPEN_EVENT, features = {} } = {}) {
+async function save(db, token, body, { event = OPEN_EVENT, features = {}, providerName = 'manual' } = {}) {
   const res = { statusCode: null, body: null, headers: {},
     set(name, value) { this.headers[name] = value; return this; },
     status(code) { this.statusCode = code; return this; },
     json(value) { this.body = value; return this; },
   };
-  await createSaveTicketAnswersHandler({ db, auth, getConfig: async () => ({ bootstrap, event, features }), now: () => NOW, log: { error() {}, warn() {} } })({
+  await createSaveTicketAnswersHandler({ db, auth, getConfig: async () => ({ bootstrap, event, features }), now: () => NOW, providerName, log: { error() {}, warn() {} } })({
     method: 'POST', headers: token ? { authorization: `Bearer ${token}` } : {}, body,
   }, res);
   return res;
@@ -124,4 +124,60 @@ test('a refund or cancellation marks the answers, and a ticket made valid again 
   await db.collection('tickets').doc('t-1').delete();
   await syncAnswerStatus({ db, ticketId: 't-1' });
   assert.equal(db.read('ticket_answers', 't-1').ticketStatus, 'cancelled');
+});
+
+// Events with no ticketing provider: the attendee answers for their account.
+const NONE = { providerName: 'none' };
+
+test('with no ticketing provider, the attendee answers for their account', async () => {
+  const db = world();
+  const res = await save(db, 'ada', { account: true, formRevision: 4, answers: ANSWERS }, NONE);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const stored = db.read('ticket_answers', 'account-ada');
+  assert.equal(stored.ticketId, null);
+  assert.equal(stored.account, true);
+  assert.equal(stored.uid, 'ada');
+  assert.equal(stored.ticketStatus, 'valid');
+  assert.equal(stored.answers.organization, 'Example News');
+  assert.equal(stored.questions.length, 4);
+  assert.equal(db.read('users', 'ada').profileVisibility, 'private');
+});
+
+test('account answers are refused when the event sells tickets, or combined with a ticket', async () => {
+  const db = world();
+  const manual = await save(db, 'ada', { account: true, formRevision: 4, answers: ANSWERS });
+  assert.equal(manual.statusCode, 409);
+  assert.equal(manual.body.error.code, 'account-answers-unavailable');
+  const both = await save(db, 'staff', { account: true, ticketId: 't-1', formRevision: 4, answers: ANSWERS }, NONE);
+  assert.equal(both.statusCode, 400);
+  assert.equal(db.read('ticket_answers', 'account-ada'), undefined);
+});
+
+test('account answers follow the same closing date and form revision as ticket answers', async () => {
+  const db = world();
+  const closed = await save(db, 'ada', { account: true, formRevision: 4, answers: ANSWERS }, { ...NONE, event: CLOSED_EVENT });
+  assert.equal(closed.statusCode, 409);
+  assert.equal(closed.body.error.code, 'registration-closed');
+  const stale = await save(db, 'ada', { account: true, formRevision: 3, answers: ANSWERS }, NONE);
+  assert.equal(stale.statusCode, 409);
+  assert.equal(stale.body.error.code, 'form-changed');
+  assert.equal(db.read('ticket_answers', 'account-ada'), undefined);
+});
+
+test('syncAnswerStatus leaves account answers alone: no ticket stands behind them', async () => {
+  const db = world({ 'ticket_answers/account-ada': { ticketId: null, account: true, uid: 'ada', answers: {}, ticketStatus: 'valid' } });
+  const writes = db.writes.length;
+  assert.deepEqual(await syncAnswerStatus({ db, ticketId: 'account-ada' }), { changed: false });
+  assert.equal(db.writes.length, writes);
+  assert.equal(db.read('ticket_answers', 'account-ada').ticketStatus, 'valid');
+});
+
+test('a staff member at an event with no tickets answers for their own account, under the same closing date', async () => {
+  const db = world({ 'users/staff': { uid: 'staff', profileVisibility: 'attendees_only' } });
+  const own = await save(db, 'staff', { account: true, formRevision: 4, answers: ANSWERS }, NONE);
+  assert.equal(own.statusCode, 200, JSON.stringify(own.body));
+  assert.equal(db.read('ticket_answers', 'account-staff').uid, 'staff');
+  assert.equal(db.writes.filter((write) => write.path.startsWith('admin_logs/')).length, 0, 'answering for oneself is not an admin action');
+  const closed = await save(db, 'staff', { account: true, formRevision: 4, answers: ANSWERS }, { ...NONE, event: CLOSED_EVENT });
+  assert.equal(closed.body.error.code, 'registration-closed');
 });

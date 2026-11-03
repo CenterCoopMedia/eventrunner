@@ -19,6 +19,8 @@ const { validateTemplateBody } = require('./render.cjs');
 const DEFAULTS = {
   'auth.otp': require('./templates/auth.otp.cjs'),
   'account.welcome': require('./templates/account.welcome.cjs'),
+  // ADR 0008 §5: an organizer approved an attendee (users/approval.cjs).
+  'attendee.approved': require('./templates/attendee.approved.cjs'),
   'feedback.confirmation': require('./templates/feedback.confirmation.cjs'),
   // Issue #330: fixed wording, rendered without an override
   // (admin/changeRequestNotices.cjs).
