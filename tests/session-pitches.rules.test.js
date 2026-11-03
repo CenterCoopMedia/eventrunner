@@ -555,6 +555,16 @@ describe('pitch stepper fields (ADR 0008 §2)', () => {
     expect((await db.collection('session_pitches').get()).empty).toBe(true);
   });
 
+  it('still replays a stored pitch after staff remove its choice, and refuses that choice on a new pitch', async () => {
+    expect((await submit(full())).statusCode).toBe(201);
+    await db.collection('config').doc('pitch_call').set({ formOptions: { ...OPTIONS, formats: ['Panel'], maxCoPresenters: 0 } }, { merge: true });
+    const replay = await submit(full());
+    expect(replay.statusCode).toBe(201);
+    expect(replay.body.id).toBe(PITCH_ID);
+    expect((await submit(full({ submissionKey: 'pitch-key-000002' }))).statusCode).toBe(400);
+    expect((await db.collection('session_pitches').get()).size).toBe(1);
+  });
+
   it('lets only an operator save the option lists, audits it, and keeps them across a call update', async () => {
     const next = { formats: [' Talk '], lengths: [45, 15], tracks: [], maxCoPresenters: 1 };
     expect((await updateOptions({ formOptions: next }, 'staff')).statusCode).toBe(403);
