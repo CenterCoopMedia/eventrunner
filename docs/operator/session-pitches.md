@@ -61,7 +61,7 @@ The settings are stored in `session_pitch_sources/airtable`. Only operators can 
 | Length in minutes (optional) | Number or single line text | A whole number from 5 to 480, such as `45`. It need not be one of the call's lengths. |
 | Track (optional) | Single line text or single select | Up to 120 characters. It need not be one of the call's tracks. |
 | Audience (optional) | Single select or single line text | `Everyone`, `New to the topic`, `Some experience` or `Experienced practitioners`, or the ids `everyone`, `beginner`, `intermediate`, `advanced`. |
-| Lead presenter name and role (optional) | Single line text | Up to 120 characters each. The record's email is the lead presenter's. |
+| Lead presenter name and role (optional) | Single line text | Up to 120 characters each. The record's email is the lead presenter's. A refresh changes only the lead's mapped fields; co-presenters from a CSV import or a staff edit stay. |
 | Access needs, notes (optional) | Long text | Up to 2,000 characters each. |
 
 A refresh writes only the fields you map. An unmapped field keeps what staff or a CSV import stored. Co-presenters are not mapped from Airtable, because each needs four fields; bring them in with the CSV import (`presenter_1_name` …).

@@ -404,7 +404,9 @@ test('a mapped stepper field comes in, and an unmapped one is left out of the ro
   assert.equal(mapped.row.summary, 'One line.');
   assert.equal(mapped.row.lengthMinutes, 45);
   assert.equal(mapped.row.audienceLevel, 'everyone');
-  assert.equal(mapped.row.presenters[0].name, 'Ada');
+  // The lead travels as its own field; applyChunk merges it into the list.
+  assert.equal(mapped.row.leadName, 'Ada');
+  assert.equal('presenters' in mapped.row, false);
   assert.equal('track' in mapped.row, false);
   assert.equal('summary' in mapRecord(record(1), fieldMap).row, false);
   const bad = mapRecord(record(1, { Minutes: 'long' }), { ...fieldMap, lengthMinutes: 'Minutes' });
@@ -431,4 +433,31 @@ test('a refresh keeps a staff correction while the Airtable record is unchanged,
   assert.equal(moved.counts.updated, 1);
   assert.equal(pitch(db, 1).title, 'Changed in Airtable');
   assert.equal(pitch(db, 1).sourceValues.title, 'Changed in Airtable');
+});
+
+test('a mapped lead name updates the lead only, and keeps the co-presenters and an unmapped lead role', async () => {
+  const db = makeDb({ 'session_pitch_sources/airtable': { ...sourceDoc, fieldMap: { ...fieldMap, leadName: 'Lead' } } });
+  const api = fakeAirtable([record(1, { Lead: 'Ada' })]);
+  const runWith = () => run(db, api);
+  tick = later();
+  await runWith();
+  const id = pitchIdFor(recId(1));
+  const created = pitch(db, 1);
+  assert.equal(created.presenters[0].name, 'Ada');
+  // Staff add a co-presenter and the lead's role on the pitch.
+  const lead = { ...created.presenters[0], role: 'Editor' };
+  await db.collection('session_pitches').doc(id).update({
+    presenters: [lead, { name: 'Bo', email: 'bo@example.test', organization: null, role: null, lead: false }],
+  });
+  api.rows = [record(1, { Lead: 'Ada Reporter' })];
+  tick = later();
+  const moved = await runWith();
+  assert.equal(moved.counts.updated, 1);
+  const after = pitch(db, 1).presenters;
+  assert.deepEqual(after.map((p) => [p.name, p.role, p.lead]), [['Ada Reporter', 'Editor', true], ['Bo', null, false]]);
+  // Unchanged after that: no new write, no revision bump.
+  const revision = pitch(db, 1).reviewRevision;
+  tick = later();
+  assert.equal((await runWith()).counts.unchanged, 1);
+  assert.equal(pitch(db, 1).reviewRevision, revision);
 });

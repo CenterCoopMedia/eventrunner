@@ -6,7 +6,7 @@ const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId, writeDraft } = require('../cms/store.cjs');
 const { validateSessionShape, validateSessionStructure } = require('../schedule/sessions.cjs');
 const { internals: { readSubmission, MAX_BODY_BYTES } } = require('./pitches.cjs');
-const { readImportedExtras } = require('shared/pitchForm');
+const { readImportedExtras, sameValue } = require('shared/pitchForm');
 
 const hash = (text) => createHash('sha256').update(text).digest('hex');
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -50,8 +50,9 @@ async function importPitches({ db, actor, body, at }) {
       if (!snap.exists) return;
       const stored = snap.data();
       const incoming = parsed.rows[i];
-      // JSON, because a presenter list is compared by value, not by reference.
-      if (Object.keys(incoming).filter((key) => key !== 'id').some((key) => JSON.stringify(stored[key] ?? null) !== JSON.stringify(incoming[key] ?? null))) fail(409, 'import-conflict', `Row ${i + 1}: This source ID already exists with different content.`);
+      // By value: a presenter list read back from Firestore may hold its
+      // keys in another order than the one it was written in.
+      if (Object.keys(incoming).filter((key) => key !== 'id').some((key) => !sameValue(stored[key], incoming[key]))) fail(409, 'import-conflict', `Row ${i + 1}: This source ID already exists with different content.`);
     });
     parsed.rows.forEach(({ id: _id, ...row }, i) => {
       if (snaps[i].exists) return;

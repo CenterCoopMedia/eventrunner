@@ -118,3 +118,20 @@ test('queue size and method gates refuse requests before proposal writes', async
     assert.equal(db.writes.length, 0);
   }
 });
+
+test('an unchanged re-import stays unchanged after Firestore returns the presenter keys in another order', async () => {
+  const db = makeFakeDb({ 'config/bootstrap': bootstrap });
+  const handler = createQueueHandler({ db, auth, getConfig: async () => ({ bootstrap }), now: () => 1000, log: { error() {} } }, 'import');
+  const body = { source: 'external-form', rows: [{ ...row, leadName: 'Ada', presenter_1_name: 'Bo', presenter_1_email: 'bo@example.test' }] };
+  const send = async (payload) => {
+    const res = { statusCode: 0, body: null, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return this; }, set() { return this; } };
+    await handler({ method: 'POST', headers: { authorization: 'Bearer staff' }, body: payload }, res);
+    return res;
+  };
+  assert.deepEqual((await send(body)).body, { imported: 1, unchanged: 0 });
+  const [id] = db.ids('session_pitches');
+  const stored = db.read('session_pitches', id);
+  const reordered = stored.presenters.map((p) => Object.fromEntries(Object.keys(p).sort().map((k) => [k, p[k]])));
+  await db.collection('session_pitches').doc(id).update({ presenters: reordered });
+  assert.deepEqual((await send(body)).body, { imported: 0, unchanged: 1 });
+});
