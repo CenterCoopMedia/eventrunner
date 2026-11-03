@@ -32,14 +32,17 @@ test.describe.serial('the setup checklist', () => {
     const doneBefore = items.filter((item) => item.state === 'ready').length;
 
     await signIn(page, ADMIN_EMAIL);
-    await page.goto('/admin/setup');
+    await page.goto('/admin/setup/legal');
     await expect(page.getByRole('heading', { level: 1, name: 'Set up your event' })).toBeVisible();
     await expect(page.getByText(`${doneBefore} of ${items.length} steps done`)).toBeVisible();
     const nav = page.getByRole('navigation', { name: 'Admin sections' });
     await expect(nav.getByRole('link', { name: 'Set up your event', exact: true })).toHaveAttribute('aria-current', 'page');
 
-    const legal = page.getByRole('listitem', { name: 'Approve the privacy policy and terms' });
+    const legal = page.locator('section', { has: page.getByRole('heading', { level: 2, name: 'Approve the privacy policy and terms' }) });
+    await expect(legal.getByText('Step 4 of 7')).toBeVisible();
     await expect(legal.getByText('To do', { exact: true })).toBeVisible();
+    // The step list beside the step marks this one as the current step.
+    await expect(page.getByRole('list', { name: 'Setup steps' }).getByRole('link', { name: /Approve the privacy policy and terms/ })).toHaveAttribute('aria-current', 'step');
     await legal.getByRole('checkbox').check();
     await legal.getByRole('button', { name: 'Mark the review complete' }).click();
 

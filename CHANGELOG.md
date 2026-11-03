@@ -37,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Set up your event** (`/admin/setup`, ADR 0007): the launch-readiness rows
-  as a checklist in the admin panel. Each step says who does it (the client,
+  as a stepper in the admin panel, one step at a time at its own address
+  (`/admin/setup/<step>`), with the step list beside it. Each step says who does it (the client,
   the hosting team, or both), its state from the server, and the screen that
   completes it. An operator can now mark the legal review complete there.
   Before this, no admin screen cleared `legal.reviewRequired`, although the

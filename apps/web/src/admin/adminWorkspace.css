@@ -300,3 +300,38 @@
   }
 }
 .admin-branding-layout-actions { display: flex; justify-content: flex-end; margin-bottom: var(--space-2xs); }
+
+
+/* "Set up your event" (ADR 0007 §7): a stepper. The step list sits beside
+   the step on a wide screen and folds into one line on a narrow one. The
+   state of each step is a word as well as a mark. */
+.admin-setup-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); align-items: start; }
+.admin-setup-steps { display: flex; flex-direction: column; gap: var(--space-2xs); }
+.admin-setup-step-link {
+  display: flex; align-items: center; gap: var(--space-sm); min-height: var(--admin-control-height);
+  padding: var(--space-xs) var(--space-sm); border: 1px solid rgb(var(--admin-rule-hairline-rgb));
+  border-radius: var(--admin-radius); background: rgb(var(--admin-ground-raised-rgb)); color: rgb(var(--admin-ink-rgb));
+  text-decoration: none;
+}
+.admin-setup-step-link[aria-current='step'] { border-color: rgb(var(--admin-action-rgb)); border-inline-start-width: 4px; background: rgb(var(--admin-action-soft-rgb)); }
+.admin-setup-step-marker {
+  display: inline-grid; place-items: center; flex: none; inline-size: 1.75rem; block-size: 1.75rem;
+  border: 1px solid rgb(var(--admin-rule-control-rgb)); border-radius: var(--admin-radius);
+  font-family: var(--admin-font-data, inherit); font-size: var(--admin-text-sm); font-weight: 700;
+}
+.admin-setup-step-link[data-done] .admin-setup-step-marker { border-color: transparent; background: rgb(var(--admin-ground-ok-rgb)); color: rgb(var(--admin-state-ok-rgb)); }
+.admin-setup-step-text { display: flex; flex-direction: column; min-width: 0; }
+.admin-setup-step-title { font-weight: 600; }
+.admin-setup-step-link[aria-current='step'] .admin-setup-step-title { font-weight: 700; }
+.admin-setup-step-state { font-size: var(--admin-text-xs); color: rgb(var(--admin-ink-secondary-rgb)); }
+.admin-setup-steps-fold { border: 1px solid rgb(var(--admin-rule-hairline-rgb)); border-radius: var(--admin-radius); background: rgb(var(--admin-ground-raised-rgb)); }
+.admin-setup-steps-summary { min-height: var(--admin-control-height); display: flex; align-items: center; padding: var(--space-xs) var(--space-sm); font-weight: 600; cursor: pointer; }
+.admin-setup-steps-fold[open] > .admin-setup-steps { padding: 0 var(--space-xs) var(--space-xs); }
+.admin-setup-detail { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; }
+.admin-setup-pager { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-xs); margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid rgb(var(--admin-rule-hairline-rgb)); }
+@media (hover: hover) and (pointer: fine) {
+  .admin-setup-step-link:hover { border-color: rgb(var(--admin-action-rgb)); }
+}
+@media (min-width: 1024px) {
+  .admin-setup-layout { grid-template-columns: minmax(15rem, 19rem) minmax(0, 1fr); }
+}

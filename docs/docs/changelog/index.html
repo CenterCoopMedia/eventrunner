@@ -146,7 +146,8 @@
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
           <li><strong>Set up your event</strong> (<code>/admin/setup</code>, ADR 0007): the launch-readiness rows
-          as a checklist in the admin panel. Each step says who does it (the client,
+          as a stepper in the admin panel, one step at a time at its own address
+          (<code>/admin/setup/&lt;step&gt;</code>), with the step list beside it. Each step says who does it (the client,
           the hosting team, or both), its state from the server, and the screen that
           completes it. An operator can now mark the legal review complete there.
           Before this, no admin screen cleared <code>legal.reviewRequired</code>, although the

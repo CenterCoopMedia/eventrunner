@@ -168,6 +168,10 @@ export default function AdminApp() {
             path="setup"
             element={<DeferredAdminPage label="setup steps"><AdminSetup /></DeferredAdminPage>}
           />
+          <Route
+            path="setup/:stepSlug"
+            element={<DeferredAdminPage label="setup steps"><AdminSetup /></DeferredAdminPage>}
+          />
           <Route path="pitches" element={<DeferredAdminPage label="session pitches"><AdminSessionPitches /></DeferredAdminPage>} />
           <Route path="pages" element={<AdminPagesList />} />
           <Route path="pages/new" element={<AdminPageEditor mode="create" />} />

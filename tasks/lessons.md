@@ -167,3 +167,13 @@ Rules written after user corrections. Read at session start.
 - A status message gave a check-in time in UTC. Joe works in Eastern time.
   Give every time in a message in Eastern time (EST or EDT, as the date
   needs), not UTC.
+
+## 2026-11-03: multi-step work is a stepper, not a long page
+
+- The setup checklist shipped as one long page. Joe asked for steppers or
+  multipage forms instead. Any flow with several steps (setup, registration,
+  pitches, onboarding) shows one step at a time, at its own address, with a
+  step list, Back and Next. This settles the open question in
+  `docs/plans/2026-09-09-cjs-parity-gap.md` (keep one form or add steps) in
+  favour of steps. Ask questions for Joe through AskUserQuestion, never in
+  chat text (he had to remind me again on this date).

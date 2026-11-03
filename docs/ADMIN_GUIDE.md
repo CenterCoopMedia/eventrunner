@@ -37,21 +37,23 @@ Staff access can end at a set time, for example for a demo account. Until that t
 
 ## Set up your event: The launch checklist
 
-Open **Set up your event**, under **Overview** on the rail. It lists the steps that must be done before the site goes live:
+Open **Set up your event**, under **Overview** on the rail. It is a stepper: one step at a time, with the list of every step beside it (on a phone, select **Show all steps**). It opens on the first step that is not done. **Back** and **Next** move between steps, and each step has its own address, for example `/admin/setup/logos`. These are the steps that must be done before the site goes live:
 
 | Step | Who does it | Where |
 | --- | --- | --- |
 | Add a second operator | You | Settings → Access |
 | Upload your logos | You | Settings → Branding |
 | Replace the placeholder text | You | Content |
-| Approve the privacy policy and terms | You | Content, then this page |
-| Verify your email domain | You and the hosting team | Your DNS, then the hosting team |
+| Approve the privacy policy and terms | You | The privacy policy in Content, then this page |
+| Set up your event email | You and the hosting team | The hosting team tells you if anything is needed from you |
 | Connect ticket sales | The hosting team | Ticketing shows the result |
 | Turn on Google sign-in | The hosting team | Nothing to do in the admin panel |
 
 Each step shows **Done** or **To do**. The server decides the state. It uses the same check that the hosting team runs before launch. Select **Check again** after you finish a step.
 
-**Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens **Set up your event**, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Mark the review complete**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
+**Approve the privacy policy and terms.** The site starts with a first draft of both pages. Your legal counsel reviews and edits them in the Content editor. Then an operator opens the **Approve the privacy policy and terms** step, ticks **Our counsel reviewed and approved the privacy policy and the terms**, and selects **Mark the review complete**. The public notice on both pages then goes away. Staff see the step but cannot mark it complete.
+
+The first-visit tour of the admin panel does not open over this page. It opens on the next admin page you visit.
 
 When every step is done, tell the hosting team. They run the launch check and publish the site.
 

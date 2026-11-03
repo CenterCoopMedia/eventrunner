@@ -68,17 +68,23 @@ function endpoints() {
   return fetch.mock.calls.map(([url]) => String(url).split('/').pop());
 }
 
-async function renderSetup() {
+async function renderSetup(path = '/admin/setup') {
   render(
-    <MemoryRouter initialEntries={['/admin/setup']}>
+    <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   );
   return screen.findByRole('heading', { level: 1, name: 'Set up your event' }, { timeout: 10_000 });
 }
 
-function step(title) {
-  return screen.getByRole('listitem', { name: title });
+/** The open step: its heading and the region it names. */
+async function openStep(title) {
+  const heading = await screen.findByRole('heading', { level: 2, name: title });
+  return heading.closest('section');
+}
+
+function stepList() {
+  return screen.getByRole('list', { name: 'Setup steps' });
 }
 
 beforeEach(() => {
@@ -99,32 +105,72 @@ describe('joinSetupSteps', () => {
   });
 });
 
-describe('the setup page', () => {
-  it('shows each step with the state the server answered, who does it, and where to go', async () => {
-    fetch.mockResolvedValueOnce(okResponse(readiness(['seeded', 'ticketing'])));
+describe('the setup stepper', () => {
+  it('opens the first step that is not done, and lists every step with its state', async () => {
+    fetch.mockResolvedValueOnce(okResponse(readiness(['admins', 'ticketing'])));
     await renderSetup();
 
     await screen.findByText('2 of 7 steps done');
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
 
-    const admins = step('Add a second operator');
-    expect(within(admins).getByText('To do')).toBeInTheDocument();
-    expect(within(admins).getByText('You')).toBeInTheDocument();
-    expect(within(admins).getByRole('link', { name: 'Open Access' })).toHaveAttribute('href', '/admin/access');
+    const step = await openStep('Upload your logos');
+    expect(within(step).getByText('Step 2 of 7')).toBeInTheDocument();
+    expect(within(step).getByText('To do')).toBeInTheDocument();
+    expect(within(step).getByText('You')).toBeInTheDocument();
+    expect(within(step).getByRole('link', { name: 'Open Branding' })).toHaveAttribute('href', '/admin/branding');
+    expect(within(step).getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/admin/setup/team');
+    expect(within(step).getByRole('link', { name: 'Next: Replace the placeholder text' })).toHaveAttribute('href', '/admin/setup/text');
 
-    const seeded = step('Replace the placeholder text');
-    expect(within(seeded).getByText('Done')).toBeInTheDocument();
-    expect(within(seeded).getByText('No placeholder text is left.')).toBeInTheDocument();
-    expect(within(seeded).queryByRole('link')).toBeNull();
+    // Every step is in the list, in order, with its state in words.
+    const items = within(stepList()).getAllByRole('link');
+    expect(items.map((link) => link.getAttribute('href'))).toEqual(SETUP_STEPS.map((s) => `/admin/setup/${s.slug}`));
+    expect(items[0]).toHaveTextContent('Add a second operatorDone');
+    expect(items[1]).toHaveTextContent('Upload your logosTo do');
+    expect(items[1]).toHaveAttribute('aria-current', 'step');
+    expect(items.filter((link) => link.hasAttribute('aria-current'))).toHaveLength(1);
+    // On a narrow screen the list folds into one line above the step.
+    expect(screen.getByText('Step 2 of 7. Show all steps')).toBeInTheDocument();
+  });
 
-    expect(within(step('Verify your email domain')).getByText('You and the hosting team')).toBeInTheDocument();
-    expect(within(step('Turn on Google sign-in')).getByText('Hosting team')).toBeInTheDocument();
+  it('moves between steps by address, and puts the focus on the new step', async () => {
+    fetch.mockResolvedValueOnce(okResponse(readiness([])));
+    await renderSetup('/admin/setup/text');
+    const step = await openStep('Replace the placeholder text');
+    expect(within(step).getByText('Step 3 of 7')).toBeInTheDocument();
 
-    // The steps the client can do today come first.
-    const titles = within(screen.getByRole('list', { name: 'Setup steps' }))
-      .getAllByRole('heading', { level: 3 })
-      .map((heading) => heading.textContent);
-    expect(titles).toEqual(SETUP_STEPS.map((s) => s.title));
+    fireEvent.click(within(step).getByRole('link', { name: 'Next: Approve the privacy policy and terms' }));
+    const next = await openStep('Approve the privacy policy and terms');
+    await waitFor(() => expect(document.activeElement).toBe(within(next).getByRole('heading', { level: 2 })));
+    expect(within(next).getByRole('link', { name: 'Open the privacy policy' })).toHaveAttribute('href', '/admin/content/privacy');
+    // One check for the whole visit, not one per step.
+    expect(endpoints()).toEqual(['webMcpCheckEventReadiness']);
+  });
+
+  it('has no Back on the first step and no Next on the last', async () => {
+    fetch.mockResolvedValueOnce(okResponse(readiness([])));
+    await renderSetup('/admin/setup/team');
+    const first = await openStep('Add a second operator');
+    expect(within(first).queryByRole('link', { name: 'Back' })).toBeNull();
+
+    fireEvent.click(within(stepList()).getByRole('link', { name: /Turn on Google sign-in/ }));
+    const last = await openStep('Turn on Google sign-in');
+    expect(within(last).getByText('Step 7 of 7')).toBeInTheDocument();
+    expect(within(last).queryByRole('link', { name: /^Next/ })).toBeNull();
+    expect(within(last).getByText('Hosting team')).toBeInTheDocument();
+  });
+
+  it('sends an unknown step address to the first open step', async () => {
+    fetch.mockResolvedValueOnce(okResponse(readiness(['admins'])));
+    await renderSetup('/admin/setup/no-such-step');
+    await openStep('Upload your logos');
+  });
+
+  it('speaks of the event email in plain words', async () => {
+    fetch.mockResolvedValueOnce(okResponse(readiness([])));
+    await renderSetup('/admin/setup/email');
+    const step = await openStep('Set up your event email');
+    expect(within(step).getByText('You and the hosting team')).toBeInTheDocument();
+    expect(step.textContent).not.toMatch(/SPF|DKIM|DMARC|DNS/);
   });
 
   it('lets an operator mark the legal review complete, and checks again', async () => {
@@ -132,8 +178,8 @@ describe('the setup page', () => {
       .mockResolvedValueOnce(okResponse(readiness([])))
       .mockResolvedValueOnce(okResponse({ ok: true }))
       .mockResolvedValueOnce(okResponse(readiness(['legal'])));
-    await renderSetup();
-    const legal = await screen.findByRole('listitem', { name: 'Approve the privacy policy and terms' });
+    await renderSetup('/admin/setup/legal');
+    const legal = await openStep('Approve the privacy policy and terms');
 
     // The box must be ticked first; the press without it saves nothing.
     fireEvent.click(within(legal).getByRole('button', { name: 'Mark the review complete' }));
@@ -146,15 +192,17 @@ describe('the setup page', () => {
     await screen.findByText('1 of 7 steps done');
     expect(endpoints()).toEqual(['webMcpCheckEventReadiness', 'updateEventConfig', 'webMcpCheckEventReadiness']);
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ event: { legal: { reviewRequired: false } } });
-    expect(within(step('Approve the privacy policy and terms')).getByText('Done')).toBeInTheDocument();
+    const done = await openStep('Approve the privacy policy and terms');
+    expect(within(done).getByText('Done')).toBeInTheDocument();
+    expect(within(done).queryByRole('checkbox')).toBeNull();
   });
 
   it('states a refused legal save in place and keeps the step open', async () => {
     fetch
       .mockResolvedValueOnce(okResponse(readiness([])))
       .mockResolvedValueOnce(errorResponse(403, 'forbidden', 'Operator access required.'));
-    await renderSetup();
-    const legal = await screen.findByRole('listitem', { name: 'Approve the privacy policy and terms' });
+    await renderSetup('/admin/setup/legal');
+    const legal = await openStep('Approve the privacy policy and terms');
     fireEvent.click(within(legal).getByRole('checkbox'));
     fireEvent.click(within(legal).getByRole('button', { name: 'Mark the review complete' }));
 
@@ -165,14 +213,17 @@ describe('the setup page', () => {
   it('gives staff no operator links and no legal sign-off', async () => {
     tier.value = 'staff';
     fetch.mockResolvedValueOnce(okResponse(readiness([])));
-    await renderSetup();
-    const admins = await screen.findByRole('listitem', { name: 'Add a second operator' });
+    await renderSetup('/admin/setup/team');
+    const team = await openStep('Add a second operator');
+    expect(within(team).queryByRole('link', { name: 'Open Access' })).toBeNull();
+    expect(within(team).getByText('An operator completes this step.')).toBeInTheDocument();
 
-    expect(within(admins).queryByRole('link')).toBeNull();
-    expect(within(admins).getByText('An operator completes this step.')).toBeInTheDocument();
-    const legal = step('Approve the privacy policy and terms');
+    fireEvent.click(within(team).getByRole('link', { name: /^Next/ }));
+    fireEvent.click(within(await openStep('Upload your logos')).getByRole('link', { name: /^Next/ }));
+    fireEvent.click(within(await openStep('Replace the placeholder text')).getByRole('link', { name: /^Next/ }));
+    const legal = await openStep('Approve the privacy policy and terms');
     expect(within(legal).queryByRole('checkbox')).toBeNull();
-    expect(within(legal).getByRole('link', { name: 'Open Content' })).toBeInTheDocument();
+    expect(within(legal).getByRole('link', { name: 'Open the privacy policy' })).toBeInTheDocument();
   });
 
   it('says so when every step is done', async () => {
@@ -180,6 +231,7 @@ describe('the setup page', () => {
     await renderSetup();
     expect(await screen.findByText(/Every step is done/)).toBeInTheDocument();
     expect(screen.getByText('7 of 7 steps done')).toBeInTheDocument();
+    await openStep('Add a second operator');
   });
 
   it('states a failed first check with the server words and no steps', async () => {
@@ -197,6 +249,19 @@ describe('the setup page', () => {
     await screen.findByText('1 of 7 steps done');
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     await waitFor(() => expect(screen.getByText(/We could not check again/)).toBeInTheDocument());
-    expect(screen.getByRole('list', { name: 'Setup steps' })).toBeInTheDocument();
+    expect(stepList()).toBeInTheDocument();
+  });
+});
+
+describe('the first-visit tour on the setup page', () => {
+  it('waits on the setup page and opens on the next admin page', async () => {
+    window.localStorage.clear();
+    fetch.mockResolvedValue(okResponse(readiness([])));
+    await renderSetup();
+    await openStep('Add a second operator');
+    expect(screen.queryByRole('heading', { name: 'Welcome to the admin panel' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Overview' }));
+    expect(await screen.findByRole('heading', { name: 'Welcome to the admin panel' })).toBeInTheDocument();
   });
 });

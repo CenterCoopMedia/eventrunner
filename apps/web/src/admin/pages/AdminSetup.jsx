@@ -1,5 +1,7 @@
-// "Set up your event" (ADR 0007 §6): the launch-readiness rows as a
-// checklist a new client works through after the first sign-in.
+// "Set up your event" (ADR 0007 §7): the launch-readiness rows as a stepper.
+// One step shows at a time, at its own address (/admin/setup/<slug>), with a
+// list of every step beside it and Back and Next under it. /admin/setup
+// opens the first step that is not done.
 //
 // THE STATE COMES FROM THE SERVER. The page calls webMcpCheckEventReadiness
 // (functions/src/admin/webMcpDiagnostics.cjs), which runs the same policy as
@@ -11,21 +13,29 @@
 // that counsel approved the privacy policy and terms, and the page saves
 // `legal.reviewRequired: false` through updateEventConfig, the endpoint the
 // Event settings form uses. config/event merges, so the save changes only
-// that field. Nothing else on the page writes.
+// that field.
+//
+// THE STEP LIST is beside the step on a wide screen. On a narrow screen it
+// folds into one line ("Step 2 of 7") that opens the list, so the step the
+// reader works on is at the top. Exactly one list exists at a time
+// (lib/viewport.js), so a screen reader meets it once.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate, useParams } from 'react-router';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useMediaQuery } from '../../lib/viewport.js';
 import { useAdminApi } from '../adminApi.js';
-import { OWNER_WORDS, joinSetupSteps } from '../setupSteps.js';
+import { ADMIN_DESKTOP_VIEWPORT } from '../AdminLayout.jsx';
+import { OWNER_WORDS, firstOpenStep, joinSetupSteps } from '../setupSteps.js';
 import {
   CheckboxField,
   FieldError,
   Notice,
-  Panel,
   primaryButtonClass,
   secondaryButtonClass,
 } from '../components/formControls.jsx';
 import AdminPageHeader, { AdminLoadingState, StatusBadge } from '../components/adminChrome.jsx';
+
+const stepPath = (step) => `/admin/setup/${step.slug}`;
 
 /** The legal sign-off: a confirmation box and one save. Operators only. */
 function LegalSignOff({ onSaved }) {
@@ -85,20 +95,47 @@ function LegalSignOff({ onSaved }) {
   );
 }
 
-/** One step: its title, state, owner, what to do, and where to go. */
-function SetupStep({ step, isOperator, onLegalSaved }) {
-  const headingId = `setup-step-${step.id}`;
+/** The list of every step: a number or a tick, the title, and its state in words. */
+function StepList({ steps, current }) {
+  return (
+    <ol className="admin-setup-steps" aria-label="Setup steps">
+      {steps.map((step, index) => (
+        <li key={step.id}>
+          <Link
+            to={stepPath(step)}
+            className="admin-setup-step-link"
+            aria-current={index === current ? 'step' : undefined}
+            data-done={step.ready ? '' : undefined}
+          >
+            <span className="admin-setup-step-marker" aria-hidden="true">{step.ready ? '✓' : index + 1}</span>
+            <span className="admin-setup-step-text">
+              <span className="admin-setup-step-title">{step.title}</span>
+              <span className="admin-setup-step-state">{step.ready ? 'Done' : 'To do'}</span>
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** One step: its place, title, state, owner, what to do, and where to go. */
+function SetupStep({ steps, index, isOperator, onLegalSaved, headingRef }) {
+  const step = steps[index];
+  const previous = steps[index - 1];
+  const next = steps[index + 1];
   const showLink = step.link && (!step.link.operator || isOperator);
   return (
-    <li aria-labelledby={headingId} className="flex flex-col gap-xs border-admin-rule-hairline border-b-admin-hairline py-sm last:border-b-0">
+    <section className="admin-setup-detail admin-panel rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md" aria-labelledby="setup-step-heading">
+      <p className="font-admin-data text-admin-xs text-admin-ink-data">Step {index + 1} of {steps.length}</p>
+      <h2 id="setup-step-heading" ref={headingRef} tabIndex={-1} className="font-admin-ui text-admin-lg font-bold text-admin-ink">
+        {step.title}
+      </h2>
       <div className="flex flex-wrap items-center gap-xs">
-        <h3 id={headingId} className="font-admin-ui text-admin-base font-bold text-admin-ink">
-          {step.title}
-        </h3>
         <StatusBadge tone={step.ready ? 'ok' : 'caution'}>{step.ready ? 'Done' : 'To do'}</StatusBadge>
         <StatusBadge tone="neutral">{OWNER_WORDS[step.owner] ?? OWNER_WORDS.host}</StatusBadge>
       </div>
-      <p className="max-w-[65ch] text-admin-sm text-admin-ink">{step.ready ? step.done : step.todo}</p>
+      <p className="max-w-[65ch] text-admin-base text-admin-ink">{step.ready ? step.done : step.todo}</p>
       {!step.ready && step.link && !showLink ? (
         <p className="text-admin-sm text-admin-ink-secondary">An operator completes this step.</p>
       ) : null}
@@ -108,17 +145,29 @@ function SetupStep({ step, isOperator, onLegalSaved }) {
         </div>
       ) : null}
       {!step.ready && step.id === 'legal' && isOperator ? <LegalSignOff onSaved={onLegalSaved} /> : null}
-    </li>
+      <nav className="admin-setup-pager" aria-label="Step navigation">
+        {previous ? (
+          <Link to={stepPath(previous)} className={secondaryButtonClass}>Back</Link>
+        ) : <span />}
+        {next ? (
+          <Link to={stepPath(next)} className={primaryButtonClass}>Next: {next.title}</Link>
+        ) : null}
+      </nav>
+    </section>
   );
 }
 
 export default function AdminSetup() {
   const call = useAdminApi();
   const { isOperator } = useAuth();
+  const { stepSlug } = useParams();
+  const wide = useMediaQuery(ADMIN_DESKTOP_VIEWPORT);
   const [checks, setChecks] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const headingRef = useRef(null);
+  const seenSlugRef = useRef(stepSlug);
 
   const refresh = useCallback(async () => {
     if (busyRef.current) return;
@@ -140,9 +189,21 @@ export default function AdminSetup() {
     refresh();
   }, [refresh]);
 
+  // A move to another step puts the focus on its heading, so a keyboard or
+  // screen-reader reader starts at the new step. The first load does not.
+  useEffect(() => {
+    if (seenSlugRef.current === stepSlug) return;
+    seenSlugRef.current = stepSlug;
+    headingRef.current?.focus();
+  }, [stepSlug]);
+
   const steps = checks ? joinSetupSteps(checks) : [];
   const doneCount = steps.filter((step) => step.ready).length;
   const allDone = checks !== null && steps.length > 0 && doneCount === steps.length;
+  const named = stepSlug ? steps.findIndex((step) => step.slug === stepSlug) : -1;
+  const current = named === -1 ? firstOpenStep(steps) : named;
+
+  if (checks && stepSlug && named === -1) return <Navigate to="/admin/setup" replace />;
 
   return (
     <div className="admin-setup flex flex-col gap-md">
@@ -174,14 +235,26 @@ export default function AdminSetup() {
         <Notice tone="ok" message="Every step is done. Tell the hosting team that the site is ready for the launch check." />
       ) : null}
 
-      {checks ? (
-        <Panel title="Steps" description="Each step shows who does it. A step changes to Done when the server sees the result.">
-          <ol className="flex flex-col" aria-label="Setup steps">
-            {steps.map((step) => (
-              <SetupStep key={step.id} step={step} isOperator={isOperator} onLegalSaved={refresh} />
-            ))}
-          </ol>
-        </Panel>
+      {checks && current !== -1 ? (
+        <div className="admin-setup-layout">
+          {wide ? (
+            <StepList steps={steps} current={current} />
+          ) : (
+            <details className="admin-setup-steps-fold">
+              <summary className="admin-setup-steps-summary">
+                Step {current + 1} of {steps.length}. Show all steps
+              </summary>
+              <StepList steps={steps} current={current} />
+            </details>
+          )}
+          <SetupStep
+            steps={steps}
+            index={current}
+            isOperator={isOperator}
+            onLegalSaved={refresh}
+            headingRef={headingRef}
+          />
+        </div>
       ) : null}
     </div>
   );

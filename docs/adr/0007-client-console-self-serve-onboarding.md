@@ -56,7 +56,8 @@ image and sharing metadata.
 
 ### 3. The guided setup
 
-A step-by-step flow with a progress bar. Each step saves as the client types. The client can
+A stepper, like the admin setup page: one step per page at its own address, a step list with
+progress, and Back and Next. Each step saves as the client types. The client can
 leave and come back, and a teammate can continue it.
 
 | Step | What the client does | What the console does |
@@ -140,12 +141,13 @@ full. The client sees it as the plain status lines in §3.
 ### 7. Setup checklist in the event admin
 
 The admin page **Set up your event** (`/admin/setup`) shows the launch-readiness rows as a
-checklist: who does each step (the client, the hosting team, or both), its state, and a link to
+stepper: one step at a time at its own address (`/admin/setup/<step>`), the step list beside it,
+and Back and Next. Each step says who does it (the client, the hosting team, or both), its state, and a link to
 the screen for it. It reads `webMcpCheckEventReadiness`, which runs the `init-event.cjs --check`
 policy and reads the config fresh, not from the five-minute container cache. It also holds the
 operator's legal sign-off (`legal.reviewRequired: false`), which no admin screen wrote before.
 The page says "hosting team", not CCM, because the code is white-label. It is on the rail under
-Overview. This page does not depend on the console; it also helps a client onboarded by hand.
+Overview, and the first-visit tour waits until the reader leaves it. This page does not depend on the console; it also helps a client onboarded by hand.
 
 On a site the console builds, §6 meets the rows for the sender domain, ticketing and the
 authorized domains before the client signs in. The rows left for the client are logos,
