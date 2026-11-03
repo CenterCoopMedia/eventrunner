@@ -7,8 +7,8 @@ accepted, one PR per part. Owner choices: standard questions plus 10 custom; ans
 checkout stepper; speakers through pitches and invites; promo codes in.
 Order is set by NC Local's launch: pitch call and early-bird tickets first.
 
-- [ ] R1 Stepper component (public and admin), interface guideline
-      section; move the admin setup page onto it.
+- [x] R1 Stepper component (public and admin), interface guideline
+      section; move the admin setup page onto it. Stacked on #581.
 - [ ] R2 Pitch stepper: five steps, presenters, staff lists for format,
       length and track; schema, rules, CSV and Airtable mapping, export.
 - [ ] R3 Accept a pitch: a speaker per presenter, dedupe by email, invite

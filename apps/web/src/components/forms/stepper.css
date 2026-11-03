@@ -1,0 +1,56 @@
+/* The stepper (ADR 0008 §1, components/forms/Stepper.jsx).
+   The parts read these custom properties. The public default maps them onto
+   the tier-2 theme roles, so a client's site style restyles the stepper;
+   adminWorkspace.css maps them onto the admin set under .stepper--admin.
+   No colour is the only signal: every state is also a word. */
+/* :where() keeps these defaults at zero specificity, so a tier's own
+   mapping (.stepper--admin) wins whichever stylesheet loads last. The admin
+   page loads this file in a lazy chunk, after adminWorkspace.css. */
+:where(.stepper-list, .stepper-fold, .stepper-heading, .stepper-pager) {
+  --stepper-ground: var(--color-surface-rgb);
+  --stepper-ground-current: var(--color-accent-soft-rgb);
+  --stepper-rule: var(--rule-hairline-rgb);
+  --stepper-rule-control: var(--color-border-control-rgb);
+  --stepper-current: var(--color-accent-rgb);
+  --stepper-ink: var(--color-text-primary-rgb);
+  --stepper-ink-secondary: var(--color-text-secondary-rgb);
+  --stepper-done-ground: var(--color-surface-alt-rgb);
+  --stepper-done-ink: var(--semantic-success-rgb);
+  --stepper-radius: var(--radius-base, 4px);
+  --stepper-control-height: 2.75rem;
+  --stepper-title-font: inherit;
+}
+
+.stepper-list { display: flex; flex-direction: column; gap: var(--space-2xs); margin: 0; padding: 0; list-style: none; }
+.stepper-item {
+  display: flex; align-items: center; gap: var(--space-sm); min-height: var(--stepper-control-height);
+  padding: var(--space-xs) var(--space-sm); border: 1px solid rgb(var(--stepper-rule));
+  border-radius: var(--stepper-radius); background: rgb(var(--stepper-ground)); color: rgb(var(--stepper-ink));
+  text-decoration: none;
+}
+.stepper-item[aria-current='step'] {
+  border-color: rgb(var(--stepper-current)); border-inline-start-width: 4px; background: rgb(var(--stepper-ground-current));
+}
+.stepper-item[data-state='locked'] { color: rgb(var(--stepper-ink-secondary)); }
+.stepper-marker {
+  display: inline-grid; place-items: center; flex: none; inline-size: 1.75rem; block-size: 1.75rem;
+  border: 1px solid rgb(var(--stepper-rule-control)); border-radius: var(--stepper-radius); font-weight: 700;
+}
+.stepper-item[data-state='done'] .stepper-marker { border-color: transparent; background: rgb(var(--stepper-done-ground)); color: rgb(var(--stepper-done-ink)); }
+.stepper-text { display: flex; flex-direction: column; min-width: 0; }
+.stepper-title { font-weight: 600; }
+.stepper-item[aria-current='step'] .stepper-title { font-weight: 700; }
+.stepper-state { font-size: 0.8125rem; color: rgb(var(--stepper-ink-secondary)); }
+
+.stepper-fold { border: 1px solid rgb(var(--stepper-rule)); border-radius: var(--stepper-radius); background: rgb(var(--stepper-ground)); }
+.stepper-fold-summary { display: flex; align-items: center; min-height: var(--stepper-control-height); padding: var(--space-xs) var(--space-sm); font-weight: 600; cursor: pointer; color: rgb(var(--stepper-ink)); }
+.stepper-fold[open] > .stepper-list { padding: 0 var(--space-xs) var(--space-xs); }
+
+.stepper-heading { display: flex; flex-direction: column; gap: var(--space-3xs, 0.25rem); }
+.stepper-place { margin: 0; font-size: 0.8125rem; color: rgb(var(--stepper-ink-secondary)); }
+.stepper-heading-title { margin: 0; font-family: var(--stepper-title-font); font-size: 1.25rem; font-weight: 700; color: rgb(var(--stepper-ink)); }
+
+.stepper-pager {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-xs);
+  margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid rgb(var(--stepper-rule));
+}

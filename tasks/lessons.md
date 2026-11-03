@@ -177,3 +177,10 @@ Rules written after user corrections. Read at session start.
   `docs/plans/2026-09-09-cjs-parity-gap.md` (keep one form or add steps) in
   favour of steps. Ask questions for Joe through AskUserQuestion, never in
   chat text (he had to remind me again on this date).
+
+## 2026-11-03: stack the pull requests
+
+- Joe asked for stacked pull requests where possible. Each part of a plan
+  gets its own branch cut from the branch of the part below it, and its pull
+  request targets that branch, not main. The bottom of the stack targets
+  main. Keep "Closes #n" in each body (see 2026-09-09).

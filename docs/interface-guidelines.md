@@ -103,6 +103,17 @@ The base is what a deployment renders before its theme states anything, and it i
 - Add a `1px` outline to images, offset by `-1px`: Black at 8% opacity in light mode, white at 8% in dark mode.
 - Portraits and avatars are square on the brand radius (`rounded-brand`), never a circle (`rounded-full`) — a circular crop is a generic-template tell.
 
+## Steppers
+
+A flow with three or more groups of work is a stepper, not one long page: setup, registration, checkout, a session pitch, a speaker profile ([ADR 0008](adr/0008-registration-and-pitch-steppers.md) §1). One form with one or two groups stays one form. Build it from `components/forms/Stepper.jsx`; do not draw a second stepper.
+
+- **One step per page, at its own address** (`/pitch/presenters`). Back, reload and a link from an email land on that step.
+- **The step list** gives every step its number (a tick when done), its title and its state as a word: **Done**, **To do** or **Not started**. The open step carries `aria-current="step"`, the leading-edge marker and the bold weight, never colour alone. A step that cannot open yet is text, not a link. On a wide screen the list sits beside the step; on a narrow one it folds into one line, "Step 2 of 5. Show all steps", above the step. Only one list is in the document.
+- **The step heading** is an `h2` under the line "Step 2 of 5". A move to another step puts the focus on it; the first load does not move the focus.
+- **Back and Next** sit under the step. Next names the step it opens ("Next: Presenters"). In a form, Next checks only the current step; a failed check stays on the step, lists the errors and focuses the first field. Next is never disabled for a validation state.
+- **Review is the last step** of a form: every answer by step, each group with an **Edit** link to its step. Submit is only there.
+- Answers save as the reader types (session storage when signed out, a server draft when signed in).
+
 ## Interaction states
 
 Every control and every interactive row defines these ten states, in both modes, on both surfaces. A state is a word, an ink change, a weight change, or a rule change. **A state is never colour alone and never a pill.** The public shapes carry them through one shared class string (`components/controlClasses.js`); the admin carries them through `admin/components/formControls.jsx`. Neither imports the other.
