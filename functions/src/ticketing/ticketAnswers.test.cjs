@@ -86,3 +86,42 @@ test('answers are refused after registration closes, for a changed form, a bad a
   assert.equal((await save(db2, 'ada', { ticketId: 't-2', formRevision: 4, answers: ANSWERS })).body.error.code, 'ticket-not-valid');
   assert.equal(db2.read('ticket_answers', 't-1'), undefined);
 });
+
+const { syncAnswerStatus } = require('./ticketAnswers.cjs');
+
+test('answers need a claimed ticket, so they always belong to an account', async () => {
+  const db = world({ 'tickets/t-open': { externalId: 't-open', status: 'valid', claimedByUid: null } });
+  const res = await save(db, 'staff', { ticketId: 't-open', formRevision: 4, answers: ANSWERS });
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'ticket-unclaimed');
+  assert.equal(db.read('ticket_answers', 't-open'), undefined);
+});
+
+test('each record keeps the questions as they were answered, and the ticket status', async () => {
+  const db = world();
+  await save(db, 'ada', { ticketId: 't-1', formRevision: 4, answers: ANSWERS });
+  const stored = db.read('ticket_answers', 't-1');
+  assert.equal(stored.ticketStatus, 'valid');
+  assert.deepEqual(stored.questions.map((q) => [q.id, q.kind, q.name]), [
+    ['organization', 'short_text', 'Organization'], ['dietary', 'dietary', 'Dietary needs'],
+    ['directoryListing', 'directory', 'Attendee directory'], ['q_shirt', 'one_choice', 'T-shirt size'],
+  ]);
+  assert.deepEqual(stored.questions.find((q) => q.id === 'q_shirt').choices, ['S', 'M']);
+});
+
+test('a refund or cancellation marks the answers, and a ticket made valid again unmarks them', async () => {
+  const db = world({ 'ticket_answers/t-1': { ticketId: 't-1', uid: 'ada', answers: {}, ticketStatus: 'valid' } });
+  await db.collection('tickets').doc('t-1').update({ status: 'refunded' });
+  await syncAnswerStatus({ db, ticketId: 't-1' });
+  assert.equal(db.read('ticket_answers', 't-1').ticketStatus, 'refunded');
+  await db.collection('tickets').doc('t-1').update({ status: 'valid' });
+  await syncAnswerStatus({ db, ticketId: 't-1' });
+  assert.equal(db.read('ticket_answers', 't-1').ticketStatus, 'valid');
+  // No answers, no write; a deleted ticket reads as cancelled.
+  const writes = db.writes.length;
+  await syncAnswerStatus({ db, ticketId: 't-2' });
+  assert.equal(db.writes.length, writes);
+  await db.collection('tickets').doc('t-1').delete();
+  await syncAnswerStatus({ db, ticketId: 't-1' });
+  assert.equal(db.read('ticket_answers', 't-1').ticketStatus, 'cancelled');
+});

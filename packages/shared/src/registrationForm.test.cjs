@@ -117,3 +117,19 @@ test('the counts summary tallies diet, access and photo answers for planning', (
   });
   assert.deepEqual(summarizeAnswers([], emptyForm()), { total: 0 });
 });
+
+test('the summary counts only answers on tickets that are still valid, and reads each answer with the question it answered', () => {
+  const form = validateRegistrationForm({ standard: { dietary: { enabled: true } } }).form;
+  const summary = summarizeAnswers([
+    { ticketStatus: 'valid', answers: { dietary: { choices: ['Vegan'] } } },
+    { ticketStatus: 'refunded', answers: { dietary: { choices: ['Vegan'] } } },
+    { answers: { dietary: { choices: ['Halal'] } } },
+  ], form);
+  assert.equal(summary.total, 2);
+  assert.deepEqual(summary.dietary.choices, { Vegan: 1, Halal: 1 });
+  // A yes/no answer stays readable after the question became short text.
+  const now = { id: 'q_x', name: 'Bring a guest', kind: 'short_text' };
+  const answered = { id: 'q_x', name: 'Bring a guest?', kind: 'yes_no' };
+  assert.equal(answerText(now, false, answered), 'No');
+  assert.equal(answerText(now, 'Maybe'), 'Maybe');
+});

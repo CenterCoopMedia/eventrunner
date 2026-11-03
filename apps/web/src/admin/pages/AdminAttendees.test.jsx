@@ -316,6 +316,8 @@ describe('AdminAttendees record and delete', () => {
       collectionCallbacks.ticket_answers([
         { id: 't-ada', uid: row().id, answers: { dietary: { choices: ['Vegan'], other: null }, accessNeeds: 'Step-free stage.', photoConsent: true } },
         { id: 't-bo', uid: 'uid-bo', answers: { dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, photoConsent: false } },
+        // Refunded: kept on record, left out of the counts.
+        { id: 't-cy', uid: 'uid-cy', ticketStatus: 'refunded', answers: { dietary: { choices: ['Vegan'], other: null }, photoConsent: true } },
       ]);
     });
     const summary = within(screen.getByRole('heading', { level: 2, name: 'Registration answers' }).closest('section'));

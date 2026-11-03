@@ -61,17 +61,28 @@ export function AttendeeAnswers({ form, records }) {
   return (
     <section aria-label="Registration answers" className="flex flex-col gap-xs">
       <h3 className="font-admin-ui text-admin-base font-semibold text-admin-ink">Registration answers</h3>
-      {!records.length ? <p className={fieldHintClass}>No answers yet.</p> : records.map((record) => (
-        <dl key={record.id} className="grid gap-x-sm gap-y-3xs sm:grid-cols-[12rem_minmax(0,1fr)]">
-          {records.length > 1 ? <p className="font-admin-data text-admin-xs text-admin-ink-data sm:col-span-2">Ticket {record.id}</p> : null}
-          {questions.map((question) => (
-            <div key={question.id} className="contents">
-              <dt className="text-admin-sm font-semibold text-admin-ink">{question.name}{question.sensitive ? ' (private)' : ''}</dt>
-              <dd className="whitespace-pre-line text-admin-sm text-admin-ink-secondary [overflow-wrap:anywhere]">{answerText(question, record.answers?.[question.id]) || 'No answer'}</dd>
-            </div>
-          ))}
-        </dl>
-      ))}
+      {!records.length ? <p className={fieldHintClass}>No answers yet.</p> : records.map((record) => {
+        const invalid = record.ticketStatus !== undefined && record.ticketStatus !== 'valid';
+        return (
+          <dl key={record.id} className="grid gap-x-sm gap-y-3xs sm:grid-cols-[12rem_minmax(0,1fr)]">
+            {records.length > 1 || invalid ? (
+              <p className="font-admin-data text-admin-xs text-admin-ink-data sm:col-span-2">
+                Ticket {record.id}{invalid ? ` (${record.ticketStatus}: not counted in the summary)` : ''}
+              </p>
+            ) : null}
+            {questions.map((question) => {
+              // The question as this attendee answered it, when the record has it.
+              const answered = Array.isArray(record.questions) ? record.questions.find((entry) => entry.id === question.id) : null;
+              return (
+                <div key={question.id} className="contents">
+                  <dt className="text-admin-sm font-semibold text-admin-ink">{answered?.name ?? question.name}{question.sensitive ? ' (private)' : ''}</dt>
+                  <dd className="whitespace-pre-line text-admin-sm text-admin-ink-secondary [overflow-wrap:anywhere]">{answerText(question, record.answers?.[question.id], answered) || 'No answer'}</dd>
+                </div>
+              );
+            })}
+          </dl>
+        );
+      })}
     </section>
   );
 }

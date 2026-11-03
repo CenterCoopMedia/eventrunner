@@ -469,11 +469,16 @@ test('the export adds one column per registration question, filled from each acc
     },
     'ticket_answers/t-ada': { ticketId: 't-ada', uid: 'uid-ada', answers: { dietary: { choices: ['Vegan', 'Other'], other: 'Low sodium' }, q_shirt: 'M' } },
     'ticket_answers/t-gone': { ticketId: 't-gone', uid: 'uid-gone', answers: { q_shirt: 'S' } },
+    // Bo's refunded ticket comes second to his valid one; its answer was a
+    // yes/no before the question became one choice, and still reads as one.
+    'ticket_answers/t-bo-a': { ticketId: 't-bo-a', uid: 'uid-bo', ticketStatus: 'refunded', answers: { q_shirt: 'S' } },
+    'ticket_answers/t-bo-b': { ticketId: 't-bo-b', uid: 'uid-bo', ticketStatus: 'valid', answers: { q_shirt: true },
+      questions: [{ id: 'q_shirt', name: 'Shirt?', kind: 'yes_no', choices: [] }] },
   });
   const res = await run(db, req('admin', { uids: ['uid-ada', 'uid-bo'], filter: FILTER }));
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
   const [header, ada, bo] = parseCsv(res.body.csv);
   assert.deepEqual(header.slice(-3), ['Answer: Dietary needs', 'Answer: Access needs', 'Answer: T-shirt size']);
   assert.deepEqual(ada.slice(-3), ['Vegan; Other: Low sodium', '', 'M']);
-  assert.deepEqual(bo.slice(-3), ['', '', '']);
+  assert.deepEqual(bo.slice(-3), ['', '', 'Yes']);
 });

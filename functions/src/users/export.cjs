@@ -205,23 +205,30 @@ function csvHeader(questions = []) {
 }
 
 /** One account's line: the exported cells only, escaped and quoted. */
-function csvLine(user, config, questions = [], answers = {}) {
-  return [...exportRow(user, config), ...questions.map((question) => answerText(question, answers[question.id]))]
-    .map(escapeCell).join(',');
+function csvLine(user, config, questions = [], record = null) {
+  const answers = record?.answers ?? {};
+  const answered = Array.isArray(record?.questions) ? record.questions : [];
+  return [
+    ...exportRow(user, config),
+    // Each answer is read with the question as it was answered.
+    ...questions.map((question) => answerText(question, answers[question.id], answered.find((entry) => entry.id === question.id))),
+  ].map(escapeCell).join(',');
 }
 
 /**
- * The registration answers of these accounts, by uid. An account that holds
- * more than one ticket shows the answers of its first ticket by id.
+ * The registration answer record of each of these accounts, by uid. An
+ * account that holds more than one ticket shows a valid ticket's answers
+ * first, then the first ticket by id.
  */
 async function answersByUid(db, uids) {
   const byUid = new Map();
   for (let start = 0; start < uids.length; start += IN_CHUNK) {
     const snap = await db.collection('ticket_answers').where('uid', 'in', uids.slice(start, start + IN_CHUNK)).get();
-    const docs = [...snap.docs].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const invalid = (doc) => (doc.data()?.ticketStatus ?? 'valid') !== 'valid';
+    const docs = [...snap.docs].sort((a, b) => (invalid(a) - invalid(b)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     for (const doc of docs) {
       const record = doc.data() || {};
-      if (!byUid.has(record.uid) && record.answers && typeof record.answers === 'object') byUid.set(record.uid, record.answers);
+      if (!byUid.has(record.uid) && record.answers && typeof record.answers === 'object') byUid.set(record.uid, record);
     }
   }
   return byUid;
@@ -321,7 +328,7 @@ async function buildExport({ db, uids, config, maxBytes = MAX_EXPORT_BYTES }) {
         skipped += 1;
         continue;
       }
-      const line = csvLine(snap.data() || {}, config, questions, answers.get(snap.id) ?? {});
+      const line = csvLine(snap.data() || {}, config, questions, answers.get(snap.id) ?? null);
       bytes += Buffer.byteLength(line) + 2;
       if (bytes > maxBytes) throw new ExportTooLargeError(maxBytes);
       lines.push(line);

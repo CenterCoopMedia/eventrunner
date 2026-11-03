@@ -81,7 +81,16 @@ export default function AdminRegistrationForm() {
 
   const edit = (patch) => { setDraft((previous) => ({ ...previous, ...patch })); setResult(''); };
   const setStandard = (id, patch) => edit({ standard: { ...draft.standard, [id]: { ...draft.standard[id], ...patch } } });
-  const setCustom = (index, patch) => edit({ custom: draft.custom.map((question, i) => (i === index ? { ...question, ...patch } : question)) });
+  // A saved question that changes its answer type becomes a new question
+  // with a new id: answers already given to the old one keep their meaning.
+  const savedIds = new Set(readRegistrationForm(live).custom.map((question) => question.id));
+  const setCustom = (index, patch) => edit({
+    custom: draft.custom.map((question, i) => {
+      if (i !== index) return question;
+      const retyped = patch.kind && patch.kind !== question.kind && savedIds.has(question.id);
+      return { ...question, ...patch, ...(retyped ? { id: newQuestion().id } : {}) };
+    }),
+  });
   const moveCustom = (index, by) => {
     const custom = [...draft.custom];
     const [moved] = custom.splice(index, 1);

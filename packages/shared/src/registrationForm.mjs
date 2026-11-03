@@ -2,6 +2,7 @@ import registrationForm from './registrationForm.cjs';
 
 export const {
   answerText,
+  answeredQuestions,
   summarizeAnswers,
   MAX_CUSTOM_QUESTIONS,
   MAX_CHOICES,

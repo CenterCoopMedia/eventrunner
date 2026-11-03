@@ -284,10 +284,15 @@ function checkAnswers(source, form) {
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, answers };
 }
 
-/** One stored answer as plain text, for the attendee record and the export. */
-function answerText(question, value) {
+/**
+ * One stored answer as plain text, for the attendee record and the export.
+ * `answered` is the question as the attendee saw it (the record's own copy,
+ * see saveTicketAnswers); its kind reads the value, so an answer stays
+ * readable after an operator changes the question.
+ */
+function answerText(question, value, answered = null) {
   if (value === undefined || value === null) return '';
-  switch (question?.kind) {
+  switch ((answered ?? question)?.kind) {
     case 'yes_no': return value === true ? 'Yes' : value === false ? 'No' : '';
     case 'directory': return DIRECTORY_CHOICES.find((choice) => choice.id === value)?.label ?? '';
     case 'dietary': {
@@ -300,6 +305,16 @@ function answerText(question, value) {
 }
 
 /**
+ * The questions an answer record keeps, as the attendee saw them: enough to
+ * read each answer later, whatever the form becomes.
+ */
+function answeredQuestions(form, answers) {
+  return activeQuestions(form)
+    .filter((question) => Object.prototype.hasOwnProperty.call(answers || {}, question.id))
+    .map(({ id, name, kind, choices }) => ({ id, name, kind, choices: [...choices] }));
+}
+
+/**
  * Counts for catering and access planning, from stored answer records
  * (`{ answers }`). Only the questions the form asks are counted. Access
  * needs are counted, never quoted: staff read them one by one on each
@@ -307,7 +322,10 @@ function answerText(question, value) {
  */
 function summarizeAnswers(records, form) {
   const read = readRegistrationForm(form);
-  const list = Array.isArray(records) ? records : [];
+  // A refunded or cancelled ticket's answers stay on record but are not
+  // planned for. A record with no status predates the field and counts.
+  const list = (Array.isArray(records) ? records : [])
+    .filter((record) => record?.ticketStatus === undefined || record?.ticketStatus === 'valid');
   const summary = { total: list.length };
   const answersOf = (record) => (isPlainObject(record?.answers) ? record.answers : {});
   if (read.standard.dietary.enabled) {
@@ -335,6 +353,7 @@ function summarizeAnswers(records, form) {
 
 module.exports = {
   answerText,
+  answeredQuestions,
   summarizeAnswers,
   MAX_CUSTOM_QUESTIONS,
   MAX_CHOICES,
