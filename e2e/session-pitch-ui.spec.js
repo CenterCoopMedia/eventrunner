@@ -197,8 +197,11 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     expect(text).not.toMatch(/PRIVATE-STAFF-NOTE|privateNotes|uid|reviewedBy/);
     await page.getByRole('link', { name: `Review ${fixture.title} (edited)` }).click();
     await expect(page.getByRole('heading', { name: 'Create session and speaker drafts' })).toBeVisible();
-    await page.getByLabel('Speaker first name').fill('Example');
-    await page.getByLabel('Speaker last name').fill('Presenter');
+    await expect(page.getByLabel('Lead presenter first name')).not.toHaveValue('');
+    await page.getByLabel('Lead presenter first name').fill('Example');
+    await page.getByLabel('Lead presenter last name').fill('Presenter');
+    await expect(page.getByRole('checkbox', { name: 'Invite the presenters now' })).toBeChecked();
+    const inviteSince = mailFileSize();
     const dayId = (await db.collection('config').doc('event').get()).data().days[0].id;
     await page.getByLabel('Event day').selectOption(dayId);
     await page.getByLabel('Start time', { exact: true }).fill('10:00');
@@ -206,10 +209,14 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await page.getByRole('checkbox', { name: /I reviewed the proposal/ }).check();
     await page.getByRole('button', { name: 'Create reviewed drafts' }).click();
     await expect(page.getByRole('link', { name: 'Review session draft' })).toBeVisible();
+    await expect(page.getByText(`Invite sent to ${email}.`, { exact: false })).toBeVisible();
+    const invite = await waitForTaggedMail(inviteSince, email, 'speaker.invite');
+    expect(invite.text).toContain('/speaker/accept');
     const converted = (await ref.get()).data().conversion;
+    expect(converted).toMatchObject({ speakerIds: [converted.speakerId], createdSpeakerIds: [converted.speakerId] });
     expect((await db.collection('cmsSchedule').doc(converted.sessionId).get()).exists).toBe(false);
     expect((await db.collection('cmsSchedule_drafts').doc(converted.sessionId).get()).data()).toMatchObject({ visible: false, status: 'dirty', speakerIds: [converted.speakerId] });
-    expect((await db.collection('speakers').doc(converted.speakerId).get()).data()).toMatchObject({ status: 'draft', uid: null, inviteToken: null });
+    expect((await db.collection('speakers').doc(converted.speakerId).get()).data()).toMatchObject({ firstName: 'Example', lastName: 'Presenter', status: 'invited', uid: null });
     expect((await db.collection('speakers_public').doc(converted.speakerId).get()).exists).toBe(false);
     await expect(page.getByRole('button', { name: 'Save notes' })).toBeEnabled();
     await page.getByLabel('Private review notes').fill('Post-conversion review');
@@ -222,10 +229,12 @@ test('staff reviews conflicts, exports without private notes, and converts accep
     await expect(page.getByLabel('Private review notes')).toHaveValue('Post-conversion review');
     const token = await adminIdToken();
     const retry = await callFunction('convertSessionPitch', { id, expectedRevision: converted.revision - 1, firstName: 'Example', lastName: 'Presenter', dayId, startTime: '10:00', endTime: '11:00' }, token);
-    expect(retry).toMatchObject({ status: 200, body: { ...converted, replayed: true } });
+    expect(retry).toMatchObject({ status: 200, body: { ...converted, replayed: true, invites: [] } });
     const denied = await callFunction('convertSessionPitch', { id: 'missing', expectedRevision: 0, firstName: 'Example', lastName: 'Presenter', dayId, startTime: '10:00', endTime: '11:00' }, token);
     expect(denied.status).toBe(404);
   } finally {
+    const invites = await db.collection('speaker_invites').where('speakerId', '==', 'pitch-' + id).get();
+    await Promise.all(invites.docs.map((doc) => doc.ref.delete()));
     await Promise.all(['session_pitches/' + id, 'session_pitches/pitch-ui-long-title', 'cmsSchedule_drafts/pitch-' + id, 'speakers/pitch-' + id, 'speaker_slugs/pitch-' + id].map((name) => db.doc(name).delete()));
     await callFunction('cmsEnsurePendingCounts', { force: true }, await adminIdToken());
   }

@@ -6,7 +6,8 @@ const { sendError, methodNotAllowed, internal } = require('../core/errors.cjs');
 const { isValidDocId, writeDraft } = require('../cms/store.cjs');
 const { validateSessionShape, validateSessionStructure } = require('../schedule/sessions.cjs');
 const { internals: { readSubmission, MAX_BODY_BYTES } } = require('./pitches.cjs');
-const { readImportedExtras, sameValue } = require('shared/pitchForm');
+const { readImportedExtras, sameValue, speakerCandidates } = require('shared/pitchForm');
+const { inviteSpeaker, internals: { DEFAULT_INVITE_TYPE } } = require('../speakers/invites.cjs');
 
 const hash = (text) => createHash('sha256').update(text).digest('hex');
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -65,12 +66,36 @@ async function importPitches({ db, actor, body, at }) {
   });
 }
 
+// The names staff confirmed, one per presenter in the stored order, each as
+// { email, firstName, lastName }. A body from before presenters (firstName
+// and lastName alone) names the lead. A presenter who is already a speaker
+// needs no name ({ email } or null), because that speaker is linked, not made.
+function readSpeakerNames(body) {
+  const names = Array.isArray(body?.speakers) ? body.speakers : [{ firstName: body?.firstName, lastName: body?.lastName }];
+  if (names.length < 1 || names.length > 5) fail(400, 'bad-request', 'speakers: Review 1-5 speaker names.');
+  return names;
+}
+
+function checkedName(name, index) {
+  const first = typeof name?.firstName === 'string' ? name.firstName.trim() : '';
+  const last = typeof name?.lastName === 'string' ? name.lastName.trim() : '';
+  if (!first || first.length > 100 || !last || last.length > 100) {
+    fail(400, 'bad-request', `speakers.${index}: Review the speaker name (1-100 characters each).`);
+  }
+  return { firstName: first, lastName: last };
+}
+
+/**
+ * Accept a pitch into drafts (ADR 0008 §3): one hidden session and one draft
+ * speaker per presenter. A presenter whose email is already on a speaker is
+ * linked to that speaker, and that speaker is not changed. The lead keeps
+ * the id `pitch-{id}`; co-presenters take `pitch-{id}-{position}`.
+ */
 async function convertPitch({ db, actor, body, now, at }) {
-  const { id, expectedRevision, firstName, lastName, dayId, startTime, endTime } = body || {};
+  const { id, expectedRevision, dayId, startTime, endTime } = body || {};
   if (!isValidDocId(id) || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) fail(400, 'bad-request', 'id and expectedRevision: A reviewed pitch and its revision are required.');
-  if (typeof firstName !== 'string' || !firstName.trim() || firstName.length > 100 || typeof lastName !== 'string' || !lastName.trim() || lastName.length > 100) fail(400, 'bad-request', 'firstName and lastName: Review the speaker name (1-100 characters each).');
+  const names = readSpeakerNames(body);
   const sessionId = `pitch-${id}`;
-  const speakerId = `pitch-${id}`;
   return db.runTransaction(async (tx) => {
     const ref = db.collection('session_pitches').doc(id);
     const snap = await tx.get(ref);
@@ -79,36 +104,77 @@ async function convertPitch({ db, actor, body, now, at }) {
     // A committed conversion is acknowledged on retry without editing drafts.
     if (pitch.conversion) return { ...pitch.conversion, replayed: true };
     if (pitch.status !== 'accepted' || revisionOf(pitch) !== expectedRevision) fail(409, 'status-conflict', 'The pitch changed or is not accepted. Reload the review before creating drafts.');
+    const presenters = speakerCandidates(pitch);
+    // Each confirmed name carries its presenter's email, so a name staff
+    // confirmed for one person is never given to another after an edit.
+    const stale = presenters.length !== names.length || names.some((name, index) => typeof name?.email === 'string'
+      && name.email.trim().toLowerCase() !== (presenters[index].email || '').toLowerCase());
+    if (stale) fail(409, 'presenters-changed', 'The presenters changed. Reload the review before creating drafts.');
     const event = await tx.get(db.collection('config').doc('event'));
     if (!(event.data()?.days || []).some((day) => day.id === dayId)) fail(400, 'bad-request', 'dayId: Choose a configured event day.');
+
+    // Speaker emails are stored in lower case (shared/speaker).
+    const matches = await Promise.all(presenters.map((p) => (p.email
+      ? tx.get(db.collection('speakers').where('email', '==', p.email.toLowerCase()).limit(1))
+      : null)));
+    const plan = presenters.map((presenter, index) => {
+      const known = matches[index]?.docs?.[0];
+      if (known) return { speakerId: known.id, presenter, created: false };
+      return { speakerId: index === 0 ? `pitch-${id}` : `pitch-${id}-${index + 1}`, presenter, name: checkedName(names[index], index), created: true };
+    });
+    const speakerIds = [...new Set(plan.map((item) => item.speakerId))];
     const fields = { title: pitch.title, description: `<p>${escapeHtml(pitch.description).replace(/\n/g, '<br>')}</p>`,
-      dayId, startTime, endTime, speakerIds: [speakerId], type: pitch.format || '' };
+      dayId, startTime, endTime, speakerIds, type: pitch.format || '' };
     const shape = validateSessionShape(fields, sessionId);
     if (!shape.ok) fail(400, 'bad-request', shape.errors.join('; '));
     const structure = await validateSessionStructure({ db, tx, docId: sessionId, fields });
     if (!structure.ok) fail(400, 'bad-request', structure.message);
-    const speakerRef = db.collection('speakers').doc(speakerId);
-    const slugRef = db.collection('speaker_slugs').doc(speakerId);
+
+    const created = plan.filter((item) => item.created);
     const checks = await Promise.all([
-      tx.get(speakerRef), tx.get(slugRef),
-      tx.get(db.collection('speakers').where('slug', '==', speakerId).limit(1)),
       tx.get(db.collection('cmsSchedule').doc(sessionId)),
       tx.get(db.collection('cmsSchedule_drafts').doc(sessionId)),
+      ...created.flatMap(({ speakerId }) => [
+        tx.get(db.collection('speakers').doc(speakerId)),
+        tx.get(db.collection('speaker_slugs').doc(speakerId)),
+        tx.get(db.collection('speakers').where('slug', '==', speakerId).limit(1)),
+      ]),
     ]);
     if (checks.some((item) => item.exists || item.empty === false)) fail(409, 'already-exists', 'A conversion draft already occupies this ID. No records were changed.');
     await writeDraft({ db, tx, collection: 'cmsSchedule', docId: sessionId, fields, visible: false, actor, now, createOnly: true });
-    tx.create(slugRef, { speakerId, updatedAt: at });
-    tx.create(speakerRef, { firstName: firstName.trim(), lastName: lastName.trim(), slug: speakerId,
-      email: pitch.email, organization: pitch.organization || '', bio: '', jobTitle: '', socialHandles: {}, headshotPath: null,
-      status: 'draft', uid: null, inviteToken: null, approvedAt: null, createdAt: at, updatedAt: at, updatedBy: actor.email });
-    const conversion = { sessionId, speakerId, revision: expectedRevision + 1 };
+    for (const { speakerId, presenter, name } of created) {
+      tx.create(db.collection('speaker_slugs').doc(speakerId), { speakerId, updatedAt: at });
+      tx.create(db.collection('speakers').doc(speakerId), { firstName: name.firstName, lastName: name.lastName, slug: speakerId,
+        email: presenter.email ? presenter.email.toLowerCase() : null, organization: presenter.organization || '', bio: '', jobTitle: presenter.role || '', socialHandles: {}, headshotPath: null,
+        status: 'draft', uid: null, inviteToken: null, approvedAt: null, createdAt: at, updatedAt: at, updatedBy: actor.email });
+    }
+    const conversion = { sessionId, speakerId: speakerIds[0], speakerIds, createdSpeakerIds: created.map((item) => item.speakerId), revision: expectedRevision + 1 };
     tx.update(ref, { conversion, convertedAt: at, convertedBy: actor.email, reviewRevision: expectedRevision + 1 });
     tx.set(db.collection('admin_logs').doc(), { action: 'convertSessionPitch', docPath: `session_pitches/${id}`, uid: actor.uid, email: actor.email, at, details: conversion });
     return conversion;
   });
 }
 
-function createQueueHandler({ db, auth, getConfig, now = Date.now, log = console }, action) {
+// "Invite the presenters now": after the drafts commit, each new speaker
+// gets the ordinary speaker invite. A failed send leaves the drafts; the
+// result says who was not invited, and the Speakers page can resend.
+async function invitePresenters({ db, getConfig, sendEmail, actor, conversion, now, log }) {
+  const invites = [];
+  for (const speakerId of conversion.createdSpeakerIds) {
+    let result;
+    try {
+      result = await inviteSpeaker({ db, getConfig, sendEmail, speakerId, inviteType: DEFAULT_INVITE_TYPE, mode: 'send', actor, now, log });
+    } catch (err) {
+      log.error('Pitch presenter invite failed', err);
+      result = { ok: false, message: 'The invitation could not be created.' };
+    }
+    const email = result.ok ? result.minted.speaker.email : null;
+    invites.push(result.ok ? { speakerId, email, sent: true } : { speakerId, sent: false, message: result.message });
+  }
+  return invites;
+}
+
+function createQueueHandler({ db, auth, getConfig, sendEmail, now = Date.now, log = console }, action) {
   return async (req, res) => {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     const actor = await requireAdmin({ db, auth, getConfig }, req, { tier: 'staff' });
@@ -116,10 +182,12 @@ function createQueueHandler({ db, auth, getConfig, now = Date.now, log = console
     if (Buffer.byteLength(JSON.stringify(req.body ?? {})) > (action === 'import' ? 512 * 1024 : MAX_BODY_BYTES)) return sendError(res, 413, 'payload-too-large', 'The request is too large.');
     try {
       const at = new Date(now());
-      const result = action === 'import'
-        ? await importPitches({ db, actor, body: req.body, now, at })
-        : await convertPitch({ db, actor, body: req.body, now, at });
-      return res.status(200).json(result);
+      if (action === 'import') return res.status(200).json(await importPitches({ db, actor, body: req.body, at }));
+      const conversion = await convertPitch({ db, actor, body: req.body, now, at });
+      const invites = req.body?.invite === true && !conversion.replayed
+        ? await invitePresenters({ db, getConfig, sendEmail, actor, conversion, now, log })
+        : [];
+      return res.status(200).json({ ...conversion, invites });
     } catch (err) {
       if (err.status) return sendError(res, err.status, err.code, err.message);
       log.error('Session pitch queue action failed', err);
@@ -129,16 +197,27 @@ function createQueueHandler({ db, auth, getConfig, now = Date.now, log = console
 }
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { defineSecret } = require('firebase-functions/params');
   const { applyCors, parseAllowedOrigins } = require('../core/http.cjs');
+  const { SEND_SECRETS_BY_PROVIDER } = require('../email/send.cjs').internals;
   const region = process.env.EVENT_FIREBASE_REGION || 'us-central1';
-  const expose = (action) => onRequest({ region }, async (req, res) => {
+  // Conversion can send the speaker invites, so it binds the send secrets.
+  const secrets = (SEND_SECRETS_BY_PROVIDER[(process.env.EVENT_EMAIL_PROVIDER || '').trim()] || []).map(defineSecret);
+  const expose = (action, options = {}) => onRequest({ region, ...options }, async (req, res) => {
     if (applyCors(req, res, { allowedOrigins: parseAllowedOrigins(process.env.EVENT_ALLOWED_ORIGINS) })) return;
     const { getDb } = require('../core/firestore.cjs');
     const { getAuth } = require('firebase-admin/auth');
     const { getEventConfig } = require('../core/config.cjs');
     const db = getDb();
-    await createQueueHandler({ db, auth: getAuth(), getConfig: () => getEventConfig({ db }) }, action)(req, res);
+    const getConfig = () => getEventConfig({ db });
+    // Built on first use, so a missing provider fails only a send.
+    const sendEmail = (message) => {
+      const { createEmailCore } = require('../email/send.cjs');
+      const { getEmailProvider } = require('../email/providers/index.cjs');
+      return createEmailCore({ db, provider: getEmailProvider({ env: process.env }), getConfig }).send(message);
+    };
+    await createQueueHandler({ db, auth: getAuth(), getConfig, sendEmail }, action)(req, res);
   });
-  return { importSessionPitches: expose('import'), convertSessionPitch: expose('convert') };
+  return { importSessionPitches: expose('import'), convertSessionPitch: expose('convert', { secrets }) };
 }
 module.exports = { readImport, createQueueHandler, get handlers() { return buildHandlers(); } };

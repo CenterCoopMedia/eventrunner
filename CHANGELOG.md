@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Accepting a pitch into drafts now makes one draft speaker per presenter.
+  A presenter whose email is already on a speaker is linked, not copied. The
+  convert dialog has **Invite the presenters now**, on by default, which sends
+  each new speaker the speaker invite in the same action and reports who was
+  invited (ADR 0008 §3).
+
 - The session pitch CSV import, export and Airtable refresh carry the pitch
   stepper's fields (ADR 0008 §2). The import reads optional `summary`,
   `lengthMinutes`, `track`, `audienceLevel`, `leadName`, `leadRole`,

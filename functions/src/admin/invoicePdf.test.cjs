@@ -43,8 +43,10 @@ function drawnText(bytes) {
       const end = text.indexOf('endstream', start);
       if (end < 0) break;
       let slice = text.slice(start, end);
+      // pdf-lib writes exactly one newline before `endstream`. Strip only
+      // that: compressed data can itself end in a CR or LF byte, and
+      // stripping it too corrupted the stream about 1 time in 256.
       if (slice.endsWith('\n')) slice = slice.slice(0, -1);
-      if (slice.endsWith('\r')) slice = slice.slice(0, -1);
       try {
         walk(zlib.inflateSync(Buffer.from(slice, 'latin1')), depth + 1);
       } catch {

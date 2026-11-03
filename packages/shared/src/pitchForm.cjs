@@ -324,6 +324,23 @@ function readPresenters(stored) {
   }];
 }
 
+/**
+ * The people an accepted pitch becomes speakers for (ADR 0008 §3): the
+ * stored presenters, lead first, with a repeated address kept once. The
+ * convert dialog and convertSessionPitch both use this, so the names staff
+ * confirm line up with the speakers the server makes.
+ */
+function speakerCandidates(stored) {
+  const seen = new Set();
+  return readPresenters(stored).filter((presenter) => {
+    const email = typeof presenter?.email === 'string' ? presenter.email.toLowerCase() : '';
+    if (!email) return true;
+    if (seen.has(email)) return false;
+    seen.add(email);
+    return true;
+  });
+}
+
 /** The stepper fields an import may carry beside the seven legacy columns. */
 const IMPORT_FIELDS = Object.freeze([
   'summary', 'lengthMinutes', 'track', 'audienceLevel', 'leadName', 'leadRole', 'accessNeeds', 'notes',
@@ -434,6 +451,7 @@ function sameValue(a, b) {
 }
 
 module.exports = {
+  speakerCandidates,
   IMPORT_FIELDS,
   PRESENTER_COLUMNS,
   readImportedExtras,

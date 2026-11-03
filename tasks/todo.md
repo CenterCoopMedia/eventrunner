@@ -22,8 +22,10 @@ Order is set by NC Local's launch: pitch call and early-bird tickets first.
 
 Owner decision (2026-11-03): NC Local waits for the console, and the pitch
 path (R2c, R3) comes before registration.
-- [ ] R3 Accept a pitch: a speaker per presenter, dedupe by email, invite
-      in one action; speaker profile stepper; `speaker.confirmation`.
+- [x] R3a Accept a pitch: a speaker per presenter, linked by email, invite
+      in one action. Stacked on R2c.
+- [ ] R3b Speaker profile stepper (`/speaker/profile`) and
+      `speaker.confirmation` on profile submit. Stacked on R3a.
 - [ ] R4 Registration questions: `config/registration_form`, admin editor
       with preview, `shared/registrationForm`, private `ticket_answers`,
       rules, attendee record, export columns, counts summary.
