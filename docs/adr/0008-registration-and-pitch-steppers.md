@@ -124,6 +124,11 @@ The account dashboard reminds them until it is done.
 **Emails:** an attendee approved by an admin gets `attendee.approved`. The confirmation emails
 that exist stay.
 
+**Where answers live (2026-11-03, after R4b review).** Answers always belong to an account, so the
+holder can read them and they are deleted with the account. With no tickets (provider `none`) the
+record is `ticket_answers/account-{uid}`. Answers given at checkout for other people are held with
+the order's seats and copied to `ticket_answers/{ticketId}` when that person claims the ticket.
+
 ### 6. Promo codes
 
 - `ticket_promo_codes`, operator- and staff-editable: code (case-insensitive, unique), percent or
