@@ -516,6 +516,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // speaker_logistics/{speakerId}: a speaker's travel, access, and audio
+    // and video answers (ADR 0008 §3). Staff only, like `speakers`, and
+    // apart from it, so the public projection is never built from it.
+    // Written only by saveOwnSpeakerLogistics (speakers/profileSteps.cjs).
+    match /speaker_logistics/{speakerId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // speakers_public/{speakerId}: the one-way projection the
     // onSpeakerWritten trigger maintains (functions/src/speakers/
     // projection.cjs). Public by design — it drives the speaker directory

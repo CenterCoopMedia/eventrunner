@@ -41,6 +41,8 @@
     "deleteSpeaker",
     "getOwnSpeakerProfile",
     "updateOwnSpeakerProfile",
+    "saveOwnSpeakerLogistics",
+    "submitOwnSpeakerProfile",
     "applySpeakerPendingEdits",
     "discardSpeakerPendingEdits",
     "speakerPhotoUpload",

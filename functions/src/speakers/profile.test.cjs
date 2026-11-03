@@ -513,6 +513,7 @@ test('applyGetOwnSpeakerProfile: the owner sees their own record, minus server-o
     speakerId: 'rae',
     firstName: 'Rae',
     lastName: 'Okonkwo',
+    pronouns: '',
     slug: 'rae-okonkwo',
     bio: 'old bio',
     headshotPath: null,
@@ -521,7 +522,9 @@ test('applyGetOwnSpeakerProfile: the owner sees their own record, minus server-o
     socialHandles: {},
     status: 'accepted',
     pendingEdits: null,
+    profileSubmittedAt: null,
   });
+  assert.deepEqual(result.logistics, { travel: null, accessNeeds: null, avNeeds: null });
   assert.equal('email' in result.speaker, false);
   assert.equal('uid' in result.speaker, false);
   assert.equal('inviteToken' in result.speaker, false);

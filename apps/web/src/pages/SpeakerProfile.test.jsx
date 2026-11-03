@@ -1,10 +1,11 @@
-// Speaker self-service profile wizard (issue #22): gates on being signed in
-// AND linked to a speaker (users/{uid}.speakerId), loads the caller's own
-// canonical record through getOwnSpeakerProfile, and saves only
-// SELF_EDITABLE_SPEAKER_FIELDS through updateOwnSpeakerProfile.
+// Speaker self-service profile steps (issue #22, ADR 0008 §3): gates on
+// being signed in AND linked to a speaker (users/{uid}.speakerId), loads the
+// caller's own record and logistics through loadOwnSpeakerProfile, saves
+// each step's SELF_EDITABLE_SPEAKER_FIELDS through updateOwnSpeakerProfile,
+// the Logistics step through saveOwnSpeakerLogistics, and submits once.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 let authValue;
 let profileValue;
@@ -20,12 +21,19 @@ vi.mock('../contexts/ToastContext.jsx', () => ({
   useToast: () => ({ showToast: showToastMock }),
 }));
 
+// The speaker record comes from this mock; loadOwnSpeakerProfile pairs it
+// with `logisticsValue`, as the server pairs the two records.
 const getOwnSpeakerProfileMock = vi.fn();
+let logisticsValue;
 const updateOwnSpeakerProfileMock = vi.fn(() => Promise.resolve({ ok: true }));
+const saveOwnSpeakerLogisticsMock = vi.fn(() => Promise.resolve({ ok: true }));
+const submitOwnSpeakerProfileMock = vi.fn(() => Promise.resolve({ submitted: true, emailed: true }));
 const deleteSpeakerPhotoMock = vi.fn(() => Promise.resolve());
 vi.mock('../lib/speakerProfileApi.js', () => ({
-  getOwnSpeakerProfile: (...args) => getOwnSpeakerProfileMock(...args),
+  loadOwnSpeakerProfile: (...args) => getOwnSpeakerProfileMock(...args).then((speaker) => ({ speaker, logistics: logisticsValue })),
   updateOwnSpeakerProfile: (...args) => updateOwnSpeakerProfileMock(...args),
+  saveOwnSpeakerLogistics: (...args) => saveOwnSpeakerLogisticsMock(...args),
+  submitOwnSpeakerProfile: (...args) => submitOwnSpeakerProfileMock(...args),
   deleteSpeakerPhoto: (...args) => deleteSpeakerPhotoMock(...args),
 }));
 
@@ -52,12 +60,19 @@ vi.mock('../components/SignInPanel.jsx', () => ({
 
 const { default: SpeakerProfile } = await import('./SpeakerProfile.jsx');
 
-function renderPage() {
-  return render(
-    <MemoryRouter>
-      <SpeakerProfile />
-    </MemoryRouter>,
+// Most tests here are about the Bio and photo step, so that is the default.
+function page(path) {
+  return (
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/speaker/profile" element={<SpeakerProfile />} />
+        <Route path="/speaker/profile/:stepSlug" element={<SpeakerProfile />} />
+      </Routes>
+    </MemoryRouter>
   );
+}
+function renderPage(path = '/speaker/profile/bio') {
+  return render(page(path));
 }
 
 const SEEDED_SPEAKER = {
@@ -77,6 +92,9 @@ beforeEach(() => {
   authValue = { user: { uid: 'u1', getIdToken: async () => 't' } };
   profileValue = { profile: { speakerId: 'rae-okonkwo' }, status: 'ready' };
   getOwnSpeakerProfileMock.mockReset().mockResolvedValue(SEEDED_SPEAKER);
+  logisticsValue = { travel: null, accessNeeds: null, avNeeds: null };
+  saveOwnSpeakerLogisticsMock.mockReset().mockResolvedValue({ ok: true });
+  submitOwnSpeakerProfileMock.mockReset().mockResolvedValue({ submitted: true, emailed: true });
   updateOwnSpeakerProfileMock.mockReset().mockResolvedValue({ ok: true });
   deleteSpeakerPhotoMock.mockReset().mockResolvedValue();
   showToastMock.mockClear();
@@ -108,14 +126,15 @@ describe('SpeakerProfile', () => {
     expect(screen.getByText('Setting up your account…')).toBeInTheDocument();
   });
 
-  it('loads the caller’s own speaker record and seeds the form from it', async () => {
-    renderPage();
+  it('loads the caller’s own speaker record and seeds each step from it', async () => {
+    renderPage('/speaker/profile/about');
     await waitFor(() => expect(getOwnSpeakerProfileMock).toHaveBeenCalledWith({
       user: authValue.user,
       speakerId: 'rae-okonkwo',
     }));
     expect(await screen.findByDisplayValue('Rae')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Old bio.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'About you' })).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 5')).toBeInTheDocument();
   });
 
   it('shows the review-status note for an accepted (not yet approved) speaker', async () => {
@@ -125,40 +144,96 @@ describe('SpeakerProfile', () => {
     ).toBeInTheDocument();
   });
 
-  it('saves only the self-editable fields, unchanged by slug/email/status', async () => {
-    renderPage();
+  it('each step saves only its own self-editable fields, never slug, email or status', async () => {
+    renderPage('/speaker/profile/about');
     await screen.findByDisplayValue('Rae');
-
-    fireEvent.change(screen.getByLabelText('Biography'), { target: { value: 'New bio.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
-
-    await waitFor(() => expect(updateOwnSpeakerProfileMock).toHaveBeenCalled());
-    const [[call]] = updateOwnSpeakerProfileMock.mock.calls;
-    expect(call.speakerId).toBe('rae-okonkwo');
-    expect(call.fields).toEqual({
-      firstName: 'Rae',
-      lastName: 'Okonkwo',
-      bio: 'New bio.',
-      organization: '',
-      jobTitle: '',
-      headshotPath: null,
-      socialHandles: {},
+    fireEvent.change(screen.getByLabelText('Pronouns (optional)'), { target: { value: ' they/them ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Bio and photo' }));
+    await waitFor(() => expect(updateOwnSpeakerProfileMock).toHaveBeenCalledTimes(1));
+    expect(updateOwnSpeakerProfileMock.mock.calls[0][0]).toEqual({
+      user: authValue.user,
+      speakerId: 'rae-okonkwo',
+      fields: { firstName: 'Rae', lastName: 'Okonkwo', pronouns: 'they/them', organization: '', jobTitle: '' },
     });
-    expect('slug' in call.fields).toBe(false);
-    expect('email' in call.fields).toBe(false);
-    expect('status' in call.fields).toBe(false);
-    expect(showToastMock).toHaveBeenCalledWith('Speaker profile saved.');
+    // The step saved, so the page moved on.
+    expect(await screen.findByRole('heading', { level: 2, name: 'Bio and photo' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Biography'), { target: { value: 'New bio.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
+    await waitFor(() => expect(updateOwnSpeakerProfileMock).toHaveBeenCalledTimes(2));
+    const { fields } = updateOwnSpeakerProfileMock.mock.calls[1][0];
+    expect(fields).toEqual({ bio: 'New bio.', headshotPath: null });
+    for (const key of ['slug', 'email', 'status']) expect(key in fields).toBe(false);
+    expect(await screen.findByText('Saved.')).toBeInTheDocument();
   });
 
-  it('requires a first and last name before saving', async () => {
-    renderPage();
+  it('saves logistics to the private record and submits the profile once from Review', async () => {
+    logisticsValue = { travel: 'Train', accessNeeds: null, avNeeds: null };
+    renderPage('/speaker/profile/logistics');
+    expect(await screen.findByDisplayValue('Train')).toBeInTheDocument();
+    expect(screen.getByText(/Only the organizers see these answers/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Audio and video needs (optional)'), { target: { value: 'A clip-on mic.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
+    await waitFor(() => expect(saveOwnSpeakerLogisticsMock).toHaveBeenCalledWith({
+      user: authValue.user,
+      speakerId: 'rae-okonkwo',
+      logistics: { travel: 'Train', accessNeeds: '', avNeeds: 'A clip-on mic.' },
+    }));
+    expect(updateOwnSpeakerProfileMock).not.toHaveBeenCalled();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Review' })).toBeInTheDocument();
+    expect(screen.getByText('A clip-on mic.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit profile' }));
+    expect(await screen.findByText('Profile submitted. We emailed you a note that we have it.')).toBeInTheDocument();
+    expect(submitOwnSpeakerProfileMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Submit profile' })).not.toBeInTheDocument();
+  });
+
+  it('shows a submitted profile as submitted, with no second submit', async () => {
+    getOwnSpeakerProfileMock.mockResolvedValue({ ...SEEDED_SPEAKER, profileSubmittedAt: '2026-11-01T14:00:00.000Z' });
+    renderPage('/speaker/profile/review');
+    expect(await screen.findByText(/you do not need to submit again/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit profile' })).not.toBeInTheDocument();
+  });
+
+  it('moves on without saving a step nobody changed, so an approved speaker queues no empty edit', async () => {
+    getOwnSpeakerProfileMock.mockResolvedValue({ ...SEEDED_SPEAKER, status: 'approved' });
+    renderPage('/speaker/profile/about');
+    await screen.findByDisplayValue('Rae');
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Bio and photo' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Bio and photo' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Links' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Logistics' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Logistics' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Review' })).toBeInTheDocument();
+    expect(updateOwnSpeakerProfileMock).not.toHaveBeenCalled();
+    expect(saveOwnSpeakerLogisticsMock).not.toHaveBeenCalled();
+    // A change after that is saved once, and the same answer is not saved again.
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+    fireEvent.change(await screen.findByLabelText('Travel (optional)'), { target: { value: 'Car' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Review' }));
+    await waitFor(() => expect(saveOwnSpeakerLogisticsMock).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole('link', { name: 'Back' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Next: Review' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Review' })).toBeInTheDocument();
+    expect(saveOwnSpeakerLogisticsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends an unknown step address to the first step', async () => {
+    renderPage('/speaker/profile/nope');
+    expect(await screen.findByRole('heading', { level: 2, name: 'About you' })).toBeInTheDocument();
+  });
+
+  it('requires a first and last name before moving on', async () => {
+    renderPage('/speaker/profile/about');
     await screen.findByDisplayValue('Rae');
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Bio and photo' }));
     expect(
       await screen.findByText('Enter the name you want printed on the programme.'),
     ).toBeInTheDocument();
     expect(updateOwnSpeakerProfileMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { level: 2, name: 'About you' })).toBeInTheDocument();
   });
 
   it('reports a load failure with a retry action rather than crashing', async () => {
@@ -189,7 +264,8 @@ describe('SpeakerProfile', () => {
   it('shows no review banner when there is nothing queued', async () => {
     getOwnSpeakerProfileMock.mockResolvedValue({ ...SEEDED_SPEAKER, status: 'approved', pendingEdits: null });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
+    expect(screen.getByDisplayValue('Old bio.')).toBeInTheDocument();
     expect(screen.queryByText(/awaiting organizer review/)).not.toBeInTheDocument();
   });
 
@@ -197,26 +273,24 @@ describe('SpeakerProfile', () => {
     getOwnSpeakerProfileMock.mockResolvedValue({ ...SEEDED_SPEAKER, status: 'approved' });
     updateOwnSpeakerProfileMock.mockResolvedValue({ ok: true, staged: true });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
 
     fireEvent.change(screen.getByLabelText('Biography'), { target: { value: 'New bio.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
 
-    await waitFor(() =>
-      expect(showToastMock).toHaveBeenCalledWith(
-        'Changes submitted. An organizer reviews them before they replace your public profile.',
-      ),
-    );
+    expect(
+      await screen.findByText('Saved for review. An organizer reviews changes before they replace your public profile.'),
+    ).toBeInTheDocument();
   });
 
   it('reports a direct (non-staged) save with the ordinary copy', async () => {
     // SEEDED_SPEAKER's status is 'accepted' — not yet approved, so nothing
     // is staged.
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
     fireEvent.change(screen.getByLabelText('Biography'), { target: { value: 'New bio.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
-    await waitFor(() => expect(showToastMock).toHaveBeenCalledWith('Speaker profile saved.'));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
+    expect(await screen.findByText('Saved.')).toBeInTheDocument();
   });
 
   // --- deferred photo cleanup (issue #22 review findings P1-2 / P2-3) -------
@@ -228,10 +302,10 @@ describe('SpeakerProfile', () => {
       headshotPath: 'speaker-photos/rae-okonkwo/old/photo.png',
     });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
 
     fireEvent.change(screen.getByLabelText('Biography'), { target: { value: 'New bio.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
     await waitFor(() => expect(updateOwnSpeakerProfileMock).toHaveBeenCalled());
     expect(deleteSpeakerPhotoMock).not.toHaveBeenCalled();
   });
@@ -243,10 +317,10 @@ describe('SpeakerProfile', () => {
       headshotPath: 'speaker-photos/rae-okonkwo/old/photo.png',
     });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
 
     fireEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
 
     await waitFor(() =>
       expect(deleteSpeakerPhotoMock).toHaveBeenCalledWith({
@@ -272,10 +346,10 @@ describe('SpeakerProfile', () => {
     });
     updateOwnSpeakerProfileMock.mockResolvedValue({ ok: true, staged: true });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
 
     fireEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
     await waitFor(() => expect(updateOwnSpeakerProfileMock).toHaveBeenCalled());
     expect(deleteSpeakerPhotoMock).not.toHaveBeenCalled();
   });
@@ -288,10 +362,10 @@ describe('SpeakerProfile', () => {
     });
     updateOwnSpeakerProfileMock.mockResolvedValue({ ok: true, staged: false });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
 
     fireEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
 
     await waitFor(() =>
       expect(deleteSpeakerPhotoMock).toHaveBeenCalledWith({
@@ -310,10 +384,10 @@ describe('SpeakerProfile', () => {
     });
     updateOwnSpeakerProfileMock.mockResolvedValue({ ok: true, staged: true });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
 
     fireEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
 
     await waitFor(() => expect(updateOwnSpeakerProfileMock).toHaveBeenCalled());
     expect(deleteSpeakerPhotoMock).not.toHaveBeenCalled();
@@ -328,10 +402,10 @@ describe('SpeakerProfile', () => {
     });
     updateOwnSpeakerProfileMock.mockResolvedValue({ ok: true, staged: true });
     renderPage();
-    await screen.findByDisplayValue('Rae');
+    await screen.findByLabelText('Biography');
 
     fireEvent.click(screen.getByRole('button', { name: 'Simulate upload' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save speaker profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Links' }));
 
     await waitFor(() =>
       expect(deleteSpeakerPhotoMock).toHaveBeenCalledWith({
@@ -354,11 +428,7 @@ describe('SpeakerProfile', () => {
     // A second load starts (e.g. the account switched) before the first
     // ever resolves.
     profileValue = { profile: { speakerId: 'someone-else' }, status: 'ready' };
-    rerender(
-      <MemoryRouter>
-        <SpeakerProfile />
-      </MemoryRouter>,
-    );
+    rerender(page('/speaker/profile/bio'));
     await screen.findByDisplayValue('Second load bio.');
 
     // The FIRST request now resolves, late. It must not clobber the form

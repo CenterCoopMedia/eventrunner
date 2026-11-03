@@ -134,6 +134,7 @@ export function AppRoutes() {
             (functions/src/email/templates/speaker.accepted.cjs) links
             straight here. */}
         <Route path="speaker/profile" element={<DeferredPage component={SpeakerProfile} label="speaker profile" />} />
+        <Route path="speaker/profile/:stepSlug" element={<DeferredPage component={SpeakerProfile} label="speaker profile" />} />
         <Route path="speaker/dashboard" element={<DeferredPage component={SpeakerDashboard} label="speaker dashboard" />} />
         {/* Self-service ticket claim (issue #33): every `ticket.claim_prompt`
             CTA (manual.cjs, eventbrite.cjs getRegistrationPrompt) links

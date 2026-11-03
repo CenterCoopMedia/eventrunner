@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The speaker profile is now five steps at `/speaker/profile`: About you,
+  Bio and photo, Links, Logistics, and Review. Each step saves when the
+  speaker moves on. Speakers can add pronouns, which show on the public
+  speaker page. Travel, access, and audio and video answers go to a new
+  staff-only record (`speaker_logistics`), shown on the speaker's admin page
+  and never published. The first submit sends `speaker.profile_received`
+  once (ADR 0008 §3, as amended).
 - Accepting a pitch into drafts now makes one draft speaker per presenter.
   A presenter whose email is already on a speaker is linked, not copied. The
   convert dialog has **Invite the presenters now**, on by default, which sends

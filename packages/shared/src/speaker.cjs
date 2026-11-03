@@ -60,6 +60,7 @@ const PUBLISHED_SPEAKER_STATUSES = Object.freeze(['approved']);
 const EDITABLE_SPEAKER_FIELDS = Object.freeze([
   'firstName',
   'lastName',
+  'pronouns',
   'slug',
   'email',
   'bio',
@@ -85,6 +86,7 @@ const EDITABLE_SPEAKER_FIELDS = Object.freeze([
 const SELF_EDITABLE_SPEAKER_FIELDS = Object.freeze([
   'firstName',
   'lastName',
+  'pronouns',
   'bio',
   'headshotPath',
   'organization',
@@ -126,6 +128,9 @@ const SERVER_OWNED_SPEAKER_FIELDS = Object.freeze([
   'pendingEdits',
   'pendingEditsAt',
   'pendingEditsBy',
+  // Stamped when the speaker submits the profile steps (ADR 0008 §3), by
+  // functions/src/speakers/profileSteps.cjs only.
+  'profileSubmittedAt',
 ]);
 
 /**
@@ -135,6 +140,7 @@ const SERVER_OWNED_SPEAKER_FIELDS = Object.freeze([
 const PUBLIC_SPEAKER_FIELDS = Object.freeze([
   'firstName',
   'lastName',
+  'pronouns',
   'displayName',
   'slug',
   'bio',
@@ -146,6 +152,7 @@ const PUBLIC_SPEAKER_FIELDS = Object.freeze([
 
 const MAX_NAME_LENGTH = 120;
 const MAX_SHORT_TEXT_LENGTH = 200;
+const MAX_PRONOUNS_LENGTH = 80;
 const MAX_BIO_LENGTH = 4000;
 const MAX_SOCIAL_HANDLES = 12;
 // Per-entry caps (issue #22 review finding P2-5): MAX_SOCIAL_HANDLES bounds
@@ -211,6 +218,7 @@ function buildPublicSpeaker(speaker) {
   const out = {
     firstName: asString(source.firstName).trim(),
     lastName: asString(source.lastName).trim(),
+    pronouns: asString(source.pronouns).trim(),
     displayName: speakerDisplayName(source),
     slug: asString(source.slug).trim(),
     bio: asString(source.bio),
@@ -320,6 +328,8 @@ function validateSpeaker(payload, { partial = false, fieldsAllowed = EDITABLE_SP
   }
 
   for (const [key, limit] of [
+    // The same limit as an attendee's pronouns (shared/profile).
+    ['pronouns', MAX_PRONOUNS_LENGTH],
     ['bio', MAX_BIO_LENGTH],
     ['organization', MAX_SHORT_TEXT_LENGTH],
     ['jobTitle', MAX_SHORT_TEXT_LENGTH],
@@ -404,6 +414,7 @@ module.exports = {
   internals: {
     MAX_NAME_LENGTH,
     MAX_SHORT_TEXT_LENGTH,
+    MAX_PRONOUNS_LENGTH,
     MAX_BIO_LENGTH,
     MAX_SOCIAL_HANDLES,
     MAX_SOCIAL_LABEL_LENGTH,

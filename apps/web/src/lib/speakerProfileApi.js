@@ -42,6 +42,37 @@ export function getOwnSpeakerProfile({ user, speakerId }) {
 }
 
 /**
+ * The own record and its private logistics answers, for the profile steps.
+ *
+ * @param {{ user: object, speakerId: string }} args
+ * @returns {Promise<{ speaker: object, logistics: { travel: string|null, accessNeeds: string|null, avNeeds: string|null } }>}
+ */
+export function loadOwnSpeakerProfile({ user, speakerId }) {
+  return callAdminEndpoint('getOwnSpeakerProfile', { speakerId }, idTokenGetter(user)).then(
+    (payload) => ({ speaker: payload.speaker, logistics: payload.logistics ?? null }),
+  );
+}
+
+/**
+ * Save the Logistics step to the staff-only record (ADR 0008 §3).
+ *
+ * @param {{ user: object, speakerId: string, logistics: object }} args
+ */
+export function saveOwnSpeakerLogistics({ user, speakerId, logistics }) {
+  return callAdminEndpoint('saveOwnSpeakerLogistics', { speakerId, logistics }, idTokenGetter(user));
+}
+
+/**
+ * Submit the profile. The first submit sends speaker.profile_received.
+ *
+ * @param {{ user: object, speakerId: string }} args
+ * @returns {Promise<{ submitted: true, emailed: boolean, replayed?: true }>}
+ */
+export function submitOwnSpeakerProfile({ user, speakerId }) {
+  return callAdminEndpoint('submitOwnSpeakerProfile', { speakerId }, idTokenGetter(user));
+}
+
+/**
  * Save the self-editable subset of the caller's own speaker record.
  * `fields` should already be limited to SELF_EDITABLE_SPEAKER_FIELDS
  * (shared/speaker) — the server rejects anything else by name, and

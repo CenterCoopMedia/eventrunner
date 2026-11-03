@@ -21,6 +21,8 @@ vi.mock('../../lib/contentSource.js', () => ({
 vi.mock('../../lib/profileSource.js', () => ({ subscribeOwnProfile: () => () => {} }));
 
 let speakerDocs = [];
+// speaker_logistics/{id} documents the logistics panel reads, by path.
+let logisticsDocs = {};
 let listenerError = null;
 vi.mock('../adminSource.js', () => ({
   subscribeAdminCollection: (name, onNext, onError) => {
@@ -30,6 +32,10 @@ vi.mock('../adminSource.js', () => ({
     } else {
       onNext([]);
     }
+    return () => {};
+  },
+  subscribeAdminDoc: (path, onNext) => {
+    onNext(logisticsDocs[path] ?? null);
     return () => {};
   },
 }));
@@ -118,6 +124,7 @@ beforeEach(() => {
   // record words this file reads; the account has already ended it.
   markTourDone('admin-1');
   speakerDocs = [];
+  logisticsDocs = {};
   listenerError = null;
   globalThis.fetch = vi.fn();
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -181,9 +188,9 @@ describe('speaker editor', () => {
     const form = screen.getByLabelText('First name').closest('form');
     const layout = form.querySelector('.admin-editor-layout--speaker');
     expect(within(layout).getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent))
-      .toEqual(['Name', 'Profile', 'Contact and status']);
+      .toEqual(['Name', 'Profile', 'Contact and status', 'Logistics']);
     expect([...layout.querySelectorAll('label')].map((label) => label.textContent.trim())).toEqual([
-      'First name', 'Last name', 'URL slug', 'Job title', 'Organization',
+      'First name', 'Last name', 'URL slug', 'Pronouns', 'Job title', 'Organization',
       'Bio', 'Replace photo', 'None',
       'Default avatar 01', 'Default avatar 02', 'Default avatar 03',
       'Default avatar 04', 'Default avatar 05', 'Default avatar 06',
@@ -274,6 +281,28 @@ describe('speaker editor', () => {
     expect(bodyOf(0).speakerId).toBe('rae-okonkwo');
     expect(bodyOf(0).speaker.bio).toBe('Updated bio.');
     expect(bodyOf(0).speaker.headshotPath).toBe('speakers/rae.jpg');
+  });
+
+  it('shows the speaker logistics to staff and saves pronouns with the profile', async () => {
+    speakerDocs = [{ ...RAE, pronouns: 'she/her', profileSubmittedAt: new Date('2026-11-03T15:00:00Z') }];
+    logisticsDocs = { 'speaker_logistics/rae-okonkwo': { travel: 'Train from Newark.', accessNeeds: null, avNeeds: 'A clip-on mic.' } };
+    fetch.mockResolvedValueOnce(okResponse({ speakerId: 'rae-okonkwo' }));
+    await renderAt('/admin/speakers/rae-okonkwo');
+
+    expect(screen.getByRole('heading', { name: 'Logistics' })).toBeInTheDocument();
+    expect(screen.getByText('Train from Newark.')).toBeInTheDocument();
+    expect(screen.getByText('A clip-on mic.')).toBeInTheDocument();
+    expect(screen.getByText('No answer')).toBeInTheDocument();
+    // In the event's time zone (Eastern in the fixture config, or the default).
+    expect(screen.getByText(/^Profile submitted Nov 3, 2026, \d{1,2}:00 [AP]M [A-Z]{2,4}\.$/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Pronouns')).toHaveValue('she/her');
+
+    fireEvent.change(screen.getByLabelText('Pronouns'), { target: { value: 'they/them' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save speaker' }));
+    });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    expect(bodyOf(0).speaker.pronouns).toBe('they/them');
   });
 
   it('saves a chosen default avatar and keeps that choice when the save fails', async () => {
