@@ -45,8 +45,8 @@ test('an operator connects Airtable, refreshes, and sees a changed record marked
   page.on('pageerror', (err) => console.error('Browser error:', err.message));
   rows = [record(1), record(2), record(3, { consent: false })];
   await signIn(page, ADMIN_EMAIL);
-  await page.goto('/admin/pitches');
-  await expect(page.getByRole('heading', { name: 'Session pitches', exact: true })).toBeVisible();
+  await page.goto('/admin/pitches/import');
+  await expect(page.getByRole('heading', { name: 'Import pitches', exact: true })).toBeVisible();
   if (await page.getByRole('button', { name: 'End tour', exact: true }).isVisible()) await page.getByRole('button', { name: 'End tour', exact: true }).click();
 
   await page.getByText('Refresh pitches from Airtable', { exact: true }).click();
@@ -63,8 +63,10 @@ test('an operator connects Airtable, refreshes, and sees a changed record marked
   await page.keyboard.press('Enter');
   await expect(page.getByText(/Refresh complete: created 2, updated 0, unchanged 0, back in Airtable 0, skipped 1, flagged as removed 0\./)).toBeVisible();
   await expect(page.getByLabel('Airtable refresh status').getByText('Completed', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Airtable pitch 1', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Airtable pitch 3', exact: true })).toHaveCount(0);
+  // The refreshed pitches are in the queue; the unconsented one is not.
+  await page.getByRole('link', { name: 'Back to the queue' }).click();
+  await expect(page.getByRole('link', { name: 'Airtable pitch 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Airtable pitch 3', exact: true })).toHaveCount(0);
   expect(requests.length).toBe(2);
   expect(requests.every((r) => r.authorization === `Bearer ${token}`)).toBe(true);
   expect(requests[0].fields).toEqual(expect.arrayContaining(['email', 'title', 'description', 'consent']));
@@ -80,13 +82,16 @@ test('an operator connects Airtable, refreshes, and sees a changed record marked
   rows = [record(1, { title: 'Airtable pitch 1, revised' }), record(3, { consent: false })];
   const status = (await db.doc('session_pitch_sync/airtable').get()).data();
   await db.doc('session_pitch_sync/airtable').update({ running: null, lastRun: { ...status.lastRun, startedAt: new Date(Date.now() - 2 * 60 * 1000) } });
+  await page.goto('/admin/pitches/import');
+  await page.getByText('Refresh pitches from Airtable', { exact: true }).click();
   await page.getByRole('button', { name: 'Refresh from Airtable' }).click();
   await expect(page.getByText(/Refresh complete: created 0, updated 1, unchanged 0, back in Airtable 0, skipped 1, flagged as removed 1\./)).toBeVisible();
-  const revised = page.getByRole('button', { name: 'Airtable pitch 1, revised', exact: true }).locator('xpath=ancestor::li[1]');
+  await page.getByRole('link', { name: 'Back to the queue' }).click();
+  const revised = page.getByRole('link', { name: 'Airtable pitch 1, revised', exact: true }).locator('xpath=ancestor::li[1]');
   await expect(revised.getByText('Updated in Airtable')).toBeVisible();
-  const removed = page.getByRole('button', { name: 'Airtable pitch 2', exact: true }).locator('xpath=ancestor::li[1]');
+  const removed = page.getByRole('link', { name: 'Airtable pitch 2', exact: true }).locator('xpath=ancestor::li[1]');
   await expect(removed.getByText('Removed from Airtable')).toBeVisible();
-  await page.getByRole('button', { name: 'Airtable pitch 1, revised', exact: true }).click();
+  await page.getByRole('link', { name: 'Airtable pitch 1, revised', exact: true }).click();
   await expect(page.getByRole('list', { name: 'Airtable changes' })).toContainText('The submitter changed title');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await db.collection('session_pitches').where('source', '==', 'airtable').get()).size).toBe(2);

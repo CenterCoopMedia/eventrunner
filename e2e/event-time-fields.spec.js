@@ -89,10 +89,9 @@ test.describe.serial('event-time fields', () => {
     await ref.set({ enabled: true, closesAt: '2027-02-01T04:59:59.000Z' });
     await signIn(page, ADMIN_EMAIL);
     await page.setViewportSize(VIEWPORTS[0][1]);
-    await page.goto('/admin/pitches');
-    await expect(page.getByRole('heading', { name: 'Session pitches', exact: true })).toBeVisible();
+    await page.goto('/admin/pitches/settings');
+    await expect(page.getByRole('heading', { name: 'Pitch call settings', exact: true })).toBeVisible();
     await endTour(page);
-    await page.getByText('Manage the call for sessions', { exact: true }).click();
     const deadline = page.getByRole('group', { name: 'Deadline', exact: true });
     const date = deadline.getByLabel('Date', { exact: true });
     const time = deadline.getByLabel('Time', { exact: true });
@@ -114,19 +113,26 @@ test.describe.serial('event-time fields', () => {
     const description = page.getByText('Only operators can open or close intake.', { exact: true });
     const lineHeight = await description.evaluate((node) => parseFloat(window.getComputedStyle(node).lineHeight));
     expect((await description.boundingBox()).height).toBeLessThan(lineHeight * 1.5);
-    const filter = await page.getByLabel('Filter by decision').boundingBox();
-    const search = await page.getByLabel('Search pitches', { exact: true }).boundingBox();
-    expect(Math.abs((filter.y + filter.height) - (search.y + search.height))).toBeLessThanOrEqual(1);
-    // Narrow: the filter stacks above the search, each at the full width.
-    await page.setViewportSize(VIEWPORTS[1][1]);
-    const filterNarrow = await page.getByLabel('Filter by decision').boundingBox();
-    const searchNarrow = await page.getByLabel('Search pitches', { exact: true }).boundingBox();
-    expect(searchNarrow.y).toBeGreaterThan(filterNarrow.y + filterNarrow.height);
-    expect(Math.abs(searchNarrow.width - filterNarrow.width)).toBeLessThanOrEqual(1);
     // 200% zoom on a 1280px screen is a 640px CSS viewport.
     await page.setViewportSize({ width: 640, height: 450 });
-    expect(await fits(page), 'pitches page fits at 200% zoom').toBe(true);
+    expect(await fits(page), 'pitch call settings fit at 200% zoom').toBe(true);
     await page.setViewportSize(VIEWPORTS[0][1]);
+
+    // The queue (ADR 0008, admin review): the filter and search on one
+    // baseline when wide, stacked at full width when narrow.
+    await page.goto('/admin/pitches');
+    await expect(page.getByRole('heading', { name: 'Session pitches', exact: true })).toBeVisible();
+    const filter = await page.getByLabel('Decision', { exact: true }).boundingBox();
+    const search = await page.getByLabel('Search', { exact: true }).boundingBox();
+    expect(Math.abs((filter.y + filter.height) - (search.y + search.height))).toBeLessThanOrEqual(1);
+    await page.setViewportSize(VIEWPORTS[1][1]);
+    const filterNarrow = await page.getByLabel('Decision', { exact: true }).boundingBox();
+    const searchNarrow = await page.getByLabel('Search', { exact: true }).boundingBox();
+    expect(searchNarrow.y).toBeGreaterThan(filterNarrow.y + filterNarrow.height);
+    expect(Math.abs(searchNarrow.width - filterNarrow.width)).toBeLessThanOrEqual(1);
+    await page.setViewportSize(VIEWPORTS[0][1]);
+    await page.goto('/admin/pitches/settings');
+    await expect(page.getByRole('heading', { name: 'Pitch call settings', exact: true })).toBeVisible();
 
     // A time the clocks skip is refused in place and nothing is saved.
     await date.fill('2027-03-14');
@@ -213,14 +219,12 @@ test.describe.serial('event-time fields', () => {
     await ref.set({ enabled: true, closesAt: '2027-02-01T04:59:59.000Z', externalFormUrl: null });
     await signIn(page, ADMIN_EMAIL);
     await page.setViewportSize(VIEWPORTS[0][1]);
-    await page.goto('/admin/pitches');
-    await expect(page.getByRole('heading', { name: 'Session pitches', exact: true })).toBeVisible();
+    await page.goto('/admin/pitches/settings');
+    await expect(page.getByRole('heading', { name: 'Pitch call settings', exact: true })).toBeVisible();
     await endTour(page);
 
-    // Keyboard only from here: open the panel and walk its controls with Tab.
-    await page.getByText('Manage the call for sessions', { exact: true }).focus();
-    await page.keyboard.press('Enter');
-    await page.keyboard.press('Tab');
+    // Keyboard only from here: walk the call settings with Tab from the first control.
+    await page.getByLabel('Accept session pitches').focus();
     expect(await tabPath(page, 6)).toEqual([
       'checkbox: Accept session pitches (checked)',
       'radio: At a set date and time (checked)',

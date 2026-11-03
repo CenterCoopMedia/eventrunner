@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Session pitches in the admin match the list idiom of Speakers: the queue
+  at `/admin/pitches` with a count and header actions, one pitch at
+  `/admin/pitches/<id>` with **Accept**, **Decline** and **Mark in review**
+  buttons, separate private notes, and **Edit pitch** (`editSessionPitch`,
+  which keeps the submitted copy and audits each change), the call, form and
+  email settings at `/admin/pitches/settings`, and CSV and Airtable imports at
+  `/admin/pitches/import`.
+
 - The session pitch form is a five-step stepper (ADR 0008 §2): the session
   (title, one-line summary, description), its format, length, track and
   audience, the presenters (the lead and up to four co-presenters), access

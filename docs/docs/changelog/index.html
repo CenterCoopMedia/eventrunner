@@ -145,6 +145,15 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>Session pitches in the admin match the list idiom of Speakers: the queue
+          at <code>/admin/pitches</code> with a count and header actions, one pitch at
+          <code>/admin/pitches/&lt;id&gt;</code> with <strong>Accept</strong>, <strong>Decline</strong> and <strong>Mark in review</strong>
+          buttons, separate private notes, and <strong>Edit pitch</strong> (<code>editSessionPitch</code>,
+          which keeps the submitted copy and audits each change), the call, form and
+          email settings at <code>/admin/pitches/settings</code>, and CSV and Airtable imports at
+          <code>/admin/pitches/import</code>.</li>
+          </ul>
+          <ul>
           <li>The session pitch form is a five-step stepper (ADR 0008 §2): the session
           (title, one-line summary, description), its format, length, track and
           audience, the presenters (the lead and up to four co-presenters), access

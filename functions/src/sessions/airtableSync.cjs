@@ -175,10 +175,17 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
           sourceUpdatedAt: null,
           sourceRemovedAt: null,
           sourceConsentMissingAt: null,
+          // What Airtable sent, so a later refresh can tell a source change
+          // from a staff correction (editSessionPitch).
+          sourceValues: row,
         });
         return;
       }
-      const changed = CONTENT_KEYS.filter((key) => (stored[key] ?? null) !== row[key]);
+      // Compare with what Airtable sent last, not with the pitch: a staff
+      // correction changes the pitch, not the source. A pitch stored before
+      // sourceValues existed compares with itself, as it always did.
+      const baseline = stored.sourceValues && typeof stored.sourceValues === 'object' ? stored.sourceValues : stored;
+      const changed = CONTENT_KEYS.filter((key) => (baseline[key] ?? null) !== row[key]);
       const flagged = Boolean(stored.sourceRemovedAt || stored.sourceConsentMissingAt);
       if (changed.length) {
         local.updated += 1;
@@ -189,6 +196,7 @@ async function applyChunk({ db, source, entries, at, actorEmail, counts }) {
           reviewRevision: revision + 1,
           sourceUpdatedAt: at,
           sourceChangedFields: changed,
+          sourceValues: row,
           sourceRemovedAt: null,
           sourceConsentMissingAt: null,
         });

@@ -1,8 +1,9 @@
-// Airtable refresh on the Session pitches page: the status staff read, the
-// refresh action, the operator settings form, and the queue markers.
+// Airtable refresh on the Import pitches page (/admin/pitches/import): the
+// status staff read, the refresh action, the operator settings form, and the
+// markers in the queue and on a pitch.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 
 let collections = {};
 let listeners = {};
@@ -19,6 +20,20 @@ vi.mock('../../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => 
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => call }));
 
 import AdminSessionPitches from './AdminSessionPitches.jsx';
+import AdminSessionPitch from './AdminSessionPitch.jsx';
+import AdminPitchImport from './AdminPitchImport.jsx';
+
+function renderAt(path) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/admin/pitches" element={<AdminSessionPitches />} />
+        <Route path="/admin/pitches/import" element={<AdminPitchImport />} />
+        <Route path="/admin/pitches/:pitchId" element={<AdminSessionPitch />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 const at = (iso) => new Date(iso);
 const lastRun = {
@@ -31,7 +46,7 @@ const lastRun = {
 };
 
 function open() {
-  render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
+  renderAt('/admin/pitches/import');
   fireEvent.click(screen.getByText('Refresh pitches from Airtable'));
 }
 
@@ -71,7 +86,7 @@ describe('Airtable refresh status and action', () => {
   });
 
   it('says when no refresh has run, and hides the panel from staff until one has', () => {
-    render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
+    renderAt('/admin/pitches/import');
     expect(screen.queryByText('Refresh pitches from Airtable')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Refresh from Airtable' })).toBeNull();
     cleanup();
@@ -161,13 +176,13 @@ describe('Airtable markers in the review queue', () => {
       { ...base, id: 'removed', title: 'Removed pitch', sourceRemovedAt: at('2026-10-12T10:00:00Z') },
       { ...base, id: 'consent', title: 'Unconsented pitch', sourceConsentMissingAt: at('2026-10-12T10:00:00Z') },
     ];
-    render(<MemoryRouter><AdminSessionPitches /></MemoryRouter>);
-    const item = (title) => screen.getByRole('button', { name: title }).closest('li');
+    renderAt('/admin/pitches');
+    const item = (title) => screen.getByRole('link', { name: title }).closest('li');
     expect(within(item('Changed pitch')).getByText('Updated in Airtable')).toBeInTheDocument();
     expect(within(item('Reviewed after change')).queryByText('Updated in Airtable')).toBeNull();
     expect(within(item('Removed pitch')).getByText('Removed from Airtable')).toBeInTheDocument();
     expect(within(item('Unconsented pitch')).getByText('Consent unchecked in Airtable')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Changed pitch' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Changed pitch' }));
     const changes = screen.getByRole('list', { name: 'Airtable changes' });
     expect(changes).toHaveTextContent('The submitter changed title, description on Oct 12, 2026, 10:00 AM UTC.');
   });

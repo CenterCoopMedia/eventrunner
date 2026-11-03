@@ -19,6 +19,7 @@ const {
   createSubmitSessionPitchHandler,
   createUpdatePitchCallHandler,
   createUpdatePitchFormOptionsHandler,
+  createEditSessionPitchHandler,
   createReviewSessionPitchHandler,
   internals: {
     MAX_DESCRIPTION_LENGTH,
@@ -115,6 +116,10 @@ async function updateCall(body, token = 'operator', now = () => T0) {
 
 async function updateOptions(body, token = 'operator', now = () => T0) {
   return call(createUpdatePitchFormOptionsHandler, token, body, { now });
+}
+
+async function editPitch(body, token = 'staff', now = () => T0 + 2000) {
+  return call(createEditSessionPitchHandler, token, body, { now });
 }
 
 async function review(body, token = 'staff', now = () => T0 + 1000) {
@@ -585,6 +590,83 @@ describe('pitch stepper fields (ADR 0008 §2)', () => {
     // The list is public, like the rest of the call, and only the server writes it.
     await assertSucceeds(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'config/pitch_call')));
     await assertFails(setDoc(doc(operatorClient(), 'config/pitch_call'), { formOptions: {} }));
+  });
+});
+
+describe('staff edits of a pitch', () => {
+  const OPTIONS = { formats: ['Panel', 'Workshop'], lengths: [30, 60], tracks: [], maxCoPresenters: 1 };
+  const edited = (overrides = {}) => ({
+    title: 'Corrected title',
+    summary: null,
+    description: pitch().description,
+    organization: 'Example newsroom',
+    format: 'Panel',
+    lengthMinutes: 30,
+    track: null,
+    audienceLevel: null,
+    leadName: 'Pat Submitter',
+    leadRole: null,
+    presenters: [],
+    accessNeeds: null,
+    notes: null,
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    await db.collection('config').doc('pitch_call').set({ enabled: true, closesAt: CLOSES_AT, formOptions: OPTIONS });
+    expect((await submit()).statusCode).toBe(201);
+  });
+
+  it('lets staff correct a pitch, keeps the submitted copy once, raises the revision, and audits the changed fields', async () => {
+    const first = await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited() });
+    expect(first.statusCode).toBe(200);
+    expect(first.body).toEqual({ id: PITCH_ID, revision: 1, changed: ['title', 'lengthMinutes'] });
+    const stored = (await db.collection('session_pitches').doc(PITCH_ID).get()).data();
+    expect(stored).toMatchObject({ title: 'Corrected title', lengthMinutes: 30, reviewRevision: 1, editedBy: STAFF_EMAIL, status: 'new' });
+    expect(stored.submitted).toMatchObject({ title: pitch().title, lengthMinutes: null });
+    expect(stored.presenters[0]).toMatchObject({ email: SUBMITTER_EMAIL, lead: true });
+
+    const second = await editPitch({ id: PITCH_ID, expectedRevision: 1, pitch: edited({ title: 'Second fix' }) });
+    expect(second.statusCode).toBe(200);
+    const again = (await db.collection('session_pitches').doc(PITCH_ID).get()).data();
+    expect(again.submitted.title).toBe(pitch().title);
+    const logs = await db.collection('admin_logs').where('action', '==', 'editSessionPitch').get();
+    expect(logs.size).toBe(2);
+    expect(logs.docs.map((d) => d.data().details.changed).sort()).toEqual([['title'], ['title', 'lengthMinutes']]);
+  });
+
+  it('refuses a stale revision, a wrong value, a non-admin and a missing pitch, without a write', async () => {
+    expect((await editPitch({ id: PITCH_ID, expectedRevision: 3, pitch: edited() })).statusCode).toBe(409);
+    expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited({ format: 'Keynote' }) })).statusCode).toBe(400);
+    expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited({ title: '' }) })).statusCode).toBe(400);
+    expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited() }, 'other')).statusCode).toBe(403);
+    expect((await editPitch({ id: 'missing-pitch', expectedRevision: 0, pitch: edited() })).statusCode).toBe(404);
+    const stored = (await db.collection('session_pitches').doc(PITCH_ID).get()).data();
+    expect(stored.reviewRevision).toBe(0);
+    expect(stored.submitted).toBeUndefined();
+  });
+
+  it('keeps a value the pitch already holds after staff take it off the list, and saves nothing when nothing changed', async () => {
+    await db.collection('session_pitches').doc(PITCH_ID).update({ format: 'Lightning talk' });
+    const unchanged = await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited({ title: pitch().title, lengthMinutes: null, format: 'Lightning talk' }) });
+    expect(unchanged.statusCode).toBe(200);
+    expect(unchanged.body.changed).toEqual([]);
+    expect((await db.collection('session_pitches').doc(PITCH_ID).get()).data().reviewRevision).toBe(0);
+    expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited({ format: 'Lightning talk' }) })).statusCode).toBe(200);
+  });
+
+  it('records the Airtable values before the first edit of an older Airtable pitch', async () => {
+    await db.collection('session_pitches').doc('airtable-old').set({ ...pitch(), source: 'airtable', email: SUBMITTER_EMAIL, status: 'new', reviewRevision: 0 });
+    expect((await editPitch({ id: 'airtable-old', expectedRevision: 0, pitch: edited() })).statusCode).toBe(200);
+    const stored = (await db.collection('session_pitches').doc('airtable-old').get()).data();
+    expect(stored.title).toBe('Corrected title');
+    expect(stored.sourceValues).toMatchObject({ title: pitch().title, description: pitch().description, format: 'Panel' });
+  });
+
+  it('makes an open review of the old text conflict', async () => {
+    expect((await editPitch({ id: PITCH_ID, expectedRevision: 0, pitch: edited() })).statusCode).toBe(200);
+    const stale = await review({ id: PITCH_ID, status: 'accepted', expectedStatus: 'new', expectedRevision: 0 });
+    expect(stale.statusCode).toBe(409);
   });
 });
 
