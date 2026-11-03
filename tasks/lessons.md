@@ -161,6 +161,11 @@ Rules written after user corrections. Read at session start.
   which pins the rail's link count, after the unit tests were fixed. When a
   change adds a link, banner or block to every admin page, grep `e2e/` as
   well as `apps/web/src` for the count or the words it changes.
+- It happened again: the speaker editor's new Logistics panel broke
+  `e2e/admin-workspace-layout.spec.js`, which pins the editor's card count.
+  The rule covers any page, not only every admin page: before pushing a new
+  panel, card, field or step, grep `e2e/` for that page's class or route
+  and run the specs that match.
 
 ## 2026-11-03: give times in Eastern time
 
