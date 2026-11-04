@@ -45,6 +45,9 @@ beforeEach(async () => {
     await setDoc(doc(db, 'organizations/o2/members/cy'), { uid: 'cy', email: 'cy@example.org', role: 'owner' });
     await setDoc(doc(db, 'invites/i1'), { orgId: 'o1', email: 'dee@example.org', role: 'editor', tokenHash: 'h', status: 'pending' });
     await setDoc(doc(db, 'console_rate_limits/invite-org-o1'), { count: 1 });
+    await setDoc(doc(db, 'applications/a1'), { orgId: 'o1', status: 'draft', answers: {} });
+    await setDoc(doc(db, 'applications/a2'), { orgId: 'o2', status: 'submitted', answers: {} });
+    await setDoc(doc(db, 'site_names/nclocal'), { appId: 'a1', orgId: 'o1' });
   });
 });
 
@@ -135,5 +138,48 @@ describe('no client writes', () => {
     const db = operator();
     await assertFails(updateDoc(doc(db, 'organizations/o2/members/cy'), { role: 'editor' }));
     await assertFails(updateDoc(doc(db, 'organizations/o2'), { name: 'Renamed' }));
+  });
+});
+
+describe('guided-setup requests', () => {
+  it('an Owner and an Editor read and list their own organization\'s requests', async () => {
+    for (const db of [ana(), ben()]) {
+      await assertSucceeds(getDoc(doc(db, 'applications/a1')));
+      await assertSucceeds(getDocs(query(collection(db, 'applications'), where('orgId', '==', 'o1'))));
+    }
+  });
+
+  it('a member cannot read or list another organization\'s requests, or list them all', async () => {
+    await assertFails(getDoc(doc(ana(), 'applications/a2')));
+    await assertFails(getDocs(query(collection(ana(), 'applications'), where('orgId', '==', 'o2'))));
+    await assertFails(getDocs(collection(ana(), 'applications')));
+  });
+
+  it('a stranger, a signed-out visitor and an unverified member read no request', async () => {
+    await assertFails(getDoc(doc(stranger(), 'applications/a1')));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'applications/a1')));
+    await assertFails(getDoc(doc(client('ana', 'ana@example.org', false), 'applications/a1')));
+  });
+
+  it('an operator reads and lists every request', async () => {
+    await assertSucceeds(getDoc(doc(operator(), 'applications/a2')));
+    await assertSucceeds(getDocs(collection(operator(), 'applications')));
+  });
+
+  it('nobody reads web-address names from the browser', async () => {
+    for (const db of [ana(), operator(), stranger()]) {
+      await assertFails(getDoc(doc(db, 'site_names/nclocal')));
+      await assertFails(getDocs(collection(db, 'site_names')));
+    }
+  });
+
+  it('nobody writes a request or a web-address name, operators included', async () => {
+    for (const db of [ana(), ben(), operator(), stranger()]) {
+      await assertFails(setDoc(doc(db, 'applications/a3'), { orgId: 'o1', status: 'draft' }));
+      await assertFails(updateDoc(doc(db, 'applications/a1'), { status: 'approved' }));
+      await assertFails(deleteDoc(doc(db, 'applications/a1')));
+      await assertFails(setDoc(doc(db, 'site_names/mine'), { appId: 'a1', orgId: 'o1' }));
+      await assertFails(deleteDoc(doc(db, 'site_names/nclocal')));
+    }
   });
 });

@@ -13,7 +13,10 @@
 
 const BEARER_RE = /^Bearer\s+(\S+)$/i;
 
-/** An expected refusal. postEndpoint sends it as is. */
+/**
+ * An expected refusal. postEndpoint sends it as is. Set `fields` (field
+ * path to message) to show the reasons next to the fields of a form.
+ */
 class ConsoleError extends Error {
   /** @param {number} status @param {string} code @param {string} message */
   constructor(status, code, message) {
@@ -24,8 +27,9 @@ class ConsoleError extends Error {
   }
 }
 
-function sendError(res, status, code, message) {
-  res.status(status).json({ error: { code, message } });
+/** `fields`, when given, is a map of field path to message, for a form. */
+function sendError(res, status, code, message, fields) {
+  res.status(status).json({ error: fields ? { code, message, fields } : { code, message } });
 }
 
 /** @param {string|undefined} raw comma-separated origins @returns {string[]} */
@@ -133,7 +137,7 @@ function postEndpoint({ auth, log = console }, action) {
         // so the operator can see why; the caller sees only the message.
         if (err.cause) log.error('console endpoint refused after a failure', err.cause);
         if (err.retryAfterSeconds) res.set('Retry-After', String(err.retryAfterSeconds));
-        sendError(res, err.status, err.code, err.message);
+        sendError(res, err.status, err.code, err.message, err.fields);
         return;
       }
       log.error('console endpoint failed', err);

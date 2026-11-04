@@ -33,8 +33,10 @@ one shot, which is how the scripts are smoke-tested.
 
 ### `prepare-functions.cjs`
 
-Packs `packages/shared` into `functions/vendor/shared.tgz` (spec §1.1); run by CI and the
-`firebase.json` functions predeploy hook.
+Packs `packages/shared` into `functions/vendor/shared.tgz` (spec §1.1) and copies the same
+tarball to `console/functions/vendor/shared.tgz` (ADR 0007 Principle 5). It refreshes both
+functions lockfiles and the root lockfile. CI and the functions predeploy hook of both
+`firebase.json` files run it.
 
 ### `init-event.cjs`
 

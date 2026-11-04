@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, forgetReturn, rememberReturn, signInErrorMessage, useAuth } from './auth.jsx';
 import AcceptInvite from './pages/AcceptInvite.jsx';
+import ApplicationStatus from './pages/ApplicationStatus.jsx';
+import OrganizationHome from './pages/OrganizationHome.jsx';
+import Setup from './pages/setup/Setup.jsx';
 import CreateOrganization from './pages/CreateOrganization.jsx';
 import Organizations from './pages/Organizations.jsx';
 import SignIn from './pages/SignIn.jsx';
@@ -119,7 +122,10 @@ export function AppRoutes() {
         <Route element={<RequireAuth />}>
           <Route path="/" element={<Organizations />} />
           <Route path="/organizations/new" element={<CreateOrganization />} />
+          <Route path="/organizations/:orgId" element={<OrganizationHome />} />
           <Route path="/organizations/:orgId/team" element={<Team />} />
+          <Route path="/organizations/:orgId/applications/:appId" element={<ApplicationStatus />} />
+          <Route path="/organizations/:orgId/applications/:appId/:step" element={<Setup />} />
           <Route path="/invite/:inviteId" element={<AcceptInvite />} />
         </Route>
         <Route path="*" element={<NotFound />} />

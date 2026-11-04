@@ -34,6 +34,19 @@ describe('callApi', () => {
     expect(error.message).toBe('An organization needs at least one Owner.');
   });
 
+  it('keeps the field errors of a refusal', async () => {
+    auth.currentUser = { getIdToken: async () => 't' };
+    vi.stubGlobal('fetch', async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { code: 'incomplete', message: 'Some answers need attention.', fields: { 'event.name': 'Enter the event name.' } } }),
+    }));
+    const error = await callApi('submitApplication', {}).catch((err) => err);
+    expect(error.fields).toEqual({ 'event.name': 'Enter the event name.' });
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 409, json: async () => ({ error: { code: 'x', message: 'No.' } }) }));
+    expect((await callApi('submitApplication', {}).catch((err) => err)).fields).toEqual({});
+  });
+
   it('gives a plain message when the network or the body fails', async () => {
     auth.currentUser = { getIdToken: async () => 't' };
     vi.stubGlobal('fetch', async () => { throw new TypeError('Failed to fetch'); });
