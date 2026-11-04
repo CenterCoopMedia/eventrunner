@@ -32,7 +32,7 @@ vi.mock('../lib/registrationFormSource.js', () => ({
   subscribeRegistrationForm: (onNext) => { state.pushForm = onNext; onNext(state.form); return () => {}; },
 }));
 vi.mock('../lib/ticketingCommerce.js', async (original) => ({ ...await original(), ticketingRequest: vi.fn() }));
-import { ticketingRequest, TicketingRequestError } from '../lib/ticketingCommerce.js';
+import { readCheckoutAttempt, ticketingRequest, TicketingRequestError } from '../lib/ticketingCommerce.js';
 import Tickets from './Tickets.jsx';
 
 const CATALOG = {
@@ -628,5 +628,81 @@ describe('registration questions in the ticket stepper', () => {
     expect(screen.queryByText(/lines\.0\.attendees/)).not.toBeInTheDocument();
     expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Resume existing checkout' })).not.toBeInTheDocument();
+  });
+});
+
+describe('promo codes on the review step', () => {
+  const PREVIEW = {
+    code: 'EARLY', subtotalAmount: 4000, totalAmount: 4000, discountAmount: 1000,
+    lines: [{ ticketTypeId: 'general', name: 'General admission', quantity: 2, unitAmount: 2000, lineAmount: 4000, listUnitAmount: 2500 }],
+  };
+  const previewCalls = () => ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingPromoPreview');
+  let checkoutError = null;
+  beforeEach(() => {
+    sessionStorage.clear();
+    state.form = null;
+    state.consentCommits = [];
+    state.auth = { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false };
+    state.event = { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} };
+    checkoutError = null;
+    ticketingRequest.mockReset();
+    ticketingRequest.mockImplementation(async (name, { body } = {}) => {
+      if (name === 'ticketingCatalog') return CATALOG;
+      if (name === 'ticketingPromoPreview') {
+        if (body.code.trim().toUpperCase() !== 'EARLY') throw new TicketingRequestError('promo-invalid', 'This code is not valid.', 400);
+        return PREVIEW;
+      }
+      if (checkoutError) throw checkoutError;
+      return { orderId: 'order-synthetic', status: 'pending', paymentStatus: 'pending', checkoutUrl: null };
+    });
+  });
+  async function apply(code) {
+    fireEvent.change(screen.getByLabelText('Promo code'), { target: { value: code } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply code' }));
+  }
+
+  it('applies a code, shows the lower total, and sends the code with the order', async () => {
+    mount(); await fill(2);
+    await apply(' early ');
+    expect(await screen.findByText('Promo code EARLY')).toBeInTheDocument();
+    expect(previewCalls()[0][1].body).toEqual({ code: 'early', catalogRevision: 1, lines: [{ ticketTypeId: 'general', quantity: 2 }] });
+    expect(screen.getByText('−$10.00')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $40.00' }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    expect(checkoutCalls()[0][1].body.promoCode).toBe('EARLY');
+  });
+
+  it('shows a refused code by the field and sends no code', async () => {
+    mount(); await fill(1);
+    await apply('GUESS');
+    expect(await screen.findByText('This code is not valid.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Promo code')).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $25.00' }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    expect(checkoutCalls()[0][1].body).not.toHaveProperty('promoCode');
+  });
+
+  it('drops an applied code when the tickets change', async () => {
+    mount(); await fill(2);
+    await apply('EARLY');
+    await screen.findByText('Promo code EARLY');
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+    fireEvent.change(await screen.findByLabelText('Quantity — General admission'), { target: { value: '1' } });
+    toReview();
+    await screen.findByRole('button', { name: 'Continue to Stripe — $25.00' });
+    expect(screen.queryByText('Promo code EARLY')).not.toBeInTheDocument();
+  });
+
+  it('removes the code when checkout refuses it, and keeps no order', async () => {
+    mount(); await fill(2);
+    await apply('EARLY');
+    await screen.findByText('Promo code EARLY');
+    checkoutError = new TicketingRequestError('promo-exhausted', 'This code has no uses left.', 409);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $40.00' }));
+    expect(await screen.findAllByText('This code has no uses left.')).not.toHaveLength(0);
+    expect(screen.queryByText('Promo code EARLY')).not.toBeInTheDocument();
+    // A refused code is refused before any order, so no saved checkout is kept.
+    expect(readCheckoutAttempt('purchaser-a')).toBeNull();
   });
 });

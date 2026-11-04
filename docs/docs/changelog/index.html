@@ -158,7 +158,9 @@
           <code>promo</code>; the orders CSV gains <strong>Promo code</strong> and <strong>Promo discount</strong>, and the
           event package gains <code>orders/promo_codes.json</code>. Clients cannot read or write
           <code>ticket_promo_codes</code>. Deploy the functions and rules together, and add
-          <code>ticketingPromoPreview</code> to the deployed functions.</li>
+          <code>ticketingPromoPreview</code> to the deployed functions. Staff manage codes under
+          <strong>Promo codes</strong> on the ticketing page; attendees apply a code on the checkout
+          <strong>Review</strong> step and see the lower total, and the order view shows the code.</li>
           <li>The Stripe ticket page is now steps: Tickets, Attendees, Questions (when
           the registration form asks any), Review, then Pay (ADR 0008 §5). Answers
           for each attendee are checked when the order is reserved, held on that

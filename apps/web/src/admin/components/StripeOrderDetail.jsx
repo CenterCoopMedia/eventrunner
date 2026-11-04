@@ -155,6 +155,7 @@ export default function StripeOrderDetail({ call, orderId, isOperator, timezone,
         <div><dt className="text-admin-base font-semibold">Purchaser</dt><dd className="wrap-anywhere font-admin-data text-admin-sm">{order.purchaserEmail || order.purchaser?.email}</dd></div>
         <div><dt className="text-admin-base font-semibold">Payment</dt><dd><StatusBadge>{ticketStatusLabel(order.paymentStatus)}</StatusBadge></dd></div>
         <div><dt className="text-admin-base font-semibold">Original total</dt><dd className="font-admin-data text-admin-sm">{formatTicketMoney(order.totalAmount, order.currency)}</dd></div>
+        {order.promo ? <div><dt className="text-admin-base font-semibold">Promo code</dt><dd className="font-admin-data text-admin-sm">{order.promo.code}: {formatTicketMoney(order.promo.discountAmount, order.currency)} off</dd></div> : null}
         <div><dt className="text-admin-base font-semibold">Refund state</dt><dd>{ticketStatusLabel(order.refundStatus || 'none')}</dd></div>
         <div><dt className="text-admin-base font-semibold">Refunded amount</dt><dd className="font-admin-data text-admin-sm">{formatTicketMoney(order.refundedAmount || 0, order.currency)}</dd></div>
         <div><dt className="text-admin-base font-semibold">Created</dt><dd className="font-admin-data text-admin-sm">{formatTicketTime(order.createdAt, timezone)}</dd></div>

@@ -54,7 +54,9 @@ path (R2c, R3) comes before registration.
   - [x] R5b Stripe `/tickets` as Tickets → Attendees → Questions → Review →
         Pay. Answers for other people are held with the order seats and
         bound to `ticket_answers` when each person claims their ticket.
-- [ ] R6 Promo codes (ADR 0004 amendment), with concurrency tests.
+- [x] R6 Promo codes (ADR 0004 amendment), with concurrency tests. R6a (#594)
+      is the server; R6b is the admin panel and the review-step field. Later:
+      split the 640-line `Tickets.jsx` into step components.
 - [ ] R7 Registration import in `/admin/import`; speaker logistics export.
 
 ## 2026-11-03: client onboarding, account creation and provisioning
