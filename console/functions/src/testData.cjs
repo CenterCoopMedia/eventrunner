@@ -19,11 +19,9 @@ const zed = { uid: 'zed', email: 'zed@example.org' };
 function stripeConnection(overrides = {}) {
   return {
     connected: true,
-    accountId: 'acct_client1',
     displayName: 'NC Local',
     livemode: false,
     connectedAt: new Date(NOW - 2000),
-    connectedBy: 'ana',
     ...overrides,
   };
 }

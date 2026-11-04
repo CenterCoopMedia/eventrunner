@@ -27,8 +27,20 @@ const EVENTS = [
   { id: 'e2', name: 'Dinner', start: null, organizationId: 'org9' },
 ];
 
-function setup({ application = {}, extra = {} } = {}) {
-  const db = seededDb({ 'applications/a1': applicationDoc({ connections: {}, ...application }), ...extra });
+/** The private row of a request that has these connections. */
+function accountsFor(connections = {}) {
+  return {
+    ...(connections.stripe ? { stripe: { accountId: 'acct_client1', connectedBy: 'ana' } } : {}),
+    ...(connections.eventbrite ? { eventbrite: { accountId: '555', connectedBy: 'ana' } } : {}),
+  };
+}
+
+function setup({ application = {}, accounts = accountsFor(application.connections), extra = {} } = {}) {
+  const db = seededDb({
+    'applications/a1': applicationDoc({ connections: {}, ...application }),
+    'console_connections/a1': accounts,
+    ...extra,
+  });
   const secrets = makeFakeSecrets();
   const log = quietLog();
   const stripe = makeFakeConnector({ answer: stripeAnswer() });
@@ -53,6 +65,7 @@ async function start(deps, provider = 'stripe', user = ana) {
 const complete = (deps, fields, user = ana) => completeConnection(deps, { body: { provider: 'stripe', code: 'code1', ...fields }, user });
 const stateRows = (db) => db.paths('console_connection_states/');
 const stored = (db) => db.read('applications/a1').connections;
+const privateRow = (db) => db.read('console_connections/a1');
 
 test('an Owner gets the provider page, and only the hash of the state is stored', async () => {
   const { db, deps } = setup();
@@ -109,10 +122,9 @@ test('completing stores the state in Firestore and the token only in Secret Mana
   assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
   assert.equal(stripe.exchanged[0].code, 'code1');
   assert.equal(stripe.exchanged[0].redirectUri, `${PUBLIC_URL}/connect/stripe/return`);
-  const { connected, accountId, displayName, livemode, connectedBy } = stored(db).stripe;
-  assert.deepEqual({ connected, accountId, displayName, livemode, connectedBy }, {
-    connected: true, accountId: 'acct_new', displayName: 'NC Local', livemode: false, connectedBy: 'ana',
-  });
+  const { connected, displayName, livemode } = stored(db).stripe;
+  assert.deepEqual({ connected, displayName, livemode }, { connected: true, displayName: 'NC Local', livemode: false });
+  assert.deepEqual(privateRow(db).stripe, { accountId: 'acct_new', connectedBy: 'ana' });
 });
 
 test('no token reaches a response, a Firestore write or a log, through the HTTP wrapper', async () => {
@@ -260,12 +272,16 @@ test('a failed token write puts the old state back and ends the new connection',
     assert.equal(err.message, 'We could not connect your Stripe account. Try again.');
     return true;
   });
-  assert.equal(stored(db).stripe.accountId, 'acct_client1');
+  assert.equal(stored(db).stripe.displayName, 'NC Local');
+  assert.equal(privateRow(db).stripe.accountId, 'acct_client1');
   assert.deepEqual(stripe.revoked, ['acct_new']);
 });
 
 test('connecting a different account ends the old one, and the same account does not', async () => {
-  const { stripe, deps } = setup({ application: { connections: { stripe: stripeConnection({ accountId: 'acct_old' }) } } });
+  const { stripe, deps } = setup({
+    application: { connections: { stripe: stripeConnection() } },
+    accounts: { stripe: { accountId: 'acct_old', connectedBy: 'ana' } },
+  });
   await complete(deps, { state: await start(deps) });
   assert.deepEqual(stripe.revoked, ['acct_old']);
   stripe.revoked.length = 0;
@@ -274,14 +290,19 @@ test('connecting a different account ends the old one, and the same account does
 });
 
 test('reconnecting Eventbrite keeps the chosen event for the same account and clears it for another', async () => {
-  const event = { id: 'e1', name: 'Summit', start: null, organizationId: 'org9' };
-  const connection = { connected: true, accountId: '555', displayName: 'Ana', event };
-  const { db, eventbrite, deps } = setup({ application: { connections: { eventbrite: connection } } });
+  const event = { id: 'e1', name: 'Summit', start: null };
+  const connection = { connected: true, displayName: 'Ana', event };
+  const { db, eventbrite, deps } = setup({
+    application: { connections: { eventbrite: connection } },
+    accounts: { eventbrite: { accountId: '555', connectedBy: 'ana', eventOrganizationId: 'org9' } },
+  });
   await complete(deps, { provider: 'eventbrite', state: await start(deps, 'eventbrite') });
   assert.equal(stored(db).eventbrite.event.id, 'e1');
+  assert.equal(privateRow(db).eventbrite.eventOrganizationId, 'org9');
   eventbrite.answer = { token: EB_TOKEN, accountId: '777', displayName: 'Other', details: {} };
   await complete(deps, { provider: 'eventbrite', state: await start(deps, 'eventbrite') });
   assert.equal(stored(db).eventbrite.event, null);
+  assert.equal(privateRow(db).eventbrite.eventOrganizationId, undefined);
 });
 
 test('disconnect deletes the token, ends the connection and clears the state', async () => {
@@ -291,13 +312,15 @@ test('disconnect deletes the token, ends the connection and clears the state', a
   assert.equal(secrets.store.size, 0);
   assert.deepEqual(stripe.revoked, ['acct_client1']);
   assert.equal(stored(db).stripe, undefined);
+  assert.equal(privateRow(db).stripe, undefined);
   assert.equal(body.revoked, true);
+  assert.equal(body.shared, false);
   assert.equal(body.connections.stripe.connected, false);
   assert.equal(body.errors['tickets.connection'], 'Connect your Stripe account.');
 });
 
 test('Eventbrite has no way to end a connection, so disconnect says so in its reply', async () => {
-  const connection = { connected: true, accountId: '555', event: null };
+  const connection = { connected: true, event: null };
   const { secrets, deps } = setup({ application: { connections: { eventbrite: connection } } });
   secrets.store.set('connection-eventbrite-a1', EB_TOKEN);
   const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'eventbrite' }, user: ana });
@@ -322,7 +345,8 @@ test('a token that cannot be deleted keeps the connection, and says so', async (
   secrets.store.set('connection-stripe-a1', TOKEN);
   secrets.failDelete = true;
   await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 502, code: 'disconnect-failed' });
-  assert.equal(stored(db).stripe.accountId, 'acct_client1');
+  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(privateRow(db).stripe.accountId, 'acct_client1');
   assert.deepEqual(stripe.revoked, []);
 });
 
@@ -355,7 +379,7 @@ test('a closed request cannot connect, but its account can be disconnected witho
 });
 
 const eventbriteDeps = (application = {}) => {
-  const parts = setup({ application: { connections: { eventbrite: { connected: true, accountId: '555', displayName: 'Ana', event: null } }, ...application } });
+  const parts = setup({ application: { connections: { eventbrite: { connected: true, displayName: 'Ana', event: null } }, ...application } });
   parts.secrets.store.set('connection-eventbrite-a1', EB_TOKEN);
   return parts;
 };
@@ -374,7 +398,9 @@ test('the event list has no organization ids or tokens, and needs a connection',
 test('choosing an event saves what the site needs and clears the field error', async () => {
   const { db, deps } = eventbriteDeps({ answers: { ...validAnswers(), tickets: { choice: 'eventbrite' } } });
   const { body } = await chooseEventbriteEvent(deps, { body: { ...BASE, eventId: 'e1' }, user: ana });
-  assert.deepEqual(stored(db).eventbrite.event, EVENTS[0]);
+  assert.deepEqual(stored(db).eventbrite.event, { id: 'e1', name: 'Summit', start: '2027-05-13T09:00:00' });
+  assert.equal(privateRow(db).eventbrite.eventOrganizationId, 'org9');
+  assert.equal(privateRow(db).eventbrite.accountId, '555');
   assert.deepEqual(body.errors, {});
   assert.equal(body.connections.eventbrite.event.name, 'Summit');
   assert.equal(body.connections.eventbrite.event.organizationId, undefined);
@@ -423,7 +449,7 @@ test('an operator cannot approve a request whose account was disconnected', asyn
 
 test('the review page shows the account and event, and notes test mode', async () => {
   const frozen = { ...validAnswers(), tickets: { choice: 'eventbrite' } };
-  const connections = { eventbrite: { connected: true, accountId: '555', displayName: 'Ana', event: { id: 'e1', name: 'Summit' } } };
+  const connections = { eventbrite: { connected: true, displayName: 'Ana', event: { id: 'e1', name: 'Summit' } } };
   const { deps } = setup({ application: { status: 'submitted', frozen, connections } });
   assert.equal((await getApplicationForReview(deps, { body: { appId: 'a1' }, user: ops })).body.connection.label, 'Connected: Ana Event: Summit');
   const { deps: stripeDeps } = setup({ application: { status: 'submitted', frozen: validAnswers(), connections: { stripe: stripeConnection() } } });
@@ -466,4 +492,115 @@ test('the site builder can read a stored connection and delete the console\'s co
   assert.deepEqual(stripe.revoked, []);
   assert.equal(stored(db).stripe.connected, true);
   assert.equal(await readStoredConnection(deps, 'a1', 'stripe'), null);
+});
+
+test('the document any member can read holds no account id, who connected, or organization id', async () => {
+  const { db, deps } = setup({ application: { answers: { ...validAnswers(), tickets: { choice: 'eventbrite' } } } });
+  await complete(deps, { provider: 'eventbrite', state: await start(deps, 'eventbrite') });
+  deps.secrets.store.set('connection-eventbrite-a1', EB_TOKEN);
+  await chooseEventbriteEvent(deps, { body: { ...BASE, eventId: 'e1' }, user: ana });
+  await complete(deps, { state: await start(deps) });
+  const readable = JSON.stringify(db.read('applications/a1').connections);
+  for (const hidden of ['acct_new', '555', 'org9', 'connectedBy', 'accountId', 'organizationId']) {
+    assert.ok(!readable.includes(hidden), hidden);
+  }
+  assert.equal(privateRow(db).stripe.accountId, 'acct_new');
+  assert.equal(privateRow(db).eventbrite.accountId, '555');
+});
+
+/** Two requests on one Stripe account: a1 here, and a2 in another organization. */
+function sharing({ a2Status = 'launched', a2Accounts = { stripe: { accountId: 'acct_client1', connectedBy: 'cy' } } } = {}) {
+  return setup({
+    application: { connections: { stripe: stripeConnection() } },
+    extra: {
+      'applications/a2': applicationDoc({ orgId: 'o2', status: a2Status, connections: { stripe: stripeConnection() } }),
+      'console_connections/a2': a2Accounts,
+    },
+  });
+}
+
+test('disconnecting one of two requests on an account keeps the connection for the other', async () => {
+  const { db, secrets, stripe, deps } = sharing();
+  secrets.store.set('connection-stripe-a1', TOKEN);
+  secrets.store.set('connection-stripe-a2', 'sk_test_other');
+  const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.deepEqual(stripe.revoked, []);
+  assert.equal(body.revoked, false);
+  assert.equal(body.shared, true);
+  assert.equal(secrets.store.has('connection-stripe-a1'), false, 'this request\'s own token is always deleted');
+  assert.equal(secrets.store.get('connection-stripe-a2'), 'sk_test_other');
+  assert.equal(privateRow(db).stripe, undefined);
+  assert.equal(db.read('console_connections/a2').stripe.accountId, 'acct_client1');
+});
+
+test('the last request on an account ends the connection', async () => {
+  const { db, stripe, deps } = sharing();
+  await db.doc('console_connections/a2').set({});
+  const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.equal(body.shared, false);
+});
+
+test('a site whose application is gone still keeps the connection, through its private row', async () => {
+  const { db, stripe, deps } = sharing();
+  await db.doc('applications/a2').delete();
+  await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.deepEqual(stripe.revoked, []);
+});
+
+test('moving a token to a client site leaves the row that keeps the connection', async () => {
+  const { db, secrets, stripe, deps } = sharing({ a2Status: 'ready' });
+  secrets.store.set('connection-stripe-a2', 'sk_test_other');
+  await deleteStoredConnection(deps, 'a2', 'stripe');
+  assert.equal(db.read('console_connections/a2').stripe.accountId, 'acct_client1');
+  await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.deepEqual(stripe.revoked, []);
+});
+
+test('connecting a different account keeps the old one when another request uses it', async () => {
+  const { stripe, deps } = sharing();
+  await complete(deps, { state: await start(deps) });
+  assert.deepEqual(stripe.revoked, []);
+});
+
+test('a half-made connection, a late refusal and a failed write all keep an account another request uses', async () => {
+  const half = sharing();
+  half.stripe.exchangeError = Object.assign(new Error('stripe exchange: no usable account token'), { accountId: 'acct_client1' });
+  await assert.rejects(complete(half.deps, { state: await start(half.deps) }), { status: 502 });
+  assert.deepEqual(half.stripe.revoked, []);
+
+  const late = sharing();
+  late.stripe.answer = stripeAnswer('acct_client1');
+  const state = await start(late.deps);
+  // The status is checked before the exchange too, so move it during the exchange.
+  const exchange = late.stripe.exchangeCode.bind(late.stripe);
+  late.stripe.exchangeCode = async (input) => {
+    await late.db.doc('applications/a1').update({ status: 'approved' });
+    return exchange(input);
+  };
+  await assert.rejects(complete(late.deps, { state }), { status: 409 });
+  assert.deepEqual(late.stripe.revoked, []);
+
+  const write = sharing();
+  write.stripe.answer = stripeAnswer('acct_client1');
+  write.secrets.failWrite = true;
+  await assert.rejects(complete(write.deps, { state: await start(write.deps) }), { status: 502 });
+  assert.deepEqual(write.stripe.revoked, []);
+});
+
+test('when the console cannot check who uses an account, it keeps the connection and logs it', async () => {
+  const { db, secrets, stripe, log, deps } = setup({ application: { connections: { stripe: stripeConnection() } } });
+  secrets.store.set('connection-stripe-a1', TOKEN);
+  const collection = db.collection;
+  db.collection = (path) => {
+    const ref = collection(path);
+    if (path !== 'console_connections') return ref;
+    return { ...ref, where() { throw new Error('index not ready'); } };
+  };
+  const { body } = await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.deepEqual(stripe.revoked, []);
+  assert.equal(body.revoked, false);
+  assert.equal(secrets.store.size, 0);
+  assert.equal(log.errors.length, 1);
+  assert.match(log.errors[0][0], /kept a connection/);
 });

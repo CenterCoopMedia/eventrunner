@@ -52,7 +52,7 @@ function application(overrides = {}) {
       { status: 'submitted', at: new Date(NOW - DAY), by: 'ana', note: null },
     ],
     review: null,
-    connections: { stripe: { connected: true, accountId: 'acct_client1', displayName: 'NC Local', livemode: true } },
+    connections: { stripe: { connected: true, displayName: 'NC Local', livemode: true } },
     ...overrides,
   };
 }

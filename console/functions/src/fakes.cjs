@@ -29,6 +29,7 @@ function clone(value) {
 
 const newId = () => randomBytes(10).toString('hex');
 const comparable = (v) => (v instanceof Date ? v.getTime() : v);
+const atPath = (data, field) => field.split('.').reduce((value, key) => (value && typeof value === 'object' ? value[key] : undefined), data);
 const COMPARE = Object.freeze({
   '==': (a, b) => a === b,
   '<': (a, b) => a < b,
@@ -136,7 +137,7 @@ function makeFakeDb(seed = {}) {
       },
       async get() {
         let rows = [...store.entries()]
-          .filter(([path, data]) => matches(path) && filters.every((f) => f.field in data && COMPARE[f.op](comparable(data[f.field]), comparable(f.value))));
+          .filter(([path, data]) => matches(path) && filters.every((f) => atPath(data, f.field) !== undefined && COMPARE[f.op](comparable(atPath(data, f.field)), comparable(f.value))));
         if (order) {
           const dir = order.direction === 'desc' ? -1 : 1;
           rows.sort(([, a], [, b]) => {

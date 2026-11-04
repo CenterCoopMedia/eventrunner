@@ -6,13 +6,14 @@
  * checks can use them.
  *
  *   applications/{appId}.connections = {
- *     stripe?:     { connected: true, accountId, displayName, livemode, connectedAt, connectedBy },
- *     eventbrite?: { connected: true, accountId, displayName, connectedAt, connectedBy,
- *                    event: null | { id, name, start, organizationId } },
+ *     stripe?:     { connected: true, displayName, livemode, connectedAt },
+ *     eventbrite?: { connected: true, displayName, connectedAt, event: null | { id, name, start } },
  *   }
  *
- * Only connection state lives here. The tokens are in the console's Secret
- * Manager, and connections.cjs is the only module that handles them.
+ * Any member of the organization can read that document directly, so it holds
+ * only what a member may see. Account ids are in `console_connections`, which
+ * no browser can read, and tokens are in the console's Secret Manager.
+ * connections.cjs is the only module that handles either.
  */
 
 const { toIso } = require('./access.cjs');

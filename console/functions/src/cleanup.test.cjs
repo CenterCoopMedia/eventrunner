@@ -150,15 +150,59 @@ test('a spam delete frees every name the request holds', async () => {
 
 const TOKEN_ID = 'connection-stripe-a1';
 const closedOld = { status: 'declined', updatedAt: new Date(NOW - 100 * DAY) };
+const privateRow = { stripe: { accountId: 'acct_client1', connectedBy: 'ana' } };
 
 test('the retention job deletes a closed request\'s stored tokens and ends its connection', async () => {
-  const db = seeded({ 'applications/a1': application(closedOld) });
+  const db = seeded({ 'applications/a1': application(closedOld), 'console_connections/a1': privateRow });
   const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored', 'connection-eventbrite-a1': 'eb-stored' });
   const stripe = makeFakeConnector();
   const result = await runRetention({ db, secrets, connectors: { stripe, eventbrite: null }, now: () => NOW, log: QUIET });
   assert.deepEqual(result, { deleted: ['a1'], failed: [] });
   assert.equal(secrets.store.size, 0);
   assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.equal(db.read('console_connections/a1'), undefined);
+});
+
+test('retention keeps the connection of an account a live site still uses, and deletes its own token', async () => {
+  const db = seeded({
+    'applications/a1': application(closedOld),
+    'console_connections/a1': privateRow,
+    'applications/live': application({ orgId: 'o2', status: 'launched' }),
+    'console_connections/live': privateRow,
+  });
+  const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
+  const stripe = makeFakeConnector();
+  const result = await runRetention({ db, secrets, connectors: { stripe }, now: () => NOW, log: QUIET });
+  assert.deepEqual(result.deleted, ['a1']);
+  assert.equal(secrets.store.size, 0);
+  assert.deepEqual(stripe.revoked, []);
+  assert.ok(db.read('console_connections/live'));
+});
+
+test('two closed requests on one account end the connection once, with the last', async () => {
+  const db = seeded({
+    'applications/a1': application(closedOld),
+    'console_connections/a1': privateRow,
+    'applications/a2': application(closedOld),
+    'console_connections/a2': privateRow,
+  });
+  const stripe = makeFakeConnector();
+  const result = await runRetention({ db, secrets: makeFakeSecrets(), connectors: { stripe }, now: () => NOW, log: QUIET });
+  assert.deepEqual(result.deleted.sort(), ['a1', 'a2']);
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+});
+
+test('a kept request does not end its connection', async () => {
+  const db = seeded({ 'applications/a1': application(closedOld), 'console_connections/a1': privateRow });
+  const realTransaction = db.runTransaction;
+  db.runTransaction = async (fn) => {
+    await db.doc('applications/a1').update({ updatedAt: new Date(NOW) });
+    return realTransaction(fn);
+  };
+  const stripe = makeFakeConnector();
+  await runRetention({ db, secrets: makeFakeSecrets(), connectors: { stripe }, now: () => NOW, log: QUIET });
+  assert.deepEqual(stripe.revoked, []);
+  assert.ok(db.read('console_connections/a1'));
 });
 
 test('the retention job leaves the tokens of a request it keeps', async () => {
@@ -181,7 +225,7 @@ test('a token that cannot be deleted keeps the request, so the next run tries ag
 });
 
 test('a failed revoke does not stop the token being deleted or the request going', async () => {
-  const db = seeded({ 'applications/a1': application(closedOld) });
+  const db = seeded({ 'applications/a1': application(closedOld), 'console_connections/a1': privateRow });
   const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
   const stripe = makeFakeConnector();
   stripe.revokeError = new Error('stripe revoke: HTTP 500');
