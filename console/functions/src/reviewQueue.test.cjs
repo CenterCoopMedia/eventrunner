@@ -65,6 +65,7 @@ test('one request comes with the frozen answers, the history, the team, the tick
   assert.equal(body.application.ticketChoice, 'stripe');
   assert.equal(body.application.webAddressName, 'nclocal');
   assert.deepEqual(body.application.history.map((h) => [h.status, h.byEmail]), [['draft', 'ana@example.org'], ['submitted', 'ana@example.org']]);
+  assert.equal(body.application.revision, 2, 'a decision sends this back');
   assert.equal(body.organization.name, 'NC Local');
   assert.deepEqual(body.team.members.map((m) => `${m.role}:${m.email}`), ['owner:ana@example.org', 'owner:bo@example.org', 'editor:ben@example.org']);
   assert.deepEqual(body.team.invites.map((i) => i.email), ['dee@example.org']);

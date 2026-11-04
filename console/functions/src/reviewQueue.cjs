@@ -107,6 +107,8 @@ async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
         answers: app.frozen || null,
         ticketChoice: app.frozen?.tickets?.choice || null,
         webAddressName: name,
+        // Sent back with a decision, so a page opened before a change is refused.
+        revision: Array.isArray(app.history) ? app.history.length : 0,
         history: readableHistory(app.history, team.members),
         review: readableReview(app.review),
         createdAt: toIso(app.createdAt),

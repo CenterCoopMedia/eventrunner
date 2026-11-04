@@ -10,7 +10,7 @@ const lastHistory = (db, id = 'a1') => db.read(`applications/${id}`).history.at(
 test('requestChanges moves a submitted request to changes_requested, records the note and emails each Owner', async () => {
   const db = seeded();
   const d = deps(db);
-  const result = await requestChanges(d, { body: { appId: 'a1', note: '  Add the venue address.  ' }, user: ops });
+  const result = await requestChanges(d, { body: { appId: 'a1', revision: 2, note: '  Add the venue address.  ' }, user: ops });
   assert.deepEqual(result.body, { application: { id: 'a1', status: 'changes_requested' }, emailed: 2, mailFailed: false });
   const app = db.read('applications/a1');
   assert.equal(app.status, 'changes_requested');
@@ -33,17 +33,17 @@ test('requestChanges moves a submitted request to changes_requested, records the
 test('a note is required and has at most 2,000 characters', async () => {
   const db = seeded();
   for (const fn of [requestChanges, declineApplication]) {
-    await assert.rejects(fn(deps(db), { body: { appId: 'a1', note: '   ' }, user: ops }), { status: 400, code: 'note-required' });
-    await assert.rejects(fn(deps(db), { body: { appId: 'a1' }, user: ops }), { status: 400, code: 'note-required' });
-    await assert.rejects(fn(deps(db), { body: { appId: 'a1', note: 'x'.repeat(2001) }, user: ops }), { status: 400, code: 'note-too-long' });
+    await assert.rejects(fn(deps(db), { body: { appId: 'a1', revision: 2, note: '   ' }, user: ops }), { status: 400, code: 'note-required' });
+    await assert.rejects(fn(deps(db), { body: { appId: 'a1', revision: 2 }, user: ops }), { status: 400, code: 'note-required' });
+    await assert.rejects(fn(deps(db), { body: { appId: 'a1', revision: 2, note: 'x'.repeat(2001) }, user: ops }), { status: 400, code: 'note-too-long' });
   }
-  await requestChanges(deps(db), { body: { appId: 'a1', note: 'x'.repeat(2000) }, user: ops });
+  await requestChanges(deps(db), { body: { appId: 'a1', revision: 2, note: 'x'.repeat(2000) }, user: ops });
   assert.equal(db.read('applications/a1').status, 'changes_requested');
 });
 
 test('only a submitted request can have changes requested', async () => {
   const db = seeded({ 'applications/a2': application({ status: 'draft' }) });
-  await assert.rejects(requestChanges(deps(db), { body: { appId: 'a2', note: 'n' }, user: ops }), { status: 409, code: 'status-changed' });
+  await assert.rejects(requestChanges(deps(db), { body: { appId: 'a2', revision: 2, note: 'n' }, user: ops }), { status: 409, code: 'status-changed' });
   assert.equal(db.read('applications/a2').status, 'draft');
 });
 
@@ -51,25 +51,51 @@ test('two operators cannot act twice: the second gets status-changed and nothing
   const db = seeded();
   const first = deps(db);
   const second = deps(db);
-  await requestChanges(first, { body: { appId: 'a1', note: 'One' }, user: ops });
-  await assert.rejects(approveApplication(second, { body: { appId: 'a1' }, user: ops2 }), { status: 409, code: 'status-changed' });
-  await assert.rejects(requestChanges(second, { body: { appId: 'a1', note: 'Two' }, user: ops2 }), { status: 409 });
+  await requestChanges(first, { body: { appId: 'a1', revision: 2, note: 'One' }, user: ops });
+  await assert.rejects(approveApplication(second, { body: { appId: 'a1', revision: 2 }, user: ops2 }), { status: 409, code: 'status-changed' });
+  await assert.rejects(requestChanges(second, { body: { appId: 'a1', revision: 2, note: 'Two' }, user: ops2 }), { status: 409 });
   assert.equal(db.read('applications/a1').history.length, 3);
   assert.equal(second.mailer.sent.length, 0);
 });
 
+test('a decision on a page opened before the request changed is refused, even when the status is the same again', async () => {
+  const db = seeded();
+  // Operator two opens the page at revision 2. Operator one asks for
+  // changes, and the client changes the answers and sends them again.
+  await requestChanges(deps(db), { body: { appId: 'a1', revision: 2, note: 'Pick a new name.' }, user: ops });
+  const app = db.read('applications/a1');
+  await db.collection('applications').doc('a1').update({
+    status: 'submitted',
+    history: [...app.history, { status: 'submitted', at: new Date(NOW), by: 'ana', note: null }],
+  });
+  const second = deps(db);
+  await assert.rejects(approveApplication(second, { body: { appId: 'a1', revision: 2 }, user: ops2 }), { status: 409, code: 'status-changed' });
+  assert.equal(db.read('applications/a1').status, 'submitted');
+  assert.equal(second.mailer.sent.length, 0);
+  await approveApplication(deps(db), { body: { appId: 'a1', revision: 4 }, user: ops2 });
+  assert.equal(db.read('applications/a1').status, 'approved');
+});
+
+test('a decision needs the revision the operator saw', async () => {
+  const db = seeded();
+  for (const revision of [undefined, -1, 1.5, '2']) {
+    await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1', revision }, user: ops }), { status: 400, code: 'bad-request' });
+  }
+  assert.equal(db.read('applications/a1').status, 'submitted');
+});
+
 test('a client cannot decide on a request', async () => {
   const db = seeded();
-  await assert.rejects(requestChanges(deps(db), { body: { appId: 'a1', note: 'n' }, user: ana }), { status: 403, code: 'not-operator' });
-  await assert.rejects(declineApplication(deps(db), { body: { appId: 'a1', note: 'n' }, user: ana }), { status: 403 });
-  await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1' }, user: ana }), { status: 403 });
+  await assert.rejects(requestChanges(deps(db), { body: { appId: 'a1', revision: 2, note: 'n' }, user: ana }), { status: 403, code: 'not-operator' });
+  await assert.rejects(declineApplication(deps(db), { body: { appId: 'a1', revision: 2, note: 'n' }, user: ana }), { status: 403 });
+  await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1', revision: 2 }, user: ana }), { status: 403 });
   assert.equal(db.read('applications/a1').status, 'submitted');
 });
 
 test('declineApplication works from submitted and changes_requested, frees the name and emails the Owners', async () => {
   const db = seeded({ 'applications/a2': application({ status: 'changes_requested', frozen: { webAddress: { name: 'other' } } }), 'site_names/other': { appId: 'a2', orgId: 'o1' } });
   const d = deps(db);
-  const result = await declineApplication(d, { body: { appId: 'a1', note: 'Not an event.' }, user: ops });
+  const result = await declineApplication(d, { body: { appId: 'a1', revision: 2, note: 'Not an event.' }, user: ops });
   assert.equal(result.body.application.status, 'declined');
   assert.equal(db.read('applications/a1').status, 'declined');
   assert.equal(db.read('site_names/nclocal'), undefined, 'the name is free again');
@@ -77,27 +103,27 @@ test('declineApplication works from submitted and changes_requested, frees the n
   assert.equal(d.mailer.sent.length, 2);
   assert.equal(d.mailer.sent[0].status, 'declined');
 
-  await declineApplication(deps(db), { body: { appId: 'a2', note: 'Duplicate.' }, user: ops });
+  await declineApplication(deps(db), { body: { appId: 'a2', revision: 2, note: 'Duplicate.' }, user: ops });
   assert.equal(db.read('applications/a2').status, 'declined');
   assert.equal(db.read('site_names/other'), undefined);
 });
 
 test('declineApplication keeps a name that another request holds', async () => {
   const db = seeded({ 'site_names/nclocal': { appId: 'someone-else', orgId: 'o9' } });
-  await declineApplication(deps(db), { body: { appId: 'a1', note: 'No.' }, user: ops });
+  await declineApplication(deps(db), { body: { appId: 'a1', revision: 2, note: 'No.' }, user: ops });
   assert.deepEqual(db.read('site_names/nclocal'), { appId: 'someone-else', orgId: 'o9' });
 });
 
 test('declineApplication refuses an approved request', async () => {
   const db = seeded({ 'applications/a1': application({ status: 'approved' }) });
-  await assert.rejects(declineApplication(deps(db), { body: { appId: 'a1', note: 'No.' }, user: ops }), { status: 409 });
+  await assert.rejects(declineApplication(deps(db), { body: { appId: 'a1', revision: 2, note: 'No.' }, user: ops }), { status: 409 });
   assert.ok(db.read('site_names/nclocal'));
 });
 
 test('approveApplication records the default build settings and emails "We are building your site"', async () => {
   const db = seeded();
   const d = deps(db);
-  const result = await approveApplication(d, { body: { appId: 'a1' }, user: ops });
+  const result = await approveApplication(d, { body: { appId: 'a1', revision: 2 }, user: ops });
   assert.deepEqual(result.body, { application: { id: 'a1', status: 'approved' }, emailed: 2, mailFailed: false });
   const app = db.read('applications/a1');
   assert.equal(app.status, 'approved');
@@ -117,16 +143,16 @@ test('approveApplication records the default build settings and emails "We are b
 test('approveApplication takes the operator changes and checks every value', async () => {
   const db = seeded();
   await assert.rejects(
-    approveApplication(deps(db), { body: { appId: 'a1', settings: { projectId: 'er-nclocal-' } }, user: ops }),
+    approveApplication(deps(db), { body: { appId: 'a1', revision: 2, settings: { projectId: 'er-nclocal-' } }, user: ops }),
     { status: 400, code: 'invalid-setting', field: 'projectId' },
   );
   await assert.rejects(
-    approveApplication(deps(db), { body: { appId: 'a1', settings: { region: 'mars' } }, user: ops }),
+    approveApplication(deps(db), { body: { appId: 'a1', revision: 2, settings: { region: 'mars' } }, user: ops }),
     { field: 'region' },
   );
   assert.equal(db.read('applications/a1').status, 'submitted', 'a bad value changes nothing');
   await approveApplication(deps(db), {
-    body: { appId: 'a1', settings: { projectId: 'nclocal-summit-2027', environment: 'nclocal-2027', gcpFolder: '555555555' } },
+    body: { appId: 'a1', revision: 2, settings: { projectId: 'nclocal-summit-2027', environment: 'nclocal-2027', gcpFolder: '555555555' } },
     user: ops,
   });
   const { settings } = db.read('applications/a1').review;
@@ -138,13 +164,13 @@ test('approveApplication takes the operator changes and checks every value', asy
 
 test('approveApplication without console settings asks for the missing value', async () => {
   const db = seeded({ 'console_config/settings': {} });
-  await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1' }, user: ops }), { status: 400, field: 'gcpFolder' });
+  await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1', revision: 2 }, user: ops }), { status: 400, field: 'gcpFolder' });
 });
 
 test('only a submitted request can be approved', async () => {
   for (const status of ['draft', 'changes_requested', 'declined', 'withdrawn', 'approved']) {
     const db = seeded({ 'applications/a1': application({ status }) });
-    await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1' }, user: ops }), { status: 409 }, status);
+    await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1', revision: 2 }, user: ops }), { status: 409 }, status);
   }
 });
 
@@ -152,7 +178,7 @@ test('a failed email does not undo the decision, and the answer says so', async 
   const db = seeded();
   const logged = [];
   const d = deps(db, { mailer: fakeMailer({ fail: true }), log: { info() {}, error: (...a) => logged.push(a) } });
-  const result = await approveApplication(d, { body: { appId: 'a1' }, user: ops });
+  const result = await approveApplication(d, { body: { appId: 'a1', revision: 2 }, user: ops });
   assert.equal(result.body.mailFailed, true);
   assert.equal(result.body.emailed, 0);
   assert.equal(db.read('applications/a1').status, 'approved');
@@ -168,14 +194,14 @@ test('one refused address does not stop the email to the other Owners', async ()
     return send(message);
   };
   const d = deps(db, { mailer });
-  const result = await approveApplication(d, { body: { appId: 'a1' }, user: ops });
+  const result = await approveApplication(d, { body: { appId: 'a1', revision: 2 }, user: ops });
   assert.equal(result.body.emailed, 1);
   assert.equal(result.body.mailFailed, true);
   assert.deepEqual(mailer.sent.map((m) => m.to), ['bo@example.org']);
 });
 
 test('a missing request is a 404', async () => {
-  await assert.rejects(approveApplication(deps(seeded()), { body: { appId: 'nope' }, user: ops }), { status: 404 });
+  await assert.rejects(approveApplication(deps(seeded()), { body: { appId: 'nope', revision: 2 }, user: ops }), { status: 404 });
 });
 
 test('declining frees the name the client picked after changes were asked for, not only the frozen one', async () => {
@@ -184,7 +210,7 @@ test('declining frees the name the client picked after changes were asked for, n
     'applications/a1': application({ status: 'changes_requested', answers: live }),
     'site_names/nclocal2': { appId: 'a1', orgId: 'o1' },
   });
-  await declineApplication(deps(db), { body: { appId: 'a1', note: 'No.' }, user: ops });
+  await declineApplication(deps(db), { body: { appId: 'a1', revision: 2, note: 'No.' }, user: ops });
   assert.equal(db.read('site_names/nclocal2'), undefined, 'the current name is free');
   assert.equal(db.read('site_names/nclocal'), undefined, 'the frozen name is free too');
 });

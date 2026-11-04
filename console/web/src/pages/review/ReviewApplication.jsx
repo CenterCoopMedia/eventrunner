@@ -75,7 +75,9 @@ export default function ReviewApplication() {
     setNotice('');
     setError('');
     try {
-      const result = await callApi(name, { appId, ...body });
+      // The revision ties the decision to the version on this page.
+      const revision = name === 'deleteSpamApplication' ? {} : { revision: data?.application.revision };
+      const result = await callApi(name, { appId, ...revision, ...body });
       if (name === 'deleteSpamApplication') {
         navigate('/review', { state: { notice: 'The request is deleted. Its web address is free again.' } });
         return true;
@@ -88,7 +90,7 @@ export default function ReviewApplication() {
       if (!err.field) setError(err.message);
       return err;
     }
-  }, [appId, load, navigate]);
+  }, [appId, data, load, navigate]);
 
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (!data) {

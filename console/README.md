@@ -97,7 +97,7 @@ The answers are checked with the same rules as `scripts/init-event.cjs` (ADR 000
 A status email that fails is logged and does not undo the change. The status page shows the true state.
 
 | `listApplicationsForReview` | Operators | Lists requests with one status (default `submitted`), newest change first, with the organization name. |
-| `getApplicationForReview` | Operators | One request: the frozen answers, the history, the team and its open invites, the ticket choice, the connection state (`Not connected yet` until P6) and the approval defaults. |
+| `getApplicationForReview` | Operators | One request: its `revision`, the frozen answers, the history, the team and its open invites, the ticket choice, the connection state (`Not connected yet` until P6) and the approval defaults. |
 | `requestChanges` | Operators | `submitted` to `changes_requested`. Needs a note of at most 2,000 characters. Emails the Owners. |
 | `declineApplication` | Operators | `submitted` or `changes_requested` to `declined`. Needs a note. Frees the web-address name. Emails the Owners. |
 | `approveApplication` | Operators | `submitted` to `approved`. Records `review.settings`. Emails the Owners: "We are building your site". |
@@ -123,7 +123,7 @@ ADR 0007 §5 is the decision. No cloud resource exists before an operator approv
    - **Approve**. The form shows the build settings with their defaults. The operator can change each value.
 4. The console emails each Owner of the organization, one message each. A failed email does not undo the decision, and one refused address does not stop the others. When any Owner was not emailed, the page says so.
 
-Each decision runs in one transaction that reads the status first. When two operators act at the same time, the second one gets `409 status-changed`. Each decision adds `{ status, at, by, note }` to `history` and writes `review` = `{ note, by, at, settings }`.
+Each decision sends `revision`, the length of `history` that `getApplicationForReview` gave the page. The decision runs in one transaction that reads the request first. When the status is not one the decision allows, or the history length is not the revision, the operator gets `409 status-changed` and reloads. So a second operator acting at the same time is refused, and so is a page opened before the client sent changed answers, even when the status is `submitted` again. Each decision adds `{ status, at, by, note }` to `history` and writes `review` = `{ note, by, at, settings }`.
 
 Approval records `review.settings` = `{ gcpFolder, billingAccount, region, projectId, environment }`:
 

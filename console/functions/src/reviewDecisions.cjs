@@ -26,7 +26,7 @@ const { statusLink } = require('./applicationStatus.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('./consoleSettings.cjs');
 
 const NOTE_MAX = 2000;
-const STATUS_CHANGED = 'Another member of the hosting team changed this request. Reload the page to see its status.';
+const STATUS_CHANGED = 'This request changed since you opened it. Reload the page to see it.';
 
 /** @returns {string} the trimmed note @throws {ConsoleError} 400 when it is missing or too long */
 function requireNote(value) {
@@ -41,24 +41,27 @@ function requireNote(value) {
 /**
  * Move one request from one of `from` to `to` in a transaction.
  *
+ * `revision` is the history length the operator saw. When the request
+ * changed since then, even back to the same status, the move is refused.
  * `review(app)` returns the `review.settings` value to record, or null.
  * With `releaseName`, every `site_names` reservation the request holds
  * is deleted.
  *
  * @returns {Promise<object>} the request as it was before the change
  */
-async function transition({ db, now = Date.now }, { appId, user, from, to, note = null, review = () => null, releaseName = false }) {
+async function transition({ db, now = Date.now }, { appId, user, from, to, revision = null, note = null, review = () => null, releaseName = false }) {
   const ref = applicationRef(db, requireAppId(appId));
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const app = { id: snap.id, ...snap.data() };
+    const history = Array.isArray(app.history) ? app.history : [];
     if (!from.includes(app.status)) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
+    if (revision !== null && revision !== history.length) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
     const held = releaseName ? await heldNames(tx, db, app.id) : [];
     // Every read is done; the writes follow.
     const settings = review(app);
     const at = new Date(now());
-    const history = Array.isArray(app.history) ? app.history : [];
     tx.update(ref, {
       status: to,
       updatedAt: at,
@@ -106,9 +109,16 @@ async function notifyOwners({ db, mailer, publicUrl, log = console }, app, { sta
   }
 }
 
+/** The history length the operator's page showed. */
+function requireRevision(value) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new ConsoleError(400, 'bad-request', 'Reload the page and try again.');
+  return value;
+}
+
 async function decide(deps, { body, user }, spec) {
   await requireOperator(deps.db, user);
-  const app = await transition(deps, { appId: body.appId, user, ...spec });
+  const revision = requireRevision(body.revision);
+  const app = await transition(deps, { appId: body.appId, user, revision, ...spec });
   const mail = await notifyOwners(deps, app, { status: spec.to, note: spec.note ?? null });
   return { body: { application: { id: app.id, status: spec.to }, ...mail } };
 }

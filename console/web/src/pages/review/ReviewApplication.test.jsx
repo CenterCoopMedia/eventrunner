@@ -34,6 +34,7 @@ function request(overrides = {}) {
       answers: ANSWERS,
       ticketChoice: 'stripe',
       webAddressName: 'nclocal',
+      revision: 2,
       history: [
         { status: 'draft', at: '2026-11-01T15:00:00.000Z', by: 'ana', byEmail: 'ana@example.org', note: null },
         { status: 'submitted', at: '2026-11-03T15:00:00.000Z', by: 'ana', byEmail: 'ana@example.org', note: null },
@@ -122,7 +123,7 @@ describe('ReviewApplication', () => {
     fireEvent.change(screen.getByLabelText('Note to the client'), { target: { value: 'Add the venue address.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send the request for changes' }));
     expect(await screen.findByText('You asked for changes. We emailed the Owners.')).toBeInTheDocument();
-    expect(callApi).toHaveBeenCalledWith('requestChanges', { appId: 'a1', note: 'Add the venue address.' });
+    expect(callApi).toHaveBeenCalledWith('requestChanges', { appId: 'a1', revision: 2, note: 'Add the venue address.' });
     expect(await screen.findByText('Changes requested', { selector: '.tag' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decline' })).toBeInTheDocument();
@@ -142,7 +143,7 @@ describe('ReviewApplication', () => {
     fireEvent.change(screen.getByLabelText('Note to the client'), { target: { value: 'Not an event.' } });
     fireEvent.click(within(screen.getByRole('form', { name: 'Decline this request' })).getByRole('button', { name: 'Decline' }));
     expect(await screen.findByText(/You declined the request/)).toBeInTheDocument();
-    expect(callApi).toHaveBeenCalledWith('declineApplication', { appId: 'a1', note: 'Not an event.' });
+    expect(callApi).toHaveBeenCalledWith('declineApplication', { appId: 'a1', revision: 2, note: 'Not an event.' });
   });
 
   it('approves with the default settings, which the operator can change', async () => {
@@ -154,7 +155,7 @@ describe('ReviewApplication', () => {
     fireEvent.change(screen.getByLabelText('Region'), { target: { value: 'us-east1' } });
     fireEvent.click(within(screen.getByRole('form', { name: 'Approve this request' })).getByRole('button', { name: 'Approve' }));
     expect(await screen.findByText(/You approved the request/)).toBeInTheDocument();
-    expect(callApi).toHaveBeenCalledWith('approveApplication', { appId: 'a1', settings: { ...DEFAULTS, region: 'us-east1' } });
+    expect(callApi).toHaveBeenCalledWith('approveApplication', { appId: 'a1', revision: 2, settings: { ...DEFAULTS, region: 'us-east1' } });
   });
 
   it('checks the approval settings and focuses a bad one', async () => {
@@ -177,12 +178,12 @@ describe('ReviewApplication', () => {
 
   it('shows a refusal when another operator acted first', async () => {
     serve(request(), {
-      approveApplication: () => { throw Object.assign(new Error('Another member of the hosting team changed this request.'), { code: 'status-changed' }); },
+      approveApplication: () => { throw Object.assign(new Error('This request changed since you opened it.'), { code: 'status-changed' }); },
     });
     page();
     fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
     fireEvent.click(within(screen.getByRole('form', { name: 'Approve this request' })).getByRole('button', { name: 'Approve' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Another member of the hosting team changed this request.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('This request changed since you opened it.');
   });
 
   it('asks before it deletes a request as spam, then goes back to the queue', async () => {
