@@ -34,7 +34,7 @@ describe('ConsoleSettings', () => {
     page();
     fireEvent.change(await screen.findByLabelText('Region'), { target: { value: 'us-east1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
-    expect(await screen.findByText('The settings are saved. New approvals use them.')).toBeInTheDocument();
+    expect(await screen.findByText('The settings are saved. New builds use them.')).toBeInTheDocument();
     expect(callApi).toHaveBeenCalledWith('saveConsoleSettings', { settings: { ...SAVED, region: 'us-east1' } });
   });
 
@@ -66,5 +66,65 @@ describe('ConsoleSettings', () => {
     page();
     expect(await screen.findByRole('heading', { level: 1, name: 'This page is for the hosting team' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Region')).not.toBeInTheDocument();
+  });
+
+  describe('the agreement', () => {
+    const AGREEMENT = { version: 2, title: 'Test agreement', body: 'Test text.', sha256: 'h', savedAt: '2026-11-04T15:00:00.000Z' };
+
+    it('says sign-ups are closed until the agreement is saved', async () => {
+      page();
+      expect(await screen.findByRole('note')).toHaveTextContent('Sign-ups are closed');
+    });
+
+    it('says sign-ups are closed until the build settings are saved', async () => {
+      serve({ getConsoleSettings: () => ({ settings: { ...SAVED, region: '' }, agreement: AGREEMENT }) });
+      page();
+      expect(await screen.findByRole('note')).toHaveTextContent('Signup links do not work');
+    });
+
+    it('does not say so when all are saved, and shows the agreement', async () => {
+      serve({ getConsoleSettings: () => ({ settings: SAVED, agreement: AGREEMENT }) });
+      page();
+      expect(await screen.findByLabelText('Title')).toHaveValue('Test agreement');
+      expect(screen.getByLabelText('Text')).toHaveValue('Test text.');
+      expect(screen.getByText(/The current text is version 2/)).toBeInTheDocument();
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Amount')).not.toBeInTheDocument();
+    });
+
+    it('saves a changed text as a new version', async () => {
+      serve({
+        getConsoleSettings: () => ({ settings: SAVED, agreement: AGREEMENT }),
+        saveAgreement: (body) => ({ created: true, agreement: { ...AGREEMENT, ...body.agreement, version: 3 } }),
+      });
+      page();
+      fireEvent.change(await screen.findByLabelText('Text'), { target: { value: 'A changed text.' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save as a new version' }));
+      expect(await screen.findByText('Version 3 is saved. New acceptances use it.')).toBeInTheDocument();
+      expect(callApi).toHaveBeenCalledWith('saveAgreement', { agreement: { title: 'Test agreement', body: 'A changed text.' } });
+      expect(screen.getByText(/The current text is version 3/)).toBeInTheDocument();
+    });
+
+    it('says when the same text saved nothing', async () => {
+      serve({
+        getConsoleSettings: () => ({ settings: SAVED, agreement: AGREEMENT }),
+        saveAgreement: () => ({ created: false, agreement: AGREEMENT }),
+      });
+      page();
+      await screen.findByLabelText('Text');
+      fireEvent.click(screen.getByRole('button', { name: 'Save as a new version' }));
+      expect(await screen.findByText('This is the same text as version 2, so nothing changed.')).toBeInTheDocument();
+    });
+
+    it('shows a refusal at the agreement field it names', async () => {
+      serve({
+        saveAgreement: () => { throw Object.assign(new Error('Enter the agreement text, up to 200,000 characters.'), { field: 'agreementBody' }); },
+      });
+      page();
+      await screen.findByLabelText('Text');
+      fireEvent.click(screen.getByRole('button', { name: 'Save as a new version' }));
+      expect(await screen.findByText('Enter the agreement text, up to 200,000 characters.')).toBeInTheDocument();
+      expect(screen.getByLabelText('Text')).toHaveAttribute('aria-invalid', 'true');
+    });
   });
 });

@@ -29,7 +29,20 @@ export function fullAnswers() {
   };
 }
 
-const ALL_DONE = { organization: true, event: true, webAddress: true, team: true, tickets: true, email: true, review: true };
+const ALL_DONE = {
+  organization: true, event: true, webAddress: true, team: true, tickets: true, email: true, review: true, agreement: false,
+};
+
+/** `connections` as getApplication returns it: a connected Stripe account. */
+export function connections(overrides = {}) {
+  return {
+    canChange: true,
+    canDisconnect: true,
+    stripe: { available: true, connected: true, displayName: 'NC Local', connectedAt: '2026-11-02T00:00:00.000Z' },
+    eventbrite: { available: true, connected: false, displayName: null, connectedAt: null, event: null },
+    ...overrides,
+  };
+}
 
 export function application(overrides = {}) {
   return {
@@ -46,11 +59,15 @@ export function application(overrides = {}) {
     errors: {},
     progress: ALL_DONE,
     ownersNeeded: 0,
+    signups: { open: true },
+    acceptance: null,
     myRole: 'owner',
     operator: false,
     canEdit: true,
-    canSubmit: true,
+    canAccept: true,
     canWithdraw: true,
+    connections: connections(),
+    build: null,
     ...overrides,
   };
 }

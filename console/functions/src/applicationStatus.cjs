@@ -1,23 +1,21 @@
 'use strict';
 
 /**
- * The client's status changes (ADR 0007 §3 and §5): send the request
- * (submitApplication) and withdraw it (withdrawApplication). Owners only.
+ * The client's status changes (ADR 0007 §3 and §5): withdraw a draft
+ * (withdrawApplication, Owners only), and the parts acceptAgreement shares.
  *
- * Each change appends to `history` and emails the client's Owners. A send
- * also emails each operator in `console_config/operators`. The email goes
- * after the change is saved, and a failed email does not undo it: the
+ * Each change appends to `history` and emails the client's Owners. The email
+ * goes after the change is saved, and a failed email does not undo it: the
  * failure is logged for the operator, and the status page shows the state.
  */
 
 const { ConsoleError } = require('./http.cjs');
-const { requireOwner } = require('./access.cjs');
+const { requireOwner, validOrgId } = require('./access.cjs');
 const { withDefaults } = require('./answers.cjs');
 const { checkAnswers } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
-const { LAUNCH_OWNERS } = require('./organizations.cjs');
 const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames } = require('./siteNames.cjs');
-const { CLOSED, EDITABLE, WITHDRAWABLE, countOwners, historyEntry, readApplication } = require('./applications.cjs');
+const { CLOSED, WITHDRAWABLE, historyEntry, readApplication } = require('./applications.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SUBMITS_PER_DAY = 5;
@@ -49,107 +47,88 @@ async function sendAll(log, sends) {
       await send();
     } catch (err) {
       allSent = false;
-      log.error('console status email failed', err);
+      // The builder's log is public, and a mail service's error can name the recipient.
+      log.error('console status email failed', String(err?.message).replace(/\S+@\S+/g, '[address]'));
     }
   }
   return allSent;
 }
 
 /** Email the Owners that the status changed. */
-async function notifyOwners({ db, mailer, log, publicUrl }, { orgId, appId, status, eventName, note = null }) {
+async function notifyOwners({ db, mailer, log, publicUrl }, { orgId, appId, status, eventName, note = null, adminLink = null }) {
   const organizationName = (await db.collection('organizations').doc(orgId).get()).data().name;
   const link = statusLink(publicUrl, orgId, appId);
   const owners = await ownerEmails(db, orgId);
   return sendAll(log, owners.map((to) => () => mailer.sendStatusChange({
-    to, organizationName, eventName, status, link, note,
+    to, organizationName, eventName, status, link, note, ...(adminLink ? { adminLink } : {}),
   })));
 }
 
-async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, eventName }) {
-  const organizationName = (await db.collection('organizations').doc(orgId).get()).data().name;
+/** `kind` and `problem` choose the words (mailer.cjs). */
+async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, eventName, kind, problem }) {
+  const org = validOrgId(orgId) ? await db.collection('organizations').doc(orgId).get() : null;
+  const organizationName = org?.exists ? org.data().name : '';
   const link = reviewLink(publicUrl, appId);
   const operators = await operatorEmails(db);
   return sendAll(log, operators.map((to) => () => mailer.sendOperatorNotice({
-    to, organizationName, eventName, link,
+    to, organizationName, eventName, link, kind, ...(problem ? { problem } : {}),
   })));
 }
 
-const INCOMPLETE = 'Some answers need attention before you send the request.';
+const INCOMPLETE = 'Some answers need attention before you continue.';
 
-async function submitApplication(deps, { body, user }) {
-  const { db, now = Date.now, log = console } = deps;
-  const { orgId, appId } = body;
-  await requireOwner(db, orgId, user, 'Only an Owner can send the request.');
-  const first = await readApplication((r) => r.get(), db, orgId, appId);
-  if (!EDITABLE.includes(first.data.status)) {
-    throw new ConsoleError(409, 'locked', 'This request was already sent.');
+/** @throws {ConsoleError} 400 incomplete, listing the fields */
+function refuseIncomplete(errors) {
+  if (Object.keys(errors).length === 0) return;
+  const err = new ConsoleError(400, 'incomplete', INCOMPLETE);
+  err.fields = errors;
+  throw err;
+}
+
+/**
+ * Inside a transaction: the answers to freeze. They are checked again on
+ * this copy, in case a teammate saved since, and the request must still
+ * hold its web-address name.
+ */
+async function answersToFreeze(tx, db, appId, data, { testMode = false } = {}) {
+  const answers = withDefaults(data.answers);
+  const again = checkAnswers(answers, data.connections, { testMode });
+  const siteName = answers.webAddress.name;
+  const held = siteName ? await tx.get(db.collection(SITE_NAMES).doc(siteName)) : null;
+  if (!again['webAddress.name'] && (!held?.exists || held.data().appId !== appId)) {
+    again['webAddress.name'] = TAKEN.message;
   }
-  const owners = await countOwners(db, orgId);
-  if (owners < LAUNCH_OWNERS) {
-    const err = new ConsoleError(409, 'owners-needed', 'Add a second Owner to the team before you send the request.');
-    err.fields = { team: 'Two Owners are needed before launch.' };
-    throw err;
-  }
-  const errors = checkAnswers(first.data.answers);
-  if (Object.keys(errors).length > 0) {
-    const err = new ConsoleError(400, 'incomplete', INCOMPLETE);
-    err.fields = errors;
-    throw err;
-  }
-  await takeSlot(db, {
+  refuseIncomplete(again);
+  return answers;
+}
+
+/** The limit on accepting. A refused acceptance does not use a slot. */
+function takeSubmitSlot(db, user, now) {
+  return takeSlot(db, {
     key: `submit-app-${user.uid}`,
     max: SUBMITS_PER_DAY,
     windowMs: DAY_MS,
     now,
     message: 'You have sent too many requests today. Try again tomorrow.',
   });
-
-  const at = new Date(now());
-  const eventName = await db.runTransaction(async (tx) => {
-    const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
-    if (!EDITABLE.includes(data.status)) throw new ConsoleError(409, 'locked', 'This request was already sent.');
-    const answers = withDefaults(data.answers);
-    // Checked again on the copy that is frozen, in case a teammate saved since.
-    const again = checkAnswers(answers);
-    const siteName = answers.webAddress.name;
-    const held = siteName ? await tx.get(db.collection(SITE_NAMES).doc(siteName)) : null;
-    if (!again['webAddress.name'] && (!held?.exists || held.data().appId !== appId)) {
-      again['webAddress.name'] = TAKEN.message;
-    }
-    if (Object.keys(again).length > 0) {
-      const err = new ConsoleError(400, 'incomplete', INCOMPLETE);
-      err.fields = again;
-      throw err;
-    }
-    tx.update(ref, {
-      status: 'submitted',
-      frozen: answers,
-      submittedAt: at,
-      submittedBy: user.uid,
-      updatedAt: at,
-      updatedBy: user.uid,
-      history: [...(Array.isArray(data.history) ? data.history : []), historyEntry('submitted', at, user.uid)],
-    });
-    return answers.event.name;
-  });
-
-  const mail = { ...deps, log };
-  const clientSent = await notifyOwners(mail, { orgId, appId, status: 'submitted', eventName });
-  const operatorsSent = await notifyOperators(mail, { orgId, appId, eventName });
-  return { body: { status: 'submitted', submittedAt: at.toISOString(), emailed: clientSent && operatorsSent } };
 }
 
 async function withdrawApplication(deps, { body, user }) {
   const { db, now = Date.now, log = console } = deps;
   const { orgId, appId } = body;
   await requireOwner(db, orgId, user, 'Only an Owner can withdraw the request.');
+  const refuseStatus = (status) => {
+    if (CLOSED.includes(status)) throw new ConsoleError(409, 'locked', 'This request is already closed.');
+    if (!WITHDRAWABLE.includes(status)) {
+      throw new ConsoleError(409, 'locked', 'Your site is being built, so you cannot withdraw it here.');
+    }
+  };
+  const first = await readApplication((r) => r.get(), db, orgId, appId);
+  refuseStatus(first.data.status);
   const at = new Date(now());
   const eventName = await db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
-    if (CLOSED.includes(data.status)) throw new ConsoleError(409, 'locked', 'This request is already closed.');
-    if (!WITHDRAWABLE.includes(data.status)) {
-      throw new ConsoleError(409, 'locked', 'We already approved this request, so you cannot withdraw it here. Contact the hosting team.');
-    }
+    refuseStatus(data.status);
     const held = await heldNames(tx, db, appId);
     releaseNames(tx, db, held);
     tx.update(ref, {
@@ -164,4 +143,13 @@ async function withdrawApplication(deps, { body, user }) {
   return { body: { status: 'withdrawn', emailed } };
 }
 
-module.exports = { submitApplication, withdrawApplication, SUBMITS_PER_DAY, statusLink };
+module.exports = {
+  SUBMITS_PER_DAY,
+  answersToFreeze,
+  notifyOperators,
+  notifyOwners,
+  refuseIncomplete,
+  statusLink,
+  takeSubmitSlot,
+  withdrawApplication,
+};

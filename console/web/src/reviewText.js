@@ -1,10 +1,8 @@
-// Words and small checks for the hosting team's review pages (ADR 0007 §5).
+// Words and small checks for the hosting team's pages (ADR 0007 §5).
 // The server makes the same checks and has the last word.
 
 export const STATUS_LABELS = Object.freeze({
   draft: 'Draft',
-  submitted: 'Waiting for review',
-  changes_requested: 'Changes requested',
   approved: 'Approved',
   building: 'Building',
   ready: 'Ready',
@@ -15,8 +13,15 @@ export const STATUS_LABELS = Object.freeze({
 
 /** The queue filters, in the order the hosting team works through them. */
 export const STATUS_FILTERS = Object.freeze([
-  'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'declined', 'withdrawn', 'draft',
+  'approved', 'building', 'ready', 'launched', 'draft', 'declined', 'withdrawn',
 ]);
+
+export const LINK_STATUS_LABELS = Object.freeze({
+  open: 'Open',
+  used: 'Used',
+  revoked: 'Revoked',
+  expired: 'Expired',
+});
 
 export const TICKET_LABELS = Object.freeze({
   stripe: 'Sell with Stripe',
@@ -52,18 +57,6 @@ export const SETTING_FIELDS = Object.freeze({
     hint: 'For example us-central1.',
     error: 'Enter a Google Cloud region, for example us-central1.',
     valid: (v) => /^[a-z]+-[a-z]+\d{1,2}$/.test(v.trim().toLowerCase()),
-  },
-  projectId: {
-    label: 'Project id',
-    hint: '6 to 30 characters: lowercase letters, digits and hyphens. Starts with a letter.',
-    error: 'Enter a project id of 6 to 30 characters: lowercase letters, digits and hyphens. Start with a letter. Do not end with a hyphen.',
-    valid: (v) => /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(v.trim()),
-  },
-  environment: {
-    label: 'Environment name',
-    hint: 'The GitHub Environment for the deploy. Lowercase letters, digits and hyphens.',
-    error: 'Enter an environment name of up to 63 characters: lowercase letters, digits and hyphens.',
-    valid: (v) => /^[a-z0-9][a-z0-9-]{0,62}$/.test(v.trim()),
   },
 });
 

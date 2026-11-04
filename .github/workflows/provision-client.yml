@@ -1,0 +1,135 @@
+name: Provision client
+
+# The site builder (ADR 0007 §6): build one client's event site from one
+# request in the client console. The console's startBuild dispatches this with
+# a GitHub App token (console/functions/src/buildDispatch.cjs), and an operator
+# can run it again with Retry the build. Every step is safe to run again.
+#
+# Auth is Workload Identity Federation as the provisioner service account, with
+# no key. It runs in the `provisioning` GitHub Environment, the only place the
+# provisioner's own App key and the Cloudflare and Postmark tokens exist.
+# docs/DEPLOY_RUNBOOK.md §12 has the one-time setup.
+#
+# It dispatches deploy.yml with GITHUB_TOKEN, which is why this job holds
+# `actions: write`. That token cannot create an Environment, so
+# scripts/provision-client.cjs uses the provisioner's App for that.
+
+run-name: Provision ${{ inputs.application_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_id:
+        description: The request's id in the client console.
+        required: true
+        type: string
+      test_mode:
+        description: Allow a test-mode ticket connection. Only for a rehearsal.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Two runs for one request would race on its cloud project. A retry waits.
+concurrency:
+  group: provision-${{ inputs.application_id }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  guard:
+    name: Guard the run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to run on a forked repository
+        run: |
+          if [ "${{ github.event.repository.fork }}" = "true" ]; then
+            echo "::error::The site builder never runs on a forked repository." >&2
+            exit 1
+          fi
+      - name: Refuse to run outside refs/heads/main
+        # Defense-in-depth only, as in deploy-client.yml. The real boundary is
+        # the WIF condition on the provisioner's identity provider and the
+        # main-only rule on the `provisioning` Environment.
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::The site builder only runs from refs/heads/main." >&2
+            exit 1
+          fi
+      - name: Check the application id
+        # Through env, never ${{ }} in the script, so a crafted id stays data.
+        # The script checks it again before it reads anything.
+        env:
+          APPLICATION_ID: ${{ inputs.application_id }}
+        run: |
+          if ! printf '%s' "$APPLICATION_ID" | grep -Eq '^[A-Za-z0-9_-]{1,200}$'; then
+            echo "::error::The application id is not valid." >&2
+            exit 1
+          fi
+
+  provision:
+    name: Build the site
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: provisioning
+    # Under GitHub's 360-minute limit, so the last step below gets to run.
+    timeout-minutes: 330
+    permissions:
+      contents: read
+      id-token: write # google-github-actions/auth (WIF)
+      actions: write # dispatch deploy.yml and read its runs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Pack packages/shared and copy it to every functions vendor folder
+        # The root npm ci installs every workspace, and each one that vendors
+        # the shared package needs its own copy.
+        run: |
+          npm run prepare:functions
+          node scripts/prepare-functions.cjs --copy
+      - run: npm ci
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        id: auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Build the site
+        env:
+          APPLICATION_ID: ${{ inputs.application_id }}
+          TEST_MODE: ${{ inputs.test_mode }}
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
+          CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          PROVISIONER_APP_ID: ${{ vars.PROVISIONER_APP_ID }}
+          PROVISIONER_INSTALLATION_ID: ${{ vars.PROVISIONER_INSTALLATION_ID }}
+          CONSOLE_POSTMARK_TOKEN: ${{ secrets.CONSOLE_POSTMARK_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          POSTMARK_ACCOUNT_TOKEN: ${{ secrets.POSTMARK_ACCOUNT_TOKEN }}
+          PROVISIONER_APP_PRIVATE_KEY: ${{ secrets.PROVISIONER_APP_PRIVATE_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$TEST_MODE" = "true" ]; then
+            node scripts/provision-client.cjs --application "$APPLICATION_ID" --test-mode
+          else
+            node scripts/provision-client.cjs --application "$APPLICATION_ID"
+          fi
+      - name: Record a run that stopped
+        # A timeout or a cancel never reaches the script's own failure record.
+        # This also runs after a failure the script recorded, and then does nothing.
+        if: ${{ (failure() || cancelled()) && steps.auth.outcome == 'success' }}
+        env:
+          APPLICATION_ID: ${{ inputs.application_id }}
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
+          CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
+          CONSOLE_POSTMARK_TOKEN: ${{ secrets.CONSOLE_POSTMARK_TOKEN }}
+        run: node scripts/provision-client.cjs --application "$APPLICATION_ID" --mark-stopped

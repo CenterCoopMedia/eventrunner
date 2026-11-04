@@ -27,7 +27,7 @@ function Days({ days }) {
 
 /** The frozen answers, in the order of the guided setup, in plain words. */
 export default function ReviewAnswers({ answers }) {
-  if (!answers) return <p>The client has not sent this request yet, so there are no frozen answers.</p>;
+  if (!answers) return <p>The client has not accepted the agreement yet, so there are no frozen answers.</p>;
   const { organization = {}, event = {}, webAddress = {}, tickets = {}, email = {} } = answers;
   const host = webAddress.name ? `${webAddress.name}.eventrunner.org` : '';
   const sender = event.name && host ? `${email.senderName || event.name} <hello@${host}>` : '';

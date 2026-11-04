@@ -7,11 +7,11 @@ const { RESERVED, checkWebAddress, siteNameProblem } = require('./siteNames.cjs'
 
 const ana = { uid: 'ana', email: 'ana@example.org' };
 
-test('a name is 3 to 30 lowercase letters, digits and hyphens, with no hyphen at either end', () => {
-  for (const good of ['abc', 'nclocal', 'nc-local-2027', 'a1b', 'x'.repeat(30)]) {
+test('a name is 3 to 27 lowercase letters, digits and hyphens, with no hyphen at either end', () => {
+  for (const good of ['abc', 'nclocal', 'nc-local-2027', 'a1b', 'x'.repeat(27)]) {
     assert.equal(siteNameProblem(good), null, good);
   }
-  for (const bad of ['ab', 'x'.repeat(31), '-abc', 'abc-', 'NC', 'nc_local', 'nc local', 'nc.local', 'café']) {
+  for (const bad of ['ab', 'x'.repeat(28), '-abc', 'abc-', 'NC', 'nc_local', 'nc local', 'nc.local', 'café']) {
     assert.equal(siteNameProblem(bad)?.reason, 'format', bad);
   }
 });

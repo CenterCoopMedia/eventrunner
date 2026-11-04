@@ -45,9 +45,9 @@ export default function WebAddressStep({ value, errors, onChange, onBlur, appId 
       <TextField
         path="webAddress.name"
         label="Name"
-        hint="3 to 30 lowercase letters, numbers and hyphens. For example, nclocal"
+        hint="3 to 27 lowercase letters, numbers and hyphens. For example, nclocal"
         autoComplete="off"
-        maxLength={30}
+        maxLength={27}
         value={value.name}
         onChange={(next) => onChange({ name: next.toLowerCase() }, 'webAddress.name')}
         onBlur={() => onBlur('webAddress.name')}

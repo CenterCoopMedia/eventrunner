@@ -16,15 +16,15 @@ describe('Organizations', () => {
     expect(await screen.findByRole('link', { name: 'Local News Lab' })).toHaveAttribute('href', '/organizations/o1');
     expect(screen.getByText('Owner')).toBeInTheDocument();
     expect(screen.getByText('Editor')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Add another organization' })).toHaveAttribute('href', '/organizations/new');
     expect(callApi).toHaveBeenCalledWith('listOrganizations', {});
     expect(screen.queryByRole('heading', { name: 'All organizations' })).not.toBeInTheDocument();
   });
 
-  it('sends a reader with no organization to the create page', async () => {
+  it('tells a reader with no organization how to start, and offers no way to make one', async () => {
     callApi.mockResolvedValue({ operator: false, organizations: [] });
-    renderPage(<Organizations />, { routes: { '/organizations/new': 'Create page' } });
-    expect(await screen.findByText('Create page')).toBeInTheDocument();
+    renderPage(<Organizations />);
+    expect(await screen.findByText(/Event sites start from a signup link.*To join a team, open the invite email\./)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /organization/i })).not.toBeInTheDocument();
   });
 
   it('shows the hosting team every organization', async () => {
@@ -38,6 +38,7 @@ describe('Organizations', () => {
     expect(screen.getByRole('link', { name: 'Far Away Org' })).toHaveAttribute('href', '/organizations/o9');
     expect(screen.getByText(/You are on the hosting team/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Review requests' })).toHaveAttribute('href', '/review');
+    expect(screen.queryByText(/Event sites start from a signup link/)).not.toBeInTheDocument();
   });
 
   it('shows the server message when the list cannot load', async () => {

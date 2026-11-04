@@ -2,6 +2,7 @@
 
 **Date:** 2026-11-03 (revised the same day)  
 **Status:** Accepted by the owner on 2026-11-03.  
+**Amended:** 2026-11-04, for the agreement, the event fee and the automatic build. See [the amendment](#amendment-2026-11-04-agreement-fee-and-automatic-build). Amended again the same day: [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link) replaces the event fee, the statuses and the operator approval.  
 **Amends:** [ADR 0001 §2](0001-event-platform-v1.md) operating model, and [ADR 0004](0004-stripe-ticket-commerce.md) (Stripe Connect, see its 2026-11-03 amendment). The model stays one Firebase project per event. This record adds a way to sign up, connect accounts, and get that project made with no manual step by the client.
 
 ## Context
@@ -26,8 +27,9 @@ the site is made for them.
    optional upgrade with a guided, automatically checked step.
 3. **Plain words.** The console never says Firebase, project, tenant, environment, webhook,
    secret, SPF or DKIM. It says "your site", "your web address", "ticket sales", "email".
-4. **Approval before cost.** No cloud resource is created before a CCM operator approves the
-   application. This is the control against cost and abuse from self-serve sign-up.
+4. ~~**Approval before cost.** No cloud resource is created before a CCM operator approves the
+   application. This is the control against cost and abuse from self-serve sign-up.~~ Replaced by
+   [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link).
 5. **One validator.** The console and `init-event.cjs` run the same answer rules
    (`shared/answers`).
 
@@ -45,8 +47,9 @@ image and sharing metadata.
 
 - Sign up with Google, Microsoft, or an emailed sign-in link. The email address is verified
   before the client can submit.
-- The client names their organization once. One organization can run more than one event; each
-  event is its own application and its own site.
+- The client names their organization once. ~~One organization can run more than one event; each
+  event is its own application and its own site.~~ Each signup link makes one organization and one
+  application, which is one site. See [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link).
 - **Team invites.** The client invites teammates by email from the console and gives each one a
   role: **Owner** (operator in the event admin) or **Editor** (staff). An invite is an email with
   a link; the teammate signs up and joins. The console requires two Owners before launch, because
@@ -68,11 +71,11 @@ leave and come back, and a teammate can continue it.
 | Your team | Invites teammates, picks Owner or Editor | Sends the invites, shows who joined |
 | Tickets | Chooses **Sell with Stripe**, **Use Eventbrite**, **Import a spreadsheet later**, or **No tickets** | See §4 |
 | Email | Sender name and the reply-to address | Shows a preview: `Event name <hello@nclocal.eventrunner.org>`; replies go to the client |
-| Review | Reads a summary and selects **Create my site** | Freezes the answers, notifies CCM |
+| Review | ~~Reads a summary and selects **Create my site**~~ Reads a summary and goes on to the agreement | ~~Freezes the answers, notifies CCM~~ Checks every answer. Accepting the agreement freezes them. |
 
-After submit, the client sees a status page with plain steps and live state: "We are reviewing
-your request", "We are building your site", "Your site is ready". Each change also sends the
-client an email.
+After accepting the agreement, the client sees a status page with plain steps and live state:
+~~"We are reviewing your request",~~ "We are building your site", "Your site is ready". Each change
+also sends the client an email.
 
 ### 4. Connecting accounts
 
@@ -92,23 +95,27 @@ event ID is typed. CCM registers one Eventbrite app.
 Tokens from these connections are written to the console's Secret Manager by the callback
 function, and never to Firestore, a response, a log or the browser. The OAuth `state` value is
 bound to the signed-in user and the application, and expires. The provisioner moves each token to
-the client project's Secret Manager and deletes the console copy. The client can disconnect and
-reconnect from the status page until the site is made, and from the admin panel after.
+the client project's Secret Manager and deletes the console copy. ~~The client can disconnect and
+reconnect from the status page until the site is made, and from the admin panel after.~~ The client
+can disconnect and reconnect until accepting the agreement, then only after a failed build (see
+[the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link)), and from the admin panel once the site is made.
 
 ### 5. Review and approval
 
-Statuses: `draft` → `submitted` → `changes_requested` (with a note to the client) or
-`approved` → `building` → `ready` → `launched`. Also `withdrawn` (by the client) and
-`declined` (by an operator, with a note).
+Replaced by [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link), which holds the current statuses.
 
-The operator review screen shows the frozen answers and the connection state. **Approve** needs
+~~Statuses: `draft` → `submitted` → `changes_requested` (with a note to the client) or
+`approved` → `building` → `ready` → `launched`. Also `withdrawn` (by the client) and
+`declined` (by an operator, with a note).~~
+
+~~The operator review screen shows the frozen answers and the connection state. **Approve** needs
 no typed values: the GCP folder, billing account and region are console settings, and the
 project id and GitHub Environment name are made from the web-address name. The operator can
-change them before approval.
+change them before approval.~~
 
 ### 6. Building the site runs in GitHub Actions
 
-Approval dispatches `provision-client.yml` with the application id. The workflow authenticates
+~~Approval~~ Accepting the agreement dispatches `provision-client.yml` with the application id. The workflow authenticates
 with Workload Identity Federation as a provisioner service account, bound to this repository on
 `refs/heads/main` only, like the deploy account. The provisioner needs folder-level project
 creator and billing user rights; a credential with those rights must not sit behind an
@@ -179,9 +186,10 @@ These are the only places a client sees a DNS record, and both are optional.
   Eventbrite app, a Postmark account that can create servers, an `eventrunner.org` zone with an
   API, a GitHub App, and a provisioner service account with folder-level roles. A new runbook
   section covers the one-time setup.
-- Self-serve sign-up adds a public write surface: rate limits (three open applications per
+- ~~Self-serve sign-up adds a public write surface: rate limits (three open applications per
   organization, five submits per account per day), verified email, App Check, and an operator
-  delete for spam.
+  delete for spam.~~ A signup link is now the only way in. Verified email, App Check, a daily limit
+  on acceptances and the operator delete for spam stay.
 - Retention: a withdrawn or declined application and its tokens are deleted 90 days after the last
   change. An approved application is kept for the life of the engagement.
 - CI stays credential-free. Every external call goes through an injected client with a fake in
@@ -190,7 +198,7 @@ These are the only places a client sees a DNS record, and both are optional.
 
 ## Not in scope
 
-- Taking payment for the service or signing the agreement in the console.
+- ~~Taking payment for the service or signing the agreement in the console.~~ Signing the agreement is in scope; see the first 2026-11-04 amendment. Taking payment for the service stays out of scope; see [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link).
 - Moving existing clients into the console.
 - Changing an event project after `ready`, except through the admin panel and the deploy
   workflows.
@@ -213,3 +221,134 @@ These are the only places a client sees a DNS record, and both are optional.
 3. An Eventbrite app (client id and secret).
 4. The `eventrunner.org` DNS zone on a provider with an API (Google Cloud DNS preferred).
 5. A Postmark account token with the right to create servers and domains.
+
+## Amendment 2026-11-04: agreement, fee and automatic build
+
+The owner's requirement: a client who does not know the hosting team opens one sign-up link, accepts
+the agreement, ~~pays the event fee~~ and sets up the event alone, as on any commercial platform. The
+client never has to ask anyone a question. This amendment replaces the parts of the record above
+that conflict with that requirement.
+
+**Agreement.** A step after Review shows the current agreement in full. An Owner types their name
+and selects accept. The server stores an append-only record: agreement version, a SHA-256 hash of
+the text, typed name, verified email, user id, organization, application and time. It emails the
+signer a copy. The browser cannot write or change the record. The text lives in the console's
+Firestore (`console_config/agreement`), and each version is kept unchanged. It is not in this public
+repository. CCM's legal review must confirm this method and the text before a real client uses it.
+
+~~**Event fee.** A step after the agreement sends the Owner to Stripe Checkout on CCM's Stripe account.
+The server reads the amount and currency from `console_config/settings`. The browser never sends an
+amount, and the repository holds no price. The console fails closed: with no agreement text or no
+fee set, the request cannot move past Review, and the page says the site is not taking sign-ups.
+A paid session counts only through a signature-verified Stripe webhook, which handles a repeated
+event once. Returning from Checkout proves nothing. This payment is separate from the client's own
+ticket sales, which go to the client's connected account and carry no CCM fee (§4 stands).~~ Replaced
+by [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link).
+
+~~**Statuses.** `draft` → `awaiting_payment` → `approved` → `building` → `ready` → `launched`.
+Accepting the agreement freezes the answers and sets `awaiting_payment`. The client can go back to
+edit before paying, which clears the acceptance. The webhook sets `approved`. `submitted` and
+`changes_requested` stay for a request an operator holds back. The status page shows each change,
+and each one also sends an email.~~ Replaced by [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link).
+
+~~**Automatic build.** This replaces principle 4 and §5's approval step. Payment starts the build, and
+the operators get a notice. No cloud resource exists before payment, which is the control against
+cost and abuse. The project id and environment name come from the web-address name, and the folder,
+billing account and region from console settings. An operator can still see every request and decline one with a refund. The agreement states the
+refund terms.~~ Replaced by [the invoice and signup link amendment](#amendment-2026-11-04-invoice-and-signup-link).
+
+**Second Owner.** The second Owner moves from a condition of sending the request to a launch check.
+A client working alone can finish sign-up~~, pay~~ and set up the site. The launch check explains the
+step and sends the invite from the same screen.
+
+**Launch.** This replaces the Launch row in §9. The client launches from the setup checklist once
+every row passes. No hosting-team step is needed. The Google sign-in row in §9 stays with the hosting
+team and is optional, because emailed codes work without it. Legal review stays with the client.
+
+**Ticket connections.** The first release includes all four choices in §3: Stripe, Eventbrite,
+a spreadsheet and no tickets.
+
+**A site built by hand first.** `eventrunner-nclocal` was built by hand on 2026-11-04 to rehearse a
+real deployment. It records the steps the provisioner must perform (`docs/DEPLOY_RUNBOOK.md`). It is
+not the client's site. It is removed or adopted before the client signs up, so `nclocal` is free.
+
+**Added owner prerequisites.**
+
+1. A Google Cloud organization. A folder needs one, and a service account cannot create a project
+   without a parent. None exists today.
+2. CCM's Stripe account in test and live mode, with Connect enabled (prerequisite 2 above). ~~It both
+   takes the fee and is the Connect platform.~~ It is the Connect platform and takes no fee.
+3. The agreement text~~, its refund terms and the event fee~~, entered in the console.
+
+## Amendment 2026-11-04: invoice and signup link
+
+The owner's decision: Stripe cannot collect the event fee, so it is invoiced outside the console. The
+console holds no fee, price or invoice data. The requirement stands: one link, and the client finishes
+alone without asking anyone a question. This amendment replaces the parts of the record above that
+conflict with that, including the event fee and statuses of the amendment above, principle 4 and §5.
+
+**The path.** The invoice is paid. An operator creates a single-use signup link and sends it. The client
+signs in, enters the details and accepts the agreement. The build starts at once. No operator approves
+a request, and nothing holds it before the build.
+
+**What the link commits to.** A link is a capability an operator issues. It works once. It is not tied
+to an email address, so a forwarded link works, once, for the first person with a verified address who
+uses it. That person becomes the Owner of a new organization with one draft request. Anyone holding an
+unused link can do the same, and the controls on that are single use, expiry and revocation. A person
+who finds a link already used is told to ask for a new one. Each link makes one organization and one
+request, so a client's second event needs a second link and is a second organization.
+
+The record is `signup_links/{linkId}`, with no browser access. The token is 32 random bytes, stored only
+as its SHA-256, compared in constant time, and carried after `#` in the URL. A link expires 30 days
+after it is created, and an operator can revoke it while it is open. The URL appears once, in the answer
+that creates it. Using a link is one transaction, which creates the organization, the Owner and the
+draft and marks the link used. The same person repeating it gets the same organization and request.
+
+**Alternatives rejected.**
+
+- Open sign-up. Anyone could sign up unpaid and spend Google Cloud projects on CCM's billing account.
+- An email allowlist. An operator would have to learn the right address first, and a client who forwards
+  the link to whoever sets up the site would be locked out and have to ask.
+- Invoice number entry. The console would need invoice data to check a number against, and it holds none.
+
+**Migration path.** Creating a link is one function, `createLink(deps, { organizationName, by })` in
+`console/functions/src/signupLinks.cjs`. Automatic invoices, a later goal, call the same function when an
+invoice is paid and email the link. What the client does and the checks on the link stay the same.
+
+**Statuses.** `draft` → `approved` → `building` → `ready` → `launched`. Closed: `withdrawn` and `declined`.
+`awaiting_payment`, `submitted` and `changes_requested` are gone. Accepting the agreement freezes the
+answers and sets `approved`, and there is no going back to edit. A client can withdraw only a draft. An
+operator can decline only a draft, with a note, which frees the web-address name. The status page shows
+each change, and each one also sends an email.
+
+**Automatic build.** This replaces principle 4 and §5's approval step. Accepting the agreement starts
+the build. The start comes before any email, so a slow email cannot lose a build. A failed start does
+not undo the acceptance: the status page shows it, and the operators get a notice. No cloud resource
+exists before acceptance, and only a link an operator issued reaches acceptance, which is the control
+against cost and abuse. The project id and environment name come from the web-address name, and the
+folder, billing account and region from console settings.
+
+**Closed by default.** Sign-ups open only with a usable agreement, a folder, a billing account and a
+region, so nothing starts that cannot build. Until then no link can be created, and using a link or
+accepting the agreement refuses. The message to the operator names what is missing.
+
+**The public way in is gone.** No endpoint or page creates an organization or a request except a signup
+link. A person with no link is told that event sites start from one, and that a teammate joins from an
+invite email. Team invites do not change.
+
+**Second Owner.** The launch check stands. A client working alone can finish sign-up and the build
+without a second Owner.
+
+**A failed build ([#608](https://github.com/CenterCoopMedia/eventrunner/issues/608)).** While a request is
+`approved` or `building` and its build has failed, an Owner can reconnect the chosen ticket account, and
+only that one, and retry the build. The frozen answers stay frozen. Only the connection changes. The
+status page says the build did not finish and offers those steps, and the Owners get an email. It never
+shows the error or the run. A client cannot accept the agreement with a test-mode connection on a live
+console, because a build the console starts is a live build. A rehearsal console sets `CONSOLE_TEST_MODE`,
+which lets a test-mode connection through and starts its builds in test mode.
+
+**Ticket sales.** §4 and ADR 0004 stand. A client can still connect their own Stripe account or Eventbrite
+to sell tickets, with CCM's Stripe account as the Connect platform.
+
+**Prerequisites.** The folder, the billing account and the region are set in the console along with the
+agreement text before the first link. The event fee is no longer entered in the console.

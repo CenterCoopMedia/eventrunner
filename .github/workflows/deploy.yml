@@ -1,5 +1,9 @@
 name: Deploy
 
+# scripts/provision-client.cjs finds its own runs again by this title, so it
+# names the client and whether the run is a bootstrap. A push keeps its usual title.
+run-name: ${{ inputs.client && format('Deploy {0}{1}', inputs.client, inputs.bootstrap && ' (bootstrap)' || '') || github.event.head_commit.message }}
+
 # Caller workflow (spec §8.1). `${{ inputs.client }}` is populated only on
 # workflow_dispatch — a push-triggered run would evaluate it to the empty
 # string and silently bind no environment, so `resolve` is the one place

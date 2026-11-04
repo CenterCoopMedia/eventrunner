@@ -30,7 +30,7 @@ CI was green on #589 to #593 at the last check; the newer ones are running.
 waits on all of P4 to P10.
 - [ ] P4 Console foundation — can start now.
 - [x] P5 Guided setup — built on `ccr-7be41c6c-vyzsth-p5-setup`, on top of P4.
-- [ ] P6 Stripe and Eventbrite connections — blocked on prerequisites.
+- [x] P6 Stripe and Eventbrite connections — built on `console-connections`, against fakes. Live use needs the prerequisites.
 - [x] P7 Operator review — built on P4; waits for the P5 rebase.
 - [ ] P8 Provisioner — blocked on prerequisites.
 - [ ] P9 Custom web address and sender domain — can start now.
@@ -145,9 +145,11 @@ gets an adversarial review before it merges.
       shared validation, review and submit with rate limits, status page,
       client emails. Web unit, rules, handler and E2E tests.
       Done without the E2E spec; console/README.md has the endpoints.
-- [ ] P6 Connections: Stripe Connect OAuth and Eventbrite OAuth with the
+- [x] P6 Connections: Stripe Connect OAuth and Eventbrite OAuth with the
       event picker; tokens to console Secret Manager only; state binding;
       disconnect. Tests against fake OAuth servers.
+      Branch `console-connections`. No real provider has been called; P10's
+      live proof must check Stripe's token field and Eventbrite's `state`.
 - [x] P7 Operator review: queue, read, request changes, decline, approve
       with defaults from console settings; spam delete; 90-day retention.
       Branch `ccr-7be41c6c-vyzsth-p7-review`, on P4.

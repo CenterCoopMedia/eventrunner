@@ -11,9 +11,10 @@ rules_version = '2';
 //   - a member reads its own organization's applications, and an operator
 //     reads every application;
 //   - an operator reads the console audit log.
-// Invites, web-address names (checkWebAddress answers on the server), the
-// operator allowlist, the console settings and the rate limits have no
-// client access at all. Every read needs a verified email address.
+// Invites, signup links, web-address names (checkWebAddress answers on the
+// server), the operator allowlist, the console settings, the rate limits, and
+// the private parts of connected accounts have no client access at all. Every
+// read needs a verified email address.
 //
 // Tests: console/tests/console.rules.test.js (npm run test:rules).
 
@@ -62,6 +63,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Connected accounts (ADR 0007 §4). A member reads connection state on
+    // the application. The account ids and the half-finished connections
+    // stay here, for the functions only, operators included.
+    match /console_connections/{appId} {
+      allow read, write: if false;
+    }
+
+    // The build record: full detail for operators, through
+    // getApplicationForReview. A client sees only the status.
+    match /console_builds/{appId} {
+      allow read, write: if false;
+    }
+
+    match /console_connection_states/{stateHash} {
+      allow read, write: if false;
+    }
+
+    // Tokens of deleted requests, until they are deleted.
+    match /console_token_deletions/{appId} {
+      allow read, write: if false;
+    }
+
     match /site_names/{name} {
       allow read, write: if false;
     }
@@ -70,7 +93,19 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    match /console_config/{docId} {
+    // Includes console_config/agreement/versions/{version}.
+    match /console_config/{document=**} {
+      allow read, write: if false;
+    }
+
+    // The signed record of each acceptance (ADR 0007, amendment 2026-11-04).
+    match /agreement_acceptances/{id} {
+      allow read, write: if false;
+    }
+
+    // Signup links (ADR 0007, amendment 2026-11-04): a capability, for the
+    // functions only, operators included.
+    match /signup_links/{linkId} {
       allow read, write: if false;
     }
 

@@ -53,10 +53,10 @@ describe('callApi', () => {
       status: 400,
       json: async () => ({ error: { code: 'incomplete', message: 'Some answers need attention.', fields: { 'event.name': 'Enter the event name.' } } }),
     }));
-    const error = await callApi('submitApplication', {}).catch((err) => err);
+    const error = await callApi('acceptAgreement', {}).catch((err) => err);
     expect(error.fields).toEqual({ 'event.name': 'Enter the event name.' });
     vi.stubGlobal('fetch', async () => ({ ok: false, status: 409, json: async () => ({ error: { code: 'x', message: 'No.' } }) }));
-    expect((await callApi('submitApplication', {}).catch((err) => err)).fields).toEqual({});
+    expect((await callApi('acceptAgreement', {}).catch((err) => err)).fields).toEqual({});
   });
 
   it('gives a plain message when the network or the body fails', async () => {

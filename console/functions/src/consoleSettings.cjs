@@ -1,21 +1,26 @@
 'use strict';
 
 /**
- * Console settings and the build settings an approval records
- * (ADR 0007 §5).
+ * Console settings and the agreement (ADR 0007, amendment 2026-11-04), and the
+ * settings a build uses (§5).
  *
- * `console_config/settings` = { gcpFolder, billingAccount, region }. These
- * are the defaults for every approval. Operators edit them through
- * saveConsoleSettings; the browser never writes them.
+ * `console_config/settings` = { gcpFolder, billingAccount, region }, the values
+ * for every build. Operators edit them through saveConsoleSettings; the browser
+ * never writes them.
  *
- * An approval records `review.settings` =
- *   { gcpFolder, billingAccount, region, projectId, environment }.
- * The project id and the environment name are made from the web-address
- * name, so an operator approves with no typed value. The operator can
- * change any value, and every value is checked here.
+ * `console_config/agreement` is the current agreement, and
+ * `console_config/agreement/versions/{version}` keeps each version. A save
+ * makes a new version and never rewrites an old one. `sha256` is the hash
+ * of `title`, two line feeds and `body`.
+ *
+ * A build's settings are { gcpFolder, billingAccount, region, projectId,
+ * environment }. The project id and the environment name are made from the
+ * web-address name, so no value is typed, and every value is checked here.
  */
 
+const { createHash } = require('node:crypto');
 const { ConsoleError } = require('./http.cjs');
+const { toIso } = require('./access.cjs');
 const { requireOperator } = require('./reviewAccess.cjs');
 
 const FOLDER_RE = /^(?:folders\/)?(\d{6,20})$/;
@@ -69,9 +74,10 @@ function normalizeEnvironment(value) {
 }
 
 /**
- * The default project id for a web-address name: `er-<name>`, cut to 30
- * characters with no trailing hyphen, and made long enough. The result
- * always passes the project-id rules.
+ * The default project id for a web-address name: `er-<name>`. siteNames.cjs
+ * limits a name so this fits whole, so two names never share a project. Other
+ * text is cut and made long enough, and the result always passes the
+ * project-id rules.
  */
 function projectIdFor(name) {
   const safe = String(name || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -93,7 +99,7 @@ async function readConsoleSettings(db) {
   return { gcpFolder: text(data.gcpFolder), billingAccount: text(data.billingAccount), region: text(data.region) };
 }
 
-/** The approval values before any operator change. */
+/** The build values for a web-address name. */
 function approvalDefaults(settings, siteName) {
   return {
     gcpFolder: settings.gcpFolder,
@@ -133,10 +139,76 @@ function checkSettings(fields, defaults, overrides = {}) {
 
 const CONSOLE_FIELDS = Object.freeze(['gcpFolder', 'billingAccount', 'region']);
 const APPROVAL_FIELDS = Object.freeze([...CONSOLE_FIELDS, 'projectId', 'environment']);
+const AGREEMENT_TITLE_MAX = 200;
+const AGREEMENT_BODY_MAX = 200000;
+
+const SIGNUPS_CLOSED = 'This site is not taking sign-ups right now. We saved your answers. Try again later.';
+
+function signupsClosed() {
+  return new ConsoleError(409, 'signups-closed', SIGNUPS_CLOSED);
+}
+
+/** One line-ending form, no outer space, so the hash of a text is stable. */
+function cleanAgreementText(value) {
+  return typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : '';
+}
+
+function agreementHash(title, body) {
+  return createHash('sha256').update(`${title}\n\n${body}`, 'utf8').digest('hex');
+}
+
+/** The stored agreement, or null when any part is missing or the text no longer matches its hash. */
+function checkedAgreement(data) {
+  if (!data || !Number.isSafeInteger(data.version) || data.version < 1) return null;
+  const { version, title, body, sha256 } = data;
+  if (typeof title !== 'string' || !title || typeof body !== 'string' || !body) return null;
+  if (sha256 !== agreementHash(title, body)) return null;
+  return { version, title, body, sha256 };
+}
+
+function agreementRef(db) {
+  return db.collection('console_config').doc('agreement');
+}
+
+const CONSOLE_FIELD_WORDS = Object.freeze({
+  gcpFolder: 'the Google Cloud folder',
+  billingAccount: 'the billing account',
+  region: 'the region',
+});
+
+/**
+ * What a signup needs, read with `get` (a transaction's or the database's).
+ * `open` needs the agreement and every setting a build uses, so nothing starts
+ * that cannot build. `missing` names what is not set, for an operator.
+ *
+ * @returns {Promise<{ open: boolean, agreement: object|null, missing: string[] }>}
+ */
+async function readSignupTerms(get, db) {
+  const settings = await get(db.collection('console_config').doc('settings'));
+  const current = await get(agreementRef(db));
+  const values = settings.exists ? settings.data() : {};
+  const agreement = current.exists ? checkedAgreement(current.data()) : null;
+  const missing = [
+    ...CONSOLE_FIELDS.filter((field) => !NORMALIZERS[field](values[field])).map((field) => CONSOLE_FIELD_WORDS[field]),
+    ...(agreement ? [] : ['the agreement']),
+  ];
+  return { open: missing.length === 0, agreement, missing };
+}
+
+/** One saved version, checked as above, or null. */
+async function readAgreementVersion(get, db, version) {
+  const snap = await get(agreementRef(db).collection('versions').doc(String(version)));
+  return snap.exists ? checkedAgreement(snap.data()) : null;
+}
 
 async function getConsoleSettings({ db }, { user }) {
   await requireOperator(db, user);
-  return { body: { settings: await readConsoleSettings(db) } };
+  const current = await agreementRef(db).get();
+  const data = current.exists ? current.data() : null;
+  const agreement = data
+    ? { version: data.version, title: data.title, body: data.body, sha256: data.sha256, savedAt: toIso(data.savedAt) }
+    : null;
+  return { body: { settings: await readConsoleSettings(db), agreement } };
 }
 
 async function saveConsoleSettings({ db, now = Date.now }, { body, user }) {
@@ -151,9 +223,56 @@ async function saveConsoleSettings({ db, now = Date.now }, { body, user }) {
   return { body: { settings } };
 }
 
+function fieldError(field, message) {
+  const err = new ConsoleError(400, 'invalid-setting', message);
+  err.field = field;
+  return err;
+}
+
+/**
+ * Save the agreement as a new version. The same text saves nothing, so a
+ * second select does not make a version that clients must accept again.
+ */
+async function saveAgreement({ db, now = Date.now }, { body, user }) {
+  await requireOperator(db, user);
+  const input = body.agreement && typeof body.agreement === 'object' ? body.agreement : {};
+  const title = cleanAgreementText(input.title);
+  const content = cleanAgreementText(input.body);
+  if (!title || title.length > AGREEMENT_TITLE_MAX) {
+    throw fieldError('agreementTitle', `Enter a title of up to ${AGREEMENT_TITLE_MAX} characters.`);
+  }
+  if (!content || content.length > AGREEMENT_BODY_MAX) {
+    throw fieldError('agreementBody', `Enter the agreement text, up to ${AGREEMENT_BODY_MAX.toLocaleString('en-US')} characters.`);
+  }
+  const sha256 = agreementHash(title, content);
+  const at = new Date(now());
+  const ref = agreementRef(db);
+  const auditRef = db.collection('console_audit').doc();
+  const saved = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.exists ? snap.data() : null;
+    if (current?.sha256 === sha256) return { ...current, created: false };
+    const version = (Number.isSafeInteger(current?.version) ? current.version : 0) + 1;
+    const record = { version, title, body: content, sha256, savedAt: at, savedBy: user.uid };
+    // A create: when the version exists, the save fails and the old text stays.
+    tx.create(ref.collection('versions').doc(String(version)), record);
+    tx.set(ref, record);
+    tx.create(auditRef, { action: 'save-agreement', appId: null, by: user.uid, at, version });
+    return { ...record, created: true };
+  });
+  return {
+    body: {
+      created: saved.created,
+      agreement: { version: saved.version, title: saved.title, body: saved.body, sha256: saved.sha256, savedAt: toIso(saved.savedAt) },
+    },
+  };
+}
+
 module.exports = {
   APPROVAL_FIELDS,
   CONSOLE_FIELDS,
+  SIGNUPS_CLOSED,
+  agreementHash,
   approvalDefaults,
   checkSettings,
   environmentFor,
@@ -162,6 +281,10 @@ module.exports = {
   normalizeFolder,
   normalizeProjectId,
   projectIdFor,
+  readAgreementVersion,
   readConsoleSettings,
+  readSignupTerms,
+  saveAgreement,
   saveConsoleSettings,
+  signupsClosed,
 };

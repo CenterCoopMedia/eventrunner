@@ -67,7 +67,7 @@ export default function SignInFinish() {
       {address && !error ? <p role="status">Signing you in. This takes a moment.</p> : null}
       {!address ? (
         <form noValidate onSubmit={onSubmit} className="stack">
-          <p>You opened the link in a different browser. Enter the email address the link was sent to.</p>
+          <p>You opened the link in a different browser. Enter the email address the link was sent to. If you started from a signup link, open that link again here once you are signed in.</p>
           <div className="field">
             <label htmlFor="finish-email">Email address</label>
             <input

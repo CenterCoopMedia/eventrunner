@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
 import {
-  ANSWER_STEPS, STEPS, errorsOfStep, setupPath, statusPath, stepByPath,
+  ANSWER_STEPS, STEPS, errorsOfStep, openStepIds, setupPath, statusPath, stepById, stepByPath,
 } from '../../setup/steps.js';
 import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
+import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
 import EventStep from './EventStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
@@ -21,8 +22,8 @@ const STEP_VIEWS = {
   email: EmailStep,
 };
 
-/** The step list: where the reader is, and which steps are done. */
-function StepList({ step, progress, orgId, appId, onGo }) {
+/** The step list: where the reader is, which steps are done, and which are open now. */
+function StepList({ step, progress, open, orgId, appId, onGo }) {
   const done = STEPS.filter((s) => progress[s.id]).length;
   return (
     <nav aria-label="Setup steps" className="step-nav">
@@ -30,6 +31,17 @@ function StepList({ step, progress, orgId, appId, onGo }) {
       <ol className="steps" aria-describedby="step-progress">
         {STEPS.map((s, i) => {
           const current = s.id === step.id;
+          if (!open.includes(s.id)) {
+            return (
+              <li key={s.id}>
+                <span className="step-locked">
+                  <span className="step-number" aria-hidden="true">{progress[s.id] ? '✓' : i + 1}</span>
+                  <span>{s.title}</span>
+                  <span className="visually-hidden"> {progress[s.id] ? '(done)' : '(not open yet)'}</span>
+                </span>
+              </li>
+            );
+          }
           return (
             <li key={s.id} className={current ? 'current' : undefined}>
               <Link
@@ -65,7 +77,20 @@ function useApplication(orgId, appId) {
       .catch((err) => { if (live) setError(err.message); });
     return () => { live = false; };
   }, [orgId, appId]);
-  return { app, setApp, error };
+  const reload = useCallback(async () => {
+    setApp((await callApi('getApplication', { orgId, appId })).application);
+  }, [orgId, appId]);
+  return { app, setApp, error, reload };
+}
+
+/** The application with one step's errors replaced by the server's new ones. */
+function withStepErrors(app, step, stepErrors) {
+  const others = Object.fromEntries(Object.entries(app.errors).filter(([path]) => !(path === step || path.startsWith(`${step}.`))));
+  return {
+    ...app,
+    errors: { ...others, ...stepErrors },
+    progress: { ...app.progress, [step]: Object.keys(stepErrors).length === 0 },
+  };
 }
 
 /**
@@ -79,7 +104,7 @@ export default function Setup() {
   const navigate = useNavigate();
   const location = useLocation();
   const step = stepByPath(stepPath);
-  const { app, setApp, error } = useApplication(orgId, appId);
+  const { app, setApp, error, reload } = useApplication(orgId, appId);
   const [touched, setTouched] = useState(() => new Set());
   // Steps whose last save the server refused (saved: false), for example a
   // taken web address. The server keeps the older answer, so the review
@@ -94,11 +119,7 @@ export default function Setup() {
         const others = prev.filter((id) => id !== result.step);
         return result.saved === false ? [...others, result.step] : others;
       });
-      setApp((prev) => {
-        const others = Object.fromEntries(Object.entries(prev.errors).filter(([path]) => !(path === result.step || path.startsWith(`${result.step}.`))));
-        const errors = { ...others, ...result.errors };
-        return { ...prev, errors, progress: { ...prev.progress, [result.step]: Object.keys(result.errors).length === 0 } };
-      });
+      setApp((prev) => withStepErrors(prev, result.step, result.errors));
     },
   });
 
@@ -113,10 +134,12 @@ export default function Setup() {
     queue({ step: step.id, answers: value });
   }, [step, touch, setApp, queue]);
 
+  const onConnections = useCallback(({ connections, errors }) => {
+    setApp((prev) => ({ ...withStepErrors(prev, 'tickets', errors), connections }));
+  }, [setApp]);
+
   const onOwnersNeeded = useCallback((ownersNeeded) => {
-    setApp((prev) => (prev.ownersNeeded === ownersNeeded ? prev : {
-      ...prev, ownersNeeded, progress: { ...prev.progress, team: ownersNeeded === 0 },
-    }));
+    setApp((prev) => (prev.ownersNeeded === ownersNeeded ? prev : { ...prev, ownersNeeded }));
   }, [setApp]);
 
   // With ?check=1 the first field with an error takes the focus, once for
@@ -141,10 +164,12 @@ export default function Setup() {
   if (error) return <p className="message error" role="alert">{error}</p>;
   if (!app) return <p role="status">Loading your setup.</p>;
   if (!app.canEdit) return <Navigate to={statusPath(orgId, appId)} replace />;
+  const open = openStepIds(app, refused);
+  if (!open.includes(step.id)) return <Navigate to={setupPath(orgId, appId, stepById(open.at(-1)))} replace />;
 
   const index = STEPS.indexOf(step);
-  const previous = STEPS[index - 1];
-  const next = STEPS[index + 1];
+  const previous = open.includes(STEPS[index - 1]?.id) ? STEPS[index - 1] : null;
+  const next = open.includes(STEPS[index + 1]?.id) ? STEPS[index + 1] : null;
   const View = STEP_VIEWS[step.id];
   const shownErrors = visibleErrors(stepErrors, touched, showAll);
 
@@ -153,6 +178,7 @@ export default function Setup() {
       <StepList
         step={step}
         progress={app.progress}
+        open={open}
         orgId={orgId}
         appId={appId}
         onGo={(e, target) => { e.preventDefault(); go(target); }}
@@ -160,12 +186,6 @@ export default function Setup() {
       <section className="step-body" aria-labelledby="step-title">
         <p className="muted">Step {index + 1} of {STEPS.length}</p>
         <h1 id="step-title" tabIndex={-1}>{step.title}</h1>
-        {app.status === 'changes_requested' && app.note ? (
-          <aside className="note" role="note">
-            <p className="note-title">The hosting team asked for changes</p>
-            <p className="pre">{app.note}</p>
-          </aside>
-        ) : null}
         {View ? (
           <View
             value={app.answers[step.id]}
@@ -173,7 +193,11 @@ export default function Setup() {
             errors={shownErrors}
             onChange={onChange}
             onBlur={touch}
+            app={app}
+            orgId={orgId}
             appId={appId}
+            flush={flush}
+            onConnections={onConnections}
           />
         ) : null}
         {step.id === 'team' ? <TeamStep orgId={orgId} onOwnersNeeded={onOwnersNeeded} /> : null}
@@ -186,8 +210,15 @@ export default function Setup() {
             refusedSteps={refused}
             orgId={orgId}
             appId={appId}
-            flush={flush}
-            onSubmitted={() => navigate(statusPath(orgId, appId))}
+          />
+        ) : null}
+        {step.id === 'agreement' ? (
+          <AgreementStep
+            app={app}
+            orgId={orgId}
+            appId={appId}
+            onRefresh={reload}
+            onAccepted={(result) => navigate(statusPath(orgId, appId), { state: { copyFailed: result.copySent === false } })}
           />
         ) : null}
         <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>
