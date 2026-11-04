@@ -69,7 +69,8 @@ function canRetryBuild(app, build, at) {
 /** What a client may know: never the error text, the run address or the step detail. */
 function buildForClient(app, build, at, { testMode = false } = {}) {
   const failed = canRetryBuild(app, build, at);
-  const ticketsFailed = build?.state === 'failed' && build.failedStep === TICKETS_STEP;
+  // A retry whose dispatch failed leaves the record `queued`, with the failed step still on it.
+  const ticketsFailed = build?.failedStep === TICKETS_STEP;
   // The same check a retry makes, so the page offers a way out of every connection refusal.
   const refused = Boolean(connectionProblem(reviewedAnswers(app)?.tickets?.choice, app.connections, { testMode }));
   return { failed, needsReconnect: failed && (ticketsFailed || refused) };

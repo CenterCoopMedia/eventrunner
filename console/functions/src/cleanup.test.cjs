@@ -291,6 +291,19 @@ test('the retention job clears connection states nobody came back for', async ()
   assert.deepEqual(db.paths('console_connection_states/'), ['console_connection_states/open']);
 });
 
+test('a spam delete keeps the accounts an earlier close left to end', async () => {
+  const connected = [{ provider: 'stripe', accountId: 'acct_client1' }];
+  const db = seeded({
+    'applications/a1': application({ status: 'declined' }),
+    'console_token_deletions/a1': { connected, at: new Date(NOW) },
+  });
+  const stripe = makeFakeConnector();
+  const secrets = makeFakeSecrets();
+  await deleteSpamApplication(deps(db, { secrets, connectors: { stripe, eventbrite: null } }), { body: { appId: 'a1', confirm: true }, user: ops });
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.equal(db.read('console_token_deletions/a1'), undefined);
+});
+
 test('a spam delete removes the stored tokens, and an approved request keeps them', async () => {
   const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
   const approved = seeded({ 'applications/a1': application({ status: 'approved' }) });

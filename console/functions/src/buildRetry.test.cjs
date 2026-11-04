@@ -200,6 +200,7 @@ test('a client hears only that the build failed and whether the ticket account i
   const failed = { status: 'building', buildStart: { state: 'started', at: new Date(NOW) } };
   assert.deepEqual(buildForClient(failed, { state: 'failed', failedStep: 'tickets', error: 'x' }, NOW), { failed: true, needsReconnect: true });
   assert.deepEqual(buildForClient(failed, { state: 'failed', failedStep: 'domain' }, NOW), { failed: true, needsReconnect: false });
+  assert.deepEqual(buildForClient({ ...failed, buildStart: { state: 'failed', at: new Date(NOW) } }, { state: 'queued', failedStep: 'tickets' }, NOW), { failed: true, needsReconnect: true }, 'a retry whose dispatch failed keeps the way to reconnect');
   assert.deepEqual(buildForClient(failed, { state: 'running', failedStep: 'tickets' }, NOW), { failed: false, needsReconnect: false });
   assert.deepEqual(buildForClient({ status: 'approved', buildStart: { state: 'failed', at: new Date(NOW) } }, null, NOW), { failed: true, needsReconnect: false });
   const rehearsed = {

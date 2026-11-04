@@ -460,9 +460,12 @@ async function deleteStoredConnection({ secrets }, appId, provider) {
  * caller then calls recordTokenDeletion with the result, after its other reads.
  */
 async function readConnectedAccounts(tx, db, appId) {
-  const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
-  return PROVIDERS.filter((provider) => accounts[provider]?.accountId)
+  const [row, pending] = await Promise.all([tx.get(accountsRef(db, appId)), tx.get(db.collection(DELETION_COLLECTION).doc(appId))]);
+  const accounts = accountsOf(row);
+  const connected = PROVIDERS.filter((provider) => accounts[provider]?.accountId)
     .map((provider) => ({ provider, accountId: accounts[provider].accountId }));
+  // Closing moved its accounts to a deletion row, and a later delete must not lose them.
+  return [...(pending.exists ? pending.data().connected || [] : []), ...connected];
 }
 
 /** The same transaction: leave a row, so its tokens are still found when the request is gone. */
