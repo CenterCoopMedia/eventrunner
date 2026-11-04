@@ -36,6 +36,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The guided setup in the client console (ADR 0007 §3, P5). An Owner
+  starts a request for an event site from the organization page. The
+  client answers seven steps, one per page at its own address, with a
+  step list, Back and Next, and each answer saves as the client types.
+  The event answers are checked with the shared rules that
+  `init-event.cjs` uses. The web-address step shows
+  `name.eventrunner.org` and says at once if the name is taken; a saved
+  name is reserved, so two requests never hold one name. The tickets
+  step records the choice only. **Create my site** needs every answer
+  and two Owners. It freezes the answers and emails the Owners and the
+  CCM operators. The status page shows the plain stages, the note when
+  the hosting team asks for changes, and **Withdraw**. An organization
+  can have three open requests, and one account can send five a day.
+  `scripts/prepare-functions.cjs` now vendors the shared package into
+  `console/functions` too, with its own lockfile.
 - **Settings → Web address** (ADR 0007 §8, P9a): an operator adds a custom
   web address. The new `webAddress` function asks Firebase Hosting for the
   domain and shows the records to add; **Check now** and the hourly

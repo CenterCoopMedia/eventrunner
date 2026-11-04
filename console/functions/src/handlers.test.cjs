@@ -28,10 +28,10 @@ test('the deploy barrel exports the same endpoints', () => {
   assert.deepEqual(Object.keys(barrel).sort(), Object.keys(ENDPOINTS).sort());
 });
 
-test('only inviteMember needs the mail secret', () => {
+test('only the endpoints that send email need the mail secret', () => {
   assert.deepEqual(
     Object.entries(ENDPOINTS).filter(([, spec]) => spec.mail).map(([name]) => name),
-    ['inviteMember'],
+    ['inviteMember', 'submitApplication', 'withdrawApplication'],
   );
 });
 

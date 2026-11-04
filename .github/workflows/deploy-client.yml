@@ -188,6 +188,10 @@ jobs:
         with:
           name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
+      - name: Copy the shared tarball to every functions vendor folder
+        # The root npm ci installs every workspace, and each one that
+        # vendors the shared package needs its own copy.
+        run: node scripts/prepare-functions.cjs --copy
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -225,6 +229,10 @@ jobs:
         with:
           name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
+      - name: Copy the shared tarball to every functions vendor folder
+        # The root npm ci installs every workspace, and each one that
+        # vendors the shared package needs its own copy.
+        run: node scripts/prepare-functions.cjs --copy
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -323,6 +331,10 @@ jobs:
           # it the install cannot resolve the tree.
           name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
+      - name: Copy the shared tarball to every functions vendor folder
+        # The root npm ci installs every workspace, and each one that
+        # vendors the shared package needs its own copy.
+        run: node scripts/prepare-functions.cjs --copy
       - name: Authenticate to Google Cloud (Workload Identity Federation)
         uses: google-github-actions/auth@v2
         with:
@@ -550,6 +562,10 @@ jobs:
         with:
           name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
+      - name: Copy the shared tarball to every functions vendor folder
+        # The root npm ci installs every workspace, and each one that
+        # vendors the shared package needs its own copy.
+        run: node scripts/prepare-functions.cjs --copy
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -585,6 +601,10 @@ jobs:
         with:
           name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
+      - name: Copy the shared tarball to every functions vendor folder
+        # The root npm ci installs every workspace, and each one that
+        # vendors the shared package needs its own copy.
+        run: node scripts/prepare-functions.cjs --copy
       - uses: actions/download-artifact@v4
         with:
           name: generated-content-${{ inputs.client }}
@@ -748,6 +768,10 @@ jobs:
         with:
           name: shared-tgz-${{ inputs.client }}
           path: functions/vendor
+      - name: Copy the shared tarball to every functions vendor folder
+        # The root npm ci installs every workspace, and each one that
+        # vendors the shared package needs its own copy.
+        run: node scripts/prepare-functions.cjs --copy
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}

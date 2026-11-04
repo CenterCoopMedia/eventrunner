@@ -145,6 +145,21 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The guided setup in the client console (ADR 0007 §3, P5). An Owner
+          starts a request for an event site from the organization page. The
+          client answers seven steps, one per page at its own address, with a
+          step list, Back and Next, and each answer saves as the client types.
+          The event answers are checked with the shared rules that
+          <code>init-event.cjs</code> uses. The web-address step shows
+          <code>name.eventrunner.org</code> and says at once if the name is taken; a saved
+          name is reserved, so two requests never hold one name. The tickets
+          step records the choice only. <strong>Create my site</strong> needs every answer
+          and two Owners. It freezes the answers and emails the Owners and the
+          CCM operators. The status page shows the plain stages, the note when
+          the hosting team asks for changes, and <strong>Withdraw</strong>. An organization
+          can have three open requests, and one account can send five a day.
+          <code>scripts/prepare-functions.cjs</code> now vendors the shared package into
+          <code>console/functions</code> too, with its own lockfile.</li>
           <li><strong>Settings → Web address</strong> (ADR 0007 §8, P9a): an operator adds a custom
           web address. The new <code>webAddress</code> function asks Firebase Hosting for the
           domain and shows the records to add; <strong>Check now</strong> and the hourly

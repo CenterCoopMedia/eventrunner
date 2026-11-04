@@ -1126,3 +1126,4 @@ Check after the first deploy:
 - Sign in at `https://console.eventrunner.org` with each of the three methods.
 - Make a test organization, invite a second address, and accept the invite from that address.
 - Sign in as an operator and confirm that the home page lists every organization.
+- With two Owners on the test organization, answer the guided setup and select **Create my site**. Confirm that the Owners and each operator get an email, and that the status page says "We are reviewing your request". Then withdraw the test request.

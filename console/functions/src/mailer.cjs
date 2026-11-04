@@ -5,7 +5,14 @@
  * with this interface, so tests pass a fake and make no network call:
  *
  *   mailer.sendInvite({ to, organizationName, inviterEmail, role, link, expiresInDays })
- *     -> Promise<void>, rejects when the provider refuses the message
+ *   mailer.sendStatusChange({ to, organizationName, eventName, status, link, note })
+ *     to a client Owner, when the status of a request changes (ADR 0007 §3)
+ *   mailer.sendOperatorNotice({ to, organizationName, eventName, link })
+ *     to a CCM operator, when a client sends a request
+ *
+ * Each returns Promise<void> and rejects when the provider refuses the
+ * message. `link` may be '' when the console address is not set; the
+ * message then has no link.
  *
  * The real mailer is Postmark. Its server token is the console project's
  * own secret, CONSOLE_POSTMARK_TOKEN, never a client project's.
@@ -44,42 +51,96 @@ function inviteMessage({ organizationName, inviterEmail, role, link, expiresInDa
 }
 
 /**
+ * What the client reads for each status (ADR 0007 §3 and §5). The first
+ * line is the status as the status page says it.
+ */
+const STATUS_WORDS = Object.freeze({
+  submitted: { subject: 'We received your request', line: 'We are reviewing your request. We will email you when it changes.' },
+  changes_requested: { subject: 'Your request needs changes', line: 'We need some changes to your request. Open it to see the note and make the changes.' },
+  approved: { subject: 'We approved your request', line: 'We approved your request. We are building your site.' },
+  building: { subject: 'We are building your site', line: 'We are building your site.' },
+  ready: { subject: 'Your site is ready', line: 'Your site is ready.' },
+  launched: { subject: 'Your site is open to the public', line: 'Your site is open to the public.' },
+  withdrawn: { subject: 'Your request was withdrawn', line: 'An Owner withdrew your request. We will not build this site.' },
+  declined: { subject: 'We cannot build this site', line: 'We cannot build this site. Read the note for the reason.' },
+});
+
+/** Text and HTML from paragraphs, with an optional link paragraph. */
+function compose(subject, paragraphs, link, linkText) {
+  const textParts = [...paragraphs];
+  if (link) textParts.push(`${linkText}:\n${link}`);
+  const htmlParts = paragraphs.map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`);
+  if (link) htmlParts.push(`<p><a href="${escapeHtml(link)}">${escapeHtml(linkText)}</a></p>`);
+  return { subject, text: `${textParts.join('\n\n')}\n`, html: htmlParts.join('\n') };
+}
+
+/** @returns {{ subject: string, text: string, html: string }} */
+function statusChangeMessage({ organizationName, eventName, status, link, note }) {
+  const words = STATUS_WORDS[status];
+  if (!words) throw new TypeError(`statusChangeMessage: unknown status ${status}`);
+  const paragraphs = [`${organizationName}: ${eventName}`, words.line];
+  if (note) paragraphs.push(`Note from the hosting team:\n${note}`);
+  return compose(`${words.subject}: ${eventName}`, paragraphs, link, 'Open your request');
+}
+
+/** @returns {{ subject: string, text: string, html: string }} */
+function operatorNoticeMessage({ organizationName, eventName, link }) {
+  return compose(
+    `New request: ${eventName} from ${organizationName}`,
+    [`${organizationName} sent a request for a site for ${eventName}.`, 'Review the answers in the console.'],
+    link,
+    'Open the request',
+  );
+}
+
+/**
  * @param {{ token: string, from: string, fetch: typeof globalThis.fetch }} deps
  */
 function createPostmarkMailer({ token, from, fetch }) {
   if (typeof token !== 'string' || !token) throw new TypeError('createPostmarkMailer: token is required');
   if (typeof from !== 'string' || !from) throw new TypeError('createPostmarkMailer: from is required');
-  return {
-    async sendInvite(invite) {
-      const message = inviteMessage(invite);
-      const response = await fetch(POSTMARK_URL, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-Postmark-Server-Token': token,
-        },
-        body: JSON.stringify({
-          From: from,
-          To: invite.to,
-          Subject: message.subject,
-          TextBody: message.text,
-          HtmlBody: message.html,
-          MessageStream: 'outbound',
-          Tag: 'console-invite',
-        }),
-      });
-      if (!response.ok) {
-        let code = '';
-        try {
-          code = ` (code ${(await response.json()).ErrorCode})`;
-        } catch {
-          code = '';
-        }
-        throw new Error(`Postmark refused the invite email: HTTP ${response.status}${code}`);
+
+  async function send(to, message, tag, what) {
+    const response = await fetch(POSTMARK_URL, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Postmark-Server-Token': token,
+      },
+      body: JSON.stringify({
+        From: from,
+        To: to,
+        Subject: message.subject,
+        TextBody: message.text,
+        HtmlBody: message.html,
+        MessageStream: 'outbound',
+        Tag: tag,
+      }),
+    });
+    if (!response.ok) {
+      let code = '';
+      try {
+        code = ` (code ${(await response.json()).ErrorCode})`;
+      } catch {
+        code = '';
       }
-    },
+      throw new Error(`Postmark refused the ${what} email: HTTP ${response.status}${code}`);
+    }
+  }
+
+  return {
+    sendInvite: (invite) => send(invite.to, inviteMessage(invite), 'console-invite', 'invite'),
+    sendStatusChange: (change) => send(change.to, statusChangeMessage(change), 'console-status', 'status'),
+    sendOperatorNotice: (notice) => send(notice.to, operatorNoticeMessage(notice), 'console-operator', 'operator notice'),
   };
 }
 
-module.exports = { createPostmarkMailer, inviteMessage, ROLE_WORDS };
+module.exports = {
+  createPostmarkMailer,
+  inviteMessage,
+  operatorNoticeMessage,
+  statusChangeMessage,
+  ROLE_WORDS,
+  STATUS_WORDS,
+};
