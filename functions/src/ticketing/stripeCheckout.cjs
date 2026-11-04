@@ -6,7 +6,7 @@ const {
 } = require('shared/ticketCommerce');
 const { answeredQuestions, checkAnswers, readRegistrationForm } = require('shared/registrationForm');
 const { verifyAuthToken } = require('../core/auth.cjs');
-const { promoRef } = require('./promoCodes.cjs');
+const { promoRef, takePromoCheck } = require('./promoCodes.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, methodNotAllowed } = require('../core/errors.cjs');
 const {
@@ -510,6 +510,7 @@ function createTicketingCheckoutHandler(deps) {
       const actor = await verifiedPurchaser(deps.auth, req);
       const parsed = validateCheckoutRequest(req.body);
       if (!parsed.ok) throw new CommerceError('invalid-checkout', parsed.issues[0].message, 400);
+      if (parsed.value.promoCode) await takePromoCheck({ db: deps.db, uid: actor.uid, at: (deps.now || (() => new Date()))() });
       const reserved = await reserveCommerceOrder({ ...deps, actor, request: parsed.value });
       let order = reserved.order;
       if (order.totalAmount > 0 && order.status === 'pending') {

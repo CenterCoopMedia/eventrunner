@@ -382,9 +382,13 @@ tickets; the order has too many discounted tickets; the code has no uses left (4
 change under a race).
 
 **Preview.** `ticketingPromoPreview` prices a cart with a code before checkout, for the review
-step. It needs a signed-in, verified account, reads without writing an order, and allows 20
-checks per account in 15 minutes. The reservation checks the code again; the preview is only
-a display.
+step. It needs a signed-in, verified account and reads without writing an order. The
+reservation checks the code again; the preview is only a display.
+
+**Check budget.** Each account has 20 code checks in 15 minutes, shared by the preview and by
+checkout with a code. A check is spent in its own transaction before the code is read: a
+refused code rolls back every write in the reservation, so only a separate write makes a
+failed guess count. Without the shared budget, checkout would answer guesses with no limit.
 
 **Request.** The checkout request gains an optional `promoCode`. It joins the request
 fingerprint only when present, so the same request ID with a different code is a different

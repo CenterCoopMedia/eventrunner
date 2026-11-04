@@ -9,10 +9,12 @@ const { randomUUID } = require('node:crypto');
 const { normalizePromoCode } = require('shared/ticketCommerce');
 const { validatePromoCode } = require('shared/promoCodes');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
-const { CATALOG, CURRENT, CommerceError, iso } = require('./stripeCommerce.cjs');
+const { CATALOG, CURRENT, INVENTORY, CommerceError, orderIdFor, iso, millis } = require('./stripeCommerce.cjs');
 
 const PROMO_CODES = 'ticket_promo_codes';
 const MAX_LISTED = 200;
+const MAX_CHECKS = 20;
+const CHECK_WINDOW_MS = 15 * 60 * 1000;
 
 function promoRef(db, code) {
   return db.collection(PROMO_CODES).doc(code);
@@ -28,6 +30,31 @@ function releasedPromoUse(snap, order, at) {
   if (!order.promo?.code || !snap?.exists) return null;
   const used = Number.isSafeInteger(snap.data().used) ? snap.data().used : 0;
   return { used: Math.max(0, used - (order.promo.discountedSeats || 0)), updatedAt: at };
+}
+
+/**
+ * Spend one of the account's code checks, in its own transaction, before the
+ * code is read: a refused code rolls back every write in the reservation, so
+ * only a separate write makes failed guesses count. Checkout and the preview
+ * share the budget, so neither answers guesses without a limit.
+ */
+async function takePromoCheck({ db, uid, at }) {
+  const ref = db.collection(INVENTORY).doc(`promo_checks_${orderIdFor(uid, 'promo-checks').slice(4)}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    let windowStart = millis(snap.data()?.windowStart);
+    let checks = snap.data()?.checks;
+    if (!Number.isFinite(windowStart) || !Number.isSafeInteger(checks) || at.getTime() - windowStart >= CHECK_WINDOW_MS) {
+      windowStart = at.getTime();
+      checks = 0;
+    }
+    if (checks >= MAX_CHECKS) {
+      const error = new CommerceError('rate-limited', 'You have checked too many codes. Try again later.', 429);
+      error.retryAfterSeconds = Math.max(1, Math.ceil((windowStart + CHECK_WINDOW_MS - at.getTime()) / 1000));
+      throw error;
+    }
+    tx.set(ref, { windowStart: new Date(windowStart), checks: checks + 1, updatedAt: at });
+  });
 }
 
 async function requireWrites(db, tx) {
@@ -106,5 +133,6 @@ async function deletePromoCode({ db, actor, body, now }) {
 }
 
 module.exports = {
-  PROMO_CODES, promoRef, releasedPromoUse, listPromoCodes, savePromoCode, deletePromoCode,
+  PROMO_CODES, MAX_CHECKS, CHECK_WINDOW_MS,
+  promoRef, releasedPromoUse, takePromoCheck, listPromoCodes, savePromoCode, deletePromoCode,
 };

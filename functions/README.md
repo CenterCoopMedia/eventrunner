@@ -203,8 +203,8 @@ Postmark announcement stream before a preview or an approval.
 a verified purchaser and computes prices/capacity on the server.
 `ticketingOrderStatus` accepts GET/POST for the owning verified purchaser only.
 `ticketingPromoPreview` accepts POST from a verified purchaser and prices a cart with
-a promo code, with no order and no use written; it allows 20 checks per account in
-15 minutes. Each is a domain factory in `src/ticketing/stripeCheckout.cjs` (the
+a promo code, with no order and no use written. It and checkout with a code share 20
+code checks per account in 15 minutes. Each is a domain factory in `src/ticketing/stripeCheckout.cjs` (the
 preview in `promoPreview.cjs`), with deploy wiring in `commerceHttp.cjs`. Promo code
 records and the admin actions are in `promoCodes.cjs`. The SDK is pinned to Stripe 23.0.0; changing it requires
 checking the Checkout request and response contract again.

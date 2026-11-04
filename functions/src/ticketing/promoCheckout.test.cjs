@@ -102,3 +102,18 @@ test('a discount below the card minimum is refused before anything is reserved',
   assert.equal(res.body.error.code, 'amount-too-small');
   assert.equal(db.read('ticket_promo_codes', 'EARLY').used, 0);
 });
+
+test('checkout and the preview share one budget of code checks, failed guesses included', async () => {
+  const { MAX_CHECKS } = require('./promoPreview.cjs').internals;
+  const { deps, db } = setup({ seed: withCode() });
+  for (let i = 0; i < MAX_CHECKS; i += 1) {
+    const guess = await checkout(deps, request({ promoCode: `GUESS${i}`, requestId: `checkout-guess-${String(i).padStart(10, '0')}` }));
+    assert.equal(guess.body.error.code, 'promo-invalid');
+  }
+  const limited = await checkout(deps, request({ promoCode: 'EARLY' }));
+  assert.equal(limited.statusCode, 429);
+  assert.equal(limited.body.error.code, 'rate-limited');
+  assert.equal(db.ids('ticket_orders').length, 0);
+  // A checkout with no code is not a code check.
+  assert.equal((await checkout(deps, request())).statusCode, 200);
+});
