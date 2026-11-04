@@ -26,6 +26,7 @@
 const { ConsoleError } = require('./http.cjs');
 const { toMillis } = require('./access.cjs');
 const { NOT_FOUND, applicationRef, readApplication, requireAppId, requireOperator } = require('./reviewAccess.cjs');
+const { readBuild } = require('./buildState.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { connectionChanging } = require('./connectionState.cjs');
 const {
@@ -52,7 +53,8 @@ async function deleteWithConnections(deps, spec) {
 
 /**
  * Delete one request in a transaction, after `check(app)` passes on the
- * request as it is now. Frees every name it holds.
+ * request as it is now. Frees every name it holds, unless a run began: that
+ * run may have made the name's project, and Google never reuses a project id.
  *
  * @returns {Promise<object[]|null>} its connected accounts, or null when `check` says to keep it
  */
@@ -65,9 +67,10 @@ async function deleteApplication(db, { appId, by, action, at, check }) {
     if (!check(app)) return null;
     const held = await heldNames(tx, db, app.id);
     const connected = await readConnectedAccounts(tx, db, app.id);
+    const build = await readBuild((r) => tx.get(r), db, app.id);
     tx.delete(ref);
     tx.delete(db.collection(ACCOUNT_COLLECTION).doc(app.id));
-    releaseNames(tx, db, held);
+    if (!build) releaseNames(tx, db, held);
     tx.create(db.collection('console_audit').doc(), { action, appId: app.id, by, at });
     recordTokenDeletion(tx, db, app.id, connected, at);
     return connected;

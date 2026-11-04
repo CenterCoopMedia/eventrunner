@@ -160,7 +160,8 @@ async function closeApplication(deps, { body, user }) {
       review: { note, by: user.uid, at, settings: null },
     });
     tx.delete(db.collection(ACCOUNT_COLLECTION).doc(appId));
-    releaseNames(tx, db, held);
+    // A run may have made the name's project, and Google never reuses a project id, so nobody could build it again.
+    if (!build) releaseNames(tx, db, held);
     tx.create(db.collection('console_audit').doc(), { action: 'close-request', appId, by: user.uid, at });
     recordTokenDeletion(tx, db, appId, accounts, at);
     return { app: current, connected: accounts };

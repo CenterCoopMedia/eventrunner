@@ -110,7 +110,7 @@ A status email that fails is logged and does not undo the change. The status pag
 | `listApplicationsForReview` | Operators | Lists requests with one status, newest change first, with the organization name. |
 | `getApplicationForReview` | Operators | One request: its `revision`, the frozen answers, the history, the team and its open invites, the ticket choice, the connection state and the build record. |
 | `declineApplication` | Operators | `draft` to `declined`. Needs a note of at most 2,000 characters. Frees the web-address name. Emails the Owners. |
-| `closeApplication` | Operators | Closes an accepted request once no run is alive, with a note: it becomes `declined`, frees its name, disconnects its accounts, and writes an audit record. It removes nothing a run made. |
+| `closeApplication` | Operators | Closes an accepted request once no run is alive, with a note: it becomes `declined`, disconnects its accounts, and writes an audit record. It frees its name only if no run ever began, because a run may have made the name's project. It removes nothing a run made. |
 | `deleteSpamApplication` | Operators | Deletes a request that is not approved, frees its name, and writes an audit record. Needs `confirm: true`. |
 | `retryBuild` | Owners and operators | Runs a failed build again. An Owner has a daily limit. A build that has not failed gets `409 not-retryable`, and a ticket account that is gone, in test mode or being changed gets `409 connection-needed`. |
 | `createSignupLink` | Operators | Makes a signup link for an organization name. The answer holds the only copy of its URL. See "Signup links". |

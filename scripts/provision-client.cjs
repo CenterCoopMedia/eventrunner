@@ -735,8 +735,9 @@ async function stripeEndpoint(ctx, token, notes) {
   const listed = await call(ctx, 'read the payment webhooks', `${STRIPE}/webhook_endpoints?limit=100`, { headers, quiet: true });
   const existing = (listed.data || []).filter((endpoint) => endpoint.url === url);
   const secret = await ctx.clientSecrets.readSecret(WEBHOOK_SECRET);
+  // Stripe shows a signing secret once, so only the endpoint recorded with it is known to match.
   const good = secret && existing.find((endpoint) => (
-    endpoint.status === 'enabled' && WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
+    endpoint.id === ctx.stripeEndpointId && endpoint.status === 'enabled' && WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
   ));
   if (good) {
     await putClientSecret(ctx, WEBHOOK_SECRET, secret);
@@ -750,6 +751,8 @@ async function stripeEndpoint(ctx, token, notes) {
   const created = await call(ctx, 'create the payment webhook', `${STRIPE}/webhook_endpoints`, { method: 'POST', headers, form, quiet: true });
   if (!created.secret) throw new Error('create the payment webhook: the answer held no signing secret');
   await putClientSecret(ctx, WEBHOOK_SECRET, created.secret);
+  ctx.stripeEndpointId = created.id;
+  await ctx.recordRef.update({ stripeEndpointId: created.id });
   notes.push('created the payment webhook');
 }
 
@@ -1191,6 +1194,7 @@ async function provision({ appId, testMode = false, deps }) {
     ownersEmailedAt: previous.exists ? previous.data().ownersEmailedAt || null : null,
     ticketsKey: previous.exists ? previous.data().ticketsKey || null : null,
     ticketsChangedAt: previous.exists ? previous.data().ticketsChangedAt || null : null,
+    stripeEndpointId: previous.exists ? previous.data().stripeEndpointId || null : null,
   };
   // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
   // closed after this sees a live run and is refused.
@@ -1210,6 +1214,7 @@ async function provision({ appId, testMode = false, deps }) {
       ownersEmailedAt: ctx.ownersEmailedAt,
       ticketsKey: ctx.ticketsKey,
       ticketsChangedAt: ctx.ticketsChangedAt,
+      stripeEndpointId: ctx.stripeEndpointId,
       environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
     });
     tx.update(ref, { buildStart: { state: 'started', at } });

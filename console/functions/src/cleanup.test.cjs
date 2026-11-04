@@ -74,6 +74,14 @@ test('the retention job deletes old withdrawn and declined requests, frees their
   assert.equal(db.read('site_names/nclocal'), undefined);
   assert.equal(db.read('site_names/gone'), undefined);
   for (const id of ['recent', 'kept', 'draft']) assert.ok(db.read(`applications/${id}`), id);
+  // A run may have made this name's project, so it stays taken after the request goes.
+  const built = seeded({
+    'applications/a1': application({ status: 'declined', updatedAt: old }),
+    'console_builds/a1': { state: 'failed' },
+  });
+  await runRetention({ db: built, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
+  assert.equal(built.read('applications/a1'), undefined);
+  assert.ok(built.read('site_names/nclocal'));
   assert.deepEqual(auditRows(db).map((r) => [r.action, r.appId, r.by]).sort(), [
     ['retention-delete', 'a1', 'retention'],
     ['retention-delete', 'w1', 'retention'],

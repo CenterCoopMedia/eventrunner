@@ -303,7 +303,8 @@ function fakeCloud(options = {}) {
       return answer({});
     }
     const params = new URLSearchParams(body);
-    const created = { id: `we_${state.endpoints.length + 1}`, url: params.get('url'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
+    state.endpointsMade = (state.endpointsMade || 0) + 1;
+    const created = { id: `we_${state.endpointsMade}`, url: params.get('url'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
     state.endpoints.push(created);
     return answer(created);
   }
@@ -781,6 +782,29 @@ test('a retry after the token moved finds it in the client project', async () =>
   assert.equal(fake.consoleSecrets.store.size, 0);
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.clientSecrets.store.get('TICKETING_API_TOKEN'), STRIPE_TOKEN);
+});
+
+test('a signing secret that did not save is not paired with the new account\'s endpoint', async () => {
+  const fake = setup();
+  const stored = () => fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  await fake.clientSecrets.writeSecret('TICKETING_WEBHOOK_SECRET', 'whsec_account_a');
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  fake.state.endpoints = [];
+  fake.state.stripeToken = `${STRIPE_TOKEN}2`;
+  fake.consoleSecrets.store.set('connection-stripe-a1', fake.state.stripeToken);
+  const writeSecret = fake.clientSecrets.writeSecret.bind(fake.clientSecrets);
+  fake.clientSecrets.writeSecret = async (id, value) => {
+    if (id === 'TICKETING_WEBHOOK_SECRET') throw new Error('no answer');
+    return writeSecret(id, value);
+  };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(stored(), 'whsec_account_a');
+  assert.equal(fake.state.endpoints.length, 1, 'the new account has its endpoint, and the old secret');
+  fake.clientSecrets.writeSecret = writeSecret;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(stored(), 'whsec_fixture');
+  assert.equal(fake.state.endpoints.length, 1);
 });
 
 test('a retry on a replaced token deploys again, or the site keeps the old one', async () => {

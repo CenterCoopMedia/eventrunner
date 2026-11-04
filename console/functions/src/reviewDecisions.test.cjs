@@ -147,11 +147,18 @@ test('closeApplication closes an accepted request whose build stopped', async ()
   assert.equal(app.status, 'declined');
   assert.deepEqual(app.connections, {});
   assert.equal(app.review.note, 'Wrong person.');
-  assert.equal(db.read('site_names/nclocal'), undefined, 'the name is free again');
+  assert.ok(db.read('site_names/nclocal'), 'a run may have made its project, so the name stays taken');
   assert.equal(db.read('console_connections/a1'), undefined);
   assert.equal(db.read('console_token_deletions/a1'), undefined, 'the tokens went, so no row is left');
   assert.ok(d.mailer.sent.every((m) => m.status === 'declined'));
   assert.ok(db.paths('console_audit/').some((p) => db.read(p).action === 'close-request'));
+});
+
+test('closeApplication frees the name when no run ever began', async () => {
+  const db = closeDb({ ...FAILED, buildStart: { state: 'failed', at: new Date(NOW) } });
+  await db.doc('console_builds/a1').delete();
+  await close(closeDeps(db));
+  assert.equal(db.read('site_names/nclocal'), undefined);
 });
 
 test('closeApplication refuses while a run may be alive, and leaves everything alone', async () => {
