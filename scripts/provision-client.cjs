@@ -760,10 +760,11 @@ async function stripeEndpoint(ctx, token, notes) {
  * A deployed function keeps the secret version and the variables it was
  * deployed with, so a deploy from before these details changed no longer
  * counts (`deploy`). This compares with the record, not with what this run
- * moved, so a run that stopped straight after the move still notes it.
+ * moved, so a run that stopped straight after the move still notes it. The
+ * details hold no secret value, so they are stored as they are.
  */
 async function noteTicketDetails(ctx, details) {
-  const key = createHash('sha256').update(JSON.stringify(details)).digest('hex');
+  const key = JSON.stringify(details);
   if (ctx.ticketsKey === key) return;
   ctx.ticketsKey = key;
   ctx.ticketsChangedAt = new Date(ctx.deps.now());
