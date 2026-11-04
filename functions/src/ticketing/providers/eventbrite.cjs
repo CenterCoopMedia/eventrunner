@@ -82,11 +82,12 @@
  *    drop, which is the one failure mode §3.3 was written to remove.
  * 6. WEBHOOK REGISTRATION SCOPE. Eventbrite webhooks are created under an
  *    ORGANIZATION, not an event, and creation needs an organization id
- *    that the deploy-time env (spec §2.1) does not carry. `registerWebhook`
- *    discovers it via `GET /v3/users/me/organizations/` and uses the
- *    first organization returned — correct for the single-org-per-token
- *    case every deployment here is expected to be, but unverified against
- *    a real multi-org account (#79).
+ *    that the deploy-time env (spec §2.1) does not carry. The site builder
+ *    knows which organization holds the event and passes it as
+ *    EVENT_TICKETING_ORGANIZATION_ID. Without that, `registerWebhook`
+ *    discovers it via `GET /v3/users/me/organizations/` and uses the first
+ *    organization returned, which is wrong for a client with more than one
+ *    organization (#79).
  * ============================================================================
  */
 
@@ -563,8 +564,10 @@ function createEventbriteProvider({ env = process.env, fetchImpl = globalThis.fe
       }
       // Judgment call 1: Eventbrite stores and calls this URL, secret included.
       const endpointUrl = endpointUrlFor(callbackUrl.trim(), webhookSecret);
-      const orgs = await apiCall('/users/me/organizations/');
-      const orgId = orgs?.organizations?.[0]?.id;
+      const givenOrgId = typeof env.EVENT_TICKETING_ORGANIZATION_ID === 'string'
+        ? env.EVENT_TICKETING_ORGANIZATION_ID.trim()
+        : '';
+      const orgId = givenOrgId || (await apiCall('/users/me/organizations/'))?.organizations?.[0]?.id;
       if (!orgId) {
         throw new Error('eventbrite registerWebhook: no organization found for TICKETING_API_TOKEN');
       }

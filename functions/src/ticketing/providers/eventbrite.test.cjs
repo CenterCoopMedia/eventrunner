@@ -587,6 +587,18 @@ test('registerWebhook: no existing subscription → creates one whose endpoint c
   assert.equal((await p.verifyWebhook(d.rawBody, {}, { query })).valid, true);
 });
 
+test('registerWebhook: uses the given organization and does not look one up (issue 79)', async () => {
+  const calls = [];
+  const fetchImpl = fakeFetch({
+    'GET /organizations/org-given/webhooks/': fixture('webhooks-list-empty.json'),
+    'POST /organizations/org-given/webhooks/': fixture('webhook-create-response.json'),
+  }, { calls });
+  const p = provider({ fetchImpl, env: { EVENT_TICKETING_ORGANIZATION_ID: ' org-given ' } });
+  await p.registerWebhook({ callbackUrl: CALLBACK, events: p.webhookEventTypes });
+  assert.equal(calls.some((c) => c.path.startsWith('/users/me/organizations/')), false);
+  assert.equal(calls.filter((c) => c.path === '/organizations/org-given/webhooks/').length, 2);
+});
+
 test('registerWebhook: refuses a non-https callback URL', async () => {
   const p = provider({ fetchImpl: async () => { throw new Error('should not be called'); } });
   await assert.rejects(() => p.registerWebhook({ callbackUrl: 'http://example.org/hook' }), /https/);
