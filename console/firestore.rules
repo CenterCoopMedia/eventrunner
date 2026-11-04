@@ -74,6 +74,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Tokens of deleted requests, until they are deleted.
+    match /console_token_deletions/{appId} {
+      allow read, write: if false;
+    }
+
     match /site_names/{name} {
       allow read, write: if false;
     }

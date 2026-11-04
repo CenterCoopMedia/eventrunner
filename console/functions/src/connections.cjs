@@ -12,8 +12,14 @@
  *   3. completeConnection deletes the state row first, so the state works once
  *      and a code is never sent to the provider twice. (Stripe ends a
  *      connection when a code is used again.) The row must name this user and
- *      provider and be unexpired. It then exchanges the code, writes the
- *      connection state to Firestore, and writes the token to Secret Manager.
+ *      provider and be unexpired. It then exchanges the code, marks the
+ *      connection as changing, writes the token to Secret Manager, and only
+ *      then makes the connection live.
+ *
+ * A disconnect holds the same mark while it deletes the token, so two calls
+ * never change one token at once. A connection is live only when its token is
+ * stored. A call that dies leaves a mark that runs out, and a connection that
+ * is not live, which the Owner connects again.
  *
  * Tokens go only to Secret Manager. Never to Firestore, a response, a log or
  * an error message. The redirect address comes from CONSOLE_PUBLIC_URL, never
@@ -42,10 +48,15 @@ const { withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
 const { CLOSED, EDITABLE, readApplication } = require('./applications.cjs');
-const { CHANGEABLE, PROVIDERS, PROVIDER_NAMES, connectionsForClient, liveConnection } = require('./connectionState.cjs');
+const {
+  CHANGEABLE, PROVIDERS, PROVIDER_NAMES, connectionChanging, connectionsForClient, liveConnection,
+} = require('./connectionState.cjs');
 
 const STATE_COLLECTION = 'console_connection_states';
 const ACCOUNT_COLLECTION = 'console_connections';
+const DELETION_COLLECTION = 'console_token_deletions';
+// Longer than a function may run (60 seconds), so a running call always holds its mark.
+const CHANGE_MS = 5 * 60 * 1000;
 // Long enough to make a new Stripe account on Stripe's page.
 const STATE_TTL_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -159,11 +170,32 @@ function previousOf(data, accounts, provider) {
   return { connection: liveConnection(data.connections, provider), account: accounts[provider] || null };
 }
 
+/** The state a provider holds while this call changes its token. Refuses when another call holds it. */
+function changingState(data, provider, at, id) {
+  if (connectionChanging(data.connections, at.getTime(), [provider])) {
+    throw new ConsoleError(409, 'connection-busy', 'This account is being changed. Try again in a few minutes.');
+  }
+  return { connected: false, change: { id, until: new Date(at.getTime() + CHANGE_MS) } };
+}
+
+const holdsChange = (data, provider, changeId) => data.connections?.[provider]?.change?.id === changeId;
+
+/** End this call's change, leaving `connection`, or no state when it is null. */
+async function finishChange({ db }, { orgId, appId, provider, changeId, connection }) {
+  await db.runTransaction(async (tx) => {
+    const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
+    if (!holdsChange(data, provider, changeId)) throw new Error('lost the connection change');
+    const rest = withoutProvider(data.connections, provider);
+    tx.update(ref, { connections: connection ? { ...rest, [provider]: connection } : rest });
+  });
+}
+
 /** Put one provider's state back after a failed Secret Manager call. */
-async function restoreState({ db, log = console }, { orgId, appId, provider, previous }) {
+async function restoreState({ db, log = console }, { orgId, appId, provider, previous, changeId }) {
   try {
     await db.runTransaction(async (tx) => {
       const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
+      if (!holdsChange(data, provider, changeId)) return;
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
       const rest = withoutProvider(data.connections, provider);
       const restAccounts = withoutProvider(accounts, provider);
@@ -243,20 +275,23 @@ async function completeConnection(deps, { body, user }) {
   const answer = await exchange(deps, { connector, provider, code: body.code });
 
   const at = new Date(now());
+  const changeId = randomBytes(8).toString('hex');
   let previous = null;
+  let connection = null;
   try {
     // The state goes first: when the request moved on while the client was
     // on the provider's page, this refuses, and nothing has been stored.
     await db.runTransaction(async (tx) => {
       const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
       requireConnectable(data, provider);
+      const changing = changingState(data, provider, at, changeId);
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
       previous = previousOf(data, accounts, provider);
       const same = previous.account?.accountId === answer.accountId;
       const keepEvent = provider === 'eventbrite' ? { event: same ? previous.connection?.event ?? null : null } : {};
       const keepOrganization = same && previous.account.eventOrganizationId ? { eventOrganizationId: previous.account.eventOrganizationId } : {};
-      const connection = { connected: true, displayName: answer.displayName, ...answer.details, ...keepEvent, connectedAt: at };
-      tx.update(ref, { connections: { ...data.connections, [provider]: connection }, updatedAt: at, updatedBy: user.uid });
+      connection = { connected: true, displayName: answer.displayName, ...answer.details, ...keepEvent, connectedAt: at };
+      tx.update(ref, { connections: { ...data.connections, [provider]: changing }, updatedAt: at, updatedBy: user.uid });
       tx.set(accountsRef(db, appId), { ...accounts, [provider]: { accountId: answer.accountId, connectedBy: user.uid, ...keepOrganization } });
     });
   } catch (err) {
@@ -267,8 +302,16 @@ async function completeConnection(deps, { body, user }) {
   try {
     await secrets.writeSecret(connectionSecretId(appId, provider), answer.token);
   } catch (err) {
-    await restoreState(deps, { orgId, appId, provider, previous });
+    await restoreState(deps, { orgId, appId, provider, previous, changeId });
     await revokeIfUnused(deps, provider, answer.accountId);
+    throw failure(502, 'connection-failed', failedToConnect(provider), err);
+  }
+
+  try {
+    await finishChange(deps, { orgId, appId, provider, changeId, connection });
+  } catch (err) {
+    // The token is stored and the connection is not live, which is safe: the
+    // private row names the account, so connecting again or a delete tidies up.
     throw failure(502, 'connection-failed', failedToConnect(provider), err);
   }
 
@@ -279,31 +322,36 @@ async function completeConnection(deps, { body, user }) {
 }
 
 async function disconnectAccount(deps, { body, user }) {
-  const { db, now = Date.now, secrets } = deps;
+  const { db, now = Date.now, secrets, log = console } = deps;
   const { orgId, appId } = body;
   const provider = requireProvider(body.provider);
   await requireOwner(db, orgId, user, ONLY_OWNER);
   const at = new Date(now());
+  const changeId = randomBytes(8).toString('hex');
   let previous = null;
   let reply = null;
   await db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
     const closed = CLOSED.includes(data.status);
     if (!closed) requireChangeable(data);
+    const changing = changingState(data, provider, at, changeId);
     const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
     previous = previousOf(data, accounts, provider);
     const connections = withoutProvider(data.connections, provider);
     // A closed request is still deleted 90 days after its last real change.
-    tx.update(ref, { connections, ...(closed ? {} : { updatedAt: at, updatedBy: user.uid }) });
+    tx.update(ref, { connections: { ...connections, [provider]: changing }, ...(closed ? {} : { updatedAt: at, updatedBy: user.uid }) });
     tx.set(accountsRef(db, appId), withoutProvider(accounts, provider));
     reply = connectionsReply(deps, data, connections);
   });
   try {
     await secrets.deleteSecret(connectionSecretId(appId, provider));
   } catch (err) {
-    await restoreState(deps, { orgId, appId, provider, previous });
+    await restoreState(deps, { orgId, appId, provider, previous, changeId });
     throw failure(502, 'disconnect-failed', `We could not disconnect your ${PROVIDER_NAMES[provider]} account. Try again.`, err);
   }
+  // The token is gone. A mark left behind only runs out.
+  await finishChange(deps, { orgId, appId, provider, changeId, connection: null })
+    .catch((err) => log.error('console could not finish a disconnect', provider, err.message));
   const ended = previous.account?.accountId
     ? await revokeIfUnused(deps, provider, previous.account.accountId)
     : { revoked: false, shared: false };
@@ -338,6 +386,8 @@ async function chooseEventbriteEvent(deps, { body, user }) {
   const { orgId, appId, eventId } = body;
   if (typeof eventId !== 'string' || !EVENT_ID.test(eventId)) throw new ConsoleError(400, 'bad-request', 'Choose your Eventbrite event.');
   // Only an event this account really has. The browser's word is not enough.
+  // Read first: the check below refuses an event read from an earlier account.
+  const accountId = accountsOf(await accountsRef(db, appId).get()).eventbrite?.accountId;
   const events = await readEventbriteEvents(deps, { orgId, appId, user });
   const event = events.find((candidate) => candidate.id === eventId);
   if (!event) throw new ConsoleError(400, 'bad-request', 'We could not find that event in your Eventbrite account.');
@@ -349,6 +399,9 @@ async function chooseEventbriteEvent(deps, { body, user }) {
     const connection = liveConnection(data.connections, 'eventbrite');
     if (!connection) throw new ConsoleError(409, 'not-connected', 'Connect your Eventbrite account first.');
     const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
+    if (accounts.eventbrite?.accountId !== accountId) {
+      throw new ConsoleError(409, 'account-changed', 'Your Eventbrite account changed. Choose your event again.');
+    }
     const { organizationId, ...shown } = event;
     const connections = { ...data.connections, eventbrite: { ...connection, event: shown } };
     tx.update(ref, { connections, updatedAt: at, updatedBy: user.uid });
@@ -389,25 +442,43 @@ async function deleteStoredConnection({ secrets }, appId, provider) {
 }
 
 /**
- * The first half of deleting a request: delete its stored tokens. Throws when
- * one cannot be deleted, so the caller keeps the request and tries again.
- *
- * @returns {Promise<{ provider: string, accountId: string }[]>} the accounts to
- *   hand to endConnections once the request and its private row are deleted
+ * Inside the transaction that deletes a request: read its private row. The
+ * caller then calls recordTokenDeletion with the result, after its other reads.
  */
-async function deleteConnectionTokens({ db, secrets }, appId) {
-  const accounts = accountsOf(await accountsRef(db, appId).get());
-  const connected = [];
-  for (const provider of PROVIDERS) {
-    await secrets.deleteSecret(connectionSecretId(appId, provider));
-    if (accounts[provider]?.accountId) connected.push({ provider, accountId: accounts[provider].accountId });
-  }
-  return connected;
+async function readConnectedAccounts(tx, db, appId) {
+  const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
+  return PROVIDERS.filter((provider) => accounts[provider]?.accountId)
+    .map((provider) => ({ provider, accountId: accounts[provider].accountId }));
 }
 
-/** The second half: end each connection nothing else uses. A failed revoke is logged. */
-async function endConnections(deps, connected) {
+/** The same transaction: leave a row, so its tokens are still found when the request is gone. */
+function recordTokenDeletion(tx, db, appId, connected, at) {
+  tx.set(db.collection(DELETION_COLLECTION).doc(appId), { connected, at });
+}
+
+/**
+ * After that transaction: delete the tokens, end each connection nothing else
+ * uses, then the row. A token that cannot be deleted throws and leaves the row
+ * for the retention job. A failed revoke is logged. Safe to repeat.
+ */
+async function deleteRecordedTokens(deps, appId, connected) {
+  for (const provider of PROVIDERS) await deps.secrets.deleteSecret(connectionSecretId(appId, provider));
   for (const { provider, accountId } of connected) await revokeIfUnused(deps, provider, accountId);
+  await deps.db.collection(DELETION_COLLECTION).doc(appId).delete();
+}
+
+/** Try again for the rows an earlier delete left. Each failure is logged; the next run tries again. */
+async function retryTokenDeletions(deps, batchSize) {
+  const { db, log = console } = deps;
+  try {
+    const snap = await db.collection(DELETION_COLLECTION).limit(batchSize).get();
+    for (const doc of snap.docs) {
+      await deleteRecordedTokens(deps, doc.id, doc.data().connected || [])
+        .catch((err) => log.error('console could not delete stored tokens', doc.id, err.message));
+    }
+  } catch (err) {
+    log.error('console could not read the tokens left to delete', err.message);
+  }
 }
 
 /** Delete state rows nobody came back for. A failure is logged; the next run tries again. */
@@ -428,17 +499,20 @@ async function sweepExpiredStates({ db, log = console }, at, batchSize) {
 
 module.exports = {
   ACCOUNT_COLLECTION,
+  DELETION_COLLECTION,
   STATE_COLLECTION,
   STATE_TTL_MS,
   chooseEventbriteEvent,
   completeConnection,
   connectionSecretId,
-  deleteConnectionTokens,
+  deleteRecordedTokens,
   deleteStoredConnection,
   disconnectAccount,
-  endConnections,
   listEventbriteEvents,
+  readConnectedAccounts,
   readStoredConnection,
+  recordTokenDeletion,
+  retryTokenDeletions,
   startConnection,
   sweepExpiredStates,
 };

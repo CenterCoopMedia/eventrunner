@@ -13,10 +13,12 @@
  *   operator looks at it. The acceptance records are in their own
  *   collection and are never deleted here.
  *
- * Both delete the request's stored account tokens first, then the request,
- * then end its connections where the provider allows it and nothing else uses
- * the account. When a token cannot be deleted the request is kept, so the job
- * tries again and no token loses its record.
+ * Both delete the request first, in a transaction that checks it as it is
+ * now and leaves a `console_token_deletions` row. Then they delete its stored
+ * account tokens and end its connections where the provider allows it and
+ * nothing else uses the account. So a delete that is refused has touched no
+ * token, and a token that cannot be deleted keeps its row for the job to try
+ * again. A request with a connection change running is not deleted.
  *
  * Each delete writes one `console_audit` record: { action, appId, by, at }.
  * `by` is the operator's uid, or 'retention' for the job. The record holds
@@ -27,9 +29,10 @@ const { ConsoleError } = require('./http.cjs');
 const { toMillis } = require('./access.cjs');
 const { NOT_FOUND, applicationRef, readApplication, requireAppId, requireOperator } = require('./reviewAccess.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
+const { connectionChanging } = require('./connectionState.cjs');
 const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
 const {
-  ACCOUNT_COLLECTION, deleteConnectionTokens, endConnections, sweepExpiredStates,
+  ACCOUNT_COLLECTION, deleteRecordedTokens, readConnectedAccounts, recordTokenDeletion, retryTokenDeletions, sweepExpiredStates,
 } = require('./connections.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -40,17 +43,21 @@ const RETENTION_BATCH = 500;
 
 /** Delete a request and everything connected to it, in the order that keeps a token findable. */
 async function deleteWithConnections(deps, spec) {
-  const connected = await deleteConnectionTokens(deps, spec.appId);
-  const done = await deleteApplication(deps.db, spec);
-  if (done) await endConnections(deps, connected);
-  return done;
+  const connected = await deleteApplication(deps.db, spec);
+  if (!connected) return false;
+  try {
+    await deleteRecordedTokens(deps, spec.appId, connected);
+  } catch (err) {
+    (deps.log || console).error('console will try again to delete stored tokens', spec.appId, err.message);
+  }
+  return true;
 }
 
 /**
  * Delete one request in a transaction, after `check(app)` passes on the
  * request as it is now. Frees every name it holds.
  *
- * @returns {Promise<boolean>} false when `check` says to keep it
+ * @returns {Promise<object[]|null>} its connected accounts, or null when `check` says to keep it
  */
 async function deleteApplication(db, { appId, by, action, at, check }) {
   const ref = applicationRef(db, appId);
@@ -58,13 +65,15 @@ async function deleteApplication(db, { appId, by, action, at, check }) {
     const snap = await tx.get(ref);
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const app = { id: snap.id, ...snap.data() };
-    if (!check(app)) return false;
+    if (!check(app)) return null;
     const held = await heldNames(tx, db, app.id);
+    const connected = await readConnectedAccounts(tx, db, app.id);
     tx.delete(ref);
     tx.delete(db.collection(ACCOUNT_COLLECTION).doc(app.id));
     releaseNames(tx, db, held);
     tx.create(db.collection('console_audit').doc(), { action, appId: app.id, by, at });
-    return true;
+    recordTokenDeletion(tx, db, app.id, connected, at);
+    return connected;
   });
 }
 
@@ -79,6 +88,9 @@ async function deleteSpamApplication(deps, { body, user }) {
       throw new ConsoleError(409, 'cannot-delete', 'This request is approved, so it cannot be deleted as spam.');
     }
     refuseNewCheckout(first, app);
+    if (connectionChanging(app.connections, now())) {
+      throw new ConsoleError(409, 'connection-busy', 'An account on this request is being changed. Try again in a few minutes.');
+    }
     return true;
   };
   check(first);
@@ -89,7 +101,7 @@ async function deleteSpamApplication(deps, { body, user }) {
 
 /** True when the request is in a retained status and its last change is 90 days old or more. */
 function isExpired(app, at) {
-  if (app.feeProblem) return false;
+  if (app.feeProblem || connectionChanging(app.connections, at)) return false;
   const changed = toMillis(app.updatedAt);
   return RETAINED_STATUSES.includes(app.status) && Number.isFinite(changed) && at - changed >= RETENTION_DAYS * DAY_MS;
 }
@@ -112,6 +124,7 @@ async function runRetention(deps) {
   const cutoff = new Date(at - RETENTION_DAYS * DAY_MS);
   const deleted = [];
   const failed = new Set();
+  await retryTokenDeletions({ ...deps, log }, batchSize);
   for (const status of RETAINED_STATUSES) {
     for (;;) {
       const snap = await db.collection('applications')

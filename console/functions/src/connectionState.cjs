@@ -14,9 +14,13 @@
  * only what a member may see. Account ids are in `console_connections`, which
  * no browser can read, and tokens are in the console's Secret Manager.
  * connections.cjs is the only module that handles either.
+ *
+ * While a call changes a provider's token, that provider holds
+ * { connected: false, change: { id, until } }. It is not live, so every check
+ * on a connection refuses it until the token and this state agree.
  */
 
-const { toIso } = require('./access.cjs');
+const { toIso, toMillis } = require('./access.cjs');
 
 const PROVIDERS = Object.freeze(['stripe', 'eventbrite']);
 const PROVIDER_NAMES = Object.freeze({ stripe: 'Stripe', eventbrite: 'Eventbrite' });
@@ -31,6 +35,11 @@ const CLOSED_STATUSES = Object.freeze(['withdrawn', 'declined']);
 function liveConnection(connections, provider) {
   const connection = connections && typeof connections === 'object' ? connections[provider] : null;
   return connection && connection.connected === true ? connection : null;
+}
+
+/** True while a call may still be changing a token of one of `providers`. */
+function connectionChanging(connections, at, providers = PROVIDERS) {
+  return providers.some((provider) => toMillis(connections?.[provider]?.change?.until) > at);
 }
 
 /**
@@ -90,6 +99,7 @@ module.exports = {
   CHANGEABLE,
   PROVIDERS,
   PROVIDER_NAMES,
+  connectionChanging,
   connectionForReview,
   connectionProblem,
   connectionsForClient,

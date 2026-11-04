@@ -624,3 +624,67 @@ test('when the console cannot check who uses an account, it keeps the connection
   assert.equal(log.errors.length, 1);
   assert.match(log.errors[0][0], /kept a connection/);
 });
+
+test('a request cannot go ahead while its token is being stored, and a failed store leaves it a draft', async () => {
+  const { db, secrets, deps } = setup({ extra: { 'site_names/nclocal': { appId: 'a1', orgId: 'o1' }, ...signupTerms() } });
+  const accepting = { ...deps, mailer: fakeMailer(), publicUrl: '' };
+  const accept = { body: { ...BASE, accept: true, name: 'Ana Owner', version: 1 }, user: ana };
+  const state = await start(deps);
+  secrets.writeSecret = async () => {
+    await assert.rejects(acceptAgreement(accepting, accept), { code: 'incomplete' });
+    throw new Error('secret add: HTTP 500');
+  };
+  await assert.rejects(complete(deps, { state }), { code: 'connection-failed' });
+  assert.equal(db.read('applications/a1').status, 'draft');
+  assert.equal(stored(db).stripe, undefined);
+});
+
+test('a connection finishing during a disconnect is refused, so no token is deleted from under it', async () => {
+  const { db, secrets, stripe, deps } = setup({ application: { connections: { stripe: stripeConnection() } } });
+  secrets.store.set('connection-stripe-a1', TOKEN);
+  const state = await start(deps);
+  const remove = secrets.deleteSecret.bind(secrets);
+  secrets.deleteSecret = async (id) => {
+    await assert.rejects(complete(deps, { state }), { code: 'connection-busy' });
+    await remove(id);
+  };
+  await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.equal(stored(db).stripe, undefined);
+  assert.equal(privateRow(db).stripe, undefined);
+  assert.equal(secrets.store.size, 0);
+  assert.ok(stripe.revoked.includes('acct_new'));
+});
+
+test('a disconnect during a connection is refused, and the connection finishes with its token', async () => {
+  const { db, secrets, deps } = setup();
+  const state = await start(deps);
+  const write = secrets.writeSecret.bind(secrets);
+  secrets.writeSecret = async (id, value) => {
+    await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { code: 'connection-busy' });
+    await write(id, value);
+  };
+  await complete(deps, { state });
+  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(stored(db).stripe.change, undefined);
+  assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
+});
+
+test('a change that never finished holds the account only until its time is up', async () => {
+  const change = (until) => ({ connections: { stripe: { connected: false, change: { id: 'dead', until: new Date(until) } } } });
+  const held = setup({ application: change(NOW + 1000), accounts: {} });
+  await assert.rejects(complete(held.deps, { state: await start(held.deps) }), { code: 'connection-busy' });
+  const expired = setup({ application: change(NOW - 1), accounts: {} });
+  await complete(expired.deps, { state: await start(expired.deps) });
+  assert.equal(stored(expired.db).stripe.connected, true);
+});
+
+test('an event read from an earlier account is not saved on the new one', async () => {
+  const { db, secrets, eventbrite, deps } = setup({ application: { connections: { eventbrite: { connected: true, displayName: 'Ana', event: null } } } });
+  secrets.store.set('connection-eventbrite-a1', EB_TOKEN);
+  eventbrite.listEvents = async () => {
+    await db.collection('console_connections').doc('a1').set({ eventbrite: { accountId: '777', connectedBy: 'ana' } });
+    return EVENTS;
+  };
+  await assert.rejects(chooseEventbriteEvent(deps, { body: { ...BASE, eventId: 'e1' }, user: ana }), { code: 'account-changed' });
+  assert.equal(stored(db).eventbrite.event, null);
+});

@@ -247,16 +247,43 @@ test('the retention job leaves the tokens of a request it keeps', async () => {
   assert.equal(secrets.store.size, 1);
 });
 
-test('a token that cannot be deleted keeps the request, so the next run tries again', async () => {
+test('a token that cannot be deleted keeps its row, so the next run tries again', async () => {
   const db = seeded({ 'applications/a1': application(closedOld) });
   const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
   secrets.failDelete = true;
   const first = await runRetention({ db, secrets, now: () => NOW, log: QUIET });
-  assert.deepEqual(first, { deleted: [], failed: ['a1'] });
-  assert.ok(db.read('applications/a1'));
+  assert.deepEqual(first, { deleted: ['a1'], failed: [] });
+  assert.equal(db.read('applications/a1'), undefined);
+  assert.equal(secrets.store.size, 1);
+  assert.ok(db.read('console_token_deletions/a1'));
   secrets.failDelete = false;
-  assert.deepEqual((await runRetention({ db, secrets, now: () => NOW, log: QUIET })).deleted, ['a1']);
+  await runRetention({ db, secrets, now: () => NOW, log: QUIET });
   assert.equal(secrets.store.size, 0);
+  assert.equal(db.read('console_token_deletions/a1'), undefined);
+});
+
+test('a delete refused at the last moment has touched no token', async () => {
+  const db = seeded({ 'applications/a1': application(closedOld) });
+  const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
+  const run = db.runTransaction.bind(db);
+  db.runTransaction = async (fn) => {
+    db.runTransaction = run;
+    await db.collection('applications').doc('a1').update({ updatedAt: new Date(NOW) });
+    return run(fn);
+  };
+  assert.deepEqual((await runRetention({ db, secrets, now: () => NOW, log: QUIET })).deleted, []);
+  assert.equal(secrets.store.size, 1);
+  assert.equal(db.read('console_token_deletions/a1'), undefined);
+});
+
+test('a request with a connection change running is not deleted', async () => {
+  const changing = { connections: { stripe: { connected: false, change: { id: 'c1', until: new Date(NOW + 1000) } } } };
+  const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
+  const old = seeded({ 'applications/a1': application({ ...closedOld, ...changing }) });
+  assert.deepEqual((await runRetention({ db: old, secrets, now: () => NOW, log: QUIET })).deleted, []);
+  const db = seeded({ 'applications/a1': application(changing) });
+  await assert.rejects(deleteSpamApplication(deps(db, { secrets }), { body: { appId: 'a1', confirm: true }, user: ops }), { code: 'connection-busy' });
+  assert.equal(secrets.store.size, 1);
 });
 
 test('a failed revoke does not stop the token being deleted or the request going', async () => {
