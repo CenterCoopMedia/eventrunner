@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Renders the social cards that pages link from their meta tags:
 //
-//   docs/social-preview.png               the product landing page
+//   docs/social-preview.png               the homepage
 //   docs/og-default.png                   any documentation page
 //   console/web/public/og-console.png     the client console (ADR 0007 §1)
 //
@@ -114,10 +114,11 @@ p { max-width: 22em; margin-block-start: 32px; font-size: 30px; line-height: 1.4
 const CARDS = [
   {
     file: 'docs/social-preview.png',
-    line: 'Event CMS',
+    line: 'Conference websites',
     title: 'Event Runner',
-    blurb: 'A white-label event CMS. One Firebase project per event. Your staff run the site '
-      + 'from the admin panel, without a developer in the room.',
+    blurb: 'Conference websites your team can run, with direct help from the person who '
+      + 'runs the service.',
+    foot: 'eventrunner.org',
   },
   {
     file: 'docs/og-default.png',

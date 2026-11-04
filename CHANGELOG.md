@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A client homepage, plus support, privacy and terms pages, for the project site. The former
+  landing page is now the project status page at `/project/`. The address for the custom domain
+  is `https://eventrunner.org/`, and repository variables set the support name and address.
+
 ### Security
 
 - Attendee profiles now enforce text, photo-path, and social-handle size limits

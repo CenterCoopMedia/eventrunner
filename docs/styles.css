@@ -341,6 +341,11 @@ a {
   padding-block: var(--space-2xl);
 }
 
+.hero-single {
+  grid-template-columns: minmax(0, 1fr);
+  padding-block-end: 0;
+}
+
 .thesis h1 {
   margin: 0 0 var(--space-md);
   font-size: var(--text-h1);
@@ -484,6 +489,12 @@ a {
   margin-block-start: var(--space-2xl);
   padding-block-start: var(--space-md);
   border-block-start: var(--section-rule-width) solid rgb(var(--section-rule-rgb));
+}
+
+.section > ul {
+  max-width: var(--measure);
+  margin: 0 0 var(--space-md);
+  padding-inline-start: var(--space-lg);
 }
 
 /* `.note` sets its own leading gap, so it is excluded rather than reset. */

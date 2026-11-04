@@ -59,7 +59,14 @@ const TOKENS_FILE = 'tokens.css';
 // Hand-written pages under docs/ that state the site's absolute address in
 // their head. The first is the landing page: its canonical URL is the address
 // the committed site is built for, and the address the others are moved from.
-const LANDING_PAGES = Object.freeze(['index.html', 'videos/index.html']);
+const LANDING_PAGES = Object.freeze([
+  'index.html',
+  'videos/index.html',
+  'project/index.html',
+  'support/index.html',
+  'privacy/index.html',
+  'terms-of-service/index.html',
+]);
 
 const PRODUCT = 'Event Runner';
 // The documentation site has its own social card, so a link to a guide is not
@@ -705,11 +712,36 @@ function rebaseLandingPage(html, fromUrl, toUrl) {
 }
 
 /**
+ * Who clients reach for help, from settings rather than source, so a person's
+ * name and address stay out of the repository. The committed pages name the
+ * shared address until both values are set.
+ *
+ * @returns {{ contact: {name: string, email: string}|null, errors: string[] }}
+ */
+function supportContact(env = process.env) {
+  const name = (env.PAGES_SUPPORT_NAME || '').trim();
+  const email = (env.PAGES_SUPPORT_EMAIL || '').trim();
+  if (!name && !email) return { contact: null, errors: [] };
+  if (!name || !/^[^\s@<>"'&]+@[^\s@<>"'&]+\.[^\s@<>"'&]+$/.test(email)) {
+    return { contact: null, errors: ['PAGES_SUPPORT_NAME and PAGES_SUPPORT_EMAIL must be a name and an email address, together'] };
+  }
+  return { contact: { name, email }, errors: [] };
+}
+
+/** One hand-written page with its support name and address filled in. */
+function withSupportContact(html, contact) {
+  if (!contact) return html;
+  return html
+    .replace(/(<span data-support-name>)[^<]*(<\/span>)/g, (_, open, close) => `${open}${escapeHtml(contact.name)}${close}`)
+    .replace(/<a data-support-email href="[^"]*">[^<]*<\/a>/g, () => `<a data-support-email href="mailto:${contact.email}">${contact.email}</a>`);
+}
+
+/**
  * Each hand-written page in LANDING_PAGES as it reads for `site`.
  *
  * @returns {{ landingPages: Map<string,string>, errors: string[] }}
  */
-function landingPagesFor(site, root, landing) {
+function landingPagesFor(site, root, landing, contact = null) {
   const fromUrl = landingSiteUrl(landing);
   if (!fromUrl) {
     return { landingPages: new Map(), errors: ['docs/index.html has no canonical link with an https site address'] };
@@ -718,7 +750,7 @@ function landingPagesFor(site, root, landing) {
   for (const name of LANDING_PAGES) {
     const file = path.join(root, 'docs', name);
     if (!fs.existsSync(file)) continue;
-    landingPages.set(name, rebaseLandingPage(fs.readFileSync(file, 'utf8'), fromUrl, site.url));
+    landingPages.set(name, withSupportContact(rebaseLandingPage(fs.readFileSync(file, 'utf8'), fromUrl, site.url), contact));
   }
   return { landingPages, errors: [] };
 }
@@ -730,14 +762,15 @@ function landingPagesFor(site, root, landing) {
  * @returns {{ files: Map<string,string>, landingPages: Map<string,string>, tokensCss: string,
  *             departures: Array, errors: string[], headingsByRoute: Map, site: object }}
  */
-function buildSite({ root = ROOT, site = pagesSite() } = {}) {
+function buildSite({ root = ROOT, site = pagesSite(), env = process.env } = {}) {
   const landing = fs.readFileSync(path.join(root, 'docs', 'index.html'), 'utf8');
   const themeTags = themeColorTags();
   const routes = routesBySource(site.docsBase);
   const pages = pagesInOrder();
   const departures = [];
-  const { landingPages, errors: landingErrors } = landingPagesFor(site, root, landing);
-  const errors = [...themeColorProblems(landing), ...landingErrors];
+  const { contact, errors: contactErrors } = supportContact(env);
+  const { landingPages, errors: landingErrors } = landingPagesFor(site, root, landing, contact);
+  const errors = [...themeColorProblems(landing), ...landingErrors, ...contactErrors];
   const files = new Map();
   const headingsByRoute = new Map();
 
@@ -958,6 +991,8 @@ module.exports = {
   linkResolver,
   main,
   rebaseLandingPage,
+  supportContact,
+  withSupportContact,
   themeColorTags,
   themeColorProblems,
   internals: {
