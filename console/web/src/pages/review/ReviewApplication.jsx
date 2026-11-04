@@ -198,7 +198,7 @@ export default function ReviewApplication() {
           <p className="history-note">{app.review.note}</p>
         </aside>
       ) : null}
-      <ReviewActions key={app.status} status={app.status} onDecide={decide} />
+      <ReviewActions key={app.status} status={app.status} canClose={data.canRetryBuild} onDecide={decide} />
 
       <h2 id="answers-title">Answers</h2>
       {app.acceptance ? <p className="muted">These are the answers the client accepted. The client cannot change them now.</p> : null}

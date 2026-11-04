@@ -436,8 +436,8 @@ test('one approved request becomes a built site, and the record and the status s
   assert.equal(record.runUrl, 'https://github.com/owner/repo/actions/runs/42');
   assert.deepEqual(record.steps.map((s) => [s.id, s.state]), STEPS.map((s) => [s.id, 'done']));
 
-  assert.deepEqual(fake.mailer.sent.filter((m) => m.kind === 'status').map((m) => m.to).sort(), ['ana@example.org', 'ana@example.org', 'bo@example.org', 'bo@example.org']);
-  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['building', 'ready']);
+  assert.deepEqual(fake.mailer.sent.filter((m) => m.kind === 'status').map((m) => m.to).sort(), ['ana@example.org', 'bo@example.org']);
+  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['ready']);
   const ready = fake.mailer.sent.find((m) => m.status === 'ready');
   assert.equal(ready.adminLink, `https://${DOMAIN}/admin`);
 });
@@ -740,7 +740,7 @@ test('a deploy that keeps failing leaves a readable record and tells operators, 
   assert.match(notice.problem, /the deploy failed 3 times/);
   assert.ok(fake.db.paths('console_audit/').map((p) => fake.db.read(p).action).includes('build-failed'));
   assert.ok(!fake.mailer.sent.some((m) => m.kind === 'status' && m.problem), 'a client sees only the status');
-  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['building', 'build-failed']);
+  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['build-failed']);
   const owners = fake.mailer.sent.filter((m) => m.status === 'build-failed');
   assert.deepEqual(owners.map((m) => m.to).sort(), ['ana@example.org', 'bo@example.org']);
   assert.match(owners[0].link, /\/organizations\/o1\/applications\/a1$/);
@@ -749,7 +749,7 @@ test('a deploy that keeps failing leaves a readable record and tells operators, 
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.db.read('applications/a1').status, 'ready');
   assert.equal(fake.db.read('console_builds/a1').error, null);
-  assert.equal(statusMail(fake.mailer).filter((s) => s === 'building').length, 2, 'one email per Owner, once');
+  assert.equal(statusMail(fake.mailer).filter((s) => s === 'ready').length, 2, 'one email per Owner, once');
 });
 
 test('a second run after a finished build changes nothing and emails nobody', async () => {

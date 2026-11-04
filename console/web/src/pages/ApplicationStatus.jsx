@@ -166,7 +166,7 @@ export default function ApplicationStatus() {
       </div>
       {error ? <p className="message error" role="alert">{error}</p> : null}
 
-      {state?.copyFailed ? <p className="message error">We could not email your copy of the agreement. Your acceptance is saved.</p> : null}
+      {state?.copyFailed ? <p className="message error">We could not email your copy of the agreement. Your acceptance is saved, and you can read it below.</p> : null}
       {app.build?.failed ? <BuildFailed app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} /> : null}
       {app.status === 'declined' && app.note ? (
         <aside className="note" role="note">
@@ -183,7 +183,7 @@ export default function ApplicationStatus() {
         <p><Link className="button primary" to={setupPath(orgId, appId, STEPS[0])}>Continue the setup</Link></p>
       ) : null}
       {app.acceptance ? (
-        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. We email the Owners when the status changes.</p>
+        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. <Link to={`${statusPath(orgId, appId)}/agreement`}>Read the agreement</Link>. We email the Owners when the status changes.</p>
       ) : null}
       {accounts.map((provider) => (
         <div className="section" key={provider}>

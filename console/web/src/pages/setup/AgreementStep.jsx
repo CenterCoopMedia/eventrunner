@@ -4,7 +4,7 @@ import { SIGNUPS_CLOSED } from '../../setup/steps.js';
 import { TextField } from '../../setup/Field.jsx';
 
 /** Blank lines part the paragraphs. Each one renders as text, so nothing in it can run as HTML. */
-function AgreementText({ agreement }) {
+export function AgreementText({ agreement }) {
   return (
     <article className="agreement" aria-labelledby="agreement-title">
       <h2 id="agreement-title">{agreement.title}</h2>

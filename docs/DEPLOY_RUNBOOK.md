@@ -1130,6 +1130,7 @@ Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitH
 | `VITE_CONSOLE_FIREBASE_API_KEY`, `VITE_CONSOLE_FIREBASE_AUTH_DOMAIN`, `VITE_CONSOLE_FIREBASE_APP_ID` | The public web settings |
 | `VITE_CONSOLE_SIGN_IN_PROVIDERS` | Comma-separated: `google`, `microsoft`. Leave it empty to offer only the emailed link. List a method only after step 2 of §11.1 sets it up, or its button fails for the client. |
 | `VITE_CONSOLE_HELP_EMAIL` | The address clients see for reaching the hosting team, on every console page. Set it before sending a signup link: refusals and failed builds tell clients to ask the hosting team, and unset, no page says how. |
+| `VITE_CONSOLE_HELP_NAME` | The person clients see beside that address, as in "Need a hand? Email ...". Unset, the line says the hosting team. |
 | `CONSOLE_PUBLIC_URL`, `CONSOLE_MAIL_FROM` | Written to `console/functions/.env` at deploy |
 | `CONSOLE_STRIPE_CLIENT_ID`, `CONSOLE_EVENTBRITE_CLIENT_ID` | Also written to `.env`. Unset means the choice is not available yet. |
 | `CONSOLE_GITHUB_APP_ID`, `CONSOLE_GITHUB_INSTALLATION_ID`, `CONSOLE_GITHUB_REPOSITORY` | Also written to `.env`. Unset means a build does not start, and operators are told. |
@@ -1304,6 +1305,8 @@ The Owners get an email saying the build did not finish, with a link to the stat
 | A token that fails its test, or a test-mode connection | The client connects the account again from the status page, then retries. They can do this alone: an Owner can reconnect the chosen account, and only that one, while the build has failed. The frozen answers stay as they are. A retry without reconnecting fails the same way, because the step deletes a test-mode token. |
 | `exists outside the client folder` | The name's project already exists somewhere else. It needs a person. |
 | `the run has no value for ...` | A setting from section 12.1 is missing. |
+
+To close an accepted request that should not go on, such as a signup link that reached the wrong person, cancel its run if one is going, wait for it to stop, then select **Close this request** on its review page. That frees the web address and disconnects the client's accounts. It removes nothing the build already made. Read the build record to see how far it got, then remove by hand what exists: the Google Cloud project, the DNS records for its address, the GitHub Environment, and the sender domain. The freed name can't be reused until the project is gone, because the build refuses a project it didn't make.
 
 To run a rehearsal with a test-mode connection, set `CONSOLE_TEST_MODE` to `true` in the `console` Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts and builds nothing live.
 

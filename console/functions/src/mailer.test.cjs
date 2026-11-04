@@ -90,7 +90,7 @@ test('statusChangeMessage says the status in plain words, with the note and the 
 
 test('statusChangeMessage has words for every status after draft and refuses an unknown one', () => {
   assert.deepEqual(Object.keys(STATUS_WORDS).sort(), [
-    'approved', 'build-failed', 'building', 'declined', 'launched', 'ready', 'withdrawn',
+    'approved', 'build-failed', 'declined', 'launched', 'ready', 'withdrawn',
   ]);
   for (const status of Object.keys(STATUS_WORDS)) {
     assert.ok(statusChangeMessage({ ...change, status, note: null }).text.length > 0, status);

@@ -60,7 +60,6 @@ function inviteMessage({ organizationName, inviterEmail, role, link, expiresInDa
  */
 const STATUS_WORDS = Object.freeze({
   approved: { subject: 'We are building your site', line: 'An Owner accepted the agreement, and we are building your site. We will email you when it is ready.' },
-  building: { subject: 'We are building your site', line: 'We are building your site.' },
   ready: { subject: 'Your site is ready', line: 'Your site is ready.' },
   launched: { subject: 'Your site is open to the public', line: 'Your site is open to the public.' },
   withdrawn: { subject: 'Your request was withdrawn', line: 'An Owner withdrew your request. We will not build this site.' },

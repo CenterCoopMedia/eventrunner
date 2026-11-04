@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router';
 import { AuthProvider, forgetReturn, rememberReturn, signInErrorMessage, useAuth } from './auth.jsx';
 import AcceptInvite from './pages/AcceptInvite.jsx';
+import AcceptedAgreement from './pages/AcceptedAgreement.jsx';
 import ApplicationStatus from './pages/ApplicationStatus.jsx';
 import ConnectReturn from './pages/ConnectReturn.jsx';
 import OrganizationHome from './pages/OrganizationHome.jsx';
@@ -40,6 +41,7 @@ function useFocusHeadingOnNavigate() {
 
 function Layout() {
   const helpEmail = import.meta.env.VITE_CONSOLE_HELP_EMAIL;
+  const helpName = import.meta.env.VITE_CONSOLE_HELP_NAME;
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
   useFocusHeadingOnNavigate();
@@ -65,7 +67,7 @@ function Layout() {
       </header>
       <main id="main" tabIndex={-1} className="page">
         <Outlet />
-        {helpEmail ? <p className="muted section">Need the hosting team? Email <a href={`mailto:${helpEmail}`}>{helpEmail}</a>.</p> : null}
+        {helpEmail ? <p className="muted section">{helpName ? `Need a hand? Email ${helpName} at ` : 'Need the hosting team? Email '}<a href={`mailto:${helpEmail}`}>{helpEmail}</a>.</p> : null}
       </main>
     </>
   );
@@ -130,6 +132,7 @@ export function AppRoutes() {
           <Route path="/organizations/:orgId" element={<OrganizationHome />} />
           <Route path="/organizations/:orgId/team" element={<Team />} />
           <Route path="/organizations/:orgId/applications/:appId" element={<ApplicationStatus />} />
+          <Route path="/organizations/:orgId/applications/:appId/agreement" element={<AcceptedAgreement />} />
           <Route path="/organizations/:orgId/applications/:appId/:step" element={<Setup />} />
           <Route path="/connect/:provider/return" element={<ConnectReturn />} />
           <Route path="/invite/:inviteId" element={<AcceptInvite />} />

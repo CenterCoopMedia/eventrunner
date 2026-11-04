@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import NoteForm from './NoteForm.jsx';
 
 const SPAM_STATUSES = ['draft', 'withdrawn', 'declined'];
+const ACCEPTED = ['approved', 'building'];
 
 /** The decisions open to the hosting team for a request with this status. */
-export function decisionsFor(status) {
+export function decisionsFor(status, canClose = false) {
   return {
     decline: status === 'draft',
+    close: canClose,
     deleteSpam: SPAM_STATUSES.includes(status),
   };
 }
@@ -16,11 +18,11 @@ export function decisionsFor(status) {
  * and returns the focus to that button. `onDecide(name, body)` returns
  * true when the server accepted, or the error.
  */
-export default function ReviewActions({ status, onDecide }) {
+export default function ReviewActions({ status, canClose = false, onDecide }) {
   const [open, setOpen] = useState(null);
   const [refocus, setRefocus] = useState(null);
   const openers = useRef({});
-  const allowed = decisionsFor(status);
+  const allowed = decisionsFor(status, canClose);
 
   useEffect(() => {
     if (refocus) {
@@ -47,7 +49,13 @@ export default function ReviewActions({ status, onDecide }) {
   );
 
   if (!Object.values(allowed).some(Boolean)) {
-    return <p>No decision is open for a request with this status.</p>;
+    return (
+      <p>
+        {ACCEPTED.includes(status)
+          ? 'To close this request, cancel its run first. You can close it once the run stops.'
+          : 'No decision is open for a request with this status.'}
+      </p>
+    );
   }
 
   return (
@@ -62,6 +70,20 @@ export default function ReviewActions({ status, onDecide }) {
           submitLabel="Decline"
           danger
           onSubmit={async (note) => (await onDecide('declineApplication', { note })) === true}
+          onCancel={close}
+        />
+      ) : null}
+
+      {allowed.close ? <div className="row-actions">{opener('close', 'Close this request', 'button danger')}</div> : null}
+
+      {open === 'close' ? (
+        <NoteForm
+          id="close"
+          title="Close this request"
+          help="Say why. The web address becomes free and the client's accounts are disconnected. Anything the build already made, such as the Google Cloud project, stays until you remove it. The deploy runbook, section 12.2, lists it."
+          submitLabel="Close the request"
+          danger
+          onSubmit={async (note) => (await onDecide('closeApplication', { note })) === true}
           onCancel={close}
         />
       ) : null}

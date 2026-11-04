@@ -2,7 +2,8 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { declineApplication } = require('./reviewDecisions.cjs');
+const { closeApplication, declineApplication } = require('./reviewDecisions.cjs');
+const { makeFakeSecrets } = require('./fakes.cjs');
 const { NOW, PUBLIC_URL, ana, application, deps, fakeMailer, ops, ops2, seeded } = require('./fakeReview.cjs');
 
 const DRAFT = { status: 'draft', frozen: null };
@@ -126,4 +127,44 @@ test('one refused address does not stop the email to the other Owners', async ()
 
 test('a missing request is a 404', async () => {
   await assert.rejects(decline(deps(draft()), 'n', ops, 'nope'), { status: 404 });
+});
+
+const FAILED = { status: 'building', buildStart: { state: 'started', at: new Date(NOW - 1000) } };
+const closeDb = (app = FAILED, record = { state: 'failed' }) => seeded({
+  'applications/a1': application(app),
+  'console_builds/a1': record,
+  'console_connections/a1': { stripe: { accountId: 'acct_1' } },
+});
+const closeDeps = (db) => ({ ...deps(db), secrets: makeFakeSecrets(), log: { error() {} } });
+const close = (d, user = ops, body = {}) => closeApplication(d, { body: { appId: 'a1', revision: 2, note: 'Wrong person.', ...body }, user });
+
+test('closeApplication closes an accepted request whose build stopped', async () => {
+  const db = closeDb();
+  const d = closeDeps(db);
+  const result = await close(d);
+  assert.equal(result.body.application.status, 'declined');
+  const app = db.read('applications/a1');
+  assert.equal(app.status, 'declined');
+  assert.deepEqual(app.connections, {});
+  assert.equal(app.review.note, 'Wrong person.');
+  assert.equal(db.read('site_names/nclocal'), undefined, 'the name is free again');
+  assert.equal(db.read('console_connections/a1'), undefined);
+  assert.equal(db.read('console_token_deletions/a1'), undefined, 'the tokens went, so no row is left');
+  assert.ok(d.mailer.sent.every((m) => m.status === 'declined'));
+  assert.ok(db.paths('console_audit/').some((p) => db.read(p).action === 'close-request'));
+});
+
+test('closeApplication refuses while a run may be alive, and leaves everything alone', async () => {
+  for (const record of [{ state: 'queued' }, { state: 'running', startedAt: new Date(NOW - 1000) }]) {
+    const db = closeDb({ ...FAILED }, record);
+    await assert.rejects(close(closeDeps(db)), { status: 409, code: 'build-running' });
+    assert.equal(db.read('applications/a1').status, 'building');
+    assert.ok(db.read('console_connections/a1'));
+  }
+});
+
+test('closeApplication is for operators, on an accepted request the page still shows', async () => {
+  await assert.rejects(close(closeDeps(closeDb()), ana), { status: 403 });
+  await assert.rejects(close(closeDeps(closeDb()), ops, { revision: 1 }), { status: 409, code: 'status-changed' });
+  await assert.rejects(close(closeDeps(closeDb({ status: 'ready' }))), { status: 409, code: 'status-changed' });
 });

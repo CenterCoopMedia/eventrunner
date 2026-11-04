@@ -41,7 +41,7 @@ test('the scheduled jobs have no Hosting rewrite', () => {
 test('only the functions that send email get the mail secret', () => {
   assert.deepEqual(
     Object.entries(ENDPOINTS).filter(([, spec]) => spec.mail).map(([name]) => name),
-    ['inviteMember', 'withdrawApplication', 'acceptAgreement', 'declineApplication', 'retryBuild'],
+    ['inviteMember', 'withdrawApplication', 'acceptAgreement', 'declineApplication', 'closeApplication', 'retryBuild'],
   );
 });
 

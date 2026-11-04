@@ -11,6 +11,12 @@
  * the organization's Owners. A failed email does not undo the decision: the
  * answer says `mailFailed`, and the failure is logged. Nothing approves a
  * request: accepting the agreement starts its build (agreementAcceptance.cjs).
+ *
+ *   closeApplication    approved | building -> declined, once no run is alive
+ *                       (note; frees the name; disconnects the accounts)
+ *
+ * This is the way out for a link that reached the wrong person. It removes
+ * nothing a run already made: an operator does that (DEPLOY_RUNBOOK.md §12.2).
  */
 
 const { ConsoleError } = require('./http.cjs');
@@ -19,6 +25,9 @@ const {
 } = require('./reviewAccess.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { statusLink } = require('./applicationStatus.cjs');
+const { RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
+const { connectionChanging } = require('./connectionState.cjs');
+const { ACCOUNT_COLLECTION, deleteRecordedTokens, readConnectedAccounts, recordTokenDeletion } = require('./connections.cjs');
 
 const NOTE_MAX = 2000;
 const STATUS_CHANGED = 'This request changed since you opened it. Reload the page to see it.';
@@ -120,4 +129,47 @@ async function declineApplication(deps, input) {
   return decide(deps, input, { from: ['draft'], to: 'declined', note, releaseName: true });
 }
 
-module.exports = { NOTE_MAX, declineApplication, requireNote, transition };
+async function closeApplication(deps, { body, user }) {
+  const { db, now = Date.now, log = console } = deps;
+  await requireOperator(db, user);
+  const note = requireNote(body.note);
+  const revision = requireRevision(body.revision);
+  const appId = requireAppId(body.appId);
+  const ref = applicationRef(db, appId);
+  const at = new Date(now());
+  const { app, connected } = await db.runTransaction(async (tx) => {
+    const [snap, build] = await Promise.all([tx.get(ref), readBuild((r) => tx.get(r), db, appId)]);
+    if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
+    const current = { id: snap.id, ...snap.data() };
+    const history = Array.isArray(current.history) ? current.history : [];
+    if (!RETRY_STATUSES.includes(current.status) || revision !== history.length) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
+    if (!canRetryBuild(current, build, at.getTime())) {
+      throw new ConsoleError(409, 'build-running', 'A build may still be running. Cancel its run, wait for it to stop, then close the request.');
+    }
+    if (connectionChanging(current.connections, at.getTime())) {
+      throw new ConsoleError(409, 'connection-busy', 'An account on this request is being changed. Try again in a few minutes.');
+    }
+    const held = await heldNames(tx, db, appId);
+    const accounts = await readConnectedAccounts(tx, db, appId);
+    tx.update(ref, {
+      status: 'declined',
+      connections: {},
+      updatedAt: at,
+      updatedBy: user.uid,
+      history: [...history, { status: 'declined', at, by: user.uid, note }],
+      review: { note, by: user.uid, at, settings: null },
+    });
+    tx.delete(db.collection(ACCOUNT_COLLECTION).doc(appId));
+    releaseNames(tx, db, held);
+    tx.create(db.collection('console_audit').doc(), { action: 'close-request', appId, by: user.uid, at });
+    recordTokenDeletion(tx, db, appId, accounts, at);
+    return { app: current, connected: accounts };
+  });
+  // A token that cannot be deleted keeps its row for the retention job.
+  await deleteRecordedTokens({ ...deps, log }, appId, connected)
+    .catch((err) => log.error('console will try again to delete stored tokens', appId, err.message));
+  const mail = await notifyOwners(deps, app, { status: 'declined', note });
+  return { body: { application: { id: app.id, status: 'declined' }, ...mail } };
+}
+
+module.exports = { NOTE_MAX, closeApplication, declineApplication, requireNote, transition };

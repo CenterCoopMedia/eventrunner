@@ -45,6 +45,7 @@ jobs:
           VITE_CONSOLE_FIREBASE_APP_ID: ${{ vars.VITE_CONSOLE_FIREBASE_APP_ID }}
           VITE_CONSOLE_SIGN_IN_PROVIDERS: ${{ vars.VITE_CONSOLE_SIGN_IN_PROVIDERS }}
           VITE_CONSOLE_HELP_EMAIL: ${{ vars.VITE_CONSOLE_HELP_EMAIL }}
+          VITE_CONSOLE_HELP_NAME: ${{ vars.VITE_CONSOLE_HELP_NAME }}
         run: npm run build:console
 
       - name: Write the functions settings

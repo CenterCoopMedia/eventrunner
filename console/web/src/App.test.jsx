@@ -87,6 +87,10 @@ describe('AppRoutes', () => {
     vi.stubEnv('VITE_CONSOLE_HELP_EMAIL', 'help@example.org');
     renderApp('/nowhere');
     expect(screen.getByRole('link', { name: 'help@example.org' })).toHaveAttribute('href', 'mailto:help@example.org');
+    cleanup();
+    vi.stubEnv('VITE_CONSOLE_HELP_NAME', 'Sam Host');
+    renderApp('/nowhere');
+    expect(screen.getByText(/Need a hand\? Email Sam Host at/)).toBeInTheDocument();
     vi.unstubAllEnvs();
   });
 

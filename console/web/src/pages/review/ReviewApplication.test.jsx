@@ -168,9 +168,9 @@ describe('ReviewApplication', () => {
     expect(callApi).toHaveBeenCalledWith('deleteSpamApplication', { appId: 'a1', confirm: true });
   });
 
-  it('offers no decision on an approved request', async () => {
+  it('offers no decision on an approved request with a run going', async () => {
     page();
-    expect(await screen.findByText('No decision is open for a request with this status.')).toBeInTheDocument();
+    expect(await screen.findByText(/cancel its run first/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete as spam' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
   });
@@ -258,6 +258,28 @@ describe('ReviewApplication', () => {
       page();
       expect(await screen.findByRole('heading', { level: 2, name: 'Build' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('closing an accepted request', () => {
+    it('offers Close once the build stopped, and warns what stays', async () => {
+      callApi.mockImplementation(async (name) => {
+        if (name === 'getApplicationForReview') return { ...request({ status: 'building' }), canRetryBuild: true };
+        return { emailed: 1, mailFailed: false };
+      });
+      page();
+      fireEvent.click(await screen.findByRole('button', { name: 'Close this request' }));
+      expect(screen.getByText(/stays until you remove it/)).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText('Note to the client'), { target: { value: 'Wrong person.' } });
+      fireEvent.click(within(screen.getByRole('form', { name: 'Close this request' })).getByRole('button', { name: 'Close the request' }));
+      await vi.waitFor(() => expect(callApi).toHaveBeenCalledWith('closeApplication', { appId: 'a1', revision: 2, note: 'Wrong person.' }));
+    });
+
+    it('says to cancel the run while one may be alive', async () => {
+      callApi.mockImplementation(async () => ({ ...request({ status: 'building' }), canRetryBuild: false }));
+      page();
+      expect(await screen.findByText(/cancel its run first/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Close this request' })).not.toBeInTheDocument();
     });
   });
 });
