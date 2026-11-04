@@ -7,9 +7,13 @@ rules_version = '2';
 // The browser may only read:
 //   - a member reads its own organization and that organization's members;
 //   - an operator (a lowercase email in console_config/operators) reads
-//     every organization and every member.
-// Invites, the operator allowlist and the rate limits have no client
-// access at all. Every read needs a verified email address.
+//     every organization and every member;
+//   - a member reads its own organization's applications, and an operator
+//     reads every application;
+//   - an operator reads the console audit log.
+// Invites, web-address names (checkWebAddress answers on the server), the
+// operator allowlist, the console settings and the rate limits have no
+// client access at all. Every read needs a verified email address.
 //
 // Tests: console/tests/console.rules.test.js (npm run test:rules).
 
@@ -51,6 +55,17 @@ service cloud.firestore {
       allow read: if isOperator();
     }
 
+    // A guided-setup request (ADR 0007 §3). A list must ask for one
+    // organization (where orgId ==), so a member never lists another's.
+    match /applications/{appId} {
+      allow read: if isOperator() || isMember(resource.data.orgId);
+      allow write: if false;
+    }
+
+    match /site_names/{name} {
+      allow read, write: if false;
+    }
+
     match /invites/{inviteId} {
       allow read, write: if false;
     }
@@ -61,6 +76,13 @@ service cloud.firestore {
 
     match /console_rate_limits/{key} {
       allow read, write: if false;
+    }
+
+    // Operator review (ADR 0007 §5). The review functions write the
+    // audit log; an operator reads it.
+    match /console_audit/{entryId} {
+      allow read: if isOperator();
+      allow write: if false;
     }
   }
 }

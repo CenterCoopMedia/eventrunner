@@ -62,15 +62,16 @@ async function requireOrganization(db, orgId) {
 }
 
 /**
- * The caller must be an Owner of the organization.
+ * The caller must be an Owner of the organization. `refusal` is what an
+ * Editor is told, so each action can say what only an Owner can do.
  * @returns {Promise<object>} the caller's member record
  */
-async function requireOwner(db, orgId, user) {
+async function requireOwner(db, orgId, user, refusal = 'Only an Owner can change the team.') {
   await requireOrganization(db, orgId);
   const member = await readMember(db, orgId, user.uid);
   if (!member) throw new ConsoleError(404, 'not-found', 'We could not find that organization.');
   if (member.role !== 'owner') {
-    throw new ConsoleError(403, 'forbidden', 'Only an Owner can change the team.');
+    throw new ConsoleError(403, 'forbidden', refusal);
   }
   return member;
 }

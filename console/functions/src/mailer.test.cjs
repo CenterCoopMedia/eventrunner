@@ -2,7 +2,16 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { createPostmarkMailer, inviteMessage } = require('./mailer.cjs');
+const {
+  STATUS_WORDS, createPostmarkMailer, inviteMessage, operatorNoticeMessage, statusChangeMessage,
+} = require('./mailer.cjs');
+
+test('no status email uses hosting jargon', () => {
+  for (const status of Object.keys(STATUS_WORDS)) {
+    const { text } = statusChangeMessage({ organizationName: 'NC Local', eventName: 'Summit', status, note: 'n', link: '' });
+    assert.ok(!/firebase|project|tenant|environment|webhook|secret/i.test(text), text);
+  }
+});
 
 const invite = {
   to: 'sam@example.org',
@@ -58,6 +67,55 @@ test('the Postmark mailer throws on a refused send and never logs the token', as
     assert.ok(!err.message.includes('pm-token'));
     return true;
   });
+});
+
+const change = {
+  to: 'ana@example.org',
+  organizationName: 'NC Local',
+  eventName: 'Summit <2027>',
+  status: 'changes_requested',
+  link: 'https://console.eventrunner.org/organizations/o1/applications/a1',
+  note: 'Add the venue address.',
+};
+
+test('statusChangeMessage says the status in plain words, with the note and the link', () => {
+  const message = statusChangeMessage(change);
+  assert.equal(message.subject, 'Your request needs changes: Summit <2027>');
+  assert.match(message.text, /We need some changes to your request\./);
+  assert.match(message.text, /Note from the hosting team:\nAdd the venue address\./);
+  assert.match(message.text, /Open your request:\nhttps:\/\/console\.eventrunner\.org\/organizations\/o1\/applications\/a1/);
+  assert.ok(message.html.includes('Summit &lt;2027&gt;'));
+  assert.ok(!/firebase|project|tenant/i.test(message.text));
+});
+
+test('statusChangeMessage has words for every status after draft and refuses an unknown one', () => {
+  assert.deepEqual(Object.keys(STATUS_WORDS).sort(), [
+    'approved', 'building', 'changes_requested', 'declined', 'launched', 'ready', 'submitted', 'withdrawn',
+  ]);
+  for (const status of Object.keys(STATUS_WORDS)) {
+    assert.ok(statusChangeMessage({ ...change, status, note: null }).text.length > 0, status);
+  }
+  assert.match(statusChangeMessage({ ...change, status: 'submitted', note: null }).text, /We are reviewing your request\./);
+  assert.ok(!statusChangeMessage({ ...change, link: '' }).text.includes('Open your request'));
+  assert.throws(() => statusChangeMessage({ ...change, status: 'lost' }), TypeError);
+});
+
+test('operatorNoticeMessage names the organization and the event', () => {
+  const message = operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a' });
+  assert.equal(message.subject, 'New request: Summit from NC Local');
+  assert.match(message.text, /NC Local sent a request for a site for Summit\./);
+});
+
+test('the Postmark mailer sends status and operator email with their own tags', async () => {
+  const bodies = [];
+  const fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+  const mailer = createPostmarkMailer({ token: 't', from: 'a@b.example', fetch });
+  await mailer.sendStatusChange(change);
+  await mailer.sendOperatorNotice({ to: 'ops@ccm.example', organizationName: 'NC Local', eventName: 'Summit', link: '' });
+  assert.deepEqual(bodies.map((b) => [b.To, b.Tag]), [['ana@example.org', 'console-status'], ['ops@ccm.example', 'console-operator']]);
 });
 
 test('the Postmark mailer needs a token and a sender', () => {

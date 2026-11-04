@@ -27,7 +27,7 @@ export default function Organizations() {
         <ul className="cards">
           {data.organizations.map((org) => (
             <li key={org.id} className="card row">
-              <Link to={`/organizations/${org.id}/team`} className="card-title">{org.name}</Link>
+              <Link to={`/organizations/${org.id}`} className="card-title">{org.name}</Link>
               <span className="tag">{ROLE_LABELS[org.role] || org.role}</span>
             </li>
           ))}
@@ -41,10 +41,11 @@ export default function Organizations() {
         <section aria-labelledby="all-orgs-title" className="section">
           <h2 id="all-orgs-title">All organizations</h2>
           <p className="muted">You are on the hosting team, so you can see every organization. You cannot change their teams.</p>
+          <p><Link to="/review">Review requests</Link></p>
           <ul className="cards">
             {(data.allOrganizations || []).map((org) => (
               <li key={org.id} className="card row">
-                <Link to={`/organizations/${org.id}/team`} className="card-title">{org.name}</Link>
+                <Link to={`/organizations/${org.id}`} className="card-title">{org.name}</Link>
                 <span className="muted">Created {formatDate(org.createdAt)}</span>
               </li>
             ))}

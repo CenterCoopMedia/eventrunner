@@ -45,6 +45,11 @@ beforeEach(async () => {
     await setDoc(doc(db, 'organizations/o2/members/cy'), { uid: 'cy', email: 'cy@example.org', role: 'owner' });
     await setDoc(doc(db, 'invites/i1'), { orgId: 'o1', email: 'dee@example.org', role: 'editor', tokenHash: 'h', status: 'pending' });
     await setDoc(doc(db, 'console_rate_limits/invite-org-o1'), { count: 1 });
+    await setDoc(doc(db, 'applications/a1'), { orgId: 'o1', status: 'draft', answers: {} });
+    await setDoc(doc(db, 'applications/a2'), { orgId: 'o2', status: 'submitted', answers: {} });
+    await setDoc(doc(db, 'site_names/nclocal'), { appId: 'a1', orgId: 'o1' });
+    await setDoc(doc(db, 'console_config/settings'), { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' });
+    await setDoc(doc(db, 'console_audit/e1'), { action: 'delete-spam', appId: 'a9', by: 'ops' });
   });
 });
 
@@ -135,5 +140,85 @@ describe('no client writes', () => {
     const db = operator();
     await assertFails(updateDoc(doc(db, 'organizations/o2/members/cy'), { role: 'editor' }));
     await assertFails(updateDoc(doc(db, 'organizations/o2'), { name: 'Renamed' }));
+  });
+});
+
+describe('guided-setup requests', () => {
+  it('an Owner and an Editor read and list their own organization\'s requests', async () => {
+    for (const db of [ana(), ben()]) {
+      await assertSucceeds(getDoc(doc(db, 'applications/a1')));
+      await assertSucceeds(getDocs(query(collection(db, 'applications'), where('orgId', '==', 'o1'))));
+    }
+  });
+
+  it('a member cannot read or list another organization\'s requests, or list them all', async () => {
+    await assertFails(getDoc(doc(ana(), 'applications/a2')));
+    await assertFails(getDocs(query(collection(ana(), 'applications'), where('orgId', '==', 'o2'))));
+    await assertFails(getDocs(collection(ana(), 'applications')));
+  });
+
+  it('a stranger, a signed-out visitor and an unverified member read no request', async () => {
+    await assertFails(getDoc(doc(stranger(), 'applications/a1')));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'applications/a1')));
+    await assertFails(getDoc(doc(client('ana', 'ana@example.org', false), 'applications/a1')));
+  });
+
+  it('an operator reads and lists every request', async () => {
+    await assertSucceeds(getDoc(doc(operator(), 'applications/a2')));
+    await assertSucceeds(getDocs(collection(operator(), 'applications')));
+  });
+
+  it('nobody reads web-address names from the browser', async () => {
+    for (const db of [ana(), operator(), stranger()]) {
+      await assertFails(getDoc(doc(db, 'site_names/nclocal')));
+      await assertFails(getDocs(collection(db, 'site_names')));
+    }
+  });
+
+  it('nobody writes a request or a web-address name, operators included', async () => {
+    for (const db of [ana(), ben(), operator(), stranger()]) {
+      await assertFails(setDoc(doc(db, 'applications/a3'), { orgId: 'o1', status: 'draft' }));
+      await assertFails(updateDoc(doc(db, 'applications/a1'), { status: 'approved' }));
+      await assertFails(deleteDoc(doc(db, 'applications/a1')));
+      await assertFails(setDoc(doc(db, 'site_names/mine'), { appId: 'a1', orgId: 'o1' }));
+      await assertFails(deleteDoc(doc(db, 'site_names/nclocal')));
+    }
+  });
+});
+
+describe('operator review (P7)', () => {
+  it('an operator reads every application and the audit log', async () => {
+    const db = operator();
+    await assertSucceeds(getDoc(doc(db, 'applications/a1')));
+    await assertSucceeds(getDocs(query(collection(db, 'applications'), where('status', '==', 'submitted'))));
+    await assertSucceeds(getDoc(doc(db, 'console_audit/e1')));
+    await assertSucceeds(getDocs(collection(db, 'console_audit')));
+  });
+
+  it('a client, a stranger and an unverified operator read no audit record and get no new read of applications', async () => {
+    const unverifiedOperator = client('ops', 'ops@ccm.example', false);
+    for (const db of [ana(), ben(), stranger(), unverifiedOperator]) {
+      await assertFails(getDocs(collection(db, 'applications')));
+      await assertFails(getDoc(doc(db, 'console_audit/e1')));
+      await assertFails(getDocs(collection(db, 'console_audit')));
+    }
+    await assertFails(getDoc(doc(stranger(), 'applications/a1')));
+  });
+
+  it('nobody reads the console settings from the browser', async () => {
+    for (const db of [ana(), operator()]) {
+      await assertFails(getDoc(doc(db, 'console_config/settings')));
+    }
+  });
+
+  it('nobody writes applications, the audit log or the settings from the browser, operators included', async () => {
+    for (const db of [ana(), operator(), stranger()]) {
+      await assertFails(updateDoc(doc(db, 'applications/a1'), { status: 'approved' }));
+      await assertFails(setDoc(doc(db, 'applications/a2'), { orgId: 'o1', status: 'submitted' }));
+      await assertFails(deleteDoc(doc(db, 'applications/a1')));
+      await assertFails(setDoc(doc(db, 'console_audit/e2'), { action: 'delete-spam', appId: 'a1', by: 'ops' }));
+      await assertFails(deleteDoc(doc(db, 'console_audit/e1')));
+      await assertFails(setDoc(doc(db, 'console_config/settings'), { gcpFolder: 'folders/1', billingAccount: 'x', region: 'x' }));
+    }
   });
 });

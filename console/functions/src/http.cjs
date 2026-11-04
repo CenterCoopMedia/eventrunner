@@ -13,7 +13,10 @@
 
 const BEARER_RE = /^Bearer\s+(\S+)$/i;
 
-/** An expected refusal. postEndpoint sends it as is. */
+/**
+ * An expected refusal. postEndpoint sends it as is. Set `fields` (field
+ * path to message) to show the reasons next to the fields of a form.
+ */
 class ConsoleError extends Error {
   /** @param {number} status @param {string} code @param {string} message */
   constructor(status, code, message) {
@@ -24,8 +27,12 @@ class ConsoleError extends Error {
   }
 }
 
-function sendError(res, status, code, message) {
-  res.status(status).json({ error: { code, message } });
+/**
+ * `extras` adds detail for a form: `fields` (a map of field path to
+ * message) or `field` (the one input a refusal is about, to focus).
+ */
+function sendError(res, status, code, message, extras = {}) {
+  res.status(status).json({ error: { code, message, ...extras } });
 }
 
 /** @param {string|undefined} raw comma-separated origins @returns {string[]} */
@@ -133,7 +140,10 @@ function postEndpoint({ auth, log = console }, action) {
         // so the operator can see why; the caller sees only the message.
         if (err.cause) log.error('console endpoint refused after a failure', err.cause);
         if (err.retryAfterSeconds) res.set('Retry-After', String(err.retryAfterSeconds));
-        sendError(res, err.status, err.code, err.message);
+        const extras = {};
+        if (err.fields && typeof err.fields === 'object') extras.fields = err.fields;
+        if (typeof err.field === 'string') extras.field = err.field;
+        sendError(res, err.status, err.code, err.message, extras);
         return;
       }
       log.error('console endpoint failed', err);

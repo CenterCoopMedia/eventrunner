@@ -93,6 +93,28 @@ test('postEndpoint logs the cause of a refusal and sends Retry-After when it has
   assert.ok(!JSON.stringify(res.body).includes('provider said no'));
 });
 
+test('postEndpoint sends the field errors of a refusal, for a form', async () => {
+  const res = makeRes();
+  await postEndpoint({ auth, log: QUIET }, async () => {
+    const err = new ConsoleError(400, 'incomplete', 'Some answers need attention.');
+    err.fields = { 'event.name': 'Enter the event name.' };
+    throw err;
+  })(makeReq({ token: 'good' }), res);
+  assert.deepEqual(res.body, {
+    error: { code: 'incomplete', message: 'Some answers need attention.', fields: { 'event.name': 'Enter the event name.' } },
+  });
+});
+
+test('postEndpoint names the field a refusal is about, when it has one', async () => {
+  const res = makeRes();
+  await postEndpoint({ auth, log: QUIET }, async () => {
+    const err = new ConsoleError(400, 'invalid-setting', 'Enter a region.');
+    err.field = 'region';
+    throw err;
+  })(makeReq({ token: 'good' }), res);
+  assert.deepEqual(res.body, { error: { code: 'invalid-setting', message: 'Enter a region.', field: 'region' } });
+});
+
 test('applyCors answers a preflight and allows only listed origins', () => {
   const allowed = parseAllowedOrigins(' https://console.eventrunner.org , http://localhost:5173 ');
   assert.deepEqual(allowed, ['https://console.eventrunner.org', 'http://localhost:5173']);

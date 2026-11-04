@@ -2,29 +2,34 @@
 'use strict';
 
 /**
- * Pack packages/shared into functions/vendor/shared.tgz (spec §1.1).
+ * Pack packages/shared into functions/vendor/shared.tgz (spec §1.1) and
+ * into console/functions/vendor/shared.tgz (ADR 0007 Principle 5: the
+ * console runs the same answer rules as init-event.cjs).
  *
- * Firebase uploads only the functions/ directory on deploy, so the shared
+ * Firebase uploads only the functions directory on deploy, so the shared
  * workspace sibling must be physically vendored — a root node_modules
  * symlink does not survive the upload and the functions crash at cold
  * start with "Cannot find module 'shared'".
  *
- * Run by the firebase.json functions predeploy hook and by CI, so a laptop
- * deploy gets exactly the same treatment. Deterministic: npm pack
+ * Run by the functions predeploy hook of both firebase.json files and by
+ * CI, so a laptop deploy gets exactly the same treatment. Deterministic: npm pack
  * normalizes tarball mtimes, so an unchanged shared package produces a
  * byte-identical tarball and functions/package-lock.json stays quiet; a
  * changed one flips the pinned integrity hash, making a stale tarball a
  * loud lockfile mismatch instead of a silent version skew.
  *
  * No dependencies beyond npm itself, so it runs on a fresh clone before
- * any install.
+ * any install. `--copy` only copies an already packed tarball into the
+ * other functions directories (see copyVendored).
  */
 
 const { execFileSync } = require('node:child_process');
-const { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } = require('node:fs');
+const { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
+/** Each functions directory that vendors the shared package, with its own lockfile. */
+const FUNCTION_DIRS = Object.freeze(['functions', path.join('console', 'functions')]);
 const vendorDir = path.join(root, 'functions', 'vendor');
 const target = path.join(vendorDir, 'shared.tgz');
 const tmp = `${target}.tmp`;
@@ -82,6 +87,21 @@ function dropSharedEntries(lockPath) {
   writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
 }
 
+/**
+ * Copy the packed functions/vendor/shared.tgz into every other functions
+ * directory. `--copy` runs only this: a deploy job that downloads the one
+ * packed tarball restores the other copies before its root `npm ci`.
+ */
+function copyVendored(base = root) {
+  const packed = path.join(base, FUNCTION_DIRS[0], 'vendor', 'shared.tgz');
+  if (!existsSync(packed)) throw new Error(`${packed} is missing: run npm run prepare:functions first`);
+  for (const dir of FUNCTION_DIRS.slice(1)) {
+    const copyDir = path.join(base, dir, 'vendor');
+    mkdirSync(copyDir, { recursive: true });
+    copyFileSync(packed, path.join(copyDir, 'shared.tgz'));
+  }
+}
+
 function main() {
   mkdirSync(vendorDir, { recursive: true });
 
@@ -101,22 +121,30 @@ function main() {
   rmSync(target, { force: true });
   renameSync(tmp, target);
 
-  dropSharedEntries(path.join(root, 'functions', 'package-lock.json'));
+  // The console gets a byte-identical copy, so both lockfiles pin one hash.
+  copyVendored(root);
+
+  for (const dir of FUNCTION_DIRS) dropSharedEntries(path.join(root, dir, 'package-lock.json'));
   dropSharedEntries(path.join(root, 'package-lock.json'));
 
-  // Refresh functions/package-lock.json so it pins the tarball's integrity
+  // Refresh each functions lockfile so it pins the tarball's integrity
   // hash without installing anything, then the root workspace lockfile,
-  // which pins the same tarball through the functions workspace.
-  npm(['install', '--prefix', path.join(root, 'functions'), '--package-lock-only'], {
-    cwd: path.join(root, 'functions'),
-  });
+  // which pins the same tarball through each functions workspace.
+  for (const dir of FUNCTION_DIRS) {
+    npm(['install', '--prefix', path.join(root, dir), '--package-lock-only'], {
+      cwd: path.join(root, dir),
+    });
+  }
   npm(['install', '--package-lock-only']);
 
-  console.log(`prepare-functions: wrote ${path.relative(root, target)}`);
+  for (const dir of FUNCTION_DIRS) {
+    console.log(`prepare-functions: wrote ${path.join(dir, 'vendor', 'shared.tgz')}`);
+  }
 }
 
 if (require.main === module) {
-  main();
+  if (process.argv.includes('--copy')) copyVendored();
+  else main();
 }
 
-module.exports = { npmCommand, main };
+module.exports = { npmCommand, main, copyVendored, FUNCTION_DIRS };

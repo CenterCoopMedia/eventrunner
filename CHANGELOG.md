@@ -36,6 +36,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The guided setup in the client console (ADR 0007 §3, P5). An Owner
+  starts a request for an event site from the organization page. The
+  client answers seven steps, one per page at its own address, with a
+  step list, Back and Next, and each answer saves as the client types.
+  The event answers are checked with the shared rules that
+  `init-event.cjs` uses. The web-address step shows
+  `name.eventrunner.org` and says at once if the name is taken; a saved
+  name is reserved, so two requests never hold one name. The tickets
+  step records the choice only. **Create my site** needs every answer
+  and two Owners. It freezes the answers and emails the Owners and the
+  CCM operators. The status page shows the plain stages, the note when
+  the hosting team asks for changes, and **Withdraw**. An organization
+  can have three open requests, and one account can send five a day.
+  `scripts/prepare-functions.cjs` now vendors the shared package into
+  `console/functions` too, with its own lockfile.
 - **Settings → Web address** (ADR 0007 §8, P9a): an operator adds a custom
   web address. The new `webAddress` function asks Firebase Hosting for the
   domain and shows the records to add; **Check now** and the hourly
@@ -59,6 +74,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   favicon and sharing image. `npm test`, `npm run test:web` (through the
   new `npm run test:console`), `npm run test:rules` and `npm run lint`
   cover it. The one-time setup is in `docs/DEPLOY_RUNBOOK.md` §11.
+- **Operator review** in the client console (ADR 0007 §5, P7). The hosting
+  team reads a queue of requests by status, opens one to see its frozen
+  answers, team and history, and then requests changes or declines (each with
+  a note) or approves. Approval records the build settings: the Google Cloud
+  folder, billing account and region from the new console settings page, and
+  a project id and environment name made from the web address (`er-nclocal`
+  and `nclocal`). An operator can change each value, and the server checks
+  each one. Each decision runs in a transaction that checks the status, and
+  emails each Owner. Operators can delete a spam request, and a daily job
+  deletes withdrawn and declined requests 90 days after the last change. Both
+  free the web address and write an audit record with no client data.
+  Approval does not start the build yet (P8).
 - **Speaker logistics** spreadsheet in **Data export** (ADR 0008 §7, staff
   tier): travel, access needs, and audio and video needs from
   `speaker_logistics`, joined to each speaker's name and email. The event data

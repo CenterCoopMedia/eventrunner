@@ -29,9 +29,9 @@ CI was green on #589 to #593 at the last check; the newer ones are running.
 **3. Build: the client console (ADR 0007), one PR each.** NC Local's site
 waits on all of P4 to P10.
 - [ ] P4 Console foundation — can start now.
-- [ ] P5 Guided setup — can start now (after P4).
+- [x] P5 Guided setup — built on `ccr-7be41c6c-vyzsth-p5-setup`, on top of P4.
 - [ ] P6 Stripe and Eventbrite connections — blocked on prerequisites.
-- [ ] P7 Operator review — can start now (after P5).
+- [x] P7 Operator review — built on P4; waits for the P5 rebase.
 - [ ] P8 Provisioner — blocked on prerequisites.
 - [ ] P9 Custom web address and sender domain — can start now.
 - [ ] P10 Runbook and live proof in a test folder — needs the owner.
@@ -141,14 +141,16 @@ gets an adversarial review before it merges.
       Editor; operators allowlist; rules tests; favicon and social metadata.
       Built by a builder agent in its own worktree (2026-11-04); every line
       read before it goes on a PR.
-- [ ] P5 Guided setup: seven steps, autosave, web-address availability,
+- [x] P5 Guided setup: seven steps, autosave, web-address availability,
       shared validation, review and submit with rate limits, status page,
       client emails. Web unit, rules, handler and E2E tests.
+      Done without the E2E spec; console/README.md has the endpoints.
 - [ ] P6 Connections: Stripe Connect OAuth and Eventbrite OAuth with the
       event picker; tokens to console Secret Manager only; state binding;
       disconnect. Tests against fake OAuth servers.
-- [ ] P7 Operator review: queue, read, request changes, decline, approve
+- [x] P7 Operator review: queue, read, request changes, decline, approve
       with defaults from console settings; spam delete; 90-day retention.
+      Branch `ccr-7be41c6c-vyzsth-p7-review`, on P4.
 - [ ] P8 Provisioner: `scripts/provision-client.cjs` idempotent steps
       (project, Hosting subdomain + DNS, authorized domains, Postmark server
       and domain + DNS, tokens and webhooks, GitHub Environment, dispatches,

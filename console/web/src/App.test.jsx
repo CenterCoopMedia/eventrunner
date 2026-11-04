@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { callApi } from './api.js';
 import { AuthContext, RETURN_KEY } from './auth.jsx';
 import { fakeAuth } from './test/renderPage.jsx';
 import { AppRoutes } from './App.jsx';
+import { application, serveApi, team } from './test/application.js';
 
 vi.mock('./api.js', () => ({ callApi: vi.fn(async () => ({ operator: false, organizations: [{ id: 'o1', name: 'Org', role: 'owner' }] })) }));
 
@@ -61,8 +62,36 @@ describe('AppRoutes', () => {
     await waitFor(() => expect(window.localStorage.getItem(RETURN_KEY)).toBeNull());
   });
 
+  it('routes the review pages, and a client gets the hosting-team message', async () => {
+    const notOperator = Object.assign(new Error('This page is for the hosting team.'), { code: 'not-operator' });
+    for (const path of ['/review', '/review/settings', '/review/a1']) {
+      callApi.mockRejectedValueOnce(notOperator);
+      const { unmount } = render(
+        <AuthContext.Provider value={fakeAuth()}>
+          <MemoryRouter initialEntries={[path]}><AppRoutes /></MemoryRouter>
+        </AuthContext.Provider>,
+      );
+      expect(await screen.findByRole('heading', { level: 1, name: 'This page is for the hosting team' })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it('has a page for an address it does not know', () => {
     renderApp('/nowhere');
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
+  });
+
+  it('routes the organization page, the setup steps and the status page', async () => {
+    serveApi({ listApplications: { applications: [], myRole: 'owner', operator: false, canCreate: true }, getTeam: team() });
+    renderApp('/organizations/o1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'NC Local' })).toBeInTheDocument();
+    cleanup();
+    serveApi();
+    renderApp('/organizations/o1/applications/a1/web-address');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your web address' })).toBeInTheDocument();
+    cleanup();
+    serveApi({ getApplication: { application: application({ status: 'submitted', canEdit: false }) } });
+    renderApp('/organizations/o1/applications/a1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'NC Local News Summit' })).toBeInTheDocument();
   });
 });

@@ -7,13 +7,13 @@ import Organizations from './Organizations.jsx';
 vi.mock('../api.js', () => ({ callApi: vi.fn() }));
 
 describe('Organizations', () => {
-  it('lists my organizations with my role and a link to each team', async () => {
+  it('lists my organizations with my role and a link to each organization', async () => {
     callApi.mockResolvedValue({
       operator: false,
       organizations: [{ id: 'o1', name: 'Local News Lab', role: 'owner' }, { id: 'o2', name: 'Media Hub', role: 'editor' }],
     });
     renderPage(<Organizations />);
-    expect(await screen.findByRole('link', { name: 'Local News Lab' })).toHaveAttribute('href', '/organizations/o1/team');
+    expect(await screen.findByRole('link', { name: 'Local News Lab' })).toHaveAttribute('href', '/organizations/o1');
     expect(screen.getByText('Owner')).toBeInTheDocument();
     expect(screen.getByText('Editor')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Add another organization' })).toHaveAttribute('href', '/organizations/new');
@@ -35,8 +35,9 @@ describe('Organizations', () => {
     });
     renderPage(<Organizations />);
     expect(await screen.findByRole('heading', { name: 'All organizations' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Far Away Org' })).toHaveAttribute('href', '/organizations/o9/team');
+    expect(screen.getByRole('link', { name: 'Far Away Org' })).toHaveAttribute('href', '/organizations/o9');
     expect(screen.getByText(/You are on the hosting team/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Review requests' })).toHaveAttribute('href', '/review');
   });
 
   it('shows the server message when the list cannot load', async () => {
