@@ -4,7 +4,8 @@
  * The console's Secret Manager, through its REST API, so no new package is
  * needed. `fetch` and `getAccessToken` are injected; tests use a fake.
  *
- * A store has writeSecret(id, value), readSecret(id) -> value or null, and
+ * A store has writeSecret(id, value), readSecret(id) -> value or null,
+ * versionStamp(id) -> a string that changes with each write, or null, and
  * deleteSecret(id), which does nothing when the secret is gone. Errors name
  * the step and the HTTP status only, never the value or a response body.
  */
@@ -60,6 +61,12 @@ function createSecretStore({ projectId, getAccessToken, fetch, log = console }) 
     async readSecret(id) {
       const answer = await call('read', `${secretPath(id)}/versions/latest:access`, { allow: [404] });
       return answer ? Buffer.from(answer.payload.data, 'base64').toString('utf8') : null;
+    },
+
+    /** Holds no part of the value. A remade secret restarts its version numbers, so the time is part of it. */
+    async versionStamp(id) {
+      const version = await call('stamp', `${secretPath(id)}/versions/latest`, { allow: [404] });
+      return version ? `${version.name}@${version.createTime}` : null;
     },
 
     async deleteSecret(id) {

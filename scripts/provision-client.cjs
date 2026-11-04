@@ -814,7 +814,7 @@ async function stepTickets(ctx) {
     await putClientSecret(ctx, WEBHOOK_SECRET, randomBytes(32).toString('hex'));
     notes.push('made the ticket webhook secret');
   }
-  await noteTicketDetails(ctx, [choice, token, await clientSecrets.readSecret(WEBHOOK_SECRET), ctx.ticketVars, ctx.ticketOrganization]);
+  await noteTicketDetails(ctx, [choice, await clientSecrets.versionStamp(TOKEN_SECRET), await clientSecrets.versionStamp(WEBHOOK_SECRET), ctx.ticketVars, ctx.ticketOrganization]);
   ctx.ticketAccount = [choice, ctx.ticketOrganization || connection.accountId, ctx.ticketVars.EVENT_TICKETING_EVENT_ID].join(':');
   ctx.ticketConfig = {
     externalEventId: ctx.ticketVars.EVENT_TICKETING_EVENT_ID,

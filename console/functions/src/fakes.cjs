@@ -266,6 +266,8 @@ function makeRes() {
 /** The console's Secret Manager, in memory. Set `failWrite`, `failRead` or `failDelete` to refuse. */
 function makeFakeSecrets(seed = {}) {
   const store = new Map(Object.entries(seed));
+  const stamps = new Map();
+  let writes = 0;
   return {
     store,
     failWrite: false,
@@ -274,6 +276,12 @@ function makeFakeSecrets(seed = {}) {
     async writeSecret(id, value) {
       if (this.failWrite) throw new Error('secret add: HTTP 500');
       store.set(id, value);
+      writes += 1;
+      stamps.set(id, `${id}@${writes}`);
+    },
+    async versionStamp(id) {
+      if (this.failRead) throw new Error('secret stamp: HTTP 500');
+      return store.has(id) ? stamps.get(id) || `${id}@seed` : null;
     },
     async readSecret(id) {
       if (this.failRead) throw new Error('secret read: HTTP 500');

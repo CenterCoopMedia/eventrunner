@@ -63,6 +63,15 @@ test('a failed write throws an error with the status and not the value', async (
   });
 });
 
+test('a version stamp changes when a remade secret restarts its numbers, and is null when it is gone', async () => {
+  const version = (createTime) => json(200, { name: 'projects/1/secrets/s1/versions/1', createTime });
+  const { secrets, fetch } = store(version('2026-01-01T00:00:00Z'), version('2026-02-01T00:00:00Z'), json(404));
+  const first = await secrets.versionStamp('s1');
+  assert.equal(fetch.calls[0].url, `${BASE}/s1/versions/latest`);
+  assert.notEqual(await secrets.versionStamp('s1'), first);
+  assert.equal(await secrets.versionStamp('s1'), null);
+});
+
 test('reading returns the value, or null when it is gone', async () => {
   const { secrets, fetch } = store(json(200, { payload: { data: Buffer.from('the value').toString('base64') } }), json(404));
   assert.equal(await secrets.readSecret('s1'), 'the value');

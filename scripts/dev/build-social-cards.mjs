@@ -65,10 +65,10 @@ const MARK = `<svg viewBox="0 0 24 24" aria-hidden="true">
  * The console card carries the accent: the top rule, the folio and a tile
  * behind the mark, the same tile as console/web/public/favicon.svg.
  *
- * @param {{ line: string, title: string, blurb: string, accent?: boolean }} card
+ * @param {{ line: string, title: string, blurb: string, foot?: string, accent?: boolean }} card
  * @returns {string} a complete document
  */
-function page({ line, title, blurb, accent = false }) {
+function page({ line, title, blurb, foot = 'An initiative of the Center for Cooperative Media at Montclair State University', accent = false }) {
   const { surface, ink, inkMuted, rule, accent: accentRgb } = palette();
   const lead = accent ? accentRgb : ink;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
@@ -107,7 +107,7 @@ p { max-width: 22em; margin-block-start: 32px; font-size: 30px; line-height: 1.4
   <div class="lockup">${accent ? `<div class="tile">${MARK}</div>` : MARK}<h1>${title}</h1></div>
   <p>${blurb}</p>
 </div>
-<div class="foot">An initiative of the Center for Cooperative Media at Montclair State University</div>
+<div class="foot">${foot}</div>
 </body></html>`;
 }
 
@@ -130,8 +130,8 @@ const CARDS = [
     file: 'console/web/public/og-console.png',
     line: 'Console',
     title: 'Event Runner',
-    blurb: 'Sign up, name your organization and invite your team. We review your request '
-      + 'and then build your event site.',
+    blurb: 'Answer a few questions, accept the agreement and start building your event site.',
+    foot: 'console.eventrunner.org',
     accent: true,
   },
 ];
