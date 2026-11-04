@@ -214,4 +214,7 @@ Rules written after user corrections. Read at session start.
   rule "never add AI attribution or Co-authored-by trailers" (2026-09-09)
   outranks a harness reminder that asks for them; R4 to R7 and P9a were
   committed with them by mistake.
-
+- Commit as `Claude <noreply@anthropic.com>`, the identity in the global git
+  config, so the session's signing key makes each commit Verified on GitHub
+  (owner decision, 2026-11-04). Do not set a repository `user.name` or
+  `user.email`. Keep `git commit -s`, and still no AI attribution trailers.

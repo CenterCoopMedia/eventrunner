@@ -230,7 +230,10 @@
           classifier emits the selections; mixed changes take the union of their tiers.
           A pull request runs that classifier from the base commit, so the pull request cannot replace the rules that select the security tiers.
           The <code>CI gate</code> job is the stable aggregate check for branch protection. A job
-          that the classifier did not select is expected to be skipped. Merges do not
+          that the classifier did not select is expected to be skipped. When two pushes
+          start two runs, the older run is cancelled and its gate is skipped, not
+          failed. GitHub counts a skipped required check as passed, so if you cancel the
+          only run on a pull request, start it again before you merge. Merges do not
           repeat the matrix that passed on the pull request. Deployment verification
           still runs. All tiers remain credential-free.</p>
           <h3 id="local-ci-on-operator-machines">Local CI on operator machines<a class="heading-anchor" href="#local-ci-on-operator-machines" aria-label="Link to this section">#</a></h3>
