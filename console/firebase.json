@@ -1,0 +1,43 @@
+{
+  "functions": {
+    "source": "functions",
+    "codebase": "console",
+    "ignore": ["node_modules", ".git", "**/*.test.cjs", "src/fake*.cjs"]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "web/dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/api/listOrganizations", "function": { "functionId": "listOrganizations", "region": "us-central1" } },
+      { "source": "/api/createOrganization", "function": { "functionId": "createOrganization", "region": "us-central1" } },
+      { "source": "/api/getTeam", "function": { "functionId": "getTeam", "region": "us-central1" } },
+      { "source": "/api/inviteMember", "function": { "functionId": "inviteMember", "region": "us-central1" } },
+      { "source": "/api/acceptInvite", "function": { "functionId": "acceptInvite", "region": "us-central1" } },
+      { "source": "/api/changeMemberRole", "function": { "functionId": "changeMemberRole", "region": "us-central1" } },
+      { "source": "/api/removeMember", "function": { "functionId": "removeMember", "region": "us-central1" } },
+      { "source": "**", "destination": "/index.html" }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "Content-Security-Policy", "value": "frame-ancestors 'none'" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "X-Robots-Tag", "value": "noindex" },
+          { "key": "Referrer-Policy", "value": "no-referrer" }
+        ]
+      }
+    ]
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "functions": { "port": 5001 },
+    "hosting": { "port": 5002 },
+    "ui": { "enabled": true }
+  }
+}
