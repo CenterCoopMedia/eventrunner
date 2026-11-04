@@ -60,7 +60,7 @@ jobs:
             if [ -n "$value" ]; then printf '%s="%s"\n' "$name" "$value" >> console/functions/.env; fi
           done
 
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
