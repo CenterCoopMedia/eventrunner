@@ -1,32 +1,33 @@
 'use strict';
 
 /**
- * The operator's decisions on a request (ADR 0007 §5):
+ * The operator's one decision on a request (ADR 0007 §5):
  *
- *   requestChanges      submitted                     -> changes_requested (note)
- *   declineApplication  submitted | changes_requested | awaiting_payment -> declined
- *                       (note; frees the name; closes an open payment page first)
- *   approveApplication  submitted                     -> approved (records the build settings)
+ *   declineApplication  draft -> declined (note; frees the name)
  *
- * Each runs in one transaction that reads the current status first, so two
+ * It runs in one transaction that reads the current status first, so two
  * operators cannot act on the same request twice. The second one gets
- * `status-changed`. Each appends to `history`, writes `review`, and then
- * emails the organization's Owners. A failed email does not undo the
- * decision: the answer says `mailFailed`, and the failure is logged.
+ * `status-changed`. It appends to `history`, writes `review`, and then emails
+ * the organization's Owners. A failed email does not undo the decision: the
+ * answer says `mailFailed`, and the failure is logged. Nothing approves a
+ * request: accepting the agreement starts its build (agreementAcceptance.cjs).
  *
- * Approval records the decision only. Building the site (P8) starts from
- * `approved` and `review.settings`; nothing is started here.
+ *   closeApplication    approved | building -> declined, once no run is alive
+ *                       (note; frees the name; disconnects the accounts)
+ *
+ * This is the way out for a link that reached the wrong person. It removes
+ * nothing a run already made: an operator does that (DEPLOY_RUNBOOK.md §12.2).
  */
 
 const { ConsoleError } = require('./http.cjs');
 const {
-  NOT_FOUND, applicationRef, ownerEmails, readApplication, requireAppId, requireOperator, reviewedAnswers, siteNameOf,
+  NOT_FOUND, applicationRef, ownerEmails, requireAppId, requireOperator, reviewedAnswers,
 } = require('./reviewAccess.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { statusLink } = require('./applicationStatus.cjs');
-const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
-const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('./consoleSettings.cjs');
-const { connectionProblem } = require('./connectionState.cjs');
+const { RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
+const { connectionChanging } = require('./connectionState.cjs');
+const { ACCOUNT_COLLECTION, deleteRecordedTokens, readConnectedAccounts, recordTokenDeletion } = require('./connections.cjs');
 
 const NOTE_MAX = 2000;
 const STATUS_CHANGED = 'This request changed since you opened it. Reload the page to see it.';
@@ -46,14 +47,12 @@ function requireNote(value) {
  *
  * `revision` is the history length the operator saw. When the request
  * changed since then, even back to the same status, the move is refused.
- * `guard(app)` can refuse the move after those checks.
- * `review(app)` returns the `review.settings` value to record, or null.
  * With `releaseName`, every `site_names` reservation the request holds
  * is deleted.
  *
  * @returns {Promise<object>} the request as it was before the change
  */
-async function transition({ db, now = Date.now }, { appId, user, from, to, revision = null, note = null, guard = () => {}, review = () => null, releaseName = false }) {
+async function transition({ db, now = Date.now }, { appId, user, from, to, revision = null, note = null, releaseName = false }) {
   const ref = applicationRef(db, requireAppId(appId));
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -62,17 +61,14 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, revis
     const history = Array.isArray(app.history) ? app.history : [];
     if (!from.includes(app.status)) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
     if (revision !== null && revision !== history.length) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
-    guard(app);
     const held = releaseName ? await heldNames(tx, db, app.id) : [];
-    // Every read is done; the writes follow.
-    const settings = review(app);
     const at = new Date(now());
     tx.update(ref, {
       status: to,
       updatedAt: at,
       updatedBy: user.uid,
       history: [...history, { status: to, at, by: user.uid, note }],
-      review: { note, by: user.uid, at, settings },
+      review: { note, by: user.uid, at, settings: null },
     });
     releaseNames(tx, db, held);
     return app;
@@ -128,41 +124,53 @@ async function decide(deps, { body, user }, spec) {
   return { body: { application: { id: app.id, status: spec.to }, ...mail } };
 }
 
-async function requestChanges(deps, input) {
-  const note = requireNote(input.body.note);
-  return decide(deps, input, { from: ['submitted'], to: 'changes_requested', note });
-}
-
 async function declineApplication(deps, input) {
   const note = requireNote(input.body.note);
-  await requireOperator(deps.db, input.user);
-  const first = await readApplication(deps.db, input.body.appId);
-  if (first.status === 'awaiting_payment') await closeOpenCheckout(deps.stripe, first);
-  return decide(deps, input, {
-    from: ['submitted', 'changes_requested', 'awaiting_payment'],
-    to: 'declined',
-    note,
-    releaseName: true,
-    guard: (app) => refuseNewCheckout(first, app),
-  });
+  return decide(deps, input, { from: ['draft'], to: 'declined', note, releaseName: true });
 }
 
-async function approveApplication(deps, input) {
-  const { db } = deps;
-  await requireOperator(db, input.user);
-  const overrides = input.body.settings && typeof input.body.settings === 'object' ? input.body.settings : {};
-  const consoleSettings = await readConsoleSettings(db);
-  // Checked inside the transaction against the request as it is then, so
-  // the project id comes from the name the request holds at approval.
-  const review = (app) => {
-    // A client can disconnect after sending the request.
-    if (connectionProblem(reviewedAnswers(app)?.tickets?.choice, app.connections)) {
-      throw new ConsoleError(409, 'connection-needed', 'The client has not connected the account for ticket sales, so this request cannot be approved yet.');
+async function closeApplication(deps, { body, user }) {
+  const { db, now = Date.now, log = console } = deps;
+  await requireOperator(db, user);
+  const note = requireNote(body.note);
+  const revision = requireRevision(body.revision);
+  const appId = requireAppId(body.appId);
+  const ref = applicationRef(db, appId);
+  const at = new Date(now());
+  const { app, connected } = await db.runTransaction(async (tx) => {
+    const [snap, build] = await Promise.all([tx.get(ref), readBuild((r) => tx.get(r), db, appId)]);
+    if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
+    const current = { id: snap.id, ...snap.data() };
+    const history = Array.isArray(current.history) ? current.history : [];
+    if (!RETRY_STATUSES.includes(current.status) || revision !== history.length) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
+    if (!canRetryBuild(current, build, at.getTime())) {
+      throw new ConsoleError(409, 'build-running', 'A build may still be running. Cancel its run, wait for it to stop, then close the request.');
     }
-    return checkSettings(APPROVAL_FIELDS, approvalDefaults(consoleSettings, siteNameOf(app)), overrides);
-  };
-  const result = await decide(deps, input, { from: ['submitted'], to: 'approved', review });
-  return result;
+    if (connectionChanging(current.connections, at.getTime())) {
+      throw new ConsoleError(409, 'connection-busy', 'An account on this request is being changed. Try again in a few minutes.');
+    }
+    const held = await heldNames(tx, db, appId);
+    const accounts = await readConnectedAccounts(tx, db, appId);
+    tx.update(ref, {
+      status: 'declined',
+      connections: {},
+      updatedAt: at,
+      updatedBy: user.uid,
+      history: [...history, { status: 'declined', at, by: user.uid, note }],
+      review: { note, by: user.uid, at, settings: null },
+    });
+    tx.delete(db.collection(ACCOUNT_COLLECTION).doc(appId));
+    // A run may have made the name's project, and Google never reuses a project id, so nobody could build it again.
+    if (!build) releaseNames(tx, db, held);
+    tx.create(db.collection('console_audit').doc(), { action: 'close-request', appId, by: user.uid, at });
+    recordTokenDeletion(tx, db, appId, accounts, at);
+    return { app: current, connected: accounts };
+  });
+  // A token that cannot be deleted keeps its row for the retention job.
+  await deleteRecordedTokens({ ...deps, log }, appId, connected)
+    .catch((err) => log.error('console will try again to delete stored tokens', appId, err.message));
+  const mail = await notifyOwners(deps, app, { status: 'declined', note });
+  return { body: { application: { id: app.id, status: 'declined' }, ...mail } };
 }
 
-module.exports = { NOTE_MAX, approveApplication, declineApplication, requestChanges, requireNote, transition };
+module.exports = { NOTE_MAX, closeApplication, declineApplication, requireNote, transition };

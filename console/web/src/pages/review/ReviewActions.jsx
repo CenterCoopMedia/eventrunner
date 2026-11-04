@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import ApproveForm from './ApproveForm.jsx';
 import NoteForm from './NoteForm.jsx';
 
-const SPAM_STATUSES = ['draft', 'awaiting_payment', 'submitted', 'changes_requested', 'withdrawn', 'declined'];
+const SPAM_STATUSES = ['draft', 'withdrawn', 'declined'];
+const ACCEPTED = ['approved', 'building'];
 
 /** The decisions open to the hosting team for a request with this status. */
-export function decisionsFor(status) {
+export function decisionsFor(status, canClose = false) {
   return {
-    requestChanges: status === 'submitted',
-    approve: status === 'submitted',
-    decline: ['submitted', 'changes_requested', 'awaiting_payment'].includes(status),
+    decline: status === 'draft',
+    close: canClose,
     deleteSpam: SPAM_STATUSES.includes(status),
   };
 }
@@ -19,11 +18,11 @@ export function decisionsFor(status) {
  * and returns the focus to that button. `onDecide(name, body)` returns
  * true when the server accepted, or the error.
  */
-export default function ReviewActions({ status, defaults, onDecide }) {
+export default function ReviewActions({ status, canClose = false, onDecide }) {
   const [open, setOpen] = useState(null);
   const [refocus, setRefocus] = useState(null);
   const openers = useRef({});
-  const allowed = decisionsFor(status);
+  const allowed = decisionsFor(status, canClose);
 
   useEffect(() => {
     if (refocus) {
@@ -50,27 +49,19 @@ export default function ReviewActions({ status, defaults, onDecide }) {
   );
 
   if (!Object.values(allowed).some(Boolean)) {
-    return <p>No decision is open for a request with this status.</p>;
+    return (
+      <p>
+        {ACCEPTED.includes(status)
+          ? 'To close this request, cancel its run first. You can close it once the run stops.'
+          : 'No decision is open for a request with this status.'}
+      </p>
+    );
   }
 
   return (
     <div className="stack">
-      <div className="row-actions">
-        {allowed.approve ? opener('approve', 'Approve', 'button primary') : null}
-        {allowed.requestChanges ? opener('changes', 'Request changes') : null}
-        {allowed.decline ? opener('decline', 'Decline', 'button danger') : null}
-      </div>
+      {allowed.decline ? <div className="row-actions">{opener('decline', 'Decline', 'button danger')}</div> : null}
 
-      {open === 'changes' ? (
-        <NoteForm
-          id="changes"
-          title="Request changes"
-          help="Say what the client must change. The client can then send the request again."
-          submitLabel="Send the request for changes"
-          onSubmit={async (note) => (await onDecide('requestChanges', { note })) === true}
-          onCancel={close}
-        />
-      ) : null}
       {open === 'decline' ? (
         <NoteForm
           id="decline"
@@ -82,8 +73,19 @@ export default function ReviewActions({ status, defaults, onDecide }) {
           onCancel={close}
         />
       ) : null}
-      {open === 'approve' ? (
-        <ApproveForm defaults={defaults} onSubmit={(settings) => onDecide('approveApplication', { settings })} onCancel={close} />
+
+      {allowed.close ? <div className="row-actions">{opener('close', 'Close this request', 'button danger')}</div> : null}
+
+      {open === 'close' ? (
+        <NoteForm
+          id="close"
+          title="Close this request"
+          help="Say why. Cancel any deploy run for this site first. The console drops the client's account connections. The web address becomes free only if no build ever began, because a build may have used it for good. Anything the build already made stays until you remove it, including the Google Cloud project and any Eventbrite token stored in it. The deploy runbook, section 12.2, lists it."
+          submitLabel="Close the request"
+          danger
+          onSubmit={async (note) => (await onDecide('closeApplication', { note })) === true}
+          onCancel={close}
+        />
       ) : null}
 
       {allowed.deleteSpam ? <SpamDelete onDelete={() => onDecide('deleteSpamApplication', { confirm: true })} /> : null}

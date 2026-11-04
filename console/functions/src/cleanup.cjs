@@ -6,12 +6,10 @@
  * - deleteSpamApplication: an operator deletes a spam request and frees
  *   its web-address name. A request that is approved or later is never
  *   deleted here, because a site may exist for it.
- * - runRetention: a scheduled job deletes `withdrawn`, `declined` and
- *   abandoned `awaiting_payment` requests 90 days after their last change
- *   (`updatedAt`), and frees their names. A payment page lasts a day, so
- *   none is open by then. A request with a payment problem stays until an
- *   operator looks at it. The acceptance records are in their own
- *   collection and are never deleted here.
+ * - runRetention: a scheduled job deletes `withdrawn` and `declined` requests
+ *   90 days after their last change (`updatedAt`), and frees their names. A
+ *   draft stays: its invoice was paid. The acceptance records are in their
+ *   own collection and are never deleted here.
  *
  * Both delete the request first, in a transaction that checks it as it is
  * now and leaves a `console_token_deletions` row. Then they delete its stored
@@ -28,17 +26,17 @@
 const { ConsoleError } = require('./http.cjs');
 const { toMillis } = require('./access.cjs');
 const { NOT_FOUND, applicationRef, readApplication, requireAppId, requireOperator } = require('./reviewAccess.cjs');
+const { readBuild } = require('./buildState.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { connectionChanging } = require('./connectionState.cjs');
-const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
 const {
   ACCOUNT_COLLECTION, deleteRecordedTokens, readConnectedAccounts, recordTokenDeletion, retryTokenDeletions, sweepExpiredStates,
 } = require('./connections.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_DAYS = 90;
-const RETAINED_STATUSES = Object.freeze(['withdrawn', 'declined', 'awaiting_payment']);
-const SPAM_STATUSES = Object.freeze(['draft', 'awaiting_payment', 'submitted', 'changes_requested', 'withdrawn', 'declined']);
+const RETAINED_STATUSES = Object.freeze(['withdrawn', 'declined']);
+const SPAM_STATUSES = Object.freeze(['draft', 'withdrawn', 'declined']);
 const RETENTION_BATCH = 500;
 
 /** Delete a request and everything connected to it, in the order that keeps a token findable. */
@@ -55,7 +53,8 @@ async function deleteWithConnections(deps, spec) {
 
 /**
  * Delete one request in a transaction, after `check(app)` passes on the
- * request as it is now. Frees every name it holds.
+ * request as it is now. Frees every name it holds, unless a run began: that
+ * run may have made the name's project, and Google never reuses a project id.
  *
  * @returns {Promise<object[]|null>} its connected accounts, or null when `check` says to keep it
  */
@@ -68,9 +67,10 @@ async function deleteApplication(db, { appId, by, action, at, check }) {
     if (!check(app)) return null;
     const held = await heldNames(tx, db, app.id);
     const connected = await readConnectedAccounts(tx, db, app.id);
+    const build = await readBuild((r) => tx.get(r), db, app.id);
     tx.delete(ref);
     tx.delete(db.collection(ACCOUNT_COLLECTION).doc(app.id));
-    releaseNames(tx, db, held);
+    if (!build) releaseNames(tx, db, held);
     tx.create(db.collection('console_audit').doc(), { action, appId: app.id, by, at });
     recordTokenDeletion(tx, db, app.id, connected, at);
     return connected;
@@ -87,21 +87,19 @@ async function deleteSpamApplication(deps, { body, user }) {
     if (!SPAM_STATUSES.includes(app.status)) {
       throw new ConsoleError(409, 'cannot-delete', 'This request is approved, so it cannot be deleted as spam.');
     }
-    refuseNewCheckout(first, app);
     if (connectionChanging(app.connections, now())) {
       throw new ConsoleError(409, 'connection-busy', 'An account on this request is being changed. Try again in a few minutes.');
     }
     return true;
   };
   check(first);
-  if (first.status === 'awaiting_payment') await closeOpenCheckout(deps.stripe, first);
   await deleteWithConnections(deps, { appId, by: user.uid, action: 'delete-spam', at: new Date(now()), check });
   return { body: { appId, deleted: true } };
 }
 
 /** True when the request is in a retained status and its last change is 90 days old or more. */
 function isExpired(app, at) {
-  if (app.feeProblem || connectionChanging(app.connections, at)) return false;
+  if (connectionChanging(app.connections, at)) return false;
   const changed = toMillis(app.updatedAt);
   return RETAINED_STATUSES.includes(app.status) && Number.isFinite(changed) && at - changed >= RETENTION_DAYS * DAY_MS;
 }

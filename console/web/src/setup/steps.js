@@ -11,7 +11,6 @@ export const STEPS = Object.freeze([
   { id: 'email', path: 'email', title: 'Email' },
   { id: 'review', path: 'review', title: 'Review' },
   { id: 'agreement', path: 'agreement', title: 'Agreement' },
-  { id: 'fee', path: 'fee', title: 'Event fee' },
 ]);
 
 /** The steps whose answers the server saves. Team and Review save nothing. */
@@ -21,16 +20,15 @@ export const ANSWER_STEPS = Object.freeze(['organization', 'event', 'webAddress'
 export const SIGNUPS_CLOSED = 'This site is not taking sign-ups right now. We saved your answers. Try again later.';
 
 /**
- * The ids of the steps open now. The server has the last word. The answers
- * stay open until an Owner accepts the agreement; the agreement opens when
- * they all pass and the site is taking sign-ups; the fee opens on acceptance.
+ * The ids of the steps open now. The server has the last word. The agreement
+ * opens when the answers all pass and the site is taking sign-ups. Accepting
+ * it starts the build and ends the setup.
  *
  * @param {object} app the request as getApplication returns it
  * @param {string[]} refusedSteps steps whose last change the server did not save
  */
 export function openStepIds(app, refusedSteps = []) {
-  if (app.status === 'awaiting_payment') return ['agreement', 'fee'];
-  const answers = STEPS.map((step) => step.id).filter((id) => id !== 'agreement' && id !== 'fee');
+  const answers = STEPS.map((step) => step.id).filter((id) => id !== 'agreement');
   const ready = app.status === 'draft' && app.signups?.open
     && Object.keys(app.errors).length === 0 && refusedSteps.length === 0;
   return ready ? [...answers, 'agreement'] : answers;
@@ -76,12 +74,12 @@ export const TICKET_CHOICES = Object.freeze([
   { value: 'none', label: 'No tickets', help: 'Your site has no tickets or registrations.', connect: false },
 ]);
 
+/** What the client reads in place of the status while a build has failed. */
+export const BUILD_FAILED_LABEL = 'We did not finish building your site';
+
 /** What the client reads for each status (ADR 0007 §3 and §5). */
 export const STATUS_LABELS = Object.freeze({
-  draft: 'Not sent yet',
-  awaiting_payment: 'Waiting for the event fee',
-  submitted: 'We are reviewing your request',
-  changes_requested: 'Changes needed',
+  draft: 'Setup not finished',
   approved: 'We are building your site',
   building: 'We are building your site',
   ready: 'Your site is ready',

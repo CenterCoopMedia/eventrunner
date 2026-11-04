@@ -57,6 +57,7 @@ const done = (response = {}) => answer({ name: 'operations/x', done: true, respo
 /** One stateful fake of every service the builder calls. */
 function fakeCloud(options = {}) {
   const state = {
+    clock: NOW,
     project: null,
     billing: '',
     services: new Set(),
@@ -302,7 +303,8 @@ function fakeCloud(options = {}) {
       return answer({});
     }
     const params = new URLSearchParams(body);
-    const created = { id: `we_${state.endpoints.length + 1}`, url: params.get('url'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
+    state.endpointsMade = (state.endpointsMade || 0) + 1;
+    const created = { id: `we_${state.endpointsMade}`, url: params.get('url'), status: 'enabled', enabled_events: params.getAll('enabled_events[]'), secret: 'whsec_fixture' };
     state.endpoints.push(created);
     return answer(created);
   }
@@ -322,6 +324,7 @@ function fakeCloud(options = {}) {
         status: 'completed',
         conclusion: failed ? 'failure' : 'success',
         html_url: `https://github.example/run/${state.runs.length + 1}`,
+        created_at: new Date(state.clock).toISOString(),
         inputs: body.inputs,
       });
       return new Response(null, { status: 204 });
@@ -393,7 +396,7 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
     fetch: fake.fetch,
     getAccessToken: async () => ({ access_token: 'gcp-token' }),
     sleep: async () => {},
-    now: () => NOW,
+    now: () => fake.state.clock,
     log: { ...quietLog(), log() {} },
     db,
     clientDb: () => clientFirestore,
@@ -411,7 +414,10 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
         await clientFirestore.collection('config').doc('event').set({ sender: answersWritten.at(-1).event.sender });
         return { code: 0, output: `init-event\n${branding}\n` };
       }
-      await clientFirestore.collection('config').doc('providers').set({ ticketing: { webhookRegisteredAt: 'now', webhookId: 'wh' } });
+      // The real script merges field by field; this fake's merge stops at the top level.
+      const providers = clientFirestore.collection('config').doc('providers');
+      const ticketing = (await providers.get()).data()?.ticketing;
+      await providers.set({ ticketing: { ...ticketing, webhookRegisteredAt: 'now', webhookId: 'wh' } }, { merge: true });
       return { code: 0, output: '' };
     },
   };
@@ -436,8 +442,8 @@ test('one approved request becomes a built site, and the record and the status s
   assert.equal(record.runUrl, 'https://github.com/owner/repo/actions/runs/42');
   assert.deepEqual(record.steps.map((s) => [s.id, s.state]), STEPS.map((s) => [s.id, 'done']));
 
-  assert.deepEqual(fake.mailer.sent.filter((m) => m.kind === 'status').map((m) => m.to).sort(), ['ana@example.org', 'ana@example.org', 'bo@example.org', 'bo@example.org']);
-  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['building', 'ready']);
+  assert.deepEqual(fake.mailer.sent.filter((m) => m.kind === 'status').map((m) => m.to).sort(), ['ana@example.org', 'bo@example.org']);
+  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['ready']);
   const ready = fake.mailer.sent.find((m) => m.status === 'ready');
   assert.equal(ready.adminLink, `https://${DOMAIN}/admin`);
 });
@@ -740,12 +746,16 @@ test('a deploy that keeps failing leaves a readable record and tells operators, 
   assert.match(notice.problem, /the deploy failed 3 times/);
   assert.ok(fake.db.paths('console_audit/').map((p) => fake.db.read(p).action).includes('build-failed'));
   assert.ok(!fake.mailer.sent.some((m) => m.kind === 'status' && m.problem), 'a client sees only the status');
-  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['building']);
+  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['build-failed']);
+  const owners = fake.mailer.sent.filter((m) => m.status === 'build-failed');
+  assert.deepEqual(owners.map((m) => m.to).sort(), ['ana@example.org', 'bo@example.org']);
+  assert.match(owners[0].link, /\/organizations\/o1\/applications\/a1$/);
+  assert.ok(!JSON.stringify(owners).includes('github.example'), 'the Owners get no run address');
 
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.db.read('applications/a1').status, 'ready');
   assert.equal(fake.db.read('console_builds/a1').error, null);
-  assert.equal(statusMail(fake.mailer).filter((s) => s === 'building').length, 2, 'one email per Owner, once');
+  assert.equal(statusMail(fake.mailer).filter((s) => s === 'ready').length, 2, 'one email per Owner, once');
 });
 
 test('a second run after a finished build changes nothing and emails nobody', async () => {
@@ -772,6 +782,70 @@ test('a retry after the token moved finds it in the client project', async () =>
   assert.equal(fake.consoleSecrets.store.size, 0);
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.clientSecrets.store.get('TICKETING_API_TOKEN'), STRIPE_TOKEN);
+});
+
+test('a signing secret that did not save is not paired with the new account\'s endpoint', async () => {
+  const fake = setup();
+  const stored = () => fake.clientSecrets.store.get('TICKETING_WEBHOOK_SECRET');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  await fake.clientSecrets.writeSecret('TICKETING_WEBHOOK_SECRET', 'whsec_account_a');
+  await fake.db.doc('applications/a1').update({ status: 'building' });
+  fake.state.endpoints = [];
+  fake.state.stripeToken = `${STRIPE_TOKEN}2`;
+  fake.consoleSecrets.store.set('connection-stripe-a1', fake.state.stripeToken);
+  const writeSecret = fake.clientSecrets.writeSecret.bind(fake.clientSecrets);
+  fake.clientSecrets.writeSecret = async (id, value) => {
+    if (id === 'TICKETING_WEBHOOK_SECRET') throw new Error('no answer');
+    return writeSecret(id, value);
+  };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.equal(stored(), 'whsec_account_a');
+  assert.equal(fake.state.endpoints.length, 1, 'the new account has its endpoint, and the old secret');
+  fake.clientSecrets.writeSecret = writeSecret;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(stored(), 'whsec_fixture');
+  assert.equal(fake.state.endpoints.length, 1);
+});
+
+test('a retry on a replaced token deploys again, or the site keeps the old one', async () => {
+  const fake = setup();
+  const again = async () => {
+    await fake.db.doc('applications/a1').update({ status: 'building' });
+    fake.state.clock += 3600000;
+    return provision({ appId: 'a1', deps: fake.deps });
+  };
+  const fullDeploys = () => fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal').length;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fullDeploys(), 1);
+  assert.equal(await again(), 0);
+  assert.equal(fullDeploys(), 1, 'nothing changed, so the earlier deploy counts');
+  fake.state.stripeToken = `${STRIPE_TOKEN}2`;
+  fake.consoleSecrets.store.set('connection-stripe-a1', fake.state.stripeToken);
+  assert.equal(await again(), 0);
+  assert.equal(fullDeploys(), 2);
+  assert.equal(fake.state.runs.filter((r) => r.display_title.includes('bootstrap')).length, 1);
+  assert.equal(await again(), 0);
+  assert.equal(fullDeploys(), 2, 'the new deploy counts for the next retry');
+});
+
+test('a retry on another Eventbrite event registers its webhook and records the event', async () => {
+  const request = eventbriteRequest();
+  const fake = setup(request);
+  const registrations = () => fake.commands.filter((c) => c.args[0] === 'scripts/register-ticketing-webhook.cjs');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(registrations().length, 1);
+  const connections = { eventbrite: { ...request.app.connections.eventbrite, event: { id: '666', name: 'B' } } };
+  await fake.db.doc('applications/a1').update({ status: 'building', connections });
+  await fake.db.doc('console_connections/a1').set({ eventbrite: { ...request.accounts.eventbrite, eventOrganizationId: 'org-b' } });
+  fake.state.clock += 3600000;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(registrations().length, 2);
+  assert.equal(registrations()[1].env.EVENT_TICKETING_EVENT_ID, '666');
+  assert.equal(registrations()[1].env.EVENT_TICKETING_ORGANIZATION_ID, 'org-b');
+  const { ticketing } = (await fake.clientFirestore.collection('config').doc('providers').get()).data();
+  assert.equal(ticketing.externalEventId, '666');
+  assert.ok(ticketing.webhookRegisteredAt);
+  assert.equal(fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal').length, 2);
 });
 
 test('init-event gets no foreign quota project, and no credential it does not need', async () => {
@@ -926,6 +1000,21 @@ test('the workflow\'s last step records a run that stopped, once', async () => {
   assert.equal(notices(fake.mailer).length, 2);
 });
 
+test('a retry made before the failed run\'s last step is not undone by that step', async () => {
+  const fake = setup({ app: { status: 'building', buildStart: { state: 'pending', at: new Date() } } });
+  const runUrl = 'https://github.com/o/r/actions/runs/77';
+  await fake.db.collection('console_builds').doc('a1').set({ state: 'queued', runUrl, error: 'the first failure', steps: [] });
+  await markStopped({ appId: 'a1', runId: '77', deps: fake.deps });
+  assert.equal(fake.db.read('console_builds/a1').state, 'queued');
+  assert.equal(fake.db.read('applications/a1').buildStart.state, 'pending');
+  assert.equal(notices(fake.mailer).length, 0);
+
+  // The retry's own run, dying before it writes, still gets recorded.
+  await markStopped({ appId: 'a1', runId: '78', deps: fake.deps });
+  assert.equal(fake.db.read('console_builds/a1').state, 'failed');
+  assert.equal(fake.db.read('applications/a1').buildStart.state, 'failed');
+});
+
 test('--mark-stopped leaves a finished request alone', async () => {
   const fake = setup({ app: { status: 'ready' } });
   assert.equal(await main(['--application', 'a1', '--mark-stopped'], ENV, () => fake.deps), 0);
@@ -944,4 +1033,20 @@ test('the id is checked before anything reads it', async () => {
   } finally {
     console.error = original;
   }
+});
+
+test('a run stops when the request closed after its first read', async () => {
+  const fake = setup();
+  const realTransaction = fake.db.runTransaction.bind(fake.db);
+  let closed = false;
+  fake.db.runTransaction = async (work) => {
+    if (!closed) {
+      closed = true;
+      await fake.db.collection('applications').doc('a1').update({ status: 'declined' });
+    }
+    return realTransaction(work);
+  };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 2);
+  assert.equal(fake.db.read('console_builds/a1'), undefined, 'no run was recorded');
+  assert.equal(fake.db.read('applications/a1').status, 'declined');
 });

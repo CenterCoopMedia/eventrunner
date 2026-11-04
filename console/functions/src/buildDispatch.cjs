@@ -8,7 +8,8 @@
  * Settings: CONSOLE_GITHUB_APP_ID, CONSOLE_GITHUB_INSTALLATION_ID,
  * CONSOLE_GITHUB_REPOSITORY (owner/name) and the secret
  * CONSOLE_GITHUB_APP_PRIVATE_KEY. With one unset or unusable it refuses to
- * dispatch, and runStartBuild reports that as a failed start.
+ * dispatch, and runStartBuild reports that as a failed start. A build is live
+ * unless CONSOLE_TEST_MODE is 'true', the setting the console's own checks read.
  *
  * Errors name the step and the HTTP status only, never the key, a token or a
  * response body. scripts/provision-client.cjs uses installationToken for the
@@ -98,7 +99,10 @@ function createStartBuild({ env, privateKey, fetch, now = Date.now }) {
     await githubFetch(fetch, 'dispatch', `/repos/${repository}/actions/workflows/${WORKFLOW}/dispatches`, {
       method: 'POST',
       headers: { ...GITHUB_HEADERS, Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ref: 'main', inputs: { application_id: appId } }),
+      body: JSON.stringify({
+        ref: 'main',
+        inputs: { application_id: appId, ...(env.CONSOLE_TEST_MODE === 'true' ? { test_mode: 'true' } : {}) },
+      }),
     });
   };
 }

@@ -2,10 +2,9 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { makeFakeStripe } = require('./fakes.cjs');
-const { acceptAgreement, getAgreement, reopenApplication } = require('./agreementAcceptance.cjs');
+const { acceptAgreement, getAgreement } = require('./agreementAcceptance.cjs');
 const { agreementHash, saveAgreement } = require('./consoleSettings.cjs');
-const { NOW, ana, applicationDoc, ben, fakeMailer, ops, quietLog, seededDb, signupTerms, validAnswers, zed } = require('./testData.cjs');
+const { NOW, ana, applicationDoc, ben, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers, zed } = require('./testData.cjs');
 
 const NAME_HELD = { 'site_names/nclocal': { appId: 'a1', orgId: 'o1', reservedAt: new Date(NOW) } };
 const ACCEPT = { orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', version: 1 };
@@ -16,18 +15,20 @@ function ready(extra = {}) {
 }
 
 function deps(db, more = {}) {
-  return { db, mailer: fakeMailer(), log: quietLog(), now: () => NOW, publicUrl: 'https://console.example', ...more };
+  return { db, mailer: fakeMailer(), log: quietLog(), now: () => NOW, publicUrl: 'https://console.example', startBuild: async () => {}, ...more };
 }
 
 const accept = (d, body = ACCEPT, user = ana) => acceptAgreement(d, { body, user });
 const records = (db) => db.paths('agreement_acceptances/').map((path) => ({ id: path.split('/')[1], ...db.read(path) }));
 
-test('an Owner accepts: the answers freeze, the record is written and the request waits for payment', async () => {
+test('an Owner accepts: the answers freeze, the record is written and the build starts', async () => {
   const db = ready();
   const mailer = fakeMailer();
   const result = await accept(deps(db, { mailer }));
-  assert.equal(result.body.status, 'awaiting_payment');
+  assert.equal(result.body.status, 'approved');
   assert.equal(result.body.copySent, true);
+  assert.equal(result.body.emailed, true);
+  assert.equal(result.body.buildStarted, true);
 
   const [record] = records(db);
   const { title, body } = { title: 'Test agreement', body: 'First test paragraph.\n\nSecond test paragraph.' };
@@ -44,14 +45,15 @@ test('an Owner accepts: the answers freeze, the record is written and the reques
   });
 
   const stored = db.read('applications/a1');
-  assert.equal(stored.status, 'awaiting_payment');
+  assert.equal(stored.status, 'approved');
   assert.deepEqual(stored.frozen, validAnswers());
+  assert.deepEqual(stored.buildStart, { state: 'started', at: new Date(NOW) });
   assert.deepEqual(stored.submittedAt, new Date(NOW));
   assert.equal(stored.submittedBy, 'ana');
   assert.deepEqual(stored.agreementAcceptance, {
     id: record.id, version: 1, sha256: record.sha256, name: 'Ana Owner', email: 'ana@example.org', at: new Date(NOW),
   });
-  assert.deepEqual(stored.history.at(-1), { status: 'awaiting_payment', at: new Date(NOW), by: 'ana', note: null });
+  assert.deepEqual(stored.history.at(-1), { status: 'approved', at: new Date(NOW), by: 'ana', note: null });
 
   const copy = mailer.sent.find((m) => m.kind === 'agreement');
   assert.equal(copy.to, 'ana@example.org');
@@ -59,7 +61,11 @@ test('an Owner accepts: the answers freeze, the record is written and the reques
   assert.equal(copy.version, 1);
   assert.equal(copy.sha256, record.sha256);
   assert.equal(copy.typedName, 'Ana Owner');
-  assert.ok(mailer.sent.some((m) => m.kind === 'status' && m.status === 'awaiting_payment'));
+  assert.ok(mailer.sent.some((m) => m.kind === 'status' && m.status === 'approved'));
+  const notice = mailer.sent.find((m) => m.kind === 'operator');
+  assert.equal(notice.noticeKind, 'started');
+  assert.equal(notice.organizationName, 'NC Local');
+  assert.equal(notice.eventName, 'NC Local News Summit');
 });
 
 test('the email on the record comes from the sign-in, not the request', async () => {
@@ -75,10 +81,10 @@ test('one Owner is enough to move on', async () => {
   const db = ready();
   assert.equal(db.paths('organizations/o1/members/').filter((p) => db.read(p).role === 'owner').length, 1);
   await accept(deps(db));
-  assert.equal(db.read('applications/a1').status, 'awaiting_payment');
+  assert.equal(db.read('applications/a1').status, 'approved');
 });
 
-test('fail closed: with no agreement or no fee, the request stays and nothing is written', async () => {
+test('fail closed: with no agreement or a setting missing, the request stays and nothing is written', async () => {
   const terms = signupTerms();
   const missing = [
     { 'console_config/settings': { gcpFolder: 'folders/1' }, 'console_config/agreement': terms['console_config/agreement'] },
@@ -147,79 +153,91 @@ test('the existing answer checks and rate limit still apply', async () => {
 });
 
 test('only a draft can accept', async () => {
-  for (const status of ['awaiting_payment', 'changes_requested', 'submitted', 'approved', 'withdrawn']) {
+  for (const status of ['approved', 'building', 'withdrawn', 'declined']) {
     const db = ready({ 'applications/a1': applicationDoc({ status }) });
     await assert.rejects(accept(deps(db)), { status: 409, code: 'locked' }, status);
     assert.deepEqual(records(db), []);
   }
 });
 
-test('a failed email does not undo the acceptance; it is logged', async () => {
+test('a failed email does not undo the acceptance or lose the build; it is logged', async () => {
   const db = ready();
   const log = quietLog();
-  const result = await accept(deps(db, { mailer: fakeMailer({ fail: true }), log }));
+  const started = [];
+  const result = await accept(deps(db, { mailer: fakeMailer({ fail: true }), log, startBuild: async (input) => started.push(input) }));
   assert.equal(result.body.copySent, false);
   assert.equal(result.body.emailed, false);
-  assert.equal(db.read('applications/a1').status, 'awaiting_payment');
+  assert.equal(result.body.buildStarted, true);
+  assert.deepEqual(started, [{ orgId: 'o1', appId: 'a1' }]);
+  assert.equal(db.read('applications/a1').status, 'approved');
   assert.equal(records(db).length, 1);
   assert.ok(log.errors.length >= 2);
 });
 
-test('going back to edit returns to draft, clears the pointer and keeps the record', async () => {
+test('the build starts before any email goes out', async () => {
   const db = ready();
-  const stripe = makeFakeStripe();
-  await accept(deps(db));
-  const before = records(db);
   const mailer = fakeMailer();
-  const result = await reopenApplication(deps(db, { stripe, mailer }), { body: IDS, user: ana });
-  assert.equal(result.body.status, 'draft');
+  let sentAtStart = null;
+  await accept(deps(db, { mailer, startBuild: async () => { sentAtStart = mailer.sent.length; } }));
+  assert.equal(sentAtStart, 0);
+});
+
+test('a failed start still accepts: the client is told through the status, not an error', async () => {
+  const db = ready();
+  const mailer = fakeMailer();
+  const result = await accept(deps(db, { mailer, startBuild: async () => { throw new Error('dispatch down'); } }));
+  assert.equal(result.body.status, 'approved');
+  assert.equal(result.body.buildStarted, false);
+  assert.equal(result.body.copySent, true);
   const stored = db.read('applications/a1');
-  assert.equal(stored.status, 'draft');
-  assert.equal(stored.agreementAcceptance, null);
-  assert.equal(stored.feeCheckout, null);
-  assert.equal(stored.frozen, null);
-  assert.equal(stored.submittedAt, null);
-  assert.deepEqual(stored.answers, validAnswers(), 'the answers stay');
-  assert.deepEqual(stored.history.map((h) => h.status), ['draft', 'awaiting_payment', 'draft']);
-  assert.deepEqual(records(db), before, 'the signed record is unchanged');
-  assert.ok(db.read('site_names/nclocal'), 'the name stays held');
-  assert.ok(mailer.sent.every((m) => m.status === 'draft'));
-
-  await accept(deps(db));
-  assert.equal(records(db).length, 2, 'accepting again adds a record');
-  assert.equal(db.read('applications/a1').status, 'awaiting_payment');
+  assert.equal(stored.status, 'approved');
+  assert.equal(stored.buildStart.state, 'failed');
+  assert.equal(records(db).length, 1);
+  assert.ok(mailer.sent.some((m) => m.kind === 'status' && m.status === 'build-failed'));
+  assert.ok(!mailer.sent.some((m) => m.kind === 'status' && m.status === 'approved'));
+  assert.ok(!mailer.sent.some((m) => m.noticeKind === 'started'));
 });
 
-test('going back closes an open payment page', async () => {
-  const db = ready({ 'applications/a1': applicationDoc({ status: 'awaiting_payment', feeCheckout: { sessionId: 'cs_open' } }) });
-  const stripe = makeFakeStripe();
-  stripe.sessions.set('cs_open', { id: 'cs_open', status: 'open' });
-  await reopenApplication(deps(db, { stripe }), { body: IDS, user: ana });
-  assert.equal(stripe.sessions.get('cs_open').status, 'expired');
+test('a throw from one step after the commit does not skip the next', async () => {
+  const db = ready();
+  const mailer = fakeMailer();
+  mailer.sendAgreementCopy = async () => { throw new Error('provider down'); };
+  const result = await accept(deps(db, { mailer }));
+  assert.equal(result.body.copySent, false);
+  assert.ok(mailer.sent.some((m) => m.kind === 'status'));
+  assert.ok(mailer.sent.some((m) => m.kind === 'operator'));
+});
+
+test('a connection dropped since the first check refuses inside the transaction', async () => {
+  const db = ready();
+  const realTransaction = db.runTransaction.bind(db);
+  db.runTransaction = async (work) => {
+    db.runTransaction = realTransaction;
+    await db.collection('applications').doc('a1').update({ connections: {} });
+    return realTransaction(work);
+  };
+  await assert.rejects(accept(deps(db)), (err) => {
+    assert.ok(err.fields['tickets.connection']);
+    return true;
+  });
   assert.equal(db.read('applications/a1').status, 'draft');
+  assert.deepEqual(records(db), []);
 });
 
-test('after paying, or when the payment service cannot say, a request cannot go back', async () => {
-  const paid = ready({ 'applications/a1': applicationDoc({ status: 'awaiting_payment', feeCheckout: { sessionId: 'cs_paid' } }) });
-  const stripe = makeFakeStripe();
-  stripe.sessions.set('cs_paid', { id: 'cs_paid', status: 'complete' });
-  await assert.rejects(reopenApplication(deps(paid, { stripe }), { body: IDS, user: ana }), { status: 409, code: 'payment-received' });
-  assert.equal(paid.read('applications/a1').status, 'awaiting_payment');
+test('a test-mode ticket account cannot accept on a live console, and can on a rehearsal one', async () => {
+  const testAccount = { connections: { stripe: stripeConnection({ livemode: false }) } };
+  const live = ready({ 'applications/a1': applicationDoc(testAccount) });
+  const started = [];
+  await assert.rejects(accept(deps(live, { startBuild: async (input) => started.push(input) })), (err) => {
+    assert.match(err.fields['tickets.connection'], /test mode/);
+    return true;
+  });
+  assert.equal(live.read('applications/a1').status, 'draft');
+  assert.deepEqual(started, []);
 
-  const unknown = ready({ 'applications/a1': applicationDoc({ status: 'awaiting_payment', feeCheckout: { sessionId: 'cs_x' } }) });
-  await assert.rejects(reopenApplication(deps(unknown, { stripe: makeFakeStripe({ down: true }) }), { body: IDS, user: ana }), { status: 502 });
-  assert.equal(unknown.read('applications/a1').status, 'awaiting_payment');
-
-  for (const status of ['draft', 'approved', 'withdrawn']) {
-    const db = ready({ 'applications/a1': applicationDoc({ status }) });
-    await assert.rejects(reopenApplication(deps(db, { stripe }), { body: IDS, user: ana }), { status: 409, code: 'locked' }, status);
-  }
-});
-
-test('only an Owner goes back', async () => {
-  const db = ready({ 'applications/a1': applicationDoc({ status: 'awaiting_payment' }) });
-  await assert.rejects(reopenApplication(deps(db), { body: IDS, user: ben }), { status: 403 });
-  assert.equal(db.read('applications/a1').status, 'awaiting_payment');
+  const rehearsal = ready({ 'applications/a1': applicationDoc(testAccount) });
+  await accept(deps(rehearsal, { consoleTestMode: true }));
+  assert.equal(rehearsal.read('applications/a1').status, 'approved');
 });
 
 test('a member reads the current text, and after accepting the accepted version', async () => {

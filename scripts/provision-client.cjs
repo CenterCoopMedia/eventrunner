@@ -29,6 +29,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { toMillis } = require('../console/functions/src/access.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
@@ -734,8 +735,9 @@ async function stripeEndpoint(ctx, token, notes) {
   const listed = await call(ctx, 'read the payment webhooks', `${STRIPE}/webhook_endpoints?limit=100`, { headers, quiet: true });
   const existing = (listed.data || []).filter((endpoint) => endpoint.url === url);
   const secret = await ctx.clientSecrets.readSecret(WEBHOOK_SECRET);
+  // Stripe shows a signing secret once, so only the endpoint recorded with it is known to match.
   const good = secret && existing.find((endpoint) => (
-    endpoint.status === 'enabled' && WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
+    endpoint.id === ctx.stripeEndpointId && endpoint.status === 'enabled' && WEBHOOK_EVENTS.every((type) => endpoint.enabled_events?.includes(type))
   ));
   if (good) {
     await putClientSecret(ctx, WEBHOOK_SECRET, secret);
@@ -749,7 +751,23 @@ async function stripeEndpoint(ctx, token, notes) {
   const created = await call(ctx, 'create the payment webhook', `${STRIPE}/webhook_endpoints`, { method: 'POST', headers, form, quiet: true });
   if (!created.secret) throw new Error('create the payment webhook: the answer held no signing secret');
   await putClientSecret(ctx, WEBHOOK_SECRET, created.secret);
+  ctx.stripeEndpointId = created.id;
+  await ctx.recordRef.update({ stripeEndpointId: created.id });
   notes.push('created the payment webhook');
+}
+
+/**
+ * A deployed function keeps the secret version and the variables it was
+ * deployed with, so a deploy from before these details changed no longer
+ * counts (`deploy`). This compares with the record, not with what this run
+ * moved, so a run that stopped straight after the move still notes it.
+ */
+async function noteTicketDetails(ctx, details) {
+  const key = createHash('sha256').update(JSON.stringify(details)).digest('hex');
+  if (ctx.ticketsKey === key) return;
+  ctx.ticketsKey = key;
+  ctx.ticketsChangedAt = new Date(ctx.deps.now());
+  await ctx.recordRef.update({ ticketsKey: key, ticketsChangedAt: ctx.ticketsChangedAt });
 }
 
 /**
@@ -796,6 +814,12 @@ async function stepTickets(ctx) {
     await putClientSecret(ctx, WEBHOOK_SECRET, randomBytes(32).toString('hex'));
     notes.push('made the ticket webhook secret');
   }
+  await noteTicketDetails(ctx, [choice, token, await clientSecrets.readSecret(WEBHOOK_SECRET), ctx.ticketVars, ctx.ticketOrganization]);
+  ctx.ticketAccount = [choice, ctx.ticketOrganization || connection.accountId, ctx.ticketVars.EVENT_TICKETING_EVENT_ID].join(':');
+  ctx.ticketConfig = {
+    externalEventId: ctx.ticketVars.EVENT_TICKETING_EVENT_ID,
+    ...(choice === 'stripe' ? { stripeAccountId: connection.accountId, livemode: connection.livemode !== false } : {}),
+  };
   return summary(notes);
 }
 
@@ -900,8 +924,9 @@ async function stepEnvironment(ctx) {
  * and mode, which is how a run is found again. A run that already succeeded
  * counts, a run in progress is waited for, and a failed one is run again a
  * bounded number of times, because a first deploy's failures are often transient.
+ * A run older than `after` is out of date, so it doesn't count.
  */
-async function deploy(ctx, { bootstrap }) {
+async function deploy(ctx, { bootstrap, after = Number.NaN }) {
   const { deps: { env, sleep }, settings: { environment } } = ctx;
   const headers = { ...GITHUB_HEADERS, Authorization: `Bearer ${env.GITHUB_TOKEN}` };
   const workflow = `${GITHUB}/repos/${env.GITHUB_REPOSITORY}/actions/workflows/deploy.yml`;
@@ -911,7 +936,8 @@ async function deploy(ctx, { bootstrap }) {
   for (let poll = 0; poll < DEPLOY_POLLS; poll += 1) {
     const listed = await call(ctx, 'read the deploy runs', `${workflow}/runs?event=workflow_dispatch&branch=main&per_page=50`, { headers });
     const latest = (listed.workflow_runs || []).find((run) => run.display_title === title) || null;
-    const counts = latest && (dispatches === 0 || latest.id !== previous);
+    const current = !(Date.parse(latest?.created_at) < after);
+    const counts = latest && (dispatches === 0 ? current : latest.id !== previous);
     if (counts && latest.status !== 'completed') {
       await sleep(DEPLOY_WAIT_MS);
     } else if (counts && latest.conclusion === 'success') {
@@ -983,8 +1009,15 @@ async function stepSeed(ctx) {
 
   const provider = ctx.ticketVars.EVENT_TICKETING_PROVIDER;
   if (PROVIDERS.includes(provider)) {
-    const stored = await db.collection('config').doc('providers').get();
-    if (!stored.data()?.ticketing?.webhookRegisteredAt) {
+    const providers = db.collection('config').doc('providers');
+    let ticketing = (await providers.get()).data()?.ticketing;
+    // A registration covers one account and event, and a client can replace them to recover a failed build.
+    if (ticketing?.registeredFor !== ctx.ticketAccount) {
+      const reset = { ...ctx.ticketConfig, registeredFor: ctx.ticketAccount, webhookRegisteredAt: null, webhookId: null };
+      await providers.set({ ticketing: reset }, { merge: true });
+      ticketing = reset;
+    }
+    if (!ticketing.webhookRegisteredAt) {
       const { code } = await runCommand('node', ['scripts/register-ticketing-webhook.cjs'], {
         env: childEnv(ctx, {
           TICKETING_API_TOKEN: await ctx.clientSecrets.readSecret(TOKEN_SECRET),
@@ -1031,7 +1064,7 @@ const STEPS = Object.freeze([
   { id: 'environment', label: 'Deploy settings', run: stepEnvironment },
   { id: 'first-deploy', label: 'First deploy', run: (ctx) => deploy(ctx, { bootstrap: true }) },
   { id: 'seed', label: 'Site content and team', run: stepSeed },
-  { id: 'full-deploy', label: 'Full deploy', run: (ctx) => deploy(ctx, { bootstrap: false }) },
+  { id: 'full-deploy', label: 'Full deploy', run: (ctx) => deploy(ctx, { bootstrap: false, after: toMillis(ctx.ticketsChangedAt) }) },
   { id: 'ready', label: 'Tell the Owners', run: stepReady },
 ]);
 
@@ -1071,7 +1104,7 @@ async function quietly(ctx, what, work) {
   }
 }
 
-/** A readable record, the queue's flag, an audit row and the operators' notice. */
+/** A readable record, the queue's flag, an audit row, and notices to the operators and the Owners. */
 async function recordFailure(ctx, step, message) {
   const { db, now } = ctx.deps;
   const at = new Date(now());
@@ -1085,6 +1118,9 @@ async function recordFailure(ctx, step, message) {
   }));
   await quietly(ctx, 'the failure notice', () => notifyOperators(consoleDeps(ctx), {
     orgId: ctx.app.orgId, appId: ctx.appId, eventName: ctx.eventName, kind: 'build-run-failed', problem: error,
+  }));
+  await quietly(ctx, 'the Owner notice', () => notifyOwners(consoleDeps(ctx), {
+    orgId: ctx.app.orgId, appId: ctx.appId, status: 'build-failed', eventName: ctx.eventName,
   }));
 }
 
@@ -1156,22 +1192,38 @@ async function provision({ appId, testMode = false, deps }) {
     eventName: frozen?.event?.name || '',
     steps: [],
     ownersEmailedAt: previous.exists ? previous.data().ownersEmailedAt || null : null,
+    ticketsKey: previous.exists ? previous.data().ticketsKey || null : null,
+    ticketsChangedAt: previous.exists ? previous.data().ticketsChangedAt || null : null,
+    stripeEndpointId: previous.exists ? previous.data().stripeEndpointId || null : null,
   };
-  await recordRef.set({
-    appId,
-    state: 'running',
-    testMode,
-    runUrl: env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL || 'https://github.com'}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : null,
-    startedAt: at,
-    updatedAt: at,
-    finishedAt: null,
-    failedStep: null,
-    error: null,
-    steps: [],
-    ownersEmailedAt: ctx.ownersEmailedAt,
-    environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
+  // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
+  // closed after this sees a live run and is refused.
+  const claimed = await db.runTransaction(async (tx) => {
+    if (!['approved', 'building'].includes((await tx.get(ref)).data()?.status)) return false;
+    tx.set(recordRef, {
+      appId,
+      state: 'running',
+      testMode,
+      runUrl: env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL || 'https://github.com'}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : null,
+      startedAt: at,
+      updatedAt: at,
+      finishedAt: null,
+      failedStep: null,
+      error: null,
+      steps: [],
+      ownersEmailedAt: ctx.ownersEmailedAt,
+      ticketsKey: ctx.ticketsKey,
+      ticketsChangedAt: ctx.ticketsChangedAt,
+      stripeEndpointId: ctx.stripeEndpointId,
+      environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
+    });
+    tx.update(ref, { buildStart: { state: 'started', at } });
+    return true;
   });
-  await ref.update({ buildStart: { state: 'started', at } });
+  if (!claimed) {
+    log.error(`provision-client: request ${appId} changed before the build began, so nothing was built`);
+    return 2;
+  }
 
   try {
     const missing = REQUIRED_ENV.filter((name) => !(env[name] || '').trim());
@@ -1181,11 +1233,8 @@ async function provision({ appId, testMode = false, deps }) {
     ctx.region = ctx.settings.region;
     ctx.domain = siteAddress(ctx.name);
     ctx.clientSecrets = deps.clientSecrets(ctx.projectId);
-    if (await moveStatus(ctx, 'approved', 'building')) {
-      await quietly(ctx, 'the building email', () => notifyOwners(consoleDeps(ctx), {
-        orgId: app.orgId, appId, status: 'building', eventName: ctx.eventName,
-      }));
-    }
+    // The acceptance email already said we are building, so this move sends none.
+    await moveStatus(ctx, 'approved', 'building');
     await runSteps(ctx);
   } catch (err) {
     log.error(`provision-client: ${err.step?.id || 'setup'} failed:`, err.message);
@@ -1200,8 +1249,11 @@ async function provision({ appId, testMode = false, deps }) {
 /**
  * For the workflow's last step. A run that timed out or was cancelled never
  * reached the catch above, so this leaves the record a run that finishes can't.
+ * A `queued` record that still names this run is a retry made after this run
+ * recorded its failure, and that retry is waiting for this run to end. A `queued`
+ * record naming an earlier run is this run's own retry, which died before writing.
  */
-async function markStopped({ appId, deps }) {
+async function markStopped({ appId, runId, deps }) {
   const { db } = deps;
   const [appSnap, recordSnap] = await Promise.all([
     db.collection('applications').doc(appId).get(),
@@ -1210,6 +1262,7 @@ async function markStopped({ appId, deps }) {
   if (!appSnap.exists || !['approved', 'building'].includes(appSnap.data().status)) return 0;
   const record = recordSnap.exists ? recordSnap.data() : {};
   if (record.state === 'failed') return 0;
+  if (record.state === 'queued' && runId && record.runUrl?.endsWith(`/actions/runs/${runId}`)) return 0;
   const app = appSnap.data();
   await recordFailure({
     appId,
@@ -1291,7 +1344,7 @@ async function main(argv = process.argv.slice(2), env = process.env, makeDeps = 
     return 2;
   }
   const deps = makeDeps(env);
-  if (args.markStopped) return markStopped({ appId: args.appId, deps });
+  if (args.markStopped) return markStopped({ appId: args.appId, runId: env.GITHUB_RUN_ID, deps });
   return provision({ appId: args.appId, testMode: args.testMode, deps });
 }
 

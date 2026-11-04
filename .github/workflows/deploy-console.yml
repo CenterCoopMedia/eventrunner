@@ -44,6 +44,8 @@ jobs:
           VITE_CONSOLE_FIREBASE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
           VITE_CONSOLE_FIREBASE_APP_ID: ${{ vars.VITE_CONSOLE_FIREBASE_APP_ID }}
           VITE_CONSOLE_SIGN_IN_PROVIDERS: ${{ vars.VITE_CONSOLE_SIGN_IN_PROVIDERS }}
+          VITE_CONSOLE_HELP_EMAIL: ${{ vars.VITE_CONSOLE_HELP_EMAIL }}
+          VITE_CONSOLE_HELP_NAME: ${{ vars.CONSOLE_HELP_NAME }}
         run: npm run build:console
 
       - name: Write the functions settings
@@ -56,9 +58,11 @@ jobs:
           CONSOLE_GITHUB_APP_ID: ${{ vars.CONSOLE_GITHUB_APP_ID }}
           CONSOLE_GITHUB_INSTALLATION_ID: ${{ vars.CONSOLE_GITHUB_INSTALLATION_ID }}
           CONSOLE_GITHUB_REPOSITORY: ${{ vars.CONSOLE_GITHUB_REPOSITORY }}
+          CONSOLE_TEST_MODE: ${{ vars.CONSOLE_TEST_MODE }}
+          CONSOLE_HELP_NAME: ${{ vars.CONSOLE_HELP_NAME }}
         run: |
           : > console/functions/.env
-          for name in CONSOLE_PUBLIC_URL CONSOLE_MAIL_FROM CONSOLE_STRIPE_CLIENT_ID CONSOLE_EVENTBRITE_CLIENT_ID CONSOLE_GITHUB_APP_ID CONSOLE_GITHUB_INSTALLATION_ID CONSOLE_GITHUB_REPOSITORY; do
+          for name in CONSOLE_PUBLIC_URL CONSOLE_MAIL_FROM CONSOLE_STRIPE_CLIENT_ID CONSOLE_EVENTBRITE_CLIENT_ID CONSOLE_GITHUB_APP_ID CONSOLE_GITHUB_INSTALLATION_ID CONSOLE_GITHUB_REPOSITORY CONSOLE_TEST_MODE CONSOLE_HELP_NAME; do
             value="${!name}"
             if [ -n "$value" ]; then printf '%s="%s"\n' "$name" "$value" >> console/functions/.env; fi
           done

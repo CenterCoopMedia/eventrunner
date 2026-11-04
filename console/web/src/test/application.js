@@ -30,7 +30,7 @@ export function fullAnswers() {
 }
 
 const ALL_DONE = {
-  organization: true, event: true, webAddress: true, team: true, tickets: true, email: true, review: true, agreement: false, fee: false,
+  organization: true, event: true, webAddress: true, team: true, tickets: true, email: true, review: true, agreement: false,
 };
 
 /** `connections` as getApplication returns it: a connected Stripe account. */
@@ -59,17 +59,15 @@ export function application(overrides = {}) {
     errors: {},
     progress: ALL_DONE,
     ownersNeeded: 0,
-    signups: { open: true, fee: { amount: 12345, currency: 'usd' } },
+    signups: { open: true },
     acceptance: null,
-    payment: null,
     myRole: 'owner',
     operator: false,
     canEdit: true,
     canAccept: true,
-    canSubmit: false,
-    canPay: false,
     canWithdraw: true,
     connections: connections(),
+    build: null,
     ...overrides,
   };
 }

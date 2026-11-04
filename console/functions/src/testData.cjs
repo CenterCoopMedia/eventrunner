@@ -21,7 +21,7 @@ function stripeConnection(overrides = {}) {
   return {
     connected: true,
     displayName: 'NC Local',
-    livemode: false,
+    livemode: true,
     connectedAt: new Date(NOW - 2000),
     ...overrides,
   };
@@ -57,7 +57,7 @@ function seededDb(extra = {}) {
   });
 }
 
-/** An application document as createApplication writes it, with overrides. */
+/** An application document as a redeemed signup link writes it, with overrides. */
 function applicationDoc(overrides = {}) {
   return {
     orgId: 'o1',
@@ -88,14 +88,14 @@ function fakeMailer({ fail = false } = {}) {
 }
 
 const AGREEMENT_TEXT = { title: 'Test agreement', body: 'First test paragraph.\n\nSecond test paragraph.' };
-const FAKE_FEE = { amount: 12345, currency: 'usd' };
+const BUILD_SETTINGS = { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' };
 
-/** The documents a request needs to pass Review, with obvious fakes. */
+/** The documents a signup needs, with obvious fakes. */
 function signupTerms() {
   const { title, body } = AGREEMENT_TEXT;
   const record = { version: 1, title, body, sha256: agreementHash(title, body), savedAt: new Date(NOW - 5000), savedBy: 'ops' };
   return {
-    'console_config/settings': { feeAmount: FAKE_FEE.amount, feeCurrency: FAKE_FEE.currency },
+    'console_config/settings': BUILD_SETTINGS,
     'console_config/agreement': record,
     'console_config/agreement/versions/1': record,
   };
@@ -105,4 +105,4 @@ function quietLog() {
   return { errors: [], error(...args) { this.errors.push(args); } };
 }
 
-module.exports = { FAKE_FEE, NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers, zed };
+module.exports = { BUILD_SETTINGS, NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers, zed };

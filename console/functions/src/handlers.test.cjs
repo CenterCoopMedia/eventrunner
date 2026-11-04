@@ -6,11 +6,11 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
-const { ENDPOINTS, SCHEDULED, WEBHOOKS, buildHandlers } = require('./handlers.cjs');
+const { ENDPOINTS, SCHEDULED, buildHandlers } = require('./handlers.cjs');
 
 const firebaseJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'firebase.json'), 'utf8'));
-const ALL_FUNCTIONS = [...Object.keys(ENDPOINTS), ...Object.keys(WEBHOOKS), ...Object.keys(SCHEDULED)].sort();
-const HTTP_FUNCTIONS = [...Object.keys(ENDPOINTS), ...Object.keys(WEBHOOKS)];
+const ALL_FUNCTIONS = [...Object.keys(ENDPOINTS), ...Object.keys(SCHEDULED)].sort();
+const HTTP_FUNCTIONS = Object.keys(ENDPOINTS);
 
 test('every endpoint is an onRequest function with a Hosting rewrite at /api/<name>', () => {
   const handlers = buildHandlers();
@@ -30,24 +30,36 @@ test('the deploy barrel exports the same endpoints', () => {
   assert.deepEqual(Object.keys(barrel).sort(), ALL_FUNCTIONS);
 });
 
-test('the retention job is scheduled and has no Hosting rewrite', () => {
-  assert.deepEqual(Object.keys(SCHEDULED), ['runApplicationRetention']);
-  assert.ok(!firebaseJson.hosting.rewrites.some((r) => r.function?.functionId === 'runApplicationRetention'));
-  assert.equal(typeof buildHandlers().runApplicationRetention, 'function');
+test('the scheduled jobs have no Hosting rewrite', () => {
+  assert.deepEqual(Object.keys(SCHEDULED), ['runApplicationRetention', 'runBuildWatch']);
+  for (const name of Object.keys(SCHEDULED)) {
+    assert.ok(!firebaseJson.hosting.rewrites.some((r) => r.function?.functionId === name), name);
+    assert.equal(typeof buildHandlers()[name], 'function', name);
+  }
 });
 
 test('only the functions that send email get the mail secret', () => {
   assert.deepEqual(
     Object.entries(ENDPOINTS).filter(([, spec]) => spec.mail).map(([name]) => name),
-    ['inviteMember', 'submitApplication', 'withdrawApplication', 'acceptAgreement', 'reopenApplication', 'requestChanges', 'declineApplication', 'approveApplication', 'retryBuild'],
+    ['inviteMember', 'withdrawApplication', 'acceptAgreement', 'declineApplication', 'closeApplication', 'retryBuild'],
   );
 });
 
-test('only the functions that reach the payment service get its key', () => {
+test('only the functions that start a build get the GitHub key', () => {
   assert.deepEqual(
-    Object.entries(ENDPOINTS).filter(([, spec]) => spec.stripe).map(([name]) => name),
-    ['withdrawApplication', 'reopenApplication', 'startFeeCheckout', 'declineApplication', 'deleteSpamApplication'],
+    Object.entries(ENDPOINTS).filter(([, spec]) => spec.build).map(([name]) => name),
+    ['acceptAgreement', 'retryBuild'],
   );
+});
+
+test('the public way in and the fee are gone: nothing makes an organization but a signup link', () => {
+  for (const name of [
+    'createOrganization', 'createApplication', 'submitApplication', 'requestChanges', 'approveApplication',
+    'reopenApplication', 'startFeeCheckout', 'saveEventFee', 'consoleFeeWebhook',
+  ]) {
+    assert.equal(ENDPOINTS[name], undefined, name);
+    assert.ok(!firebaseJson.hosting.rewrites.some((r) => r.source === `/api/${name}`), name);
+  }
 });
 
 test('the functions run in the region the Hosting rewrites name, whatever the environment says', () => {

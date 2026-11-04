@@ -68,7 +68,7 @@ describe('Coming back from a provider', () => {
   });
 
   it('a mismatch shows the plain message on the step', async () => {
-    callApi.mockRejectedValue(new ApiError(400, 'state-mismatch', 'We could not match this to your request, or it took too long. Start again from the tickets step.'));
+    callApi.mockRejectedValue(new ApiError(400, 'state-mismatch', 'We could not match this to your request, or it took too long. Connect the account again.'));
     rememberConnectReturn(TICKETS);
     renderReturn('?code=c1&state=wrong');
     expect(await screen.findByText(/Landed .*tickets: error: We could not match this/)).toBeInTheDocument();

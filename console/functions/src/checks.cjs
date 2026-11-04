@@ -169,12 +169,12 @@ function checkWebAddressAnswer(errors, { webAddress }) {
   if (problem) add(errors, 'webAddress.name', problem.message);
 }
 
-function checkTickets(errors, { tickets }, connections) {
+function checkTickets(errors, { tickets }, connections, testMode) {
   if (!TICKET_CHOICES.includes(tickets.choice)) {
     add(errors, 'tickets.choice', 'Choose how you sell tickets.');
     return;
   }
-  const problem = connectionProblem(tickets.choice, connections);
+  const problem = connectionProblem(tickets.choice, connections, { testMode });
   if (problem) add(errors, problem.field, problem.message);
 }
 
@@ -189,15 +189,17 @@ function checkEmail(errors, { email }) {
  * @param {object} stored the answers
  * @param {object} [connections] the request's `connections`. Leaving it out
  *   means nothing is connected, so a ticket provider choice fails.
+ * @param {{ testMode?: boolean }} [options] `testMode` lets a test-mode connection
+ *   pass, for a console whose builds run in test mode (connectionProblem).
  * @returns {Record<string, string>} errors by field path; empty when all pass
  */
-function checkAnswers(stored, connections) {
+function checkAnswers(stored, connections, { testMode = false } = {}) {
   const answers = withDefaults(stored);
   const errors = {};
   checkOrganization(errors, answers);
   checkEvent(errors, answers);
   checkWebAddressAnswer(errors, answers);
-  checkTickets(errors, answers, connections);
+  checkTickets(errors, answers, connections, testMode);
   checkEmail(errors, answers);
   // The shared rules last: a console message for a field wins over the
   // general one the shared error maps to.

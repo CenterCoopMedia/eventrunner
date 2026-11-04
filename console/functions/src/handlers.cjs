@@ -14,32 +14,33 @@
  *   CONSOLE_POSTMARK_TOKEN   secret: the Postmark server token
  *   CONSOLE_STRIPE_CLIENT_ID           the Stripe Connect client id; unset means not available yet
  *   CONSOLE_EVENTBRITE_CLIENT_ID       the Eventbrite app key; unset means not available yet
- *   CONSOLE_STRIPE_SECRET_KEY          secret: CCM's Stripe key, for the event fee and the Connect platform
- *   CONSOLE_STRIPE_FEE_WEBHOOK_SECRET  secret: signs consoleFeeWebhook deliveries
+ *   CONSOLE_STRIPE_SECRET_KEY          secret: CCM's Stripe key, for the Connect platform
  *   CONSOLE_EVENTBRITE_CLIENT_SECRET   secret: the Eventbrite app's client secret
  *   CONSOLE_GITHUB_APP_ID              the console's GitHub App, which starts the build
  *   CONSOLE_GITHUB_INSTALLATION_ID     that App's installation on the repository
  *   CONSOLE_GITHUB_REPOSITORY          the repository, as owner/name
  *   CONSOLE_GITHUB_APP_PRIVATE_KEY     secret: that App's private key
+ *   CONSOLE_TEST_MODE                  'true' on a rehearsal console: its builds run in test mode, so a test-mode account passes
  */
 
 const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
-const { createOrganization, getTeam, listOrganizations } = require('./organizations.cjs');
+const { getTeam, listOrganizations } = require('./organizations.cjs');
 const { acceptInvite, inviteMember } = require('./invites.cjs');
 const { changeMemberRole, removeMember } = require('./members.cjs');
-const { createApplication, getApplication, listApplications } = require('./applications.cjs');
+const { getApplication, listApplications } = require('./applications.cjs');
 const { saveApplicationStep } = require('./applicationSave.cjs');
-const { submitApplication, withdrawApplication } = require('./applicationStatus.cjs');
+const { withdrawApplication } = require('./applicationStatus.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
 const { getApplicationForReview, listApplicationsForReview } = require('./reviewQueue.cjs');
-const { approveApplication, declineApplication, requestChanges } = require('./reviewDecisions.cjs');
+const { closeApplication, declineApplication } = require('./reviewDecisions.cjs');
 const { deleteSpamApplication, runRetention } = require('./cleanup.cjs');
-const { getConsoleSettings, saveAgreement, saveConsoleSettings, saveEventFee } = require('./consoleSettings.cjs');
-const { acceptAgreement, getAgreement, reopenApplication } = require('./agreementAcceptance.cjs');
-const { startFeeCheckout, stripeClient } = require('./feeCheckout.cjs');
-const { feeWebhookEndpoint } = require('./feeWebhook.cjs');
+const { getConsoleSettings, saveAgreement, saveConsoleSettings } = require('./consoleSettings.cjs');
+const { acceptAgreement, getAgreement } = require('./agreementAcceptance.cjs');
+const {
+  createSignupLink, getSignupLink, listSignupLinks, redeemSignupLink, revokeSignupLink,
+} = require('./signupLinks.cjs');
 const { createStartBuild } = require('./buildDispatch.cjs');
-const { retryBuild } = require('./buildRetry.cjs');
+const { reportSilentBuilds, retryBuild } = require('./buildRetry.cjs');
 const {
   chooseEventbriteEvent, completeConnection, disconnectAccount, listEventbriteEvents, startConnection,
 } = require('./connections.cjs');
@@ -51,38 +52,37 @@ const { connectionsAvailable, createConnectors } = require('./connectors.cjs');
 const REGION = 'us-central1';
 // Daily, at a quiet hour. The job is safe to run again at any time.
 const RETENTION_SCHEDULE = 'every day 04:17';
+const BUILD_WATCH_SCHEDULE = 'every 60 minutes';
 
 const ENDPOINTS = Object.freeze({
   listOrganizations: { action: listOrganizations },
-  createOrganization: { action: createOrganization },
   getTeam: { action: getTeam },
   inviteMember: { action: inviteMember, mail: true },
   acceptInvite: { action: acceptInvite },
   changeMemberRole: { action: changeMemberRole },
   removeMember: { action: removeMember },
-  createApplication: { action: createApplication },
   getApplication: { action: getApplication },
   listApplications: { action: listApplications },
   saveApplicationStep: { action: saveApplicationStep },
   checkWebAddress: { action: checkWebAddress },
-  submitApplication: { action: submitApplication, mail: true },
-  withdrawApplication: { action: withdrawApplication, mail: true, stripe: true },
-  // The agreement and the event fee (ADR 0007, amendment 2026-11-04).
+  withdrawApplication: { action: withdrawApplication, mail: true },
+  // Signup links and the agreement (ADR 0007, amendment 2026-11-04).
+  createSignupLink: { action: createSignupLink },
+  listSignupLinks: { action: listSignupLinks },
+  revokeSignupLink: { action: revokeSignupLink },
+  getSignupLink: { action: getSignupLink },
+  redeemSignupLink: { action: redeemSignupLink },
   getAgreement: { action: getAgreement },
-  acceptAgreement: { action: acceptAgreement, mail: true },
-  reopenApplication: { action: reopenApplication, mail: true, stripe: true },
-  startFeeCheckout: { action: startFeeCheckout, stripe: true },
-  // Operator review (ADR 0007 §5).
+  acceptAgreement: { action: acceptAgreement, mail: true, build: true },
+  // Operator review (ADR 0007 §5). An Owner can also retry a failed build.
   listApplicationsForReview: { action: listApplicationsForReview },
   getApplicationForReview: { action: getApplicationForReview },
-  requestChanges: { action: requestChanges, mail: true },
-  declineApplication: { action: declineApplication, mail: true, stripe: true },
-  approveApplication: { action: approveApplication, mail: true },
+  declineApplication: { action: declineApplication, mail: true },
+  closeApplication: { action: closeApplication, mail: true, connect: true },
   retryBuild: { action: retryBuild, mail: true, build: true },
-  deleteSpamApplication: { action: deleteSpamApplication, stripe: true, connect: true },
+  deleteSpamApplication: { action: deleteSpamApplication, connect: true },
   getConsoleSettings: { action: getConsoleSettings },
   saveConsoleSettings: { action: saveConsoleSettings },
-  saveEventFee: { action: saveEventFee },
   saveAgreement: { action: saveAgreement },
   // Account connections (ADR 0007 §4).
   startConnection: { action: startConnection, connect: true },
@@ -92,14 +92,10 @@ const ENDPOINTS = Object.freeze({
   chooseEventbriteEvent: { action: chooseEventbriteEvent, connect: true },
 });
 
-/** Called by a provider: the raw body, a signature, and no sign-in or CORS. */
-const WEBHOOKS = Object.freeze({
-  consoleFeeWebhook: { endpoint: feeWebhookEndpoint },
-});
-
 /** Scheduled jobs: not HTTP, so no Hosting rewrite. */
 const SCHEDULED = Object.freeze({
   runApplicationRetention: { job: runRetention, schedule: RETENTION_SCHEDULE, connect: true },
+  runBuildWatch: { job: reportSilentBuilds, schedule: BUILD_WATCH_SCHEDULE, mail: true },
 });
 
 const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice', 'sendAgreementCopy']);
@@ -126,7 +122,6 @@ function buildHandlers({ startBuild } = {}) {
   const region = REGION;
   const postmarkToken = defineSecret('CONSOLE_POSTMARK_TOKEN');
   const stripeKey = defineSecret('CONSOLE_STRIPE_SECRET_KEY');
-  const feeWebhookSecret = defineSecret('CONSOLE_STRIPE_FEE_WEBHOOK_SECRET');
   const eventbriteClientSecret = defineSecret('CONSOLE_EVENTBRITE_CLIENT_SECRET');
   const connectSecrets = [stripeKey, eventbriteClientSecret];
   const githubAppKey = defineSecret('CONSOLE_GITHUB_APP_PRIVATE_KEY');
@@ -171,7 +166,6 @@ function buildHandlers({ startBuild } = {}) {
   for (const [name, spec] of Object.entries(ENDPOINTS)) {
     const secrets = [...new Set([
       ...(spec.mail ? [postmarkToken] : []),
-      ...(spec.stripe ? [stripeKey] : []),
       ...(spec.connect ? connectSecrets : []),
       ...(spec.build ? [githubAppKey] : []),
     ])];
@@ -179,37 +173,35 @@ function buildHandlers({ startBuild } = {}) {
     handlers[name] = onRequest(options, async (req, res) => {
       if (applyCors(req, res, parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS))) return;
       const { db, auth } = adminServices();
-      const deps = { db, auth, now: Date.now, log: console, publicUrl: publicUrl(), connectionsAvailable: connectionsAvailable(process.env) };
+      const deps = {
+        db,
+        auth,
+        now: Date.now,
+        log: console,
+        publicUrl: publicUrl(),
+        connectionsAvailable: connectionsAvailable(process.env),
+        consoleTestMode: process.env.CONSOLE_TEST_MODE === 'true',
+      };
       if (spec.connect) Object.assign(deps, connectDeps());
       if (spec.mail) deps.mailer = lazyMailer();
-      if (spec.stripe) deps.stripe = stripeClient(stripeKey.value());
       if (spec.build) deps.startBuild = buildStarter();
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });
   }
-  for (const [name, spec] of Object.entries(WEBHOOKS)) {
-    handlers[name] = onRequest({ region, secrets: [postmarkToken, stripeKey, feeWebhookSecret, githubAppKey] }, async (req, res) => {
+  for (const [name, spec] of Object.entries(SCHEDULED)) {
+    const secrets = [...(spec.mail ? [postmarkToken] : []), ...(spec.connect ? connectSecrets : [])];
+    handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York', secrets }, async () => {
       const { db } = adminServices();
-      await spec.endpoint({
+      await spec.job({
         db,
         now: Date.now,
         log: console,
-        publicUrl: publicUrl(),
-        mailer: lazyMailer(),
-        stripe: stripeClient(stripeKey.value()),
-        webhookSecret: feeWebhookSecret.value(),
-        startBuild: buildStarter(),
-      })(req, res);
-    });
-  }
-  for (const [name, spec] of Object.entries(SCHEDULED)) {
-    const secrets = spec.connect ? { secrets: connectSecrets } : {};
-    handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York', ...secrets }, async () => {
-      const { db } = adminServices();
-      await spec.job({ db, now: Date.now, log: console, ...(spec.connect ? connectDeps() : {}) });
+        ...(spec.connect ? connectDeps() : {}),
+        ...(spec.mail ? { mailer: lazyMailer(), publicUrl: publicUrl() } : {}),
+      });
     });
   }
   return handlers;
 }
 
-module.exports = { ENDPOINTS, REGION, SCHEDULED, WEBHOOKS, buildHandlers };
+module.exports = { ENDPOINTS, REGION, SCHEDULED, buildHandlers };

@@ -3,8 +3,10 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { deleteSpamApplication, isExpired, runRetention } = require('./cleanup.cjs');
-const { makeFakeConnector, makeFakeSecrets, makeFakeStripe } = require('./fakes.cjs');
-const { DAY, NOW, QUIET, ana, answers, application, deps, ops, seeded } = require('./fakeReview.cjs');
+const { makeFakeConnector, makeFakeSecrets } = require('./fakes.cjs');
+const { DAY, NOW, QUIET, ana, answers, application, deps, ops, seeded: seededReview, } = require('./fakeReview.cjs');
+
+const seeded = (extra) => seededReview({ 'applications/a1': application({ status: 'draft' }), ...extra });
 
 const auditRows = (db) => db.paths('console_audit/').map((p) => db.read(p));
 
@@ -62,7 +64,7 @@ test('the retention job deletes old withdrawn and declined requests, frees their
     'site_names/gone': { appId: 'w1', orgId: 'o1' },
     'applications/recent': application({ status: 'declined', updatedAt: new Date(NOW - 10 * DAY) }),
     'applications/kept': application({ status: 'approved', updatedAt: old }),
-    'applications/sub': application({ status: 'submitted', updatedAt: old }),
+    'applications/draft': application({ status: 'draft', updatedAt: old }),
   });
   const result = await runRetention({ db, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
   assert.deepEqual(result.deleted.sort(), ['a1', 'w1']);
@@ -71,7 +73,15 @@ test('the retention job deletes old withdrawn and declined requests, frees their
   assert.equal(db.read('applications/w1'), undefined);
   assert.equal(db.read('site_names/nclocal'), undefined);
   assert.equal(db.read('site_names/gone'), undefined);
-  for (const id of ['recent', 'kept', 'sub']) assert.ok(db.read(`applications/${id}`), id);
+  for (const id of ['recent', 'kept', 'draft']) assert.ok(db.read(`applications/${id}`), id);
+  // A run may have made this name's project, so it stays taken after the request goes.
+  const built = seeded({
+    'applications/a1': application({ status: 'declined', updatedAt: old }),
+    'console_builds/a1': { state: 'failed' },
+  });
+  await runRetention({ db: built, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
+  assert.equal(built.read('applications/a1'), undefined);
+  assert.ok(built.read('site_names/nclocal'));
   assert.deepEqual(auditRows(db).map((r) => [r.action, r.appId, r.by]).sort(), [
     ['retention-delete', 'a1', 'retention'],
     ['retention-delete', 'w1', 'retention'],
@@ -140,7 +150,7 @@ test('the retention job stops when a full batch has nothing it can delete', asyn
 test('a spam delete frees every name the request holds', async () => {
   const live = { ...application().answers, webAddress: { name: 'nclocal2' } };
   const db = seeded({
-    'applications/a1': application({ status: 'changes_requested', answers: live }),
+    'applications/a1': application({ status: 'draft', answers: live }),
     'site_names/nclocal2': { appId: 'a1', orgId: 'o1' },
   });
   await deleteSpamApplication(deps(db), { body: { appId: 'a1', confirm: true }, user: ops });
@@ -148,39 +158,15 @@ test('a spam delete frees every name the request holds', async () => {
   assert.equal(db.read('site_names/nclocal'), undefined);
 });
 
-test('an abandoned request waiting for payment is deleted after 90 days and frees its name, and its acceptance record stays', async () => {
+test('a closed request\'s acceptance record outlives it', async () => {
   const old = new Date(NOW - 90 * DAY);
   const db = seeded({
-    'applications/a1': application({ status: 'awaiting_payment', updatedAt: old }),
+    'applications/a1': application({ status: 'withdrawn', updatedAt: old }),
     'agreement_acceptances/r1': { version: 1, appId: 'a1' },
   });
   const { deleted } = await runRetention({ db, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
   assert.deepEqual(deleted, ['a1']);
-  assert.deepEqual(db.paths('site_names/'), []);
   assert.ok(db.read('agreement_acceptances/r1'), 'the signed record is kept');
-});
-
-test('a request with a payment problem stays until an operator looks at it', () => {
-  const old = new Date(NOW - 200 * DAY);
-  assert.equal(isExpired(application({ status: 'awaiting_payment', updatedAt: old }), NOW), true);
-  assert.equal(isExpired(application({ status: 'awaiting_payment', updatedAt: old, feeProblem: { code: 'amount-mismatch' } }), NOW), false);
-});
-
-test('a spam delete closes an open payment page, and a paid one refuses it', async () => {
-  const stripe = makeFakeStripe();
-  stripe.sessions.set('cs_open', { id: 'cs_open', status: 'open' });
-  stripe.sessions.set('cs_paid', { id: 'cs_paid', status: 'complete' });
-  const held = (sessionId) => seeded({ 'applications/a1': application({ status: 'awaiting_payment', feeCheckout: { sessionId } }) });
-  const body = { appId: 'a1', confirm: true };
-
-  const open = held('cs_open');
-  await deleteSpamApplication({ ...deps(open), stripe }, { body, user: ops });
-  assert.equal(open.read('applications/a1'), undefined);
-  assert.equal(stripe.sessions.get('cs_open').status, 'expired');
-
-  const paid = held('cs_paid');
-  await assert.rejects(deleteSpamApplication({ ...deps(paid), stripe }, { body, user: ops }), { status: 409, code: 'payment-received' });
-  assert.ok(paid.read('applications/a1'));
 });
 
 const TOKEN_ID = 'connection-stripe-a1';
@@ -281,7 +267,7 @@ test('a request with a connection change running is not deleted', async () => {
   const secrets = makeFakeSecrets({ [TOKEN_ID]: 'sk_test_stored' });
   const old = seeded({ 'applications/a1': application({ ...closedOld, ...changing }) });
   assert.deepEqual((await runRetention({ db: old, secrets, now: () => NOW, log: QUIET })).deleted, []);
-  const db = seeded({ 'applications/a1': application(changing) });
+  const db = seeded({ 'applications/a1': application({ status: 'draft', ...changing }) });
   await assert.rejects(deleteSpamApplication(deps(db, { secrets }), { body: { appId: 'a1', confirm: true }, user: ops }), { code: 'connection-busy' });
   assert.equal(secrets.store.size, 1);
 });
@@ -303,6 +289,19 @@ test('the retention job clears connection states nobody came back for', async ()
   });
   await runRetention({ db, secrets: makeFakeSecrets(), now: () => NOW, log: QUIET });
   assert.deepEqual(db.paths('console_connection_states/'), ['console_connection_states/open']);
+});
+
+test('a spam delete keeps the accounts an earlier close left to end', async () => {
+  const connected = [{ provider: 'stripe', accountId: 'acct_client1' }];
+  const db = seeded({
+    'applications/a1': application({ status: 'declined' }),
+    'console_token_deletions/a1': { connected, at: new Date(NOW) },
+  });
+  const stripe = makeFakeConnector();
+  const secrets = makeFakeSecrets();
+  await deleteSpamApplication(deps(db, { secrets, connectors: { stripe, eventbrite: null } }), { body: { appId: 'a1', confirm: true }, user: ops });
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+  assert.equal(db.read('console_token_deletions/a1'), undefined);
 });
 
 test('a spam delete removes the stored tokens, and an approved request keeps them', async () => {

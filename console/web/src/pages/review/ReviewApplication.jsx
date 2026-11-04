@@ -1,23 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { callApi } from '../../api.js';
-import { ROLE_LABELS, formatDate, formatFee } from '../../text.js';
+import { ROLE_LABELS, formatDate } from '../../text.js';
 import { STATUS_LABELS, TICKET_LABELS, formatDateTime } from '../../reviewText.js';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
 import ReviewActions from './ReviewActions.jsx';
 import ReviewAnswers from './ReviewAnswers.jsx';
 import ReviewHistory from './ReviewHistory.jsx';
 
-const DONE = Object.freeze({
-  requestChanges: 'You asked for changes.',
-  declineApplication: 'You declined the request. Its web address is free again.',
-  approveApplication: 'You approved the request and recorded the build settings.',
-});
-
 /** What the page says after a decision, with the email result. */
-function doneMessage(name, result) {
-  if (result.mailFailed) return `${DONE[name]} We could not email every Owner. Contact them another way.`;
-  return `${DONE[name]} We emailed the Owners.`;
+function decidedMessage(name, result) {
+  const done = name === 'closeApplication'
+    ? 'You closed the request. If no build ever began, its web address is free again.'
+    : 'You declined the request. Its web address is free again.';
+  return result.mailFailed ? `${done} We could not email every Owner. Contact them another way.` : `${done} We emailed the Owners.`;
 }
 
 function Team({ team }) {
@@ -72,7 +68,7 @@ function BuildRecord({ build, canRetry, retrying, onRetry }) {
             <aside className="note" role="note">
               <p className="note-title">The build failed</p>
               <p className="break">{build.error}</p>
-              <p>The payment stands. Fix the cause, then retry. The steps that finished are not done twice.</p>
+              <p>Fix the cause, then retry. The steps that finished are not done twice.</p>
             </aside>
           ) : null}
           <ol className="stack" aria-labelledby="build-title">
@@ -98,48 +94,17 @@ function BuildRecord({ build, canRetry, retrying, onRetry }) {
   );
 }
 
-/** What the hosting team must act on after a payment. */
-function PaymentNotes({ app, build }) {
+/** The current acceptance, as the server recorded it. */
+function Acceptance({ acceptance }) {
+  if (!acceptance) return null;
   return (
     <>
-      {app.buildStart?.state === 'failed' && build?.state !== 'failed' ? (
-        <aside className="note" role="note">
-          <p className="note-title">The build did not start</p>
-          <p>The payment stands and the request stays approved. Read the function logs and fix the cause, then retry the build.</p>
-        </aside>
-      ) : null}
-      {app.feeProblem ? (
-        <aside className="note" role="note">
-          <p className="note-title">A payment needs attention</p>
-          <p>A paid session did not approve this request. Reason: {app.feeProblem.code}. Session: <span className="break">{app.feeProblem.sessionId}</span>. Payment intent: <span className="break">{app.feeProblem.paymentIntentId || 'not given'}</span>. Compare it with the payment in Stripe, and refund it if it should not stand.</p>
-        </aside>
-      ) : null}
-    </>
-  );
-}
-
-/** The current acceptance and the payment, as the server recorded them. */
-function AgreementAndFee({ acceptance, payment }) {
-  if (!acceptance && !payment) return null;
-  return (
-    <>
-      <h2 id="agreement-fee-title">Agreement and event fee</h2>
+      <h2 id="agreement-title">Agreement</h2>
       <dl className="answers">
-        {acceptance ? (
-          <>
-            <div className="answer"><dt>Accepted by</dt><dd>{acceptance.name} ({acceptance.email}), {formatDateTime(acceptance.at)}</dd></div>
-            <div className="answer"><dt>Agreement version</dt><dd>{acceptance.version}</dd></div>
-            <div className="answer"><dt>SHA-256 of the text</dt><dd className="break">{acceptance.sha256}</dd></div>
-            <div className="answer"><dt>Acceptance record</dt><dd className="break">{acceptance.id}</dd></div>
-          </>
-        ) : null}
-        {payment ? (
-          <>
-            <div className="answer"><dt>Event fee paid</dt><dd>{formatFee(payment)}, {formatDateTime(payment.paidAt)}</dd></div>
-            <div className="answer"><dt>Checkout session</dt><dd className="break">{payment.sessionId}</dd></div>
-            <div className="answer"><dt>Payment intent</dt><dd className="break">{payment.paymentIntentId || 'Not given'}</dd></div>
-          </>
-        ) : null}
+        <div className="answer"><dt>Accepted by</dt><dd>{acceptance.name} ({acceptance.email}), {formatDateTime(acceptance.at)}</dd></div>
+        <div className="answer"><dt>Agreement version</dt><dd>{acceptance.version}</dd></div>
+        <div className="answer"><dt>SHA-256 of the text</dt><dd className="break">{acceptance.sha256}</dd></div>
+        <div className="answer"><dt>Acceptance record</dt><dd className="break">{acceptance.id}</dd></div>
       </dl>
     </>
   );
@@ -176,15 +141,14 @@ export default function ReviewApplication() {
       const revision = name === 'deleteSpamApplication' ? {} : { revision: data?.application.revision };
       const result = await callApi(name, { appId, ...revision, ...body });
       if (name === 'deleteSpamApplication') {
-        navigate('/review', { state: { notice: 'The request is deleted. Its web address is free again.' } });
+        navigate('/review', { state: { notice: 'The request is deleted. If no build ever began, its web address is free again.' } });
         return true;
       }
-      setNotice(doneMessage(name, result));
+      setNotice(decidedMessage(name, result));
       await load();
       return true;
     } catch (err) {
-      // A refusal about one setting shows at that field in the form.
-      if (!err.field) setError(err.message);
+      setError(err.message);
       return err;
     }
   }, [appId, data, load, navigate]);
@@ -221,7 +185,12 @@ export default function ReviewApplication() {
         {notice ? <p className="message success">{notice}</p> : null}
       </div>
       {error ? <p className="message error" role="alert">{error}</p> : null}
-      <PaymentNotes app={app} build={data.build} />
+      {app.buildStart?.state === 'failed' && data.build?.state !== 'failed' ? (
+        <aside className="note" role="note">
+          <p className="note-title">The build did not start</p>
+          <p>The request stays approved. Read the function logs and fix the cause, then retry the build.</p>
+        </aside>
+      ) : null}
       <BuildRecord build={data.build} canRetry={data.canRetryBuild} retrying={retrying} onRetry={retry} />
 
       <h2 id="decision-title">Decision</h2>
@@ -231,17 +200,13 @@ export default function ReviewApplication() {
           <p className="history-note">{app.review.note}</p>
         </aside>
       ) : null}
-      <ReviewActions key={app.status} status={app.status} defaults={data.approvalDefaults} onDecide={decide} />
+      <ReviewActions key={app.status} status={app.status} canClose={data.canRetryBuild} onDecide={decide} />
 
       <h2 id="answers-title">Answers</h2>
-      <p className="muted">
-        {app.status === 'awaiting_payment'
-          ? 'These are the answers the client accepted. The client can go back and change them until they pay.'
-          : 'These are the answers the client sent. The client cannot change them during review.'}
-      </p>
+      {app.acceptance ? <p className="muted">These are the answers the client accepted. The client cannot change them now.</p> : null}
       <ReviewAnswers answers={app.answers} />
 
-      <AgreementAndFee acceptance={app.acceptance} payment={app.payment} />
+      <Acceptance acceptance={app.acceptance} />
 
       <h2 id="tickets-title">Ticket sales</h2>
       <dl className="answers">

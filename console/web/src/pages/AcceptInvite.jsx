@@ -4,8 +4,8 @@ import { callApi } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { withArticle } from '../text.js';
 
-/** The token sits after `#` in the emailed link, so no server log holds it. */
-function tokenFrom(hash) {
+/** The token sits after `#` in the link, so no server log holds it. */
+export function tokenFrom(hash) {
   const params = new URLSearchParams(String(hash || '').replace(/^#/, ''));
   return params.get('token') || '';
 }

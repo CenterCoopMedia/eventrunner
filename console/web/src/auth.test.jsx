@@ -1,7 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  GoogleAuthProvider, OAuthProvider, isSignInWithEmailLink, onAuthStateChanged,
+  GoogleAuthProvider, OAuthProvider, isSignInWithEmailLink, onIdTokenChanged,
   sendSignInLinkToEmail, signInWithEmailLink, signInWithPopup, signOut,
 } from 'firebase/auth';
 import { AuthProvider, EMAIL_KEY, signInErrorMessage, useAuth } from './auth.jsx';
@@ -10,7 +10,7 @@ vi.mock('firebase/auth', () => ({
   GoogleAuthProvider: vi.fn(function GoogleAuthProvider() { this.providerId = 'google.com'; }),
   OAuthProvider: vi.fn(function OAuthProvider(id) { this.providerId = id; }),
   isSignInWithEmailLink: vi.fn(() => true),
-  onAuthStateChanged: vi.fn(),
+  onIdTokenChanged: vi.fn(),
   sendSignInLinkToEmail: vi.fn(async () => {}),
   signInWithEmailLink: vi.fn(async () => ({})),
   signInWithPopup: vi.fn(async () => ({})),
@@ -24,7 +24,7 @@ function Probe() {
 }
 
 beforeEach(() => {
-  onAuthStateChanged.mockImplementation((_auth, callback) => {
+  onIdTokenChanged.mockImplementation((_auth, callback) => {
     callback({ uid: 'ana', email: 'ana@example.org', emailVerified: true });
     return () => {};
   });
@@ -34,6 +34,19 @@ describe('AuthProvider', () => {
   it('shares the signed-in user once Firebase reports it', () => {
     render(<AuthProvider><Probe /></AuthProvider>);
     expect(screen.getByText('ready ana@example.org')).toBeInTheDocument();
+  });
+
+  it('passes on an emailed link confirming the session of the same user', () => {
+    let report;
+    onIdTokenChanged.mockImplementation((_auth, callback) => {
+      report = callback;
+      callback({ uid: 'ana', email: 'ana@example.org', emailVerified: false });
+      return () => {};
+    });
+    render(<AuthProvider><Probe /></AuthProvider>);
+    expect(api.user.emailVerified).toBe(false);
+    act(() => report({ uid: 'ana', email: 'ana@example.org', emailVerified: true }));
+    expect(api.user.emailVerified).toBe(true);
   });
 
   it('signs in with Google and with Microsoft in a popup', async () => {

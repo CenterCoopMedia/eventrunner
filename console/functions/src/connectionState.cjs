@@ -24,11 +24,11 @@ const { toIso, toMillis } = require('./access.cjs');
 
 const PROVIDERS = Object.freeze(['stripe', 'eventbrite']);
 const PROVIDER_NAMES = Object.freeze({ stripe: 'Stripe', eventbrite: 'Eventbrite' });
-// A client can change a connection until the request can be paid for (ADR 0007
-// §4, amendment 2026-11-04). The fee webhook approves with no further check,
-// so `awaiting_payment` is locked, and an Owner reopens the request to change
-// the account. From `approved` on, the provisioner owns the tokens.
-const CHANGEABLE = Object.freeze(['draft', 'submitted', 'changes_requested']);
+// A client can change a connection freely until accepting the agreement starts
+// the build (ADR 0007 §4, amendment 2026-11-04). From `approved` on, the
+// provisioner owns the tokens, and an Owner can only reconnect the chosen
+// account after a failed build (requireConnectable in connections.cjs).
+const CHANGEABLE = Object.freeze(['draft']);
 const CLOSED_STATUSES = Object.freeze(['withdrawn', 'declined']);
 
 /** @returns {object|null} the connection state of one provider, when it is connected */
@@ -45,13 +45,19 @@ function connectionChanging(connections, at, providers = PROVIDERS) {
 /**
  * Why the ticket choice cannot go ahead yet. A missing `connections` counts
  * as not connected, so a caller that forgets to pass it refuses the request.
+ * The build the console starts is live unless `testMode` says otherwise, and
+ * stepTickets in scripts/provision-client.cjs refuses a test connection on a
+ * live build, so this refuses it first.
  *
  * @returns {{ field: string, message: string }|null}
  */
-function connectionProblem(choice, connections) {
+function connectionProblem(choice, connections, { testMode = false } = {}) {
   if (!PROVIDERS.includes(choice)) return null;
   const connection = liveConnection(connections, choice);
   if (!connection) return { field: 'tickets.connection', message: `Connect your ${PROVIDER_NAMES[choice]} account.` };
+  if (connection.livemode === false && !testMode) {
+    return { field: 'tickets.connection', message: `Your ${PROVIDER_NAMES[choice]} account is in test mode. Connect a live account.` };
+  }
   if (choice === 'eventbrite' && !connection.event?.id) {
     return { field: 'tickets.event', message: 'Choose your Eventbrite event.' };
   }
@@ -60,12 +66,13 @@ function connectionProblem(choice, connections) {
 
 /**
  * What the browser gets. `available` says which providers the console has
- * set up. An Owner can also disconnect a closed request's account, rather
- * than wait for it to be deleted.
+ * set up. `reconnect` says a failed build lets an Owner connect again. An Owner
+ * can also disconnect a closed request's account, rather than wait for it to
+ * be deleted.
  */
-function connectionsForClient(connections, { available = {}, status, role } = {}) {
+function connectionsForClient(connections, { available = {}, status, role, reconnect = false } = {}) {
   const owner = role === 'owner';
-  const canChange = owner && CHANGEABLE.includes(status);
+  const draft = owner && CHANGEABLE.includes(status);
   const one = (provider) => {
     const connection = liveConnection(connections, provider);
     return {
@@ -79,8 +86,8 @@ function connectionsForClient(connections, { available = {}, status, role } = {}
   };
   const event = liveConnection(connections, 'eventbrite')?.event;
   return {
-    canChange,
-    canDisconnect: canChange || (owner && CLOSED_STATUSES.includes(status)),
+    canChange: draft || (owner && reconnect),
+    canDisconnect: draft || (owner && CLOSED_STATUSES.includes(status)),
     stripe: one('stripe'),
     eventbrite: { ...one('eventbrite'), event: event ? { id: event.id, name: event.name, start: event.start || null } : null },
   };

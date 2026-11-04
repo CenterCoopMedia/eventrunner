@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
   approvalDefaults, checkSettings, environmentFor, getConsoleSettings, normalizeBilling, normalizeFolder,
-  normalizeProjectId, projectIdFor, readSignupTerms, saveAgreement, saveConsoleSettings, saveEventFee, APPROVAL_FIELDS,
+  normalizeProjectId, projectIdFor, readSignupTerms, saveAgreement, saveConsoleSettings, APPROVAL_FIELDS,
 } = require('./consoleSettings.cjs');
 const { siteNameProblem } = require('./siteNames.cjs');
 const { NOW, ana, ops, seeded } = require('./fakeReview.cjs');
@@ -92,38 +92,9 @@ test('saveConsoleSettings checks each value, stores only the three fields, and a
   assert.deepEqual(db.read('console_config/settings'), stored);
 });
 
-const FEE = { amount: 12345, currency: 'usd' };
 const AGREEMENT = { title: 'Test agreement', body: 'First test paragraph.\n\nSecond test paragraph.' };
 const dep = (db) => ({ db, now: () => NOW });
 const audits = (db) => db.paths('console_audit/').map((path) => db.read(path));
-
-test('an operator sets the fee, and the settings and the fee keep each other', async () => {
-  const db = seeded();
-  const result = await saveEventFee(dep(db), { body: { fee: { amount: FEE.amount, currency: 'USD' } }, user: ops });
-  assert.deepEqual(result.body.fee, FEE);
-  const stored = db.read('console_config/settings');
-  assert.equal(stored.feeAmount, FEE.amount);
-  assert.equal(stored.feeCurrency, 'usd');
-  assert.equal(stored.region, 'us-central1');
-  await saveConsoleSettings(dep(db), {
-    body: { settings: { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-east1' } }, user: ops,
-  });
-  assert.equal(db.read('console_config/settings').feeAmount, FEE.amount, 'saving settings keeps the fee');
-  assert.deepEqual(audits(db).map((a) => a.action).sort(), ['save-fee', 'save-settings']);
-  assert.deepEqual((await getConsoleSettings(dep(db), { body: {}, user: ops })).body.fee, FEE);
-});
-
-test('a fee that is not a positive whole number, or a bad currency, is refused', async () => {
-  const db = seeded();
-  for (const amount of [0, -1, 10.5, '100', null, 100000000]) {
-    await assert.rejects(saveEventFee(dep(db), { body: { fee: { amount, currency: 'usd' } }, user: ops }), { status: 400, field: 'feeAmount' }, String(amount));
-  }
-  for (const currency of ['', 'dollars', 'us', 7]) {
-    await assert.rejects(saveEventFee(dep(db), { body: { fee: { amount: 100, currency } }, user: ops }), { status: 400, field: 'feeCurrency' }, String(currency));
-  }
-  assert.equal(db.read('console_config/settings').feeAmount, undefined);
-  assert.deepEqual(audits(db), []);
-});
 
 test('each saved agreement is a new version, and an old version never changes', async () => {
   const db = seeded();
@@ -158,20 +129,30 @@ test('an agreement needs a title and a text, and only an operator saves one', as
   await assert.rejects(saveAgreement(dep(db), { body: { agreement: { title: '', body: 'x' } }, user: ops }), { field: 'agreementTitle' });
   await assert.rejects(saveAgreement(dep(db), { body: { agreement: { title: 't', body: ' ' } }, user: ops }), { field: 'agreementBody' });
   await assert.rejects(saveAgreement(dep(db), { body: { agreement: AGREEMENT }, user: ana }), { status: 403 });
-  await assert.rejects(saveEventFee(dep(db), { body: { fee: FEE }, user: ana }), { status: 403 });
   assert.equal(db.read('console_config/agreement'), undefined);
 });
 
-test('sign-ups open only with a usable fee and an agreement that matches its hash', async () => {
+test('sign-ups open only with every build setting and an agreement that matches its hash', async () => {
   const get = (r) => r.get();
   const db = seeded();
-  assert.equal((await readSignupTerms(get, db)).open, false);
-  await saveEventFee(dep(db), { body: { fee: FEE }, user: ops });
-  assert.equal((await readSignupTerms(get, db)).open, false);
+  assert.deepEqual(await readSignupTerms(get, db), { open: false, agreement: null, missing: ['the agreement'] });
   await saveAgreement(dep(db), { body: { agreement: AGREEMENT }, user: ops });
-  assert.equal((await readSignupTerms(get, db)).open, true);
+  const open = await readSignupTerms(get, db);
+  assert.equal(open.open, true);
+  assert.deepEqual(open.missing, []);
+  await db.collection('console_config').doc('settings').update({ billingAccount: '', region: 'mars' });
+  const unset = await readSignupTerms(get, db);
+  assert.equal(unset.open, false);
+  assert.deepEqual(unset.missing, ['the billing account', 'the region']);
+  assert.ok(unset.agreement, 'the agreement is still read');
+  await db.collection('console_config').doc('settings').update({ billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' });
   await db.collection('console_config').doc('agreement').update({ body: 'Changed outside the console.' });
   const closed = await readSignupTerms(get, db);
   assert.equal(closed.open, false);
   assert.equal(closed.agreement, null);
+});
+
+test('the console settings answer carries no fee', async () => {
+  const { body } = await getConsoleSettings(dep(seeded()), { body: {}, user: ops });
+  assert.deepEqual(Object.keys(body).sort(), ['agreement', 'settings']);
 });

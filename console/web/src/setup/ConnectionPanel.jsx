@@ -133,11 +133,12 @@ function EventPicker({ orgId, appId, chosen, error, onConnections, onNotice }) {
  * `onConnections({ connections, errors })` gets the server's new state.
  * `beforeLeave` saves pending answers before the browser leaves for the
  * provider, and returns false when it could not. `returnPath` is where the
- * client comes back to.
+ * client comes back to. `connectLabel` names the connect button when the
+ * button means something narrower than a first connection.
  */
 export default function ConnectionPanel({
   provider, orgId, appId, connections, errors = {}, canConnect = connections.canChange, myRole,
-  beforeLeave, returnPath, onConnections, onNotice,
+  beforeLeave, returnPath, onConnections, onNotice, connectLabel,
 }) {
   const copy = PROVIDER_COPY[provider];
   const account = connections[provider];
@@ -146,6 +147,8 @@ export default function ConnectionPanel({
   const title = useRef(null);
   const connectError = errors[CONNECTION_FIELD];
   const connectErrorId = `${fieldId(CONNECTION_FIELD)}-error`;
+  // A reconnect after the answers froze keeps the chosen event; it asks only when the new account lost it.
+  const showPicker = canConnect && (connections.canChange || !account.event);
 
   async function connect() {
     setError('');
@@ -190,7 +193,7 @@ export default function ConnectionPanel({
             {account.connectedAt ? <span className="muted"> since {formatDate(account.connectedAt)}</span> : null}
           </p>
           {connections.canDisconnect ? <p>{CAN_DISCONNECT}</p> : null}
-          {provider === 'eventbrite' && canConnect ? (
+          {provider === 'eventbrite' && showPicker ? (
             <EventPicker
               orgId={orgId}
               appId={appId}
@@ -200,12 +203,12 @@ export default function ConnectionPanel({
               onNotice={onNotice}
             />
           ) : null}
-          {provider === 'eventbrite' && !canConnect ? (
+          {provider === 'eventbrite' && !showPicker ? (
             <p>Event: {account.event ? eventLabel(account.event) : <span className="muted">Not chosen yet</span>}</p>
           ) : null}
           {canConnect || connections.canDisconnect ? (
             <div className="step-actions">
-              {canConnect ? <button type="button" className="button" disabled={leaving} onClick={connect}>Connect again</button> : null}
+              {canConnect ? <button type="button" className="button" disabled={leaving} onClick={connect}>{connectLabel || 'Connect again'}</button> : null}
               {connections.canDisconnect ? <Disconnect name={copy.name} onDisconnect={disconnect} /> : null}
             </div>
           ) : null}
@@ -220,7 +223,7 @@ export default function ConnectionPanel({
           ) : null}
           {account.available ? (
             <>
-              <p>{copy.explain} {CAN_DISCONNECT}</p>
+              <p>{copy.explain}{connections.canDisconnect ? ` ${CAN_DISCONNECT}` : ''}</p>
               {connectError ? <p id={connectErrorId} className="field-error">{connectError}</p> : null}
               {canConnect ? (
                 <p>
@@ -232,7 +235,7 @@ export default function ConnectionPanel({
                     aria-describedby={connectError ? connectErrorId : undefined}
                     onClick={connect}
                   >
-                    {copy.button}
+                    {connectLabel || copy.button}
                   </button>
                 </p>
               ) : null}

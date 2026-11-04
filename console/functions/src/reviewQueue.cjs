@@ -9,7 +9,6 @@
 const { ConsoleError } = require('./http.cjs');
 const { toIso, toMillis } = require('./access.cjs');
 const { STATUSES, readApplication, requireOperator, reviewedAnswers, siteNameOf } = require('./reviewAccess.cjs');
-const { approvalDefaults, readConsoleSettings } = require('./consoleSettings.cjs');
 const { connectionForReview } = require('./connectionState.cjs');
 const { canRetryBuild, readBuild, readableBuild } = require('./buildRetry.cjs');
 
@@ -29,7 +28,7 @@ async function organizationNames(db, orgIds) {
 
 async function listApplicationsForReview({ db }, { body, user }) {
   await requireOperator(db, user);
-  const status = body.status === undefined ? 'submitted' : body.status;
+  const status = body.status === undefined ? 'approved' : body.status;
   if (!STATUSES.includes(status)) throw new ConsoleError(400, 'bad-request', 'Choose a status.');
   // Newest change first. console/firestore.indexes.json holds the index.
   const snap = await db.collection('applications')
@@ -51,7 +50,6 @@ async function listApplicationsForReview({ db }, { body, user }) {
       submittedAt: toIso(app.submittedAt),
       updatedAt: toIso(app.updatedAt),
       buildStartFailed: app.buildStart?.state === 'failed',
-      feeProblem: app.feeProblem?.code || null,
     };
   });
   return { body: { status, applications } };
@@ -91,50 +89,46 @@ function readableReview(review) {
   return { note: review.note || null, by: review.by || null, at: toIso(review.at), settings: review.settings || null };
 }
 
-/** The current acceptance and the payment, for the hosting team. */
-function readablePayment(app) {
+/** The acceptance and the build start, for the hosting team. */
+function readableProgress(app) {
   const accepted = app.agreementAcceptance;
-  const paid = app.payment;
   return {
     acceptance: accepted ? { id: accepted.id, version: accepted.version, sha256: accepted.sha256, name: accepted.name, email: accepted.email, at: toIso(accepted.at) } : null,
-    payment: paid ? { sessionId: paid.sessionId, paymentIntentId: paid.paymentIntentId, amount: paid.amount, currency: paid.currency, paidAt: toIso(paid.paidAt) } : null,
     buildStart: app.buildStart ? { state: app.buildStart.state, at: toIso(app.buildStart.at) } : null,
-    feeProblem: app.feeProblem ? { code: app.feeProblem.code, sessionId: app.feeProblem.sessionId, paymentIntentId: app.feeProblem.paymentIntentId || null, at: toIso(app.feeProblem.at) } : null,
   };
 }
 
 async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
   await requireOperator(db, user);
   const app = await readApplication(db, body.appId);
-  const [orgSnap, team, settings, build] = await Promise.all([
+  const [orgSnap, team, build] = await Promise.all([
     db.collection('organizations').doc(String(app.orgId)).get(),
     readTeam(db, String(app.orgId), now()),
-    readConsoleSettings(db),
-    readBuild(db, app.id),
+    readBuild((r) => r.get(), db, app.id),
   ]);
-  const name = siteNameOf(app);
+  const answers = reviewedAnswers(app);
   return {
     body: {
       application: {
         id: app.id,
         orgId: app.orgId,
         status: app.status,
-        answers: app.frozen || null,
-        ticketChoice: app.frozen?.tickets?.choice || null,
-        webAddressName: name,
+        // A draft has no frozen copy, and a draft is what an operator can decline.
+        answers: app.frozen || app.answers || null,
+        ticketChoice: answers?.tickets?.choice || null,
+        webAddressName: siteNameOf(app),
         // Sent back with a decision, so a page opened before a change is refused.
         revision: Array.isArray(app.history) ? app.history.length : 0,
         history: readableHistory(app.history, team.members),
         review: readableReview(app.review),
-        ...readablePayment(app),
+        ...readableProgress(app),
         createdAt: toIso(app.createdAt),
         submittedAt: toIso(app.submittedAt),
         updatedAt: toIso(app.updatedAt),
       },
       organization: { id: app.orgId, name: orgSnap.exists ? orgSnap.data().name : '' },
       team,
-      connection: connectionForReview(app.frozen?.tickets?.choice, app.connections),
-      approvalDefaults: approvalDefaults(settings, name),
+      connection: connectionForReview(answers?.tickets?.choice, app.connections),
       build: readableBuild(build),
       canRetryBuild: canRetryBuild(app, build, now()),
     },

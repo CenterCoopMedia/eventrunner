@@ -47,7 +47,8 @@ const { requireOwner, toMillis } = require('./access.cjs');
 const { withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
-const { CLOSED, EDITABLE, readApplication } = require('./applications.cjs');
+const { RETRY_STATUSES, canRetryBuild, readBuild } = require('./buildState.cjs');
+const { CLOSED, readApplication } = require('./applications.cjs');
 const {
   CHANGEABLE, PROVIDERS, PROVIDER_NAMES, connectionChanging, connectionsForClient, liveConnection,
 } = require('./connectionState.cjs');
@@ -67,7 +68,7 @@ const EVENT_ID = /^[A-Za-z0-9_-]{1,160}$/;
 const SECRET_APP_ID = /^[A-Za-z0-9_-]{1,200}$/;
 
 const ONLY_OWNER = 'Only an Owner can change this account.';
-const MISMATCH = 'We could not match this to your request, or it took too long. Start again from the tickets step.';
+const MISMATCH = 'We could not match this to your request, or it took too long. Connect the account again.';
 const stillBuilding = 'Your site is being built, so you cannot change this account here now.';
 const failedToConnect = (provider) => `We could not connect your ${PROVIDER_NAMES[provider]} account. Try again.`;
 
@@ -106,24 +107,30 @@ const redirectUri = (publicUrl, provider) => `${publicUrl}/connect/${provider}/r
 
 function requireChangeable(data) {
   if (CLOSED.includes(data.status)) throw new ConsoleError(409, 'locked', 'This request is closed.');
-  if (data.status === 'awaiting_payment') throw new ConsoleError(409, 'locked', 'Select Change your answers to change this account.');
   if (!CHANGEABLE.includes(data.status)) throw new ConsoleError(409, 'locked', stillBuilding);
 }
 
-/** After the answers are frozen, only the account they chose can be connected. */
-function requireConnectable(data, provider) {
-  requireChangeable(data);
-  if (EDITABLE.includes(data.status)) return;
+/**
+ * A draft can connect any account. After acceptance the provisioner owns the
+ * tokens, so an Owner can replace only the account the frozen answers chose,
+ * and only while a failed build waits for its retry. `get` is a transaction's
+ * or the database's.
+ */
+async function requireConnectable({ db, now = Date.now }, get, { appId, data, provider }) {
+  if (CLOSED.includes(data.status)) throw new ConsoleError(409, 'locked', 'This request is closed.');
+  if (CHANGEABLE.includes(data.status)) return;
+  if (!canRetryBuild(data, await readBuild(get, db, appId), now())) throw new ConsoleError(409, 'locked', stillBuilding);
   if (withDefaults(data.frozen || data.answers).tickets.choice !== provider) {
     throw new ConsoleError(409, 'locked', 'Your request does not use this account.');
   }
 }
 
 /** The reply after a change: the state for the page, and the tickets step's errors. */
-function connectionsReply({ connectionsAvailable: available }, data, connections) {
+function connectionsReply({ connectionsAvailable: available, consoleTestMode: testMode }, data, connections) {
+  const reconnect = RETRY_STATUSES.includes(data.status);
   return {
-    connections: connectionsForClient(connections, { available, status: data.status, role: 'owner' }),
-    errors: stepErrors(checkAnswers(data.answers, connections), 'tickets'),
+    connections: connectionsForClient(connections, { available, status: data.status, role: 'owner', reconnect }),
+    errors: stepErrors(checkAnswers(data.answers, connections, { testMode }), 'tickets'),
   };
 }
 
@@ -220,7 +227,7 @@ async function startConnection(deps, { body, user }) {
   const provider = requireProvider(body.provider);
   await requireOwner(db, orgId, user, ONLY_OWNER);
   const { data } = await readApplication((r) => r.get(), db, orgId, appId);
-  requireConnectable(data, provider);
+  await requireConnectable(deps, (r) => r.get(), { appId, data, provider });
   const connector = requireConnector(deps, provider);
   await takeSlot(db, {
     key: `connect-${user.uid}`,
@@ -277,7 +284,7 @@ async function completeConnection(deps, { body, user }) {
   }
   const connector = requireConnector(deps, provider);
   const first = await readApplication((r) => r.get(), db, orgId, appId);
-  requireConnectable(first.data, provider);
+  await requireConnectable(deps, (r) => r.get(), { appId, data: first.data, provider });
 
   const answer = await exchange(deps, { connector, provider, code: body.code });
 
@@ -290,7 +297,7 @@ async function completeConnection(deps, { body, user }) {
     // on the provider's page, this refuses, and nothing has been stored.
     await db.runTransaction(async (tx) => {
       const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
-      requireConnectable(data, provider);
+      await requireConnectable(deps, (r) => tx.get(r), { appId, data, provider });
       const changing = changingState(data, provider, at, changeId);
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
       previous = previousOf(data, accounts, provider);
@@ -370,7 +377,7 @@ async function readEventbriteEvents(deps, { orgId, appId, user }) {
   const { db, secrets } = deps;
   await requireOwner(db, orgId, user, ONLY_OWNER);
   const { data } = await readApplication((r) => r.get(), db, orgId, appId);
-  requireChangeable(data);
+  await requireConnectable(deps, (r) => r.get(), { appId, data, provider: 'eventbrite' });
   const connector = requireConnector(deps, 'eventbrite');
   const refusal = 'We could not read your Eventbrite events. Try again, or connect your account again.';
   if (!liveConnection(data.connections, 'eventbrite')) throw new ConsoleError(409, 'not-connected', 'Connect your Eventbrite account first.');
@@ -402,7 +409,7 @@ async function chooseEventbriteEvent(deps, { body, user }) {
   let reply = null;
   await db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
-    requireChangeable(data);
+    await requireConnectable(deps, (r) => tx.get(r), { appId, data, provider: 'eventbrite' });
     const connection = liveConnection(data.connections, 'eventbrite');
     if (!connection) throw new ConsoleError(409, 'not-connected', 'Connect your Eventbrite account first.');
     const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
@@ -453,9 +460,12 @@ async function deleteStoredConnection({ secrets }, appId, provider) {
  * caller then calls recordTokenDeletion with the result, after its other reads.
  */
 async function readConnectedAccounts(tx, db, appId) {
-  const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
-  return PROVIDERS.filter((provider) => accounts[provider]?.accountId)
+  const [row, pending] = await Promise.all([tx.get(accountsRef(db, appId)), tx.get(db.collection(DELETION_COLLECTION).doc(appId))]);
+  const accounts = accountsOf(row);
+  const connected = PROVIDERS.filter((provider) => accounts[provider]?.accountId)
     .map((provider) => ({ provider, accountId: accounts[provider].accountId }));
+  // Closing moved its accounts to a deletion row, and a later delete must not lose them.
+  return [...(pending.exists ? pending.data().connected || [] : []), ...connected];
 }
 
 /** The same transaction: leave a row, so its tokens are still found when the request is gone. */
