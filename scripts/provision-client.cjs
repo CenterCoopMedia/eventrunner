@@ -180,12 +180,12 @@ async function call(ctx, label, url, { method = 'GET', headers = {}, json, form,
     },
     ...(json !== undefined ? { body: JSON.stringify(json) } : {}),
     ...(form ? { body: form.toString() } : {}),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
   };
   for (let attempt = 1; ; attempt += 1) {
     let response;
     try {
-      response = await fetch(url, init);
+      // A signal per attempt: the wait before a retry outlasts the timeout.
+      response = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
     } catch {
       throw new Error(`${label}: no answer`);
     }
@@ -1184,11 +1184,8 @@ async function provision({ appId, testMode = false, deps }) {
     ctx.region = ctx.settings.region;
     ctx.domain = siteAddress(ctx.name);
     ctx.clientSecrets = deps.clientSecrets(ctx.projectId);
-    if (await moveStatus(ctx, 'approved', 'building')) {
-      await quietly(ctx, 'the building email', () => notifyOwners(consoleDeps(ctx), {
-        orgId: app.orgId, appId, status: 'building', eventName: ctx.eventName,
-      }));
-    }
+    // The acceptance email already said we are building, so this move sends none.
+    await moveStatus(ctx, 'approved', 'building');
     await runSteps(ctx);
   } catch (err) {
     log.error(`provision-client: ${err.step?.id || 'setup'} failed:`, err.message);

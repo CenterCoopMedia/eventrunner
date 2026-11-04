@@ -47,6 +47,10 @@ test('a run that never reported can be retried after an hour, and not before', (
   assert.equal(canRetryBuild(started(hour - 1), null, at), false);
   assert.equal(canRetryBuild(started(hour + 1), null, at), true);
   assert.equal(canRetryBuild(started(hour + 1), { state: 'queued' }, at), true);
+  // A function that died between the commit and the start leaves it pending.
+  const pending = (ago) => ({ status: 'approved', buildStart: { state: 'pending', at: new Date(at - ago) } });
+  assert.equal(canRetryBuild(pending(hour - 1), null, at), false);
+  assert.equal(canRetryBuild(pending(hour + 1), null, at), true);
   assert.equal(canRetryBuild(started(hour + 1), { state: 'running' }, at), false);
 });
 
