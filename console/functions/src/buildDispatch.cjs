@@ -8,7 +8,7 @@
  * Settings: CONSOLE_GITHUB_APP_ID, CONSOLE_GITHUB_INSTALLATION_ID,
  * CONSOLE_GITHUB_REPOSITORY (owner/name) and the secret
  * CONSOLE_GITHUB_APP_PRIVATE_KEY. With one unset or unusable it refuses to
- * dispatch, and runStartBuild (feeWebhook.cjs) reports that as a failed start.
+ * dispatch, and runStartBuild reports that as a failed start.
  *
  * Errors name the step and the HTTP status only, never the key, a token or a
  * response body. scripts/provision-client.cjs uses installationToken for the
@@ -16,6 +16,7 @@
  */
 
 const { createPrivateKey, createSign } = require('node:crypto');
+const { notifyOperators } = require('./applicationStatus.cjs');
 
 const API = 'https://api.github.com';
 const WORKFLOW = 'provision-client.yml';
@@ -102,4 +103,41 @@ function createStartBuild({ env, privateKey, fetch, now = Date.now }) {
   };
 }
 
-module.exports = { GITHUB_HEADERS, WORKFLOW, appJwt, createStartBuild, installationToken };
+/** Run a step after the start. A failure is logged and the next step still runs. */
+async function afterStart(log, what, step) {
+  try {
+    await step();
+  } catch (err) {
+    log.error(`console build start: ${what} failed`, err);
+  }
+}
+
+/**
+ * Start the build and record the outcome on the request. A failed start never
+ * throws: it is flagged for the review queue, audited and sent to operators,
+ * and an operator can then retry (buildRetry.cjs).
+ *
+ * @param {object} deps needs db, startBuild, now, log, and what notifyOperators needs
+ * @param {{ orgId: string, appId: string, eventName: string, by?: string }} input
+ * @returns {Promise<boolean>} whether it started
+ */
+async function runStartBuild(deps, { orgId, appId, eventName, by = 'console' }) {
+  const { db, startBuild, now, log } = deps;
+  const ref = db.collection('applications').doc(appId);
+  try {
+    await startBuild({ orgId, appId });
+  } catch (err) {
+    log.error('console build start: the build did not start', appId, err);
+    const at = new Date(now());
+    await afterStart(log, 'recording the failure', () => ref.update({ buildStart: { state: 'failed', at } }));
+    await afterStart(log, 'auditing the failure', () => db.collection('console_audit').doc().create({
+      action: 'build-start-failed', appId, by, at,
+    }));
+    await afterStart(log, 'the failure notice', () => notifyOperators(deps, { orgId, appId, eventName, kind: 'build-failed' }));
+    return false;
+  }
+  await afterStart(log, 'recording the start', () => ref.update({ buildStart: { state: 'started', at: new Date(now()) } }));
+  return true;
+}
+
+module.exports = { GITHUB_HEADERS, WORKFLOW, appJwt, createStartBuild, installationToken, runStartBuild };

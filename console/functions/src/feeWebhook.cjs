@@ -21,6 +21,7 @@ const { sendError } = require('./http.cjs');
 const { validOrgId } = require('./access.cjs');
 const { AWAITING_PAYMENT } = require('./applications.cjs');
 const { notifyOperators, notifyOwners } = require('./applicationStatus.cjs');
+const { runStartBuild } = require('./buildDispatch.cjs');
 
 const COLLECTION = 'console_fee_events';
 // Far more than one event needs, small enough to refuse junk before any check.
@@ -103,26 +104,6 @@ async function afterCommit(log, what, step) {
   }
 }
 
-/** Shared with the operator's retry (buildRetry.cjs). @returns {Promise<boolean>} whether it started */
-async function runStartBuild(deps, { orgId, appId, eventName, by = BY_PAYMENT }) {
-  const { db, startBuild, now, log } = deps;
-  const ref = db.collection('applications').doc(appId);
-  try {
-    await startBuild({ orgId, appId });
-  } catch (err) {
-    log.error('console fee webhook: the build did not start', appId, err);
-    const at = new Date(now());
-    await afterCommit(log, 'recording the build failure', () => ref.update({ buildStart: { state: 'failed', at } }));
-    await afterCommit(log, 'auditing the build failure', () => db.collection('console_audit').doc().create({
-      action: 'build-start-failed', appId, by, at,
-    }));
-    await afterCommit(log, 'the build failure notice', () => notifyOperators(deps, { orgId, appId, eventName, kind: 'build-failed' }));
-    return false;
-  }
-  await afterCommit(log, 'recording the build start', () => ref.update({ buildStart: { state: 'started', at: new Date(now()) } }));
-  return true;
-}
-
 /**
  * One verified event.
  * @returns {Promise<{ outcome: string }>}
@@ -151,7 +132,7 @@ async function handleFeeEvent(input, event) {
 
   await afterCommit(log, 'the Owner email', () => notifyOwners(deps, { orgId, appId, status: 'paid', eventName }));
   await afterCommit(log, 'the operator notice', () => notifyOperators(deps, { orgId, appId, eventName, kind: 'paid' }));
-  if (typeof deps.startBuild === 'function') await runStartBuild(deps, { orgId, appId, eventName });
+  if (typeof deps.startBuild === 'function') await runStartBuild(deps, { orgId, appId, eventName, by: BY_PAYMENT });
   return { outcome: 'approved' };
 }
 
@@ -188,4 +169,4 @@ function feeWebhookEndpoint(deps) {
   };
 }
 
-module.exports = { COLLECTION, feeWebhookEndpoint, handleFeeEvent, runStartBuild };
+module.exports = { COLLECTION, feeWebhookEndpoint, handleFeeEvent };

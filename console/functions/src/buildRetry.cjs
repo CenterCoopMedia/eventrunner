@@ -16,7 +16,7 @@
 const { ConsoleError } = require('./http.cjs');
 const { toIso } = require('./access.cjs');
 const { applicationRef, requireAppId, requireOperator, reviewedAnswers, NOT_FOUND } = require('./reviewAccess.cjs');
-const { runStartBuild } = require('./feeWebhook.cjs');
+const { runStartBuild } = require('./buildDispatch.cjs');
 
 const BUILD_COLLECTION = 'console_builds';
 const RETRY_STATUSES = Object.freeze(['approved', 'building']);
