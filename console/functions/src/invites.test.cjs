@@ -199,3 +199,14 @@ test('acceptInvite keeps the role of someone who is already a member', async () 
   assert.equal(db.read('organizations/o1/members/ben').role, 'editor');
   assert.equal(db.read('invites/i9').status, 'accepted');
 });
+
+test('with no console address set, no invite is made and no email with a broken link is sent', async () => {
+  const db = seeded();
+  const mailer = fakeMailer();
+  await assert.rejects(
+    inviteMember({ ...deps(db, mailer), publicUrl: '' }, { body: { orgId: 'o1', email: 'sam@example.org', role: 'editor' }, user: ana }),
+    (err) => err.status === 502 && err.code === 'mail-failed',
+  );
+  assert.equal(mailer.sent.length, 0);
+  assert.equal((await db.collection('invites').get()).size, 0);
+});

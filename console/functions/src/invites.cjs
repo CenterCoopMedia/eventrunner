@@ -41,6 +41,13 @@ function sameHash(a, b) {
 async function inviteMember({ db, mailer, now = Date.now, publicUrl }, { body, user }) {
   const { orgId } = body;
   const inviter = await requireOwner(db, orgId, user);
+  // Without the console address the link in the email would be broken.
+  // A setup fault: refuse before an invite exists or a rate slot is spent.
+  if (typeof publicUrl !== 'string' || !/^https?:\/\//.test(publicUrl)) {
+    const failed = new ConsoleError(502, 'mail-failed', 'We could not send the invite email. Try again.');
+    failed.cause = new Error('CONSOLE_PUBLIC_URL is not set');
+    throw failed;
+  }
   const email = normalizeEmail(body.email);
   if (!email) throw new ConsoleError(400, 'bad-request', 'Enter a valid email address.');
   if (!ROLES.includes(body.role)) throw new ConsoleError(400, 'bad-request', 'Choose Owner or Editor.');
