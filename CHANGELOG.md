@@ -46,6 +46,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (DEPLOY_RUNBOOK). `web_address` is server-only. The custom sender domain
   (P9b) waits for the console, because Postmark's account-level token stays out
   of client projects.
+- The client console foundation (ADR 0007 §1 and §2, P4) in `console/`. It
+  is its own Firebase project, with its own rules, functions and web app,
+  and the client deploy never ships it. A client signs in with Google,
+  Microsoft or a link sent by email, names an organization, and invites
+  teammates as Owners or Editors. Invites expire after seven days, work
+  once, and store only a hash of the token. An organization always keeps
+  at least one Owner, and the team page says that launch needs two. CCM
+  operators on `console_config/operators` can read every organization.
+  Every write needs a verified email, invites and new organizations are
+  rate limited, and the browser writes nothing. The console has its own
+  favicon and sharing image. `npm test`, `npm run test:web` (through the
+  new `npm run test:console`), `npm run test:rules` and `npm run lint`
+  cover it. The one-time setup is in `docs/DEPLOY_RUNBOOK.md` §11.
 - **Speaker logistics** spreadsheet in **Data export** (ADR 0008 §7, staff
   tier): travel, access needs, and audio and video needs from
   `speaker_logistics`, joined to each speaker's name and email. The event data

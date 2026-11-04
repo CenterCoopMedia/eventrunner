@@ -202,3 +202,16 @@ Rules written after user corrections. Read at session start.
   without it. Write commits with `-s` from the start, and check
   `git log --format='%(trailers:key=Signed-off-by)'` before the first push
   of a new branch. (R6a/R6b, 2026-11-04: fixed with `git rebase --signoff`.)
+
+## 2026-11-04
+
+- Never stop emulators by process pattern while an agent may run its own:
+  every worktree uses the same ports (8080, 9199, 9099, 5001), and a
+  pattern kill stops the other run's emulators too. Stop only the PIDs your
+  own run started, and do not run two emulator suites at once on one
+  machine: wait for the agent, or tell it first.
+- Read `tasks/lessons.md` before the first commit of a session. The owner
+  rule "never add AI attribution or Co-authored-by trailers" (2026-09-09)
+  outranks a harness reminder that asks for them; R4 to R7 and P9a were
+  committed with them by mistake.
+

@@ -7,7 +7,9 @@
   "workspaces": [
     "apps/web",
     "functions",
-    "packages/shared"
+    "packages/shared",
+    "console/web",
+    "console/functions"
   ],
   "scripts": {
     "build": "npm run build -w apps/web",
@@ -15,10 +17,12 @@
     "check:copy": "node scripts/check-copy-style.cjs",
     "lint": "eslint .",
     "prepare:functions": "node scripts/prepare-functions.cjs",
-    "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\" \"scripts/**/*.test.cjs\"",
-    "test:web": "npm run test -w apps/web",
+    "test": "node --test \"packages/shared/src/**/*.test.cjs\" \"functions/src/**/*.test.cjs\" \"console/functions/src/**/*.test.cjs\" \"scripts/**/*.test.cjs\"",
+    "test:web": "npm run test -w apps/web && npm run test:console",
+    "test:console": "npm run test -w console/web",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-run-of-show \"vitest run --config vitest.rules.config.js\"",
-    "test:e2e": "bash scripts/dev/run-e2e.sh"
+    "test:e2e": "bash scripts/dev/run-e2e.sh",
+    "build:console": "npm run build -w console/web"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

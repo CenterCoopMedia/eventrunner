@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// Security rules of the client console project (ADR 0007 §2). Not the
+// client event rules: those are the root firestore.rules.
+//
+// The console's server functions own every write (console/functions).
+// The browser may only read:
+//   - a member reads its own organization and that organization's members;
+//   - an operator (a lowercase email in console_config/operators) reads
+//     every organization and every member.
+// Invites, the operator allowlist and the rate limits have no client
+// access at all. Every read needs a verified email address.
+//
+// Tests: console/tests/console.rules.test.js (npm run test:rules).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function verified() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true;
+    }
+
+    function isOperator() {
+      let operators = /databases/$(database)/documents/console_config/operators;
+      return verified()
+        && exists(operators)
+        && get(operators).data.emails is list
+        && request.auth.token.email.lower() in get(operators).data.emails;
+    }
+
+    function isMember(orgId) {
+      return verified()
+        && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    match /organizations/{orgId} {
+      allow get: if isMember(orgId) || isOperator();
+      allow list: if isOperator();
+      allow write: if false;
+
+      match /members/{uid} {
+        allow read: if isMember(orgId) || isOperator();
+        allow write: if false;
+      }
+    }
+
+    // "Every member of every organization", for an operator only.
+    match /{path=**}/members/{uid} {
+      allow read: if isOperator();
+    }
+
+    match /invites/{inviteId} {
+      allow read, write: if false;
+    }
+
+    match /console_config/{docId} {
+      allow read, write: if false;
+    }
+
+    match /console_rate_limits/{key} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -126,6 +126,7 @@
               <li><a href="#8-rolling-back-a-bad-deploy">8. Rolling back a bad deploy</a></li>
               <li><a href="#9-site-publisher-optional-per-client">9. Site publisher (optional, per client)</a></li>
               <li><a href="#10-project-site-on-github-pages">10. Project site on GitHub Pages</a></li>
+              <li><a href="#11-client-console">11. Client console</a></li>
             </ul>
           </nav>
           <p>One-time setup an operator does per client deployment, before the first <code>workflow_dispatch</code> run of
@@ -1065,6 +1066,49 @@
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">PAGES_BASE_URL=https://docs.eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
           node scripts/lib/pages-site.cjs                                                    # prints the address in use
           </code></pre>
+          <h2 id="11-client-console">11. Client console<a class="heading-anchor" href="#11-client-console" aria-label="Link to this section">#</a></h2>
+          <p>The client console (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0007-client-console-self-serve-onboarding.md">ADR 0007</a>) is one CCM-owned Firebase project at <code>console.eventrunner.org</code>. It is not a client deployment, so sections 0 to 9 do not apply to it. Its code is in <code>console/</code>, and <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/console/README.md">console/README.md</a> describes it. This section is the one-time setup and a manual deploy. The full runbook, with a deploy workflow, comes later.</p>
+          <h3 id="111-one-time-setup">11.1 One-time setup<a class="heading-anchor" href="#111-one-time-setup" aria-label="Link to this section">#</a></h3>
+          <ol>
+          <li><p>Create the console Firebase project on the Blaze plan. Turn on Firestore (Native mode) and Authentication.</p></li>
+          <li><p>In Authentication, turn on these sign-in methods:</p>
+          <ul>
+          <li><strong>Google</strong>.</li>
+          <li><strong>Email/Password</strong> with <strong>Email link (passwordless sign-in)</strong>.</li>
+          <li><strong>Microsoft</strong>. This needs an app registration in Microsoft Entra ID (Azure portal, <strong>App registrations</strong>). Allow accounts in any organizational directory and personal Microsoft accounts. Add the redirect URI that the Firebase Microsoft provider shows (<code>https://&lt;auth domain&gt;/__/auth/handler</code>). Make a client secret, then put the application (client) ID and the secret in the Firebase Microsoft provider. Write down when the secret expires.</li>
+          </ul></li>
+          <li><p>In Authentication settings, add <code>console.eventrunner.org</code> to the authorized domains.</p></li>
+          <li><p>In Hosting, add the custom domain <code>console.eventrunner.org</code>.</p></li>
+          <li><p>In Postmark, make a server for the console and verify its sender domain. Store the server token in the console project:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">cd console
+          npx firebase functions:secrets:set CONSOLE_POSTMARK_TOKEN --project &lt;console-project-id&gt;
+          </code></pre></li>
+          </ol>
+          <ol start="6">
+          <li><p>Write <code>console/functions/.env</code> (Git ignores it):</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">CONSOLE_PUBLIC_URL=https://console.eventrunner.org
+          CONSOLE_MAIL_FROM=Event Runner &lt;hello@console.eventrunner.org&gt;
+          </code></pre></li>
+          </ol>
+          <ol start="7">
+          <li>In the Firestore data viewer, make the document <code>console_config/operators</code> with an array field <code>emails</code>. Add each CCM operator&#39;s address in lowercase.</li>
+          </ol>
+          <h3 id="112-deploy">11.2 Deploy<a class="heading-anchor" href="#112-deploy" aria-label="Link to this section">#</a></h3>
+          <p>Run from the repository root with the console project&#39;s public web settings:</p>
+          <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">npm run prepare:functions &amp;&amp; npm ci
+          VITE_CONSOLE_FIREBASE_API_KEY=... VITE_CONSOLE_FIREBASE_AUTH_DOMAIN=... \
+          VITE_CONSOLE_FIREBASE_PROJECT_ID=&lt;console-project-id&gt; VITE_CONSOLE_FIREBASE_APP_ID=... \
+            npm run build:console
+          cd console
+          npx firebase deploy --project &lt;console-project-id&gt;
+          </code></pre>
+          <p><code>console/firebase.json</code> deploys the console rules, indexes, functions and <code>web/dist</code> only. Never run this with a client project id, and never deploy the console from the repository root: the root <code>firebase.json</code> is the client deployment.</p>
+          <p>Check after the first deploy:</p>
+          <ul>
+          <li>Sign in at <code>https://console.eventrunner.org</code> with each of the three methods.</li>
+          <li>Make a test organization, invite a second address, and accept the invite from that address.</li>
+          <li>Sign in as an operator and confirm that the home page lists every organization.</li>
+          </ul>
         </article>
         <p class="source-note">This page is generated from <a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/DEPLOY_RUNBOOK.md"><code>docs/DEPLOY_RUNBOOK.md</code></a>. Edit the Markdown, not the HTML.</p>
         <nav class="page-nav" aria-label="Documentation pages">
