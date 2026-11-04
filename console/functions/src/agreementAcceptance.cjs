@@ -140,8 +140,9 @@ async function acceptAgreement(deps, { body, user }) {
 
   const after = { ...deps, now, log };
   const buildStarted = await isolated(log, 'the build start', () => runStartBuild(after, { orgId, appId, eventName, by: user.uid }));
-  const copySent = await isolated(log, 'the copy', () => sendCopy(after, { user, orgId, appId, eventName, agreement, name, at }));
+  // Right after the start, so a run that fails quickly can't email first and be contradicted.
   const emailed = await isolated(log, 'the Owners email', () => notifyOwners(after, { orgId, appId, status: buildStarted ? 'approved' : 'build-failed', eventName }));
+  const copySent = await isolated(log, 'the copy', () => sendCopy(after, { user, orgId, appId, eventName, agreement, name, at }));
   // runStartBuild has already told operators about a failed start.
   if (buildStarted) await isolated(log, 'the operators email', () => notifyOperators(after, { orgId, appId, eventName, kind: 'started' }));
   return { body: { status: 'approved', acceptanceId: recordRef.id, copySent, emailed, buildStarted } };
