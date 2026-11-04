@@ -22,11 +22,17 @@ const { createApplication, getApplication, listApplications } = require('./appli
 const { saveApplicationStep } = require('./applicationSave.cjs');
 const { submitApplication, withdrawApplication } = require('./applicationStatus.cjs');
 const { checkWebAddress } = require('./siteNames.cjs');
+const { getApplicationForReview, listApplicationsForReview } = require('./reviewQueue.cjs');
+const { approveApplication, declineApplication, requestChanges } = require('./reviewDecisions.cjs');
+const { deleteSpamApplication, runRetention } = require('./cleanup.cjs');
+const { getConsoleSettings, saveConsoleSettings } = require('./consoleSettings.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
 // this region, and the web app calls only those routes. Moving the console
 // means changing both files together.
 const REGION = 'us-central1';
+// Daily, at a quiet hour. The job is safe to run again at any time.
+const RETENTION_SCHEDULE = 'every day 04:17';
 
 const ENDPOINTS = Object.freeze({
   listOrganizations: { action: listOrganizations },
@@ -43,6 +49,20 @@ const ENDPOINTS = Object.freeze({
   checkWebAddress: { action: checkWebAddress },
   submitApplication: { action: submitApplication, mail: true },
   withdrawApplication: { action: withdrawApplication, mail: true },
+  // Operator review (ADR 0007 §5).
+  listApplicationsForReview: { action: listApplicationsForReview },
+  getApplicationForReview: { action: getApplicationForReview },
+  requestChanges: { action: requestChanges, mail: true },
+  declineApplication: { action: declineApplication, mail: true },
+  approveApplication: { action: approveApplication, mail: true },
+  deleteSpamApplication: { action: deleteSpamApplication },
+  getConsoleSettings: { action: getConsoleSettings },
+  saveConsoleSettings: { action: saveConsoleSettings },
+});
+
+/** Scheduled jobs: not HTTP, so no Hosting rewrite. */
+const SCHEDULED = Object.freeze({
+  runApplicationRetention: { job: runRetention, schedule: RETENTION_SCHEDULE },
 });
 
 const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice']);
@@ -61,6 +81,7 @@ function adminServices() {
 
 function buildHandlers() {
   const { onRequest } = require('firebase-functions/v2/https');
+  const { onSchedule } = require('firebase-functions/v2/scheduler');
   const { defineSecret } = require('firebase-functions/params');
   const { createPostmarkMailer } = require('./mailer.cjs');
 
@@ -87,7 +108,13 @@ function buildHandlers() {
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });
   }
+  for (const [name, spec] of Object.entries(SCHEDULED)) {
+    handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York' }, async () => {
+      const { db } = adminServices();
+      await spec.job({ db, now: Date.now, log: console });
+    });
+  }
   return handlers;
 }
 
-module.exports = { ENDPOINTS, REGION, buildHandlers };
+module.exports = { ENDPOINTS, REGION, SCHEDULED, buildHandlers };

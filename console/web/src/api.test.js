@@ -32,6 +32,18 @@ describe('callApi', () => {
     expect(error.code).toBe('last-owner');
     expect(error.status).toBe(409);
     expect(error.message).toBe('An organization needs at least one Owner.');
+    expect(error.field).toBe(null);
+  });
+
+  it('keeps the field the server names, so a page can focus it', async () => {
+    auth.currentUser = { getIdToken: async () => 't' };
+    vi.stubGlobal('fetch', async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { code: 'invalid-setting', message: 'Enter a region.', field: 'region' } }),
+    }));
+    const error = await callApi('saveConsoleSettings', {}).catch((err) => err);
+    expect(error.field).toBe('region');
   });
 
   it('keeps the field errors of a refusal', async () => {

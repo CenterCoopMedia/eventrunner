@@ -74,6 +74,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   favicon and sharing image. `npm test`, `npm run test:web` (through the
   new `npm run test:console`), `npm run test:rules` and `npm run lint`
   cover it. The one-time setup is in `docs/DEPLOY_RUNBOOK.md` §11.
+- **Operator review** in the client console (ADR 0007 §5, P7). The hosting
+  team reads a queue of requests by status, opens one to see its frozen
+  answers, team and history, and then requests changes or declines (each with
+  a note) or approves. Approval records the build settings: the Google Cloud
+  folder, billing account and region from the new console settings page, and
+  a project id and environment name made from the web address (`er-nclocal`
+  and `nclocal`). An operator can change each value, and the server checks
+  each one. Each decision runs in a transaction that checks the status, and
+  emails each Owner. Operators can delete a spam request, and a daily job
+  deletes withdrawn and declined requests 90 days after the last change. Both
+  free the web address and write an audit record with no client data.
+  Approval does not start the build yet (P8).
 - **Speaker logistics** spreadsheet in **Data export** (ADR 0008 §7, staff
   tier): travel, access needs, and audio and video needs from
   `speaker_logistics`, joined to each speaker's name and email. The event data

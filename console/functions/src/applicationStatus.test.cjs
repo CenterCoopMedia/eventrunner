@@ -43,7 +43,7 @@ test('an Owner sends a complete request: the answers freeze, the status and hist
   });
   const toOperators = mailer.sent.filter((m) => m.kind === 'operator');
   assert.deepEqual(toOperators.map((m) => m.to), ['ops@ccm.example', 'two@ccm.example']);
-  assert.equal(toOperators[0].link, link);
+  assert.equal(toOperators[0].link, `${PUBLIC_URL}/review/a1`, 'operators open the review page');
 });
 
 test('only an Owner sends', async () => {

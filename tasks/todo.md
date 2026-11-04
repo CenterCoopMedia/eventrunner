@@ -31,7 +31,7 @@ waits on all of P4 to P10.
 - [ ] P4 Console foundation — can start now.
 - [x] P5 Guided setup — built on `ccr-7be41c6c-vyzsth-p5-setup`, on top of P4.
 - [ ] P6 Stripe and Eventbrite connections — blocked on prerequisites.
-- [ ] P7 Operator review — can start now (after P5).
+- [x] P7 Operator review — built on P4; waits for the P5 rebase.
 - [ ] P8 Provisioner — blocked on prerequisites.
 - [ ] P9 Custom web address and sender domain — can start now.
 - [ ] P10 Runbook and live proof in a test folder — needs the owner.
@@ -148,8 +148,9 @@ gets an adversarial review before it merges.
 - [ ] P6 Connections: Stripe Connect OAuth and Eventbrite OAuth with the
       event picker; tokens to console Secret Manager only; state binding;
       disconnect. Tests against fake OAuth servers.
-- [ ] P7 Operator review: queue, read, request changes, decline, approve
+- [x] P7 Operator review: queue, read, request changes, decline, approve
       with defaults from console settings; spam delete; 90-day retention.
+      Branch `ccr-7be41c6c-vyzsth-p7-review`, on P4.
 - [ ] P8 Provisioner: `scripts/provision-client.cjs` idempotent steps
       (project, Hosting subdomain + DNS, authorized domains, Postmark server
       and domain + DNS, tokens and webhooks, GitHub Environment, dispatches,
