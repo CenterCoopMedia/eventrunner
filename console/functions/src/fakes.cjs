@@ -261,4 +261,55 @@ function makeRes() {
   return res;
 }
 
-module.exports = { makeFakeDb, makeFakeAuth, makeReq, makeRes };
+/** The console's Secret Manager, in memory. Set `failWrite`, `failRead` or `failDelete` to refuse. */
+function makeFakeSecrets(seed = {}) {
+  const store = new Map(Object.entries(seed));
+  return {
+    store,
+    failWrite: false,
+    failRead: false,
+    failDelete: false,
+    async writeSecret(id, value) {
+      if (this.failWrite) throw new Error('secret add: HTTP 500');
+      store.set(id, value);
+    },
+    async readSecret(id) {
+      if (this.failRead) throw new Error('secret read: HTTP 500');
+      return store.has(id) ? store.get(id) : null;
+    },
+    async deleteSecret(id) {
+      if (this.failDelete) throw new Error('secret delete: HTTP 500');
+      store.delete(id);
+    },
+  };
+}
+
+/**
+ * One provider's connector, recording its calls. `answer` is what
+ * exchangeCode returns; `exchangeError` and `revokeError` make those calls fail.
+ */
+function makeFakeConnector({ answer, events = [], revokes = true } = {}) {
+  return {
+    answer,
+    exchanged: [],
+    revoked: [],
+    exchangeError: null,
+    revokeError: null,
+    authorizeUrl: ({ state, redirectUri }) => `https://provider.example/authorize?state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(redirectUri)}`,
+    async exchangeCode(input) {
+      this.exchanged.push(input);
+      if (this.exchangeError) throw this.exchangeError;
+      return this.answer;
+    },
+    async revoke(accountId) {
+      this.revoked.push(accountId);
+      if (this.revokeError) throw this.revokeError;
+      return revokes;
+    },
+    async listEvents() {
+      return events;
+    },
+  };
+}
+
+module.exports = { makeFakeAuth, makeFakeConnector, makeFakeDb, makeFakeSecrets, makeReq, makeRes };

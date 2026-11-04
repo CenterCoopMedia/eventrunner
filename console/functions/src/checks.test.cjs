@@ -9,7 +9,7 @@ const { checkAnswers, stepErrors, toInitAnswers } = require('./checks.cjs');
 const { validAnswers } = require('./testData.cjs');
 
 test('a complete set of answers passes every check', () => {
-  assert.deepEqual(checkAnswers(validAnswers()), {});
+  assert.deepEqual(checkAnswers(validAnswers(), { stripe: { connected: true } }), {});
 });
 
 test('empty answers name every required field, by path, in plain words', () => {
@@ -97,4 +97,22 @@ test('withDefaults fills a missing step', () => {
   const answers = withDefaults({ tickets: { choice: 'none' } });
   assert.equal(answers.tickets.choice, 'none');
   assert.deepEqual(answers.webAddress, { name: '' });
+});
+
+test('a ticket provider needs a live connection, and Eventbrite a chosen event', () => {
+  const choosing = (choice) => ({ ...validAnswers(), tickets: { choice } });
+  assert.equal(checkAnswers(choosing('stripe'))['tickets.connection'], 'Connect your Stripe account.');
+  assert.equal(checkAnswers(choosing('stripe'), {})['tickets.connection'], 'Connect your Stripe account.');
+  assert.equal(checkAnswers(choosing('stripe'), { stripe: { connected: false } })['tickets.connection'], 'Connect your Stripe account.');
+  assert.equal(checkAnswers(choosing('stripe'), { eventbrite: { connected: true, event: { id: 'e1' } } })['tickets.connection'], 'Connect your Stripe account.');
+  assert.equal(checkAnswers(choosing('eventbrite'))['tickets.connection'], 'Connect your Eventbrite account.');
+  const noEvent = { eventbrite: { connected: true, event: null } };
+  assert.equal(checkAnswers(choosing('eventbrite'), noEvent)['tickets.event'], 'Choose your Eventbrite event.');
+  assert.deepEqual(checkAnswers(choosing('eventbrite'), { eventbrite: { connected: true, event: { id: 'e1' } } }), {});
+});
+
+test('a spreadsheet or no tickets needs no connection', () => {
+  for (const choice of ['spreadsheet', 'none']) {
+    assert.deepEqual(checkAnswers({ ...validAnswers(), tickets: { choice } }), {}, choice);
+  }
 });

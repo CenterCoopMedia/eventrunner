@@ -12,6 +12,10 @@
  *   CONSOLE_MAIL_FROM        the sender of invite emails
  *   CONSOLE_ALLOWED_ORIGINS  extra origins for a local dev server
  *   CONSOLE_POSTMARK_TOKEN   secret: the Postmark server token
+ *   CONSOLE_STRIPE_CLIENT_ID          the Stripe Connect client id; unset means not available yet
+ *   CONSOLE_EVENTBRITE_CLIENT_ID      the Eventbrite app key; unset means not available yet
+ *   CONSOLE_STRIPE_SECRET_KEY         secret: the console's Stripe platform key
+ *   CONSOLE_EVENTBRITE_CLIENT_SECRET  secret: the Eventbrite app's client secret
  */
 
 const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
@@ -26,6 +30,10 @@ const { getApplicationForReview, listApplicationsForReview } = require('./review
 const { approveApplication, declineApplication, requestChanges } = require('./reviewDecisions.cjs');
 const { deleteSpamApplication, runRetention } = require('./cleanup.cjs');
 const { getConsoleSettings, saveConsoleSettings } = require('./consoleSettings.cjs');
+const {
+  chooseEventbriteEvent, completeConnection, disconnectAccount, listEventbriteEvents, startConnection,
+} = require('./connections.cjs');
+const { connectionsAvailable, createConnectors } = require('./connectors.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
 // this region, and the web app calls only those routes. Moving the console
@@ -55,14 +63,20 @@ const ENDPOINTS = Object.freeze({
   requestChanges: { action: requestChanges, mail: true },
   declineApplication: { action: declineApplication, mail: true },
   approveApplication: { action: approveApplication, mail: true },
-  deleteSpamApplication: { action: deleteSpamApplication },
+  deleteSpamApplication: { action: deleteSpamApplication, connect: true },
   getConsoleSettings: { action: getConsoleSettings },
   saveConsoleSettings: { action: saveConsoleSettings },
+  // Account connections (ADR 0007 §4).
+  startConnection: { action: startConnection, connect: true },
+  completeConnection: { action: completeConnection, connect: true },
+  disconnectAccount: { action: disconnectAccount, connect: true },
+  listEventbriteEvents: { action: listEventbriteEvents, connect: true },
+  chooseEventbriteEvent: { action: chooseEventbriteEvent, connect: true },
 });
 
 /** Scheduled jobs: not HTTP, so no Hosting rewrite. */
 const SCHEDULED = Object.freeze({
-  runApplicationRetention: { job: runRetention, schedule: RETENTION_SCHEDULE },
+  runApplicationRetention: { job: runRetention, schedule: RETENTION_SCHEDULE, connect: true },
 });
 
 const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice']);
@@ -87,14 +101,38 @@ function buildHandlers() {
 
   const region = REGION;
   const postmarkToken = defineSecret('CONSOLE_POSTMARK_TOKEN');
+  const stripeSecretKey = defineSecret('CONSOLE_STRIPE_SECRET_KEY');
+  const eventbriteClientSecret = defineSecret('CONSOLE_EVENTBRITE_CLIENT_SECRET');
+  const connectSecrets = [stripeSecretKey, eventbriteClientSecret];
+  // Made per call: secret values exist only while a function that declares them runs.
+  const connectDeps = () => {
+    const { applicationDefault } = require('firebase-admin/app');
+    const { createSecretStore } = require('./secretStore.cjs');
+    return {
+      connectors: createConnectors({
+        env: process.env,
+        stripeSecretKey: stripeSecretKey.value(),
+        eventbriteClientSecret: eventbriteClientSecret.value(),
+        fetch: globalThis.fetch,
+      }),
+      secrets: createSecretStore({
+        projectId: process.env.GCLOUD_PROJECT,
+        getAccessToken: () => applicationDefault().getAccessToken(),
+        fetch: globalThis.fetch,
+        log: console,
+      }),
+    };
+  };
 
   const handlers = {};
   for (const [name, spec] of Object.entries(ENDPOINTS)) {
-    const options = { region, ...(spec.mail ? { secrets: [postmarkToken] } : {}) };
+    const secrets = [...(spec.mail ? [postmarkToken] : []), ...(spec.connect ? connectSecrets : [])];
+    const options = { region, ...(secrets.length > 0 ? { secrets } : {}) };
     handlers[name] = onRequest(options, async (req, res) => {
       if (applyCors(req, res, parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS))) return;
       const { db, auth } = adminServices();
-      const deps = { db, auth, now: Date.now, log: console, publicUrl: (process.env.CONSOLE_PUBLIC_URL || '').replace(/\/+$/, '') };
+      const deps = { db, auth, now: Date.now, log: console, publicUrl: (process.env.CONSOLE_PUBLIC_URL || '').replace(/\/+$/, ''), connectionsAvailable: connectionsAvailable(process.env) };
+      if (spec.connect) Object.assign(deps, connectDeps());
       if (spec.mail) {
         // Made at send time, so a missing setting is a failed send that the
         // action reports and logs, not a crash before the request is read.
@@ -109,9 +147,10 @@ function buildHandlers() {
     });
   }
   for (const [name, spec] of Object.entries(SCHEDULED)) {
-    handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York' }, async () => {
+    const secrets = spec.connect ? { secrets: connectSecrets } : {};
+    handlers[name] = onSchedule({ region, schedule: spec.schedule, timeZone: 'America/New_York', ...secrets }, async () => {
       const { db } = adminServices();
-      await spec.job({ db, now: Date.now, log: console });
+      await spec.job({ db, now: Date.now, log: console, ...(spec.connect ? connectDeps() : {}) });
     });
   }
   return handlers;

@@ -35,6 +35,11 @@
       { "source": "/api/deleteSpamApplication", "function": { "functionId": "deleteSpamApplication", "region": "us-central1" } },
       { "source": "/api/getConsoleSettings", "function": { "functionId": "getConsoleSettings", "region": "us-central1" } },
       { "source": "/api/saveConsoleSettings", "function": { "functionId": "saveConsoleSettings", "region": "us-central1" } },
+      { "source": "/api/startConnection", "function": { "functionId": "startConnection", "region": "us-central1" } },
+      { "source": "/api/completeConnection", "function": { "functionId": "completeConnection", "region": "us-central1" } },
+      { "source": "/api/disconnectAccount", "function": { "functionId": "disconnectAccount", "region": "us-central1" } },
+      { "source": "/api/listEventbriteEvents", "function": { "functionId": "listEventbriteEvents", "region": "us-central1" } },
+      { "source": "/api/chooseEventbriteEvent", "function": { "functionId": "chooseEventbriteEvent", "region": "us-central1" } },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

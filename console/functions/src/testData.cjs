@@ -15,6 +15,19 @@ const cy = { uid: 'cy', email: 'cy@example.org' };
 const ops = { uid: 'ops', email: 'ops@ccm.example' };
 const zed = { uid: 'zed', email: 'zed@example.org' };
 
+/** What a connected Stripe account looks like in `applications/{appId}.connections`. */
+function stripeConnection(overrides = {}) {
+  return {
+    connected: true,
+    accountId: 'acct_client1',
+    displayName: 'NC Local',
+    livemode: false,
+    connectedAt: new Date(NOW - 2000),
+    connectedBy: 'ana',
+    ...overrides,
+  };
+}
+
 function validAnswers() {
   return {
     organization: { name: 'NC Local', website: 'nclocal.org', address: '1 Main Street\nRaleigh, NC 27601' },
@@ -60,6 +73,7 @@ function applicationDoc(overrides = {}) {
     submittedBy: null,
     history: [{ status: 'draft', at: new Date(NOW - 1000), by: 'ana', note: null }],
     review: null,
+    connections: { stripe: stripeConnection() },
     ...overrides,
   };
 }
@@ -77,4 +91,4 @@ function quietLog() {
   return { errors: [], error(...args) { this.errors.push(args); } };
 }
 
-module.exports = { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, validAnswers, zed };
+module.exports = { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, stripeConnection, validAnswers, zed };

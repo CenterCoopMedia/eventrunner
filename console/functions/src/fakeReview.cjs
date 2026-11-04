@@ -6,7 +6,7 @@
  * firebase.json leaves `src/fake*.cjs` out of the deploy.
  */
 
-const { makeFakeDb } = require('./fakes.cjs');
+const { makeFakeDb, makeFakeSecrets } = require('./fakes.cjs');
 
 const NOW = Date.parse('2026-11-04T15:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
@@ -52,6 +52,7 @@ function application(overrides = {}) {
       { status: 'submitted', at: new Date(NOW - DAY), by: 'ana', note: null },
     ],
     review: null,
+    connections: { stripe: { connected: true, accountId: 'acct_client1', displayName: 'NC Local', livemode: true } },
     ...overrides,
   };
 }
@@ -88,7 +89,7 @@ function fakeMailer({ fail = false } = {}) {
 const QUIET = { info() {}, error() {} };
 
 function deps(db, extra = {}) {
-  return { db, mailer: fakeMailer(), now: () => NOW, publicUrl: PUBLIC_URL, log: QUIET, ...extra };
+  return { db, mailer: fakeMailer(), secrets: makeFakeSecrets(), now: () => NOW, publicUrl: PUBLIC_URL, log: QUIET, ...extra };
 }
 
 module.exports = { DAY, NOW, PUBLIC_URL, QUIET, ana, answers, application, deps, fakeMailer, ops, ops2, seeded };

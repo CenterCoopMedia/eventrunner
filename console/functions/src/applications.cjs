@@ -5,6 +5,7 @@
  *
  * `applications/{appId}` {
  *   orgId, status, answers, frozen (a copy of answers at submit, else null),
+ *   connections (connected accounts, see connectionState.cjs; absent until one is connected),
  *   createdBy, createdAt, updatedAt, updatedBy, submittedAt, submittedBy,
  *   history: [{ status, at, by, note }]  // oldest first
  *   review: null | { note, by, at, settings }  // written by operator review only
@@ -18,6 +19,7 @@ const { ConsoleError } = require('./http.cjs');
 const { requireMemberOrOperator, requireOwner, toIso, toMillis, validOrgId } = require('./access.cjs');
 const { emptyAnswers, withDefaults } = require('./answers.cjs');
 const { checkAnswers } = require('./checks.cjs');
+const { connectionsForClient } = require('./connectionState.cjs');
 const { siteAddress } = require('./siteNames.cjs');
 const { LAUNCH_OWNERS } = require('./organizations.cjs');
 
@@ -86,9 +88,9 @@ function stepProgress(errors, ownersNeeded) {
 }
 
 /** What the browser gets. The operator also gets who did each change and the review. */
-function applicationForClient(id, data, { role, operator, ownersNeeded }) {
+function applicationForClient(id, data, { role, operator, ownersNeeded, available }) {
   const answers = withDefaults(data.answers);
-  const errors = checkAnswers(answers);
+  const errors = checkAnswers(answers, data.connections);
   const editable = EDITABLE.includes(data.status);
   const body = {
     id,
@@ -114,6 +116,7 @@ function applicationForClient(id, data, { role, operator, ownersNeeded }) {
     canEdit: Boolean(role) && editable,
     canSubmit: role === 'owner' && editable,
     canWithdraw: role === 'owner' && WITHDRAWABLE.includes(data.status),
+    connections: connectionsForClient(data.connections, { available, status: data.status, role }),
   };
   if (operator) {
     body.frozen = data.frozen || null;
@@ -157,12 +160,12 @@ async function createApplication({ db, now = Date.now }, { body, user }) {
   return { status: 201, body: { application: { id: ref.id, orgId, status: 'draft' } } };
 }
 
-async function getApplication({ db }, { body, user }) {
+async function getApplication({ db, connectionsAvailable }, { body, user }) {
   const { orgId, appId } = body;
   const access = await requireMemberOrOperator(db, orgId, user);
   const { ref, data } = await readApplication((r) => r.get(), db, orgId, appId);
   const ownersNeeded = Math.max(0, LAUNCH_OWNERS - await countOwners(db, orgId));
-  return { body: { application: applicationForClient(ref.id, data, { ...access, ownersNeeded }) } };
+  return { body: { application: applicationForClient(ref.id, data, { ...access, ownersNeeded, available: connectionsAvailable }) } };
 }
 
 async function listApplications({ db }, { body, user }) {

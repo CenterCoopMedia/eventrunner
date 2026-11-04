@@ -23,6 +23,7 @@ const { isEmailAddress } = require('shared/email');
 const { safeUrlHref } = require('shared/urlSafety');
 const { MAX_DAYS, TICKET_CHOICES, withDefaults } = require('./answers.cjs');
 const { siteNameProblem, siteAddress } = require('./siteNames.cjs');
+const { connectionProblem } = require('./connectionState.cjs');
 
 const SENDER_LOCAL_PART = 'hello';
 // Used only to check the other steps while the web address is not chosen.
@@ -168,8 +169,13 @@ function checkWebAddressAnswer(errors, { webAddress }) {
   if (problem) add(errors, 'webAddress.name', problem.message);
 }
 
-function checkTickets(errors, { tickets }) {
-  if (!TICKET_CHOICES.includes(tickets.choice)) add(errors, 'tickets.choice', 'Choose how you sell tickets.');
+function checkTickets(errors, { tickets }, connections) {
+  if (!TICKET_CHOICES.includes(tickets.choice)) {
+    add(errors, 'tickets.choice', 'Choose how you sell tickets.');
+    return;
+  }
+  const problem = connectionProblem(tickets.choice, connections);
+  if (problem) add(errors, problem.field, problem.message);
 }
 
 function checkEmail(errors, { email }) {
@@ -180,15 +186,18 @@ function checkEmail(errors, { email }) {
 
 /**
  * Every check on every answer step.
+ * @param {object} stored the answers
+ * @param {object} [connections] the request's `connections`. Leaving it out
+ *   means nothing is connected, so a ticket provider choice fails.
  * @returns {Record<string, string>} errors by field path; empty when all pass
  */
-function checkAnswers(stored) {
+function checkAnswers(stored, connections) {
   const answers = withDefaults(stored);
   const errors = {};
   checkOrganization(errors, answers);
   checkEvent(errors, answers);
   checkWebAddressAnswer(errors, answers);
-  checkTickets(errors, answers);
+  checkTickets(errors, answers, connections);
   checkEmail(errors, answers);
   // The shared rules last: a console message for a field wins over the
   // general one the shared error maps to.

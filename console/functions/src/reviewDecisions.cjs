@@ -24,6 +24,7 @@ const {
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { statusLink } = require('./applicationStatus.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('./consoleSettings.cjs');
+const { connectionProblem } = require('./connectionState.cjs');
 
 const NOTE_MAX = 2000;
 const STATUS_CHANGED = 'This request changed since you opened it. Reload the page to see it.';
@@ -140,7 +141,13 @@ async function approveApplication(deps, input) {
   const consoleSettings = await readConsoleSettings(db);
   // Checked inside the transaction against the request as it is then, so
   // the project id comes from the name the request holds at approval.
-  const review = (app) => checkSettings(APPROVAL_FIELDS, approvalDefaults(consoleSettings, siteNameOf(app)), overrides);
+  const review = (app) => {
+    // A client can disconnect after sending the request.
+    if (connectionProblem(reviewedAnswers(app)?.tickets?.choice, app.connections)) {
+      throw new ConsoleError(409, 'connection-needed', 'The client has not connected the account for ticket sales, so this request cannot be approved yet.');
+    }
+    return checkSettings(APPROVAL_FIELDS, approvalDefaults(consoleSettings, siteNameOf(app)), overrides);
+  };
   const result = await decide(deps, input, { from: ['submitted'], to: 'approved', review });
   return result;
 }

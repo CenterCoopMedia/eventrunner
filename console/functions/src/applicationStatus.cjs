@@ -90,7 +90,7 @@ async function submitApplication(deps, { body, user }) {
     err.fields = { team: 'Two Owners are needed before launch.' };
     throw err;
   }
-  const errors = checkAnswers(first.data.answers);
+  const errors = checkAnswers(first.data.answers, first.data.connections);
   if (Object.keys(errors).length > 0) {
     const err = new ConsoleError(400, 'incomplete', INCOMPLETE);
     err.fields = errors;
@@ -110,7 +110,7 @@ async function submitApplication(deps, { body, user }) {
     if (!EDITABLE.includes(data.status)) throw new ConsoleError(409, 'locked', 'This request was already sent.');
     const answers = withDefaults(data.answers);
     // Checked again on the copy that is frozen, in case a teammate saved since.
-    const again = checkAnswers(answers);
+    const again = checkAnswers(answers, data.connections);
     const siteName = answers.webAddress.name;
     const held = siteName ? await tx.get(db.collection(SITE_NAMES).doc(siteName)) : null;
     if (!again['webAddress.name'] && (!held?.exists || held.data().appId !== appId)) {

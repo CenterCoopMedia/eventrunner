@@ -67,7 +67,7 @@ async function saveApplicationStep({ db, now = Date.now }, { body, user }) {
     }
     const answers = { ...withDefaults(data.answers), [step]: clean };
     tx.update(ref, { answers, updatedAt: at, updatedBy: user.uid });
-    return { saved: true, errors: stepErrors(checkAnswers(answers), step) };
+    return { saved: true, errors: stepErrors(checkAnswers(answers, data.connections), step) };
   });
 
   return {
