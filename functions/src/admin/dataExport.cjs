@@ -7,9 +7,9 @@
  * `{ filename, csv, rowCount }`, the same shape exportAttendees answers, and
  * the admin saves it with the same download code.
  *
- * TIERS. Sessions, speakers, organizations and invoices are staff tier: a
- * staff admin already reads every one of those documents in the admin
- * panel. Ticket
+ * TIERS. Sessions, speakers, speaker logistics, organizations and invoices
+ * are staff tier: a staff admin already reads every one of those documents
+ * in the admin panel. Ticket
  * orders and admissions are operator tier: they name purchasers and carry
  * payment state, and the ticketing page shows them to staff one order at a
  * time only. The gate admits both tiers, then refuses an operator dataset
@@ -35,6 +35,7 @@ const {
   LimitError,
   admissionRecord,
   invoiceRecord,
+  logisticsRecord,
   orderRecord,
   organizationRecord,
   readDocs,
@@ -202,6 +203,31 @@ const DATASETS = Object.freeze({
       },
       { header: 'Bio', value: (row) => row.bio },
       { header: 'Headshot path', value: (row) => row.headshotPath },
+    ],
+  },
+  // ADR 0008 §7. Staff-only answers, so the event package leaves them out
+  // (eventPackage EXCLUDED) and this spreadsheet is the one way to get them.
+  speakerLogistics: {
+    tier: 'staff',
+    filename: 'speaker-logistics',
+    docPath: 'speaker_logistics',
+    packagePath: null,
+    packageHolds: null,
+    async read({ db, counter, maxDocs, cache }) {
+      const records = await readRecords({ db, collection: 'speaker_logistics', counter, maxDocs, cache }, logisticsRecord);
+      const speakers = new Map((await readRecords({ db, collection: 'speakers', counter, maxDocs, cache }, speakerRecord))
+        .map((speaker) => [speaker.id, speaker]));
+      return records.map((record) => ({ ...record, speaker: speakers.get(record.id) ?? null }));
+    },
+    columns: [
+      { header: 'Speaker ID', value: (row) => row.id },
+      { header: 'First name', value: (row) => row.speaker?.firstName },
+      { header: 'Last name', value: (row) => row.speaker?.lastName },
+      { header: 'Email', value: (row) => row.speaker?.email },
+      { header: 'Travel', value: (row) => row.travel },
+      { header: 'Access needs', value: (row) => row.accessNeeds },
+      { header: 'Audio and video needs', value: (row) => row.avNeeds },
+      { header: 'Updated', value: (row) => row.updatedAt },
     ],
   },
   organizations: {
@@ -400,7 +426,9 @@ function createExportEventDataHandler({
           : 'Ask an operator for the event data package';
         return sendError(
           res, 413, 'too-large',
-          `This spreadsheet is too large to build here. ${where}: its file ${dataset.packagePath} holds ${dataset.packageHolds}.`,
+          dataset.packagePath
+            ? `This spreadsheet is too large to build here. ${where}: its file ${dataset.packagePath} holds ${dataset.packageHolds}.`
+            : 'This spreadsheet is too large to build here, and the event data package leaves it out. Ask the hosting team for a copy.',
         );
       }
       log.error(`exportEventData: the ${request.name} records could not be read`, err);

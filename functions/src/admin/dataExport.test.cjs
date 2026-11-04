@@ -97,7 +97,7 @@ test('readRequest names a missing dataset, an unknown one, and an extra key', ()
 test('each dataset states its tier: orders and admissions are operator only', () => {
   assert.deepEqual(
     Object.fromEntries(DATASET_NAMES.map((name) => [name, DATASETS[name].tier])),
-    { sessions: 'staff', speakers: 'staff', organizations: 'staff', orders: 'operator', admissions: 'operator', invoices: 'staff' },
+    { sessions: 'staff', speakers: 'staff', speakerLogistics: 'staff', organizations: 'staff', orders: 'operator', admissions: 'operator', invoices: 'staff' },
   );
 });
 
@@ -255,6 +255,23 @@ test('invoices: staff get the number, status, parties, dates and totals in major
   assertNoSecrets(res.body.csv);
 });
 
+test('speaker logistics: staff get travel, access and audio and video needs, joined to the speaker, never the account id', async () => {
+  const { handler } = setup();
+  const res = await run(handler, 'staff', { dataset: 'speakerLogistics' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.filename, 'speaker-logistics-2026-10-01.csv');
+  const rows = asObjects(parseCsv(res.body.csv));
+  assert.equal(rows.length, 1);
+  const [ada] = rows;
+  assert.equal(ada['Speaker ID'], 'speaker-ada');
+  assert.equal(ada.Email, 'ada@example.com');
+  assert.equal(ada.Travel, 'Flying in from Denver on the 26th');
+  assert.equal(ada['Access needs'], '\'=step-free stage');
+  assert.equal(ada['Audio and video needs'], 'HDMI and a lapel mic');
+  assert.ok(!res.body.csv.includes('uid-ada'), 'no account id');
+  assertNoSecrets(res.body.csv);
+});
+
 test('every export writes its admin_logs row with the dataset and the count', async () => {
   const { db, handler } = setup();
   await run(handler, 'staff', { dataset: 'speakers' });
@@ -291,7 +308,13 @@ test('a read past the document cap answers 413 with a path the caller can take',
   // The package paths named here are the package's own.
   const { internals: { SECTIONS } } = require('./eventPackage.cjs');
   const paths = SECTIONS.flatMap((section) => section.files.map((file) => file.path));
-  for (const name of DATASET_NAMES) assert.ok(paths.includes(DATASETS[name].packagePath), name);
+  for (const name of DATASET_NAMES) {
+    // A dataset the package leaves out on purpose names no file, and the package says why.
+    if (DATASETS[name].packagePath === null) {
+      const { internals: { EXCLUDED } } = require('./eventPackage.cjs');
+      assert.ok(EXCLUDED.some((entry) => entry.source.split(', ').includes(DATASETS[name].docPath)), name);
+    } else assert.ok(paths.includes(DATASETS[name].packagePath), name);
+  }
 });
 
 test('a page larger than one read page is read in id order, every document once', async () => {

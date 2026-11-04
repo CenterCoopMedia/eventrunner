@@ -56,6 +56,13 @@ export const SPREADSHEETS = Object.freeze([
     description: 'Name, email address, organization, status, and published sessions of every speaker.',
   },
   {
+    dataset: 'speakerLogistics',
+    label: 'Speaker logistics',
+    tier: 'staff',
+    noun: ['speaker', 'speakers'],
+    description: 'Travel, access needs, and audio and video needs each speaker gave. Private: share it only with the people who arrange them.',
+  },
+  {
     dataset: 'organizations',
     label: 'Organizations and sponsors',
     tier: 'staff',

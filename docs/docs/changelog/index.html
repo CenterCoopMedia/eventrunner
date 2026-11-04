@@ -145,6 +145,11 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li><strong>Speaker logistics</strong> spreadsheet in <strong>Data export</strong> (ADR 0008 §7, staff
+          tier): travel, access needs, and audio and video needs from
+          <code>speaker_logistics</code>, joined to each speaker&#39;s name and email. The event data
+          package still leaves these private answers out, so this is the one export
+          of them; a dataset may now name no package file (<code>packagePath: null</code>).</li>
           <li><strong>Registrations</strong> in <strong>Import records</strong> (ADR 0008 §7). With the manual
           ticketing provider, each row makes a valid ticket: ticket ID, email, names,
           ticket type, and one <code>answer:&lt;question id&gt;</code> column per registration

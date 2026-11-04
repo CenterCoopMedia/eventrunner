@@ -937,8 +937,9 @@ The event's records as spreadsheets, and the event data package for the handoff 
 |---|---|---|
 | Sessions | Staff | Session ID, title, state, hidden, day, date, start and end time, time zone, type, track, location, speakers, speaker IDs, the session it is part of, description, number of materials, no materials needed (yes or no) |
 | Speakers | Staff | Speaker ID, first and last name, email, organization, role, status, published sessions (live and not hidden), social handles, bio, headshot path in Storage |
+| Speaker logistics | Staff | Speaker ID, first and last name, email, travel, access needs, audio and video needs, last updated. Only speakers who answered. These answers are private and are not in the event data package, so share the file only with the people who arrange travel, access and the stage. |
 | Organizations and sponsors | Staff | Organization ID, name, state, hidden, tier, website, description, support description, logo path, order |
-| Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, tax, total, refund status, refunded, tickets, ticket IDs |
+| Ticket orders | Operator | Order ID, created, mode (live or test), source, status, payment status, purchaser email, currency, subtotal, discount, promo code, promo discount, tax, total, refund status, refunded, tickets, ticket IDs |
 | Admissions | Operator | Ticket ID, order ID, provider, ticket type, holder's first and last name, email, status, whether an account claimed it, checked in, purchased |
 | Invoices | Staff | Invoice ID, number, status, bill-to name, contact name, billing email, organization ID, reference, issue date, due date, currency, subtotal, discounts, tax, total, paid on, payment method, payment note, void reason, the invoice it was copied from, created. A reopened invoice's earlier payments are in the event data package. A payment through the Stripe pay link shows the method as **Card (Stripe)**. |
 

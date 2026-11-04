@@ -61,10 +61,10 @@ describe('AdminDataExport', () => {
     );
   });
 
-  it('shows staff the four staff spreadsheets, and says who exports orders and the package', () => {
+  it('shows staff the five staff spreadsheets, and says who exports orders and the package', () => {
     renderPage();
     expect(screen.getByRole('heading', { level: 1, name: 'Data export' })).toBeInTheDocument();
-    for (const name of ['Export sessions', 'Export speakers', 'Export organizations and sponsors', 'Export invoices']) {
+    for (const name of ['Export sessions', 'Export speakers', 'Export speaker logistics', 'Export organizations and sponsors', 'Export invoices']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
     expect(screen.queryByRole('button', { name: 'Export ticket orders' })).toBeNull();

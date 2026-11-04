@@ -30,6 +30,8 @@
  * Pure: no db, no clock. The readers at the end take a db.
  */
 
+const { readLogistics } = require('shared/speakerLogistics');
+
 /** Keys removed at every depth of every exported record. */
 const SECRET_KEY_RE = /^(?:raw|rawPayload|payload|stripeRequest|idempotencyKey|checkoutUrl)$|token(?!s$)|secret|password|passcode|apikey|api_key|privatekey|private_key|credential|signature/i;
 
@@ -149,6 +151,15 @@ function sessionRecord(id, data) {
   // missing key means "materials are needed" (issue #332).
   record.materialsNotNeeded = data?.materialsNotNeeded === true;
   return record;
+}
+
+/**
+ * A speaker_logistics document (ADR 0008 §3): the three answers, read with
+ * shared readLogistics, and when they changed. Not the account that saved
+ * them (updatedBy).
+ */
+function logisticsRecord(id, data) {
+  return { id, ...readLogistics(data), updatedAt: toIso(data?.updatedAt) };
 }
 
 /**
@@ -461,6 +472,7 @@ class LimitError extends Error {
 
 module.exports = {
   LIST_SEPARATOR,
+  logisticsRecord,
   PAGE_SIZE,
   LimitError,
   admissionRecord,
