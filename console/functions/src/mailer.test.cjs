@@ -6,6 +6,13 @@ const {
   STATUS_WORDS, createPostmarkMailer, inviteMessage, operatorNoticeMessage, statusChangeMessage,
 } = require('./mailer.cjs');
 
+test('no status email uses hosting jargon', () => {
+  for (const status of Object.keys(STATUS_WORDS)) {
+    const { text } = statusChangeMessage({ organizationName: 'NC Local', eventName: 'Summit', status, note: 'n', link: '' });
+    assert.ok(!/firebase|project|tenant|environment|webhook|secret/i.test(text), text);
+  }
+});
+
 const invite = {
   to: 'sam@example.org',
   organizationName: 'Local <News> & Co',

@@ -27,6 +27,14 @@
       { "source": "/api/checkWebAddress", "function": { "functionId": "checkWebAddress", "region": "us-central1" } },
       { "source": "/api/submitApplication", "function": { "functionId": "submitApplication", "region": "us-central1" } },
       { "source": "/api/withdrawApplication", "function": { "functionId": "withdrawApplication", "region": "us-central1" } },
+      { "source": "/api/listApplicationsForReview", "function": { "functionId": "listApplicationsForReview", "region": "us-central1" } },
+      { "source": "/api/getApplicationForReview", "function": { "functionId": "getApplicationForReview", "region": "us-central1" } },
+      { "source": "/api/requestChanges", "function": { "functionId": "requestChanges", "region": "us-central1" } },
+      { "source": "/api/declineApplication", "function": { "functionId": "declineApplication", "region": "us-central1" } },
+      { "source": "/api/approveApplication", "function": { "functionId": "approveApplication", "region": "us-central1" } },
+      { "source": "/api/deleteSpamApplication", "function": { "functionId": "deleteSpamApplication", "region": "us-central1" } },
+      { "source": "/api/getConsoleSettings", "function": { "functionId": "getConsoleSettings", "region": "us-central1" } },
+      { "source": "/api/saveConsoleSettings", "function": { "functionId": "saveConsoleSettings", "region": "us-central1" } },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

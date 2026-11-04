@@ -105,6 +105,16 @@ test('postEndpoint sends the field errors of a refusal, for a form', async () =>
   });
 });
 
+test('postEndpoint names the field a refusal is about, when it has one', async () => {
+  const res = makeRes();
+  await postEndpoint({ auth, log: QUIET }, async () => {
+    const err = new ConsoleError(400, 'invalid-setting', 'Enter a region.');
+    err.field = 'region';
+    throw err;
+  })(makeReq({ token: 'good' }), res);
+  assert.deepEqual(res.body, { error: { code: 'invalid-setting', message: 'Enter a region.', field: 'region' } });
+});
+
 test('applyCors answers a preflight and allows only listed origins', () => {
   const allowed = parseAllowedOrigins(' https://console.eventrunner.org , http://localhost:5173 ');
   assert.deepEqual(allowed, ['https://console.eventrunner.org', 'http://localhost:5173']);
