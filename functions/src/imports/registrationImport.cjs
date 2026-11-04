@@ -20,7 +20,10 @@
  * RE-IMPORT is the three-way merge every import type uses: a name, ticket
  * type or answer that staff or the attendee changed since the last import
  * is kept and reported. A claimed ticket's email never changes by import:
- * the address is what links the ticket to its account.
+ * the address is what links the ticket to its account. A new email on an
+ * unclaimed ticket is a new person, so the held answers are replaced by
+ * the row's own. The directory question is never imported: who can see a
+ * person is their own choice.
  */
 
 const { EMAIL_ADDRESS_RE } = require('shared/email');
@@ -50,6 +53,11 @@ const FIELDS = Object.freeze([
 function mappingError(mapping) {
   if (!mapping.externalId) return 'mapping.externalId: map a column to the ticket ID';
   if (!mapping.email) return "mapping.email: map a column to the attendee's email";
+  // The directory listing sets who can see a person. The attendee chooses
+  // it on their own profile; a staff file never does.
+  if (mapping[`${ANSWER_PREFIX}directoryListing`]) {
+    return `mapping.${ANSWER_PREFIX}directoryListing: the attendee chooses their directory listing on their profile, so it cannot be imported`;
+  }
   return null;
 }
 
@@ -183,7 +191,16 @@ async function planRow({ db, tx, input, key, context, now }) {
       reasons: ['email: this ticket is claimed by an account, so its email cannot change by import. Change it on the attendee record.'],
     };
   }
-  const notes = conflicts.map(conflictNote);
+  // A new email on an unclaimed ticket is a new person: answers given for
+  // the first one never pass to them (as commerceAdmin correctAttendee).
+  // The hold is replaced by this row's own answers, or removed.
+  const newPerson = !claimedBy && Object.prototype.hasOwnProperty.call(patch, 'email');
+  if (newPerson) {
+    for (const field of Object.keys(patch)) if (isAnswerField(field)) delete patch[field];
+    for (const field of Object.keys(values)) if (isAnswerField(field) && values[field] !== null) patch[field] = values[field];
+  }
+  const notes = (newPerson ? conflicts.filter((field) => !isAnswerField(field)) : conflicts).map(conflictNote);
+  if (newPerson && answersSnap.exists) notes.push('email: a new email is a new person, so the answers held for the old one are removed.');
   const matched = !key;
   if (matched) notes.unshift(matchNote('ticket', id, 'ticket ID'));
   const changedFields = Object.keys(patch);
@@ -204,7 +221,11 @@ async function planRow({ db, tx, input, key, context, now }) {
     async write(writeTx) {
       const at = new Date(now());
       if (Object.keys(ticketPatch).length) writeTx.set(ticketRef, { ...ticketPatch, updatedAt: at }, { merge: true });
-      if (Object.keys(answerPatch).length) {
+      if (newPerson) {
+        const answers = answersFrom(answerPatch);
+        if (Object.keys(answers).length) writeTx.set(answersRef, answerRecord({ ticketId: id, answers, form: context.form, status: ticket.status, at }));
+        else writeTx.delete(answersRef);
+      } else if (Object.keys(answerPatch).length) {
         const answers = answersFrom({ ...Object.fromEntries(Object.entries(storedAnswers).map(([k, v]) => [`${ANSWER_PREFIX}${k}`, v])), ...answerPatch });
         writeTx.set(answersRef, answerRecord({ ticketId: id, uid: claimedBy, answers, form: context.form, status: ticket.status, at }));
       }

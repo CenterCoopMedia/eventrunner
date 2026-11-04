@@ -44,8 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be left for the attendee. Until a claim they wait in server-only
   `ticket_answer_holds/{ticketId}`, and `claimTicket` moves them to
   `ticket_answers` (the attendee's own record wins). Re-import is the usual
-  three-way merge; a claimed ticket's email never changes by import. Any other
-  provider refuses every row. Deploy the functions and rules together.
+  three-way merge; a claimed ticket's email never changes by import, and a new
+  email on an unclaimed ticket replaces the held answers with the row's own.
+  The directory question is never imported. Any other provider refuses every
+  row. Deploy the functions and rules together.
 - Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04, ADR 0008
   §6). Staff and operators save codes on the commerce admin endpoint
   (`promoCodes`, `savePromoCode`, `deletePromoCode`): percent or amount off each

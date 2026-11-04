@@ -12,6 +12,7 @@ import {
   projectRows,
   summaryWords,
   templateCsv,
+  pruneMapping,
   withAnswerFields,
 } from './recordImport.js';
 
@@ -85,7 +86,7 @@ describe('record import vocabulary', () => {
 
 describe('registration answer columns', () => {
   const FORM = {
-    standard: { organization: { enabled: true, required: true }, photoConsent: { enabled: true } },
+    standard: { organization: { enabled: true, required: true }, photoConsent: { enabled: true }, directoryListing: { enabled: true } },
     custom: [{ id: 'q_meal', kind: 'one_choice', label: 'Lunch choice', choices: ['Fish', 'Vegetable'] }],
   };
   it('adds one answer field per asked question, keyed the way the server reads them', () => {
@@ -98,6 +99,11 @@ describe('registration answer columns', () => {
     // The template carries the answer columns, and they map back.
     const { headers } = parseCsvFile(templateCsv(type));
     expect(guessMapping(headers, type)['answer:q_meal']).toBe('answer_lunch_choice');
+  });
+  it('keeps only mappings for fields the type still has', () => {
+    const type = withAnswerFields(importTypeById('registrations'), FORM);
+    expect(pruneMapping({ externalId: 'ticket_id', 'answer:q_meal': 'lunch', 'answer:q_gone': 'old' }, type))
+      .toEqual({ externalId: 'ticket_id', 'answer:q_meal': 'lunch' });
   });
   it('leaves other types and a missing form alone', () => {
     expect(withAnswerFields(importTypeById('speakers'), FORM)).toBe(importTypeById('speakers'));

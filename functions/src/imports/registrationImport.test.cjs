@@ -127,3 +127,27 @@ test('another ticketing provider refuses every row and writes nothing', withProv
   assert.equal(commit.body.summary.error, 1);
   assert.deepEqual(writtenCollections(db, before).filter((name) => name !== 'admin_logs'), []);
 }));
+
+test('a new email on an unclaimed ticket drops the old answers: a new email is a new person', withProvider('manual', async () => {
+  const db = dbWithForm();
+  await previewAndCommit(db, body());
+  // Only the ticket ID and email are mapped: the old answers must not pass to the new address.
+  const moved = await previewAndCommit(db, body([{ Ticket: 'REG-1', Email: 'carl@example.org' }], { externalId: 'Ticket', email: 'Email' }));
+  assert.equal(moved.commit.body.rows[0].verdict, 'update');
+  assert.equal(db.read('tickets', 'REG-1').email, 'carl@example.org');
+  assert.equal(db.read('ticket_answer_holds', 'REG-1'), undefined);
+  await claimTicket({ db, externalId: 'REG-1', uid: 'uid-carl', email: 'carl@example.org' });
+  assert.equal(db.read('ticket_answers', 'REG-1'), undefined);
+
+  // With answers on the same row, the hold holds only those.
+  await previewAndCommit(db, body([{ ...ROW, Ticket: 'REG-2' }]));
+  await previewAndCommit(db, body([{ ...ROW, Ticket: 'REG-2', Email: 'dee@example.org', Newsroom: '', Lunch: 'Vegetable' }]));
+  assert.deepEqual(db.read('ticket_answer_holds', 'REG-2').answers, { q_meal: 'Vegetable' });
+}));
+
+test('the directory question cannot be imported: the attendee chooses their listing', withProvider('manual', async () => {
+  const db = makeDb({ 'config/registration_form': { ...FORM, standard: { ...FORM.standard, directoryListing: { enabled: true } } } });
+  const res = await callImport(db, { ...body([{ ...ROW, Listing: 'public' }], { ...MAPPING, 'answer:directoryListing': 'Listing' }), dryRun: true });
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.error.message, /answer:directoryListing/);
+}));

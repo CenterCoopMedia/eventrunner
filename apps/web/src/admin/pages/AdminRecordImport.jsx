@@ -33,6 +33,7 @@ import {
   missingMapping,
   projectRows,
   summaryWords,
+  pruneMapping,
   templateCsv,
   withAnswerFields,
 } from '../recordImport.js';
@@ -146,14 +147,13 @@ export default function AdminRecordImport() {
     setMapping(parsed ? guessMapping(parsed.headers, withAnswerFields(importTypeById(next), answerForm)) : {});
   }
 
-  // The questions can arrive after the file: map their columns then, and
-  // keep every choice already made.
-  const answerCount = type.fields.length;
+  // The questions can arrive after the file, and can change: map new
+  // question columns, keep every choice already made, and drop a mapping
+  // whose question the form no longer asks, so its column is not sent.
   useEffect(() => {
     if (!parsed || typeId !== 'registrations') return;
-    setMapping((current) => ({ ...guessMapping(parsed.headers, type), ...current }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answerCount, parsed, typeId]);
+    setMapping((current) => pruneMapping({ ...guessMapping(parsed.headers, type), ...current }, type));
+  }, [type, parsed, typeId]);
 
   function changeMapping(next) {
     setMapping(next);

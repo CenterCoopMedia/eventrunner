@@ -161,9 +161,8 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
       const answersRef = db.collection(ANSWERS).doc(id);
       const [holdSnap, answersSnap] = await tx.getAll(holdRef, answersRef);
       if (holdSnap.exists) {
-        hold = { holdRef, answersRef, data: holdSnap.data() || {}, recordExists: answersSnap.exists, userRef: null, visibility: null };
-        const answers = hold.data.answers;
-        if (!hold.recordExists && answers && typeof answers === 'object') Object.assign(hold, await directoryVisibility({ db, tx, uid, answers }));
+        // The import never carries the directory answer, so a hold sets no profile visibility.
+        hold = { holdRef, answersRef, data: holdSnap.data() || {}, recordExists: answersSnap.exists };
       }
     }
     const at = now();
@@ -199,7 +198,6 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
           questions: Array.isArray(hold.data.questions) ? hold.data.questions : [],
           ticketStatus: data.status, updatedAt: at, updatedBy: 'import',
         });
-        if (hold.userRef) tx.set(hold.userRef, { profileVisibility: hold.visibility, updatedAt: at }, { merge: true });
       }
       tx.delete(hold.holdRef);
     }

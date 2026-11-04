@@ -97,13 +97,20 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
  */
 export function withAnswerFields(type, form) {
   if (type.id !== 'registrations' || !form) return type;
-  const answers = activeQuestions(form).map((question) => ({
+  // The directory listing is the attendee's own choice; the server refuses it.
+  const answers = activeQuestions(form).filter((question) => question.id !== 'directoryListing').map((question) => ({
     id: `answer:${question.id}`,
     label: `Answer: ${question.name}`,
     header: `answer_${question.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`,
     example: '',
   }));
   return { ...type, fields: [...type.fields, ...answers] };
+}
+
+/** The mapping without fields the type no longer has (a question removed from the form). */
+export function pruneMapping(mapping, type) {
+  const ids = new Set(type.fields.map((field) => field.id));
+  return Object.fromEntries(Object.entries(mapping).filter(([field]) => ids.has(field)));
 }
 
 export function importTypeById(id) {

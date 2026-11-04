@@ -153,8 +153,10 @@
           be left for the attendee. Until a claim they wait in server-only
           <code>ticket_answer_holds/{ticketId}</code>, and <code>claimTicket</code> moves them to
           <code>ticket_answers</code> (the attendee&#39;s own record wins). Re-import is the usual
-          three-way merge; a claimed ticket&#39;s email never changes by import. Any other
-          provider refuses every row. Deploy the functions and rules together.</li>
+          three-way merge; a claimed ticket&#39;s email never changes by import, and a new
+          email on an unclaimed ticket replaces the held answers with the row&#39;s own.
+          The directory question is never imported. Any other provider refuses every
+          row. Deploy the functions and rules together.</li>
           <li>Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04, ADR 0008
           §6). Staff and operators save codes on the commerce admin endpoint
           (<code>promoCodes</code>, <code>savePromoCode</code>, <code>deletePromoCode</code>): percent or amount off each
