@@ -19,7 +19,8 @@
  * loud lockfile mismatch instead of a silent version skew.
  *
  * No dependencies beyond npm itself, so it runs on a fresh clone before
- * any install.
+ * any install. `--copy` only copies an already packed tarball into the
+ * other functions directories (see copyVendored).
  */
 
 const { execFileSync } = require('node:child_process');
@@ -86,6 +87,21 @@ function dropSharedEntries(lockPath) {
   writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
 }
 
+/**
+ * Copy the packed functions/vendor/shared.tgz into every other functions
+ * directory. `--copy` runs only this: a deploy job that downloads the one
+ * packed tarball restores the other copies before its root `npm ci`.
+ */
+function copyVendored(base = root) {
+  const packed = path.join(base, FUNCTION_DIRS[0], 'vendor', 'shared.tgz');
+  if (!existsSync(packed)) throw new Error(`${packed} is missing: run npm run prepare:functions first`);
+  for (const dir of FUNCTION_DIRS.slice(1)) {
+    const copyDir = path.join(base, dir, 'vendor');
+    mkdirSync(copyDir, { recursive: true });
+    copyFileSync(packed, path.join(copyDir, 'shared.tgz'));
+  }
+}
+
 function main() {
   mkdirSync(vendorDir, { recursive: true });
 
@@ -106,11 +122,7 @@ function main() {
   renameSync(tmp, target);
 
   // The console gets a byte-identical copy, so both lockfiles pin one hash.
-  for (const dir of FUNCTION_DIRS.slice(1)) {
-    const copyDir = path.join(root, dir, 'vendor');
-    mkdirSync(copyDir, { recursive: true });
-    copyFileSync(target, path.join(copyDir, 'shared.tgz'));
-  }
+  copyVendored(root);
 
   for (const dir of FUNCTION_DIRS) dropSharedEntries(path.join(root, dir, 'package-lock.json'));
   dropSharedEntries(path.join(root, 'package-lock.json'));
@@ -131,7 +143,8 @@ function main() {
 }
 
 if (require.main === module) {
-  main();
+  if (process.argv.includes('--copy')) copyVendored();
+  else main();
 }
 
-module.exports = { npmCommand, main, FUNCTION_DIRS };
+module.exports = { npmCommand, main, copyVendored, FUNCTION_DIRS };

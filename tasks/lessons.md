@@ -215,3 +215,7 @@ Rules written after user corrections. Read at session start.
   outranks a harness reminder that asks for them; R4 to R7 and P9a were
   committed with them by mistake.
 
+- Run the whole `npm test` before a commit, even for a one-file workflow
+  change. A fix for the deploy artifact passed its own new test but named a
+  `console/` path in deploy-client.yml, which `console-isolation.test.cjs`
+  forbids. Only the full run showed it.
