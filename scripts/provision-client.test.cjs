@@ -57,6 +57,7 @@ const done = (response = {}) => answer({ name: 'operations/x', done: true, respo
 /** One stateful fake of every service the builder calls. */
 function fakeCloud(options = {}) {
   const state = {
+    clock: NOW,
     project: null,
     billing: '',
     services: new Set(),
@@ -322,6 +323,7 @@ function fakeCloud(options = {}) {
         status: 'completed',
         conclusion: failed ? 'failure' : 'success',
         html_url: `https://github.example/run/${state.runs.length + 1}`,
+        created_at: new Date(state.clock).toISOString(),
         inputs: body.inputs,
       });
       return new Response(null, { status: 204 });
@@ -393,7 +395,7 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
     fetch: fake.fetch,
     getAccessToken: async () => ({ access_token: 'gcp-token' }),
     sleep: async () => {},
-    now: () => NOW,
+    now: () => fake.state.clock,
     log: { ...quietLog(), log() {} },
     db,
     clientDb: () => clientFirestore,
@@ -411,7 +413,10 @@ function setup({ app = {}, cloud = {}, secrets, accounts, branding = '  branding
         await clientFirestore.collection('config').doc('event').set({ sender: answersWritten.at(-1).event.sender });
         return { code: 0, output: `init-event\n${branding}\n` };
       }
-      await clientFirestore.collection('config').doc('providers').set({ ticketing: { webhookRegisteredAt: 'now', webhookId: 'wh' } });
+      // The real script merges field by field; this fake's merge stops at the top level.
+      const providers = clientFirestore.collection('config').doc('providers');
+      const ticketing = (await providers.get()).data()?.ticketing;
+      await providers.set({ ticketing: { ...ticketing, webhookRegisteredAt: 'now', webhookId: 'wh' } }, { merge: true });
       return { code: 0, output: '' };
     },
   };
@@ -776,6 +781,47 @@ test('a retry after the token moved finds it in the client project', async () =>
   assert.equal(fake.consoleSecrets.store.size, 0);
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.clientSecrets.store.get('TICKETING_API_TOKEN'), STRIPE_TOKEN);
+});
+
+test('a retry on a replaced token deploys again, or the site keeps the old one', async () => {
+  const fake = setup();
+  const again = async () => {
+    await fake.db.doc('applications/a1').update({ status: 'building' });
+    fake.state.clock += 3600000;
+    return provision({ appId: 'a1', deps: fake.deps });
+  };
+  const fullDeploys = () => fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal').length;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(fullDeploys(), 1);
+  assert.equal(await again(), 0);
+  assert.equal(fullDeploys(), 1, 'nothing changed, so the earlier deploy counts');
+  fake.state.stripeToken = `${STRIPE_TOKEN}2`;
+  fake.consoleSecrets.store.set('connection-stripe-a1', fake.state.stripeToken);
+  assert.equal(await again(), 0);
+  assert.equal(fullDeploys(), 2);
+  assert.equal(fake.state.runs.filter((r) => r.display_title.includes('bootstrap')).length, 1);
+  assert.equal(await again(), 0);
+  assert.equal(fullDeploys(), 2, 'the new deploy counts for the next retry');
+});
+
+test('a retry on another Eventbrite event registers its webhook and records the event', async () => {
+  const request = eventbriteRequest();
+  const fake = setup(request);
+  const registrations = () => fake.commands.filter((c) => c.args[0] === 'scripts/register-ticketing-webhook.cjs');
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(registrations().length, 1);
+  const connections = { eventbrite: { ...request.app.connections.eventbrite, event: { id: '666', name: 'B' } } };
+  await fake.db.doc('applications/a1').update({ status: 'building', connections });
+  await fake.db.doc('console_connections/a1').set({ eventbrite: { ...request.accounts.eventbrite, eventOrganizationId: 'org-b' } });
+  fake.state.clock += 3600000;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
+  assert.equal(registrations().length, 2);
+  assert.equal(registrations()[1].env.EVENT_TICKETING_EVENT_ID, '666');
+  assert.equal(registrations()[1].env.EVENT_TICKETING_ORGANIZATION_ID, 'org-b');
+  const { ticketing } = (await fake.clientFirestore.collection('config').doc('providers').get()).data();
+  assert.equal(ticketing.externalEventId, '666');
+  assert.ok(ticketing.webhookRegisteredAt);
+  assert.equal(fake.state.runs.filter((r) => r.display_title === 'Deploy nclocal').length, 2);
 });
 
 test('init-event gets no foreign quota project, and no credential it does not need', async () => {

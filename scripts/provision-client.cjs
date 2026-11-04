@@ -29,6 +29,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { toMillis } = require('../console/functions/src/access.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('../console/functions/src/consoleSettings.cjs');
 const { reviewedAnswers, siteNameOf } = require('../console/functions/src/reviewAccess.cjs');
 const { notifyOperators, notifyOwners } = require('../console/functions/src/applicationStatus.cjs');
@@ -753,6 +754,20 @@ async function stripeEndpoint(ctx, token, notes) {
 }
 
 /**
+ * A deployed function keeps the secret version and the variables it was
+ * deployed with, so a deploy from before these details changed no longer
+ * counts (`deploy`). This compares with the record, not with what this run
+ * moved, so a run that stopped straight after the move still notes it.
+ */
+async function noteTicketDetails(ctx, details) {
+  const key = createHash('sha256').update(JSON.stringify(details)).digest('hex');
+  if (ctx.ticketsKey === key) return;
+  ctx.ticketsKey = key;
+  ctx.ticketsChangedAt = new Date(ctx.deps.now());
+  await ctx.recordRef.update({ ticketsKey: key, ticketsChangedAt: ctx.ticketsChangedAt });
+}
+
+/**
  * ADR §6.6: test the chosen account's token, move it to the client project,
  * delete the console's copies and any leftover. The token is read from the
  * console first, so a rerun after the move finds it in the client project.
@@ -796,6 +811,12 @@ async function stepTickets(ctx) {
     await putClientSecret(ctx, WEBHOOK_SECRET, randomBytes(32).toString('hex'));
     notes.push('made the ticket webhook secret');
   }
+  await noteTicketDetails(ctx, [choice, token, await clientSecrets.readSecret(WEBHOOK_SECRET), ctx.ticketVars, ctx.ticketOrganization]);
+  ctx.ticketAccount = [choice, ctx.ticketOrganization || connection.accountId, ctx.ticketVars.EVENT_TICKETING_EVENT_ID].join(':');
+  ctx.ticketConfig = {
+    externalEventId: ctx.ticketVars.EVENT_TICKETING_EVENT_ID,
+    ...(choice === 'stripe' ? { stripeAccountId: connection.accountId, livemode: connection.livemode !== false } : {}),
+  };
   return summary(notes);
 }
 
@@ -900,8 +921,9 @@ async function stepEnvironment(ctx) {
  * and mode, which is how a run is found again. A run that already succeeded
  * counts, a run in progress is waited for, and a failed one is run again a
  * bounded number of times, because a first deploy's failures are often transient.
+ * A run older than `after` is out of date, so it doesn't count.
  */
-async function deploy(ctx, { bootstrap }) {
+async function deploy(ctx, { bootstrap, after = Number.NaN }) {
   const { deps: { env, sleep }, settings: { environment } } = ctx;
   const headers = { ...GITHUB_HEADERS, Authorization: `Bearer ${env.GITHUB_TOKEN}` };
   const workflow = `${GITHUB}/repos/${env.GITHUB_REPOSITORY}/actions/workflows/deploy.yml`;
@@ -911,7 +933,8 @@ async function deploy(ctx, { bootstrap }) {
   for (let poll = 0; poll < DEPLOY_POLLS; poll += 1) {
     const listed = await call(ctx, 'read the deploy runs', `${workflow}/runs?event=workflow_dispatch&branch=main&per_page=50`, { headers });
     const latest = (listed.workflow_runs || []).find((run) => run.display_title === title) || null;
-    const counts = latest && (dispatches === 0 || latest.id !== previous);
+    const current = !(Date.parse(latest?.created_at) < after);
+    const counts = latest && (dispatches === 0 ? current : latest.id !== previous);
     if (counts && latest.status !== 'completed') {
       await sleep(DEPLOY_WAIT_MS);
     } else if (counts && latest.conclusion === 'success') {
@@ -983,8 +1006,15 @@ async function stepSeed(ctx) {
 
   const provider = ctx.ticketVars.EVENT_TICKETING_PROVIDER;
   if (PROVIDERS.includes(provider)) {
-    const stored = await db.collection('config').doc('providers').get();
-    if (!stored.data()?.ticketing?.webhookRegisteredAt) {
+    const providers = db.collection('config').doc('providers');
+    let ticketing = (await providers.get()).data()?.ticketing;
+    // A registration covers one account and event, and a client can replace them to recover a failed build.
+    if (ticketing?.registeredFor !== ctx.ticketAccount) {
+      const reset = { ...ctx.ticketConfig, registeredFor: ctx.ticketAccount, webhookRegisteredAt: null, webhookId: null };
+      await providers.set({ ticketing: reset }, { merge: true });
+      ticketing = reset;
+    }
+    if (!ticketing.webhookRegisteredAt) {
       const { code } = await runCommand('node', ['scripts/register-ticketing-webhook.cjs'], {
         env: childEnv(ctx, {
           TICKETING_API_TOKEN: await ctx.clientSecrets.readSecret(TOKEN_SECRET),
@@ -1031,7 +1061,7 @@ const STEPS = Object.freeze([
   { id: 'environment', label: 'Deploy settings', run: stepEnvironment },
   { id: 'first-deploy', label: 'First deploy', run: (ctx) => deploy(ctx, { bootstrap: true }) },
   { id: 'seed', label: 'Site content and team', run: stepSeed },
-  { id: 'full-deploy', label: 'Full deploy', run: (ctx) => deploy(ctx, { bootstrap: false }) },
+  { id: 'full-deploy', label: 'Full deploy', run: (ctx) => deploy(ctx, { bootstrap: false, after: toMillis(ctx.ticketsChangedAt) }) },
   { id: 'ready', label: 'Tell the Owners', run: stepReady },
 ]);
 
@@ -1159,6 +1189,8 @@ async function provision({ appId, testMode = false, deps }) {
     eventName: frozen?.event?.name || '',
     steps: [],
     ownersEmailedAt: previous.exists ? previous.data().ownersEmailedAt || null : null,
+    ticketsKey: previous.exists ? previous.data().ticketsKey || null : null,
+    ticketsChangedAt: previous.exists ? previous.data().ticketsChangedAt || null : null,
   };
   // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
   // closed after this sees a live run and is refused.
@@ -1176,6 +1208,8 @@ async function provision({ appId, testMode = false, deps }) {
       error: null,
       steps: [],
       ownersEmailedAt: ctx.ownersEmailedAt,
+      ticketsKey: ctx.ticketsKey,
+      ticketsChangedAt: ctx.ticketsChangedAt,
       environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
     });
     tx.update(ref, { buildStart: { state: 'started', at } });
