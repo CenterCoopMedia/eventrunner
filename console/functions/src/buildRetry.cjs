@@ -30,10 +30,11 @@ async function readBuild(db, appId) {
 
 /**
  * A run writes its record as soon as it is ready. One that dies before that
- * (checkout, npm ci, sign-in) cannot say so, so a long silence counts as failed.
+ * (checkout, npm ci, sign-in) cannot say so, and a function that dies before
+ * the start leaves it pending, so a long silence counts as failed.
  */
 function startWentSilent(app, build, at) {
-  return app.buildStart?.state === 'started'
+  return ['pending', 'started'].includes(app.buildStart?.state)
     && (!build || build.state === 'queued')
     && at - toMillis(app.buildStart.at) > SILENT_START_MS;
 }
