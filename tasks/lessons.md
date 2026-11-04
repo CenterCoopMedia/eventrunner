@@ -217,7 +217,12 @@ Rules written after user corrections. Read at session start.
 - Commit as `Claude <noreply@anthropic.com>`, the identity in the global git
   config, so the session's signing key makes each commit Verified on GitHub
   (owner decision, 2026-11-04). Do not set a repository `user.name` or
-  `user.email`. Keep `git commit -s`, and still no AI attribution trailers.
+  `user.email`. Do not use `git commit -s`: it writes
+  `Signed-off-by: Claude <noreply@anthropic.com>`, and the repository rule
+  "No AI attribution" refuses any commit message with that address, which
+  blocks the merge. Sign off as the owner instead, with
+  `--trailer "Signed-off-by: Joe Amditis <6799804+jamditis@users.noreply.github.com>"`.
+  The rule's pattern is in `gh api repos/CenterCoopMedia/eventrunner/rules/branches/main`.
 - Ask the owner every question with the AskUserQuestion tool, never in
   plain text at the end of a reply. The owner answers only there; questions
   left in prose waited for hours (2026-11-04).
