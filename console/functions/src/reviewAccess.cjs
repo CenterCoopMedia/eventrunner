@@ -54,6 +54,16 @@ function siteNameOf(app) {
   return typeof name === 'string' && validOrgId(name) ? name : null;
 }
 
+/**
+ * Every web-address name the request can hold: the frozen one and the
+ * live one. They differ when the client picked a new name after changes
+ * were asked for. Releasing frees each one that still points at the request.
+ */
+function siteNamesOf(app) {
+  const names = [app.frozen?.webAddress?.name, app.answers?.webAddress?.name];
+  return [...new Set(names.filter((name) => typeof name === 'string' && validOrgId(name)))];
+}
+
 /** The lowercase emails of the organization's Owners. */
 async function ownerEmails(db, orgId) {
   if (!validOrgId(orgId)) return [];
@@ -71,4 +81,5 @@ module.exports = {
   requireOperator,
   reviewedAnswers,
   siteNameOf,
+  siteNamesOf,
 };

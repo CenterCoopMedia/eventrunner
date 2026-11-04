@@ -116,3 +116,14 @@ test('the retention job logs a failed delete and carries on', async () => {
   assert.equal(result.deleted.length, 1);
   assert.equal(logged.length, 1);
 });
+
+test('a spam delete frees every name the request holds', async () => {
+  const live = { ...application().answers, webAddress: { name: 'nclocal2' } };
+  const db = seeded({
+    'applications/a1': application({ status: 'changes_requested', answers: live }),
+    'site_names/nclocal2': { appId: 'a1', orgId: 'o1' },
+  });
+  await deleteSpamApplication({ db, now: () => NOW }, { body: { appId: 'a1', confirm: true }, user: ops });
+  assert.equal(db.read('site_names/nclocal2'), undefined);
+  assert.equal(db.read('site_names/nclocal'), undefined);
+});

@@ -161,3 +161,14 @@ test('a failed email does not undo the decision, and the answer says so', async 
 test('a missing request is a 404', async () => {
   await assert.rejects(approveApplication(deps(seeded()), { body: { appId: 'nope' }, user: ops }), { status: 404 });
 });
+
+test('declining frees the name the client picked after changes were asked for, not only the frozen one', async () => {
+  const live = { ...application().answers, webAddress: { name: 'nclocal2' } };
+  const db = seeded({
+    'applications/a1': application({ status: 'changes_requested', answers: live }),
+    'site_names/nclocal2': { appId: 'a1', orgId: 'o1' },
+  });
+  await declineApplication(deps(db), { body: { appId: 'a1', note: 'No.' }, user: ops });
+  assert.equal(db.read('site_names/nclocal2'), undefined, 'the current name is free');
+  assert.equal(db.read('site_names/nclocal'), undefined, 'the frozen name is free too');
+});

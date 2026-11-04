@@ -19,7 +19,7 @@
 
 const { ConsoleError } = require('./http.cjs');
 const {
-  NOT_FOUND, applicationRef, ownerEmails, requireAppId, requireOperator, reviewedAnswers, siteNameOf,
+  NOT_FOUND, applicationRef, ownerEmails, requireAppId, requireOperator, reviewedAnswers, siteNameOf, siteNamesOf,
 } = require('./reviewAccess.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('./consoleSettings.cjs');
 
@@ -52,9 +52,8 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, note 
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const app = { id: snap.id, ...snap.data() };
     if (!from.includes(app.status)) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
-    const name = releaseName ? siteNameOf(app) : null;
-    const nameRef = name ? db.collection('site_names').doc(name) : null;
-    const nameSnap = nameRef ? await tx.get(nameRef) : null;
+    const nameRefs = releaseName ? siteNamesOf(app).map((name) => db.collection('site_names').doc(name)) : [];
+    const nameSnaps = nameRefs.length ? await tx.getAll(...nameRefs) : [];
     // Every read is done; the writes follow.
     const settings = review(app);
     const at = new Date(now());
@@ -66,7 +65,7 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, note 
       history: [...history, { status: to, at, by: user.uid, note }],
       review: { note, by: user.uid, at, settings },
     });
-    if (nameSnap?.exists && nameSnap.data().appId === app.id) tx.delete(nameRef);
+    nameSnaps.forEach((snap, i) => { if (snap.exists && snap.data().appId === app.id) tx.delete(nameRefs[i]); });
     return app;
   });
 }
