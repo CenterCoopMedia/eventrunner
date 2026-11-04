@@ -10,6 +10,9 @@ import Organizations from './pages/Organizations.jsx';
 import SignIn from './pages/SignIn.jsx';
 import SignInFinish from './pages/SignInFinish.jsx';
 import Team from './pages/Team.jsx';
+import ConsoleSettings from './pages/review/ConsoleSettings.jsx';
+import ReviewApplication from './pages/review/ReviewApplication.jsx';
+import ReviewQueue from './pages/review/ReviewQueue.jsx';
 
 const MARK = (
   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="mark">
@@ -127,6 +130,9 @@ export function AppRoutes() {
           <Route path="/organizations/:orgId/applications/:appId" element={<ApplicationStatus />} />
           <Route path="/organizations/:orgId/applications/:appId/:step" element={<Setup />} />
           <Route path="/invite/:inviteId" element={<AcceptInvite />} />
+          <Route path="/review" element={<ReviewQueue />} />
+          <Route path="/review/settings" element={<ConsoleSettings />} />
+          <Route path="/review/:appId" element={<ReviewApplication />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Route>

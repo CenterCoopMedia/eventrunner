@@ -8,12 +8,14 @@ const BASE = (import.meta.env.VITE_CONSOLE_API_BASE || '').replace(/\/+$/, '');
 
 export class ApiError extends Error {
   /** `fields` maps a field path to a message, for a form; {} when there are none. */
-  constructor(status, code, message, fields = {}) {
+  constructor(status, code, message, fields = {}, field = null) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.fields = fields;
+    // The input a refusal is about, when the server names one.
+    this.field = field;
   }
 }
 
@@ -50,6 +52,7 @@ export async function callApi(name, body = {}) {
       error?.code || 'internal',
       typeof error?.message === 'string' ? error.message : 'Something went wrong. Try again.',
       error?.fields && typeof error.fields === 'object' ? error.fields : {},
+      typeof error?.field === 'string' ? error.field : null,
     );
   }
   return payload;
