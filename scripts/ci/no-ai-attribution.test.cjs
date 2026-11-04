@@ -176,7 +176,7 @@ test('clean and null bodies cause no write', async () => {
 test('workflow fetches only trusted default-branch code and never interpolates submitted text', () => {
   const workflow = fs.readFileSync(path.join(__dirname, '../../.github/workflows/no-ai-attribution.yml'), 'utf8');
   assert.ok(workflow.includes('pull_request_target:'));
-  assert.ok(!/\n  pull_request:/.test(workflow));
+  assert.ok(!/\n {2}pull_request:/.test(workflow));
   assert.ok(!workflow.includes('actions/checkout'));
   assert.ok(workflow.includes('branch: context.payload.repository.default_branch'));
   assert.ok(workflow.includes('ref: branch.commit.sha'));
