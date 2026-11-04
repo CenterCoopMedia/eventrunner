@@ -41,6 +41,7 @@ export default function Organizations() {
         <section aria-labelledby="all-orgs-title" className="section">
           <h2 id="all-orgs-title">All organizations</h2>
           <p className="muted">You are on the hosting team, so you can see every organization. You cannot change their teams.</p>
+          <p><Link to="/review">Review requests</Link></p>
           <ul className="cards">
             {(data.allOrganizations || []).map((org) => (
               <li key={org.id} className="card row">

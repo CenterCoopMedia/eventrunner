@@ -37,6 +37,7 @@ describe('Organizations', () => {
     expect(await screen.findByRole('heading', { name: 'All organizations' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Far Away Org' })).toHaveAttribute('href', '/organizations/o9');
     expect(screen.getByText(/You are on the hosting team/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Review requests' })).toHaveAttribute('href', '/review');
   });
 
   it('shows the server message when the list cannot load', async () => {

@@ -125,8 +125,8 @@ input[type="email"], input[type="text"], input[type="url"], input[type="date"], 
   border-radius: var(--radius);
 }
 select { width: auto; max-width: 100%; }
+textarea { min-height: 7rem; resize: vertical; }
 input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"] { border-color: rgb(var(--danger)); border-width: 2px; }
-textarea { resize: vertical; }
 .hint { margin: 0; color: rgb(var(--ink-muted)); font-size: 0.95rem; }
 .pre { white-space: pre-line; }
 .field-error { margin: 0; color: rgb(var(--danger)); font-weight: 600; }
@@ -251,3 +251,21 @@ textarea { resize: vertical; }
 a.button { text-decoration: none; }
 a.button.primary { color: rgb(var(--on-accent)); }
 .summary > a, .step-body > p > a { display: inline-block; min-height: 44px; padding-block: 0.6rem; }
+
+/* Operator review (ADR 0007 §5). */
+.break { overflow-wrap: anywhere; }
+.filters ul { list-style: none; padding: 0; margin: 0 0 var(--space-md); display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+.filter { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-sm); border: 1px solid rgb(var(--control-border)); border-radius: var(--radius); color: rgb(var(--ink)); text-decoration: none; }
+.filter[aria-current="page"] { background: rgb(var(--accent)); border-color: rgb(var(--accent)); color: rgb(var(--on-accent)); font-weight: 600; }
+.answers { margin: 0 0 var(--space-md); display: grid; gap: var(--space-xs); }
+.answer { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); gap: var(--space-sm); padding-block: var(--space-xs); border-bottom: 1px solid rgb(var(--rule)); }
+.answer dt { font-weight: 600; }
+.answer dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 30rem) {
+  .answer { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+h3 { font-size: 1.05rem; margin: var(--space-lg) 0 var(--space-xs); }
+.history { padding-inline-start: 1.25rem; display: grid; gap: var(--space-sm); }
+.history-note { margin: 0.25rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.decision { margin-top: var(--space-md); padding: var(--space-md); border: 1px solid rgb(var(--rule)); border-radius: var(--radius); }
+.decision h3 { margin-top: 0; }

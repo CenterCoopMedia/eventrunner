@@ -26,6 +26,10 @@ function statusLink(publicUrl, orgId, appId) {
   return publicUrl ? `${publicUrl}/organizations/${orgId}/applications/${appId}` : '';
 }
 
+function reviewLink(publicUrl, appId) {
+  return publicUrl ? `${publicUrl}/review/${appId}` : '';
+}
+
 async function ownerEmails(db, orgId) {
   const snap = await db.collection('organizations').doc(orgId).collection('members').where('role', '==', 'owner').get();
   return [...new Set(snap.docs.map((doc) => doc.data().email).filter(Boolean))];
@@ -63,7 +67,7 @@ async function notifyOwners({ db, mailer, log, publicUrl }, { orgId, appId, stat
 
 async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, eventName }) {
   const organizationName = (await db.collection('organizations').doc(orgId).get()).data().name;
-  const link = statusLink(publicUrl, orgId, appId);
+  const link = reviewLink(publicUrl, appId);
   const operators = await operatorEmails(db);
   return sendAll(log, operators.map((to) => () => mailer.sendOperatorNotice({
     to, organizationName, eventName, link,

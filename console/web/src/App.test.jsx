@@ -62,6 +62,20 @@ describe('AppRoutes', () => {
     await waitFor(() => expect(window.localStorage.getItem(RETURN_KEY)).toBeNull());
   });
 
+  it('routes the review pages, and a client gets the hosting-team message', async () => {
+    const notOperator = Object.assign(new Error('This page is for the hosting team.'), { code: 'not-operator' });
+    for (const path of ['/review', '/review/settings', '/review/a1']) {
+      callApi.mockRejectedValueOnce(notOperator);
+      const { unmount } = render(
+        <AuthContext.Provider value={fakeAuth()}>
+          <MemoryRouter initialEntries={[path]}><AppRoutes /></MemoryRouter>
+        </AuthContext.Provider>,
+      );
+      expect(await screen.findByRole('heading', { level: 1, name: 'This page is for the hosting team' })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it('has a page for an address it does not know', () => {
     renderApp('/nowhere');
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();

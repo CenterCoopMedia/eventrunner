@@ -29,6 +29,13 @@ function clone(value) {
 
 const newId = () => randomBytes(10).toString('hex');
 const comparable = (v) => (v instanceof Date ? v.getTime() : v);
+const COMPARE = Object.freeze({
+  '==': (a, b) => a === b,
+  '<': (a, b) => a < b,
+  '<=': (a, b) => a <= b,
+  '>': (a, b) => a > b,
+  '>=': (a, b) => a >= b,
+});
 
 function makeFakeDb(seed = {}) {
   /** @type {Map<string, object>} full document path -> data */
@@ -118,8 +125,8 @@ function makeFakeDb(seed = {}) {
     return {
       _kind: 'query',
       where(field, op, value) {
-        if (op !== '==') throw new Error(`fake supports only '==', got ${op}`);
-        return { ...next({ filters: [...filters, { field, value }] }), _kind: 'query' };
+        if (!(op in COMPARE)) throw new Error(`fake supports only ${Object.keys(COMPARE).join(', ')}, got ${op}`);
+        return { ...next({ filters: [...filters, { field, op, value }] }), _kind: 'query' };
       },
       orderBy(field, direction = 'asc') {
         return { ...next({ order: { field, direction } }), _kind: 'query' };
@@ -129,7 +136,7 @@ function makeFakeDb(seed = {}) {
       },
       async get() {
         let rows = [...store.entries()]
-          .filter(([path, data]) => matches(path) && filters.every((f) => data[f.field] === f.value));
+          .filter(([path, data]) => matches(path) && filters.every((f) => f.field in data && COMPARE[f.op](comparable(data[f.field]), comparable(f.value))));
         if (order) {
           const dir = order.direction === 'desc' ? -1 : 1;
           rows.sort(([, a], [, b]) => {
