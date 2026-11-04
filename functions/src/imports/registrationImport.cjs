@@ -133,11 +133,17 @@ function labelOf(values) {
   return [values.firstName, values.lastName].filter(Boolean).join(' ') || values.email || null;
 }
 
-/** The answer document as the import writes it: a hold, or the account's record. */
-function answerRecord({ ticketId, uid, answers, form, status, at }) {
+/**
+ * The answer document as the import writes it: a hold, or the account's
+ * record. `kept` holds the saved question for each answer this import did
+ * not change, so an answer stays readable after its question changes.
+ */
+function answerRecord({ ticketId, uid, answers, form, status, at, kept = new Map() }) {
+  const current = new Map(answeredQuestions(form, answers).map((question) => [question.id, question]));
+  const questions = Object.keys(answers).map((id) => kept.get(id) ?? current.get(id)).filter(Boolean);
   return {
     ticketId, ...(uid ? { uid } : {}), answers, formRevision: form.revision,
-    questions: answeredQuestions(form, answers), ticketStatus: status, updatedAt: at, updatedBy: 'import',
+    questions, ticketStatus: status, updatedAt: at, updatedBy: 'import',
   };
 }
 
@@ -159,7 +165,9 @@ async function planRow({ db, tx, input, key, context, now }) {
       async write(writeTx) {
         const at = new Date(now());
         writeTx.set(ticketRef, {
-          externalId: id, orderId: null, email: values.email, firstName: values.firstName ?? null,
+          // The ID doubles as the order reference, as in the ticket CSV
+          // import: the claim page looks a manual ticket up by it.
+          externalId: id, orderId: id, email: values.email, firstName: values.firstName ?? null,
           lastName: values.lastName ?? null, ticketClass: values.ticketClass ?? null, quantity: 1,
           purchasedAt: null, status: 'valid', provider: 'manual', source: 'import', raw: null,
           claimedByUid: null, claimedAt: null, claimPromptSentAt: null, createdAt: at, updatedAt: at,
@@ -227,7 +235,10 @@ async function planRow({ db, tx, input, key, context, now }) {
         else writeTx.delete(answersRef);
       } else if (Object.keys(answerPatch).length) {
         const answers = answersFrom({ ...Object.fromEntries(Object.entries(storedAnswers).map(([k, v]) => [`${ANSWER_PREFIX}${k}`, v])), ...answerPatch });
-        writeTx.set(answersRef, answerRecord({ ticketId: id, uid: claimedBy, answers, form: context.form, status: ticket.status, at }));
+        const changed = new Set(Object.keys(answerPatch).map((field) => field.slice(ANSWER_PREFIX.length)));
+        const stored = Array.isArray(answersSnap.data()?.questions) ? answersSnap.data().questions : [];
+        const kept = new Map(stored.filter((question) => question?.id && !changed.has(question.id)).map((question) => [question.id, question]));
+        writeTx.set(answersRef, answerRecord({ ticketId: id, uid: claimedBy, answers, form: context.form, status: ticket.status, at, kept }));
       }
     },
   };

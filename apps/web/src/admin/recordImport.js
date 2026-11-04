@@ -101,7 +101,8 @@ export function withAnswerFields(type, form) {
   const answers = activeQuestions(form).filter((question) => question.id !== 'directoryListing').map((question) => ({
     id: `answer:${question.id}`,
     label: `Answer: ${question.name}`,
-    header: `answer_${question.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}`,
+    // The question ID keeps every header unique, whatever the labels say.
+    header: `answer_${question.id}`,
     example: '',
   }));
   return { ...type, fields: [...type.fields, ...answers] };

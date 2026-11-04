@@ -164,3 +164,17 @@ test('answerFromText reads a CSV cell back into the answer answerText writes', (
   assert.equal(answerFromText(questions.photoConsent, 'maybe'), 'maybe');
   assert.deepEqual(checkAnswers({ q_shirt: 'XXL', organization: 'Gazette' }, FORM).ok, false);
 });
+
+test('answerFromText keeps a choice that contains a semicolon, and reads Other without a slow pattern', () => {
+  const { answerFromText, answerText } = require('./registrationForm.cjs');
+  const question = { id: 'q_pick', kind: 'many_choices', choices: ['A; B', 'A', 'B'] };
+  assert.deepEqual(answerFromText(question, answerText(question, ['A; B'])), ['A; B']);
+  assert.deepEqual(answerFromText(question, 'A; B; B'), ['A; B', 'B']);
+  assert.deepEqual(answerFromText(question, 'a;b'), ['A; B']);
+  const dietary = { id: 'dietary', kind: 'dietary', choices: [] };
+  assert.deepEqual(answerFromText(dietary, 'Vegan; Other: no nuts; no shellfish'), { choices: ['Vegan', 'Other'], other: 'no nuts; no shellfish' });
+  // A long run of tabs after "other" returns at once (CodeQL: polynomial regex).
+  const started = Date.now();
+  answerFromText(dietary, `other${'\t'.repeat(50000)}x`);
+  assert.ok(Date.now() - started < 200);
+});

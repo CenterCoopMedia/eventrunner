@@ -315,7 +315,6 @@ function answerFromText(question, text) {
   if (!raw) return undefined;
   const key = (value) => value.trim().toLowerCase();
   const pick = (choices, value) => choices.find((choice) => key(choice) === key(value)) ?? value.trim();
-  const items = () => raw.split(';').map((item) => item.trim()).filter(Boolean);
   switch (question?.kind) {
     case 'yes_no':
       if (['yes', 'y', 'true'].includes(key(raw))) return true;
@@ -326,19 +325,61 @@ function answerFromText(question, text) {
     case 'one_choice':
       return pick(question.choices, raw);
     case 'many_choices':
-      return items().map((item) => pick(question.choices, item));
+      return splitChoices(raw, question.choices);
     case 'dietary': {
       const choices = [];
       let other = '';
-      for (const item of items()) {
-        const match = /^other\s*:\s*(.*)$/i.exec(item);
-        if (match) { choices.push('Other'); other = match[1].trim(); } else choices.push(pick(DIETARY_CHOICES, item));
+      const parts = raw.split(';');
+      for (let index = 0; index < parts.length; index += 1) {
+        const otherText = afterOther(parts[index]);
+        if (otherText !== null) {
+          // Other comes last in answerText, so the rest of the cell is its text.
+          choices.push('Other');
+          other = [otherText, ...parts.slice(index + 1)].join(';').trim();
+          break;
+        }
+        choices.push(...splitChoices(parts[index], DIETARY_CHOICES));
       }
       return { choices, other };
     }
     default:
       return raw;
   }
+}
+
+/**
+ * A ";" list read back into choices. A choice may itself contain ";", so
+ * at each place the longest run of parts that names a choice wins.
+ */
+function splitChoices(raw, choices) {
+  // Case and the spacing around each ";" do not matter.
+  const key = (value) => value.split(';').map((part) => part.trim()).join(';').toLowerCase();
+  const known = new Map(choices.map((choice) => [key(choice), choice]));
+  const parts = raw.split(';');
+  const picked = [];
+  let index = 0;
+  while (index < parts.length) {
+    let taken = 0;
+    for (let end = parts.length; end > index; end -= 1) {
+      const joined = key(parts.slice(index, end).join(';'));
+      if (known.has(joined)) { picked.push(known.get(joined)); taken = end - index; break; }
+    }
+    if (!taken) {
+      const text = parts[index].trim();
+      if (text) picked.push(text);
+      taken = 1;
+    }
+    index += taken;
+  }
+  return picked;
+}
+
+/** The text after "Other:" (any case and spacing), or null. No regular expression: CodeQL. */
+function afterOther(part) {
+  const text = part.trimStart();
+  if (text.slice(0, 5).toLowerCase() !== 'other') return null;
+  const rest = text.slice(5).trimStart();
+  return rest.startsWith(':') ? rest.slice(1).trim() : null;
 }
 
 /**

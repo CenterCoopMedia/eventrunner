@@ -98,7 +98,14 @@ describe('registration answer columns', () => {
     expect(registrationImport.mappingPrefix).toBe('answer:');
     // The template carries the answer columns, and they map back.
     const { headers } = parseCsvFile(templateCsv(type));
-    expect(guessMapping(headers, type)['answer:q_meal']).toBe('answer_lunch_choice');
+    expect(headers).toContain('answer_q_meal');
+    expect(guessMapping(headers, type)['answer:q_meal']).toBe('answer_q_meal');
+    // Labels that read the same still get their own columns.
+    const twins = withAnswerFields(importTypeById('registrations'), { standard: {}, custom: [
+      { id: 'q_one', kind: 'short_text', label: '公司' }, { id: 'q_two', kind: 'short_text', label: '职务' },
+    ] });
+    const twinHeaders = twins.fields.map((field) => field.header);
+    expect(new Set(twinHeaders).size).toBe(twinHeaders.length);
   });
   it('keeps only mappings for fields the type still has', () => {
     const type = withAnswerFields(importTypeById('registrations'), FORM);

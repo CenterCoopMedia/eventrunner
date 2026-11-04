@@ -151,3 +151,23 @@ test('the directory question cannot be imported: the attendee chooses their list
   assert.equal(res.statusCode, 400);
   assert.match(res.body.error.message, /answer:directoryListing/);
 }));
+
+test('an imported ticket carries its ID as the order reference, so the claim page finds it', withProvider('manual', async () => {
+  const db = dbWithForm();
+  await previewAndCommit(db, body());
+  assert.equal(db.read('tickets', 'REG-1').orderId, 'REG-1');
+}));
+
+test('an update keeps the saved question for answers the import did not change', withProvider('manual', async () => {
+  const db = dbWithForm();
+  await previewAndCommit(db, body());
+  // The lunch question changes kind after the answer was held.
+  await db.collection('config').doc('registration_form').set({
+    ...FORM, revision: 4, custom: [{ id: 'q_meal', kind: 'short_text', label: 'Lunch notes' }],
+  });
+  const updated = await previewAndCommit(db, body([{ ...ROW, Newsroom: 'Herald' }], { externalId: 'Ticket', email: 'Email', 'answer:organization': 'Newsroom' }));
+  assert.equal(updated.commit.body.rows[0].verdict, 'update');
+  const hold = db.read('ticket_answer_holds', 'REG-1');
+  assert.deepEqual(hold.answers, { organization: 'Herald', q_meal: 'Fish' });
+  assert.equal(hold.questions.find((question) => question.id === 'q_meal').kind, 'one_choice');
+}));
