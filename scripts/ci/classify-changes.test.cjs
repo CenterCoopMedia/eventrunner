@@ -147,6 +147,17 @@ test('the documentation and gate jobs retain their required checks', () => {
   assert.doesNotMatch(dco, /run: node scripts\/check-dco\.cjs/);
 });
 
+test('a run that concurrency cancelled leaves no failed gate behind', () => {
+  // Two pushes close together start two runs and cancel one. With
+  // `if: always()` the cancelled run's gate failed and left a red required
+  // check on a commit whose other run was green. The gate skips a
+  // cancelled run instead; a failed or skipped tier still fails it.
+  const workflow = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
+  const gate = workflow.slice(workflow.indexOf('\n  gate:'));
+  assert.match(gate, /\n {4}if: \$\{\{ !cancelled\(\) \}\}\n/);
+  assert.doesNotMatch(gate.slice(0, gate.indexOf('steps:')), /always\(\)/);
+});
+
 test('workflow, configuration, and dependency changes select the full matrix', () => {
   for (const path of [
     '.github/workflows/ci.yml',

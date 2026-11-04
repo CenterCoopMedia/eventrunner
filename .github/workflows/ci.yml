@@ -501,7 +501,13 @@ jobs:
 
   gate:
     name: CI gate
-    if: always()
+    # Runs when a tier fails or is skipped, so the verdict is always
+    # written, but not in a run that concurrency cancelled: that run's
+    # gate would fail on "cancelled" and leave a red required check next
+    # to the newer run's green one. A cancelled run's gate is skipped, and
+    # GitHub counts a skipped required check as passed, so a PR whose
+    # only run was cancelled by hand needs a re-run before it merges.
+    if: ${{ !cancelled() }}
     needs: [changes, dco, secrets, docs, demo, lint, audit, unit, unit-web, build, hygiene, rules, e2e]
     runs-on: ubuntu-latest
     # Keep this job's name stable and require it in branch protection.
