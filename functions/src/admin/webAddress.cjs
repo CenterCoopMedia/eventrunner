@@ -93,8 +93,16 @@ async function checkRecord({ db, hosting, identity, env, now, record }) {
     next.records = [];
     next.liveAt = record.liveAt ?? at;
   }
-  await db.collection(COLLECTION).doc(DOC).set(next);
-  return next;
+  // The Hosting read can take a while. Write only if the record is still the
+  // one this check started from, so a removal or a new domain in the
+  // meantime wins over a stale check.
+  const ref = db.collection(COLLECTION).doc(DOC);
+  return db.runTransaction(async (tx) => {
+    const current = await tx.get(ref);
+    if (!current.exists || current.data().domain !== record.domain) return current.exists ? current.data() : null;
+    tx.set(ref, next);
+    return next;
+  });
 }
 
 /** The scheduled check: only while a domain waits for its records. */
@@ -102,6 +110,9 @@ async function runWebAddressCheck({ db, hosting, identity, env = process.env, no
   const snap = await db.collection(COLLECTION).doc(DOC).get();
   const record = snap.exists ? snap.data() : null;
   if (!record || !['records', 'switch'].includes(record.state)) return { checked: false };
+  // A read-only historical demo changes nothing, sign-in settings included.
+  const policy = await checkDemoWrites({ db });
+  if (!policy.ok) return { checked: false };
   await checkRecord({ db, hosting, identity, env, now, record });
   return { checked: true };
 }
@@ -171,38 +182,59 @@ function createWebAddressHandler({ db, auth, getConfig, hosting, identity, env =
   };
 }
 
-async function googleCall({ fetchImpl, getAccessToken, url, method = 'GET', body }) {
+async function googleCall({ fetchImpl, getAccessToken, url, method = 'GET', body, missingOk = false }) {
   const token = await getAccessToken({ fetchImpl });
   const response = await fetchImpl(url, {
     method,
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+  if (missingOk && response.status === 404) return null;
   if (!response.ok) throw new Error(`Google API answered ${response.status}`);
   return response.status === 204 ? {} : response.json();
 }
 
-/** Records Hosting still needs added, in plain fields. */
-function recordsToAdd(domain) {
+const ACTIONS = Object.freeze({ ADD: 'add', REMOVE: 'remove' });
+
+/**
+ * The records Hosting still needs changed, in plain fields: what to add,
+ * and conflicting records to remove (an old A record, another site's TXT).
+ */
+function recordsToChange(domain) {
   const desired = Array.isArray(domain?.requiredDnsUpdates?.desired) ? domain.requiredDnsUpdates.desired : [];
   return desired.flatMap((set) => (Array.isArray(set.records) ? set.records : []))
-    .filter((record) => record.requiredAction === 'ADD')
-    .map((record) => ({ type: record.type, host: record.domainName, value: record.rdata }));
+    .filter((record) => ACTIONS[record.requiredAction])
+    .map((record) => ({ action: ACTIONS[record.requiredAction], type: record.type, host: record.domainName, value: record.rdata }));
 }
 
 /** Firebase Hosting custom domains (v1beta1) for this project's site. */
 function createHostingClient({ projectId, site, fetchImpl = globalThis.fetch, getAccessToken }) {
   const base = `${HOSTING_API}/projects/${encodeURIComponent(projectId)}/sites/${encodeURIComponent(site)}/customDomains`;
-  const read = (domain) => googleCall({ fetchImpl, getAccessToken, url: `${base}/${encodeURIComponent(domain)}` });
+  // Null while Hosting has no such domain, or has not finished making it.
+  const read = (domain) => googleCall({ fetchImpl, getAccessToken, url: `${base}/${encodeURIComponent(domain)}`, missingOk: true });
   return {
+    /**
+     * Create the domain, reuse it when Hosting already has it, or restore it
+     * when it was removed in the last 30 days. Creating is a long-running
+     * operation; when it has not finished, there are no records yet and the
+     * next check reads them.
+     */
     async addDomain(domain) {
-      await googleCall({ fetchImpl, getAccessToken, method: 'POST', url: `${base}?customDomainId=${encodeURIComponent(domain)}`, body: {} });
-      return { records: recordsToAdd(await read(domain)) };
+      const found = await read(domain);
+      if (found && !found.deleteTime) return { records: recordsToChange(found) };
+      if (found) {
+        await googleCall({ fetchImpl, getAccessToken, method: 'POST', url: `${base}/${encodeURIComponent(domain)}:undelete`, body: {} });
+      } else {
+        await googleCall({ fetchImpl, getAccessToken, method: 'POST', url: `${base}?customDomainId=${encodeURIComponent(domain)}`, body: {} });
+      }
+      const after = await read(domain);
+      return { records: after ? recordsToChange(after) : [] };
     },
     async readDomain(domain) {
       const found = await read(domain);
+      if (!found) return { live: false, records: [] };
       const live = found.hostState === 'HOST_ACTIVE' && found.ownershipState === 'OWNERSHIP_ACTIVE' && found.cert?.state === 'CERT_ACTIVE';
-      return { live, records: recordsToAdd(found) };
+      return { live, records: recordsToChange(found) };
     },
     async removeDomain(domain) {
       await googleCall({ fetchImpl, getAccessToken, method: 'DELETE', url: `${base}/${encodeURIComponent(domain)}` });

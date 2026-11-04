@@ -1098,7 +1098,7 @@ The badge catalog: Categories, each with a max-picks cap and its list of badges,
 Your site already works at its own address. A custom web address, such as `summit.example.org`, is optional. Operators only.
 
 1. Type the domain under **Your domain** and select **Add this address**. Use the plain domain, with no `https://` and no path.
-2. The page shows the records to add. Add each one where you manage your domain (the company you bought it from, or your IT team). Changes there can take a few hours to reach everyone.
+2. The page shows the records to change. Where you manage your domain (the company you bought it from, or your IT team), add each record marked **Add** and remove each record marked **Remove**: an old record for the same name stops the new address from working. Changes there can take a few hours to reach everyone.
 3. Select **Check now**, or wait: the site checks every hour. While the records are not in place, the state is **Waiting for the records**.
 4. When the domain works, the state is **Ready to switch**: sign-in already accepts the domain. Ask the hosting team to switch the site to it. After the switch the state is **In use**.
 

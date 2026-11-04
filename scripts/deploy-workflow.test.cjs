@@ -371,3 +371,12 @@ test('every function rewrite names a function the smoke list preflights', () => 
     );
   }
 });
+
+test('both functions env writers pass the Hosting site, so a custom web address targets the deployed site', () => {
+  const writers = workflow.split('- name: Write the functions runtime env for this project').slice(1);
+  assert.equal(writers.length, 2);
+  for (const writer of writers) {
+    assert.match(writer, /EVENT_HOSTING_SITE: \$\{\{ vars\.EVENT_HOSTING_SITE \}\}/);
+    assert.match(writer, /echo "EVENT_HOSTING_SITE=\$\{EVENT_HOSTING_SITE:-\$EVENT_FIREBASE_PROJECT_ID\}"/);
+  }
+});

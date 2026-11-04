@@ -12,8 +12,9 @@ const {
 const NOW = new Date('2026-11-04T15:00:00Z');
 const auth = { async verifyIdToken(token) { return { uid: token, email: `${token}@example.org`, email_verified: true }; } };
 const RECORDS = [
-  { type: 'A', host: 'summit.example.org', value: '199.36.158.100' },
-  { type: 'TXT', host: 'summit.example.org', value: 'hosting-site=example-event' },
+  { action: 'add', type: 'A', host: 'summit.example.org', value: '199.36.158.100' },
+  { action: 'add', type: 'TXT', host: 'summit.example.org', value: 'hosting-site=example-event' },
+  { action: 'remove', type: 'A', host: 'summit.example.org', value: '10.0.0.1' },
 ];
 
 function fakeHosting(state = {}) {
@@ -149,6 +150,7 @@ test('the hosting client calls the Hosting API for this site and reads its recor
           requiredDnsUpdates: { desired: [{ domainName: 'summit.example.org', records: [
             { domainName: 'summit.example.org', type: 'A', rdata: '199.36.158.100', requiredAction: 'ADD' },
             { domainName: 'summit.example.org', type: 'A', rdata: '10.0.0.1', requiredAction: 'NONE' },
+            { domainName: 'summit.example.org', type: 'A', rdata: '10.0.0.2', requiredAction: 'REMOVE' },
           ] }] },
         };
       },
@@ -157,10 +159,79 @@ test('the hosting client calls the Hosting API for this site and reads its recor
   const client = createHostingClient({ projectId: 'example-event', site: 'example-site', fetchImpl, getAccessToken: async () => 'token' });
   const read = await client.readDomain('summit.example.org');
   assert.equal(read.live, true);
-  assert.deepEqual(read.records, [{ type: 'A', host: 'summit.example.org', value: '199.36.158.100' }]);
+  // Conflicting records Hosting wants removed are shown too, marked as such.
+  assert.deepEqual(read.records, [
+    { action: 'add', type: 'A', host: 'summit.example.org', value: '199.36.158.100' },
+    { action: 'remove', type: 'A', host: 'summit.example.org', value: '10.0.0.2' },
+  ]);
   assert.deepEqual(requests[0], ['GET', 'https://firebasehosting.googleapis.com/v1beta1/projects/example-event/sites/example-site/customDomains/summit.example.org']);
-  await client.addDomain('summit.example.org');
-  assert.deepEqual(requests[1], ['POST', 'https://firebasehosting.googleapis.com/v1beta1/projects/example-event/sites/example-site/customDomains?customDomainId=summit.example.org']);
+});
+
+function hostingFetch(answers) {
+  const requests = [];
+  const fetchImpl = async (url, init = {}) => {
+    const method = init.method || 'GET';
+    requests.push([method, url]);
+    const answer = answers.shift() || { status: 200, body: {} };
+    return { ok: answer.status < 300, status: answer.status, async json() { return answer.body; } };
+  };
+  return { requests, client: createHostingClient({ projectId: 'example-event', site: 'example-site', fetchImpl, getAccessToken: async () => 'token' }) };
+}
+const BASE = 'https://firebasehosting.googleapis.com/v1beta1/projects/example-event/sites/example-site/customDomains';
+
+test('adding a new domain creates it, and a slow operation still gives a record to check later', async () => {
+  const { requests, client } = hostingFetch([
+    { status: 404, body: {} },                       // not there yet
+    { status: 200, body: { name: 'operations/1', done: false } },
+    { status: 404, body: {} },                       // creation not finished
+  ]);
+  const added = await client.addDomain('summit.example.org');
+  assert.deepEqual(added, { records: [] });
+  assert.deepEqual(requests.map(([method, url]) => [method, url.replace(BASE, '')]), [
+    ['GET', '/summit.example.org'], ['POST', '?customDomainId=summit.example.org'], ['GET', '/summit.example.org'],
+  ]);
+});
+
+test('adding a domain Hosting already has reuses it, and a removed one is restored', async () => {
+  const live = { hostState: 'HOST_ACTIVE', requiredDnsUpdates: { desired: [] } };
+  const existing = hostingFetch([{ status: 200, body: live }]);
+  await existing.client.addDomain('summit.example.org');
+  assert.deepEqual(existing.requests.map(([method]) => method), ['GET']);
+
+  const removed = hostingFetch([
+    { status: 200, body: { ...live, deleteTime: '2026-11-01T00:00:00Z' } },
+    { status: 200, body: { name: 'operations/2' } },
+    { status: 200, body: live },
+  ]);
+  await removed.client.addDomain('summit.example.org');
+  assert.deepEqual(removed.requests.map(([method, url]) => [method, url.replace(BASE, '')]), [
+    ['GET', '/summit.example.org'], ['POST', '/summit.example.org:undelete'], ['GET', '/summit.example.org'],
+  ]);
+});
+
+test('the scheduled check changes nothing on a read-only historical demo', async () => {
+  const { db, hosting, identity, call, env } = setup();
+  await call({ action: 'add', domain: 'summit.example.org' });
+  await db.collection('config').doc('event').set({ historicalDemo: true });
+  hosting.state.live = true;
+  const result = await runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
+  assert.equal(result.checked, false);
+  assert.deepEqual(identity.calls, []);
+  assert.equal(db.read('web_address', 'current').state, 'records');
+});
+
+test('a check still running when the address is removed does not bring it back', async () => {
+  const { db, hosting, identity, call, env } = setup();
+  await call({ action: 'add', domain: 'summit.example.org' });
+  let release;
+  hosting.readDomain = async () => { await new Promise((resolve) => { release = resolve; }); return { live: false, records: RECORDS }; };
+  const check = runWebAddressCheck({ db, hosting, identity, env, now: () => NOW });
+  await new Promise((resolve) => setImmediate(resolve));
+  hosting.removeDomain = async () => {};
+  await call({ action: 'remove' });
+  release();
+  await check;
+  assert.equal(db.read('web_address', 'current'), undefined);
 });
 
 test('the identity client adds the domain to the authorized domains once', async () => {

@@ -10,8 +10,9 @@ import AdminWebAddress from './AdminWebAddress.jsx';
 
 const NONE = { domain: null, state: 'none', records: [], currentAddress: 'https://example-event.eventrunner.org', lastCheckedAt: null };
 const RECORDS = [
-  { type: 'A', host: 'summit.example.org', value: '199.36.158.100' },
-  { type: 'TXT', host: 'summit.example.org', value: 'hosting-site=example-event' },
+  { action: 'add', type: 'A', host: 'summit.example.org', value: '199.36.158.100' },
+  { action: 'add', type: 'TXT', host: 'summit.example.org', value: 'hosting-site=example-event' },
+  { action: 'remove', type: 'A', host: 'summit.example.org', value: '10.0.0.2' },
 ];
 const WAITING = { ...NONE, domain: 'summit.example.org', state: 'records', records: RECORDS, lastCheckedAt: '2026-11-04T15:00:00.000Z' };
 
@@ -36,8 +37,11 @@ describe('AdminWebAddress', () => {
     fireEvent.change(await screen.findByLabelText('Your domain'), { target: { value: 'summit.example.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add this address' }));
     const table = await screen.findByRole('table', { name: 'Records to add at your domain provider' });
-    expect(within(table).getAllByRole('row')).toHaveLength(3);
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
     expect(within(table).getByText('199.36.158.100')).toBeInTheDocument();
+    // A conflicting record Hosting wants gone is marked Remove.
+    const removal = within(table).getByText('10.0.0.2').closest('tr');
+    expect(within(removal).getByText('Remove')).toBeInTheDocument();
     expect(callMock).toHaveBeenLastCalledWith('webAddress', { action: 'add', domain: 'summit.example.org' });
     expect(screen.getByRole('button', { name: 'Check now' })).toBeInTheDocument();
   });

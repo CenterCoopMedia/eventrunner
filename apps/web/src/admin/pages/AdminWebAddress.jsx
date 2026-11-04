@@ -84,15 +84,17 @@ export default function AdminWebAddress() {
             {words ? <p><StatusBadge tone={words.tone}>{words.label}</StatusBadge></p> : null}
             {status.state === 'records' ? (
               <>
-                <p className="text-admin-sm text-admin-ink">Add these records where you manage your domain. Changes there can take a few hours to reach everyone.</p>
+                <p className="text-admin-sm text-admin-ink">Make these changes where you manage your domain: add each record marked Add, and remove each record marked Remove. Changes there can take a few hours to reach everyone.</p>
+                {status.records.length === 0 ? <p className="text-admin-sm text-admin-ink-secondary">The records are not ready yet. Select Check now in a minute.</p> : null}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-admin-sm" aria-label="Records to add at your domain provider">
                     <thead>
-                      <tr><th scope="col" className="py-2xs pr-sm">Type</th><th scope="col" className="py-2xs pr-sm">Name</th><th scope="col" className="py-2xs">Value</th></tr>
+                      <tr><th scope="col" className="py-2xs pr-sm">Change</th><th scope="col" className="py-2xs pr-sm">Type</th><th scope="col" className="py-2xs pr-sm">Name</th><th scope="col" className="py-2xs">Value</th></tr>
                     </thead>
                     <tbody>
                       {status.records.map((record) => (
-                        <tr key={`${record.type}-${record.host}-${record.value}`} className="border-admin-rule-hairline border-t-admin-hairline">
+                        <tr key={`${record.action}-${record.type}-${record.host}-${record.value}`} className="border-admin-rule-hairline border-t-admin-hairline">
+                          <td className="py-2xs pr-sm font-semibold">{record.action === 'remove' ? 'Remove' : 'Add'}</td>
                           <td className="py-2xs pr-sm font-admin-data">{record.type}</td>
                           <td className="wrap-anywhere py-2xs pr-sm font-admin-data">{record.host}</td>
                           <td className="wrap-anywhere py-2xs font-admin-data">{record.value}</td>
