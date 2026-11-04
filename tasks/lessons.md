@@ -218,3 +218,6 @@ Rules written after user corrections. Read at session start.
   config, so the session's signing key makes each commit Verified on GitHub
   (owner decision, 2026-11-04). Do not set a repository `user.name` or
   `user.email`. Keep `git commit -s`, and still no AI attribution trailers.
+- Ask the owner every question with the AskUserQuestion tool, never in
+  plain text at the end of a reply. The owner answers only there; questions
+  left in prose waited for hours (2026-11-04).
