@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Settings → Web address** (ADR 0007 §8, P9a): an operator adds a custom
+  web address. The new `webAddress` function asks Firebase Hosting for the
+  domain and shows the records to add; **Check now** and the hourly
+  `webAddressCheck` read Hosting's state, and a live domain is added to the
+  Auth authorized domains. The switch of `EVENT_PUBLIC_URL` stays a deploy,
+  run by the hosting team until the provisioner exists. The functions runtime
+  account needs `roles/firebasehosting.admin` and `roles/firebaseauth.admin`
+  (DEPLOY_RUNBOOK). `web_address` is server-only. The custom sender domain
+  (P9b) waits for the console, because Postmark's account-level token stays out
+  of client projects.
 - The client console foundation (ADR 0007 §1 and §2, P4) in `console/`. It
   is its own Firebase project, with its own rules, functions and web app,
   and the client deploy never ships it. A client signs in with Google,

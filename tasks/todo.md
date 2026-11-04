@@ -139,6 +139,8 @@ gets an adversarial review before it merges.
 - [ ] P4 Console foundation: `console/` app and functions; sign-up with
       Google, Microsoft, email link; organizations; team invites with Owner and
       Editor; operators allowlist; rules tests; favicon and social metadata.
+      Built by a builder agent in its own worktree (2026-11-04); every line
+      read before it goes on a PR.
 - [ ] P5 Guided setup: seven steps, autosave, web-address availability,
       shared validation, review and submit with rate limits, status page,
       client emails. Web unit, rules, handler and E2E tests.
@@ -153,6 +155,18 @@ gets an adversarial review before it merges.
       init) against injected fakes; `provision-client.yml`; GitHub App dispatch.
 - [ ] P9 Optional upgrades in the admin: custom web address and custom
       sender domain with **Check now** and a scheduled check.
+  - [ ] P9a Custom web address (2026-11-04 plan). `/admin/web-address`,
+        operator tier. The server asks Firebase Hosting (its own project,
+        default credentials, injected client) to add the domain and shows
+        the records Hosting returns, in plain words. **Check now** and a
+        scheduled check read Hosting's state; when the domain is live the
+        server adds it to the sign-in authorized domains (Identity Toolkit,
+        injected client) and records that the public address must change by
+        a deploy. Until P8's GitHub App, that deploy is a hosting-team step
+        on the setup checklist. Fakes in every test; CI stays credential-free.
+  - [ ] P9b Custom sender domain, after P8. Postmark domain verification
+        needs the account-level token, which ADR 0004's isolation rule keeps
+        out of client projects, so the check runs from the console.
 - [ ] P10 Operator runbook for the one-time setup and a live proof in a test
       folder with Stripe and Eventbrite test accounts. Needs the owner.
 

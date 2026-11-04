@@ -197,6 +197,7 @@ export const DOCKET = Object.freeze([
       { to: 'registration-form', label: 'Registration form', tier: 'operator' },
       { to: 'features', label: 'Features', tier: 'operator' },
       { to: 'branding', label: 'Branding', tier: 'operator' },
+      { to: 'web-address', label: 'Web address', tier: 'operator' },
       { to: 'access', label: 'Access', tier: 'operator' },
       { to: 'system-errors', label: 'System errors', tier: 'operator' },
     ],

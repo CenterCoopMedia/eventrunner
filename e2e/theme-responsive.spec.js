@@ -347,10 +347,10 @@ test('phone admin uses a compact bar and full-width sheet on every page', async 
   const links = docket.getByRole('navigation', { name: 'Admin sections' }).getByRole('link');
   // DOCKET in apps/web/src/admin/AdminLayout.jsx, operator tier, with
   // Invoices (#208), Scheduled reminders (#518), Set up your event
-  // (ADR 0007) and Registration form (ADR 0008 §4). That module imports CSS
-  // and JSX, so the spec cannot read it; AdminLayout.test.jsx pins the same
-  // number.
-  await expect(links).toHaveCount(32);
+  // (ADR 0007), Registration form (ADR 0008 §4) and Web address (ADR 0007
+  // §8). That module imports CSS and JSX, so the spec cannot read it;
+  // AdminLayout.test.jsx pins the same number.
+  await expect(links).toHaveCount(33);
   await expect(docket.getByRole('link', { name: 'Session pitches', exact: true })).toBeVisible();
   await expect(docket.getByText(ADMIN_EMAIL)).toBeVisible();
   await expect(docket.getByRole('button', { name: 'Sign out' })).toBeVisible();

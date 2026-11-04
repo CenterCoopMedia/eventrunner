@@ -39,6 +39,7 @@ import AdminWebMcpRegistration from '../webmcp/AdminWebMcpRegistration.jsx';
 // sessions list, so its figures and panels stay out of the admin entry chunk
 // (scripts/ci/bundle-budget.json).
 const AdminSessionPitches = lazy(() => import('./pages/AdminSessionPitches.jsx'));
+const AdminWebAddress = lazy(() => import('./pages/AdminWebAddress.jsx'));
 const AdminSessionPitch = lazy(() => import('./pages/AdminSessionPitch.jsx'));
 const AdminPitchSettings = lazy(() => import('./pages/AdminPitchSettings.jsx'));
 const AdminRegistrationForm = lazy(() => import('./pages/AdminRegistrationForm.jsx'));
@@ -352,6 +353,7 @@ export default function AdminApp() {
           />
           <Route path="system-errors" element={<AdminSystemErrors />} />
           <Route path="access" element={<AdminAccess />} />
+          <Route path="web-address" element={<DeferredAdminPage label="web address"><AdminWebAddress /></DeferredAdminPage>} />
           <Route
             path="*"
             element={

@@ -772,6 +772,29 @@
           of scope here and tracked there, not in this runbook. The Cloud Run site-publisher has since landed
           (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
           ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.</p>
+          <h3 id="custom-web-address-from-the-admin">Custom web address from the admin<a class="heading-anchor" href="#custom-web-address-from-the-admin" aria-label="Link to this section">#</a></h3>
+          <p>An operator can add a custom web address on <strong>Settings → Web address</strong> (ADR 0007 §8). The
+          <code>webAddress</code> function asks Firebase Hosting for the domain, shows the client the records to add,
+          and checks every hour (<code>webAddressCheck</code>). When the domain is live it adds the domain to the Auth
+          authorized domains. The functions runtime account needs two roles on the client project for this,
+          once:</p>
+          <pre data-scroll-region data-scroll-label="Code example (bash)"><code class="language-bash">gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
+            --member=&quot;serviceAccount:&lt;FUNCTIONS_RUNTIME_ACCOUNT&gt;&quot; --role=&quot;roles/firebasehosting.admin&quot;
+          gcloud projects add-iam-policy-binding &lt;GCP_PROJECT_ID&gt; \
+            --member=&quot;serviceAccount:&lt;FUNCTIONS_RUNTIME_ACCOUNT&gt;&quot; --role=&quot;roles/firebaseauth.admin&quot;
+          </code></pre>
+          <p>The runtime account is <code>EVENT_FUNCTIONS_SERVICE_ACCOUNT</code> when set, else the project&#39;s default
+          compute service account. Without the roles the page answers &quot;did not answer, try again&quot; and the
+          function log names the refusal.</p>
+          <p>When the page says <strong>Ready to switch</strong>, finish the change by deploy, because the public address
+          is a deploy-time value:</p>
+          <ol>
+          <li>Set <code>EVENT_PUBLIC_URL</code> to <code>https://&lt;domain&gt;</code> in the client&#39;s GitHub Environment (§3), and add
+          the same origin to <code>EVENT_ALLOWED_ORIGINS</code>.</li>
+          <li>Deploy from <code>main</code>.</li>
+          <li>Run <code>node scripts/init-event.cjs --check</code>. The page then shows <strong>In use</strong>.</li>
+          </ol>
+          <p>The console&#39;s provisioner (ADR 0007, P8) will run this deploy for the client.</p>
           <h2 id="9-site-publisher-optional-per-client">9. Site publisher (optional, per client)<a class="heading-anchor" href="#9-site-publisher-optional-per-client" aria-label="Link to this section">#</a></h2>
           <p><strong>What it does.</strong> The frontend reads CMS content from Firestore at runtime, so a publish is already
           live for human visitors the moment <code>cmsPublish</code> commits (spec §2.4, §8.4). What lags is the static

@@ -145,6 +145,16 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li><strong>Settings → Web address</strong> (ADR 0007 §8, P9a): an operator adds a custom
+          web address. The new <code>webAddress</code> function asks Firebase Hosting for the
+          domain and shows the records to add; <strong>Check now</strong> and the hourly
+          <code>webAddressCheck</code> read Hosting&#39;s state, and a live domain is added to the
+          Auth authorized domains. The switch of <code>EVENT_PUBLIC_URL</code> stays a deploy,
+          run by the hosting team until the provisioner exists. The functions runtime
+          account needs <code>roles/firebasehosting.admin</code> and <code>roles/firebaseauth.admin</code>
+          (DEPLOY_RUNBOOK). <code>web_address</code> is server-only. The custom sender domain
+          (P9b) waits for the console, because Postmark&#39;s account-level token stays out
+          of client projects.</li>
           <li>The client console foundation (ADR 0007 §1 and §2, P4) in <code>console/</code>. It
           is its own Firebase project, with its own rules, functions and web app,
           and the client deploy never ships it. A client signs in with Google,
