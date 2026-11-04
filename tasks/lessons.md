@@ -221,3 +221,7 @@ Rules written after user corrections. Read at session start.
 - Ask the owner every question with the AskUserQuestion tool, never in
   plain text at the end of a reply. The owner answers only there; questions
   left in prose waited for hours (2026-11-04).
+- Never post GitHub comments or review replies (owner decision,
+  2026-11-04). Fix each finding in a commit whose message gives the
+  reason, then resolve the thread with no reply. A finding left unfixed is
+  reported to the owner in the session, and its thread stays open.
