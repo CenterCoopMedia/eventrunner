@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 
-const state = vi.hoisted(() => ({ consentCommits: [], auth: { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false }, event: { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} } }));
+const state = vi.hoisted(() => ({ form: null, pushForm: null, consentCommits: [], auth: { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false }, event: { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} } }));
 vi.mock('../contexts/AuthContext.jsx', () => ({ useAuth: () => state.auth, functionsOrigin: () => 'https://functions.example.test' }));
 vi.mock('../contexts/EventConfigContext.jsx', () => ({ useEventConfig: () => ({ eventConfig: state.event }) }));
 vi.mock('../components/SignInPanel.jsx', () => ({ default: () => <p>Inline verified sign-in</p> }));
@@ -27,6 +27,10 @@ vi.mock('../components/forms/Choice.jsx', async (original) => {
   return { ...actual, Checkbox: ObservedCheckbox };
 });
 
+// The registration form is delivered at once; a test can push a newer one.
+vi.mock('../lib/registrationFormSource.js', () => ({
+  subscribeRegistrationForm: (onNext) => { state.pushForm = onNext; onNext(state.form); return () => {}; },
+}));
 vi.mock('../lib/ticketingCommerce.js', async (original) => ({ ...await original(), ticketingRequest: vi.fn() }));
 import { ticketingRequest, TicketingRequestError } from '../lib/ticketingCommerce.js';
 import Tickets from './Tickets.jsx';
@@ -40,20 +44,45 @@ const WIDE_SALES_WINDOW = { salesStartAt: '2030-05-01T14:00:00.000Z', salesEndAt
 const NARROW_SALES_WINDOW = { salesStartAt: '2030-05-02T15:00:00.000Z', salesEndAt: '2030-06-01T18:00:00.000Z' };
 function Location() { const location = useLocation(); return <p>Location: {location.pathname}{location.search}</p>; }
 function mount() { return render(<MemoryRouter initialEntries={['/tickets']}><Routes><Route path="/tickets" element={<Tickets />} /><Route path="*" element={<Location />} /></Routes></MemoryRouter>); }
-async function fill(quantity = 1) {
+const FORM = {
+  standard: { organization: { enabled: true, required: true }, photoConsent: { enabled: true, required: false } },
+  custom: [],
+  revision: 4,
+};
+const checkoutCalls = () => ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout');
+function next(title) { fireEvent.click(screen.getByRole('button', { name: `Next: ${title}` })); }
+async function choose(quantity = 1) {
   await screen.findByLabelText('Quantity — General admission');
   fireEvent.change(screen.getByLabelText('Quantity — General admission'), { target: { value: String(quantity) } });
+}
+function nameAttendees(quantity = 1) {
   for (let index = 0; index < quantity; index += 1) {
     fireEvent.change(screen.getAllByLabelText('First name')[index], { target: { value: 'Synthetic' } });
     fireEvent.change(screen.getAllByLabelText('Last name')[index], { target: { value: `Attendee ${index + 1}` } });
     fireEvent.change(screen.getAllByLabelText('Attendee email')[index], { target: { value: `attendee-${index + 1}@example.test` } });
   }
+}
+/** Walks Tickets → Attendees → Review (no questions asked) and accepts the terms. */
+async function fill(quantity = 1) {
+  await choose(quantity);
+  next('Attendees');
+  nameAttendees(quantity);
+  next('Review');
   fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+}
+/** From wherever the buyer was sent back to, Next through to Review. */
+function toReview() {
+  for (const title of ['Attendees', 'Questions', 'Review']) {
+    const button = screen.queryByRole('button', { name: `Next: ${title}` });
+    if (button) fireEvent.click(button);
+  }
 }
 
 describe('attendee ticket selection', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    state.form = null;
+    state.pushForm = null;
     state.consentCommits = [];
     state.auth = { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false };
     state.event = { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} };
@@ -73,7 +102,10 @@ describe('attendee ticket selection', () => {
     mount(); await fill();
     expect(screen.getByRole('checkbox')).toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
-    await screen.findByText(changed.refundPolicy);
+    await screen.findByText('Review the available tickets and try again.');
+    // A capacity refusal returns the buyer to selection; the others stay on Review.
+    if (code === 'sold-out') expect(await screen.findByLabelText('Quantity — General admission')).toHaveValue('1');
+    await waitFor(() => { toReview(); expect(screen.getByText(changed.refundPolicy)).toBeInTheDocument(); });
     expect(screen.getByRole('checkbox')).not.toBeChecked();
     const updatedCommits = state.consentCommits.filter(({ policy }) => policy === changed.refundPolicy);
     expect(updatedCommits.length).toBeGreaterThan(0);
@@ -104,16 +136,21 @@ describe('attendee ticket selection', () => {
     expect(screen.queryByText(/No payment is required/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Reserve tickets|Continue to Stripe/ })).not.toBeInTheDocument();
     expect(screen.getByText('Choose at least one ticket to continue.')).toBeInTheDocument();
-    // The submit stays usable and explains itself rather than going silent.
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    // Next stays usable and explains itself rather than going silent.
+    next('Attendees');
     expect(await screen.findByRole('alert')).toHaveTextContent('Choose at least one ticket.');
     expect(screen.getByRole('alert')).toHaveFocus();
+    expect(screen.getByLabelText('Quantity — General admission')).toBeInTheDocument();
     expect(ticketingRequest).not.toHaveBeenCalledWith('ticketingCheckout', expect.anything());
-    // A chosen paid ticket replaces the prompt with the payment step and
-    // clears the empty-cart error.
+    // A chosen paid ticket replaces the prompt with its total and clears the
+    // empty-cart error; Review then offers the paid handoff.
     fireEvent.change(screen.getByLabelText('Quantity — General admission'), { target: { value: '1' } });
     expect(screen.queryByText('Choose at least one ticket to continue.')).not.toBeInTheDocument();
     expect(screen.queryByText('Choose at least one ticket.')).not.toBeInTheDocument();
+    expect(screen.getByText('Total for 1 ticket: $25.00')).toBeInTheDocument();
+    next('Attendees');
+    nameAttendees(1);
+    next('Review');
     expect(screen.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeInTheDocument();
   });
 
@@ -122,7 +159,7 @@ describe('attendee ticket selection', () => {
     mount();
     await screen.findByLabelText('Quantity — General admission');
     expect(screen.queryByText(/No payment is required/)).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Quantity — General admission'), { target: { value: '1' } });
+    await fill();
     expect(screen.getByText(/No payment is required/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reserve tickets' })).toBeInTheDocument();
   });
@@ -145,7 +182,9 @@ describe('attendee ticket selection', () => {
     const nextBuyerCommits = state.consentCommits.filter(({ buyer }) => buyer === 'next-purchaser@example.test');
     expect(nextBuyerCommits.length).toBeGreaterThan(0);
     expect(nextBuyerCommits.every(({ checked }) => checked === false)).toBe(true);
-    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    // The cart resets for the new purchaser, so Review locks and selection opens.
+    expect(await screen.findByLabelText('Quantity — General admission')).toHaveValue('0');
+    expect(screen.queryByRole('checkbox', { checked: true })).not.toBeInTheDocument();
     expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(0);
   });
   it('requires verified sign-in before revealing purchase controls', async () => {
@@ -200,19 +239,33 @@ describe('attendee ticket selection', () => {
   });
   it('validates attendee identity and refund terms, focusing the field that needs correction', async () => {
     mount();
-    await screen.findByLabelText('Quantity — General admission');
-    fireEvent.change(screen.getByLabelText('Quantity — General admission'), { target: { value: '1' } });
-    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    await choose(1);
+    next('Attendees');
+    next('Review');
     expect(screen.getByLabelText('First name')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByLabelText('First name')).toHaveFocus();
+    expect(screen.getByLabelText('Attendee email')).toHaveAttribute('aria-invalid', 'true');
+    // Review stays locked while this step fails.
+    expect(screen.queryByRole('link', { name: /Review/ })).not.toBeInTheDocument();
+    nameAttendees(1);
+    next('Review');
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
     expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
-    expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(0);
+    expect(screen.getByRole('checkbox')).toHaveFocus();
+    expect(checkoutCalls()).toHaveLength(0);
+  });
+  it('sends a locked step address to the first step that needs work', async () => {
+    render(<MemoryRouter initialEntries={['/tickets?step=review']}><Routes><Route path="/tickets" element={<Tickets />} /><Route path="*" element={<Location />} /></Routes></MemoryRouter>);
+    expect(await screen.findByLabelText('Quantity — General admission')).toHaveValue('0');
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
   it('shows a complete total and submits identities and quantities without trusting browser prices', async () => {
     mount();
     await fill(2);
     expect(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' })).toBeInTheDocument();
     expect(screen.getByText(CATALOG.refundPolicy)).toBeInTheDocument();
+    expect(screen.getByText('Ticket 2: General admission for Synthetic Attendee 2')).toBeInTheDocument();
+    expect(screen.getByText('attendee-2@example.test')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' }));
     await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
     const body = ticketingRequest.mock.calls.find(([name]) => name === 'ticketingCheckout')[1].body;
@@ -263,7 +316,7 @@ describe('attendee ticket selection', () => {
     expect(screen.getByText(changed.refundPolicy)).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Ticket prices or terms have changed.');
     expect(screen.getByRole('alert')).toHaveFocus();
-    expect(screen.getByLabelText('Attendee email')).toHaveValue('attendee-1@example.test');
+    expect(screen.getByText('attendee-1@example.test')).toBeInTheDocument();
     expect(screen.getByRole('checkbox')).not.toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $35.00' }));
     expect(screen.getByRole('checkbox')).toHaveAttribute('aria-invalid', 'true');
@@ -291,7 +344,7 @@ describe('attendee ticket selection', () => {
     mount(); await fill();
     fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
     await screen.findByText('The last seat was purchased.');
-    expect(screen.getByLabelText('Quantity — General admission')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Quantity — General admission')).toBeInTheDocument();
     expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
   });
   it('clears a first-submission profile refusal so reload returns to ticket selection', async () => {
@@ -302,8 +355,9 @@ describe('attendee ticket selection', () => {
     const view = mount(); await fill();
     fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
     await screen.findByText('Your account is still being set up. Wait a moment and try again.');
-    expect(screen.getByLabelText('Quantity — General admission')).toHaveValue('1');
-    expect(screen.getByLabelText('Attendee email')).toHaveValue('attendee-1@example.test');
+    // The buyer stays on Review with the same cart and attendees.
+    expect(screen.getByText('General admission × 1')).toBeInTheDocument();
+    expect(screen.getByText('attendee-1@example.test')).toBeInTheDocument();
     expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
 
     view.unmount(); mount();
@@ -324,7 +378,7 @@ describe('attendee ticket selection', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Resume existing checkout' }));
     expect(await screen.findByLabelText('Quantity — General admission')).toHaveValue('0');
     expect(screen.getByRole('alert')).toHaveTextContent('Choose your tickets again.');
-    expect(screen.getByRole('alert')).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus());
     expect(screen.queryByRole('button', { name: 'Resume existing checkout' })).not.toBeInTheDocument();
     expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
     expect(ticketingRequest).toHaveBeenCalledWith('ticketingCheckout', expect.objectContaining({ body: { ...attempt, resume: true } }));
@@ -417,5 +471,162 @@ describe('attendee ticket selection', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Opening your order…' }));
     expect(ticketingRequest.mock.calls.filter(([name]) => name === 'ticketingCheckout')).toHaveLength(1);
     await act(async () => resolve({ orderId: 'order-synthetic', checkoutUrl: null, status: 'pending' }));
+  });
+});
+
+describe('registration questions in the ticket stepper', () => {
+  const VIP = { id: 'vip', name: 'VIP', description: 'Front rows', unitAmount: 5000, available: true, remaining: 3, minPerOrder: 1, maxPerOrder: 3 };
+  beforeEach(() => {
+    sessionStorage.clear();
+    state.form = FORM;
+    state.pushForm = null;
+    state.consentCommits = [];
+    state.auth = { user: { uid: 'purchaser-a', email: 'purchaser@example.test', emailVerified: true }, loading: false };
+    state.event = { name: 'Synthetic event', timezone: 'UTC', historicalDemo: false, registration: {} };
+    ticketingRequest.mockReset();
+    ticketingRequest.mockImplementation(async (name) => name === 'ticketingCatalog' ? CATALOG : { orderId: 'order-synthetic', checkoutUrl: null });
+  });
+  async function toQuestions(quantity = 2) {
+    await choose(quantity);
+    next('Attendees');
+    nameAttendees(quantity);
+    next('Questions');
+  }
+  function answerOrganization(index, value) {
+    fireEvent.change(screen.getAllByLabelText('Organization (required)')[index], { target: { value } });
+  }
+
+  it('shows the Questions step only when the registration form asks something', async () => {
+    state.form = { ...FORM, standard: {} };
+    const view = mount();
+    await choose(1);
+    expect(screen.queryByText('Questions')).not.toBeInTheDocument();
+    next('Attendees');
+    expect(screen.getByRole('button', { name: 'Next: Review' })).toBeInTheDocument();
+    view.unmount();
+
+    state.form = FORM;
+    mount();
+    await choose(1);
+    expect(screen.getByText('Questions')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
+    next('Attendees');
+    expect(screen.getByRole('button', { name: 'Next: Questions' })).toBeInTheDocument();
+  });
+
+  it('checks each attendee’s answers on Next and sends them per attendee with the form revision', async () => {
+    mount();
+    await toQuestions(2);
+    expect(screen.getByRole('group', { name: 'Ticket 1: General admission for Synthetic Attendee 1' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Ticket 2: General admission for Synthetic Attendee 2' })).toBeInTheDocument();
+    next('Review');
+    const fields = screen.getAllByLabelText('Organization (required)');
+    expect(fields[0]).toHaveAttribute('aria-invalid', 'true');
+    expect(fields[1]).toHaveAttribute('aria-invalid', 'true');
+    expect(fields[0]).toHaveFocus();
+    expect(screen.getAllByText('Answer this question.')).toHaveLength(2);
+    answerOrganization(0, '  Synthetic Org  ');
+    answerOrganization(1, 'Second Org');
+    fireEvent.click(screen.getAllByRole('radio', { name: 'Yes' })[1]);
+    next('Review');
+    expect(screen.getByText('Synthetic Org')).toBeInTheDocument();
+    expect(screen.getByText('Yes')).toBeInTheDocument();
+    expect(screen.getByText('Not answered')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    expect(checkoutCalls()[0][1].body).toEqual({ requestId: expect.any(String), catalogRevision: 1, formRevision: 4, lines: [{ ticketTypeId: 'general', quantity: 2, attendees: [
+      { firstName: 'Synthetic', lastName: 'Attendee 1', email: 'attendee-1@example.test', answers: { organization: 'Synthetic Org' } },
+      { firstName: 'Synthetic', lastName: 'Attendee 2', email: 'attendee-2@example.test', answers: { organization: 'Second Org', photoConsent: true } },
+    ] }] });
+  });
+
+  it('sends no answers or form revision when every answer is blank', async () => {
+    state.form = { ...FORM, standard: { photoConsent: { enabled: true, required: false } } };
+    mount();
+    await toQuestions(1);
+    next('Review');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    const body = checkoutCalls()[0][1].body;
+    expect(body).not.toHaveProperty('formRevision');
+    expect(body.lines[0].attendees[0]).not.toHaveProperty('answers');
+  });
+
+  it('takes the newer form on form-changed, keeps answers still asked, and returns to Questions', async () => {
+    let checkouts = 0;
+    ticketingRequest.mockImplementation(async (name) => {
+      if (name === 'ticketingCatalog') return CATALOG;
+      checkouts += 1;
+      if (checkouts === 1) throw new TicketingRequestError('form-changed', 'The registration questions changed.', 409);
+      return { orderId: 'order-synthetic', checkoutUrl: null };
+    });
+    mount();
+    await toQuestions(1);
+    answerOrganization(0, 'Synthetic Org');
+    fireEvent.click(screen.getByRole('radio', { name: 'Yes' }));
+    next('Review');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+    // The live form moves on while the buyer reviews; the page stays pinned.
+    const NEWER = { standard: { organization: { enabled: true, required: true }, jobTitle: { enabled: true, required: true } }, custom: [], revision: 5 };
+    act(() => state.pushForm(NEWER));
+    expect(screen.getByText('May the organizers photograph you and use the photos?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    // The step re-renders as the newer form lands, so query again until it settles.
+    await waitFor(() => {
+      expect(screen.getByText(/The registration questions changed while you were buying/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Answer the registration questions' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Job title (required)')).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Organization (required)')).toHaveValue('Synthetic Org');
+    expect(screen.getByLabelText('Job title (required)')).toHaveValue('');
+    expect(screen.queryByRole('radio', { name: 'Yes' })).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
+    next('Review');
+    expect(screen.getByLabelText('Job title (required)')).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.change(screen.getByLabelText('Job title (required)'), { target: { value: 'Reporter' } });
+    next('Review');
+    expect(screen.getByRole('checkbox')).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    const [first, second] = checkoutCalls().map(([, options]) => options.body);
+    expect(first.formRevision).toBe(4);
+    expect(first.lines[0].attendees[0].answers).toEqual({ organization: 'Synthetic Org', photoConsent: true });
+    expect(second.formRevision).toBe(5);
+    expect(second.lines[0].attendees[0].answers).toEqual({ organization: 'Synthetic Org', jobTitle: 'Reporter' });
+    expect(second.requestId).not.toBe(first.requestId);
+  });
+
+  it('maps a server answer error to that attendee’s field, numbering lines sorted by ticket type id', async () => {
+    // The catalog lists VIP first; the server numbers lines sorted by id, so line 0 is general.
+    ticketingRequest.mockImplementation(async (name) => {
+      if (name === 'ticketingCatalog') return { ...CATALOG, maxPerOrder: 6, ticketTypes: [VIP, ...CATALOG.ticketTypes] };
+      throw new TicketingRequestError('invalid-checkout', 'lines.0.attendees.1.answers.organization: Use at most 200 characters.; lines.1.attendees.0.answers.organization: Answer this question.', 400);
+    });
+    mount();
+    await screen.findByLabelText('Quantity — VIP');
+    fireEvent.change(screen.getByLabelText('Quantity — VIP'), { target: { value: '1' } });
+    await choose(2);
+    next('Attendees');
+    nameAttendees(3);
+    next('Questions');
+    // Seats in page order: VIP 1, General 1, General 2.
+    answerOrganization(0, 'VIP Org');
+    answerOrganization(1, 'General Org 1');
+    answerOrganization(2, 'General Org 2');
+    next('Review');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'I have read and accept the refund policy' }));
+    fireEvent.click(screen.getByRole('button', { name: /Continue to Stripe/ }));
+    expect(await screen.findByText('Use at most 200 characters.')).toBeInTheDocument();
+    const fields = screen.getAllByLabelText('Organization (required)');
+    expect(fields[0]).toHaveAttribute('aria-invalid', 'true');
+    expect(fields[1]).not.toHaveAttribute('aria-invalid', 'true');
+    expect(fields[2]).toHaveAttribute('aria-invalid', 'true');
+    expect(fields[0]).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Answer the registration questions' })).toBeInTheDocument();
+    expect(screen.queryByText(/lines\.0\.attendees/)).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('eventrunner.ticket-checkout.purchaser-a')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resume existing checkout' })).not.toBeInTheDocument();
   });
 });

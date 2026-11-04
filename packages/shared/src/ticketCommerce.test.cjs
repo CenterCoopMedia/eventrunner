@@ -89,6 +89,39 @@ test('checkout normalizes an accepted catalog revision and leaves revision-free 
   assert.equal(validateCheckoutRequest({ requestId: request().requestId, resume: true, catalogRevision: 1 }).ok, false);
 });
 
+test('attendees may carry answers, kept as given, and the request may carry the form revision', () => {
+  const answers = { organization: ' Gazette ', q_meal1: ['Fish'] };
+  const checked = validateCheckoutRequest(request({ formRevision: 3, lines: [
+    { ticketTypeId: 'general', quantity: 2, attendees: [{ ...attendee, answers }, attendee] },
+  ] }));
+  assert.equal(checked.ok, true);
+  assert.equal(checked.value.formRevision, 3);
+  // The server checks answers against the form; the validator does not trim them.
+  assert.deepEqual(checked.value.lines[0].attendees[0].answers, answers);
+  // No answers key on an attendee without answers, so old request fingerprints are unchanged.
+  assert.equal(Object.hasOwn(checked.value.lines[0].attendees[1], 'answers'), false);
+  assert.equal(Object.hasOwn(validateCheckoutRequest(request()).value, 'formRevision'), false);
+  for (const formRevision of [null, -1, 1.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(validateCheckoutRequest(request({ formRevision })).ok, false);
+  }
+  assert.equal(validateCheckoutRequest({ requestId: request().requestId, resume: true, formRevision: 1 }).ok, false);
+});
+
+test('attendee answers must be a plain object of at most 16 KB, refused by field', () => {
+  const withAnswers = (answers, index = 1) => request({ lines: [
+    { ticketTypeId: 'general', quantity: 2, attendees: index === 1 ? [attendee, { ...attendee, answers }] : [{ ...attendee, answers }, attendee] },
+  ] });
+  for (const answers of [null, [], 'text', 3, true]) {
+    const checked = validateCheckoutRequest(withAnswers(answers));
+    assert.equal(checked.ok, false, JSON.stringify(answers));
+    assert.equal(checked.issues[0].path, 'lines.0.attendees.1.answers');
+  }
+  const big = validateCheckoutRequest(withAnswers({ accessNeeds: 'x'.repeat(16 * 1024) }, 0));
+  assert.equal(big.ok, false);
+  assert.equal(big.issues[0].path, 'lines.0.attendees.0.answers');
+  assert.equal(validateCheckoutRequest(withAnswers({ accessNeeds: 'x'.repeat(16 * 1024 - 20) })).ok, true);
+});
+
 test('group purchases have a global seat ceiling, not one ceiling per type', () => {
   assert.equal(validateCheckoutRequest(request({ lines: [
     { ticketTypeId: 'general', quantity: 11, attendees: Array(11).fill(attendee) },

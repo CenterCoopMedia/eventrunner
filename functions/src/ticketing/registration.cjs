@@ -23,12 +23,15 @@
  */
 
 const { isValidTransition } = require('shared/registration');
+const { isCommerceOrderId } = require('shared/ticketCommerce');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError } = require('../core/errors.cjs');
 const {
   internals: { TICKETS, safeDocId },
 } = require('./index.cjs');
 const { upsertTickets } = require('./sync.cjs');
+const { ANSWERS } = require('./ticketAnswers.cjs');
+const { ORDERS } = require('./stripeCommerce.cjs');
 
 const USERS = 'users';
 
@@ -120,8 +123,58 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
     // account ticketed and, when the flag is on, approved. Only a valid
     // ticket may do that (issues #358, #359, #360).
     if (data.status !== 'valid') return { claimed: false, reason: 'not_valid' };
+    // ADR 0008 §5: answers given at checkout wait on the order's seat until
+    // this attendee claims; they then belong to the account. Every read
+    // comes before any write, as a Firestore transaction requires.
+    let move = null;
+    if (isCommerceOrderId(data.orderId)) {
+      const orderRef = db.collection(ORDERS).doc(data.orderId);
+      const answersRef = db.collection(ANSWERS).doc(id);
+      const [orderSnap, answersSnap] = await tx.getAll(orderRef, answersRef);
+      const order = orderSnap.exists ? orderSnap.data() : null;
+      const seats = Array.isArray(order?.seats) ? order.seats : [];
+      const seat = seats.find((entry) => entry?.externalId === id);
+      if (seat && seat.answers && typeof seat.answers === 'object') {
+        move = { order, orderRef, answersRef, seats, seat, recordExists: answersSnap.exists, userRef: null, visibility: null };
+        // A directory answer sets the holder's profile visibility, as
+        // saveTicketAnswers does: "public" needs the public profiles feature.
+        const listing = seat.answers.directoryListing;
+        if (!move.recordExists && typeof listing === 'string') {
+          const userRef = db.collection(USERS).doc(uid);
+          const [userSnap, featuresSnap] = await tx.getAll(userRef, db.collection('config').doc('features'));
+          if (userSnap.exists) {
+            const allowPublic = featuresSnap.exists && featuresSnap.data()?.publicAttendeeProfiles === true;
+            move.userRef = userRef;
+            move.visibility = listing === 'public' && !allowPublic ? 'attendees_only' : listing;
+          }
+        }
+      }
+    }
     const at = now();
     tx.set(ref, { claimedByUid: uid, claimedAt: at, updatedAt: at }, { merge: true });
+    if (move) {
+      const { order, seat } = move;
+      // An answer record already there is the attendee's own later answer; it wins.
+      if (!move.recordExists) {
+        const ids = Object.keys(seat.answers);
+        tx.create(move.answersRef, {
+          ticketId: id, uid, answers: seat.answers,
+          formRevision: order.registrationFormRevision ?? null,
+          questions: (Array.isArray(order.registrationQuestions) ? order.registrationQuestions : [])
+            .filter((question) => ids.includes(question?.id)),
+          ticketStatus: data.status, updatedAt: at, updatedBy: 'checkout',
+        });
+        if (move.userRef) tx.set(move.userRef, { profileVisibility: move.visibility, updatedAt: at }, { merge: true });
+      }
+      // Sensitive answers stay on the order only until the claim.
+      tx.update(move.orderRef, {
+        seats: move.seats.map((entry) => {
+          if (entry !== seat) return entry;
+          const { answers: _moved, ...rest } = entry;
+          return rest;
+        }),
+      });
+    }
     return { claimed: true };
   });
 }

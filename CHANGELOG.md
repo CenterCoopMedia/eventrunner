@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The Stripe ticket page is now steps: Tickets, Attendees, Questions (when
+  the registration form asks any), Review, then Pay (ADR 0008 §5). Answers
+  for each attendee are checked when the order is reserved, held on that
+  seat, and moved to the attendee's own `ticket_answers` record when they
+  claim the ticket. Giving a seat to a different email drops its answers.
 - **Complete your registration** (`/registration`, ADR 0008 §5): a signed-in
   attendee answers the registration questions, one step per valid ticket,
   then Review. The dashboard reminds them until every ticket has answers.
