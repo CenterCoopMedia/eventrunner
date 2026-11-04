@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Settings → Registration form** (operators): turn on the standard
+  attendee questions (organization, job title, dietary needs, access needs,
+  photo consent, directory listing), make them required, and write up to 10
+  questions of your own, with a live preview of the attendee's view. Saved
+  to `config/registration_form` with a revision guard through
+  `updateRegistrationForm` (ADR 0008 §4).
 - The speaker profile is now five steps at `/speaker/profile`: About you,
   Bio and photo, Links, Logistics, and Review. Each step saves when the
   speaker moves on. Speakers can add pronouns, which show on the public

@@ -1050,6 +1050,16 @@ Select **Add milestone**. Focus moves to the new row's name field. Each mileston
 
 With no milestones and no goal, the Overview shows no milestone panel at all.
 
+## Settings → Registration form
+
+Operators only. This page sets the questions each attendee answers when they register (ADR 0008 §4). The editor is on the left and a preview of the attendee's view is on the right; the preview follows every change before you save, and **Check answers** runs the same check the server will. The site's own style applies on the live page.
+
+- **Standard questions** have fixed wording: organization, job title, dietary needs (choices plus Other), access needs, photo consent, and the attendee directory. Turn on the ones you need and make any of them required. Dietary and access answers are private to staff. The directory answer sets the attendee's profile visibility.
+- **Your questions**: up to 10, each a short answer, long answer, one choice, several choices, or yes or no. A question has a label (up to 200 characters), optional help text (up to 300), and for a choice question 2 to 20 choices, one per line. Move up and Move down set the order; attendees see your questions after the standard ones.
+- **Saving** checks the whole form first and names any mistake on its field. Each save raises the revision shown under the title. If someone else saved after you opened the page, the save is refused and the page offers the current version; your unsaved changes stay on the page until you load it.
+
+The questions are stored in `config/registration_form`, which anyone can read, because they are what every attendee is shown. Attendees answer them during checkout and on **Complete your registration** (R4b and R5).
+
 ## Settings → Features
 
 Feature flags, wired to a **whole-document replace** — every known flag is always sent, and an omitted flag means disabled. When a new flag is added to the platform it appears here automatically, because the form's key list comes from the same shared schema the server validates against.

@@ -267,7 +267,7 @@ describe('admin route gating', () => {
     for (const tab of ['Overview', 'Pages', 'Sessions', 'Organizations', 'Content', 'Updates', 'Timeline', 'Media', 'Materials', 'Version history', 'Unpublished changes', 'Speakers', 'Attendees', 'Badges', 'Scheduled reminders', 'Live updates', 'Ticketing', 'Invoices', 'Import records', 'Feedback', 'Email log', 'Change requests', 'Event', 'Data export']) {
       expect(screen.getByRole('link', { name: tab })).toBeInTheDocument();
     }
-    for (const tab of ['Features', 'Branding', 'Access', 'System errors']) {
+    for (const tab of ['Registration form', 'Features', 'Branding', 'Access', 'System errors']) {
       expect(screen.queryByRole('link', { name: tab })).toBeNull();
     }
     // The tier is said in a word beside the address, never left to inference.
