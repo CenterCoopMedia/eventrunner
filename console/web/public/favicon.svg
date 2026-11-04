@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Event Runner console">
+  <!-- The console variant of docs/favicon.svg: the same four-stroke mark,
+       reversed out of a tile in the house accent, so a console tab is easy
+       to tell from a docs tab or an event site tab. Colors are the light
+       and dark brand tokens of the civic site style (design/tokens). -->
+  <style>
+    .tile { fill: rgb(26 82 150) }
+    .mark { fill: rgb(250 250 249) }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: rgb(128 178 238) }
+      .mark { fill: rgb(25 26 28) }
+    }
+  </style>
+  <rect class="tile" width="24" height="24" rx="4"/>
+  <g class="mark" transform="translate(3.6 3.6) scale(0.7)">
+    <rect x="2.5" y="2" width="3" height="20"/>
+    <rect x="5.5" y="2" width="16" height="3"/>
+    <rect x="5.5" y="11" width="9.5" height="2"/>
+    <rect x="5.5" y="19.5" width="13" height="2.5"/>
+  </g>
+</svg>
