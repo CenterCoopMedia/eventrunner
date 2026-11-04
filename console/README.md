@@ -2,7 +2,7 @@
 
 The client console is where a client signs up, names its organization, invites its team and answers the guided setup for each event site. It runs at `console.eventrunner.org` in its own Firebase project, which CCM owns. It is not part of a client deployment, and no client project reads from it. [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md) is the decision record.
 
-This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), and operator review (P7). Account connections and provisioning come in later parts.
+This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), operator review (P7), and the agreement and event fee (ADR 0007, amendment 2026-11-04). Account connections and provisioning come in later parts.
 
 ## What is here
 
@@ -30,14 +30,20 @@ The console uses plain words. It never says Firebase, project, tenant, environme
 | `organizations/{orgId}` | `name`, `createdAt`, `createdBy` (uid) | `createOrganization` |
 | `organizations/{orgId}/members/{uid}` | `uid`, `email` (lowercase), `role` (`owner` or `editor`), `joinedAt` | `createOrganization`, `acceptInvite`, `changeMemberRole`, `removeMember` |
 | `invites/{inviteId}` | `orgId`, `email` (lowercase), `role`, `tokenHash` (SHA-256 of the token), `status` (`pending`, `accepted` or `replaced`), `invitedBy`, `invitedByEmail`, `createdAt`, `expiresAt`, and after use `acceptedBy` and `acceptedAt` | `inviteMember`, `acceptInvite` |
-| `applications/{appId}` | `orgId`, `status`, `answers`, `frozen` (a copy of `answers` at submit, else null), `createdBy`, `createdAt`, `updatedAt`, `updatedBy`, `submittedAt`, `submittedBy`, `history` (a list of `{ status, at, by, note }`, oldest first), `review` (null, or `{ note, by, at, settings }`) | `createApplication`, `saveApplicationStep`, `submitApplication`, `withdrawApplication`; `requestChanges`, `declineApplication`, `approveApplication`, `deleteSpamApplication`, the retention job. Only review writes `review`. |
-| `site_names/{name}` | `appId`, `orgId`, `reservedAt` | `saveApplicationStep` (web-address step), `withdrawApplication`; review frees a name on decline, spam delete and retention |
+| `applications/{appId}` | `orgId`, `status`, `answers`, `frozen` (a copy of `answers` at submit, else null), `createdBy`, `createdAt`, `updatedAt`, `updatedBy`, `submittedAt`, `submittedBy`, `history` (a list of `{ status, at, by, note }`, oldest first), `review` (null, or `{ note, by, at, settings }`), `agreementAcceptance` (null, or `{ id, version, sha256, name, email, at }`, the pointer to the current record), `feeCheckout` (null, or `{ sessionId, amount, currency, attempt, createdAt }`), `payment` (`{ sessionId, paymentIntentId, amount, currency, paidAt, eventId }`), `feeProblem` (`{ code, sessionId, paymentIntentId, at }`), `buildStart` (`{ state, at }`, with `state` `pending`, `started` or `failed`) | `createApplication`, `saveApplicationStep`, `acceptAgreement`, `reopenApplication`, `startFeeCheckout`, `submitApplication`, `withdrawApplication`; `requestChanges`, `declineApplication`, `approveApplication`, `deleteSpamApplication`, the retention job; `consoleFeeWebhook` writes `payment`, `feeProblem` and `buildStart`. Only review writes `review`. |
+| `site_names/{name}` | `appId`, `orgId`, `reservedAt` | `saveApplicationStep` (web-address step), `withdrawApplication`; review frees a name on decline, spam delete and retention. A request waiting for payment keeps its name. |
 | `console_config/operators` | `emails` (lowercase) | A CCM operator, by hand in the Firebase console |
-| `console_config/settings` | `gcpFolder`, `billingAccount`, `region` | `saveConsoleSettings`. The guided setup does not read it. |
+| `console_config/settings` | `gcpFolder`, `billingAccount`, `region`, `feeAmount` (a whole number in the currency's smallest unit), `feeCurrency` (three lowercase letters) | `saveConsoleSettings`, `saveEventFee`. The guided setup reads only the fee, and only on the server. |
+| `console_config/agreement` | `version`, `title`, `body`, `sha256`, `savedAt`, `savedBy`: the current agreement | `saveAgreement` |
+| `console_config/agreement/versions/{version}` | The same fields. Each version is created once and never changes. | `saveAgreement` |
+| `agreement_acceptances/{id}` | `version`, `sha256`, `typedName`, `email` (verified), `uid`, `orgId`, `appId`, `at`. Created once, never changed, and kept when the request goes back to edit or is deleted. | `acceptAgreement` |
+| `console_fee_events/{sessionId}` | `eventId`, `sessionId`, `paymentIntentId`, `appId`, `orgId`, `amount`, `currency`, `outcome` (`approved`, or the reason it did not approve), `at`. Kept when the request is deleted. | `consoleFeeWebhook` |
 | `console_rate_limits/{key}` | `count`, `windowStart` | The functions |
-| `console_audit/{id}` | `action`, `appId`, `by` (a uid, or `retention`), `at`. No client data. | `saveConsoleSettings`, `deleteSpamApplication`, the retention job |
+| `console_audit/{id}` | `action`, `appId`, `by` (a uid, `retention` or `payment`), `at`, and `version` on `save-agreement`. No client data. | `saveConsoleSettings`, `saveEventFee`, `saveAgreement`, `deleteSpamApplication`, the retention job, `consoleFeeWebhook` when a build does not start |
 
-An application is one event and one site. The client sees it as "your request". Its statuses are `draft`, `submitted`, `changes_requested`, `approved`, `building`, `ready`, `launched`, `withdrawn` and `declined` (ADR 0007 §5). An application is open unless it is `withdrawn` or `declined`.
+An application is one event and one site. The client sees it as "your request". Its statuses are `draft`, `awaiting_payment`, `submitted`, `changes_requested`, `approved`, `building`, `ready`, `launched`, `withdrawn` and `declined` (ADR 0007 §5 and its amendment). An application is open unless it is `withdrawn` or `declined`.
+
+The usual path is `draft`, then `awaiting_payment` when an Owner accepts the agreement, then `approved` when the payment is confirmed. `submitted` and `changes_requested` remain for requests that were sent before the amendment.
 
 `answers` has one part for each step that takes answers:
 
@@ -67,7 +73,7 @@ A member record repeats its own uid. Firestore cannot query a collection group b
 - **Editor**: edits the event content. In the event admin, an Editor is staff.
 - **Operator**: a CCM person named in `console_config/operators`. An operator can read every organization and team, and reviews requests. An operator does not change a client's team.
 
-An organization always keeps at least one Owner. The console asks for two Owners before launch, because launch readiness needs two operators.
+An organization always keeps at least one Owner. Two Owners are a condition of launch, because launch readiness needs two operators. They are not a condition of finishing the setup or of paying.
 
 ## Functions
 
@@ -87,8 +93,12 @@ Each function is an HTTP POST with a JSON body and the person's ID token. The we
 | `getApplication` | Members and operators | Reads one request, with its errors by field, the progress of each step, the note from the hosting team, and what the caller can do. An operator also gets `frozen`, `review` and who made each change. |
 | `saveApplicationStep` | Members | Saves one step's answers while the request is `draft` or `changes_requested`. Returns that step's errors by field. The web-address step saves only a name the request can hold: it reserves the name and releases the old one in one transaction. |
 | `checkWebAddress` | Anyone signed in | Says at once if a name has a bad format, is reserved, or is held by another request. |
-| `submitApplication` | Owners | Needs every step to pass and two Owners. Copies `answers` to `frozen`, sets `submitted`, adds to `history`, and emails the Owners and each operator. Five a day for one account. |
-| `withdrawApplication` | Owners | Sets `withdrawn` before approval, releases the name, and emails the Owners. |
+| `getAgreement` | Members and operators | Reads the current agreement. Once a request is accepted, reads the accepted version and who accepted it. `agreement` is null when none is set. |
+| `acceptAgreement` | Owners | Needs every step to pass, a set agreement and fee, the version on the page, and a typed name. Copies `answers` to `frozen`, creates the record in `agreement_acceptances`, sets `awaiting_payment`, and emails the signer a copy. Shares the five a day of `submitApplication`. An older version gets `409 agreement-changed`. |
+| `reopenApplication` | Owners | `awaiting_payment` to `draft`. Closes the payment page first, clears `frozen`, `agreementAcceptance` and `feeCheckout`, and keeps the record. Refused with `409 payment-received` when the page was already paid. |
+| `startFeeCheckout` | Owners | Opens a payment page for a request in `awaiting_payment`. The amount and currency come from `console_config/settings`; anything in the request body is ignored. An open page for the same fee is reused, and a page with an old fee is closed first. A paid page returns `alreadyPaid` and no new page. |
+| `submitApplication` | Owners | Sends a `changes_requested` request back to the hosting team. Needs every step to pass. Copies `answers` to `frozen`, sets `submitted`, adds to `history`, and emails the Owners and each operator. Five a day for one account. A `draft` gets `409 agreement-required`. |
+| `withdrawApplication` | Owners | Sets `withdrawn` before approval, closes any open payment page, releases the name, and emails the Owners. |
 
 A refusal for a form carries `error.fields`, a map of field path to message, for example `{ "event.days.0.date": "Enter a real date." }`.
 
@@ -99,21 +109,48 @@ A status email that fails is logged and does not undo the change. The status pag
 | `listApplicationsForReview` | Operators | Lists requests with one status (default `submitted`), newest change first, with the organization name. |
 | `getApplicationForReview` | Operators | One request: its `revision`, the frozen answers, the history, the team and its open invites, the ticket choice, the connection state (`Not connected yet` until P6) and the approval defaults. |
 | `requestChanges` | Operators | `submitted` to `changes_requested`. Needs a note of at most 2,000 characters. Emails the Owners. |
-| `declineApplication` | Operators | `submitted` or `changes_requested` to `declined`. Needs a note. Frees the web-address name. Emails the Owners. |
+| `declineApplication` | Operators | `submitted`, `changes_requested` or `awaiting_payment` to `declined`. Needs a note. Closes any open payment page. Frees the web-address name. Emails the Owners. |
 | `approveApplication` | Operators | `submitted` to `approved`. Records `review.settings`. Emails the Owners: "We are building your site". |
-| `deleteSpamApplication` | Operators | Deletes a request that is not approved, frees its name, and writes an audit record. Needs `confirm: true`. |
-| `getConsoleSettings` | Operators | Reads `console_config/settings`. |
-| `saveConsoleSettings` | Operators | Checks and saves the settings, and writes an audit record. |
+| `deleteSpamApplication` | Operators | Deletes a request that is not approved, closes any open payment page, frees its name, and writes an audit record. Needs `confirm: true`. |
+| `getConsoleSettings` | Operators | Reads `console_config/settings`, the fee and the current agreement. |
+| `saveConsoleSettings` | Operators | Checks and saves the build settings, and writes an audit record. Other fields on the document stay. |
+| `saveEventFee` | Operators | Checks and saves the amount and currency, and writes an audit record. New payment pages use it. |
+| `saveAgreement` | Operators | Saves the title and text as a new version, and writes an audit record. The same text saves nothing. |
+| `consoleFeeWebhook` | Stripe, by signature | See "The agreement and the event fee". No sign-in and no CORS. |
 
 The review functions read the operator allowlist on each call. A caller who is not on it gets `403 not-operator`, and the web page says "This page is for the hosting team".
 
 The invite email carries the token after `#` in the link, so the browser does not send it to a server. The database keeps only its SHA-256. A new invite to the same address replaces the open one.
 
-Mail goes through an injected mailer with three methods: `sendInvite`, `sendStatusChange` (to the Owners) and `sendOperatorNotice` (to each operator). In production it is Postmark, with the console project's own `CONSOLE_POSTMARK_TOKEN` secret. The tests use a fake and make no network call.
+Mail goes through an injected mailer with four methods: `sendInvite`, `sendStatusChange` (to the Owners), `sendOperatorNotice` (to each operator) and `sendAgreementCopy` (to the signer). In production it is Postmark, with the console project's own `CONSOLE_POSTMARK_TOKEN` secret. The Stripe client is injected the same way, with `makeFakeStripe` in `functions/src/fakes.cjs` for tests. The tests make no network call.
+
+## The agreement and the event fee
+
+The amendment to ADR 0007 is the decision. A client finishes with no human: the steps pass, an Owner accepts the agreement, an Owner pays, and the request is `approved`.
+
+**Closed by default.** With no usable agreement or fee, `getApplication` returns `signups.open: false`, the page says the site is not taking sign-ups right now, and `acceptAgreement` refuses with `409 signups-closed`. An agreement whose text no longer matches its `sha256` counts as missing.
+
+**Going back.** Before paying, an Owner can return the request to `draft`. The record in `agreement_acceptances` stays, and accepting again creates a new one.
+
+**The webhook.** `consoleFeeWebhook` is the only thing that counts a fee as paid. Returning from the payment page changes nothing: the status page says it is waiting for payment confirmation and checks again. The function:
+
+1. Checks the Stripe signature on the raw request body, and refuses a bad one with 400.
+2. Ignores every event except `checkout.session.completed` with `payment_status: paid`.
+3. In one transaction, claims `console_fee_events/{sessionId}`, so a repeated event does nothing, and checks the request. It approves only when the request is in `awaiting_payment`, in the same organization, and this session and its amount and currency match `feeCheckout`.
+4. On a match, sets `approved`, records `payment`, and adds a history entry with `by: 'payment'`.
+5. After the commit, emails the Owners and operators and calls `deps.startBuild({ orgId, appId })` if it is present. A build that does not start is logged, sets `buildStart.state` to `failed`, writes an audit record and notifies operators. The payment stands.
+
+**A payment that does not approve.** The money has moved, so the status stays and the operator gets what they need to refund it in the Stripe dashboard. The claim records the reason as its `outcome`: `wrong-status`, `not-current-session`, `amount-mismatch`, `wrong-organization` or `request-missing`. Each operator gets an email with the session and payment intent ids. When the request still exists it also gets `feeProblem`, which shows on the review page and in the queue. For a deleted request, the email and the claim are the only pointers. The console has no refund button and no way to clear `feeProblem`.
+
+**Closing a request.** Withdraw, decline, delete as spam and going back to edit close the payment page first, then compare `feeCheckout.sessionId` with their first read inside the transaction. When a new page opened in between, they refuse with `409 status-changed`, and a second try closes the new page. The retention job re-checks `updatedAt` in its transaction, and opening a page changes `updatedAt`.
+
+**Paid requests.** A paid request cannot be declined here, so the "decline one with a refund" path in the amendment is not built. An operator refunds in the Stripe dashboard.
+
+The agreement text is plain text. The web page renders it as text in paragraphs, never as HTML. This repository holds no agreement text and no fee: operators enter both at `/review/settings`. ADR 0007 asks for legal review of the text before a real client signs.
 
 ## Operator review
 
-ADR 0007 §5 is the decision. No cloud resource exists before an operator approves a request.
+ADR 0007 §5 is the decision. A paid request needs no operator decision, so this path is for requests that were sent before the amendment and any a client sends back after changes. No cloud resource exists before a request is approved.
 
 1. The client submits. The request is `submitted` and appears in the queue at `/review`.
 2. The operator opens it at `/review/<appId>` and reads the frozen answers, the team and the history.
@@ -133,15 +170,19 @@ Approval records `review.settings` = `{ gcpFolder, billingAccount, region, proje
 
 Approval does not start the build. P8 starts it from `approved` and `review.settings`.
 
-**Spam.** **Delete as spam** deletes a request that is not yet approved and frees its name. A request that is approved or later cannot be deleted this way, because a site can exist for it.
+**Spam.** **Delete as spam** deletes a request that is not yet approved, closes any open payment page and frees its name. A request that is approved or later cannot be deleted this way, because a site can exist for it.
 
-**Retention.** The scheduled function `runApplicationRetention` runs each day at 04:17 Eastern time. It deletes `withdrawn` and `declined` requests 90 days after `updatedAt`, and frees their names. It checks each request again inside its own transaction, so a request that changed after the query stays. A second run is safe. Each delete writes an audit record. The account-connection tokens of P6 are not in Firestore; their clean-up comes with P6.
+**Retention.** The scheduled function `runApplicationRetention` runs each day at 04:17 Eastern time. It deletes `withdrawn`, `declined` and abandoned `awaiting_payment` requests 90 days after `updatedAt`, and frees their names. A request with a `feeProblem` stays. The records in `agreement_acceptances` and `console_fee_events` are never deleted. It checks each request again inside its own transaction, so a request that changed after the query stays. A second run is safe. Each delete writes an audit record. The account-connection tokens of P6 are not in Firestore; their clean-up comes with P6.
 
 ## Settings
 
 | Name | Where | What it is |
 |---|---|---|
 | `CONSOLE_POSTMARK_TOKEN` | Secret Manager in the console project | The Postmark server token for invite and status email |
+| `CONSOLE_STRIPE_SECRET_KEY` | Secret Manager in the console project | CCM's Stripe key, for the event fee. It must exist before a deploy. |
+| `CONSOLE_STRIPE_FEE_WEBHOOK_SECRET` | Secret Manager in the console project | The signing secret of the Stripe webhook endpoint `https://console.eventrunner.org/api/consoleFeeWebhook`, which sends `checkout.session.completed`. It must exist before a deploy. |
+| The event fee | `/review/settings` | The amount and currency clients pay. Sign-ups stay closed until it is set. |
+| The agreement | `/review/settings` | The title and text clients accept. Sign-ups stay closed until it is set. Each save with new text is a new version. |
 | `CONSOLE_MAIL_FROM` | `functions/.env` | The sender, for example `Event Runner <hello@console.eventrunner.org>` |
 | `CONSOLE_PUBLIC_URL` | `functions/.env` | `https://console.eventrunner.org`, for invite links and the links in status email |
 | `CONSOLE_ALLOWED_ORIGINS` | `functions/.env` | Extra origins for a local dev server, comma-separated |
@@ -153,10 +194,12 @@ Approval does not start the build. P8 starts it from `approved` and `review.sett
 | Address | Page |
 |---|---|
 | `/organizations/:orgId` | The organization: its event sites and **Set up a new event site** |
-| `/organizations/:orgId/applications/:appId/<step>` | One step of the setup. The steps are `organization`, `event`, `web-address`, `team`, `tickets`, `email` and `review`. |
-| `/organizations/:orgId/applications/:appId` | The status page: the plain stages, the note from the hosting team, and **Withdraw the request** |
+| `/organizations/:orgId/applications/:appId/<step>` | One step of the setup. The steps are `organization`, `event`, `web-address`, `team`, `tickets`, `email`, `review`, `agreement` and `fee`. |
+| `/organizations/:orgId/applications/:appId` | The status page: the plain stages, the note from the hosting team, and **Withdraw the request**. `?payment=done` and `?payment=cancelled` are where the payment page returns. |
 
-Each step saves as the client types, after a short pause. Next, Back and the step list send a waiting save first. When a save fails, the step stays open and says the answers are not saved; the next try sends them again, and **Create my site** waits until they are saved. When the server refuses a web-address name, it keeps the old name, so the review holds the request and links to the step until a new name saves. Errors show by field once the client touches the field. Add `?check=1` to a step address to show all of its errors and put the focus on the first one; the review links use it. The tickets step records the choice only. For Stripe and Eventbrite it says "You connect this account after we approve your request." The connect buttons come in P6.
+Each step saves as the client types, after a short pause. Next, Back and the step list send a waiting save first. When a save fails, the step stays open and says the answers are not saved; the next try sends them again, and Next waits until they are saved. When the server refuses a web-address name, it keeps the old name, so the review holds the request and links to the step until a new name saves. Errors show by field once the client touches the field. Add `?check=1` to a step address to show all of its errors and put the focus on the first one; the review links use it. The tickets step records the choice only. For Stripe and Eventbrite it says "You connect this account after we approve your request." The connect buttons come in P6.
+
+The agreement step opens when every answer passes and sign-ups are open. The event fee step opens when the request is in `awaiting_payment`, and the answer steps then stay closed until an Owner selects **Change your answers**. An address for a step that is not open goes to the last open one. The step list shows those steps without a link.
 
 ## Tests
 
