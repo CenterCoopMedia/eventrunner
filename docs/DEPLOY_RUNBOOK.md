@@ -1119,7 +1119,26 @@ The client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)
 
 ### 11.2 Deploy
 
-Run from the repository root with the console project's public web settings:
+Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitHub Environment `console`, which is limited to `main`, and signs in with Workload Identity Federation as the console's deploy service account. The provider's condition names this workflow and that Environment, so no other workflow can use it.
+
+| Environment variable | Holds |
+|---|---|
+| `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT` | The deploy identity |
+| `CONSOLE_PROJECT_ID` | The console project |
+| `VITE_CONSOLE_FIREBASE_API_KEY`, `VITE_CONSOLE_FIREBASE_AUTH_DOMAIN`, `VITE_CONSOLE_FIREBASE_APP_ID` | The public web settings |
+| `VITE_CONSOLE_SIGN_IN_PROVIDERS` | Comma-separated: `google`, `microsoft`. Leave it empty to offer only the emailed link. List a method only after step 2 of §11.1 sets it up, or its button fails for the client. |
+| `CONSOLE_PUBLIC_URL`, `CONSOLE_MAIL_FROM` | Written to `console/functions/.env` at deploy |
+| `CONSOLE_STRIPE_CLIENT_ID`, `CONSOLE_EVENTBRITE_CLIENT_ID` | Also written to `.env`. Unset means the choice is not available yet. |
+
+Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_STRIPE_FEE_WEBHOOK_SECRET`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`. A function that names a secret will not deploy without it, so until a provider is ready store a long random value, never a guessable word: the fee webhook checks signatures with that value. The functions' runtime account needs read access to each one.
+
+Set these up as the project owner before the first deploy, because the deploy account cannot:
+
+- The Artifact Registry repository `gcf-artifacts` in `us-central1`, with the cleanup policy `firebase-functions-cleanup` (delete images older than 86400 seconds).
+- For the Pub/Sub service agent, `roles/iam.serviceAccountTokenCreator`. For the functions' runtime account, `roles/run.invoker`, `roles/eventarc.eventReceiver`, `roles/datastore.user`, and `roles/iam.serviceAccountTokenCreator` on itself, so emailed sign-in can make tokens.
+- For the deploy account, the role list in §2 without `roles/storage.admin`, plus `roles/secretmanager.viewer`, the custom role `eventrunnerDeployInvoker`, and `roles/iam.serviceAccountUser` on the compute and App Engine default accounts.
+
+To deploy by hand instead, run from the repository root with the console project's public web settings:
 
 ```sh
 npm run prepare:functions && npm ci

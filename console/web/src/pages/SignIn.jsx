@@ -3,7 +3,13 @@ import { Navigate } from 'react-router';
 import { signInErrorMessage, peekReturn, useAuth } from '../auth.jsx';
 import { isEmail } from '../text.js';
 
+/** The sign-in methods set up in this console's project. Left out, both show; set empty, only the emailed link does. */
+function signInProviders() {
+  return (import.meta.env.VITE_CONSOLE_SIGN_IN_PROVIDERS ?? 'google,microsoft').split(',').map((name) => name.trim()).filter(Boolean);
+}
+
 export default function SignIn() {
+  const providers = signInProviders();
   const auth = useAuth();
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState('');
@@ -47,16 +53,22 @@ export default function SignIn() {
 
       {error ? <p className="message error" role="alert">{error}</p> : null}
 
-      <div className="stack">
-        <button type="button" className="button provider" disabled={busy} onClick={() => run(auth.signInWithGoogle)}>
-          Continue with Google
-        </button>
-        <button type="button" className="button provider" disabled={busy} onClick={() => run(auth.signInWithMicrosoft)}>
-          Continue with Microsoft
-        </button>
-      </div>
+      {providers.length > 0 ? (
+        <div className="stack">
+          {providers.includes('google') ? (
+            <button type="button" className="button provider" disabled={busy} onClick={() => run(auth.signInWithGoogle)}>
+              Continue with Google
+            </button>
+          ) : null}
+          {providers.includes('microsoft') ? (
+            <button type="button" className="button provider" disabled={busy} onClick={() => run(auth.signInWithMicrosoft)}>
+              Continue with Microsoft
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
-      <h2 className="divider">Or get a sign-in link by email</h2>
+      <h2 className="divider">{providers.length > 0 ? 'Or get a sign-in link by email' : 'Get a sign-in link by email'}</h2>
       {sentTo ? (
         <p className="message success" role="status">
           We sent a sign-in link to {sentTo}. Open the link on this device to sign in.

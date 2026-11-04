@@ -1,0 +1,72 @@
+name: Deploy console
+
+# The client console (ADR 0007): one CCM-owned Firebase project, deployed by
+# hand from main. It is not a client deployment. The WIF provider accepts only
+# this workflow, on main, in the `console` Environment (docs/DEPLOY_RUNBOOK.md §11).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for google-github-actions/auth (WIF)
+
+concurrency:
+  group: deploy-console
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  deploy:
+    name: Deploy the console
+    if: github.ref == 'refs/heads/main' && !github.event.repository.fork
+    environment: console
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Prepare the functions package
+        run: npm run prepare:functions
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the console
+        env:
+          VITE_CONSOLE_FIREBASE_API_KEY: ${{ vars.VITE_CONSOLE_FIREBASE_API_KEY }}
+          VITE_CONSOLE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_CONSOLE_FIREBASE_AUTH_DOMAIN }}
+          VITE_CONSOLE_FIREBASE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+          VITE_CONSOLE_FIREBASE_APP_ID: ${{ vars.VITE_CONSOLE_FIREBASE_APP_ID }}
+          VITE_CONSOLE_SIGN_IN_PROVIDERS: ${{ vars.VITE_CONSOLE_SIGN_IN_PROVIDERS }}
+        run: npm run build:console
+
+      - name: Write the functions settings
+        # Public values only. Secrets are in Secret Manager.
+        env:
+          CONSOLE_PUBLIC_URL: ${{ vars.CONSOLE_PUBLIC_URL }}
+          CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
+          CONSOLE_STRIPE_CLIENT_ID: ${{ vars.CONSOLE_STRIPE_CLIENT_ID }}
+          CONSOLE_EVENTBRITE_CLIENT_ID: ${{ vars.CONSOLE_EVENTBRITE_CLIENT_ID }}
+        run: |
+          : > console/functions/.env
+          for name in CONSOLE_PUBLIC_URL CONSOLE_MAIL_FROM CONSOLE_STRIPE_CLIENT_ID CONSOLE_EVENTBRITE_CLIENT_ID; do
+            value="${!name}"
+            if [ -n "$value" ]; then printf '%s="%s"\n' "$name" "$value" >> console/functions/.env; fi
+          done
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Deploy
+        working-directory: console
+        env:
+          CONSOLE_PROJECT_ID: ${{ vars.CONSOLE_PROJECT_ID }}
+        run: npx firebase deploy --project "$CONSOLE_PROJECT_ID" --non-interactive

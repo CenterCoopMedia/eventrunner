@@ -17,6 +17,14 @@ describe('SignIn', () => {
     expect(document.body.textContent).not.toMatch(/firebase|project|tenant/i);
   });
 
+  it('offers only the emailed link when no other sign-in method is set up', () => {
+    vi.stubEnv('VITE_CONSOLE_SIGN_IN_PROVIDERS', '');
+    renderPage(<SignIn />, { path: '/signin', auth: signedOut() });
+    expect(screen.queryByRole('button', { name: /Continue with/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Get a sign-in link by email' })).toBeInTheDocument();
+    vi.unstubAllEnvs();
+  });
+
   it('signs in with Microsoft', async () => {
     const auth = signedOut();
     renderPage(<SignIn />, { path: '/signin', auth });
