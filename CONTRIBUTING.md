@@ -105,7 +105,7 @@ The full interface bar — accessibility, typography, color tokens, motion, and 
 | Command | What it covers |
 |---|---|
 | `npm run lint` | ESLint over every workspace, including the hex-literal ban (spec §7.6) and `react-hooks/rules-of-hooks` |
-| `npm test` | `packages/shared` and `functions` unit tests (Node `--test`, fakes — no emulator) |
+| `npm test` | `packages/shared`, `functions` and `scripts` unit tests (Node `--test`, fakes — no emulator) |
 | `npm run test:rules` | Firestore and Storage security rules on the Firebase emulators |
 | `npm run test -w apps/web` | `apps/web` component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator) |
 | `npm run build -w apps/web` | Production build of `apps/web`; credential-free with dummy `VITE_FIREBASE_*` values |

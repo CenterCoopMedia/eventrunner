@@ -4,7 +4,7 @@ A white-label event CMS for conferences and gatherings. Each client event gets i
 
 **License:** [Apache-2.0](LICENSE). The code is free. The trademark is the exclusivity lever: nobody else can market hosting under this name.
 
-**Status:** Public extraction in progress. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract. Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). Milestones 1 to 4 and the public-site parity milestone are complete. Packaging (M5) and the parity milestones M8 to M12 are open. The design vocabulary is expanding in six waves ([#249](https://github.com/CenterCoopMedia/eventrunner/issues/249)); wave 1 has merged.
+**Status:** Preparing for the first outside client, NC Local. The [v1 architecture spec](docs/adr/0001-event-platform-v1.md) and [feature triage](docs/plans/2026-08-16-event-platform-v1-triage.md) are the contract; later decisions are in the [decision records](docs/adr/). Work is tracked on the [roadmap](docs/ROADMAP.md) and the [project board](https://github.com/orgs/CenterCoopMedia/projects/2). Milestones 1 to 4 and the public-site parity milestone are complete. The registration and pitch steppers ([ADR 0008](docs/adr/0008-registration-and-pitch-steppers.md)) are built. The client console, where a client signs up and gets a site with no keys, files or DNS ([ADR 0007](docs/adr/0007-client-console-self-serve-onboarding.md)), is in progress.
 
 Site: [centercoopmedia.github.io/eventrunner](https://centercoopmedia.github.io/eventrunner/)
 Documentation: [centercoopmedia.github.io/eventrunner/docs](https://centercoopmedia.github.io/eventrunner/docs/)
@@ -30,21 +30,41 @@ Nonprofit and journalism organizations, universities, and event producers who wa
 
 The reference implementation is the [2026 Collaborative Journalism Summit](https://summit.collaborativejournalism.org) site (`jamditis/cjs2026`). That repo stays the live production event. This repo is a new extract, not a fork. Features cut from v1 stay in the summit repo.
 
-## What v1 includes
+## What it includes
 
-- Block-based CMS with draft/publish
-- Schedule, sessions, bookmarks, ICS/calendar links
-- Speaker invite, accept, profile, and approval
+**The public site and attendees**
+
+- Block-based CMS with draft and publish, pages, updates, a timeline, and a media library
+- Schedule, sessions, bookmarks, and calendar links
+- Google sign-in and emailed 6-digit codes
 - Attendee directory and profiles
 - Sponsors and organizations
-- Google sign-in and emailed 6-digit OTP codes
-- Session materials with embargo
-- Media library
-- Eventbrite plus manual/CSV ticketing adapters
 - Per-event theming: six site styles, each with a light and a dark palette, and a specimen book in the demo that draws every device in every style and mode
-- An admin CMS on its own editorial desk, in the event's own colours
+
+**Registration and tickets**
+
+- Ticketing through Eventbrite, a manual or CSV ticket list, or Stripe Checkout on the organizer's own Stripe account ([ADR 0004](docs/adr/0004-stripe-ticket-commerce.md))
+- A checkout in steps: tickets, attendees, registration questions, review, and pay
+- Registration questions: a standard set (organization, job title, diet, access needs, photo consent, directory listing) and up to 10 custom questions. Answers belong to each attendee's account and only staff see them
+- Promo codes, priced on the server with use limits that hold under racing checkouts
+- Complimentary tickets, refunds, check-in, and a private attendee record
+
+**Speakers and the program**
+
+- Session pitches in steps, with co-presenters, a staff review queue, and intake from the site, a CSV file, or Airtable ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md))
+- An accepted pitch invites each presenter as a speaker
+- Speaker invite, accept, and a profile in steps, with private travel, access, and audio and video needs
+- Session materials with embargo
+
+**Running the event**
+
+- An admin CMS on its own editorial desk, in the event's own colours, with a setup checklist for launch
 - Transactional email through a provider adapter (Postmark is the reference)
-- Announcement email from the admin panel to registered attendees, approved attendees, or speakers, with a preview, a test send, a confirmation of the recipient count, a separate broadcast stream, and one-click unsubscribe
+- Announcement email to registered attendees, approved attendees, or speakers, with a preview, a test send, a confirmation of the recipient count, a separate broadcast stream, and one-click unsubscribe
+- Scheduled reminders ([ADR 0006](docs/adr/0006-scheduled-reminders.md)) and live updates
+- Sponsor invoices with a PDF, email, and an optional card payment link
+- Import of speakers, sessions, organizations, and registrations from CSV files, and spreadsheet exports, including speaker logistics
+- An event data package for the handoff after the event
 
 What v1 does not include is listed in the [triage record](docs/plans/2026-08-16-event-platform-v1-triage.md). Video generation, social feeds, and speaker chat stay out. Sponsor invoicing was cut in the triage and is back in scope ([ADR 0001 §4.2 amendment](docs/adr/0001-event-platform-v1.md#42-collections-not-carried-over), [#208](https://github.com/CenterCoopMedia/eventrunner/issues/208)). Airtable is in scope for session pitch intake only: a read-only refresh from one approved table into the private review queue ([ADR 0005](docs/adr/0005-airtable-pitch-intake.md)). Other Airtable sync stays out. Announcement email goes only to the event's attendees and speakers; it is not a marketing list tool.
 
@@ -78,10 +98,16 @@ docs                Spec, roadmap, design records, and the GitHub Pages site
 Node 22 (22.12 or later), Node 24, or Node 26 and later. Vitest 5 does not run on Node 23 or 25.
 
 ```bash
-npm test
+npm install
+npm test            # shared package, Cloud Functions, and scripts (Node's test runner)
+npm run test:web    # the web app (Vitest)
+npm run test:rules  # Firestore and Storage rules on the emulators (needs Java)
+npm run test:e2e    # browser journeys on the emulators (Playwright)
+npm run lint
+npm run build
 ```
 
-That runs the shared-package suite on Node's built-in test runner. No install step and no credentials. The emulator loop (`npm run dev:emulators`) lands with the web app and functions.
+None of these needs a credential. Every external service has a fake in the tests.
 
 Rules that apply to every PR:
 

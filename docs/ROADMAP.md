@@ -102,6 +102,33 @@ Items that wait on a third party.
 
 Read-only diagnostics done. Write tools wait on a separate security and product review.
 
+## M13: Registration and pitch steppers ([ADR 0008](adr/0008-registration-and-pitch-steppers.md)) — built, in review
+
+Every public intake is a stepper with the same keyboard path, errors and save behaviour.
+
+- [x] Stepper component and the admin setup page on it
+- [x] Pitch stepper with co-presenters; staff lists for format, length and track
+- [x] Admin pitch pages; CSV, Airtable and export for the new fields
+- [x] Accept a pitch: a speaker per presenter, invited in one action
+- [x] Speaker profile stepper with private logistics
+- [x] Registration questions: the form editor, private answers, the attendee record and the export
+- [x] Complete your registration, and the Stripe checkout in steps with questions
+- [x] Promo codes ([ADR 0004 amendment](adr/0004-stripe-ticket-commerce.md#amendment-2026-11-04-promo-codes))
+- [x] Registrations import and the speaker logistics export
+
+## M14: Client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)) — in progress
+
+A client signs up, answers plain questions, connects Stripe or Eventbrite with a button, and gets a site. No keys, files or DNS.
+
+- [x] Shared answer validator and the admin setup checklist
+- [ ] Console foundation: sign-up, organizations, team invites
+- [ ] Guided setup and the status page
+- [ ] Stripe and Eventbrite connections (needs the owner's prerequisites)
+- [ ] Operator review
+- [ ] Provisioner (needs the owner's prerequisites)
+- [ ] Custom web address; custom sender domain from the console
+- [ ] Runbook and a live proof in a test folder
+
 ## Parity milestones
 
 Prospective clients asked for the platform they used at CJS 2026. CJS parity is now the product target. See [docs/plans/2026-09-09-cjs-parity-gap.md](plans/2026-09-09-cjs-parity-gap.md) for the full gap analysis and issue list.
