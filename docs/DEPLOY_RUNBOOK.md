@@ -1047,3 +1047,53 @@ To see what an address changes, without writing a file:
 PAGES_BASE_URL=https://docs.eventrunner.org/ node scripts/build-pages.cjs --check   # shows what would change
 node scripts/lib/pages-site.cjs                                                    # prints the address in use
 ```
+
+## 11. Client console
+
+The client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)) is one CCM-owned Firebase project at `console.eventrunner.org`. It is not a client deployment, so sections 0 to 9 do not apply to it. Its code is in `console/`, and [console/README.md](../console/README.md) describes it. This section is the one-time setup and a manual deploy. The full runbook, with a deploy workflow, comes later.
+
+### 11.1 One-time setup
+
+1. Create the console Firebase project on the Blaze plan. Turn on Firestore (Native mode) and Authentication.
+2. In Authentication, turn on these sign-in methods:
+   - **Google**.
+   - **Email/Password** with **Email link (passwordless sign-in)**.
+   - **Microsoft**. This needs an app registration in Microsoft Entra ID (Azure portal, **App registrations**). Allow accounts in any organizational directory and personal Microsoft accounts. Add the redirect URI that the Firebase Microsoft provider shows (`https://<auth domain>/__/auth/handler`). Make a client secret, then put the application (client) ID and the secret in the Firebase Microsoft provider. Write down when the secret expires.
+3. In Authentication settings, add `console.eventrunner.org` to the authorized domains.
+4. In Hosting, add the custom domain `console.eventrunner.org`.
+5. In Postmark, make a server for the console and verify its sender domain. Store the server token in the console project:
+
+   ```sh
+   cd console
+   npx firebase functions:secrets:set CONSOLE_POSTMARK_TOKEN --project <console-project-id>
+   ```
+
+6. Write `console/functions/.env` (Git ignores it):
+
+   ```sh
+   CONSOLE_PUBLIC_URL=https://console.eventrunner.org
+   CONSOLE_MAIL_FROM=Event Runner <hello@console.eventrunner.org>
+   ```
+
+7. In the Firestore data viewer, make the document `console_config/operators` with an array field `emails`. Add each CCM operator's address in lowercase.
+
+### 11.2 Deploy
+
+Run from the repository root with the console project's public web settings:
+
+```sh
+npm run prepare:functions && npm ci
+VITE_CONSOLE_FIREBASE_API_KEY=... VITE_CONSOLE_FIREBASE_AUTH_DOMAIN=... \
+VITE_CONSOLE_FIREBASE_PROJECT_ID=<console-project-id> VITE_CONSOLE_FIREBASE_APP_ID=... \
+  npm run build:console
+cd console
+npx firebase deploy --project <console-project-id>
+```
+
+`console/firebase.json` deploys the console rules, indexes, functions and `web/dist` only. Never run this with a client project id, and never deploy the console from the repository root: the root `firebase.json` is the client deployment.
+
+Check after the first deploy:
+
+- Sign in at `https://console.eventrunner.org` with each of the three methods.
+- Make a test organization, invite a second address, and accept the invite from that address.
+- Sign in as an operator and confirm that the home page lists every organization.
