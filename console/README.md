@@ -77,7 +77,7 @@ A member record repeats its own uid. Firestore cannot query a collection group b
 - **Editor**: edits the event content. In the event admin, an Editor is staff.
 - **Operator**: a CCM person named in `console_config/operators`. An operator can read every organization and team, and reviews requests. An operator does not change a client's team.
 
-An organization always keeps at least one Owner. Two Owners are a condition of launch, because launch readiness needs two operators. They are not a condition of finishing the setup or of starting the build.
+An organization always keeps at least one Owner. The console recommends two Owners, so one lost inbox can't lock a team out. It is not a condition of finishing the setup, starting the build or launching.
 
 ## Functions
 

@@ -19,7 +19,7 @@ describe('Review step', () => {
     expect(screen.getByText('Sell with Stripe')).toBeInTheDocument();
     expect(screen.getByText('Connected: NC Local')).toBeInTheDocument();
     expect(screen.getByText('NC Local <hello@nclocal.eventrunner.org>')).toBeInTheDocument();
-    expect(screen.getByText('The team has the two Owners that launch needs.')).toBeInTheDocument();
+    expect(screen.getByText('The team has two Owners.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Change your event' })).toHaveAttribute('href', '/organizations/o1/applications/a1/event');
   });
 
@@ -39,7 +39,7 @@ describe('Review step', () => {
     expect(problems.getByRole('link', { name: 'Tickets' })).toHaveAttribute('href', '/organizations/o1/applications/a1/tickets?check=1');
     expect(problems.getByText(/Choose how you sell tickets\./)).toBeInTheDocument();
     expect(screen.queryByText(/Add a second Owner/)).not.toBeInTheDocument();
-    expect(screen.getByText(/You can finish the setup now\. Launch needs two Owners/)).toBeInTheDocument();
+    expect(screen.getByText(/You can finish the setup now\. We recommend a second Owner/)).toBeInTheDocument();
     expect(screen.getByText('Finish the answers above first. Then you can continue.')).toBeInTheDocument();
   });
 });

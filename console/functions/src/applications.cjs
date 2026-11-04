@@ -86,7 +86,7 @@ function stepProgress(errors, data) {
     step,
     !Object.keys(errors).some((path) => path === step || path.startsWith(`${step}.`)),
   ]));
-  // The second Owner is a launch check, so the team step never holds the setup.
+  // A second Owner is a recommendation, so the team step never holds the setup.
   done.team = true;
   done.review = Object.keys(errors).length === 0;
   done.agreement = Boolean(data.agreementAcceptance);

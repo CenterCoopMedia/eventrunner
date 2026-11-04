@@ -55,7 +55,7 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
       </section>
       <section aria-labelledby="sum-team" className="summary">
         <h2 id="sum-team">Your team</h2>
-        <p>{ownersNeeded === 0 ? 'The team has the two Owners that launch needs.' : 'You can finish the setup now. Launch needs two Owners, and you can add the second one later.'}</p>
+        <p>{ownersNeeded === 0 ? 'The team has two Owners.' : 'You can finish the setup now. We recommend a second Owner, and you can add one at any time.'}</p>
         {edit('team', 'Your team')}
       </section>
       <section aria-labelledby="sum-tickets" className="summary">

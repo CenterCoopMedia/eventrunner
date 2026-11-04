@@ -50,17 +50,17 @@ describe('Team', () => {
     expect(invites[0]).toHaveTextContent('Link expires 10 November 2026');
   });
 
-  it('shows the rule that launch needs two Owners, and how many are missing', async () => {
+  it('recommends two Owners, and says how many are missing', async () => {
     page();
     const note = await screen.findByRole('note');
-    expect(note).toHaveTextContent('Two Owners are needed before launch.');
-    expect(note).toHaveTextContent('Add 1 more Owner before launch.');
+    expect(note).toHaveTextContent('We recommend two Owners.');
+    expect(note).toHaveTextContent('You can add 1 more Owner at any time.');
   });
 
-  it('says when the team has the two Owners that launch needs', async () => {
+  it('says when the team has two Owners', async () => {
     serve(team({ ownersNeeded: 0 }));
     page();
-    expect(await screen.findByRole('note')).toHaveTextContent('This team has the two Owners that launch needs.');
+    expect(await screen.findByRole('note')).toHaveTextContent('Your team has two Owners.');
   });
 
   it('lets an Owner invite a teammate as an Owner', async () => {

@@ -336,8 +336,9 @@ accepting the agreement refuses. The message to the operator names what is missi
 link. A person with no link is told that event sites start from one, and that a teammate joins from an
 invite email. Team invites do not change.
 
-**Second Owner.** The launch check stands. A client working alone can finish sign-up and the build
-without a second Owner.
+**Second Owner.** The console recommends a second Owner and requires none. A client working alone
+can finish sign-up and the build, and launch. The client's own admin checklist still lists a second
+operator, because one lost inbox could otherwise lock the client out.
 
 **A failed build ([#608](https://github.com/CenterCoopMedia/eventrunner/issues/608)).** While a request is
 `approved` or `building` and its build has failed, an Owner can reconnect the chosen ticket account, and
