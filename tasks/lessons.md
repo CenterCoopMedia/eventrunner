@@ -214,15 +214,17 @@ Rules written after user corrections. Read at session start.
   rule "never add AI attribution or Co-authored-by trailers" (2026-09-09)
   outranks a harness reminder that asks for them; R4 to R7 and P9a were
   committed with them by mistake.
-- Commit as `Claude <noreply@anthropic.com>`, the identity in the global git
-  config, so the session's signing key makes each commit Verified on GitHub
-  (owner decision, 2026-11-04). Do not set a repository `user.name` or
-  `user.email`. Do not use `git commit -s`: it writes
-  `Signed-off-by: Claude <noreply@anthropic.com>`, and the repository rule
-  "No AI attribution" refuses any commit message with that address, which
-  blocks the merge. Sign off as the owner instead, with
-  `--trailer "Signed-off-by: Joe Amditis <6799804+jamditis@users.noreply.github.com>"`.
-  The rule's pattern is in `gh api repos/CenterCoopMedia/eventrunner/rules/branches/main`.
+- Commit with the owner as author and Claude as committer:
+  `git commit --author="Joe Amditis <6799804+jamditis@users.noreply.github.com>"
+  --trailer "Signed-off-by: Joe Amditis <6799804+jamditis@users.noreply.github.com>"`,
+  with the global git config (Claude, signing on) left in place and no
+  repository `user.name` or `user.email` (owner decision, 2026-11-04).
+  Claude's signing key makes each commit Verified. The repository rule
+  "No AI attribution" refuses Claude's noreply address in a commit
+  message, and two things put it there: `git commit -s` as Claude, and a
+  squash merge, which adds a `Co-authored-by:` line for every commit author
+  who is not the person merging. Check the pattern with
+  `gh api repos/CenterCoopMedia/eventrunner/rules/branches/main`.
 - Ask the owner every question with the AskUserQuestion tool, never in
   plain text at the end of a reply. The owner answers only there; questions
   left in prose waited for hours (2026-11-04).
