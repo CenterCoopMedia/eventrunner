@@ -211,7 +211,7 @@
           </thead>
           <tbody>
           <tr><td><code>npm run lint</code></td><td>ESLint over every workspace, including the hex-literal ban (spec §7.6) and <code>react-hooks/rules-of-hooks</code></td></tr>
-          <tr><td><code>npm test</code></td><td><code>packages/shared</code> and <code>functions</code> unit tests (Node <code>--test</code>, fakes — no emulator)</td></tr>
+          <tr><td><code>npm test</code></td><td><code>packages/shared</code>, <code>functions</code> and <code>scripts</code> unit tests (Node <code>--test</code>, fakes — no emulator)</td></tr>
           <tr><td><code>npm run test:rules</code></td><td>Firestore and Storage security rules on the Firebase emulators</td></tr>
           <tr><td><code>npm run test -w apps/web</code></td><td><code>apps/web</code> component/context/lib unit tests (vitest + Testing Library, jsdom — no emulator)</td></tr>
           <tr><td><code>npm run build -w apps/web</code></td><td>Production build of <code>apps/web</code>; credential-free with dummy <code>VITE_FIREBASE_*</code> values</td></tr>
