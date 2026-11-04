@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { callApi } from '../../api.js';
 import {
   ANSWER_STEPS, STEPS, errorsOfStep, setupPath, statusPath, stepByPath,
@@ -77,6 +77,7 @@ export default function Setup() {
   const { orgId, appId, step: stepPath } = useParams();
   const [search] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const step = stepByPath(stepPath);
   const { app, setApp, error } = useApplication(orgId, appId);
   const [touched, setTouched] = useState(() => new Set());
@@ -108,12 +109,15 @@ export default function Setup() {
     }));
   }, [setApp]);
 
-  // With ?check=1 the first field with an error takes the focus.
+  // With ?check=1 the first field with an error takes the focus, once for
+  // each visit to the step. Later saves and keystrokes leave the focus alone.
+  const focusedVisit = useRef(null);
   useEffect(() => {
-    if (!showAll || !app) return;
+    if (!showAll || !app || focusedVisit.current === location.key) return;
+    focusedVisit.current = location.key;
     const first = document.querySelector('.step-body [aria-invalid="true"], .step-body [data-group-error]');
     first?.focus?.();
-  }, [showAll, app, stepPath]);
+  }, [showAll, app, location.key]);
 
   const go = useCallback(async (target) => {
     await flush();

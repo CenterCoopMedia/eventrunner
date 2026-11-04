@@ -108,6 +108,30 @@ describe('Setup', () => {
     await waitFor(() => expect(field).toHaveFocus());
   });
 
+  it('with ?check=1 the focus stays where the reader types after the first focus', async () => {
+    serveApi({
+      getApplication: {
+        application: application({
+          answers: emptyAnswers(),
+          errors: { 'organization.name': 'Enter the name.', 'organization.address': 'Enter the mailing address.' },
+        }),
+      },
+      saveApplicationStep: (body) => ({
+        step: body.step, saved: true, answers: body.answers, errors: { 'organization.name': 'Enter the name.', 'organization.address': 'Use at least 10 characters.' },
+      }),
+    });
+    renderSetup('organization', { query: '?check=1' });
+    const name = await screen.findByLabelText('Organization name');
+    await waitFor(() => expect(name).toHaveFocus());
+    const address = screen.getByLabelText('Mailing address');
+    address.focus();
+    fireEvent.change(address, { target: { value: '1 Main' } });
+    expect(address).toHaveFocus();
+    await waitFor(() => expect(callsTo('saveApplicationStep')).toHaveLength(1), { timeout: 2000 });
+    await screen.findByText('Saved.');
+    expect(address).toHaveFocus();
+  });
+
   it('shows the note when the hosting team asked for changes', async () => {
     serveApi({ getApplication: { application: application({ status: 'changes_requested', note: 'Add the venue address.' }) } });
     renderSetup('event');
