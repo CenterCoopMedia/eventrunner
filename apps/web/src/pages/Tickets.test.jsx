@@ -672,6 +672,24 @@ describe('promo codes on the review step', () => {
     expect(checkoutCalls()[0][1].body.promoCode).toBe('EARLY');
   });
 
+  it('does not start checkout while a code check is still running', async () => {
+    let finish;
+    ticketingRequest.mockImplementation(async (name) => {
+      if (name === 'ticketingCatalog') return CATALOG;
+      if (name === 'ticketingPromoPreview') return new Promise((resolve) => { finish = () => resolve(PREVIEW); });
+      return { orderId: 'order-synthetic', status: 'pending', paymentStatus: 'pending', checkoutUrl: null };
+    });
+    mount(); await fill(2);
+    await apply('EARLY');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Stripe — $50.00' }));
+    expect(checkoutCalls()).toHaveLength(0);
+    await act(async () => finish());
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue to Stripe — $40.00' }));
+    await screen.findByText('Location: /tickets/status?orderId=order-synthetic');
+    expect(checkoutCalls()).toHaveLength(1);
+    expect(checkoutCalls()[0][1].body.promoCode).toBe('EARLY');
+  });
+
   it('shows a refused code by the field and sends no code', async () => {
     mount(); await fill(1);
     await apply('GUESS');

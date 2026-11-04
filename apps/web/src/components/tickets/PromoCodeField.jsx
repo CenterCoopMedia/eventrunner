@@ -8,10 +8,12 @@ import { TextField } from '../forms/publicForm.jsx';
 
 /**
  * @param {{ user: object, cart: { ticketTypeId: string, quantity: number }[], catalogRevision: number,
- *   applied: object|null, refusal: string, onApplied: (preview: object|null) => void }} props
+ *   applied: object|null, refusal: string, onApplied: (preview: object|null) => void,
+ *   onPendingChange: (pending: boolean) => void }} props
  *   `refusal` is a message from a refused checkout, shown like a refused preview.
+ *   `onPendingChange` tells the page a check is running, so Pay can wait for it.
  */
-export default function PromoCodeField({ user, cart, catalogRevision, applied, refusal, onApplied }) {
+export default function PromoCodeField({ user, cart, catalogRevision, applied, refusal, onApplied, onPendingChange }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,6 +24,7 @@ export default function PromoCodeField({ user, cart, catalogRevision, applied, r
     if (busy) return;
     if (!code.trim()) { setError('Enter a promo code.'); return; }
     setBusy(true);
+    onPendingChange(true);
     setError('');
     try {
       const preview = await ticketingRequest('ticketingPromoPreview', { user, body: { code: code.trim(), catalogRevision, lines: cart } });
@@ -31,6 +34,7 @@ export default function PromoCodeField({ user, cart, catalogRevision, applied, r
       setError(err.message);
     } finally {
       setBusy(false);
+      onPendingChange(false);
     }
   }
 

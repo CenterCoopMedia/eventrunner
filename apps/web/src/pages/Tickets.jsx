@@ -112,6 +112,8 @@ export default function Tickets() {
   // An applied code holds the preview for the cart it priced.
   const [promo, setPromo] = useState(null);
   const [promoRefusal, setPromoRefusal] = useState('');
+  // Pay waits for a running code check, so a discount shown later is the one sent.
+  const [promoPending, setPromoPending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(null);
   const [passed, setPassed] = useState([]);
@@ -413,7 +415,7 @@ export default function Tickets() {
     }
 
     function pay() {
-      if (submittingRef.current) return;
+      if (submittingRef.current || promoPending) return;
       for (const formStep of formSteps) {
         const found = stepErrors(formStep.slug);
         if (hasErrors(found)) {
@@ -447,7 +449,7 @@ export default function Tickets() {
 
     const questions = asksQuestions ? activeQuestions(form) : [];
     const payControl = (
-      <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Preparing your order…' : !count ? 'Continue' : payable > 0 ? `Continue to Stripe — ${formatTicketMoney(payable, catalog.currency)}` : 'Reserve tickets'}</button>
+      <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy || promoPending}>{busy ? 'Preparing your order…' : !count ? 'Continue' : payable > 0 ? `Continue to Stripe — ${formatTicketMoney(payable, catalog.currency)}` : 'Reserve tickets'}</button>
     );
 
     return (
@@ -543,7 +545,7 @@ export default function Tickets() {
                     </div>
                   </dl>
                   {count ? <PromoCodeField
-                    key={cartKey} user={user} cart={cart} catalogRevision={catalog.catalogRevision} applied={applied} refusal={promoRefusal}
+                    key={cartKey} user={user} cart={cart} catalogRevision={catalog.catalogRevision} applied={applied} refusal={promoRefusal} onPendingChange={setPromoPending}
                     onApplied={(preview) => { setPromoRefusal(''); setPromo(preview ? { cartKey, preview } : null); }}
                   /> : null}
                   <p className="text-caption text-text-secondary">{catalog.taxTreatment === 'inclusive' ? 'Any applicable tax is included in these prices.' : 'The organizer has configured this event not to collect tax.'} The organizer pays processing fees; no additional fees are added to your total.</p>
