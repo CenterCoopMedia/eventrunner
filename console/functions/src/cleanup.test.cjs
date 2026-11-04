@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { deleteSpamApplication, isExpired, runRetention } = require('./cleanup.cjs');
+const { makeFakeStripe } = require('./fakes.cjs');
 const { DAY, NOW, QUIET, ana, answers, application, deps, ops, seeded } = require('./fakeReview.cjs');
 
 const auditRows = (db) => db.paths('console_audit/').map((p) => db.read(p));
@@ -145,4 +146,39 @@ test('a spam delete frees every name the request holds', async () => {
   await deleteSpamApplication({ db, now: () => NOW }, { body: { appId: 'a1', confirm: true }, user: ops });
   assert.equal(db.read('site_names/nclocal2'), undefined);
   assert.equal(db.read('site_names/nclocal'), undefined);
+});
+
+test('an abandoned request waiting for payment is deleted after 90 days and frees its name, and its acceptance record stays', async () => {
+  const old = new Date(NOW - 90 * DAY);
+  const db = seeded({
+    'applications/a1': application({ status: 'awaiting_payment', updatedAt: old }),
+    'agreement_acceptances/r1': { version: 1, appId: 'a1' },
+  });
+  const { deleted } = await runRetention({ db, now: () => NOW, log: QUIET });
+  assert.deepEqual(deleted, ['a1']);
+  assert.deepEqual(db.paths('site_names/'), []);
+  assert.ok(db.read('agreement_acceptances/r1'), 'the signed record is kept');
+});
+
+test('a request with a payment problem stays until an operator looks at it', () => {
+  const old = new Date(NOW - 200 * DAY);
+  assert.equal(isExpired(application({ status: 'awaiting_payment', updatedAt: old }), NOW), true);
+  assert.equal(isExpired(application({ status: 'awaiting_payment', updatedAt: old, feeProblem: { code: 'amount-mismatch' } }), NOW), false);
+});
+
+test('a spam delete closes an open payment page, and a paid one refuses it', async () => {
+  const stripe = makeFakeStripe();
+  stripe.sessions.set('cs_open', { id: 'cs_open', status: 'open' });
+  stripe.sessions.set('cs_paid', { id: 'cs_paid', status: 'complete' });
+  const held = (sessionId) => seeded({ 'applications/a1': application({ status: 'awaiting_payment', feeCheckout: { sessionId } }) });
+  const body = { appId: 'a1', confirm: true };
+
+  const open = held('cs_open');
+  await deleteSpamApplication({ ...deps(open), stripe }, { body, user: ops });
+  assert.equal(open.read('applications/a1'), undefined);
+  assert.equal(stripe.sessions.get('cs_open').status, 'expired');
+
+  const paid = held('cs_paid');
+  await assert.rejects(deleteSpamApplication({ ...deps(paid), stripe }, { body, user: ops }), { status: 409, code: 'payment-received' });
+  assert.ok(paid.read('applications/a1'));
 });

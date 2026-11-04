@@ -35,6 +35,13 @@
       { "source": "/api/deleteSpamApplication", "function": { "functionId": "deleteSpamApplication", "region": "us-central1" } },
       { "source": "/api/getConsoleSettings", "function": { "functionId": "getConsoleSettings", "region": "us-central1" } },
       { "source": "/api/saveConsoleSettings", "function": { "functionId": "saveConsoleSettings", "region": "us-central1" } },
+      { "source": "/api/getAgreement", "function": { "functionId": "getAgreement", "region": "us-central1" } },
+      { "source": "/api/acceptAgreement", "function": { "functionId": "acceptAgreement", "region": "us-central1" } },
+      { "source": "/api/reopenApplication", "function": { "functionId": "reopenApplication", "region": "us-central1" } },
+      { "source": "/api/startFeeCheckout", "function": { "functionId": "startFeeCheckout", "region": "us-central1" } },
+      { "source": "/api/saveEventFee", "function": { "functionId": "saveEventFee", "region": "us-central1" } },
+      { "source": "/api/saveAgreement", "function": { "functionId": "saveAgreement", "region": "us-central1" } },
+      { "source": "/api/consoleFeeWebhook", "function": { "functionId": "consoleFeeWebhook", "region": "us-central1" } },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

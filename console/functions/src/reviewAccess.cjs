@@ -12,7 +12,7 @@ const { ConsoleError } = require('./http.cjs');
 const { isOperator, validOrgId } = require('./access.cjs');
 
 const STATUSES = Object.freeze([
-  'draft', 'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined',
+  'draft', 'awaiting_payment', 'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined',
 ]);
 
 const NOT_OPERATOR = 'This page is for the hosting team.';

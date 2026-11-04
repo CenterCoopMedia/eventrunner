@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { approveApplication, declineApplication, requestChanges } = require('./reviewDecisions.cjs');
+const { makeFakeStripe } = require('./fakes.cjs');
 const { NOW, PUBLIC_URL, ana, application, deps, fakeMailer, ops, ops2, seeded } = require('./fakeReview.cjs');
 
 const lastHistory = (db, id = 'a1') => db.read(`applications/${id}`).history.at(-1);
@@ -213,4 +214,29 @@ test('declining frees the name the client picked after changes were asked for, n
   await declineApplication(deps(db), { body: { appId: 'a1', revision: 2, note: 'No.' }, user: ops });
   assert.equal(db.read('site_names/nclocal2'), undefined, 'the current name is free');
   assert.equal(db.read('site_names/nclocal'), undefined, 'the frozen name is free too');
+});
+
+test('a request waiting for payment can be declined, which closes the payment page, and a paid one cannot', async () => {
+  const stripe = makeFakeStripe();
+  stripe.sessions.set('cs_open', { id: 'cs_open', status: 'open' });
+  stripe.sessions.set('cs_paid', { id: 'cs_paid', status: 'complete' });
+  const held = (sessionId) => seeded({ 'applications/a1': application({ status: 'awaiting_payment', feeCheckout: { sessionId } }) });
+  const input = { body: { appId: 'a1', revision: 2, note: 'Not an event.' }, user: ops };
+
+  const open = held('cs_open');
+  await declineApplication({ ...deps(open), stripe }, input);
+  assert.equal(open.read('applications/a1').status, 'declined');
+  assert.equal(stripe.sessions.get('cs_open').status, 'expired');
+  assert.deepEqual(open.paths('site_names/'), []);
+
+  const paid = held('cs_paid');
+  await assert.rejects(declineApplication({ ...deps(paid), stripe }, input), { status: 409, code: 'payment-received' });
+  assert.equal(paid.read('applications/a1').status, 'awaiting_payment');
+});
+
+test('a request waiting for payment cannot be approved by hand or have changes requested', async () => {
+  const db = seeded({ 'applications/a1': application({ status: 'awaiting_payment' }) });
+  await assert.rejects(approveApplication(deps(db), { body: { appId: 'a1', revision: 2 }, user: ops }), { status: 409, code: 'status-changed' });
+  await assert.rejects(requestChanges(deps(db), { body: { appId: 'a1', revision: 2, note: 'n' }, user: ops }), { status: 409, code: 'status-changed' });
+  assert.equal(db.read('applications/a1').status, 'awaiting_payment');
 });

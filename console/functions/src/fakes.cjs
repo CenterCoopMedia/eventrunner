@@ -228,11 +228,12 @@ function makeFakeAuth(tokens = {}) {
 }
 
 /** A request shaped like the Express object onRequest hands a handler. */
-function makeReq({ method = 'POST', body = {}, token, origin } = {}) {
+function makeReq({ method = 'POST', body = {}, token, origin, rawBody, signature } = {}) {
   const headers = {};
+  if (signature) headers['stripe-signature'] = signature;
   if (token) headers.authorization = `Bearer ${token}`;
   if (origin) headers.origin = origin;
-  return { method, body, headers, get: (name) => headers[name.toLowerCase()] };
+  return { method, body, rawBody, headers, get: (name) => headers[name.toLowerCase()] };
 }
 
 /** A response that records what the handler sent. */
@@ -261,4 +262,69 @@ function makeRes() {
   return res;
 }
 
-module.exports = { makeFakeDb, makeFakeAuth, makeReq, makeRes };
+/**
+ * A fake Stripe client with what the console uses: Checkout Sessions in
+ * memory, and the real SDK's signature check, which needs no network.
+ * A repeated idempotency key returns the same session, as Stripe does.
+ * With `down`, every session call rejects.
+ */
+function makeFakeStripe({ down = false } = {}) {
+  const Stripe = require('stripe');
+  const sdk = new Stripe('sk_test_fake');
+  const sessions = new Map();
+  const byKey = new Map();
+  const calls = { create: [], retrieve: [], expire: [] };
+  const guard = () => {
+    if (down) throw new Error('fake Stripe is down');
+  };
+  return {
+    calls,
+    sessions,
+    checkout: {
+      sessions: {
+        async create(params, options = {}) {
+          guard();
+          calls.create.push({ params, options });
+          if (options.idempotencyKey && byKey.has(options.idempotencyKey)) return clone(sessions.get(byKey.get(options.idempotencyKey)));
+          const id = `cs_test_${sessions.size + 1}`;
+          const [{ price_data: price, quantity }] = params.line_items;
+          const session = {
+            id,
+            url: `https://pay.example/${id}`,
+            status: 'open',
+            payment_status: 'unpaid',
+            amount_total: price.unit_amount * quantity,
+            currency: price.currency,
+            metadata: params.metadata,
+          };
+          sessions.set(id, session);
+          if (options.idempotencyKey) byKey.set(options.idempotencyKey, id);
+          return clone(session);
+        },
+        async retrieve(id) {
+          guard();
+          calls.retrieve.push(id);
+          return clone(sessions.get(id));
+        },
+        async expire(id) {
+          guard();
+          calls.expire.push(id);
+          const session = sessions.get(id);
+          if (session.status !== 'open') throw new Error(`fake Stripe: session is ${session.status}`);
+          session.status = 'expired';
+          return clone(session);
+        },
+      },
+    },
+    webhooks: {
+      constructEvent: (...args) => sdk.webhooks.constructEvent(...args),
+    },
+    /** A delivery as Stripe signs it. */
+    signed(event, secret) {
+      const rawBody = Buffer.from(JSON.stringify(event));
+      return { rawBody, signature: sdk.webhooks.generateTestHeaderString({ payload: rawBody.toString(), secret }) };
+    },
+  };
+}
+
+module.exports = { makeFakeDb, makeFakeAuth, makeFakeStripe, makeReq, makeRes };

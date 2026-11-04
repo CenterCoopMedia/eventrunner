@@ -3,13 +3,13 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const {
-  STATUS_WORDS, createPostmarkMailer, inviteMessage, operatorNoticeMessage, statusChangeMessage,
+  STATUS_WORDS, agreementCopyMessage, createPostmarkMailer, inviteMessage, operatorNoticeMessage, statusChangeMessage,
 } = require('./mailer.cjs');
 
 test('no status email uses hosting jargon', () => {
   for (const status of Object.keys(STATUS_WORDS)) {
     const { text } = statusChangeMessage({ organizationName: 'NC Local', eventName: 'Summit', status, note: 'n', link: '' });
-    assert.ok(!/firebase|project|tenant|environment|webhook|secret/i.test(text), text);
+    assert.ok(!/firebase|project|tenant|environment|webhook|secret|stripe|checkout/i.test(text), text);
   }
 });
 
@@ -90,7 +90,7 @@ test('statusChangeMessage says the status in plain words, with the note and the 
 
 test('statusChangeMessage has words for every status after draft and refuses an unknown one', () => {
   assert.deepEqual(Object.keys(STATUS_WORDS).sort(), [
-    'approved', 'building', 'changes_requested', 'declined', 'launched', 'ready', 'submitted', 'withdrawn',
+    'approved', 'awaiting_payment', 'building', 'changes_requested', 'declined', 'draft', 'launched', 'paid', 'ready', 'submitted', 'withdrawn',
   ]);
   for (const status of Object.keys(STATUS_WORDS)) {
     assert.ok(statusChangeMessage({ ...change, status, note: null }).text.length > 0, status);
@@ -104,6 +104,32 @@ test('operatorNoticeMessage names the organization and the event', () => {
   const message = operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a' });
   assert.equal(message.subject, 'New request: Summit from NC Local');
   assert.match(message.text, /NC Local sent a request for a site for Summit\./);
+});
+
+test('operatorNoticeMessage says what happened to a payment', () => {
+  const notice = { organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a' };
+  assert.match(operatorNoticeMessage({ ...notice, kind: 'paid' }).subject, /^Paid: Summit/);
+  assert.match(operatorNoticeMessage({ ...notice, kind: 'build-failed' }).text, /build did not start/);
+  assert.match(operatorNoticeMessage({ ...notice, kind: 'payment-problem', problem: 'amount-mismatch' }).text, /amount-mismatch/);
+});
+
+test('the agreement copy holds the full text, the record details and escaped HTML', () => {
+  const message = agreementCopyMessage({
+    organizationName: 'NC Local',
+    eventName: 'Summit',
+    title: 'Test agreement',
+    version: 3,
+    body: 'First <b>test</b> paragraph.\n\nSecond test paragraph.',
+    sha256: 'abc123',
+    typedName: 'Ana Owner',
+    acceptedAt: '2026-11-04T15:00:00.000Z',
+    link: 'https://x.example/a',
+  });
+  for (const part of ['Ana Owner', 'Version 3', 'abc123', 'Test agreement', 'First <b>test</b> paragraph.', 'Second test paragraph.', '2026-11-04T15:00:00.000Z']) {
+    assert.ok(message.text.includes(part), part);
+  }
+  assert.ok(message.html.includes('First &lt;b&gt;test&lt;/b&gt; paragraph.'));
+  assert.ok(!message.html.includes('<b>'));
 });
 
 test('the Postmark mailer sends status and operator email with their own tags', async () => {

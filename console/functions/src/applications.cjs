@@ -8,7 +8,15 @@
  *   createdBy, createdAt, updatedAt, updatedBy, submittedAt, submittedBy,
  *   history: [{ status, at, by, note }]  // oldest first
  *   review: null | { note, by, at, settings }  // written by operator review only
+ *   agreementAcceptance: null | { id, version, sha256, name, email, at }  // the current acceptance
+ *   feeCheckout: null | { sessionId, amount, currency, attempt, createdAt }  // the payment page
+ *   payment: null | { sessionId, paymentIntentId, amount, currency, paidAt, eventId }
+ *   buildStart: { state: 'pending'|'started'|'failed', at }  // after payment, no detail
+ *   feeProblem: { code, sessionId, at }  // a paid session that did not approve the request
  * }
+ *
+ * The browser can read this document (console/firestore.rules), so error
+ * text stays in the logs. The signed record is in agreement_acceptances.
  *
  * One application is one event and one site. The client calls it "your
  * request"; the console never shows the word application.
@@ -20,16 +28,18 @@ const { emptyAnswers, withDefaults } = require('./answers.cjs');
 const { checkAnswers } = require('./checks.cjs');
 const { siteAddress } = require('./siteNames.cjs');
 const { LAUNCH_OWNERS } = require('./organizations.cjs');
+const { readSignupTerms } = require('./consoleSettings.cjs');
 
 const COLLECTION = 'applications';
 const STATUSES = Object.freeze([
-  'draft', 'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined',
+  'draft', 'awaiting_payment', 'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined',
 ]);
 const CLOSED = Object.freeze(['withdrawn', 'declined']);
 const EDITABLE = Object.freeze(['draft', 'changes_requested']);
-const WITHDRAWABLE = Object.freeze(['draft', 'submitted', 'changes_requested']);
+const WITHDRAWABLE = Object.freeze(['draft', 'awaiting_payment', 'submitted', 'changes_requested']);
+const AWAITING_PAYMENT = 'awaiting_payment';
 const MAX_OPEN_PER_ORG = 3;
-const STEP_IDS = Object.freeze(['organization', 'event', 'webAddress', 'team', 'tickets', 'email', 'review']);
+const STEP_IDS = Object.freeze(['organization', 'event', 'webAddress', 'team', 'tickets', 'email', 'review', 'agreement', 'fee']);
 
 const NOT_FOUND = 'We could not find that request.';
 
@@ -75,21 +85,25 @@ function currentNote(data) {
 }
 
 /** Which steps are complete, for the step list. */
-function stepProgress(errors, ownersNeeded) {
+function stepProgress(errors, data) {
   const done = Object.fromEntries(STEP_IDS.map((step) => [
     step,
     !Object.keys(errors).some((path) => path === step || path.startsWith(`${step}.`)),
   ]));
-  done.team = ownersNeeded === 0;
-  done.review = Object.keys(errors).length === 0 && ownersNeeded === 0;
+  // The second Owner is a launch check, so the team step never holds the setup.
+  done.team = true;
+  done.review = Object.keys(errors).length === 0;
+  done.agreement = Boolean(data.agreementAcceptance);
+  done.fee = Boolean(data.payment);
   return done;
 }
 
 /** What the browser gets. The operator also gets who did each change and the review. */
-function applicationForClient(id, data, { role, operator, ownersNeeded }) {
+function applicationForClient(id, data, { role, operator, ownersNeeded, signups }) {
   const answers = withDefaults(data.answers);
   const errors = checkAnswers(answers);
   const editable = EDITABLE.includes(data.status);
+  const owner = role === 'owner';
   const body = {
     id,
     orgId: data.orgId,
@@ -107,13 +121,23 @@ function applicationForClient(id, data, { role, operator, ownersNeeded }) {
       ...(operator ? { by: entry.by || null } : {}),
     })),
     errors,
-    progress: stepProgress(errors, ownersNeeded),
+    progress: stepProgress(errors, data),
     ownersNeeded,
+    signups,
+    acceptance: data.agreementAcceptance
+      ? { version: data.agreementAcceptance.version, name: data.agreementAcceptance.name, at: toIso(data.agreementAcceptance.at) }
+      : null,
+    payment: data.payment
+      ? { amount: data.payment.amount, currency: data.payment.currency, paidAt: toIso(data.payment.paidAt) }
+      : null,
     myRole: role,
     operator,
     canEdit: Boolean(role) && editable,
-    canSubmit: role === 'owner' && editable,
-    canWithdraw: role === 'owner' && WITHDRAWABLE.includes(data.status),
+    canAccept: owner && data.status === 'draft',
+    // A request the hosting team held back goes back to them.
+    canSubmit: owner && data.status === 'changes_requested',
+    canPay: owner && data.status === AWAITING_PAYMENT,
+    canWithdraw: owner && WITHDRAWABLE.includes(data.status),
   };
   if (operator) {
     body.frozen = data.frozen || null;
@@ -144,6 +168,9 @@ async function createApplication({ db, now = Date.now }, { body, user }) {
     submittedBy: null,
     history: [historyEntry('draft', at, user.uid)],
     review: null,
+    agreementAcceptance: null,
+    feeCheckout: null,
+    payment: null,
   };
   await db.runTransaction(async (tx) => {
     const existing = await tx.get(db.collection(COLLECTION).where('orgId', '==', orgId));
@@ -162,7 +189,9 @@ async function getApplication({ db }, { body, user }) {
   const access = await requireMemberOrOperator(db, orgId, user);
   const { ref, data } = await readApplication((r) => r.get(), db, orgId, appId);
   const ownersNeeded = Math.max(0, LAUNCH_OWNERS - await countOwners(db, orgId));
-  return { body: { application: applicationForClient(ref.id, data, { ...access, ownersNeeded }) } };
+  const { open, fee } = await readSignupTerms((r) => r.get(), db);
+  const signups = { open, fee };
+  return { body: { application: applicationForClient(ref.id, data, { ...access, ownersNeeded, signups }) } };
 }
 
 async function listApplications({ db }, { body, user }) {
@@ -197,6 +226,7 @@ async function listApplications({ db }, { body, user }) {
 }
 
 module.exports = {
+  AWAITING_PAYMENT,
   CLOSED,
   COLLECTION,
   EDITABLE,

@@ -12,6 +12,8 @@
  *   CONSOLE_MAIL_FROM        the sender of invite emails
  *   CONSOLE_ALLOWED_ORIGINS  extra origins for a local dev server
  *   CONSOLE_POSTMARK_TOKEN   secret: the Postmark server token
+ *   CONSOLE_STRIPE_SECRET_KEY          secret: CCM's Stripe key, for the event fee
+ *   CONSOLE_STRIPE_FEE_WEBHOOK_SECRET  secret: signs consoleFeeWebhook deliveries
  */
 
 const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
@@ -25,7 +27,10 @@ const { checkWebAddress } = require('./siteNames.cjs');
 const { getApplicationForReview, listApplicationsForReview } = require('./reviewQueue.cjs');
 const { approveApplication, declineApplication, requestChanges } = require('./reviewDecisions.cjs');
 const { deleteSpamApplication, runRetention } = require('./cleanup.cjs');
-const { getConsoleSettings, saveConsoleSettings } = require('./consoleSettings.cjs');
+const { getConsoleSettings, saveAgreement, saveConsoleSettings, saveEventFee } = require('./consoleSettings.cjs');
+const { acceptAgreement, getAgreement, reopenApplication } = require('./agreementAcceptance.cjs');
+const { startFeeCheckout, stripeClient } = require('./feeCheckout.cjs');
+const { feeWebhookEndpoint } = require('./feeWebhook.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
 // this region, and the web app calls only those routes. Moving the console
@@ -48,16 +53,28 @@ const ENDPOINTS = Object.freeze({
   saveApplicationStep: { action: saveApplicationStep },
   checkWebAddress: { action: checkWebAddress },
   submitApplication: { action: submitApplication, mail: true },
-  withdrawApplication: { action: withdrawApplication, mail: true },
+  withdrawApplication: { action: withdrawApplication, mail: true, stripe: true },
+  // The agreement and the event fee (ADR 0007, amendment 2026-11-04).
+  getAgreement: { action: getAgreement },
+  acceptAgreement: { action: acceptAgreement, mail: true },
+  reopenApplication: { action: reopenApplication, mail: true, stripe: true },
+  startFeeCheckout: { action: startFeeCheckout, stripe: true },
   // Operator review (ADR 0007 §5).
   listApplicationsForReview: { action: listApplicationsForReview },
   getApplicationForReview: { action: getApplicationForReview },
   requestChanges: { action: requestChanges, mail: true },
-  declineApplication: { action: declineApplication, mail: true },
+  declineApplication: { action: declineApplication, mail: true, stripe: true },
   approveApplication: { action: approveApplication, mail: true },
-  deleteSpamApplication: { action: deleteSpamApplication },
+  deleteSpamApplication: { action: deleteSpamApplication, stripe: true },
   getConsoleSettings: { action: getConsoleSettings },
   saveConsoleSettings: { action: saveConsoleSettings },
+  saveEventFee: { action: saveEventFee },
+  saveAgreement: { action: saveAgreement },
+});
+
+/** Called by a provider: the raw body, a signature, and no sign-in or CORS. */
+const WEBHOOKS = Object.freeze({
+  consoleFeeWebhook: { endpoint: feeWebhookEndpoint },
 });
 
 /** Scheduled jobs: not HTTP, so no Hosting rewrite. */
@@ -65,7 +82,7 @@ const SCHEDULED = Object.freeze({
   runApplicationRetention: { job: runRetention, schedule: RETENTION_SCHEDULE },
 });
 
-const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice']);
+const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice', 'sendAgreementCopy']);
 
 let services = null;
 function adminServices() {
@@ -79,7 +96,8 @@ function adminServices() {
   return services;
 }
 
-function buildHandlers() {
+/** `startBuild({ orgId, appId })` is given by the part that builds the site. */
+function buildHandlers({ startBuild } = {}) {
   const { onRequest } = require('firebase-functions/v2/https');
   const { onSchedule } = require('firebase-functions/v2/scheduler');
   const { defineSecret } = require('firebase-functions/params');
@@ -87,25 +105,47 @@ function buildHandlers() {
 
   const region = REGION;
   const postmarkToken = defineSecret('CONSOLE_POSTMARK_TOKEN');
+  const stripeKey = defineSecret('CONSOLE_STRIPE_SECRET_KEY');
+  const feeWebhookSecret = defineSecret('CONSOLE_STRIPE_FEE_WEBHOOK_SECRET');
+
+  // Made at send time, so a missing setting is a failed send that the
+  // action reports and logs, not a crash before the request is read.
+  const lazyMailer = () => {
+    const mailer = () => createPostmarkMailer({
+      token: postmarkToken.value(),
+      from: process.env.CONSOLE_MAIL_FROM || '',
+      fetch: globalThis.fetch,
+    });
+    return Object.fromEntries(MAIL_METHODS.map((method) => [method, (message) => mailer()[method](message)]));
+  };
+  const publicUrl = () => (process.env.CONSOLE_PUBLIC_URL || '').replace(/\/+$/, '');
 
   const handlers = {};
   for (const [name, spec] of Object.entries(ENDPOINTS)) {
-    const options = { region, ...(spec.mail ? { secrets: [postmarkToken] } : {}) };
+    const secrets = [...(spec.mail ? [postmarkToken] : []), ...(spec.stripe ? [stripeKey] : [])];
+    const options = { region, ...(secrets.length > 0 ? { secrets } : {}) };
     handlers[name] = onRequest(options, async (req, res) => {
       if (applyCors(req, res, parseAllowedOrigins(process.env.CONSOLE_ALLOWED_ORIGINS))) return;
       const { db, auth } = adminServices();
-      const deps = { db, auth, now: Date.now, log: console, publicUrl: (process.env.CONSOLE_PUBLIC_URL || '').replace(/\/+$/, '') };
-      if (spec.mail) {
-        // Made at send time, so a missing setting is a failed send that the
-        // action reports and logs, not a crash before the request is read.
-        const mailer = () => createPostmarkMailer({
-          token: postmarkToken.value(),
-          from: process.env.CONSOLE_MAIL_FROM || '',
-          fetch: globalThis.fetch,
-        });
-        deps.mailer = Object.fromEntries(MAIL_METHODS.map((method) => [method, (message) => mailer()[method](message)]));
-      }
+      const deps = { db, auth, now: Date.now, log: console, publicUrl: publicUrl() };
+      if (spec.mail) deps.mailer = lazyMailer();
+      if (spec.stripe) deps.stripe = stripeClient(stripeKey.value());
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
+    });
+  }
+  for (const [name, spec] of Object.entries(WEBHOOKS)) {
+    handlers[name] = onRequest({ region, secrets: [postmarkToken, stripeKey, feeWebhookSecret] }, async (req, res) => {
+      const { db } = adminServices();
+      await spec.endpoint({
+        db,
+        now: Date.now,
+        log: console,
+        publicUrl: publicUrl(),
+        mailer: lazyMailer(),
+        stripe: stripeClient(stripeKey.value()),
+        webhookSecret: feeWebhookSecret.value(),
+        startBuild,
+      })(req, res);
     });
   }
   for (const [name, spec] of Object.entries(SCHEDULED)) {
@@ -117,4 +157,4 @@ function buildHandlers() {
   return handlers;
 }
 
-module.exports = { ENDPOINTS, REGION, SCHEDULED, buildHandlers };
+module.exports = { ENDPOINTS, REGION, SCHEDULED, WEBHOOKS, buildHandlers };

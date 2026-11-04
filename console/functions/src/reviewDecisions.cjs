@@ -4,7 +4,8 @@
  * The operator's decisions on a request (ADR 0007 §5):
  *
  *   requestChanges      submitted                     -> changes_requested (note)
- *   declineApplication  submitted | changes_requested -> declined (note; frees the name)
+ *   declineApplication  submitted | changes_requested | awaiting_payment -> declined
+ *                       (note; frees the name; closes an open payment page first)
  *   approveApplication  submitted                     -> approved (records the build settings)
  *
  * Each runs in one transaction that reads the current status first, so two
@@ -19,10 +20,11 @@
 
 const { ConsoleError } = require('./http.cjs');
 const {
-  NOT_FOUND, applicationRef, ownerEmails, requireAppId, requireOperator, reviewedAnswers, siteNameOf,
+  NOT_FOUND, applicationRef, ownerEmails, readApplication, requireAppId, requireOperator, reviewedAnswers, siteNameOf,
 } = require('./reviewAccess.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { statusLink } = require('./applicationStatus.cjs');
+const { closeOpenCheckout } = require('./feeCheckout.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('./consoleSettings.cjs');
 
 const NOTE_MAX = 2000;
@@ -130,7 +132,10 @@ async function requestChanges(deps, input) {
 
 async function declineApplication(deps, input) {
   const note = requireNote(input.body.note);
-  return decide(deps, input, { from: ['submitted', 'changes_requested'], to: 'declined', note, releaseName: true });
+  await requireOperator(deps.db, input.user);
+  const app = await readApplication(deps.db, input.body.appId);
+  if (app.status === 'awaiting_payment') await closeOpenCheckout(deps.stripe, app);
+  return decide(deps, input, { from: ['submitted', 'changes_requested', 'awaiting_payment'], to: 'declined', note, releaseName: true });
 }
 
 async function approveApplication(deps, input) {

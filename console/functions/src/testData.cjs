@@ -7,6 +7,7 @@
  */
 
 const { makeFakeDb } = require('./fakes.cjs');
+const { agreementHash } = require('./consoleSettings.cjs');
 
 const NOW = Date.parse('2026-11-04T15:00:00Z');
 const ana = { uid: 'ana', email: 'ana@example.org' };
@@ -69,7 +70,22 @@ function fakeMailer({ fail = false } = {}) {
     sent: [],
     async sendInvite(m) { if (fail) throw new Error('provider down'); this.sent.push({ kind: 'invite', ...m }); },
     async sendStatusChange(m) { if (fail) throw new Error('provider down'); this.sent.push({ kind: 'status', ...m }); },
-    async sendOperatorNotice(m) { if (fail) throw new Error('provider down'); this.sent.push({ kind: 'operator', ...m }); },
+    async sendOperatorNotice(m) { if (fail) throw new Error('provider down'); this.sent.push({ ...m, noticeKind: m.kind, kind: 'operator' }); },
+    async sendAgreementCopy(m) { if (fail) throw new Error('provider down'); this.sent.push({ kind: 'agreement', ...m }); },
+  };
+}
+
+const AGREEMENT_TEXT = { title: 'Test agreement', body: 'First test paragraph.\n\nSecond test paragraph.' };
+const FAKE_FEE = { amount: 12345, currency: 'usd' };
+
+/** The documents a request needs to pass Review, with obvious fakes. */
+function signupTerms() {
+  const { title, body } = AGREEMENT_TEXT;
+  const record = { version: 1, title, body, sha256: agreementHash(title, body), savedAt: new Date(NOW - 5000), savedBy: 'ops' };
+  return {
+    'console_config/settings': { feeAmount: FAKE_FEE.amount, feeCurrency: FAKE_FEE.currency },
+    'console_config/agreement': record,
+    'console_config/agreement/versions/1': record,
   };
 }
 
@@ -77,4 +93,4 @@ function quietLog() {
   return { errors: [], error(...args) { this.errors.push(args); } };
 }
 
-module.exports = { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, validAnswers, zed };
+module.exports = { FAKE_FEE, NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, validAnswers, zed };

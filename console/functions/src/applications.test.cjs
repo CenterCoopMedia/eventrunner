@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { createApplication, getApplication, listApplications } = require('./applications.cjs');
-const { NOW, ana, applicationDoc, ben, cy, ops, seededDb, zed } = require('./testData.cjs');
+const { FAKE_FEE, NOW, ana, applicationDoc, ben, cy, ops, seededDb, signupTerms, zed } = require('./testData.cjs');
 
 const deps = (db) => ({ db, now: () => NOW });
 
@@ -60,12 +60,17 @@ test('a member and an operator read a request; a stranger and another organizati
   assert.equal(forAna.status, 'draft');
   assert.equal(forAna.address, 'nclocal.eventrunner.org');
   assert.deepEqual(forAna.errors, {});
-  assert.equal(forAna.ownersNeeded, 1);
-  assert.equal(forAna.progress.team, false);
+  assert.equal(forAna.ownersNeeded, 1, 'still shown, for launch');
+  assert.equal(forAna.progress.team, true, 'a second Owner does not hold the setup');
   assert.equal(forAna.progress.event, true);
-  assert.equal(forAna.progress.review, false);
+  assert.equal(forAna.progress.review, true);
+  assert.equal(forAna.progress.agreement, false);
+  assert.equal(forAna.progress.fee, false);
+  assert.deepEqual(forAna.signups, { open: false, fee: null }, 'nothing set: closed');
   assert.equal(forAna.canEdit, true);
-  assert.equal(forAna.canSubmit, true);
+  assert.equal(forAna.canAccept, true);
+  assert.equal(forAna.canPay, false);
+  assert.equal(forAna.canSubmit, false, 'a draft goes through the agreement');
   assert.equal(forAna.canWithdraw, true);
   assert.equal(forAna.frozen, undefined, 'a client does not get the operator fields');
   assert.equal(forAna.review, undefined);
@@ -73,6 +78,7 @@ test('a member and an operator read a request; a stranger and another organizati
 
   const forBen = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ben })).body.application;
   assert.equal(forBen.canEdit, true);
+  assert.equal(forBen.canAccept, false);
   assert.equal(forBen.canSubmit, false);
   assert.equal(forBen.canWithdraw, false);
 
@@ -86,6 +92,28 @@ test('a member and an operator read a request; a stranger and another organizati
   await assert.rejects(getApplication(deps(db), { body: { orgId: 'o2', appId: 'a1' }, user: cy }), { status: 404 });
   await assert.rejects(getApplication(deps(db), { body: { orgId: 'o1', appId: 'nope' }, user: ana }), { status: 404 });
   await assert.rejects(getApplication(deps(db), { body: { orgId: 'o1', appId: 'a/b' }, user: ana }), { status: 400 });
+});
+
+test('a request waiting for payment is locked, can be paid, and tells the client the fee', async () => {
+  const db = seededDb({
+    ...signupTerms(),
+    'applications/a1': applicationDoc({
+      status: 'awaiting_payment',
+      agreementAcceptance: { id: 'r1', version: 1, sha256: 'x', name: 'Ana Owner', email: 'ana@example.org', at: new Date(NOW) },
+      feeCheckout: { sessionId: 'cs_secret_to_client', amount: FAKE_FEE.amount, currency: FAKE_FEE.currency },
+    }),
+  });
+  const forAna = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ana })).body.application;
+  assert.equal(forAna.canEdit, false);
+  assert.equal(forAna.canAccept, false);
+  assert.equal(forAna.canPay, true);
+  assert.equal(forAna.canWithdraw, true);
+  assert.equal(forAna.progress.agreement, true);
+  assert.deepEqual(forAna.signups, { open: true, fee: FAKE_FEE });
+  assert.deepEqual(forAna.acceptance, { version: 1, name: 'Ana Owner', at: new Date(NOW).toISOString() });
+  assert.ok(!JSON.stringify(forAna).includes('cs_secret_to_client'), 'the session id stays on the server');
+  const forBen = (await getApplication(deps(db), { body: { orgId: 'o1', appId: 'a1' }, user: ben })).body.application;
+  assert.equal(forBen.canPay, false);
 });
 
 test('getApplication shows the note of a change request, from the history or the review', async () => {

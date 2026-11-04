@@ -50,6 +50,8 @@ async function listApplicationsForReview({ db }, { body, user }) {
       status: app.status,
       submittedAt: toIso(app.submittedAt),
       updatedAt: toIso(app.updatedAt),
+      buildStartFailed: app.buildStart?.state === 'failed',
+      feeProblem: app.feeProblem?.code || null,
     };
   });
   return { body: { status, applications } };
@@ -89,6 +91,18 @@ function readableReview(review) {
   return { note: review.note || null, by: review.by || null, at: toIso(review.at), settings: review.settings || null };
 }
 
+/** The current acceptance and the payment, for the hosting team. */
+function readablePayment(app) {
+  const accepted = app.agreementAcceptance;
+  const paid = app.payment;
+  return {
+    acceptance: accepted ? { id: accepted.id, version: accepted.version, sha256: accepted.sha256, name: accepted.name, email: accepted.email, at: toIso(accepted.at) } : null,
+    payment: paid ? { sessionId: paid.sessionId, paymentIntentId: paid.paymentIntentId, amount: paid.amount, currency: paid.currency, paidAt: toIso(paid.paidAt) } : null,
+    buildStart: app.buildStart ? { state: app.buildStart.state, at: toIso(app.buildStart.at) } : null,
+    feeProblem: app.feeProblem ? { code: app.feeProblem.code, sessionId: app.feeProblem.sessionId, at: toIso(app.feeProblem.at) } : null,
+  };
+}
+
 async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
   await requireOperator(db, user);
   const app = await readApplication(db, body.appId);
@@ -111,6 +125,7 @@ async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
         revision: Array.isArray(app.history) ? app.history.length : 0,
         history: readableHistory(app.history, team.members),
         review: readableReview(app.review),
+        ...readablePayment(app),
         createdAt: toIso(app.createdAt),
         submittedAt: toIso(app.submittedAt),
         updatedAt: toIso(app.updatedAt),

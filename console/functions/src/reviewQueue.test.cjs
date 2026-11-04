@@ -29,6 +29,8 @@ test('the queue lists submitted requests by default, newest first, with the orga
     status: 'submitted',
     submittedAt: new Date(NOW - DAY).toISOString(),
     updatedAt: new Date(NOW - 2 * DAY).toISOString(),
+    buildStartFailed: false,
+    feeProblem: null,
   });
 });
 

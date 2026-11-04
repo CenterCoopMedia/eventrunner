@@ -6,26 +6,28 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
-const { ENDPOINTS, SCHEDULED, buildHandlers } = require('./handlers.cjs');
+const { ENDPOINTS, SCHEDULED, WEBHOOKS, buildHandlers } = require('./handlers.cjs');
 
 const firebaseJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'firebase.json'), 'utf8'));
+const ALL_FUNCTIONS = [...Object.keys(ENDPOINTS), ...Object.keys(WEBHOOKS), ...Object.keys(SCHEDULED)].sort();
+const HTTP_FUNCTIONS = [...Object.keys(ENDPOINTS), ...Object.keys(WEBHOOKS)];
 
 test('every endpoint is an onRequest function with a Hosting rewrite at /api/<name>', () => {
   const handlers = buildHandlers();
-  assert.deepEqual(Object.keys(handlers).sort(), [...Object.keys(ENDPOINTS), ...Object.keys(SCHEDULED)].sort());
-  for (const name of Object.keys(ENDPOINTS)) {
+  assert.deepEqual(Object.keys(handlers).sort(), ALL_FUNCTIONS);
+  for (const name of HTTP_FUNCTIONS) {
     assert.equal(typeof handlers[name], 'function', name);
     const rewrite = firebaseJson.hosting.rewrites.find((r) => r.source === `/api/${name}`);
     assert.ok(rewrite, `rewrite for ${name}`);
     assert.equal(rewrite.function.functionId, name);
   }
   const apiRewrites = firebaseJson.hosting.rewrites.filter((r) => r.source.startsWith('/api/'));
-  assert.equal(apiRewrites.length, Object.keys(ENDPOINTS).length, 'no rewrite points at a missing function');
+  assert.equal(apiRewrites.length, HTTP_FUNCTIONS.length, 'no rewrite points at a missing function');
 });
 
 test('the deploy barrel exports the same endpoints', () => {
   const barrel = require('../index.js');
-  assert.deepEqual(Object.keys(barrel).sort(), [...Object.keys(ENDPOINTS), ...Object.keys(SCHEDULED)].sort());
+  assert.deepEqual(Object.keys(barrel).sort(), ALL_FUNCTIONS);
 });
 
 test('the retention job is scheduled and has no Hosting rewrite', () => {
@@ -37,7 +39,14 @@ test('the retention job is scheduled and has no Hosting rewrite', () => {
 test('only the functions that send email get the mail secret', () => {
   assert.deepEqual(
     Object.entries(ENDPOINTS).filter(([, spec]) => spec.mail).map(([name]) => name),
-    ['inviteMember', 'submitApplication', 'withdrawApplication', 'requestChanges', 'declineApplication', 'approveApplication'],
+    ['inviteMember', 'submitApplication', 'withdrawApplication', 'acceptAgreement', 'reopenApplication', 'requestChanges', 'declineApplication', 'approveApplication'],
+  );
+});
+
+test('only the functions that reach the payment service get its key', () => {
+  assert.deepEqual(
+    Object.entries(ENDPOINTS).filter(([, spec]) => spec.stripe).map(([name]) => name),
+    ['withdrawApplication', 'reopenApplication', 'startFeeCheckout', 'declineApplication', 'deleteSpamApplication'],
   );
 });
 

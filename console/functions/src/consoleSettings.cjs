@@ -1,12 +1,19 @@
 'use strict';
 
 /**
- * Console settings and the build settings an approval records
- * (ADR 0007 §5).
+ * Console settings, the event fee and the agreement (ADR 0007, amendment
+ * 2026-11-04), and the build settings an approval records (§5).
  *
- * `console_config/settings` = { gcpFolder, billingAccount, region }. These
- * are the defaults for every approval. Operators edit them through
- * saveConsoleSettings; the browser never writes them.
+ * `console_config/settings` = { gcpFolder, billingAccount, region,
+ * feeAmount, feeCurrency }. The first three are the defaults for every
+ * approval. `feeAmount` is a whole number in the currency's smallest unit,
+ * and the server reads it only from here. Operators edit them through
+ * saveConsoleSettings and saveEventFee; the browser never writes them.
+ *
+ * `console_config/agreement` is the current agreement, and
+ * `console_config/agreement/versions/{version}` keeps each version. A save
+ * makes a new version and never rewrites an old one. `sha256` is the hash
+ * of `title`, two line feeds and `body`.
  *
  * An approval records `review.settings` =
  *   { gcpFolder, billingAccount, region, projectId, environment }.
@@ -15,7 +22,9 @@
  * change any value, and every value is checked here.
  */
 
+const { createHash } = require('node:crypto');
 const { ConsoleError } = require('./http.cjs');
+const { toIso } = require('./access.cjs');
 const { requireOperator } = require('./reviewAccess.cjs');
 
 const FOLDER_RE = /^(?:folders\/)?(\d{6,20})$/;
@@ -133,10 +142,77 @@ function checkSettings(fields, defaults, overrides = {}) {
 
 const CONSOLE_FIELDS = Object.freeze(['gcpFolder', 'billingAccount', 'region']);
 const APPROVAL_FIELDS = Object.freeze([...CONSOLE_FIELDS, 'projectId', 'environment']);
+// The most one payment can be, in the currency's smallest unit.
+const FEE_AMOUNT_MAX = 99999999;
+const CURRENCY_RE = /^[a-z]{3}$/;
+const AGREEMENT_TITLE_MAX = 200;
+const AGREEMENT_BODY_MAX = 200000;
+
+const SIGNUPS_CLOSED = 'This site is not taking sign-ups right now. We saved your answers. Try again later.';
+
+function signupsClosed() {
+  return new ConsoleError(409, 'signups-closed', SIGNUPS_CLOSED);
+}
+
+/** @returns {{ amount: number, currency: string }|null} null unless both are usable */
+function cleanFee(amount, currency) {
+  const code = text(currency).toLowerCase();
+  if (!Number.isSafeInteger(amount) || amount < 1 || amount > FEE_AMOUNT_MAX || !CURRENCY_RE.test(code)) return null;
+  return { amount, currency: code };
+}
+
+/** One line-ending form, no outer space, so the hash of a text is stable. */
+function cleanAgreementText(value) {
+  return typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : '';
+}
+
+function agreementHash(title, body) {
+  return createHash('sha256').update(`${title}\n\n${body}`, 'utf8').digest('hex');
+}
+
+/** The stored agreement, or null when any part is missing or the text no longer matches its hash. */
+function checkedAgreement(data) {
+  if (!data || !Number.isSafeInteger(data.version) || data.version < 1) return null;
+  const { version, title, body, sha256 } = data;
+  if (typeof title !== 'string' || !title || typeof body !== 'string' || !body) return null;
+  if (sha256 !== agreementHash(title, body)) return null;
+  return { version, title, body, sha256 };
+}
+
+function agreementRef(db) {
+  return db.collection('console_config').doc('agreement');
+}
+
+/**
+ * What a request needs to pass Review, read with `get` (a transaction's or
+ * the database's). `open` is false when either part is missing, so the
+ * console fails closed.
+ *
+ * @returns {Promise<{ open: boolean, fee: object|null, agreement: object|null }>}
+ */
+async function readSignupTerms(get, db) {
+  const settings = await get(db.collection('console_config').doc('settings'));
+  const current = await get(agreementRef(db));
+  const fee = settings.exists ? cleanFee(settings.data().feeAmount, settings.data().feeCurrency) : null;
+  const agreement = current.exists ? checkedAgreement(current.data()) : null;
+  return { open: Boolean(fee && agreement), fee, agreement };
+}
+
+/** One saved version, checked as above, or null. */
+async function readAgreementVersion(get, db, version) {
+  const snap = await get(agreementRef(db).collection('versions').doc(String(version)));
+  return snap.exists ? checkedAgreement(snap.data()) : null;
+}
 
 async function getConsoleSettings({ db }, { user }) {
   await requireOperator(db, user);
-  return { body: { settings: await readConsoleSettings(db) } };
+  const { fee } = await readSignupTerms((r) => r.get(), db);
+  const current = await agreementRef(db).get();
+  const data = current.exists ? current.data() : null;
+  const agreement = data
+    ? { version: data.version, title: data.title, body: data.body, sha256: data.sha256, savedAt: toIso(data.savedAt) }
+    : null;
+  return { body: { settings: await readConsoleSettings(db), fee, agreement } };
 }
 
 async function saveConsoleSettings({ db, now = Date.now }, { body, user }) {
@@ -145,15 +221,79 @@ async function saveConsoleSettings({ db, now = Date.now }, { body, user }) {
   const settings = checkSettings(CONSOLE_FIELDS, {}, input);
   const auditRef = db.collection('console_audit').doc();
   await db.runTransaction(async (tx) => {
-    tx.set(db.collection('console_config').doc('settings'), settings);
+    // Merged, so the event fee on the same document stays.
+    tx.set(db.collection('console_config').doc('settings'), settings, { merge: true });
     tx.create(auditRef, { action: 'save-settings', appId: null, by: user.uid, at: new Date(now()) });
   });
   return { body: { settings } };
 }
 
+function fieldError(field, message) {
+  const err = new ConsoleError(400, 'invalid-setting', message);
+  err.field = field;
+  return err;
+}
+
+async function saveEventFee({ db, now = Date.now }, { body, user }) {
+  await requireOperator(db, user);
+  const input = body.fee && typeof body.fee === 'object' ? body.fee : {};
+  if (!Number.isSafeInteger(input.amount) || input.amount < 1 || input.amount > FEE_AMOUNT_MAX) {
+    throw fieldError('feeAmount', 'Enter the amount as a whole number in the smallest unit of the currency.');
+  }
+  const fee = cleanFee(input.amount, input.currency);
+  if (!fee) throw fieldError('feeCurrency', 'Enter a three-letter currency code.');
+  const auditRef = db.collection('console_audit').doc();
+  await db.runTransaction(async (tx) => {
+    tx.set(db.collection('console_config').doc('settings'), { feeAmount: fee.amount, feeCurrency: fee.currency }, { merge: true });
+    tx.create(auditRef, { action: 'save-fee', appId: null, by: user.uid, at: new Date(now()) });
+  });
+  return { body: { fee } };
+}
+
+/**
+ * Save the agreement as a new version. The same text saves nothing, so a
+ * second select does not make a version that clients must accept again.
+ */
+async function saveAgreement({ db, now = Date.now }, { body, user }) {
+  await requireOperator(db, user);
+  const input = body.agreement && typeof body.agreement === 'object' ? body.agreement : {};
+  const title = cleanAgreementText(input.title);
+  const content = cleanAgreementText(input.body);
+  if (!title || title.length > AGREEMENT_TITLE_MAX) {
+    throw fieldError('agreementTitle', `Enter a title of up to ${AGREEMENT_TITLE_MAX} characters.`);
+  }
+  if (!content || content.length > AGREEMENT_BODY_MAX) {
+    throw fieldError('agreementBody', `Enter the agreement text, up to ${AGREEMENT_BODY_MAX.toLocaleString('en-US')} characters.`);
+  }
+  const sha256 = agreementHash(title, content);
+  const at = new Date(now());
+  const ref = agreementRef(db);
+  const auditRef = db.collection('console_audit').doc();
+  const saved = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.exists ? snap.data() : null;
+    if (current?.sha256 === sha256) return { ...current, created: false };
+    const version = (Number.isSafeInteger(current?.version) ? current.version : 0) + 1;
+    const record = { version, title, body: content, sha256, savedAt: at, savedBy: user.uid };
+    // A create: when the version exists, the save fails and the old text stays.
+    tx.create(ref.collection('versions').doc(String(version)), record);
+    tx.set(ref, record);
+    tx.create(auditRef, { action: 'save-agreement', appId: null, by: user.uid, at, version });
+    return { ...record, created: true };
+  });
+  return {
+    body: {
+      created: saved.created,
+      agreement: { version: saved.version, title: saved.title, body: saved.body, sha256: saved.sha256, savedAt: toIso(saved.savedAt) },
+    },
+  };
+}
+
 module.exports = {
   APPROVAL_FIELDS,
   CONSOLE_FIELDS,
+  SIGNUPS_CLOSED,
+  agreementHash,
   approvalDefaults,
   checkSettings,
   environmentFor,
@@ -162,6 +302,11 @@ module.exports = {
   normalizeFolder,
   normalizeProjectId,
   projectIdFor,
+  readAgreementVersion,
   readConsoleSettings,
+  readSignupTerms,
+  saveAgreement,
   saveConsoleSettings,
+  saveEventFee,
+  signupsClosed,
 };
