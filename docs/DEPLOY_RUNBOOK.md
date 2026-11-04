@@ -1131,6 +1131,7 @@ Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitH
 | `VITE_CONSOLE_SIGN_IN_PROVIDERS` | Comma-separated: `google`, `microsoft`. Leave it empty to offer only the emailed link. List a method only after step 2 of §11.1 sets it up, or its button fails for the client. |
 | `CONSOLE_PUBLIC_URL`, `CONSOLE_MAIL_FROM` | Written to `console/functions/.env` at deploy |
 | `CONSOLE_STRIPE_CLIENT_ID`, `CONSOLE_EVENTBRITE_CLIENT_ID` | Also written to `.env`. Unset means the choice is not available yet. |
+| `CONSOLE_GITHUB_APP_ID`, `CONSOLE_GITHUB_INSTALLATION_ID`, `CONSOLE_GITHUB_REPOSITORY` | Also written to `.env`. Unset means a build does not start, and operators are told. |
 
 Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_STRIPE_FEE_WEBHOOK_SECRET`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`. A function that names a secret will not deploy without it, so until a provider is ready store a long random value, never a guessable word: the fee webhook checks signatures with that value. The functions' runtime account needs read access to each one.
 
@@ -1234,7 +1235,7 @@ Use placeholders from your own records. Nothing below belongs in the repository.
 
    GitHub's permission list puts creating an Environment and its branch rule under Administration, variables under Environments, and reading the Environment under Actions. The provisioner writes no GitHub secrets, because `deploy-client.yml` reads none: a client's secrets live in its own Secret Manager. Administration is broad. The key exists only in the `provisioning` Environment, and each token the script asks for is cut down to these three on this one repository.
 
-5. **The console's settings.** Put these in `console/functions/.env`, and store the key. The secret must exist before any deploy. Until the App exists, store a placeholder: the console then refuses to start a build, and says so to operators.
+5. **The console's settings.** Set these as variables in the `console` Environment, which `deploy-console.yml` writes to `console/functions/.env`, and store the key. The secret must exist before any deploy. Until the App exists, store a placeholder: the console then refuses to start a build, and says so to operators.
 
    ```sh
    CONSOLE_GITHUB_APP_ID=<console app id>

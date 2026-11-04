@@ -71,6 +71,8 @@ function connectionsForClient(connections, { available = {}, status, role } = {}
     return {
       available: available[provider] === true,
       connected: Boolean(connection),
+      // A change that did not finish: the account may still be connected, so an Owner can end it.
+      unfinished: !connection && Boolean(connections?.[provider]?.change),
       displayName: connection?.displayName || null,
       connectedAt: toIso(connection?.connectedAt),
     };

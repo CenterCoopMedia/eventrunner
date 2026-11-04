@@ -212,6 +212,12 @@ export default function ConnectionPanel({
         </>
       ) : (
         <>
+          {account.unfinished && connections.canDisconnect ? (
+            <>
+              <p>An earlier change to this account did not finish, so we may still have access to it. Disconnect to end that access.</p>
+              <div className="step-actions"><Disconnect name={copy.name} onDisconnect={disconnect} /></div>
+            </>
+          ) : null}
           {account.available ? (
             <>
               <p>{copy.explain} {CAN_DISCONNECT}</p>

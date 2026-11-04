@@ -136,7 +136,7 @@ async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
       connection: connectionForReview(app.frozen?.tickets?.choice, app.connections),
       approvalDefaults: approvalDefaults(settings, name),
       build: readableBuild(build),
-      canRetryBuild: canRetryBuild(app, build),
+      canRetryBuild: canRetryBuild(app, build, now()),
     },
   };
 }

@@ -12,12 +12,14 @@ const { acceptAgreement } = require('./agreementAcceptance.cjs');
 const { submitApplication } = require('./applicationStatus.cjs');
 const { approveApplication } = require('./reviewDecisions.cjs');
 const { getApplicationForReview } = require('./reviewQueue.cjs');
+const { connectionsForClient, liveConnection } = require('./connectionState.cjs');
 const { connectionsAvailable } = require('./connectors.cjs');
 const { makeFakeAuth, makeFakeConnector, makeFakeSecrets, makeReq, makeRes } = require('./fakes.cjs');
 const { postEndpoint } = require('./http.cjs');
 const { NOW, ana, applicationDoc, ben, cy, fakeMailer, ops, quietLog, seededDb, signupTerms, stripeConnection, validAnswers } = require('./testData.cjs');
 
 const TOKEN = 'sk_test_THEsecretTOKEN';
+const AFTER_LEASE = 6 * 60 * 1000;
 const EB_TOKEN = 'THEeventbriteTOKEN';
 const BASE = { orgId: 'o1', appId: 'a1' };
 const PUBLIC_URL = 'https://console.example';
@@ -264,18 +266,26 @@ test('a request that moved on during the exchange stores nothing and ends the ne
   assert.equal(stored(db).stripe, undefined);
 });
 
-test('a failed token write puts the old state back and ends the new connection', async () => {
+test('a failed token write ends the connection, and connecting again ends the old account', async () => {
   const { db, secrets, stripe, deps } = setup({ application: { connections: { stripe: stripeConnection() } } });
   const state = await start(deps);
   secrets.failWrite = true;
   await assert.rejects(complete(deps, { state }), (err) => {
     assert.equal(err.status, 502);
-    assert.equal(err.message, 'We could not connect your Stripe account. Try again.');
+    assert.equal(err.message, 'We could not connect your Stripe account. Try again in a few minutes.');
     return true;
   });
-  assert.equal(stored(db).stripe.displayName, 'NC Local');
+  assert.equal(liveConnection(stored(db), 'stripe'), null);
   assert.equal(privateRow(db).stripe.accountId, 'acct_client1');
   assert.deepEqual(stripe.revoked, ['acct_new']);
+  secrets.failWrite = false;
+  // A write that was only slow must not land on the next connection's token.
+  await assert.rejects(complete(deps, { state: await start(deps) }), { status: 409, code: 'connection-busy' });
+  deps.now = () => NOW + AFTER_LEASE;
+  await complete(deps, { state: await start(deps) });
+  assert.equal(stored(db).stripe.connected, true);
+  // The refused try ended its own new connection, and the last one ended the old account.
+  assert.deepEqual(stripe.revoked, ['acct_new', 'acct_new', 'acct_client1']);
 });
 
 test('connecting a different account ends the old one, and the same account does not', async () => {
@@ -341,14 +351,32 @@ test('a failed revoke does not stop a disconnect, and is logged without the toke
   assert.ok(!JSON.stringify(log.errors).includes(TOKEN));
 });
 
-test('a token that cannot be deleted keeps the connection, and says so', async () => {
+test('a failed token delete ends the connection and says so, and trying again ends the account', async () => {
   const { db, secrets, stripe, deps } = setup({ application: { connections: { stripe: stripeConnection() } } });
   secrets.store.set('connection-stripe-a1', TOKEN);
   secrets.failDelete = true;
   await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 502, code: 'disconnect-failed' });
-  assert.equal(stored(db).stripe.connected, true);
+  assert.equal(liveConnection(stored(db), 'stripe'), null);
   assert.equal(privateRow(db).stripe.accountId, 'acct_client1');
   assert.deepEqual(stripe.revoked, []);
+  secrets.failDelete = false;
+  deps.now = () => NOW + AFTER_LEASE;
+  await disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana });
+  assert.equal(secrets.store.has('connection-stripe-a1'), false);
+  assert.deepEqual(stripe.revoked, ['acct_client1']);
+});
+
+test('a failed delete on a closed request still offers the Owner a way to end the account', async () => {
+  const connections = { stripe: stripeConnection() };
+  const { db, secrets, deps } = setup({ application: { status: 'withdrawn', connections } });
+  secrets.store.set('connection-stripe-a1', TOKEN);
+  secrets.failDelete = true;
+  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 502 });
+  const client = connectionsForClient(stored(db), { status: 'withdrawn', role: 'owner' });
+  assert.equal(client.canDisconnect, true);
+  assert.equal(client.stripe.connected, false);
+  assert.equal(client.stripe.unfinished, true);
+  assert.equal(client.eventbrite.unfinished, false);
 });
 
 test('a sent request can change only the account it chose', async () => {
@@ -636,7 +664,7 @@ test('a request cannot go ahead while its token is being stored, and a failed st
   };
   await assert.rejects(complete(deps, { state }), { code: 'connection-failed' });
   assert.equal(db.read('applications/a1').status, 'draft');
-  assert.equal(stored(db).stripe, undefined);
+  assert.equal(liveConnection(stored(db), 'stripe'), null);
 });
 
 test('a connection finishing during a disconnect is refused, so no token is deleted from under it', async () => {

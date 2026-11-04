@@ -114,6 +114,14 @@ describe('ApplicationStatus', () => {
       expect(callsTo('disconnectAccount')).toEqual([{ orgId: 'o1', appId: 'a1', provider: 'stripe' }]);
     });
 
+    it('a closed request with an unfinished change still offers Disconnect', async () => {
+      const unfinished = { available: true, connected: false, unfinished: true, displayName: null, connectedAt: null };
+      serveStatus({ status: 'withdrawn', canEdit: false, canWithdraw: false, connections: connections({ canChange: false, stripe: unfinished }) });
+      page();
+      expect(await screen.findByText(/An earlier change to this account did not finish/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
+    });
+
     it('an Editor sees the account and cannot change it', async () => {
       serveStatus({ status: 'submitted', canEdit: false, myRole: 'editor', connections: connections({ canChange: false, canDisconnect: false }) });
       page();

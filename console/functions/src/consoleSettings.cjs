@@ -78,9 +78,10 @@ function normalizeEnvironment(value) {
 }
 
 /**
- * The default project id for a web-address name: `er-<name>`, cut to 30
- * characters with no trailing hyphen, and made long enough. The result
- * always passes the project-id rules.
+ * The default project id for a web-address name: `er-<name>`. siteNames.cjs
+ * limits a name so this fits whole, so two names never share a project. Other
+ * text is cut and made long enough, and the result always passes the
+ * project-id rules.
  */
 function projectIdFor(name) {
   const safe = String(name || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');

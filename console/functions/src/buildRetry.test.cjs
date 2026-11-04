@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { retryBuild } = require('./buildRetry.cjs');
+const { canRetryBuild, retryBuild } = require('./buildRetry.cjs');
 const { getApplicationForReview } = require('./reviewQueue.cjs');
 const { NOW, ana, application, deps, ops, seeded } = require('./fakeReview.cjs');
 
@@ -33,6 +33,16 @@ function setup({ app = {}, record = null, startBuild } = {}) {
     deps: { ...deps(db), startBuild: startBuild || (async (args) => { started.push(args); }) },
   };
 }
+
+test('a run that never reported can be retried after an hour, and not before', () => {
+  const at = Date.parse('2026-11-04T12:00:00Z');
+  const started = (ago) => ({ status: 'approved', buildStart: { state: 'started', at: new Date(at - ago) } });
+  const hour = 60 * 60 * 1000;
+  assert.equal(canRetryBuild(started(hour - 1), null, at), false);
+  assert.equal(canRetryBuild(started(hour + 1), null, at), true);
+  assert.equal(canRetryBuild(started(hour + 1), { state: 'queued' }, at), true);
+  assert.equal(canRetryBuild(started(hour + 1), { state: 'running' }, at), false);
+});
 
 test('an operator can retry a build that did not start', async () => {
   const { db, deps: d, started } = setup();

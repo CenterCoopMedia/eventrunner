@@ -24,7 +24,7 @@
  * calls to a client's Stripe or Eventbrite account give the status only.
  */
 
-const { randomBytes } = require('node:crypto');
+const { createHash, randomBytes } = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -117,6 +117,11 @@ const DEPLOY_ROLES = Object.freeze([
   'roles/serviceusage.serviceUsageConsumer',
   'roles/storage.admin',
 ]);
+
+// Who a project or an Environment was made for, so a build never takes over another's.
+const OWNER_LABEL = 'eventrunner-request';
+const OWNER_VARIABLE = 'EVENTRUNNER_REQUEST_ID';
+const ownerLabel = (appId) => createHash('sha256').update(appId, 'utf8').digest('hex').slice(0, 32);
 
 const POOL = 'github-actions';
 const PROVIDER = 'github';
@@ -316,13 +321,14 @@ async function stepProject(ctx) {
   if (!project) {
     const op = await google(ctx, 'create the project', `${CRM}/projects`, {
       method: 'POST',
-      json: { projectId, parent: settings.gcpFolder, displayName: projectId },
+      json: { projectId, parent: settings.gcpFolder, displayName: projectId, labels: { [OWNER_LABEL]: ownerLabel(ctx.appId) } },
     });
     await finish(ctx, 'create the project', CRM, op);
     project = await google(ctx, 'read the project', projectResource(ctx));
     notes.push('created the project');
   }
   if (project.parent !== settings.gcpFolder) throw new Error(`project ${projectId} exists outside the client folder`);
+  if (project.labels?.[OWNER_LABEL] !== ownerLabel(ctx.appId)) throw new Error(`project ${projectId} was not made for this request`);
   if (project.state && project.state !== 'ACTIVE') throw new Error(`project ${projectId} is ${project.state}`);
   ctx.projectNumber = project.name.split('/')[1];
 
@@ -797,6 +803,7 @@ async function stepTickets(ctx) {
 function deployVariables(ctx) {
   const { domain, name, projectId, region, site, bucket, web } = ctx;
   return {
+    [OWNER_VARIABLE]: ctx.appId,
     WIF_PROVIDER: ctx.wifProvider,
     WIF_SERVICE_ACCOUNT: ctx.deployEmail,
     EVENT_SLUG: name,
@@ -840,6 +847,20 @@ async function stepEnvironment(ctx) {
   const notes = [];
 
   const existing = await call(ctx, 'read the Environment', base, { headers, allow: [404] });
+  const stored = new Map();
+  for (let page = 1; existing; page += 1) {
+    const listed = await call(ctx, 'read the variables', `${base}/variables?per_page=30&page=${page}`, { headers });
+    for (const variable of listed.variables || []) stored.set(variable.name, variable.value);
+    if ((listed.variables || []).length < 30) break;
+  }
+  // Nothing else proves whose an unowned Environment is. The claim is written
+  // before creating one, so a run lost at any point can be retried.
+  const ours = stored.get(OWNER_VARIABLE) === ctx.appId
+    || (existing && stored.size === 0 && (await ctx.recordRef.get()).data()?.environmentClaim === environment);
+  if (existing && !ours) {
+    throw new Error(`the Environment ${environment} was not made for this request`);
+  }
+  if (!existing) await ctx.recordRef.set({ environmentClaim: environment }, { merge: true });
   if (existing?.deployment_branch_policy?.custom_branch_policies !== true) {
     await call(ctx, 'create the Environment', base, {
       method: 'PUT',
@@ -848,18 +869,17 @@ async function stepEnvironment(ctx) {
     });
     notes.push('created the Environment');
   }
+  // First, and create only: when two requests race for one name, the second is refused here.
+  if (!stored.has(OWNER_VARIABLE)) {
+    await call(ctx, `create ${OWNER_VARIABLE}`, `${base}/variables`, { method: 'POST', headers, json: { name: OWNER_VARIABLE, value: ctx.appId } });
+    stored.set(OWNER_VARIABLE, ctx.appId);
+  }
   const policies = await call(ctx, 'read the branch rule', `${base}/deployment-branch-policies`, { headers });
   if (!(policies.branch_policies || []).some((policy) => policy.name === 'main' && policy.type !== 'tag')) {
     await call(ctx, 'write the branch rule', `${base}/deployment-branch-policies`, { method: 'POST', headers, json: { name: 'main', type: 'branch' } });
     notes.push('added the main-only rule');
   }
 
-  const stored = new Map();
-  for (let page = 1; ; page += 1) {
-    const listed = await call(ctx, 'read the variables', `${base}/variables?per_page=30&page=${page}`, { headers });
-    for (const variable of listed.variables || []) stored.set(variable.name, variable.value);
-    if ((listed.variables || []).length < 30) break;
-  }
   ctx.vars = deployVariables(ctx);
   let written = 0;
   for (const [name, value] of Object.entries(ctx.vars)) {
@@ -1149,6 +1169,7 @@ async function provision({ appId, testMode = false, deps }) {
     error: null,
     steps: [],
     ownersEmailedAt: ctx.ownersEmailedAt,
+    environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
   });
   await ref.update({ buildStart: { state: 'started', at } });
 

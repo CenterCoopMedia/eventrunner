@@ -190,20 +190,27 @@ async function finishChange({ db }, { orgId, appId, provider, changeId, connecti
   });
 }
 
-/** Put one provider's state back after a failed Secret Manager call. */
-async function restoreState({ db, log = console }, { orgId, appId, provider, previous, changeId }) {
+/**
+ * After a failed Secret Manager call, nothing can show that the token and the
+ * state agree: the call may yet finish, so even a read cannot settle it. The
+ * connection stops being live, and its mark stays for a full lease, so a late
+ * call cannot undo the next change. The private row goes back to the account
+ * that may still be connected, so that next change ends it.
+ */
+async function endAfterFailure({ db, now = Date.now, log = console }, { orgId, appId, provider, previous, changeId }) {
   try {
     await db.runTransaction(async (tx) => {
       const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
       if (!holdsChange(data, provider, changeId)) return;
       const accounts = accountsOf(await tx.get(accountsRef(db, appId)));
-      const rest = withoutProvider(data.connections, provider);
       const restAccounts = withoutProvider(accounts, provider);
-      tx.update(ref, { connections: previous.connection ? { ...rest, [provider]: previous.connection } : rest });
+      const change = { id: changeId, until: new Date(now() + CHANGE_MS) };
+      tx.update(ref, { connections: { ...data.connections, [provider]: { connected: false, change } } });
       tx.set(accountsRef(db, appId), previous.account ? { ...restAccounts, [provider]: previous.account } : restAccounts);
     });
   } catch (err) {
-    log.error('console could not restore a connection state', provider, err.message);
+    // The change mark is left, which is not live and runs out.
+    log.error('console could not end a connection after a failure', provider, err.message);
   }
 }
 
@@ -302,9 +309,9 @@ async function completeConnection(deps, { body, user }) {
   try {
     await secrets.writeSecret(connectionSecretId(appId, provider), answer.token);
   } catch (err) {
-    await restoreState(deps, { orgId, appId, provider, previous, changeId });
+    await endAfterFailure(deps, { orgId, appId, provider, previous, changeId });
     await revokeIfUnused(deps, provider, answer.accountId);
-    throw failure(502, 'connection-failed', failedToConnect(provider), err);
+    throw failure(502, 'connection-failed', `We could not connect your ${PROVIDER_NAMES[provider]} account. Try again in a few minutes.`, err);
   }
 
   try {
@@ -346,8 +353,8 @@ async function disconnectAccount(deps, { body, user }) {
   try {
     await secrets.deleteSecret(connectionSecretId(appId, provider));
   } catch (err) {
-    await restoreState(deps, { orgId, appId, provider, previous, changeId });
-    throw failure(502, 'disconnect-failed', `We could not disconnect your ${PROVIDER_NAMES[provider]} account. Try again.`, err);
+    await endAfterFailure(deps, { orgId, appId, provider, previous, changeId });
+    throw failure(502, 'disconnect-failed', `We could not disconnect your ${PROVIDER_NAMES[provider]} account. Try again in a few minutes.`, err);
   }
   // The token is gone. A mark left behind only runs out.
   await finishChange(deps, { orgId, appId, provider, changeId, connection: null })

@@ -122,7 +122,7 @@ export default function ApplicationStatus() {
   const closed = ['withdrawn', 'declined'].includes(app.status);
   const feeLink = setupPath(orgId, appId, stepById('fee'));
   const choice = app.answers.tickets.choice;
-  const accounts = PROVIDERS.filter((provider) => app.connections[provider].connected || (provider === choice && !closed));
+  const accounts = PROVIDERS.filter((provider) => app.connections[provider].connected || app.connections[provider].unfinished || (provider === choice && !closed));
   return (
     <section aria-labelledby="status-title">
       <h1 id="status-title" tabIndex={-1}>{title}</h1>

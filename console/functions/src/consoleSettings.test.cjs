@@ -6,6 +6,7 @@ const {
   approvalDefaults, checkSettings, environmentFor, getConsoleSettings, normalizeBilling, normalizeFolder,
   normalizeProjectId, projectIdFor, readSignupTerms, saveAgreement, saveConsoleSettings, saveEventFee, APPROVAL_FIELDS,
 } = require('./consoleSettings.cjs');
+const { siteNameProblem } = require('./siteNames.cjs');
 const { NOW, ana, ops, seeded } = require('./fakeReview.cjs');
 
 const PROJECT_ID_RULE = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
@@ -20,6 +21,9 @@ test('projectIdFor makes er-<name> and always meets the project-id rules', () =>
     assert.ok(!id.endsWith('-'), id);
   }
   assert.equal(projectIdFor('ab'), 'er-ab-site');
+  const longest = 'a'.repeat(27);
+  assert.equal(siteNameProblem(longest), null);
+  assert.equal(projectIdFor(longest), `er-${longest}`);
 });
 
 test('normalizeProjectId follows the GCP rules', () => {

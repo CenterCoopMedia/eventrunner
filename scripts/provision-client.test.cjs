@@ -129,7 +129,7 @@ function fakeCloud(options = {}) {
     }
     if (url.host === 'cloudresourcemanager.googleapis.com') {
       if (method === 'POST') {
-        state.project = { name: `projects/${NUMBER}`, projectId: body.projectId, parent: body.parent, state: 'ACTIVE' };
+        state.project = { name: `projects/${NUMBER}`, projectId: body.projectId, parent: body.parent, labels: body.labels, state: 'ACTIVE' };
         return done();
       }
       return state.project ? answer(state.project) : answer({ error: { message: 'denied' } }, 403);
@@ -333,6 +333,8 @@ function fakeCloud(options = {}) {
     }
     if (p.endsWith('/variables')) {
       if (method === 'POST') {
+        if (body.name === 'EVENTRUNNER_REQUEST_ID' && state.failOwnerWrite) return answer({ message: 'down' }, 500);
+        if (body.name === 'EVENTRUNNER_REQUEST_ID' && state.ownerTaken) return answer({ message: 'taken' }, 409);
         state.variables[body.name] = body.value;
         return answer({}, 201);
       }
@@ -342,7 +344,10 @@ function fakeCloud(options = {}) {
       state.variables[body.name] = body.value;
       return new Response(null, { status: 204 });
     }
-    if (method === 'PUT') state.environment = { ...body, name: p.split('/').at(-1) };
+    if (method === 'PUT') {
+      state.environment = { ...body, name: p.split('/').at(-1) };
+      if (state.loseCreateAnswer) throw new Error('no answer');
+    }
     return state.environment ? answer(state.environment) : answer({}, 404);
   }
 
@@ -825,6 +830,56 @@ test('a project in another folder stops the build rather than taking it over', a
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
   assert.match(fake.db.read('console_builds/a1').error, /outside the client folder/);
   assert.equal(fake.state.billing, '');
+});
+
+test('a project made for another request stops the build rather than sharing it', async () => {
+  const fake = setup();
+  fake.state.project = { name: `projects/${NUMBER}`, projectId: PROJECT, parent: 'folders/123456789012', labels: { 'eventrunner-request': 'someone-else' }, state: 'ACTIVE' };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.match(fake.db.read('console_builds/a1').error, /was not made for this request/);
+  assert.equal(fake.state.billing, '');
+});
+
+test('an Environment holding another owner\'s variables stops the build and is left alone', async () => {
+  const fake = setup();
+  const theirs = { deployment_branch_policy: { protected_branches: false, custom_branch_policies: false }, name: 'nclocal' };
+  fake.state.environment = theirs;
+  fake.state.variables = { WIF_PROVIDER: 'theirs' };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.match(fake.db.read('console_builds/a1').error, /was not made for this request/);
+  assert.deepEqual(fake.state.variables, { WIF_PROVIDER: 'theirs' });
+  assert.equal(fake.state.environment, theirs);
+});
+
+test('a run that stops after creating an Environment can be retried, whatever it lost', async () => {
+  for (const lost of ['failOwnerWrite', 'loseCreateAnswer']) {
+    const fake = setup();
+    fake.state[lost] = true;
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1, lost);
+    assert.ok(fake.state.environment, lost);
+    assert.deepEqual(fake.state.variables, {}, lost);
+    fake.state[lost] = false;
+    assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0, lost);
+    assert.equal(fake.state.variables.EVENTRUNNER_REQUEST_ID, 'a1', lost);
+  }
+});
+
+test('a request losing the race for an Environment name stops and removes nothing', async () => {
+  const fake = setup();
+  fake.state.ownerTaken = true;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.match(fake.db.read('console_builds/a1').error, /EVENTRUNNER_REQUEST_ID/);
+  assert.ok(fake.state.environment);
+});
+
+test('an existing Environment with no variables has no owner, so it stops the build', async () => {
+  const fake = setup();
+  const theirs = { deployment_branch_policy: { protected_branches: false, custom_branch_policies: false }, name: 'nclocal' };
+  fake.state.environment = theirs;
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 1);
+  assert.match(fake.db.read('console_builds/a1').error, /was not made for this request/);
+  assert.deepEqual(fake.state.variables, {});
+  assert.equal(fake.state.environment, theirs);
 });
 
 test('settings an operator approved win over the console settings', async () => {

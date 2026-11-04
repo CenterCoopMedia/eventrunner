@@ -53,9 +53,12 @@ jobs:
           CONSOLE_MAIL_FROM: ${{ vars.CONSOLE_MAIL_FROM }}
           CONSOLE_STRIPE_CLIENT_ID: ${{ vars.CONSOLE_STRIPE_CLIENT_ID }}
           CONSOLE_EVENTBRITE_CLIENT_ID: ${{ vars.CONSOLE_EVENTBRITE_CLIENT_ID }}
+          CONSOLE_GITHUB_APP_ID: ${{ vars.CONSOLE_GITHUB_APP_ID }}
+          CONSOLE_GITHUB_INSTALLATION_ID: ${{ vars.CONSOLE_GITHUB_INSTALLATION_ID }}
+          CONSOLE_GITHUB_REPOSITORY: ${{ vars.CONSOLE_GITHUB_REPOSITORY }}
         run: |
           : > console/functions/.env
-          for name in CONSOLE_PUBLIC_URL CONSOLE_MAIL_FROM CONSOLE_STRIPE_CLIENT_ID CONSOLE_EVENTBRITE_CLIENT_ID; do
+          for name in CONSOLE_PUBLIC_URL CONSOLE_MAIL_FROM CONSOLE_STRIPE_CLIENT_ID CONSOLE_EVENTBRITE_CLIENT_ID CONSOLE_GITHUB_APP_ID CONSOLE_GITHUB_INSTALLATION_ID CONSOLE_GITHUB_REPOSITORY; do
             value="${!name}"
             if [ -n "$value" ]; then printf '%s="%s"\n' "$name" "$value" >> console/functions/.env; fi
           done

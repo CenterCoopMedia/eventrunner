@@ -14,12 +14,13 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
-const { toIso } = require('./access.cjs');
+const { toIso, toMillis } = require('./access.cjs');
 const { applicationRef, requireAppId, requireOperator, reviewedAnswers, NOT_FOUND } = require('./reviewAccess.cjs');
 const { runStartBuild } = require('./buildDispatch.cjs');
 
 const BUILD_COLLECTION = 'console_builds';
 const RETRY_STATUSES = Object.freeze(['approved', 'building']);
+const SILENT_START_MS = 60 * 60 * 1000;
 
 /** @returns {Promise<object|null>} the stored record */
 async function readBuild(db, appId) {
@@ -27,9 +28,20 @@ async function readBuild(db, appId) {
   return snap.exists ? snap.data() : null;
 }
 
-/** A start that failed, or a run that failed, on a request still waiting for its site. */
-function canRetryBuild(app, build) {
-  return RETRY_STATUSES.includes(app.status) && (app.buildStart?.state === 'failed' || build?.state === 'failed');
+/**
+ * A run writes its record as soon as it is ready. One that dies before that
+ * (checkout, npm ci, sign-in) cannot say so, so a long silence counts as failed.
+ */
+function startWentSilent(app, build, at) {
+  return app.buildStart?.state === 'started'
+    && (!build || build.state === 'queued')
+    && at - toMillis(app.buildStart.at) > SILENT_START_MS;
+}
+
+/** A start or a run that failed, or a run that never reported, on a request still waiting for its site. */
+function canRetryBuild(app, build, at) {
+  return RETRY_STATUSES.includes(app.status)
+    && (app.buildStart?.state === 'failed' || build?.state === 'failed' || startWentSilent(app, build, at));
 }
 
 function readableBuild(build) {
@@ -71,7 +83,7 @@ async function retryBuild(deps, { body, user }) {
     const [snap, buildSnap] = await Promise.all([tx.get(ref), tx.get(buildRef)]);
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const data = snap.data();
-    if (!canRetryBuild(data, buildSnap.exists ? buildSnap.data() : null)) {
+    if (!canRetryBuild(data, buildSnap.exists ? buildSnap.data() : null, now())) {
       throw new ConsoleError(409, 'not-retryable', 'This build has not failed. Reload the page to see it.');
     }
     const at = new Date(now());

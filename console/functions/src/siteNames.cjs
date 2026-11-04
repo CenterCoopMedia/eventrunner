@@ -10,24 +10,25 @@
  * read the collection (console/firestore.rules); checkWebAddress answers
  * for it on the server.
  *
- * A name is 3 to 30 characters of lowercase letters, digits and hyphens.
+ * A name is 3 to 27 characters of lowercase letters, digits and hyphens.
  * It does not start or end with a hyphen, and it is not on RESERVED.
  */
 
 const SITE_DOMAIN = 'eventrunner.org';
 const COLLECTION = 'site_names';
 const NAME_MIN = 3;
-const NAME_MAX = 30;
+// The longest that fits a project id whole: `er-` and 27 is the limit of 30.
+const NAME_MAX = 27;
 const NAME_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 // Names CCM uses or may use, and names that look official on a mail or
 // web address. Kept on the server only, so a new entry needs no web release.
 const RESERVED = Object.freeze(new Set([
   'about', 'abuse', 'account', 'accounts', 'admin', 'administrator', 'api', 'app', 'apps', 'assets',
-  'auth', 'beta', 'billing', 'blog', 'cdn', 'ccm', 'cloud', 'console', 'dashboard', 'demo', 'dev',
-  'docs', 'email', 'eventrunner', 'events', 'files', 'ftp', 'hello', 'help', 'hostmaster', 'imap',
+  'auth', 'beta', 'billing', 'blog', 'cdn', 'ccm', 'cloud', 'console', 'copilot', 'dashboard', 'demo', 'dev',
+  'docs', 'email', 'eventrunner', 'events', 'files', 'ftp', 'github-pages', 'hello', 'help', 'hostmaster', 'imap',
   'info', 'internal', 'legal', 'login', 'mail', 'media', 'mx', 'no-reply', 'noreply', 'ns1', 'ns2',
-  'operator', 'operators', 'pop', 'portal', 'postmaster', 'preview', 'privacy', 'prod', 'production',
+  'operator', 'operators', 'pop', 'portal', 'postmaster', 'preview', 'privacy', 'prod', 'production', 'provisioning',
   'root', 'sandbox', 'security', 'signin', 'signup', 'smtp', 'staging', 'static', 'status', 'support',
   'terms', 'test', 'webmail', 'webmaster', 'www',
 ]));
