@@ -1,0 +1,20 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeCoAuthoredBy": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(jq -r '.tool_input.command // \"\"'); if printf '%s' \"$c\" | grep -Eq '(^|[^[:alnum:]])(git|gh)[[:space:]]' && printf '%s' \"$c\" | grep -Eiq 'co-authored-by:.*(claude|anthropic|openai|codex|chatgpt|gemini|copilot|grok|kimi)|claude-session:|generated (with|by) .*(claude|openai|codex|chatgpt|gemini|copilot|grok|kimi)|noreply@anthropic'; then echo 'Blocked: no AI attribution in commits, comments or PR bodies in this repo.' >&2; exit 2; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
