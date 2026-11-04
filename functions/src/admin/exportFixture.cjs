@@ -131,6 +131,12 @@ function exportSeed() {
     // speakers: createSpeaker (speakers/profile.cjs), the invite and
     // acceptance transactions (speakers/invites.cjs), the self-edit queue
     // (pendingEdits), and convertSessionPitch.
+    // speaker_logistics: what the speaker profile stepper writes (ADR 0008 §3).
+    // Staff-only; the package leaves it out, the logistics export reads it.
+    'speaker_logistics/speaker-ada': {
+      travel: 'Flying in from Denver on the 26th', accessNeeds: '=step-free stage', avNeeds: 'HDMI and a lapel mic',
+      updatedAt: AT, updatedBy: 'uid-ada',
+    },
     'speakers/speaker-ada': {
       firstName: 'Ada', lastName: 'Quill', slug: 'ada-quill', email: 'ada@example.com',
       organization: '@Ledger', jobTitle: 'Editor', bio: 'Covers budgets.',

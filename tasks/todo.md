@@ -1,5 +1,47 @@
 # Session task list
 
+## What's left (updated 2026-11-04, 9 p.m. Eastern)
+
+**1. Merge the open stack, in order.** Each PR is based on the one before.
+CI was green on #589 to #593 at the last check; the newer ones are running.
+
+| PR | Slice | State |
+|---|---|---|
+| #589 | R4a registration form editor | Ready |
+| #590 | R4b private answers, attendee record, export | Ready |
+| #592 | R5a Complete your registration | Ready |
+| #593 | R5b checkout stepper with questions | Ready |
+| #594 | R6a promo codes (server) | Needs your two choices below |
+| #595 | R6b promo codes (web) | CI running |
+| #596 | R7a registrations import | CI running; review fixes pushed |
+| #597 | R7b speaker logistics export | CI running |
+
+**2. Decisions only the owner can make.**
+- [ ] #594: refuse an order that has more discounted tickets than the
+      per-order limit (no part discount). Recommended: yes.
+- [ ] #594: a 100% code makes a free order under the free-ticket limits
+      (a cap per buyer, one free ticket per email). Recommended: yes.
+- [ ] The five ADR 0007 prerequisites: GCP folder and billing, Stripe
+      platform account (Connect), Eventbrite app, a DNS zone with an API,
+      a Postmark account token. These block P6, P8 and P10.
+- [ ] Approve the Stripe sandbox rehearsal (ADR 0004) before live sales.
+
+**3. Build: the client console (ADR 0007), one PR each.** NC Local's site
+waits on all of P4 to P10.
+- [ ] P4 Console foundation — can start now.
+- [ ] P5 Guided setup — can start now (after P4).
+- [ ] P6 Stripe and Eventbrite connections — blocked on prerequisites.
+- [ ] P7 Operator review — can start now (after P5).
+- [ ] P8 Provisioner — blocked on prerequisites.
+- [ ] P9 Custom web address and sender domain — can start now.
+- [ ] P10 Runbook and live proof in a test folder — needs the owner.
+
+**4. Follow-ups (small, no decisions needed).**
+- [ ] Split the 640-line `apps/web/src/pages/Tickets.jsx` into step components.
+- [ ] Browser E2E for the registrations import (unit and page tests exist).
+- [ ] Stripe epic leftovers: hosted browser evidence and the sandbox
+      rehearsal (item 2). Its other three boxes are stale: that code shipped.
+
 ## 2026-11-03: registration, pitch and speaker steppers
 
 Spec: [ADR 0008](../docs/adr/0008-registration-and-pitch-steppers.md),
@@ -57,7 +99,7 @@ path (R2c, R3) comes before registration.
 - [x] R6 Promo codes (ADR 0004 amendment), with concurrency tests. R6a (#594)
       is the server; R6b is the admin panel and the review-step field. Later:
       split the 640-line `Tickets.jsx` into step components.
-- [ ] R7 Registration import in `/admin/import`; speaker logistics export.
+- [x] R7 Registration import in `/admin/import`; speaker logistics export.
   - [x] R7a Registrations import type (ADR 0008 §7). Manual provider only;
         any other provider refuses every row. Columns: external ID (the
         ticket ID), email, first and last name, ticket type, and
@@ -68,9 +110,9 @@ path (R2c, R3) comes before registration.
         seats (an attendee's own record wins). Re-import is the three-way
         merge: an answer or name staff or the attendee changed is kept and
         reported. The email of a claimed ticket never changes by import.
-  - [ ] R7b Speaker logistics export (staff-only `speaker_logistics`):
-        travel, access, audio and video needs. Check the pitch export has
-        the new pitch columns and presenters.
+  - [x] R7b Speaker logistics export (staff-only `speaker_logistics`):
+        travel, access, audio and video needs. The pitch queue export
+        already has the new pitch columns and presenters (pitchCsv.js).
 
 ## 2026-11-03: client onboarding, account creation and provisioning
 

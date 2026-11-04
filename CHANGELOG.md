@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Speaker logistics** spreadsheet in **Data export** (ADR 0008 §7, staff
+  tier): travel, access needs, and audio and video needs from
+  `speaker_logistics`, joined to each speaker's name and email. The event data
+  package still leaves these private answers out, so this is the one export
+  of them; a dataset may now name no package file (`packagePath: null`).
 - **Registrations** in **Import records** (ADR 0008 §7). With the manual
   ticketing provider, each row makes a valid ticket: ticket ID, email, names,
   ticket type, and one `answer:<question id>` column per registration
