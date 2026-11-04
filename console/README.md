@@ -2,7 +2,7 @@
 
 The client console is where a client signs up, names its organization, invites its team and answers the guided setup for each event site. It runs at `console.eventrunner.org` in its own Firebase project, which CCM owns. It is not part of a client deployment, and no client project reads from it. [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md) is the decision record.
 
-This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), and operator review (P7). Account connections and provisioning come in later parts.
+This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), account connections (P6), and operator review (P7). Provisioning comes in a later part.
 
 ## What is here
 
@@ -30,7 +30,9 @@ The console uses plain words. It never says Firebase, project, tenant, environme
 | `organizations/{orgId}` | `name`, `createdAt`, `createdBy` (uid) | `createOrganization` |
 | `organizations/{orgId}/members/{uid}` | `uid`, `email` (lowercase), `role` (`owner` or `editor`), `joinedAt` | `createOrganization`, `acceptInvite`, `changeMemberRole`, `removeMember` |
 | `invites/{inviteId}` | `orgId`, `email` (lowercase), `role`, `tokenHash` (SHA-256 of the token), `status` (`pending`, `accepted` or `replaced`), `invitedBy`, `invitedByEmail`, `createdAt`, `expiresAt`, and after use `acceptedBy` and `acceptedAt` | `inviteMember`, `acceptInvite` |
-| `applications/{appId}` | `orgId`, `status`, `answers`, `frozen` (a copy of `answers` at submit, else null), `createdBy`, `createdAt`, `updatedAt`, `updatedBy`, `submittedAt`, `submittedBy`, `history` (a list of `{ status, at, by, note }`, oldest first), `review` (null, or `{ note, by, at, settings }`) | `createApplication`, `saveApplicationStep`, `submitApplication`, `withdrawApplication`; `requestChanges`, `declineApplication`, `approveApplication`, `deleteSpamApplication`, the retention job. Only review writes `review`. |
+| `applications/{appId}` | `orgId`, `status`, `answers`, `frozen` (a copy of `answers` at submit, else null), `createdBy`, `createdAt`, `updatedAt`, `updatedBy`, `submittedAt`, `submittedBy`, `history` (a list of `{ status, at, by, note }`, oldest first), `review` (null, or `{ note, by, at, settings }`), `connections` (see "Account connections") | `createApplication`, `saveApplicationStep`, `submitApplication`, `withdrawApplication`; `requestChanges`, `declineApplication`, `approveApplication`, `deleteSpamApplication`, the retention job. Only review writes `review`. Only `completeConnection`, `disconnectAccount` and `chooseEventbriteEvent` write `connections`. |
+| `console_connections/{appId}` | `stripe` (`accountId`, `connectedBy`), `eventbrite` (`accountId`, `connectedBy`, `eventOrganizationId`). No browser can read it, operators included. | `completeConnection`, `disconnectAccount`, `chooseEventbriteEvent`; deleted with the application by spam delete and the retention job |
+| `console_connection_states/{hash}` | `uid`, `orgId`, `appId`, `provider`, `createdAt`, `expiresAt` for a connection in progress. The id is the SHA-256 of the `state` value. No browser can read it. | `startConnection`, `completeConnection`; the retention job sweeps expired ones |
 | `site_names/{name}` | `appId`, `orgId`, `reservedAt` | `saveApplicationStep` (web-address step), `withdrawApplication`; review frees a name on decline, spam delete and retention |
 | `console_config/operators` | `emails` (lowercase) | A CCM operator, by hand in the Firebase console |
 | `console_config/settings` | `gcpFolder`, `billingAccount`, `region` | `saveConsoleSettings`. The guided setup does not read it. |
@@ -97,13 +99,18 @@ The answers are checked with the same rules as `scripts/init-event.cjs` (ADR 000
 A status email that fails is logged and does not undo the change. The status page shows the true state.
 
 | `listApplicationsForReview` | Operators | Lists requests with one status (default `submitted`), newest change first, with the organization name. |
-| `getApplicationForReview` | Operators | One request: its `revision`, the frozen answers, the history, the team and its open invites, the ticket choice, the connection state (`Not connected yet` until P6) and the approval defaults. |
+| `getApplicationForReview` | Operators | One request: its `revision`, the frozen answers, the history, the team and its open invites, the ticket choice, the connection state and the approval defaults. |
 | `requestChanges` | Operators | `submitted` to `changes_requested`. Needs a note of at most 2,000 characters. Emails the Owners. |
 | `declineApplication` | Operators | `submitted` or `changes_requested` to `declined`. Needs a note. Frees the web-address name. Emails the Owners. |
-| `approveApplication` | Operators | `submitted` to `approved`. Records `review.settings`. Emails the Owners: "We are building your site". |
+| `approveApplication` | Operators | `submitted` to `approved`. Refuses with `409 connection-needed` when the chosen account is not connected. Records `review.settings`. Emails the Owners: "We are building your site". |
 | `deleteSpamApplication` | Operators | Deletes a request that is not approved, frees its name, and writes an audit record. Needs `confirm: true`. |
 | `getConsoleSettings` | Operators | Reads `console_config/settings`. |
 | `saveConsoleSettings` | Operators | Checks and saves the settings, and writes an audit record. |
+| `startConnection` | Owners | Returns the provider's page to send the browser to. Thirty a day for one account. |
+| `completeConnection` | The person who started it | Takes `state` and `code` from the return page, and finishes the connection. |
+| `disconnectAccount` | Owners | Deletes the stored token and ends the connection at the provider, unless another request uses the account. Returns `revoked` and `shared`. |
+| `listEventbriteEvents` | Owners | The client's upcoming Eventbrite events, for the picker. |
+| `chooseEventbriteEvent` | Owners | Saves one event from that list. It checks the id against the list, so nothing typed can get in. |
 
 The review functions read the operator allowlist on each call. A caller who is not on it gets `403 not-operator`, and the web page says "This page is for the hosting team".
 
@@ -135,7 +142,33 @@ Approval does not start the build. P8 starts it from `approved` and `review.sett
 
 **Spam.** **Delete as spam** deletes a request that is not yet approved and frees its name. A request that is approved or later cannot be deleted this way, because a site can exist for it.
 
-**Retention.** The scheduled function `runApplicationRetention` runs each day at 04:17 Eastern time. It deletes `withdrawn` and `declined` requests 90 days after `updatedAt`, and frees their names. It checks each request again inside its own transaction, so a request that changed after the query stays. A second run is safe. Each delete writes an audit record. The account-connection tokens of P6 are not in Firestore; their clean-up comes with P6.
+**Retention.** The scheduled function `runApplicationRetention` runs each day at 04:17 Eastern time. It deletes `withdrawn` and `declined` requests 90 days after `updatedAt`, and frees their names. It checks each request again inside its own transaction, so a request that changed after the query stays. A second run is safe. Each delete writes an audit record. It deletes the request's stored account tokens first, and when one cannot be deleted the request stays for the next run. After the request is gone it ends each connection at the provider, unless another request uses the account. The same run sweeps expired `console_connection_states`.
+
+## Account connections
+
+ADR 0007 §4 is the decision. In the tickets step, and on the status page until the site is built, an Owner connects the client's own Stripe or Eventbrite account with a button, and picks an Eventbrite event from a list. `functions/src/connections.cjs` holds the flow, `connectors.cjs` the provider calls, and `secretStore.cjs` the Secret Manager calls. All three are injected, and the tests use fakes.
+
+1. `startConnection` stores the SHA-256 of a random `state`, tied to the person, the request and the provider, for 60 minutes. It returns the provider's page, and the browser goes there.
+2. The provider sends the browser to `/connect/<provider>/return`. That page removes the code from the address and posts it to `completeConnection`.
+3. `completeConnection` uses up the `state` in a transaction, so it works once and only for the person who started it. It trades the code for a token, records the connection, and writes the token to the console's Secret Manager as `connection-<provider>-<appId>`.
+
+The redirect address comes from `CONSOLE_PUBLIC_URL`, never from the request. The web app goes only to the provider's own https page, and comes back only to a request page inside the console.
+
+**Where each thing is kept.**
+
+| Where | What | Who can read it |
+|---|---|---|
+| `applications/{appId}.connections` | `stripe`: `connected`, `displayName`, `livemode`, `connectedAt`. `eventbrite`: `connected`, `displayName`, `connectedAt`, `event` (`id`, `name`, `start`). | Every member of the organization and every operator, directly |
+| `console_connections/{appId}` | The account id, who connected it, and the event's Eventbrite organization | The functions |
+| Secret Manager | The token | The functions |
+
+**Sharing an account.** One account can serve several requests, in one organization or several. Ending a connection at the provider ends it for all of them, live sites included. So the only code that ends one is `revokeIfUnused`. It looks in `console_connections` for any request that names the account, and keeps the connection when it finds one, or when it cannot tell. A request's own token is always deleted. A row stays when the site builder moves a token to a client project, so it speaks for that site even if the application is later removed. A connection finishing in the moment between that check and the revoke can still be ended.
+
+**When a connection can change.** While the request is `draft`, `changes_requested` or `submitted`, an Owner can connect, reconnect and disconnect. From `approved` on it cannot change, because the build uses it. A `withdrawn` or `declined` request can only disconnect.
+
+**For the site builder (P8).** `readStoredConnection(deps, appId, provider)` returns the token and the account details a client site needs. `deleteStoredConnection(deps, appId, provider)` deletes the console's copy after the move, keeps the row in `console_connections`, and does not end the connection. Both are documented in `connections.cjs`. Only the provider the client chose moves, so P8 also deletes any token left for the other one.
+
+The console does not hear about a client who removes the app from their provider account, so it shows that account as connected until the client reconnects. P8 should test each token before it moves it.
 
 ## Settings
 
@@ -143,7 +176,11 @@ Approval does not start the build. P8 starts it from `approved` and `review.sett
 |---|---|---|
 | `CONSOLE_POSTMARK_TOKEN` | Secret Manager in the console project | The Postmark server token for invite and status email |
 | `CONSOLE_MAIL_FROM` | `functions/.env` | The sender, for example `Event Runner <hello@console.eventrunner.org>` |
-| `CONSOLE_PUBLIC_URL` | `functions/.env` | `https://console.eventrunner.org`, for invite links and the links in status email |
+| `CONSOLE_PUBLIC_URL` | `functions/.env` | `https://console.eventrunner.org`, for invite links, the links in status email and the addresses providers return to |
+| `CONSOLE_STRIPE_SECRET_KEY` | Secret Manager in the console project | The Stripe platform account's secret key |
+| `CONSOLE_STRIPE_CLIENT_ID` | `functions/.env` | The platform's Connect client id. Unset, the choice says it is not available yet. |
+| `CONSOLE_EVENTBRITE_CLIENT_SECRET` | Secret Manager in the console project | The Eventbrite app's client secret |
+| `CONSOLE_EVENTBRITE_CLIENT_ID` | `functions/.env` | The Eventbrite app's API key. Unset, the choice says it is not available yet. |
 | `CONSOLE_ALLOWED_ORIGINS` | `functions/.env` | Extra origins for a local dev server, comma-separated |
 | `VITE_CONSOLE_FIREBASE_*` | Build environment | The console project's public web settings: `API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `APP_ID` |
 | `VITE_CONSOLE_API_BASE` | Build environment | Only for local development against the functions emulator |
@@ -154,9 +191,10 @@ Approval does not start the build. P8 starts it from `approved` and `review.sett
 |---|---|
 | `/organizations/:orgId` | The organization: its event sites and **Set up a new event site** |
 | `/organizations/:orgId/applications/:appId/<step>` | One step of the setup. The steps are `organization`, `event`, `web-address`, `team`, `tickets`, `email` and `review`. |
-| `/organizations/:orgId/applications/:appId` | The status page: the plain stages, the note from the hosting team, and **Withdraw the request** |
+| `/organizations/:orgId/applications/:appId` | The status page: the plain stages, the note from the hosting team, the connected account, and **Withdraw the request** |
+| `/connect/:provider/return` | Where a provider sends the browser back. It finishes the connection and returns to the page the client left. |
 
-Each step saves as the client types, after a short pause. Next, Back and the step list send a waiting save first. When a save fails, the step stays open and says the answers are not saved; the next try sends them again, and **Create my site** waits until they are saved. When the server refuses a web-address name, it keeps the old name, so the review holds the request and links to the step until a new name saves. Errors show by field once the client touches the field. Add `?check=1` to a step address to show all of its errors and put the focus on the first one; the review links use it. The tickets step records the choice only. For Stripe and Eventbrite it says "You connect this account after we approve your request." The connect buttons come in P6.
+Each step saves as the client types, after a short pause. Next, Back and the step list send a waiting save first. When a save fails, the step stays open and says the answers are not saved; the next try sends them again, and **Create my site** waits until they are saved. When the server refuses a web-address name, it keeps the old name, so the review holds the request and links to the step until a new name saves. Errors show by field once the client touches the field. Add `?check=1` to a step address to show all of its errors and put the focus on the first one; the review links use it. The tickets step saves the choice, then for Stripe and Eventbrite shows **Connect with Stripe** or **Connect with Eventbrite**. It saves waiting answers before the browser leaves for the provider. The answers check needs a live connection, and for Eventbrite a chosen event, before the request can move on.
 
 ## Tests
 

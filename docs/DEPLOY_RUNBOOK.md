@@ -1105,6 +1105,17 @@ The client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)
    ```
 
 7. In the Firestore data viewer, make the document `console_config/operators` with an array field `emails`. Add each CCM operator's address in lowercase.
+8. Set up account connections (ADR 0007 §4). The two secrets must exist before any deploy, because a function that names a secret will not deploy without it. Until a provider is ready, store a placeholder and leave its client id out of `.env`: the tickets step then says the choice is not available yet.
+
+   ```sh
+   cd console
+   npx firebase functions:secrets:set CONSOLE_STRIPE_SECRET_KEY --project <console-project-id>
+   npx firebase functions:secrets:set CONSOLE_EVENTBRITE_CLIENT_SECRET --project <console-project-id>
+   ```
+
+   - **Stripe**: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI `https://console.eventrunner.org/connect/stripe/return`. Put the Connect client id in `console/functions/.env` as `CONSOLE_STRIPE_CLIENT_ID`. Use the test mode client id and key for a rehearsal.
+   - **Eventbrite**: make an app, and set its OAuth redirect URI to `https://console.eventrunner.org/connect/eventbrite/return`. Put its API key in `console/functions/.env` as `CONSOLE_EVENTBRITE_CLIENT_ID`, and its client secret in the secret above.
+   - **Secret Manager**: turn on the Secret Manager API in the console project. Give the functions' runtime service account the **Secret Manager Admin** role, with an IAM condition on the secret name prefix `projects/<project-number>/secrets/connection-`, so it cannot change other secrets. Without a condition, the role reaches every secret in the project.
 
 ### 11.2 Deploy
 
@@ -1127,3 +1138,4 @@ Check after the first deploy:
 - Make a test organization, invite a second address, and accept the invite from that address.
 - Sign in as an operator and confirm that the home page lists every organization.
 - With two Owners on the test organization, answer the guided setup and select **Create my site**. Confirm that the Owners and each operator get an email, and that the status page says "We are reviewing your request". Then withdraw the test request.
+- With a provider set up, connect a test account from the tickets step, then disconnect it. On Eventbrite, confirm that coming back works at all: its documents do not say it returns the `state` value, and without it the console refuses the connection.
