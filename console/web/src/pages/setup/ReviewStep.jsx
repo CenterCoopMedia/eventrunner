@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { callApi } from '../../api.js';
-import { STEPS, SITE_DOMAIN, TICKET_CHOICES, CONNECT_LATER, setupPath, stepById, stepOfField } from '../../setup/steps.js';
+import { STEPS, SITE_DOMAIN, TICKET_CHOICES, setupPath, stepById, stepOfField } from '../../setup/steps.js';
 import { senderPreview } from './EmailStep.jsx';
 
 function Row({ label, children }) {
@@ -18,9 +18,10 @@ function dayText(day) {
     .filter(Boolean).join(', ');
 }
 
-function Summary({ answers, ownersNeeded, orgId, appId }) {
+function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
   const { organization, event, webAddress, tickets, email } = answers;
   const choice = TICKET_CHOICES.find((c) => c.value === tickets.choice);
+  const account = choice?.connect ? connections[choice.value] : null;
   const edit = (id, title) => (
     <Link to={`${setupPath(orgId, appId, STEPS.find((s) => s.id === id))}`}>Change {title.toLowerCase()}</Link>
   );
@@ -61,8 +62,11 @@ function Summary({ answers, ownersNeeded, orgId, appId }) {
       </section>
       <section aria-labelledby="sum-tickets" className="summary">
         <h2 id="sum-tickets">Tickets</h2>
-        <dl><Row label="Ticket sales">{choice?.label}</Row></dl>
-        {choice?.connect ? <p className="muted">{CONNECT_LATER}</p> : null}
+        <dl>
+          <Row label="Ticket sales">{choice?.label}</Row>
+          {account ? <Row label="Account">{account.connected ? `Connected: ${account.displayName || 'yes'}` : 'Not connected yet'}</Row> : null}
+          {choice?.value === 'eventbrite' ? <Row label="Eventbrite event">{account.event?.name}</Row> : null}
+        </dl>
         {edit('tickets', 'Tickets')}
       </section>
       <section aria-labelledby="sum-email" className="summary">
@@ -150,7 +154,7 @@ export default function ReviewStep({ app, answers, errors, ownersNeeded, refused
       {error ? <p className="message error" role="alert">{error}</p> : null}
       <NotSaved steps={notSaved} orgId={orgId} appId={appId} />
       <Problems fields={shown} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} titleRef={titleRef} />
-      <Summary answers={answers} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} />
+      <Summary answers={answers} connections={app.connections} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} />
       {app.canSubmit ? (
         <div className="section">
           <button type="button" className="button primary" onClick={submit} disabled={busy || held}>Create my site</button>

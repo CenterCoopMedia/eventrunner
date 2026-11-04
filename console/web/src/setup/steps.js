@@ -55,8 +55,6 @@ export const TICKET_CHOICES = Object.freeze([
   { value: 'none', label: 'No tickets', help: 'Your site has no tickets or registrations.', connect: false },
 ]);
 
-export const CONNECT_LATER = 'You connect this account after we approve your request.';
-
 /** What the client reads for each status (ADR 0007 §3 and §5). */
 export const STATUS_LABELS = Object.freeze({
   draft: 'Not sent yet',

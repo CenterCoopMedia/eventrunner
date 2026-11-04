@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import { callApi } from '../api.js';
-import { STATUS_LABELS, STEPS, setupPath } from '../setup/steps.js';
+import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
+import { STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
 import { formatDate } from '../text.js';
 
 const REFRESH_MS = 30000;
@@ -38,6 +39,8 @@ function Stages({ status }) {
   );
 }
 
+const PROVIDERS = TICKET_CHOICES.filter((choice) => choice.connect).map((choice) => choice.value);
+
 /** Withdraw asks once, in place. Cancel returns the focus to Withdraw. */
 function Withdraw({ onWithdraw }) {
   const [asking, setAsking] = useState(false);
@@ -63,6 +66,7 @@ function Withdraw({ onWithdraw }) {
 /** The live state of one request, with the note from the hosting team. */
 export default function ApplicationStatus() {
   const { orgId, appId } = useParams();
+  const { state } = useLocation();
   const [app, setApp] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -98,12 +102,15 @@ export default function ApplicationStatus() {
 
   const title = app.answers.event.name || 'New event site';
   const closed = ['withdrawn', 'declined'].includes(app.status);
+  const choice = app.answers.tickets.choice;
+  const accounts = PROVIDERS.filter((provider) => app.connections[provider].connected || (provider === choice && !closed));
   return (
     <section aria-labelledby="status-title">
       <h1 id="status-title" tabIndex={-1}>{title}</h1>
       <p className="lead">{STATUS_LABELS[app.status]}</p>
       {app.address ? <p>Web address: <strong>{app.address}</strong></p> : null}
 
+      <ConnectionNotice message={state?.connectionMessage} />
       <div aria-live="polite" className="live">
         {notice ? <p className="message success">{notice}</p> : null}
       </div>
@@ -133,6 +140,23 @@ export default function ApplicationStatus() {
           </Link>
         </p>
       ) : null}
+      {accounts.map((provider) => (
+        <div className="section" key={provider}>
+          <ConnectionPanel
+            provider={provider}
+            orgId={orgId}
+            appId={appId}
+            connections={app.connections}
+            errors={provider === choice ? app.errors : {}}
+            // Once the answers are with the hosting team, only the account they chose can connect.
+            canConnect={app.connections.canChange && (app.canEdit || provider === choice)}
+            myRole={app.myRole}
+            returnPath={statusPath(orgId, appId)}
+            onConnections={load}
+            onNotice={setNotice}
+          />
+        </div>
+      ))}
       {app.submittedAt ? <p className="muted">Sent on {formatDate(app.submittedAt)}. We email the Owners when the status changes.</p> : null}
       {app.canWithdraw ? <div className="section"><Withdraw onWithdraw={withdraw} /></div> : null}
       <p className="section"><Link to={`/organizations/${orgId}`}>Back to your event sites</Link></p>
