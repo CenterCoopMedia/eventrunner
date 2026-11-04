@@ -13,7 +13,7 @@ const { test } = require('node:test');
 const { reopenApplication } = require('./agreementAcceptance.cjs');
 const { withdrawApplication } = require('./applicationStatus.cjs');
 const { deleteSpamApplication, isExpired, runRetention } = require('./cleanup.cjs');
-const { makeFakeStripe, makeReq, makeRes } = require('./fakes.cjs');
+const { makeFakeSecrets, makeFakeStripe, makeReq, makeRes } = require('./fakes.cjs');
 const { startFeeCheckout } = require('./feeCheckout.cjs');
 const { feeWebhookEndpoint } = require('./feeWebhook.cjs');
 const { declineApplication } = require('./reviewDecisions.cjs');
@@ -50,7 +50,7 @@ function setup(app) {
   stripe.sessions.set(OLD_SESSION, { id: OLD_SESSION, url: 'https://pay.example/old', status: 'open' });
   const log = quietLog();
   const mailer = fakeMailer();
-  return { db, stripe, log, mailer, deps: { db, stripe, log, mailer, now: () => NOW, publicUrl: PUBLIC_URL } };
+  return { db, stripe, log, mailer, deps: { db, stripe, log, mailer, secrets: makeFakeSecrets(), now: () => NOW, publicUrl: PUBLIC_URL } };
 }
 
 /** Run `step` once, just before the next transaction: after a path's first read and its close. */
@@ -118,7 +118,7 @@ for (const [name, close] of Object.entries(CLOSERS)) {
 test('retention keeps an old request when a page opens just before its delete', async () => {
   const { db, stripe, deps } = setup(waiting(null, { updatedAt: new Date(NOW - 91 * 24 * 60 * 60 * 1000) }));
   beforeNextTransaction(db, () => startFeeCheckout(deps, { body: IDS, user: ana }));
-  const { deleted } = await runRetention({ db, now: () => NOW, log: quietLog() });
+  const { deleted } = await runRetention({ db, secrets: makeFakeSecrets(), now: () => NOW, log: quietLog() });
   assert.deepEqual(deleted, []);
   assert.equal(db.read('applications/a1').status, 'awaiting_payment');
   assert.equal(stripe.sessions.get(db.read('applications/a1').feeCheckout.sessionId).status, 'open');

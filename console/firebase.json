@@ -42,6 +42,11 @@
       { "source": "/api/saveEventFee", "function": { "functionId": "saveEventFee", "region": "us-central1" } },
       { "source": "/api/saveAgreement", "function": { "functionId": "saveAgreement", "region": "us-central1" } },
       { "source": "/api/consoleFeeWebhook", "function": { "functionId": "consoleFeeWebhook", "region": "us-central1" } },
+      { "source": "/api/startConnection", "function": { "functionId": "startConnection", "region": "us-central1" } },
+      { "source": "/api/completeConnection", "function": { "functionId": "completeConnection", "region": "us-central1" } },
+      { "source": "/api/disconnectAccount", "function": { "functionId": "disconnectAccount", "region": "us-central1" } },
+      { "source": "/api/listEventbriteEvents", "function": { "functionId": "listEventbriteEvents", "region": "us-central1" } },
+      { "source": "/api/chooseEventbriteEvent", "function": { "functionId": "chooseEventbriteEvent", "region": "us-central1" } },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [

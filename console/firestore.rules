@@ -12,8 +12,9 @@ rules_version = '2';
 //     reads every application;
 //   - an operator reads the console audit log.
 // Invites, web-address names (checkWebAddress answers on the server), the
-// operator allowlist, the console settings and the rate limits have no
-// client access at all. Every read needs a verified email address.
+// operator allowlist, the console settings, the rate limits, and the private
+// parts of connected accounts have no client access at all. Every read needs
+// a verified email address.
 //
 // Tests: console/tests/console.rules.test.js (npm run test:rules).
 
@@ -60,6 +61,17 @@ service cloud.firestore {
     match /applications/{appId} {
       allow read: if isOperator() || isMember(resource.data.orgId);
       allow write: if false;
+    }
+
+    // Connected accounts (ADR 0007 §4). A member reads connection state on
+    // the application. The account ids and the half-finished connections
+    // stay here, for the functions only, operators included.
+    match /console_connections/{appId} {
+      allow read, write: if false;
+    }
+
+    match /console_connection_states/{stateHash} {
+      allow read, write: if false;
     }
 
     match /site_names/{name} {

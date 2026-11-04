@@ -98,7 +98,7 @@ async function acceptAgreement(deps, { body, user }) {
   if (body.accept !== true) throw new ConsoleError(400, 'accept-required', 'Select Accept the agreement to continue.');
   const name = typedName(body.name);
   if (!(await readSignupTerms((r) => r.get(), db)).open) throw signupsClosed();
-  refuseIncomplete(checkAnswers(first.data.answers));
+  refuseIncomplete(checkAnswers(first.data.answers, first.data.connections));
   await takeSubmitSlot(db, user, now);
 
   const at = new Date(now());

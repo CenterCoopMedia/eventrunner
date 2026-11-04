@@ -10,11 +10,10 @@ const { ConsoleError } = require('./http.cjs');
 const { toIso, toMillis } = require('./access.cjs');
 const { STATUSES, readApplication, requireOperator, reviewedAnswers, siteNameOf } = require('./reviewAccess.cjs');
 const { approvalDefaults, readConsoleSettings } = require('./consoleSettings.cjs');
+const { connectionForReview } = require('./connectionState.cjs');
 
 const QUEUE_LIMIT = 200;
 const ROLE_ORDER = { owner: 0, editor: 1 };
-// The account connections arrive in P6. Until then the state is fixed.
-const CONNECTION_PLACEHOLDER = Object.freeze({ state: 'not_connected', label: 'Not connected yet' });
 
 /** Names of the given organizations, read once each. */
 async function organizationNames(db, orgIds) {
@@ -132,10 +131,10 @@ async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
       },
       organization: { id: app.orgId, name: orgSnap.exists ? orgSnap.data().name : '' },
       team,
-      connection: { ...CONNECTION_PLACEHOLDER },
+      connection: connectionForReview(app.frozen?.tickets?.choice, app.connections),
       approvalDefaults: approvalDefaults(settings, name),
     },
   };
 }
 
-module.exports = { CONNECTION_PLACEHOLDER, getApplicationForReview, listApplicationsForReview };
+module.exports = { getApplicationForReview, listApplicationsForReview };

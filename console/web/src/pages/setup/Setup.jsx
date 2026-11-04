@@ -84,6 +84,16 @@ function useApplication(orgId, appId) {
   return { app, setApp, error, reload };
 }
 
+/** The application with one step's errors replaced by the server's new ones. */
+function withStepErrors(app, step, stepErrors) {
+  const others = Object.fromEntries(Object.entries(app.errors).filter(([path]) => !(path === step || path.startsWith(`${step}.`))));
+  return {
+    ...app,
+    errors: { ...others, ...stepErrors },
+    progress: { ...app.progress, [step]: Object.keys(stepErrors).length === 0 },
+  };
+}
+
 /**
  * The guided setup (ADR 0007 §3): one step per page at its own address,
  * a step list with progress, Back and Next, and autosave as the client
@@ -110,11 +120,7 @@ export default function Setup() {
         const others = prev.filter((id) => id !== result.step);
         return result.saved === false ? [...others, result.step] : others;
       });
-      setApp((prev) => {
-        const others = Object.fromEntries(Object.entries(prev.errors).filter(([path]) => !(path === result.step || path.startsWith(`${result.step}.`))));
-        const errors = { ...others, ...result.errors };
-        return { ...prev, errors, progress: { ...prev.progress, [result.step]: Object.keys(result.errors).length === 0 } };
-      });
+      setApp((prev) => withStepErrors(prev, result.step, result.errors));
     },
   });
 
@@ -128,6 +134,10 @@ export default function Setup() {
     setApp((prev) => ({ ...prev, answers: { ...prev.answers, [step.id]: value } }));
     queue({ step: step.id, answers: value });
   }, [step, touch, setApp, queue]);
+
+  const onConnections = useCallback(({ connections, errors }) => {
+    setApp((prev) => ({ ...withStepErrors(prev, 'tickets', errors), connections }));
+  }, [setApp]);
 
   const onOwnersNeeded = useCallback((ownersNeeded) => {
     setApp((prev) => (prev.ownersNeeded === ownersNeeded ? prev : { ...prev, ownersNeeded }));
@@ -192,7 +202,11 @@ export default function Setup() {
             errors={shownErrors}
             onChange={onChange}
             onBlur={touch}
+            app={app}
+            orgId={orgId}
             appId={appId}
+            flush={flush}
+            onConnections={onConnections}
           />
         ) : null}
         {step.id === 'team' ? <TeamStep orgId={orgId} onOwnersNeeded={onOwnersNeeded} /> : null}

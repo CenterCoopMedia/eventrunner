@@ -3,6 +3,7 @@ import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } fro
 import { AuthProvider, forgetReturn, rememberReturn, signInErrorMessage, useAuth } from './auth.jsx';
 import AcceptInvite from './pages/AcceptInvite.jsx';
 import ApplicationStatus from './pages/ApplicationStatus.jsx';
+import ConnectReturn from './pages/ConnectReturn.jsx';
 import OrganizationHome from './pages/OrganizationHome.jsx';
 import Setup from './pages/setup/Setup.jsx';
 import CreateOrganization from './pages/CreateOrganization.jsx';
@@ -129,6 +130,7 @@ export function AppRoutes() {
           <Route path="/organizations/:orgId/team" element={<Team />} />
           <Route path="/organizations/:orgId/applications/:appId" element={<ApplicationStatus />} />
           <Route path="/organizations/:orgId/applications/:appId/:step" element={<Setup />} />
+          <Route path="/connect/:provider/return" element={<ConnectReturn />} />
           <Route path="/invite/:inviteId" element={<AcceptInvite />} />
           <Route path="/review" element={<ReviewQueue />} />
           <Route path="/review/settings" element={<ConsoleSettings />} />

@@ -96,7 +96,7 @@ function refuseIncomplete(errors) {
  */
 async function answersToFreeze(tx, db, appId, data) {
   const answers = withDefaults(data.answers);
-  const again = checkAnswers(answers);
+  const again = checkAnswers(answers, data.connections);
   const siteName = answers.webAddress.name;
   const held = siteName ? await tx.get(db.collection(SITE_NAMES).doc(siteName)) : null;
   if (!again['webAddress.name'] && (!held?.exists || held.data().appId !== appId)) {
@@ -127,7 +127,7 @@ async function submitApplication(deps, { body, user }) {
     if (status !== 'changes_requested') throw new ConsoleError(409, 'locked', 'This request was already sent.');
   };
   refuseStatus(first.data.status);
-  refuseIncomplete(checkAnswers(first.data.answers));
+  refuseIncomplete(checkAnswers(first.data.answers, first.data.connections));
   await takeSubmitSlot(db, user, now);
 
   const at = new Date(now());

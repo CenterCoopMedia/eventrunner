@@ -71,7 +71,7 @@ test('one request comes with the frozen answers, the history, the team, the tick
   assert.equal(body.organization.name, 'NC Local');
   assert.deepEqual(body.team.members.map((m) => `${m.role}:${m.email}`), ['owner:ana@example.org', 'owner:bo@example.org', 'editor:ben@example.org']);
   assert.deepEqual(body.team.invites.map((i) => i.email), ['dee@example.org']);
-  assert.deepEqual(body.connection, { state: 'not_connected', label: 'Not connected yet' });
+  assert.deepEqual(body.connection, { state: 'connected', label: 'Connected: NC Local' });
   assert.deepEqual(body.approvalDefaults, {
     gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1', projectId: 'er-nclocal', environment: 'nclocal',
   });

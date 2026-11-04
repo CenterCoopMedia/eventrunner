@@ -13,6 +13,11 @@
  *   operator looks at it. The acceptance records are in their own
  *   collection and are never deleted here.
  *
+ * Both delete the request's stored account tokens first, then the request,
+ * then end its connections where the provider allows it and nothing else uses
+ * the account. When a token cannot be deleted the request is kept, so the job
+ * tries again and no token loses its record.
+ *
  * Each delete writes one `console_audit` record: { action, appId, by, at }.
  * `by` is the operator's uid, or 'retention' for the job. The record holds
  * no client data.
@@ -20,15 +25,26 @@
 
 const { ConsoleError } = require('./http.cjs');
 const { toMillis } = require('./access.cjs');
-const { NOT_FOUND, applicationRef, requireAppId, requireOperator } = require('./reviewAccess.cjs');
+const { NOT_FOUND, applicationRef, readApplication, requireAppId, requireOperator } = require('./reviewAccess.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
+const {
+  ACCOUNT_COLLECTION, deleteConnectionTokens, endConnections, sweepExpiredStates,
+} = require('./connections.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_DAYS = 90;
 const RETAINED_STATUSES = Object.freeze(['withdrawn', 'declined', 'awaiting_payment']);
 const SPAM_STATUSES = Object.freeze(['draft', 'awaiting_payment', 'submitted', 'changes_requested', 'withdrawn', 'declined']);
 const RETENTION_BATCH = 500;
+
+/** Delete a request and everything connected to it, in the order that keeps a token findable. */
+async function deleteWithConnections(deps, spec) {
+  const connected = await deleteConnectionTokens(deps, spec.appId);
+  const done = await deleteApplication(deps.db, spec);
+  if (done) await endConnections(deps, connected);
+  return done;
+}
 
 /**
  * Delete one request in a transaction, after `check(app)` passes on the
@@ -45,32 +61,29 @@ async function deleteApplication(db, { appId, by, action, at, check }) {
     if (!check(app)) return false;
     const held = await heldNames(tx, db, app.id);
     tx.delete(ref);
+    tx.delete(db.collection(ACCOUNT_COLLECTION).doc(app.id));
     releaseNames(tx, db, held);
     tx.create(db.collection('console_audit').doc(), { action, appId: app.id, by, at });
     return true;
   });
 }
 
-async function deleteSpamApplication({ db, stripe, now = Date.now }, { body, user }) {
+async function deleteSpamApplication(deps, { body, user }) {
+  const { db, now = Date.now } = deps;
   await requireOperator(db, user);
   const appId = requireAppId(body.appId);
   if (body.confirm !== true) throw new ConsoleError(400, 'confirm-required', 'Confirm that you want to delete this request.');
-  const snap = await applicationRef(db, appId).get();
-  const first = snap.exists ? snap.data() : {};
-  if (first.status === 'awaiting_payment') await closeOpenCheckout(stripe, first);
-  await deleteApplication(db, {
-    appId,
-    by: user.uid,
-    action: 'delete-spam',
-    at: new Date(now()),
-    check: (app) => {
-      if (!SPAM_STATUSES.includes(app.status)) {
-        throw new ConsoleError(409, 'cannot-delete', 'This request is approved, so it cannot be deleted as spam.');
-      }
-      refuseNewCheckout(first, app);
-      return true;
-    },
-  });
+  const first = await readApplication(db, appId);
+  const check = (app) => {
+    if (!SPAM_STATUSES.includes(app.status)) {
+      throw new ConsoleError(409, 'cannot-delete', 'This request is approved, so it cannot be deleted as spam.');
+    }
+    refuseNewCheckout(first, app);
+    return true;
+  };
+  check(first);
+  if (first.status === 'awaiting_payment') await closeOpenCheckout(deps.stripe, first);
+  await deleteWithConnections(deps, { appId, by: user.uid, action: 'delete-spam', at: new Date(now()), check });
   return { body: { appId, deleted: true } };
 }
 
@@ -87,12 +100,14 @@ function isExpired(app, at) {
  * It stops when a batch is short, or when a full batch deleted nothing (so
  * a request that keeps failing cannot hold the job in a loop). Each request
  * is checked again inside its own transaction, so one that changed after
- * the query is kept.
+ * the query is kept. Connection states nobody came back for are cleared at
+ * the end.
  *
- * @param {{ db: object, now?: () => number, log?: { info: Function, error: Function }, batchSize?: number }} deps
+ * @param {{ db: object, secrets: object, connectors?: object, now?: () => number, log?: { info: Function, error: Function }, batchSize?: number }} deps
  * @returns {Promise<{ deleted: string[], failed: string[] }>}
  */
-async function runRetention({ db, now = Date.now, log = console, batchSize = RETENTION_BATCH }) {
+async function runRetention(deps) {
+  const { db, now = Date.now, log = console, batchSize = RETENTION_BATCH } = deps;
   const at = now();
   const cutoff = new Date(at - RETENTION_DAYS * DAY_MS);
   const deleted = [];
@@ -105,7 +120,8 @@ async function runRetention({ db, now = Date.now, log = console, batchSize = RET
       for (const doc of snap.docs) {
         if (failed.has(doc.id)) continue;
         try {
-          const done = await deleteApplication(db, {
+          if (!isExpired(doc.data(), at)) continue;
+          const done = await deleteWithConnections({ ...deps, log }, {
             appId: doc.id, by: 'retention', action: 'retention-delete', at: new Date(at), check: (app) => isExpired(app, at),
           });
           if (done) {
@@ -121,6 +137,7 @@ async function runRetention({ db, now = Date.now, log = console, batchSize = RET
       if (snap.docs.length < batchSize || progress === 0) break;
     }
   }
+  await sweepExpiredStates({ db, log }, at, batchSize);
   log.info?.(`console retention deleted ${deleted.length} request(s)`);
   return { deleted, failed: [...failed] };
 }

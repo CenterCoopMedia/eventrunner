@@ -1,6 +1,6 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { application, callsTo, serveApi } from '../test/application.js';
+import { application, callsTo, connections, serveApi } from '../test/application.js';
 import { renderPage } from '../test/renderPage.jsx';
 import ApplicationStatus from './ApplicationStatus.jsx';
 
@@ -93,6 +93,61 @@ describe('ApplicationStatus', () => {
     expect(screen.getByText('This request is closed.')).toBeInTheDocument();
   });
 
+  describe('the connected account', () => {
+    const notConnected = { available: true, connected: false, displayName: null, connectedAt: null };
+
+    it('connects and disconnects until the site is built', async () => {
+      let linked = connections();
+      serveApi({
+        getApplication: () => ({ application: application({ status: 'submitted', canEdit: false, connections: linked }) }),
+        disconnectAccount: () => {
+          linked = connections({ stripe: notConnected });
+          return { connections: linked, errors: {}, revoked: true, shared: false };
+        },
+      });
+      page();
+      expect(await screen.findByText('Connected: NC Local')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Yes, disconnect' }));
+      expect(await screen.findByText('You disconnected your Stripe account.')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Connect with Stripe' })).toBeInTheDocument();
+      expect(callsTo('disconnectAccount')).toEqual([{ orgId: 'o1', appId: 'a1', provider: 'stripe' }]);
+    });
+
+    it('an Editor sees the account and cannot change it', async () => {
+      serveStatus({ status: 'submitted', canEdit: false, myRole: 'editor', connections: connections({ canChange: false, canDisconnect: false }) });
+      page();
+      expect(await screen.findByText('Connected: NC Local')).toBeInTheDocument();
+      expect(screen.getByText('Only an Owner can change this account.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Connect again' })).not.toBeInTheDocument();
+    });
+
+    it('from approval on, the account cannot change', async () => {
+      serveStatus({ status: 'approved', canEdit: false, canWithdraw: false, connections: connections({ canChange: false, canDisconnect: false }) });
+      page();
+      expect(await screen.findByText('Connected: NC Local')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Disconnect' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Connect again' })).not.toBeInTheDocument();
+    });
+
+    it('a closed request can only disconnect, and asks for nothing new', async () => {
+      serveStatus({ status: 'withdrawn', canEdit: false, canWithdraw: false, connections: connections({ canChange: false, canDisconnect: true }) });
+      page();
+      expect(await screen.findByRole('button', { name: 'Disconnect' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Connect again' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Connect with Eventbrite' })).not.toBeInTheDocument();
+    });
+
+    it('asks nothing of a request that needs no account', async () => {
+      const answers = { ...application().answers, tickets: { choice: 'spreadsheet' } };
+      serveStatus({ status: 'submitted', canEdit: false, answers, connections: connections({ stripe: notConnected }) });
+      page();
+      expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Connect with/ })).not.toBeInTheDocument();
+    });
+  });
+
   it('shows a load error', async () => {
     serveApi({ getApplication: () => { throw new Error('We could not find that request.'); } });
     page();
@@ -181,8 +236,20 @@ describe('ApplicationStatus', () => {
       expect(screen.queryByText('Waiting for payment confirmation')).not.toBeInTheDocument();
     });
 
+    it('keeps the connected account while the request waits for payment', async () => {
+      serveStatus({ ...WAITING, connections: connections({ canChange: false, canDisconnect: false }) });
+      pageAt('');
+      expect(await screen.findByText('Your Stripe account')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /disconnect/i })).not.toBeInTheDocument();
+    });
+
     it('never names the systems behind the console', async () => {
-      serveStatus(WAITING);
+      // A client who sells tickets with Stripe sees their own account named, so this one does not.
+      serveStatus({
+        ...WAITING,
+        answers: { ...application().answers, tickets: { choice: 'spreadsheet' } },
+        connections: connections({ stripe: { available: true, connected: false, displayName: null, connectedAt: null } }),
+      });
       const { container } = pageAt('?payment=done');
       await screen.findByText('Waiting for payment confirmation');
       expect(container.textContent).not.toMatch(/firebase|project|tenant|environment|webhook|secret|stripe|checkout/i);

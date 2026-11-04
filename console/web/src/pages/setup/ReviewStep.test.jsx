@@ -23,7 +23,7 @@ describe('Review step', () => {
     expect(screen.getByText('nclocal.eventrunner.org')).toBeInTheDocument();
     expect(screen.getByText('2027-05-13, 09:00 to 17:00')).toBeInTheDocument();
     expect(screen.getByText('Sell with Stripe')).toBeInTheDocument();
-    expect(screen.getByText('You connect this account after we approve your request.')).toBeInTheDocument();
+    expect(screen.getByText('Connected: NC Local')).toBeInTheDocument();
     expect(screen.getByText('NC Local <hello@nclocal.eventrunner.org>')).toBeInTheDocument();
     expect(screen.getByText('The team has the two Owners that launch needs.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Change your event' })).toHaveAttribute('href', '/organizations/o1/applications/a1/event');

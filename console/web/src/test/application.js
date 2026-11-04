@@ -33,6 +33,17 @@ const ALL_DONE = {
   organization: true, event: true, webAddress: true, team: true, tickets: true, email: true, review: true, agreement: false, fee: false,
 };
 
+/** `connections` as getApplication returns it: a connected Stripe account. */
+export function connections(overrides = {}) {
+  return {
+    canChange: true,
+    canDisconnect: true,
+    stripe: { available: true, connected: true, displayName: 'NC Local', connectedAt: '2026-11-02T00:00:00.000Z' },
+    eventbrite: { available: true, connected: false, displayName: null, connectedAt: null, event: null },
+    ...overrides,
+  };
+}
+
 export function application(overrides = {}) {
   return {
     id: 'a1',
@@ -58,6 +69,7 @@ export function application(overrides = {}) {
     canSubmit: false,
     canPay: false,
     canWithdraw: true,
+    connections: connections(),
     ...overrides,
   };
 }
