@@ -9,8 +9,9 @@
  * `console_fee_events/{sessionId}` is the claim: one transaction reads it,
  * creates it and applies the outcome, so a repeated event does nothing. A
  * paid session that fails a check is claimed too, with its reason. The
- * money has moved, so operators get a notice and decide about a refund;
- * a retry could not change the answer.
+ * money has moved, so operators get a notice with the ids to refund from;
+ * a retry could not change the answer. The claim outlives the request, so
+ * a payment on a deleted request still leaves its record.
  *
  * Mail and the build start run after the commit. Their failures are logged
  * and shown to operators and never undo the payment.
@@ -69,7 +70,7 @@ function claimSession({ db, now, startBuild }, event, session, { appId, orgId })
       at,
     });
     if (problem && app) {
-      tx.update(ref, { feeProblem: { code: problem, sessionId: session.id, at }, updatedAt: at });
+      tx.update(ref, { feeProblem: { code: problem, sessionId: session.id, paymentIntentId: intent, at }, updatedAt: at });
     } else if (!problem) {
       tx.update(ref, {
         status: 'approved',
@@ -140,7 +141,9 @@ async function handleFeeEvent(input, event) {
 
   if (problem) {
     log.error('console fee webhook: a paid session did not approve its request', { sessionId: session.id, appId, problem });
-    await afterCommit(log, 'the payment problem notice', () => notifyOperators(deps, { orgId, appId, eventName, kind: 'payment-problem', problem }));
+    await afterCommit(log, 'the payment problem notice', () => notifyOperators(deps, {
+      orgId, appId, eventName, kind: 'payment-problem', problem, sessionId: session.id, paymentIntentId: paymentIntentId(session),
+    }));
     return { outcome: problem };
   }
 

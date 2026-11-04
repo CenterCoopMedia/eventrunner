@@ -9,6 +9,8 @@
  * one back. Two selects at once send one idempotency key, so Stripe answers
  * both with one session. A session is closed before the request can change
  * (edit, withdraw, decline, delete), and a paid one refuses the change.
+ * The close happens outside the path's transaction, so that transaction
+ * calls refuseNewCheckout: a page opened since the close is still live.
  * Only the webhook (feeWebhook.cjs) counts a payment.
  */
 
@@ -48,6 +50,20 @@ async function closeOpenCheckout(stripe, app) {
   // A session paid in between makes expire fail: the next try reads it as paid.
   if (session.status === 'open') session = await askStripe(() => stripe.checkout.sessions.expire(sessionId));
   if (session.status === 'complete') throw new ConsoleError(409, 'payment-received', PAID);
+}
+
+/**
+ * Inside a path's transaction: refuse when the session changed since the
+ * first read and close. Opening a page adds no history, so a revision check
+ * cannot see this. A second try closes the new page.
+ * @param {object} first the request as first read
+ * @param {object} current the request inside the transaction
+ * @throws {ConsoleError} 409 status-changed
+ */
+function refuseNewCheckout(first, current) {
+  if ((current.feeCheckout?.sessionId || null) !== (first.feeCheckout?.sessionId || null)) {
+    throw new ConsoleError(409, 'status-changed', 'This request just changed. Reload the page and try again.');
+  }
 }
 
 function statusUrl(publicUrl, orgId, appId, result) {
@@ -134,4 +150,4 @@ async function startFeeCheckout({ db, stripe, publicUrl, now = Date.now, log = c
   return { body: { url: session.url } };
 }
 
-module.exports = { closeOpenCheckout, startFeeCheckout, stripeClient };
+module.exports = { closeOpenCheckout, refuseNewCheckout, startFeeCheckout, stripeClient };

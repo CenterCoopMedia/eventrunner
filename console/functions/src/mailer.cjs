@@ -7,9 +7,10 @@
  *   mailer.sendInvite({ to, organizationName, inviterEmail, role, link, expiresInDays })
  *   mailer.sendStatusChange({ to, organizationName, eventName, status, link, note })
  *     to a client Owner, when the status of a request changes (ADR 0007 §3)
- *   mailer.sendOperatorNotice({ to, organizationName, eventName, link, kind, problem })
+ *   mailer.sendOperatorNotice({ to, organizationName, eventName, link, kind, problem, sessionId, paymentIntentId })
  *     to a CCM operator. `kind` is 'request' (the default), 'paid',
  *     'build-failed' or 'payment-problem', which carries a `problem` code
+ *     and the ids to find the payment by
  *   mailer.sendAgreementCopy({ to, organizationName, eventName, title, version, body, sha256, typedName, acceptedAt, link })
  *     to the person who accepted the agreement
  *
@@ -90,13 +91,17 @@ function statusChangeMessage({ organizationName, eventName, status, link, note }
 }
 
 /** @returns {{ subject: string, text: string, html: string }} */
-function operatorNoticeMessage({ organizationName, eventName, link, kind = 'request', problem = '' }) {
+function operatorNoticeMessage({ organizationName, eventName, link, kind = 'request', problem = '', sessionId = '', paymentIntentId = '' }) {
   const who = `${eventName} from ${organizationName}`;
   const words = {
     request: [`New request: ${who}`, [`${organizationName} sent a request for a site for ${eventName}.`, 'Review the answers in the console.']],
     paid: [`Paid: ${who}`, [`${organizationName} paid the event fee for ${eventName}. The request is approved.`]],
     'build-failed': [`Build did not start: ${who}`, ['The payment stands and the request stays approved, but the build did not start. Read the function logs, then start the build.']],
-    'payment-problem': [`Payment needs attention: ${who}`, [`A paid session did not approve this request. Reason: ${problem}.`, 'Compare it with the payment in Stripe, and refund it if it should not stand.']],
+    'payment-problem': [`Payment needs attention: ${who}`, [
+      `A paid session did not approve this request. Reason: ${problem}.`,
+      `Session: ${sessionId}. Payment intent: ${paymentIntentId || 'not given'}.`,
+      'Compare it with the payment in Stripe, and refund it if it should not stand.',
+    ]],
   }[kind];
   return compose(words[0], words[1], link, 'Open the request');
 }

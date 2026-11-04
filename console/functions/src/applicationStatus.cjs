@@ -19,7 +19,7 @@ const { checkAnswers } = require('./checks.cjs');
 const { takeSlot } = require('./rateLimit.cjs');
 const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames } = require('./siteNames.cjs');
 const { AWAITING_PAYMENT, CLOSED, WITHDRAWABLE, historyEntry, readApplication } = require('./applications.cjs');
-const { closeOpenCheckout } = require('./feeCheckout.cjs');
+const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SUBMITS_PER_DAY = 5;
@@ -68,12 +68,12 @@ async function notifyOwners({ db, mailer, log, publicUrl }, { orgId, appId, stat
 }
 
 /** `kind` and `problem` choose the words (mailer.cjs). A payment can name an organization that is gone. */
-async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, eventName, kind, problem }) {
+async function notifyOperators({ db, mailer, log, publicUrl }, { orgId, appId, eventName, kind, problem, sessionId, paymentIntentId }) {
   const org = validOrgId(orgId) ? await db.collection('organizations').doc(orgId).get() : null;
   const organizationName = org?.exists ? org.data().name : '';
   const link = reviewLink(publicUrl, appId);
   const operators = await operatorEmails(db);
-  const extra = { ...(kind ? { kind } : {}), ...(problem ? { problem } : {}) };
+  const extra = { ...(kind ? { kind } : {}), ...(problem ? { problem, sessionId, paymentIntentId } : {}) };
   return sendAll(log, operators.map((to) => () => mailer.sendOperatorNotice({
     to, organizationName, eventName, link, ...extra,
   })));
@@ -171,6 +171,7 @@ async function withdrawApplication(deps, { body, user }) {
   const eventName = await db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
     refuseStatus(data.status);
+    refuseNewCheckout(first.data, data);
     const held = await heldNames(tx, db, appId);
     releaseNames(tx, db, held);
     tx.update(ref, {

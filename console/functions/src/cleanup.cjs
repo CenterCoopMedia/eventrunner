@@ -22,7 +22,7 @@ const { ConsoleError } = require('./http.cjs');
 const { toMillis } = require('./access.cjs');
 const { NOT_FOUND, applicationRef, requireAppId, requireOperator } = require('./reviewAccess.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
-const { closeOpenCheckout } = require('./feeCheckout.cjs');
+const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_DAYS = 90;
@@ -55,8 +55,9 @@ async function deleteSpamApplication({ db, stripe, now = Date.now }, { body, use
   await requireOperator(db, user);
   const appId = requireAppId(body.appId);
   if (body.confirm !== true) throw new ConsoleError(400, 'confirm-required', 'Confirm that you want to delete this request.');
-  const first = await applicationRef(db, appId).get();
-  if (first.exists && first.data().status === 'awaiting_payment') await closeOpenCheckout(stripe, first.data());
+  const snap = await applicationRef(db, appId).get();
+  const first = snap.exists ? snap.data() : {};
+  if (first.status === 'awaiting_payment') await closeOpenCheckout(stripe, first);
   await deleteApplication(db, {
     appId,
     by: user.uid,
@@ -66,6 +67,7 @@ async function deleteSpamApplication({ db, stripe, now = Date.now }, { body, use
       if (!SPAM_STATUSES.includes(app.status)) {
         throw new ConsoleError(409, 'cannot-delete', 'This request is approved, so it cannot be deleted as spam.');
       }
+      refuseNewCheckout(first, app);
       return true;
     },
   });

@@ -148,3 +148,11 @@ test('the Postmark mailer needs a token and a sender', () => {
   assert.throws(() => createPostmarkMailer({ token: '', from: 'a@b.example', fetch() {} }), TypeError);
   assert.throws(() => createPostmarkMailer({ token: 't', from: '', fetch() {} }), TypeError);
 });
+
+test('a payment problem notice names the payment to refund', () => {
+  const { text } = operatorNoticeMessage({
+    organizationName: 'NC Local', eventName: 'Summit', link: '', kind: 'payment-problem', problem: 'request-missing', sessionId: 'cs_1', paymentIntentId: 'pi_1',
+  });
+  assert.match(text, /Reason: request-missing/);
+  assert.match(text, /Session: cs_1\. Payment intent: pi_1\./);
+});

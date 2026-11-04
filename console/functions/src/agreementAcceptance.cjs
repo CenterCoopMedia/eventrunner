@@ -16,7 +16,7 @@ const { checkAnswers } = require('./checks.cjs');
 const { AWAITING_PAYMENT, historyEntry, readApplication } = require('./applications.cjs');
 const { readAgreementVersion, readSignupTerms, signupsClosed } = require('./consoleSettings.cjs');
 const { answersToFreeze, notifyOwners, refuseIncomplete, statusLink, takeSubmitSlot } = require('./applicationStatus.cjs');
-const { closeOpenCheckout } = require('./feeCheckout.cjs');
+const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
 
 const COLLECTION = 'agreement_acceptances';
 const NAME_MIN = 2;
@@ -153,10 +153,7 @@ async function reopenApplication(deps, { body, user }) {
   const eventName = await db.runTransaction(async (tx) => {
     const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
     refuse(data.status);
-    // A teammate opened a payment page after the close above.
-    if ((data.feeCheckout?.sessionId || null) !== (first.data.feeCheckout?.sessionId || null)) {
-      throw new ConsoleError(409, 'status-changed', 'This request just changed. Try again.');
-    }
+    refuseNewCheckout(first.data, data);
     tx.update(ref, {
       status: 'draft',
       frozen: null,

@@ -24,7 +24,7 @@ const {
 } = require('./reviewAccess.cjs');
 const { heldNames, releaseNames } = require('./siteNames.cjs');
 const { statusLink } = require('./applicationStatus.cjs');
-const { closeOpenCheckout } = require('./feeCheckout.cjs');
+const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('./consoleSettings.cjs');
 
 const NOTE_MAX = 2000;
@@ -45,13 +45,14 @@ function requireNote(value) {
  *
  * `revision` is the history length the operator saw. When the request
  * changed since then, even back to the same status, the move is refused.
+ * `guard(app)` can refuse the move after those checks.
  * `review(app)` returns the `review.settings` value to record, or null.
  * With `releaseName`, every `site_names` reservation the request holds
  * is deleted.
  *
  * @returns {Promise<object>} the request as it was before the change
  */
-async function transition({ db, now = Date.now }, { appId, user, from, to, revision = null, note = null, review = () => null, releaseName = false }) {
+async function transition({ db, now = Date.now }, { appId, user, from, to, revision = null, note = null, guard = () => {}, review = () => null, releaseName = false }) {
   const ref = applicationRef(db, requireAppId(appId));
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -60,6 +61,7 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, revis
     const history = Array.isArray(app.history) ? app.history : [];
     if (!from.includes(app.status)) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
     if (revision !== null && revision !== history.length) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
+    guard(app);
     const held = releaseName ? await heldNames(tx, db, app.id) : [];
     // Every read is done; the writes follow.
     const settings = review(app);
@@ -133,9 +135,15 @@ async function requestChanges(deps, input) {
 async function declineApplication(deps, input) {
   const note = requireNote(input.body.note);
   await requireOperator(deps.db, input.user);
-  const app = await readApplication(deps.db, input.body.appId);
-  if (app.status === 'awaiting_payment') await closeOpenCheckout(deps.stripe, app);
-  return decide(deps, input, { from: ['submitted', 'changes_requested', 'awaiting_payment'], to: 'declined', note, releaseName: true });
+  const first = await readApplication(deps.db, input.body.appId);
+  if (first.status === 'awaiting_payment') await closeOpenCheckout(deps.stripe, first);
+  return decide(deps, input, {
+    from: ['submitted', 'changes_requested', 'awaiting_payment'],
+    to: 'declined',
+    note,
+    releaseName: true,
+    guard: (app) => refuseNewCheckout(first, app),
+  });
 }
 
 async function approveApplication(deps, input) {

@@ -99,7 +99,7 @@ function readablePayment(app) {
     acceptance: accepted ? { id: accepted.id, version: accepted.version, sha256: accepted.sha256, name: accepted.name, email: accepted.email, at: toIso(accepted.at) } : null,
     payment: paid ? { sessionId: paid.sessionId, paymentIntentId: paid.paymentIntentId, amount: paid.amount, currency: paid.currency, paidAt: toIso(paid.paidAt) } : null,
     buildStart: app.buildStart ? { state: app.buildStart.state, at: toIso(app.buildStart.at) } : null,
-    feeProblem: app.feeProblem ? { code: app.feeProblem.code, sessionId: app.feeProblem.sessionId, at: toIso(app.feeProblem.at) } : null,
+    feeProblem: app.feeProblem ? { code: app.feeProblem.code, sessionId: app.feeProblem.sessionId, paymentIntentId: app.feeProblem.paymentIntentId || null, at: toIso(app.feeProblem.at) } : null,
   };
 }
 

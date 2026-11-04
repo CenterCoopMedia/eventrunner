@@ -12,7 +12,7 @@
  *   feeCheckout: null | { sessionId, amount, currency, attempt, createdAt }  // the payment page
  *   payment: null | { sessionId, paymentIntentId, amount, currency, paidAt, eventId }
  *   buildStart: { state: 'pending'|'started'|'failed', at }  // after payment, no detail
- *   feeProblem: { code, sessionId, at }  // a paid session that did not approve the request
+ *   feeProblem: { code, sessionId, paymentIntentId, at }  // a paid session that did not approve the request
  * }
  *
  * The browser can read this document (console/firestore.rules), so error
