@@ -36,6 +36,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04, ADR 0008
+  §6). Staff and operators save codes on the commerce admin endpoint
+  (`promoCodes`, `savePromoCode`, `deletePromoCode`): percent or amount off each
+  ticket, the ticket types, a use limit and a per-order limit in tickets, start
+  and end times, active or not. The server applies a code inside the reservation
+  transaction and sends the lower unit price to Stripe; a use is held with the
+  reservation and given back when an unpaid hold expires, so racing checkouts
+  cannot pass a limit. `ticketingPromoPreview` prices a cart with a code for the
+  review step. The preview and checkout with a code share 20 code checks per account
+  in 15 minutes, so failed guesses are limited too. Orders keep the code in
+  `promo`; the orders CSV gains **Promo code** and **Promo discount**, and the
+  event package gains `orders/promo_codes.json`. Clients cannot read or write
+  `ticket_promo_codes`. Deploy the functions and rules together, and add
+  `ticketingPromoPreview` to the deployed functions.
 - The Stripe ticket page is now steps: Tickets, Attendees, Questions (when
   the registration form asks any), Review, then Pay (ADR 0008 §5). Answers
   for each attendee are checked when the order is reserved, held on that

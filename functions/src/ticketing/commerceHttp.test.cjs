@@ -68,7 +68,7 @@ test('native endpoint construction failures return a sanitized retryable respons
 });
 
 test('dependency failures do not expose private exception details from any native endpoint', async () => {
-  for (const [endpoint, method] of [['ticketingCatalog', 'GET'], ['ticketingCheckout', 'POST'], ['ticketingOrderStatus', 'GET']]) {
+  for (const [endpoint, method] of [['ticketingCatalog', 'GET'], ['ticketingCheckout', 'POST'], ['ticketingOrderStatus', 'GET'], ['ticketingPromoPreview', 'POST']]) {
     const { handlers, res, errors } = fixture({ EVENT_TICKETING_PROVIDER: 'none' }, { failDatabase: true });
     await assert.doesNotReject(handlers[endpoint]({ method, headers: {} }, res));
     assert.equal(res.statusCode, 503);

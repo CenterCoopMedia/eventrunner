@@ -303,11 +303,16 @@ function orderRecord(id, data) {
     totalAmount: numberOrNull(source.totalAmount),
     refundStatus: text(source.refundStatus) || 'none',
     refundedAmount: numberOrNull(source.refundedAmount) ?? 0,
+    // An Event Runner promo code lowers the unit price, so its discount is
+    // here and not in discountAmount, which mirrors Stripe's own discount.
+    promoCode: textOrNull(source.promo?.code),
+    promoDiscountAmount: numberOrNull(source.promo?.discountAmount) ?? 0,
     lines: lines.map((line) => ({
       ticketTypeId: text(line?.ticketTypeId),
       name: text(line?.name),
       quantity: numberOrNull(line?.quantity) ?? 0,
       unitAmount: numberOrNull(line?.unitAmount),
+      listUnitAmount: numberOrNull(line?.listUnitAmount) ?? numberOrNull(line?.unitAmount),
       lineAmount: numberOrNull(line?.lineAmount),
     })),
     ticketIds: textList(source.ticketIds),

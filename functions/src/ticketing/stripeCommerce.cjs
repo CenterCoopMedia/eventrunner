@@ -3,6 +3,7 @@
 /** Durable commerce records. None is a work queue; ticket_sync_queue remains the only queue. */
 const crypto = require('node:crypto');
 const { MAX_AMOUNT, CURRENCY_MINIMUMS, isSalesWindowOpen } = require('shared/ticketCommerce');
+const { applyPromoCode } = require('shared/promoCodes');
 
 const CATALOG = 'ticket_catalog';
 const INVENTORY = 'ticket_inventory';
@@ -36,7 +37,11 @@ function attemptIdFor(orderId) {
 }
 
 function requestFingerprint(request, source = 'checkout', reason = '') {
-  return digest(JSON.stringify({ lines: request.lines, source, reason, catalogRevision: request.catalogRevision }));
+  // The code joins only when present, so fingerprints without one do not change.
+  return digest(JSON.stringify({
+    lines: request.lines, source, reason, catalogRevision: request.catalogRevision,
+    ...(request.promoCode ? { promoCode: request.promoCode } : {}),
+  }));
 }
 
 function providerScope(provider) {
@@ -142,12 +147,17 @@ async function transitionOrderInventory({ db, orderId, to, patch = {}, now = () 
   });
 }
 
-function priceSelections({ catalog, request, at, comp = false }) {
+/**
+ * Server prices for a cart. With a requested code, `promo` is its stored
+ * record (null when none exists); the code is applied before the amount
+ * limits, so a discounted total must still meet the card minimum.
+ */
+function priceSelections({ catalog, request, at, comp = false, promo = null }) {
   if (!comp && (!catalog.published || catalog.salesPaused || !catalog.commercialTermsConfirmed
       || !isSalesWindowOpen(catalog, at))) {
     throw new CommerceError('sales-closed', 'Ticket sales are currently closed.');
   }
-  const lines = request.lines.map((selection) => {
+  let lines = request.lines.map((selection) => {
     const type = catalog.ticketTypes.find((entry) => entry.id === selection.ticketTypeId);
     if (!type || !type.active || (!comp && (type.visibility !== 'public' || !isSalesWindowOpen(type, at)))) {
       throw new CommerceError('ticket-unavailable', 'A selected ticket type is unavailable.');
@@ -166,6 +176,16 @@ function priceSelections({ catalog, request, at, comp = false }) {
       ...(comp ? { originalUnitAmount: type.unitAmount } : {}),
     };
   });
+  let promoSummary = null;
+  if (!comp && request.promoCode) {
+    const applied = applyPromoCode({ promo, lines, at });
+    if (!applied.ok) throw new CommerceError(applied.code, applied.message, applied.status);
+    lines = applied.lines;
+    promoSummary = {
+      code: request.promoCode, kind: promo.kind, value: promo.value,
+      discountedSeats: applied.discountedSeats, discountAmount: applied.discountAmount,
+    };
+  }
   const seats = lines.reduce((sum, line) => sum + line.quantity, 0);
   if (seats > catalog.maxPerOrder) throw new CommerceError('quantity-out-of-range', 'This order exceeds the ticket quantity limit.', 400);
   const totalAmount = lines.reduce((sum, line) => sum + line.lineAmount, 0);
@@ -175,7 +195,7 @@ function priceSelections({ catalog, request, at, comp = false }) {
   if (totalAmount > 0 && totalAmount < CURRENCY_MINIMUMS[catalog.currency]) {
     throw new CommerceError('amount-too-small', 'This order is below the minimum card payment amount.', 400);
   }
-  return { lines, subtotalAmount: totalAmount, totalAmount };
+  return { lines, subtotalAmount: totalAmount, totalAmount, ...(promoSummary ? { promo: promoSummary } : {}) };
 }
 
 function makeSeats(orderId, lines, request) {

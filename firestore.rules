@@ -827,6 +827,9 @@ service cloud.firestore {
     match /ticket_inventory/{inventoryId} { allow read, write: if false; }
     match /ticket_orders/{orderId} { allow read, write: if false; }
     match /ticket_payment_attempts/{attemptId} { allow read, write: if false; }
+    // Promo codes and their use counts (ADR 0004 amendment 2026-11-04): a
+    // code must not be listable, and only checkout may move the counter.
+    match /ticket_promo_codes/{code} { allow read, write: if false; }
 
     // Invoicing (issue #208). Server-only in BOTH directions, staff and
     // operators included. An invoice names a third party's billing contact

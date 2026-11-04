@@ -8,6 +8,7 @@
 const { randomUUID } = require('node:crypto');
 const { checkDemoWrites, throwIfDemoPolicyUnavailable } = require('../core/demoWrites.cjs');
 const { internals: { scopeMatches, metadataMatches, objectId, safeId } } = require('./providers/stripe.cjs');
+const { promoRef, releasedPromoUse } = require('./promoCodes.cjs');
 
 const LEASE_MS = 5 * 60_000;
 const REFUND_STATES = new Set(['pending', 'requires_action', 'succeeded', 'failed', 'canceled']);
@@ -241,17 +242,23 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
       const patch = financialPatch(current, state, at);
       const inventoryRef = db.collection('ticket_inventory').doc('current');
       const inventorySnap = await tx.get(inventoryRef);
+      // Read before any write: an expired hold gives its promo code uses back.
+      // Only that case reads the code, so a busy code does not slow other passes.
+      const releasing = current.inventoryState === 'held' && state.session.status === 'expired';
+      const promoSnap = releasing && current.promo?.code ? await tx.get(promoRef(db, current.promo.code)) : null;
       const ticketSnapshots = [];
       for (const seat of current.seats) ticketSnapshots.push(await tx.get(db.collection('tickets').doc(seat.externalId)));
       let inventory = inventorySnap.data();
       let inventoryPatch = {};
       const paid = patch.paymentStatus === 'succeeded';
+      let promoUse = null;
       if ((paid && current.inventoryState === 'held') ||
           (state.session.status === 'expired' && current.inventoryState === 'held')) {
         const { inventoryTransitionPatch } = require('./stripeCommerce.cjs');
         const transition = inventoryTransitionPatch({ order: current, inventory, to: paid ? 'sold' : 'released' });
         inventory = transition.inventory;
         inventoryPatch = transition.orderPatch;
+        if (!paid) promoUse = releasedPromoUse(promoSnap, current, at);
       }
       if (paid && current.inventoryState === 'released') {
         patch.status = 'exception';
@@ -283,6 +290,7 @@ async function reconcileStripeOrder({ db, provider, orderId, now = () => new Dat
         tickets.push(ticket);
       }
       if (Object.keys(inventoryPatch).length) tx.set(inventoryRef, inventory);
+      if (promoUse) tx.set(promoRef(db, current.promo.code), promoUse, { merge: true });
       tx.set(ref, { ...patch, ...inventoryPatch, reconciliationLease: null }, { merge: true });
       return { complete: true, tickets, ticketsPersisted: true, status: patch.status,
         ...(patch.reconciliationException ? { exception: patch.reconciliationException } : {}),

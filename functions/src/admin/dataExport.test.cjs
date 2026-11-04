@@ -202,6 +202,8 @@ test('orders: an operator gets amounts in major units and no provider ids, check
   assert.equal(order['Order ID'], 'ord_fixture1');
   assert.equal(order.Mode, 'test');
   assert.equal(order.Total, '50.00');
+  assert.equal(order['Promo code'], '');
+  assert.equal(order['Promo discount'], '0.00');
   assert.equal(order.Tickets, '2 × General');
   assert.equal(order['Ticket IDs'], 'ord_fixture1_0_0; ord_fixture1_0_1');
   assert.ok(!res.body.csv.includes('uid-ada'));

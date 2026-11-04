@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { validateTicketCatalog, validateCheckoutRequest, isSalesWindowOpen } = require('./ticketCommerce.cjs');
+const { validateTicketCatalog, validateCheckoutRequest, isSalesWindowOpen, normalizePromoCode } = require('./ticketCommerce.cjs');
 
 const catalog = (patch = {}) => ({
   currency: 'usd', capacity: 100, taxTreatment: 'not_collected',
@@ -105,6 +105,22 @@ test('attendees may carry answers, kept as given, and the request may carry the 
     assert.equal(validateCheckoutRequest(request({ formRevision })).ok, false);
   }
   assert.equal(validateCheckoutRequest({ requestId: request().requestId, resume: true, formRevision: 1 }).ok, false);
+});
+
+test('the request may carry a promo code, stored in capitals, never on resume', () => {
+  const checked = validateCheckoutRequest(request({ promoCode: '  early-bird ' }));
+  assert.equal(checked.ok, true);
+  assert.equal(checked.value.promoCode, 'EARLY-BIRD');
+  // No key without a code, so old request fingerprints are unchanged.
+  assert.equal(Object.hasOwn(validateCheckoutRequest(request()).value, 'promoCode'), false);
+  assert.equal(Object.hasOwn(validateCheckoutRequest(request({ promoCode: '  ' })).value, 'promoCode'), false);
+  for (const promoCode of ['ab', 'two words', 42, null]) {
+    const result = validateCheckoutRequest(request({ promoCode }));
+    assert.equal(result.ok, false);
+    assert.equal(result.issues[0].path, 'promoCode');
+  }
+  assert.equal(validateCheckoutRequest({ requestId: request().requestId, resume: true, promoCode: 'EARLY' }).ok, false);
+  assert.equal(normalizePromoCode(' save10 '), 'SAVE10');
 });
 
 test('attendee answers must be a plain object of at most 16 KB, refused by field', () => {

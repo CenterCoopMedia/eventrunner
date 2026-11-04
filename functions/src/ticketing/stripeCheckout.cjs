@@ -6,6 +6,7 @@ const {
 } = require('shared/ticketCommerce');
 const { answeredQuestions, checkAnswers, readRegistrationForm } = require('shared/registrationForm');
 const { verifyAuthToken } = require('../core/auth.cjs');
+const { promoRef, takePromoCheck } = require('./promoCodes.cjs');
 const { checkDemoWrites } = require('../core/demoWrites.cjs');
 const { sendError, methodNotAllowed } = require('../core/errors.cjs');
 const {
@@ -217,13 +218,16 @@ async function reserveCommerceOrder({
     // or released checkout does not need a second cleanup write to unlock it.
     const purchaserRef = db.collection(INVENTORY).doc(`purchaser_${orderIdFor(actor.uid, 'inventory').slice(4)}`);
     const hasAnswers = request.lines.some((line) => line.attendees.some((person) => person.answers !== undefined));
+    const promoCode = comp ? null : request.promoCode || null;
     // The form joins the read set only when answers came, so a question edit
-    // racing this reservation retries it against the new form.
-    const [catalogSnap, inventorySnap, purchaserSnap, formSnap] = await Promise.all([
+    // racing this reservation retries it against the new form. The code joins
+    // when one came, so two checkouts racing its last use cannot both take it.
+    const [catalogSnap, inventorySnap, purchaserSnap, formSnap, promoSnap] = await Promise.all([
       tx.get(db.collection(CATALOG).doc(CURRENT)),
       tx.get(inventoryRef),
       comp ? Promise.resolve(null) : tx.get(purchaserRef),
       hasAnswers ? tx.get(db.collection('config').doc('registration_form')) : Promise.resolve(null),
+      promoCode ? tx.get(promoRef(db, promoCode)) : Promise.resolve(null),
     ]);
     const catalog = catalogValue(catalogSnap);
     // The catalog is in this transaction's read set. A concurrent price or
@@ -251,7 +255,8 @@ async function reserveCommerceOrder({
     }
     const at = now();
     const rate = comp ? null : purchaserWindow(purchaserSnap?.data(), at);
-    const priced = priceSelections({ catalog, request, at, comp });
+    const promo = promoSnap?.exists ? promoSnap.data() : null;
+    const priced = priceSelections({ catalog, request, at, comp, promo });
     const paid = priced.totalAmount > 0;
     if (paid) requirePaymentCredentials(provider);
     const publicUrl = paid ? configuredPublicUrl(config, env) : null;
@@ -323,6 +328,9 @@ async function reserveCommerceOrder({
     if (freeBudgetRef) {
       tx.set(freeBudgetRef, freeBudget);
       for (const ref of recipientRefs) tx.create(ref, { orderId: id, createdAt: at });
+    }
+    if (priced.promo) {
+      tx.set(promoRef(db, promoCode), { used: (promo.used || 0) + priced.promo.discountedSeats, updatedAt: at }, { merge: true });
     }
     tx.create(orderRef, order);
     tx.create(attemptRef, attempt);
@@ -502,6 +510,7 @@ function createTicketingCheckoutHandler(deps) {
       const actor = await verifiedPurchaser(deps.auth, req);
       const parsed = validateCheckoutRequest(req.body);
       if (!parsed.ok) throw new CommerceError('invalid-checkout', parsed.issues[0].message, 400);
+      if (parsed.value.promoCode) await takePromoCheck({ db: deps.db, uid: actor.uid, at: (deps.now || (() => new Date()))() });
       const reserved = await reserveCommerceOrder({ ...deps, actor, request: parsed.value });
       let order = reserved.order;
       if (order.totalAmount > 0 && order.status === 'pending') {
@@ -544,7 +553,10 @@ async function readPurchaserOrder({ db, provider, actor, orderId, requestId, now
     subtotalAmount: order.subtotalAmount, totalAmount: order.totalAmount,
     taxAmount: order.taxAmount, feeAmount: order.feeAmount, taxTreatment: order.taxTreatment,
     refundStatus: order.refundStatus, refundedAmount: order.refundedAmount,
-    lines: order.lines.map(({ ticketTypeId, name, quantity, unitAmount, lineAmount }) => ({ ticketTypeId, name, quantity, unitAmount, lineAmount })),
+    lines: order.lines.map(({ ticketTypeId, name, quantity, unitAmount, lineAmount, listUnitAmount }) => ({
+      ticketTypeId, name, quantity, unitAmount, lineAmount, ...(listUnitAmount !== undefined ? { listUnitAmount } : {}),
+    })),
+    ...(order.promo ? { promo: { code: order.promo.code, discountAmount: order.promo.discountAmount } } : {}),
     tickets, updatedAt: iso(order.updatedAt), checkedAt: now().toISOString(),
   };
 }
@@ -564,6 +576,6 @@ function createTicketingOrderStatusHandler(deps) {
 module.exports = {
   readTicketingCatalog, reserveCommerceOrder, recoverCheckoutAttempt, readPurchaserOrder, createCompOrder,
   createTicketingCatalogHandler, createTicketingCheckoutHandler, createTicketingOrderStatusHandler,
-  internals: { verifiedPurchaser, checkoutResponse, safeCheckoutUrl, verifyCreatedSession, purchaserWindow,
+  internals: { verifiedPurchaser, handleError, catalogValue, assertWritableEvent, checkoutResponse, safeCheckoutUrl, verifyCreatedSession, purchaserWindow,
     ATTEMPT_LEASE_MS, RETRY_BACKOFF_MS, PURCHASER_WINDOW_MS, MAX_PURCHASER_ORDERS },
 };

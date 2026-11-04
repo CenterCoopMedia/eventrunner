@@ -125,6 +125,7 @@
     "ticketingCatalog",
     "ticketingCheckout",
     "ticketingOrderStatus",
+    "ticketingPromoPreview",
     "ticketingCommerceAdmin",
     "ticketingCheckIn",
     "ticketingMyTickets",

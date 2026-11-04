@@ -3,7 +3,8 @@
 **Date:** 2026-10-13  
 **Status:** Proposed for review with the implementation of [epic #483](https://github.com/CenterCoopMedia/eventrunner/issues/483). Merge accepts this extension; merchant setup and live sales require a separate launch decision.  
 **Extends:** [ADR 0001](0001-event-platform-v1.md), ticketing sections only.  
-**Amended:** 2026-10-20, for a card pay link on an issued sponsor invoice ([#519](https://github.com/CenterCoopMedia/eventrunner/issues/519)). See [the amendment](#amendment-2026-10-20-invoice-pay-links).
+**Amended:** 2026-10-20, for a card pay link on an issued sponsor invoice ([#519](https://github.com/CenterCoopMedia/eventrunner/issues/519)). See [the amendment](#amendment-2026-10-20-invoice-pay-links).  
+**Amended:** 2026-11-04, for Event Runner promo codes ([ADR 0008](0008-registration-and-pitch-steppers.md) §6). See [the amendment](#amendment-2026-11-04-promo-codes).
 
 ## Decision and boundaries
 
@@ -336,6 +337,64 @@ not met until the client connects again.
 **Test mode.** The console connects in test mode first when the operator asks for a rehearsal,
 and in live mode for the launch. `EVENT_STRIPE_MODE` follows the mode of the token.
 
+## Amendment 2026-11-04: promo codes
+
+[ADR 0008](0008-registration-and-pitch-steppers.md) §6 puts promo codes in scope. Event Runner
+decides the price. Stripe's own promotion codes stay off (`allow_promotion_codes: false`), so
+only one place sets a price.
+
+**Records.** `ticket_promo_codes/{CODE}`. The document ID is the code in capitals, so a code is
+unique without a query and case does not matter. A code has 3 to 32 letters, digits, `-` or `_`.
+Each record has:
+
+- `kind`: `percent` (1 to 100) or `amount` (minor units off each ticket);
+- `ticketTypeIds`: the ticket types it applies to, or empty for every paid type;
+- `maxUses`: the number of discounted tickets over all orders, or none;
+- `maxPerOrder`: the number of discounted tickets in one order, or none;
+- `startsAt` and `endsAt`, and `active`;
+- `used`: the discounted tickets that are held or sold.
+
+Clients cannot read or write the collection. Staff and operators list and save codes through
+the commerce admin endpoint. A save never changes `used`. A code with uses cannot be deleted; it
+is made inactive.
+
+**Price.** The server applies the code inside the reservation transaction, after the catalog
+price. Each eligible ticket gets the same discount: a percent is rounded to the nearest minor
+unit, half up; an amount is taken off each ticket; no price goes below zero. Free ticket types
+get no discount. The discounted unit price goes to Checkout as `price_data.unit_amount`, so
+Stripe reports no discount of its own. For this reason `discountAmount` stays 0: it mirrors
+Stripe's `total_details.amount_discount`, which reconciliation compares. The order records the
+code in `promo` (code, kind, value, discounted tickets, discount amount), and each discounted
+line keeps `listUnitAmount`. `totalAmount` is the paid amount, and refunds already follow it.
+
+**Limits.** Limits count discounted tickets. An order with more eligible tickets than
+`maxPerOrder` is refused, not part-discounted: one line has one unit price in Checkout. The code
+document is in the reservation's read set, so two checkouts racing the last use cannot both
+take it. The use is released in the reconciliation transaction that releases an expired, unpaid
+hold. A paid, refunded or cancelled order keeps its use. A comp order ignores codes.
+
+**Free orders.** A code that makes an order free makes a free order. The free-ticket guards
+still apply: the per-purchaser budget and one free ticket per attendee email.
+
+**Errors.** An unknown, inactive or out-of-window code gets one message, "This code is not
+valid.", so a guess learns nothing. Other answers: the code does not apply to the selected
+tickets; the order has too many discounted tickets; the code has no uses left (409, it can
+change under a race).
+
+**Preview.** `ticketingPromoPreview` prices a cart with a code before checkout, for the review
+step. It needs a signed-in, verified account and reads without writing an order. The
+reservation checks the code again; the preview is only a display.
+
+**Check budget.** Each account has 20 code checks in 15 minutes, shared by the preview and by
+checkout with a code. A check is spent in its own transaction before the code is read: a
+refused code rolls back every write in the reservation, so only a separate write makes a
+failed guess count. Without the shared budget, checkout would answer guesses with no limit.
+
+**Request.** The checkout request gains an optional `promoCode`. It joins the request
+fingerprint only when present, so the same request ID with a different code is a different
+order and old fingerprints do not change.
+
+## Stripe references
 
 - [Checkout fulfillment](https://docs.stripe.com/checkout/fulfillment?payment-ui=stripe-hosted)
 - [Webhook signatures, retries, and event ordering](https://docs.stripe.com/webhooks)
