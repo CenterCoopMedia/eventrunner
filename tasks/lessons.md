@@ -189,3 +189,12 @@ Rules written after user corrections. Read at session start.
   gets its own branch cut from the branch of the part below it, and its pull
   request targets that branch, not main. The bottom of the stack targets
   main. Keep "Closes #n" in each body (see 2026-09-09).
+
+## 2026-11-03: a contract between parallel agents must name the real codes
+
+- R5b split the server and the web page between two agents. My brief told
+  the web agent bad answers come back as `bad-request`; the server agent used
+  `invalid-checkout`, the code its module already used. Both test suites
+  passed against their own mocks, and Codex caught the gap. When work is
+  split, write the exact error codes and message shapes into both briefs, and
+  before pushing grep the server for each code the client matches on.

@@ -301,7 +301,8 @@ export default function Tickets() {
         const catalogChanged = err.code === 'catalog-changed';
         // Both refuse the answers before any order exists.
         const formChanged = err.code === 'form-changed';
-        const answerErrors = err.code === 'bad-request' && body.resume !== true ? answerErrorsOf(err.message, body.lines, sentForm) : null;
+        // stripeCheckout refuses bad answers as invalid-checkout.
+        const answerErrors = err.code === 'invalid-checkout' && body.resume !== true ? answerErrorsOf(err.message, body.lines, sentForm) : null;
         if (missingSavedCheckout || profileRejectedBeforeCreation || catalogChanged || formChanged || answerErrors || NO_ORDER_CODES.includes(err.code)) {
           forgetCheckoutAttempt(uid);
           requestRef.current = null;

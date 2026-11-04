@@ -135,7 +135,19 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
       const seats = Array.isArray(order?.seats) ? order.seats : [];
       const seat = seats.find((entry) => entry?.externalId === id);
       if (seat && seat.answers && typeof seat.answers === 'object') {
-        move = { order, orderRef, answersRef, seats, seat, recordExists: answersSnap.exists };
+        move = { order, orderRef, answersRef, seats, seat, recordExists: answersSnap.exists, userRef: null, visibility: null };
+        // A directory answer sets the holder's profile visibility, as
+        // saveTicketAnswers does: "public" needs the public profiles feature.
+        const listing = seat.answers.directoryListing;
+        if (!move.recordExists && typeof listing === 'string') {
+          const userRef = db.collection(USERS).doc(uid);
+          const [userSnap, featuresSnap] = await tx.getAll(userRef, db.collection('config').doc('features'));
+          if (userSnap.exists) {
+            const allowPublic = featuresSnap.exists && featuresSnap.data()?.publicAttendeeProfiles === true;
+            move.userRef = userRef;
+            move.visibility = listing === 'public' && !allowPublic ? 'attendees_only' : listing;
+          }
+        }
       }
     }
     const at = now();
@@ -152,6 +164,7 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
             .filter((question) => ids.includes(question?.id)),
           ticketStatus: data.status, updatedAt: at, updatedBy: 'checkout',
         });
+        if (move.userRef) tx.set(move.userRef, { profileVisibility: move.visibility, updatedAt: at }, { merge: true });
       }
       // Sensitive answers stay on the order only until the claim.
       tx.update(move.orderRef, {

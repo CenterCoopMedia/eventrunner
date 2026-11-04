@@ -602,7 +602,7 @@ describe('registration questions in the ticket stepper', () => {
     // The catalog lists VIP first; the server numbers lines sorted by id, so line 0 is general.
     ticketingRequest.mockImplementation(async (name) => {
       if (name === 'ticketingCatalog') return { ...CATALOG, maxPerOrder: 6, ticketTypes: [VIP, ...CATALOG.ticketTypes] };
-      throw new TicketingRequestError('bad-request', 'lines.0.attendees.1.answers.organization: Use at most 200 characters.; lines.1.attendees.0.answers.organization: Answer this question.', 400);
+      throw new TicketingRequestError('invalid-checkout', 'lines.0.attendees.1.answers.organization: Use at most 200 characters.; lines.1.attendees.0.answers.organization: Answer this question.', 400);
     });
     mount();
     await screen.findByLabelText('Quantity — VIP');

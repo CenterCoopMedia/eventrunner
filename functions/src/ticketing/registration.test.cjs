@@ -745,3 +745,23 @@ test('createUserFromTicket fails closed on unavailable policy and still creates 
   assert.equal(res.body.created, true);
   assert.equal(authImpl.created.length, 1);
 });
+
+test('a directory answer given at checkout sets the holder\'s profile visibility at claim, behind the public profiles feature', async () => {
+  const withDirectory = (directoryListing, extra = {}) => orderDb({
+    [`ticket_orders/${ORDER_ID}`]: {
+      id: ORDER_ID, registrationFormRevision: 4, registrationQuestions: QUESTIONS,
+      seats: [{ externalId: `${ORDER_ID}_0_0`, email: 'attendee@example.com', answers: { directoryListing } }],
+    },
+    ...extra,
+  });
+  const claim = (db) => claimTicket({ db, externalId: `${ORDER_ID}_0_0`, uid: 'uid-ada', email: 'attendee@example.com', now: () => T0 });
+  const hidden = withDirectory('private');
+  await claim(hidden);
+  assert.equal(hidden.read('users', 'uid-ada').profileVisibility, 'private');
+  const publicOff = withDirectory('public');
+  await claim(publicOff);
+  assert.equal(publicOff.read('users', 'uid-ada').profileVisibility, 'attendees_only');
+  const publicOn = withDirectory('public', { 'config/features': { publicAttendeeProfiles: true } });
+  await claim(publicOn);
+  assert.equal(publicOn.read('users', 'uid-ada').profileVisibility, 'public');
+});
