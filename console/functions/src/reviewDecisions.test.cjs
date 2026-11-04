@@ -26,7 +26,7 @@ test('requestChanges moves a submitted request to changes_requested, records the
     eventName: 'NC Local Summit',
     status: 'changes_requested',
     note: 'Add the venue address.',
-    link: `${PUBLIC_URL}/`,
+    link: `${PUBLIC_URL}/organizations/o1/applications/a1`,
   });
 });
 

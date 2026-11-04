@@ -17,7 +17,8 @@
 
 const { ConsoleError } = require('./http.cjs');
 const { toMillis } = require('./access.cjs');
-const { NOT_FOUND, applicationRef, requireAppId, requireOperator, siteNamesOf } = require('./reviewAccess.cjs');
+const { NOT_FOUND, applicationRef, requireAppId, requireOperator } = require('./reviewAccess.cjs');
+const { heldNames, releaseNames } = require('./siteNames.cjs');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const RETENTION_DAYS = 90;
@@ -27,7 +28,7 @@ const RETENTION_BATCH = 500;
 
 /**
  * Delete one request in a transaction, after `check(app)` passes on the
- * request as it is now. Frees its name when the name still points at it.
+ * request as it is now. Frees every name it holds.
  *
  * @returns {Promise<boolean>} false when `check` says to keep it
  */
@@ -38,10 +39,9 @@ async function deleteApplication(db, { appId, by, action, at, check }) {
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const app = { id: snap.id, ...snap.data() };
     if (!check(app)) return false;
-    const nameRefs = siteNamesOf(app).map((name) => db.collection('site_names').doc(name));
-    const nameSnaps = nameRefs.length ? await tx.getAll(...nameRefs) : [];
+    const held = await heldNames(tx, db, app.id);
     tx.delete(ref);
-    nameSnaps.forEach((snap, i) => { if (snap.exists && snap.data().appId === app.id) tx.delete(nameRefs[i]); });
+    releaseNames(tx, db, held);
     tx.create(db.collection('console_audit').doc(), { action, appId: app.id, by, at });
     return true;
   });

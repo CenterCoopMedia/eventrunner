@@ -19,8 +19,10 @@
 
 const { ConsoleError } = require('./http.cjs');
 const {
-  NOT_FOUND, applicationRef, ownerEmails, requireAppId, requireOperator, reviewedAnswers, siteNameOf, siteNamesOf,
+  NOT_FOUND, applicationRef, ownerEmails, requireAppId, requireOperator, reviewedAnswers, siteNameOf,
 } = require('./reviewAccess.cjs');
+const { heldNames, releaseNames } = require('./siteNames.cjs');
+const { statusLink } = require('./applicationStatus.cjs');
 const { APPROVAL_FIELDS, approvalDefaults, checkSettings, readConsoleSettings } = require('./consoleSettings.cjs');
 
 const NOTE_MAX = 2000;
@@ -40,8 +42,8 @@ function requireNote(value) {
  * Move one request from one of `from` to `to` in a transaction.
  *
  * `review(app)` returns the `review.settings` value to record, or null.
- * With `releaseName`, the request's `site_names` reservation is deleted
- * when it still belongs to this request.
+ * With `releaseName`, every `site_names` reservation the request holds
+ * is deleted.
  *
  * @returns {Promise<object>} the request as it was before the change
  */
@@ -52,8 +54,7 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, note 
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const app = { id: snap.id, ...snap.data() };
     if (!from.includes(app.status)) throw new ConsoleError(409, 'status-changed', STATUS_CHANGED);
-    const nameRefs = releaseName ? siteNamesOf(app).map((name) => db.collection('site_names').doc(name)) : [];
-    const nameSnaps = nameRefs.length ? await tx.getAll(...nameRefs) : [];
+    const held = releaseName ? await heldNames(tx, db, app.id) : [];
     // Every read is done; the writes follow.
     const settings = review(app);
     const at = new Date(now());
@@ -65,7 +66,7 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, note 
       history: [...history, { status: to, at, by: user.uid, note }],
       review: { note, by: user.uid, at, settings },
     });
-    nameSnaps.forEach((snap, i) => { if (snap.exists && snap.data().appId === app.id) tx.delete(nameRefs[i]); });
+    releaseNames(tx, db, held);
     return app;
   });
 }
@@ -86,7 +87,7 @@ async function notifyOwners({ db, mailer, publicUrl, log = console }, app, { sta
       eventName: reviewedAnswers(app)?.event?.name || '',
       status,
       note,
-      link: base ? `${base}/` : '',
+      link: statusLink(base, app.orgId, app.id),
     };
     for (const to of owners) await mailer.sendStatusChange({ ...change, to });
     return { emailed: owners.length, mailFailed: false };
