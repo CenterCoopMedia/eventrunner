@@ -468,7 +468,7 @@ test('each grant the rehearsal missed is made up front', async () => {
   assert.ok(holds(bindingsOf(fake, `${iam}/${COMPUTE}`), 'roles/iam.serviceAccountUser', deploy), 'act as compute');
   assert.ok(holds(bindingsOf(fake, `${iam}/${PROJECT}@appspot.gserviceaccount.com`), 'roles/iam.serviceAccountUser', deploy), 'act as appspot');
 
-  assert.ok(fake.state.identities.includes('storage.googleapis.com'), 'the storage agent is made first');
+  assert.ok(fake.state.identities.some((service) => service === 'storage.googleapis.com'), 'the storage agent is made first');
   assert.ok(holds(project, 'roles/pubsub.publisher', `serviceAccount:service-${NUMBER}@gs-project-accounts.iam.gserviceaccount.com`));
   assert.ok(holds(project, 'roles/iam.serviceAccountTokenCreator', `serviceAccount:service-${NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com`));
   assert.ok(holds(project, 'roles/run.invoker', `serviceAccount:${COMPUTE}`));
@@ -616,7 +616,7 @@ test('a test-mode connection fails a live build and its token is deleted', async
   assert.match(fake.db.read('console_builds/a1').error, /test mode, and this is a live build/);
   assert.equal(fake.consoleSecrets.store.size, 0);
   assert.equal(fake.clientSecrets.store.has('TICKETING_API_TOKEN'), false);
-  assert.ok(!fake.calls.some((c) => c.url.includes('api.stripe.com')), 'a test token is not used');
+  assert.ok(!fake.calls.some((c) => new URL(c.url).host === 'api.stripe.com'), 'a test token is not used');
   assert.ok(notices(fake.mailer).some((n) => n.noticeKind === 'build-run-failed'));
 });
 
