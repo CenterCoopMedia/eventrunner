@@ -1,6 +1,7 @@
 import registrationForm from './registrationForm.cjs';
 
 export const {
+  answerFromText,
   answerText,
   answeredQuestions,
   summarizeAnswers,

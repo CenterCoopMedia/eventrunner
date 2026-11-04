@@ -646,8 +646,8 @@
           <p>Open <strong>Invoice settings</strong> from the Invoices page. The settings hold what every issued invoice copies: The issuer name, address and email, the tax ID, the payment instructions, the number prefix and the fallback currency. Staff can read them. Only an operator can change them, because they hold the bank details. The settings are not part of the public event settings.</p>
           <p>The number prefix is 1 to 10 capital letters, digits or hyphens, and starts with a letter. The page shows the next number.</p>
           <h2 id="import-records">Import records<a class="heading-anchor" href="#import-records" aria-label="Link to this section">#</a></h2>
-          <p>Add speakers, sessions and organizations (sponsors and partners) from a CSV file, for example an export from a spreadsheet or another event system. Open <strong>Import records</strong> under Operations. Staff and operators can use it.</p>
-          <p><strong>The import saves drafts only.</strong> It publishes nothing and sends no email or invitation:</p>
+          <p>Add speakers, sessions, organizations (sponsors and partners) and registrations from a CSV file, for example an export from a spreadsheet or another event system. Open <strong>Import records</strong> under Operations. Staff and operators can use it.</p>
+          <p><strong>The import saves drafts only</strong>, except registrations, which make tickets (below). It publishes nothing and sends no email or invitation:</p>
           <ul>
           <li>A new speaker has the status <strong>Not invited</strong> (draft). It is not in the public speaker directory. Approve or invite the speaker on the <strong>Speakers</strong> page.</li>
           <li>A new session or organization is a draft, and it is hidden: <strong>Show this session when it is published</strong> and <strong>Show this organization when it is published</strong> are cleared. Turn the option on in the editor, then publish.</li>
@@ -657,7 +657,7 @@
           </ul>
           <p><strong>Steps.</strong></p>
           <ol>
-          <li>Select the <strong>Record type</strong>: Speakers, Sessions or Organizations. Import speakers before sessions, so that the sessions can name their speakers.</li>
+          <li>Select the <strong>Record type</strong>: Speakers, Sessions, Organizations or Registrations. Import speakers before sessions, so that the sessions can name their speakers.</li>
           <li>Choose the CSV file. The first row names the columns. A file can have up to 500 rows and 5 MB. A cell can have up to 5000 characters. Split a larger file.</li>
           <li>Under <strong>Columns</strong>, point each field at a column of the file. A column with the template&#39;s header, or with the field&#39;s name, is selected for you. A field set to <strong>Not in this file</strong> is never read or changed. Only the columns you map leave your browser.</li>
           <li>Select <strong>Preview import</strong>. The preview lists each row with its result: <strong>New</strong>, <strong>Update</strong>, <strong>Matches existing</strong>, <strong>No change</strong> or <strong>Error</strong>, and the reason for each error. Nothing is saved yet.</li>
@@ -679,6 +679,13 @@
           <li>A session matches by <code>session_id</code>. With no <code>session_id</code> cell, it matches the session whose ID the title makes, if that session has the same title and is on the same day. A session with the same title on another day is a different session: the row makes a new one, with a note.</li>
           <li>An organization matches by its address (<code>slug</code>, or the address the name makes).</li>
           <li>A record that an import already linked to another external ID is not matched. The row is an error. Check the external ID.</li>
+          </ul>
+          <p><strong>Registrations.</strong> With the manual ticketing provider, the <strong>Registrations</strong> type makes one ticket per row, for attendees who registered somewhere else. With any other provider every row is refused, because that provider owns its tickets.</p>
+          <ul>
+          <li>Map <strong>Ticket ID</strong> (the external ID, which becomes the ticket&#39;s ID) and <strong>Email address</strong>. First name, last name and ticket type are optional.</li>
+          <li>Each question on the registration form has an <strong>Answer:</strong> field. Write yes or no for a yes-or-no question, the choice&#39;s words for a choice, and separate several choices with <code>;</code>. For diet, write <code>Other: </code> before a need that is not listed. The attendee directory question is not offered: each attendee chooses their own listing on their profile. A required question the file leaves blank is not an error: the attendee answers it later on <strong>Complete your registration</strong>.</li>
+          <li>A new row makes a valid ticket. Its answers wait with the ticket and belong to nobody until the attendee signs in with the same email and claims it. They then move to the attendee&#39;s account. If the attendee already answered, their own answers are kept.</li>
+          <li>Import the file again to change names, ticket types or answers. An answer the attendee changed is kept, with a note. The email of a claimed ticket never changes by import, because it links the ticket to the account. Change it on the attendee record. A new email on an unclaimed ticket is a new person: the answers held for the old address are removed, and only the row&#39;s own answers are kept.</li>
           </ul>
           <p><strong>Checks.</strong> Each row goes through the same checks as the editor: a speaker&#39;s names, email and slug; a session&#39;s title, description, day and times; an organization&#39;s name, website and order. A row that fails shows the editor&#39;s own message.</p>
           <p><strong>Download a template</strong> with <strong>Download the speaker template</strong> (or the session or organization template). Each template has the header row below and one example row. You can use other column names and map them by hand.</p>

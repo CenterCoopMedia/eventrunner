@@ -58,6 +58,19 @@ path (R2c, R3) comes before registration.
       is the server; R6b is the admin panel and the review-step field. Later:
       split the 640-line `Tickets.jsx` into step components.
 - [ ] R7 Registration import in `/admin/import`; speaker logistics export.
+  - [x] R7a Registrations import type (ADR 0008 §7). Manual provider only;
+        any other provider refuses every row. Columns: external ID (the
+        ticket ID), email, first and last name, ticket type, and
+        `answer:<question id>` per question. A new row makes a valid manual
+        ticket. Answers are checked against the live form; until a claim
+        they wait in server-only `ticket_answer_holds/{ticketId}`, and
+        `claimTicket` moves them to `ticket_answers` as it does for checkout
+        seats (an attendee's own record wins). Re-import is the three-way
+        merge: an answer or name staff or the attendee changed is kept and
+        reported. The email of a claimed ticket never changes by import.
+  - [ ] R7b Speaker logistics export (staff-only `speaker_logistics`):
+        travel, access, audio and video needs. Check the pitch export has
+        the new pitch columns and presenters.
 
 ## 2026-11-03: client onboarding, account creation and provisioning
 

@@ -700,9 +700,9 @@ The number prefix is 1 to 10 capital letters, digits or hyphens, and starts with
 
 ## Import records
 
-Add speakers, sessions and organizations (sponsors and partners) from a CSV file, for example an export from a spreadsheet or another event system. Open **Import records** under Operations. Staff and operators can use it.
+Add speakers, sessions, organizations (sponsors and partners) and registrations from a CSV file, for example an export from a spreadsheet or another event system. Open **Import records** under Operations. Staff and operators can use it.
 
-**The import saves drafts only.** It publishes nothing and sends no email or invitation:
+**The import saves drafts only**, except registrations, which make tickets (below). It publishes nothing and sends no email or invitation:
 
 - A new speaker has the status **Not invited** (draft). It is not in the public speaker directory. Approve or invite the speaker on the **Speakers** page.
 - A new session or organization is a draft, and it is hidden: **Show this session when it is published** and **Show this organization when it is published** are cleared. Turn the option on in the editor, then publish.
@@ -712,7 +712,7 @@ Add speakers, sessions and organizations (sponsors and partners) from a CSV file
 
 **Steps.**
 
-1. Select the **Record type**: Speakers, Sessions or Organizations. Import speakers before sessions, so that the sessions can name their speakers.
+1. Select the **Record type**: Speakers, Sessions, Organizations or Registrations. Import speakers before sessions, so that the sessions can name their speakers.
 2. Choose the CSV file. The first row names the columns. A file can have up to 500 rows and 5 MB. A cell can have up to 5000 characters. Split a larger file.
 3. Under **Columns**, point each field at a column of the file. A column with the template's header, or with the field's name, is selected for you. A field set to **Not in this file** is never read or changed. Only the columns you map leave your browser.
 4. Select **Preview import**. The preview lists each row with its result: **New**, **Update**, **Matches existing**, **No change** or **Error**, and the reason for each error. Nothing is saved yet.
@@ -735,6 +735,13 @@ If the file or the mapping changes after the preview, the import is refused. Pre
 - A session matches by `session_id`. With no `session_id` cell, it matches the session whose ID the title makes, if that session has the same title and is on the same day. A session with the same title on another day is a different session: the row makes a new one, with a note.
 - An organization matches by its address (`slug`, or the address the name makes).
 - A record that an import already linked to another external ID is not matched. The row is an error. Check the external ID.
+
+**Registrations.** With the manual ticketing provider, the **Registrations** type makes one ticket per row, for attendees who registered somewhere else. With any other provider every row is refused, because that provider owns its tickets.
+
+- Map **Ticket ID** (the external ID, which becomes the ticket's ID) and **Email address**. First name, last name and ticket type are optional.
+- Each question on the registration form has an **Answer:** field. Write yes or no for a yes-or-no question, the choice's words for a choice, and separate several choices with `;`. For diet, write `Other: ` before a need that is not listed. The attendee directory question is not offered: each attendee chooses their own listing on their profile. A required question the file leaves blank is not an error: the attendee answers it later on **Complete your registration**.
+- A new row makes a valid ticket. Its answers wait with the ticket and belong to nobody until the attendee signs in with the same email and claims it. They then move to the attendee's account. If the attendee already answered, their own answers are kept.
+- Import the file again to change names, ticket types or answers. An answer the attendee changed is kept, with a note. The email of a claimed ticket never changes by import, because it links the ticket to the account. Change it on the attendee record. A new email on an unclaimed ticket is a new person: the answers held for the old address are removed, and only the row's own answers are kept.
 
 **Checks.** Each row goes through the same checks as the editor: a speaker's names, email and slug; a session's title, description, day and times; an organization's name, website and order. A row that fails shows the editor's own message.
 

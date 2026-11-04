@@ -133,3 +133,48 @@ test('the summary counts only answers on tickets that are still valid, and reads
   assert.equal(answerText(now, false, answered), 'No');
   assert.equal(answerText(now, 'Maybe'), 'Maybe');
 });
+
+test('answerFromText reads a CSV cell back into the answer answerText writes', () => {
+  const { answerFromText, answerText } = require('./registrationForm.cjs');
+  const questions = Object.fromEntries(activeQuestions({
+    ...FORM, standard: { ...FORM.standard, photoConsent: { enabled: true } },
+  }).map((question) => [question.id, question]));
+  const cases = [
+    ['organization', 'Gazette'],
+    ['photoConsent', true],
+    ['photoConsent', false],
+    ['directoryListing', 'attendees_only'],
+    ['q_shirt', 'M'],
+    ['q_topics', ['Revenue', 'Audience']],
+    ['dietary', { choices: ['Vegan', 'Other'], other: 'No mushrooms' }],
+  ];
+  for (const [id, value] of cases) {
+    assert.deepEqual(answerFromText(questions[id], answerText(questions[id], value)), value, id);
+  }
+  // Loose spellings an export from another platform uses.
+  assert.equal(answerFromText(questions.photoConsent, ' YES '), true);
+  assert.equal(answerFromText(questions.photoConsent, 'n'), false);
+  assert.equal(answerFromText(questions.directoryListing, 'private'), 'private');
+  assert.equal(answerFromText(questions.q_shirt, ' m '), 'M');
+  assert.deepEqual(answerFromText(questions.q_topics, 'audience;revenue'), ['Audience', 'Revenue']);
+  assert.deepEqual(answerFromText(questions.dietary, 'vegetarian; gluten-free'), { choices: ['Vegetarian', 'Gluten-free'], other: '' });
+  // Blank is no answer; a value no choice matches is kept as typed so checkAnswers names it.
+  assert.equal(answerFromText(questions.organization, '   '), undefined);
+  assert.equal(answerFromText(questions.q_shirt, 'XXL'), 'XXL');
+  assert.equal(answerFromText(questions.photoConsent, 'maybe'), 'maybe');
+  assert.deepEqual(checkAnswers({ q_shirt: 'XXL', organization: 'Gazette' }, FORM).ok, false);
+});
+
+test('answerFromText keeps a choice that contains a semicolon, and reads Other without a slow pattern', () => {
+  const { answerFromText, answerText } = require('./registrationForm.cjs');
+  const question = { id: 'q_pick', kind: 'many_choices', choices: ['A; B', 'A', 'B'] };
+  assert.deepEqual(answerFromText(question, answerText(question, ['A; B'])), ['A; B']);
+  assert.deepEqual(answerFromText(question, 'A; B; B'), ['A; B', 'B']);
+  assert.deepEqual(answerFromText(question, 'a;b'), ['A; B']);
+  const dietary = { id: 'dietary', kind: 'dietary', choices: [] };
+  assert.deepEqual(answerFromText(dietary, 'Vegan; Other: no nuts; no shellfish'), { choices: ['Vegan', 'Other'], other: 'no nuts; no shellfish' });
+  // A long run of tabs after "other" returns at once (CodeQL: polynomial regex).
+  const started = Date.now();
+  answerFromText(dietary, `other${'\t'.repeat(50000)}x`);
+  assert.ok(Date.now() - started < 200);
+});

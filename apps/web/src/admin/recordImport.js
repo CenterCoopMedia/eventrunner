@@ -1,10 +1,12 @@
-// The record import page's vocabulary (functions/src/imports/): the three
+// The record import page's vocabulary (functions/src/imports/): the four
 // record types, the fields a CSV column can be mapped to, the template each
 // type downloads, and the words each preview verdict is set in.
 //
 // The server owns the field list. recordImport.test.js reads each
 // importer's `fields` and holds this file to it, so a field cannot be added
 // on one side only.
+
+import { activeQuestions } from 'shared/registrationForm';
 
 /** Each record type the import writes, in the order the page offers them. */
 export const RECORD_IMPORT_TYPES = Object.freeze([
@@ -69,7 +71,48 @@ export const RECORD_IMPORT_TYPES = Object.freeze([
       { id: 'order', label: 'Order on the sponsors page', header: 'order', example: '1' },
     ],
   },
+  {
+    id: 'registrations',
+    label: 'Registrations',
+    noun: 'registration',
+    plural: 'registrations',
+    // Registrations make tickets, not drafts (functions/src/imports/registrationImport.cjs).
+    asDrafts: false,
+    previewNote: 'Each new row makes a valid ticket. Answers wait with the ticket until the attendee claims it, then belong to their account. No email is sent.',
+    doneNote: 'The tickets are on the Attendees page. Each attendee claims theirs by signing in with the same email.',
+    fields: [
+      { id: 'externalId', label: 'Ticket ID', required: true, header: 'ticket_id', example: 'REG-001' },
+      { id: 'email', label: 'Email address', required: true, header: 'email', example: 'ada@example.com' },
+      { id: 'firstName', label: 'First name', header: 'first_name', example: 'Ada' },
+      { id: 'lastName', label: 'Last name', header: 'last_name', example: 'Lovelace' },
+      { id: 'ticketClass', label: 'Ticket type', header: 'ticket_type', example: 'Full event pass' },
+    ],
+  },
 ]);
+
+/**
+ * The registrations type with one field per question the form asks,
+ * `answer:<question id>` as the server reads it. Other types, and a form
+ * not loaded yet, come back unchanged.
+ */
+export function withAnswerFields(type, form) {
+  if (type.id !== 'registrations' || !form) return type;
+  // The directory listing is the attendee's own choice; the server refuses it.
+  const answers = activeQuestions(form).filter((question) => question.id !== 'directoryListing').map((question) => ({
+    id: `answer:${question.id}`,
+    label: `Answer: ${question.name}`,
+    // The question ID keeps every header unique, whatever the labels say.
+    header: `answer_${question.id}`,
+    example: '',
+  }));
+  return { ...type, fields: [...type.fields, ...answers] };
+}
+
+/** The mapping without fields the type no longer has (a question removed from the form). */
+export function pruneMapping(mapping, type) {
+  const ids = new Set(type.fields.map((field) => field.id));
+  return Object.fromEntries(Object.entries(mapping).filter(([field]) => ids.has(field)));
+}
 
 export function importTypeById(id) {
   return RECORD_IMPORT_TYPES.find((type) => type.id === id) ?? RECORD_IMPORT_TYPES[0];

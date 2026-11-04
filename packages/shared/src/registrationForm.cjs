@@ -305,6 +305,84 @@ function answerText(question, value, answered = null) {
 }
 
 /**
+ * A CSV cell read back into an answer: the reverse of answerText, for the
+ * registration import (ADR 0008 §7). Case and spacing do not matter, and
+ * yes/no takes y/n and true/false. Blank is no answer (undefined). A value
+ * no choice matches is kept as typed, so checkAnswers names the problem.
+ */
+function answerFromText(question, text) {
+  const raw = typeof text === 'string' ? text.trim() : '';
+  if (!raw) return undefined;
+  const key = (value) => value.trim().toLowerCase();
+  const pick = (choices, value) => choices.find((choice) => key(choice) === key(value)) ?? value.trim();
+  switch (question?.kind) {
+    case 'yes_no':
+      if (['yes', 'y', 'true'].includes(key(raw))) return true;
+      if (['no', 'n', 'false'].includes(key(raw))) return false;
+      return raw;
+    case 'directory':
+      return DIRECTORY_CHOICES.find((choice) => key(choice.id) === key(raw) || key(choice.label) === key(raw))?.id ?? raw;
+    case 'one_choice':
+      return pick(question.choices, raw);
+    case 'many_choices':
+      return splitChoices(raw, question.choices);
+    case 'dietary': {
+      const choices = [];
+      let other = '';
+      const parts = raw.split(';');
+      for (let index = 0; index < parts.length; index += 1) {
+        const otherText = afterOther(parts[index]);
+        if (otherText !== null) {
+          // Other comes last in answerText, so the rest of the cell is its text.
+          choices.push('Other');
+          other = [otherText, ...parts.slice(index + 1)].join(';').trim();
+          break;
+        }
+        choices.push(...splitChoices(parts[index], DIETARY_CHOICES));
+      }
+      return { choices, other };
+    }
+    default:
+      return raw;
+  }
+}
+
+/**
+ * A ";" list read back into choices. A choice may itself contain ";", so
+ * at each place the longest run of parts that names a choice wins.
+ */
+function splitChoices(raw, choices) {
+  // Case and the spacing around each ";" do not matter.
+  const key = (value) => value.split(';').map((part) => part.trim()).join(';').toLowerCase();
+  const known = new Map(choices.map((choice) => [key(choice), choice]));
+  const parts = raw.split(';');
+  const picked = [];
+  let index = 0;
+  while (index < parts.length) {
+    let taken = 0;
+    for (let end = parts.length; end > index; end -= 1) {
+      const joined = key(parts.slice(index, end).join(';'));
+      if (known.has(joined)) { picked.push(known.get(joined)); taken = end - index; break; }
+    }
+    if (!taken) {
+      const text = parts[index].trim();
+      if (text) picked.push(text);
+      taken = 1;
+    }
+    index += taken;
+  }
+  return picked;
+}
+
+/** The text after "Other:" (any case and spacing), or null. No regular expression: CodeQL. */
+function afterOther(part) {
+  const text = part.trimStart();
+  if (text.slice(0, 5).toLowerCase() !== 'other') return null;
+  const rest = text.slice(5).trimStart();
+  return rest.startsWith(':') ? rest.slice(1).trim() : null;
+}
+
+/**
  * The questions an answer record keeps, as the attendee saw them: enough to
  * read each answer later, whatever the form becomes.
  */
@@ -352,6 +430,7 @@ function summarizeAnswers(records, form) {
 }
 
 module.exports = {
+  answerFromText,
   answerText,
   answeredQuestions,
   summarizeAnswers,

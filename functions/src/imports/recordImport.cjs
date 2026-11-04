@@ -89,6 +89,8 @@ const MAX_CELL_LENGTH = 5000;
 const MAX_COLUMNS = 60;
 /** The longest external id. */
 const MAX_EXTERNAL_ID_LENGTH = 200;
+/** The id part of a prefixed mapping key (a registration question id). */
+const MAPPING_KEY_RE = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 // Printable characters only. Built from code points so the source has no
 // literal control characters.
 const CONTROL_CHAR_RE = new RegExp(`[${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}]`);
@@ -269,6 +271,17 @@ function validateImportRequest(body, importers) {
     const value = body.mapping[field];
     if (typeof value === 'string' && value.trim()) mapping[field] = value;
   }
+  // An importer whose fields depend on stored data (the registration
+  // questions) takes `<prefix><id>` keys; the importer checks each id.
+  if (importer.mappingPrefix) {
+    const extra = Object.keys(body.mapping).filter((field) => field.startsWith(importer.mappingPrefix));
+    if (extra.length > MAX_COLUMNS) return { ok: false, message: `mapping: map at most ${MAX_COLUMNS} columns` };
+    for (const field of extra) {
+      const value = body.mapping[field];
+      if (!MAPPING_KEY_RE.test(field.slice(importer.mappingPrefix.length))) return { ok: false, message: `mapping.${field}: not a usable field` };
+      if (typeof value === 'string' && value.trim()) mapping[field] = value;
+    }
+  }
   const mappingError = importer.mappingError(mapping);
   if (mappingError) return { ok: false, message: mappingError };
 
@@ -311,6 +324,7 @@ function requestDigest({ type, mapping, rows }) {
  *
  * An importer exposes:
  *   fields                 [{ id, required? }]
+ *   mappingPrefix?         also take `<prefix><id>` mapping keys
  *   mappingError(mapping)  a refusal or null
  *   loadContext({ db })    read once per request (event config, say)
  *   mapRow({ row, mapping, context })
@@ -500,6 +514,7 @@ function defaultImporters() {
     speakers: require('./speakerImport.cjs'),
     sessions: require('./sessionImport.cjs'),
     organizations: require('./organizationImport.cjs'),
+    registrations: require('./registrationImport.cjs'),
   };
 }
 

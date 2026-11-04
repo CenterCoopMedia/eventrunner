@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as speakerImport from '../../../../functions/src/imports/speakerImport.cjs';
 import * as sessionImport from '../../../../functions/src/imports/sessionImport.cjs';
 import * as organizationImport from '../../../../functions/src/imports/organizationImport.cjs';
+import * as registrationImport from '../../../../functions/src/imports/registrationImport.cjs';
 import { parseCsvFile } from '../lib/csv.js';
 import {
   RECORD_IMPORT_TYPES,
@@ -11,9 +12,11 @@ import {
   projectRows,
   summaryWords,
   templateCsv,
+  pruneMapping,
+  withAnswerFields,
 } from './recordImport.js';
 
-const SERVER = { speakers: speakerImport, sessions: sessionImport, organizations: organizationImport };
+const SERVER = { speakers: speakerImport, sessions: sessionImport, organizations: organizationImport, registrations: registrationImport };
 
 describe('record import vocabulary', () => {
   it('offers exactly the fields each server importer maps, with the same required ones', () => {
@@ -78,5 +81,39 @@ describe('record import vocabulary', () => {
   it('states a summary in words, singular and plural', () => {
     expect(summaryWords({ create: 2, update: 1, unchanged: 0, error: 1 })).toBe('2 new, 1 update, 0 no change, 1 error');
     expect(summaryWords({ create: 0, update: 2, unchanged: 3, error: 0 })).toBe('0 new, 2 updates, 3 no change, 0 errors');
+  });
+});
+
+describe('registration answer columns', () => {
+  const FORM = {
+    standard: { organization: { enabled: true, required: true }, photoConsent: { enabled: true }, directoryListing: { enabled: true } },
+    custom: [{ id: 'q_meal', kind: 'one_choice', label: 'Lunch choice', choices: ['Fish', 'Vegetable'] }],
+  };
+  it('adds one answer field per asked question, keyed the way the server reads them', () => {
+    const type = withAnswerFields(importTypeById('registrations'), FORM);
+    const answers = type.fields.filter((field) => field.id.startsWith('answer:'));
+    expect(answers.map((field) => field.id)).toEqual(['answer:organization', 'answer:photoConsent', 'answer:q_meal']);
+    expect(answers.map((field) => field.label)).toEqual(['Answer: Organization', 'Answer: Photo consent', 'Answer: Lunch choice']);
+    expect(answers.every((field) => !field.required)).toBe(true);
+    expect(registrationImport.mappingPrefix).toBe('answer:');
+    // The template carries the answer columns, and they map back.
+    const { headers } = parseCsvFile(templateCsv(type));
+    expect(headers).toContain('answer_q_meal');
+    expect(guessMapping(headers, type)['answer:q_meal']).toBe('answer_q_meal');
+    // Labels that read the same still get their own columns.
+    const twins = withAnswerFields(importTypeById('registrations'), { standard: {}, custom: [
+      { id: 'q_one', kind: 'short_text', label: '公司' }, { id: 'q_two', kind: 'short_text', label: '职务' },
+    ] });
+    const twinHeaders = twins.fields.map((field) => field.header);
+    expect(new Set(twinHeaders).size).toBe(twinHeaders.length);
+  });
+  it('keeps only mappings for fields the type still has', () => {
+    const type = withAnswerFields(importTypeById('registrations'), FORM);
+    expect(pruneMapping({ externalId: 'ticket_id', 'answer:q_meal': 'lunch', 'answer:q_gone': 'old' }, type))
+      .toEqual({ externalId: 'ticket_id', 'answer:q_meal': 'lunch' });
+  });
+  it('leaves other types and a missing form alone', () => {
+    expect(withAnswerFields(importTypeById('speakers'), FORM)).toBe(importTypeById('speakers'));
+    expect(withAnswerFields(importTypeById('registrations'), null).fields).toEqual(importTypeById('registrations').fields);
   });
 });
