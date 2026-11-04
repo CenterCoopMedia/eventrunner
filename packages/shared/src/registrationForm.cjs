@@ -305,6 +305,43 @@ function answerText(question, value, answered = null) {
 }
 
 /**
+ * A CSV cell read back into an answer: the reverse of answerText, for the
+ * registration import (ADR 0008 §7). Case and spacing do not matter, and
+ * yes/no takes y/n and true/false. Blank is no answer (undefined). A value
+ * no choice matches is kept as typed, so checkAnswers names the problem.
+ */
+function answerFromText(question, text) {
+  const raw = typeof text === 'string' ? text.trim() : '';
+  if (!raw) return undefined;
+  const key = (value) => value.trim().toLowerCase();
+  const pick = (choices, value) => choices.find((choice) => key(choice) === key(value)) ?? value.trim();
+  const items = () => raw.split(';').map((item) => item.trim()).filter(Boolean);
+  switch (question?.kind) {
+    case 'yes_no':
+      if (['yes', 'y', 'true'].includes(key(raw))) return true;
+      if (['no', 'n', 'false'].includes(key(raw))) return false;
+      return raw;
+    case 'directory':
+      return DIRECTORY_CHOICES.find((choice) => key(choice.id) === key(raw) || key(choice.label) === key(raw))?.id ?? raw;
+    case 'one_choice':
+      return pick(question.choices, raw);
+    case 'many_choices':
+      return items().map((item) => pick(question.choices, item));
+    case 'dietary': {
+      const choices = [];
+      let other = '';
+      for (const item of items()) {
+        const match = /^other\s*:\s*(.*)$/i.exec(item);
+        if (match) { choices.push('Other'); other = match[1].trim(); } else choices.push(pick(DIETARY_CHOICES, item));
+      }
+      return { choices, other };
+    }
+    default:
+      return raw;
+  }
+}
+
+/**
  * The questions an answer record keeps, as the attendee saw them: enough to
  * read each answer later, whatever the form becomes.
  */
@@ -352,6 +389,7 @@ function summarizeAnswers(records, form) {
 }
 
 module.exports = {
+  answerFromText,
   answerText,
   answeredQuestions,
   summarizeAnswers,

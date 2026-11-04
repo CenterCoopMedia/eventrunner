@@ -133,3 +133,34 @@ test('the summary counts only answers on tickets that are still valid, and reads
   assert.equal(answerText(now, false, answered), 'No');
   assert.equal(answerText(now, 'Maybe'), 'Maybe');
 });
+
+test('answerFromText reads a CSV cell back into the answer answerText writes', () => {
+  const { answerFromText, answerText } = require('./registrationForm.cjs');
+  const questions = Object.fromEntries(activeQuestions({
+    ...FORM, standard: { ...FORM.standard, photoConsent: { enabled: true } },
+  }).map((question) => [question.id, question]));
+  const cases = [
+    ['organization', 'Gazette'],
+    ['photoConsent', true],
+    ['photoConsent', false],
+    ['directoryListing', 'attendees_only'],
+    ['q_shirt', 'M'],
+    ['q_topics', ['Revenue', 'Audience']],
+    ['dietary', { choices: ['Vegan', 'Other'], other: 'No mushrooms' }],
+  ];
+  for (const [id, value] of cases) {
+    assert.deepEqual(answerFromText(questions[id], answerText(questions[id], value)), value, id);
+  }
+  // Loose spellings an export from another platform uses.
+  assert.equal(answerFromText(questions.photoConsent, ' YES '), true);
+  assert.equal(answerFromText(questions.photoConsent, 'n'), false);
+  assert.equal(answerFromText(questions.directoryListing, 'private'), 'private');
+  assert.equal(answerFromText(questions.q_shirt, ' m '), 'M');
+  assert.deepEqual(answerFromText(questions.q_topics, 'audience;revenue'), ['Audience', 'Revenue']);
+  assert.deepEqual(answerFromText(questions.dietary, 'vegetarian; gluten-free'), { choices: ['Vegetarian', 'Gluten-free'], other: '' });
+  // Blank is no answer; a value no choice matches is kept as typed so checkAnswers names it.
+  assert.equal(answerFromText(questions.organization, '   '), undefined);
+  assert.equal(answerFromText(questions.q_shirt, 'XXL'), 'XXL');
+  assert.equal(answerFromText(questions.photoConsent, 'maybe'), 'maybe');
+  assert.deepEqual(checkAnswers({ q_shirt: 'XXL', organization: 'Gazette' }, FORM).ok, false);
+});

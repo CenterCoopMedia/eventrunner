@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Registrations** in **Import records** (ADR 0008 §7). With the manual
+  ticketing provider, each row makes a valid ticket: ticket ID, email, names,
+  ticket type, and one `answer:<question id>` column per registration
+  question, read with the new shared `answerFromText` (the reverse of
+  `answerText`). Answers are checked against the live form; required ones may
+  be left for the attendee. Until a claim they wait in server-only
+  `ticket_answer_holds/{ticketId}`, and `claimTicket` moves them to
+  `ticket_answers` (the attendee's own record wins). Re-import is the usual
+  three-way merge; a claimed ticket's email never changes by import. Any other
+  provider refuses every row. Deploy the functions and rules together.
 - Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04, ADR 0008
   §6). Staff and operators save codes on the commerce admin endpoint
   (`promoCodes`, `savePromoCode`, `deletePromoCode`): percent or amount off each

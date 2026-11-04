@@ -17,11 +17,12 @@
 //
 // The preview is a ruled table (RuledTable): each verdict a word in a badge
 // whose tint agrees with it, never colour alone and never a pill.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { parseCsvFile } from '../../lib/csv.js';
 import { useAdminApi } from '../adminApi.js';
 import { saveTextFile } from '../downloadFile.js';
+import { subscribeRegistrationForm } from '../../lib/registrationFormSource.js';
 import {
   MATCHED_WORD,
   RECORD_IMPORT_TYPES,
@@ -33,6 +34,7 @@ import {
   projectRows,
   summaryWords,
   templateCsv,
+  withAnswerFields,
 } from '../recordImport.js';
 import {
   Notice,
@@ -58,6 +60,7 @@ const LIST_PAGES = {
   speakers: '/admin/speakers',
   sessions: '/admin/sessions',
   organizations: '/admin/organizations',
+  registrations: '/admin/attendees',
 };
 
 const PREVIEW_COLUMNS = [
@@ -123,7 +126,10 @@ function PreviewTable({ result, type }) {
 export default function AdminRecordImport() {
   const call = useAdminApi();
   const [typeId, setTypeId] = useState(RECORD_IMPORT_TYPES[0].id);
-  const type = importTypeById(typeId);
+  // Registrations take one column per registration question (ADR 0008 §7).
+  const [answerForm, setAnswerForm] = useState(null);
+  useEffect(() => (typeId === 'registrations' ? subscribeRegistrationForm(setAnswerForm) : undefined), [typeId]);
+  const type = useMemo(() => withAnswerFields(importTypeById(typeId), answerForm), [typeId, answerForm]);
   const [parsed, setParsed] = useState(null); // { headers, rows, fileName }
   const [mapping, setMapping] = useState({});
   const [result, setResult] = useState(null); // the last preview or import response
@@ -137,8 +143,17 @@ export default function AdminRecordImport() {
     setTypeId(next);
     setResult(null);
     setNotice(null);
-    setMapping(parsed ? guessMapping(parsed.headers, importTypeById(next)) : {});
+    setMapping(parsed ? guessMapping(parsed.headers, withAnswerFields(importTypeById(next), answerForm)) : {});
   }
+
+  // The questions can arrive after the file: map their columns then, and
+  // keep every choice already made.
+  const answerCount = type.fields.length;
+  useEffect(() => {
+    if (!parsed || typeId !== 'registrations') return;
+    setMapping((current) => ({ ...guessMapping(parsed.headers, type), ...current }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answerCount, parsed, typeId]);
 
   function changeMapping(next) {
     setMapping(next);
@@ -226,7 +241,7 @@ export default function AdminRecordImport() {
     <div className="flex flex-col gap-md">
       <AdminPageHeader
         title="Import records"
-        description="Add or update speakers, sessions and organizations from a CSV file. The import saves drafts only. It publishes nothing and sends no email."
+        description="Add or update speakers, sessions, organizations and registrations from a CSV file. Speakers, sessions and organizations are saved as drafts only; registrations make tickets. The import publishes nothing and sends no email."
       />
 
       <Panel
@@ -331,7 +346,7 @@ export default function AdminRecordImport() {
                     >
                       {busy === 'import'
                         ? 'Importing…'
-                        : `Import ${writes} ${writes === 1 ? type.noun : type.plural} as drafts`}
+                        : `Import ${writes} ${writes === 1 ? type.noun : type.plural}${type.asDrafts === false ? '' : ' as drafts'}`}
                     </button>
                   </div>
                 </div>

@@ -145,6 +145,16 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li><strong>Registrations</strong> in <strong>Import records</strong> (ADR 0008 §7). With the manual
+          ticketing provider, each row makes a valid ticket: ticket ID, email, names,
+          ticket type, and one <code>answer:&lt;question id&gt;</code> column per registration
+          question, read with the new shared <code>answerFromText</code> (the reverse of
+          <code>answerText</code>). Answers are checked against the live form; required ones may
+          be left for the attendee. Until a claim they wait in server-only
+          <code>ticket_answer_holds/{ticketId}</code>, and <code>claimTicket</code> moves them to
+          <code>ticket_answers</code> (the attendee&#39;s own record wins). Re-import is the usual
+          three-way merge; a claimed ticket&#39;s email never changes by import. Any other
+          provider refuses every row. Deploy the functions and rules together.</li>
           <li>Promo codes for Stripe ticket sales (ADR 0004 amendment 2026-11-04, ADR 0008
           §6). Staff and operators save codes on the commerce admin endpoint
           (<code>promoCodes</code>, <code>savePromoCode</code>, <code>deletePromoCode</code>): percent or amount off each

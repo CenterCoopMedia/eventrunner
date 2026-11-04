@@ -243,7 +243,7 @@ const EXCLUDED = Object.freeze([
   { source: 'speaker_reminders, reminder_schedules, reminder_schedule_runs, reminder_ledger', reason: 'Reminder settings and the record of each reminder sent. Operational only.' },
   { source: 'ticket_webhook_deliveries, ticket_sync_queue, ticket_payment_attempts, ticket_inventory', reason: 'Raw provider payloads, the sync queue, payment attempts and holds.' },
   { source: 'users/*/bookmarks, users/*/sessionNotes, schedule_shares', reason: 'Each attendee\'s private saved sessions and notes.' },
-  { source: 'ticket_answers, speaker_logistics', reason: 'Private registration answers and speaker logistics, including diet, access and travel needs. Export attendee answers from the Attendees page when they are needed; both are deleted with the event data.' },
+  { source: 'ticket_answers, ticket_answer_holds, speaker_logistics', reason: 'Private registration answers (claimed, and imported ones waiting for a claim) and speaker logistics, including diet, access and travel needs. Export attendee answers from the Attendees page when they are needed; all are deleted with the event data.' },
   { source: 'users_public, speakers_public, session_materials_public, announcements_public', reason: 'Public projections of records the package already holds.' },
   { source: 'invoice_settings, invoice_counters', reason: 'The live invoice settings hold bank details, and the counter only numbers the next invoice. Each issued invoice keeps its own copy of the issuer block.' },
   { source: 'feedback, change_requests, system_errors', reason: 'Inbox and diagnostic records. Request them separately.' },

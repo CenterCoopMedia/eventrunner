@@ -9,6 +9,13 @@ const callMock = vi.fn();
 vi.mock('../adminApi.js', () => ({ useAdminApi: () => callMock }));
 const saveMock = vi.fn();
 vi.mock('../downloadFile.js', () => ({ saveTextFile: (...args) => saveMock(...args) }));
+const REGISTRATION_FORM = {
+  standard: { organization: { enabled: true, required: true } },
+  custom: [{ id: 'q_meal', kind: 'one_choice', label: 'Lunch choice', choices: ['Fish', 'Vegetable'] }],
+};
+vi.mock('../../lib/registrationFormSource.js', () => ({
+  subscribeRegistrationForm: (onNext) => { onNext(REGISTRATION_FORM); return () => {}; },
+}));
 
 import AdminRecordImport from './AdminRecordImport.jsx';
 
@@ -58,7 +65,7 @@ describe('AdminRecordImport', () => {
   it('names the page and says the import writes drafts and sends no email', () => {
     renderPage();
     expect(screen.getByRole('heading', { level: 1, name: 'Import records' })).toBeInTheDocument();
-    expect(screen.getByText(/saves drafts only\. It publishes nothing and sends no email\./)).toBeInTheDocument();
+    expect(screen.getByText(/saved as drafts only; registrations make tickets\. The import publishes nothing and sends no email\./)).toBeInTheDocument();
     expect(screen.getByLabelText('Record type')).toHaveValue('speakers');
   });
 
@@ -209,5 +216,23 @@ describe('AdminRecordImport', () => {
     expect(screen.getByLabelText('Name (required)')).toHaveValue('name');
     fireEvent.change(screen.getByLabelText('Record type'), { target: { value: 'sessions' } });
     expect(screen.getByLabelText('Title (required)')).toHaveValue('title');
+  });
+
+  it('imports registrations with a column per registration question, as tickets, not drafts', async () => {
+    callMock.mockResolvedValueOnce({ ...PREVIEW, type: 'registrations', summary: { create: 1, update: 0, unchanged: 0, error: 0 }, rows: [PREVIEW.rows[0]] });
+    renderPage();
+    fireEvent.change(screen.getByLabelText('Record type'), { target: { value: 'registrations' } });
+    await chooseFile('ticket_id,email,first_name,answer_organization,answer_lunch_choice,phone\nREG-1,ada@example.com,Ada,Gazette,Fish,555-0100\n');
+    expect(await screen.findByLabelText('Answer: Lunch choice')).toHaveValue('answer_lunch_choice');
+    fireEvent.click(screen.getByRole('button', { name: 'Preview import' }));
+    await waitFor(() => expect(callMock).toHaveBeenCalledTimes(1));
+    const [, body] = callMock.mock.calls[0];
+    expect(body.type).toBe('registrations');
+    expect(body.mapping).toEqual({
+      externalId: 'ticket_id', email: 'email', firstName: 'first_name',
+      'answer:organization': 'answer_organization', 'answer:q_meal': 'answer_lunch_choice',
+    });
+    expect(JSON.stringify(body.rows)).not.toContain('555-0100');
+    expect(await screen.findByRole('button', { name: 'Import 1 registration' })).toBeInTheDocument();
   });
 });

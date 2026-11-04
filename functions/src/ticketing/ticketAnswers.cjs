@@ -31,6 +31,9 @@ const { answeredQuestions, checkAnswers, readRegistrationForm } = require('share
 const { getEventPhase } = require('shared/config');
 
 const ANSWERS = 'ticket_answers';
+// Answers from the registration import wait here, server-only, until the
+// ticket is claimed (ADR 0008 §7); claimTicket moves them to ANSWERS.
+const HOLDS = 'ticket_answer_holds';
 const CLOSED_PHASES = Object.freeze(['registration_closed', 'in_progress', 'ended', 'archived']);
 const MAX_BODY_BYTES = 32 * 1024;
 
@@ -202,4 +205,4 @@ function buildHandlers() {
   };
 }
 
-module.exports = { ANSWERS, createSaveTicketAnswersHandler, syncAnswerStatus, get handlers() { return buildHandlers(); } };
+module.exports = { ANSWERS, HOLDS, createSaveTicketAnswersHandler, syncAnswerStatus, get handlers() { return buildHandlers(); } };

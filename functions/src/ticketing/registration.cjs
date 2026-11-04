@@ -30,7 +30,7 @@ const {
   internals: { TICKETS, safeDocId },
 } = require('./index.cjs');
 const { upsertTickets } = require('./sync.cjs');
-const { ANSWERS } = require('./ticketAnswers.cjs');
+const { ANSWERS, HOLDS } = require('./ticketAnswers.cjs');
 const { ORDERS } = require('./stripeCommerce.cjs');
 
 const USERS = 'users';
@@ -90,6 +90,21 @@ async function applyTicketClaimToUser({ db, uid, now = () => new Date() }) {
 }
 
 /**
+ * A directory answer sets the holder's profile visibility, as
+ * saveTicketAnswers does: "public" needs the public profiles feature.
+ * Reads only; returns the user ref and visibility to write, or nothing.
+ */
+async function directoryVisibility({ db, tx, uid, answers }) {
+  const listing = answers.directoryListing;
+  if (typeof listing !== 'string') return {};
+  const userRef = db.collection(USERS).doc(uid);
+  const [userSnap, featuresSnap] = await tx.getAll(userRef, db.collection('config').doc('features'));
+  if (!userSnap.exists) return {};
+  const allowPublic = featuresSnap.exists && featuresSnap.data()?.publicAttendeeProfiles === true;
+  return { userRef, visibility: listing === 'public' && !allowPublic ? 'attendees_only' : listing };
+}
+
+/**
  * Claim one ticket for one uid, atomically.
  *
  * Refusals are values, not exceptions: a ticket already claimed by
@@ -136,18 +151,19 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
       const seat = seats.find((entry) => entry?.externalId === id);
       if (seat && seat.answers && typeof seat.answers === 'object') {
         move = { order, orderRef, answersRef, seats, seat, recordExists: answersSnap.exists, userRef: null, visibility: null };
-        // A directory answer sets the holder's profile visibility, as
-        // saveTicketAnswers does: "public" needs the public profiles feature.
-        const listing = seat.answers.directoryListing;
-        if (!move.recordExists && typeof listing === 'string') {
-          const userRef = db.collection(USERS).doc(uid);
-          const [userSnap, featuresSnap] = await tx.getAll(userRef, db.collection('config').doc('features'));
-          if (userSnap.exists) {
-            const allowPublic = featuresSnap.exists && featuresSnap.data()?.publicAttendeeProfiles === true;
-            move.userRef = userRef;
-            move.visibility = listing === 'public' && !allowPublic ? 'attendees_only' : listing;
-          }
-        }
+        if (!move.recordExists) Object.assign(move, await directoryVisibility({ db, tx, uid, answers: seat.answers }));
+      }
+    }
+    // ADR 0008 §7: answers from the registration import wait in a hold.
+    let hold = null;
+    if (!move) {
+      const holdRef = db.collection(HOLDS).doc(id);
+      const answersRef = db.collection(ANSWERS).doc(id);
+      const [holdSnap, answersSnap] = await tx.getAll(holdRef, answersRef);
+      if (holdSnap.exists) {
+        hold = { holdRef, answersRef, data: holdSnap.data() || {}, recordExists: answersSnap.exists, userRef: null, visibility: null };
+        const answers = hold.data.answers;
+        if (!hold.recordExists && answers && typeof answers === 'object') Object.assign(hold, await directoryVisibility({ db, tx, uid, answers }));
       }
     }
     const at = now();
@@ -174,6 +190,18 @@ async function claimTicket({ db, externalId, uid, email = null, now = () => new 
           return rest;
         }),
       });
+    }
+    if (hold) {
+      // An answer record already there is the attendee's own; it wins.
+      if (!hold.recordExists && hold.data.answers && typeof hold.data.answers === 'object') {
+        tx.create(hold.answersRef, {
+          ticketId: id, uid, answers: hold.data.answers, formRevision: hold.data.formRevision ?? null,
+          questions: Array.isArray(hold.data.questions) ? hold.data.questions : [],
+          ticketStatus: data.status, updatedAt: at, updatedBy: 'import',
+        });
+        if (hold.userRef) tx.set(hold.userRef, { profileVisibility: hold.visibility, updatedAt: at }, { merge: true });
+      }
+      tx.delete(hold.holdRef);
     }
     return { claimed: true };
   });
