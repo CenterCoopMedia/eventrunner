@@ -3,7 +3,7 @@
 // test gives them a fake context and never starts the Firebase SDK.
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  GoogleAuthProvider, OAuthProvider, isSignInWithEmailLink, onAuthStateChanged,
+  GoogleAuthProvider, OAuthProvider, isSignInWithEmailLink, onIdTokenChanged,
   sendSignInLinkToEmail, signInWithEmailLink, signInWithPopup, signOut,
 } from 'firebase/auth';
 import { auth } from './firebase.js';
@@ -80,7 +80,9 @@ export function signInErrorMessage(error) {
 export function AuthProvider({ children }) {
   const [state, setState] = useState({ user: null, ready: false });
 
-  useEffect(() => onAuthStateChanged(auth, (user) => setState({ user, ready: true })), []);
+  // Not onAuthStateChanged: it stays quiet when the uid does not change, as when an
+  // emailed link confirms an open session, and that reader would never get past confirming.
+  useEffect(() => onIdTokenChanged(auth, (user) => setState({ user, ready: true })), []);
 
   const value = useMemo(() => ({
     ...state,

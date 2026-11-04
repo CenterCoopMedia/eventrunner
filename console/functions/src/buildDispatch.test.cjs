@@ -48,6 +48,12 @@ test('it asks for actions write on one repository, then dispatches the workflow 
   assert.deepEqual(calls[1].body, { ref: 'main', inputs: { application_id: 'app_1' } });
 });
 
+test('a rehearsal console asks for a test-mode build, and no other console does', async () => {
+  const { fetch, calls } = fakeGithub();
+  await createStartBuild({ env: { ...ENV, CONSOLE_TEST_MODE: 'true' }, privateKey, fetch, now: () => NOW })({ appId: 'app_1' });
+  assert.deepEqual(calls[1].body.inputs, { application_id: 'app_1', test_mode: 'true' });
+});
+
 for (const [name, env, key] of [
   ['no app id', { ...ENV, CONSOLE_GITHUB_APP_ID: '' }, privateKey],
   ['no installation id', { ...ENV, CONSOLE_GITHUB_INSTALLATION_ID: ' ' }, privateKey],

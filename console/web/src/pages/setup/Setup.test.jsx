@@ -17,15 +17,13 @@ describe('Setup', () => {
     });
     renderSetup('event');
     expect(await screen.findByRole('heading', { level: 1, name: 'Your event' })).toBeInTheDocument();
-    expect(screen.getByText('Step 2 of 9')).toBeInTheDocument();
+    expect(screen.getByText('Step 2 of 8')).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Setup steps' });
-    expect(within(nav).getByText('2 of 9 steps done')).toBeInTheDocument();
+    expect(within(nav).getByText('2 of 8 steps done')).toBeInTheDocument();
     const links = within(nav).getAllByRole('link');
     expect(links.map((l) => l.textContent.replace(' (done)', '').replace(/^[✓\d]+/, ''))).toEqual([
       'Your organization', 'Your event', 'Your web address', 'Your team', 'Tickets', 'Email', 'Review', 'Agreement',
     ]);
-    expect(within(nav).getByText('Event fee').closest('a')).toBeNull();
-    expect(within(nav).getByText('(not open yet)')).toBeInTheDocument();
     expect(links[1]).toHaveAttribute('aria-current', 'step');
     expect(links[0]).toHaveTextContent('(done)');
     expect(links[2]).toHaveAttribute('href', '/organizations/o1/applications/a1/web-address');
@@ -134,16 +132,8 @@ describe('Setup', () => {
     expect(address).toHaveFocus();
   });
 
-  it('shows the note when the hosting team asked for changes', async () => {
-    serveApi({ getApplication: { application: application({ status: 'changes_requested', note: 'Add the venue address.' }) } });
-    renderSetup('event');
-    const note = await screen.findByRole('note');
-    expect(note).toHaveTextContent('The hosting team asked for changes');
-    expect(note).toHaveTextContent('Add the venue address.');
-  });
-
   it('sends a request the reader cannot change to its status page', async () => {
-    serveApi({ getApplication: { application: application({ status: 'submitted', canEdit: false }) } });
+    serveApi({ getApplication: { application: application({ status: 'approved', canEdit: false }) } });
     renderSetup('event');
     expect(await screen.findByText('Status page')).toBeInTheDocument();
   });
@@ -162,12 +152,12 @@ describe('Setup', () => {
   it('says when a save fails', async () => {
     serveApi({
       getApplication: { application: application({ answers: emptyAnswers() }) },
-      saveApplicationStep: () => { throw new Error('This request is with the hosting team, so you cannot change it now.'); },
+      saveApplicationStep: () => { throw new Error('Your site is being built, so you cannot change this now.'); },
     });
     renderSetup('organization');
     fireEvent.change(await screen.findByLabelText('Website (optional)'), { target: { value: 'x.org' } });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(await screen.findByText(/Not saved. This request is with the hosting team/)).toBeInTheDocument();
+    expect(await screen.findByText(/Not saved. Your site is being built/)).toBeInTheDocument();
   });
 
   it('holds the request while the server kept an older web address, until a name saves', async () => {
@@ -215,16 +205,15 @@ describe('Setup', () => {
     expect(callsTo('saveApplicationStep').map((b) => b.answers.website)).toEqual(['x.org', 'x.org']);
   });
 
-  describe('the agreement and the event fee', () => {
+  describe('the agreement', () => {
     const NAV = { name: 'Setup steps' };
-    const WAITING = { status: 'awaiting_payment', canEdit: false, canAccept: false, canPay: true };
 
     it('Next on Review opens the agreement', async () => {
       serveApi({ getAgreement: { agreement: { version: 1, title: 'Test agreement', body: 'Test text.' }, accepted: null } });
       renderSetup('review');
       fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
       expect(await screen.findByRole('heading', { level: 1, name: 'Agreement' })).toBeInTheDocument();
-      expect(screen.getByText('Step 8 of 9')).toBeInTheDocument();
+      expect(screen.getByText('Step 8 of 8')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
     });
@@ -237,46 +226,24 @@ describe('Setup', () => {
       expect(within(screen.getByRole('navigation', NAV)).queryByRole('link', { name: /Agreement/ })).not.toBeInTheDocument();
     });
 
-    it('with no agreement or fee, the request stays at Review and the page says why', async () => {
-      serveApi({ getApplication: { application: application({ signups: { open: false, fee: null } }) } });
+    it('when sign-ups are closed, the request stays at Review and the page says why', async () => {
+      serveApi({ getApplication: { application: application({ signups: { open: false } }) } });
       renderSetup('agreement');
       expect(await screen.findByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
       expect(screen.getByText('This site is not taking sign-ups right now. We saved your answers. Try again later.')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
     });
 
-    it('the fee address goes to the agreement until an Owner accepts', async () => {
-      serveApi({ getAgreement: { agreement: { version: 1, title: 'Test agreement', body: 'Test text.' }, accepted: null } });
-      renderSetup('fee');
-      expect(await screen.findByRole('heading', { level: 1, name: 'Agreement' })).toBeInTheDocument();
-    });
-
-    it('waiting for payment, only the agreement and the fee are open', async () => {
-      serveApi({ getApplication: { application: application(WAITING) } });
-      renderSetup('event');
-      expect(await screen.findByRole('heading', { level: 1, name: 'Event fee' })).toBeInTheDocument();
-      const links = within(screen.getByRole('navigation', NAV)).getAllByRole('link');
-      expect(links.map((l) => l.textContent.replace(/^[✓\d]+/, ''))).toEqual(['Agreement', 'Event fee']);
-      expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
-    });
-
-    it('an Editor can open the fee step while the request waits for payment', async () => {
-      serveApi({ getApplication: { application: application({ ...WAITING, myRole: 'editor', canPay: false }) } });
-      renderSetup('fee');
-      expect(await screen.findByText(/Only an Owner can pay the event fee/)).toBeInTheDocument();
-    });
-
-    it('an operator who is not on the team goes to the status page', async () => {
-      serveApi({ getApplication: { application: application({ ...WAITING, myRole: null, canPay: false, operator: true }) } });
-      renderSetup('fee');
+    it('after acceptance every step goes to the status page, for a member too', async () => {
+      serveApi({ getApplication: { application: application({ status: 'approved', canEdit: false, canAccept: false, canWithdraw: false }) } });
+      renderSetup('agreement');
       expect(await screen.findByText('Status page')).toBeInTheDocument();
     });
 
-    it('a request the hosting team held back has no agreement or fee step', async () => {
-      serveApi({ getApplication: { application: application({ status: 'changes_requested', canAccept: false, canSubmit: true }) } });
+    it('an operator who is not on the team goes to the status page', async () => {
+      serveApi({ getApplication: { application: application({ myRole: null, canEdit: false, canAccept: false, operator: true }) } });
       renderSetup('agreement');
-      expect(await screen.findByRole('button', { name: 'Send the changes' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 1, name: 'Review' })).toBeInTheDocument();
+      expect(await screen.findByText('Status page')).toBeInTheDocument();
     });
   });
 });

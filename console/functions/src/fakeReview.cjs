@@ -38,7 +38,7 @@ function application(overrides = {}) {
   const frozen = answers();
   return {
     orgId: 'o1',
-    status: 'submitted',
+    status: 'approved',
     answers: frozen,
     frozen,
     createdBy: 'ana',
@@ -49,7 +49,7 @@ function application(overrides = {}) {
     submittedBy: 'ana',
     history: [
       { status: 'draft', at: new Date(NOW - 3 * DAY), by: 'ana', note: null },
-      { status: 'submitted', at: new Date(NOW - DAY), by: 'ana', note: null },
+      { status: 'approved', at: new Date(NOW - DAY), by: 'ana', note: null },
     ],
     review: null,
     connections: { stripe: { connected: true, displayName: 'NC Local', livemode: true } },

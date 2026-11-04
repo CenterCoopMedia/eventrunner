@@ -1,7 +1,8 @@
 'use strict';
 
 /**
- * Organizations (ADR 0007 §2): create one, list mine, read its team.
+ * Organizations (ADR 0007 §2): list mine, read its team. One is made only by
+ * redeeming a signup link (signupLinks.cjs).
  *
  * `organizations/{orgId}`               { name, createdAt, createdBy }
  * `organizations/{orgId}/members/{uid}` { uid, email, role, joinedAt }
@@ -12,14 +13,10 @@
  * collection-group index for that field.
  */
 
-const { ConsoleError } = require('./http.cjs');
 const { isOperator, requireMemberOrOperator, toIso, toMillis } = require('./access.cjs');
-const { takeSlot } = require('./rateLimit.cjs');
 
 const NAME_MIN = 2;
 const NAME_MAX = 100;
-const DAY_MS = 24 * 60 * 60 * 1000;
-const CREATES_PER_DAY = 5;
 const LAUNCH_OWNERS = 2;
 const OPERATOR_LIST_LIMIT = 500;
 
@@ -28,29 +25,6 @@ function cleanName(value) {
   if (typeof value !== 'string') return null;
   const name = value.trim().replace(/\s+/g, ' ');
   return name.length >= NAME_MIN && name.length <= NAME_MAX ? name : null;
-}
-
-async function createOrganization({ db, now = Date.now }, { body, user }) {
-  const name = cleanName(body.name);
-  if (!name) {
-    throw new ConsoleError(400, 'bad-request', `Enter a name of ${NAME_MIN} to ${NAME_MAX} characters.`);
-  }
-  await takeSlot(db, {
-    key: `create-org-${user.uid}`,
-    max: CREATES_PER_DAY,
-    windowMs: DAY_MS,
-    now,
-    message: 'You have made too many organizations today. Try again tomorrow.',
-  });
-  const orgRef = db.collection('organizations').doc();
-  const at = new Date(now());
-  await db.runTransaction(async (tx) => {
-    tx.create(orgRef, { name, createdAt: at, createdBy: user.uid });
-    tx.create(orgRef.collection('members').doc(user.uid), {
-      uid: user.uid, email: user.email, role: 'owner', joinedAt: at,
-    });
-  });
-  return { status: 201, body: { organization: { id: orgRef.id, name, role: 'owner' } } };
 }
 
 async function listOrganizations({ db }, { user }) {
@@ -104,4 +78,4 @@ async function getTeam({ db, now = Date.now }, { body, user }) {
   };
 }
 
-module.exports = { createOrganization, getTeam, listOrganizations, cleanName, LAUNCH_OWNERS };
+module.exports = { getTeam, listOrganizations, cleanName, LAUNCH_OWNERS, NAME_MAX, NAME_MIN };

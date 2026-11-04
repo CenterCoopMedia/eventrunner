@@ -740,7 +740,11 @@ test('a deploy that keeps failing leaves a readable record and tells operators, 
   assert.match(notice.problem, /the deploy failed 3 times/);
   assert.ok(fake.db.paths('console_audit/').map((p) => fake.db.read(p).action).includes('build-failed'));
   assert.ok(!fake.mailer.sent.some((m) => m.kind === 'status' && m.problem), 'a client sees only the status');
-  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['building']);
+  assert.deepEqual([...new Set(statusMail(fake.mailer))], ['building', 'build-failed']);
+  const owners = fake.mailer.sent.filter((m) => m.status === 'build-failed');
+  assert.deepEqual(owners.map((m) => m.to).sort(), ['ana@example.org', 'bo@example.org']);
+  assert.match(owners[0].link, /\/organizations\/o1\/applications\/a1$/);
+  assert.ok(!JSON.stringify(owners).includes('github.example'), 'the Owners get no run address');
 
   assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 0);
   assert.equal(fake.db.read('applications/a1').status, 'ready');
@@ -924,6 +928,21 @@ test('the workflow\'s last step records a run that stopped, once', async () => {
 
   await markStopped({ appId: 'a1', deps: fake.deps });
   assert.equal(notices(fake.mailer).length, 2);
+});
+
+test('a retry made before the failed run\'s last step is not undone by that step', async () => {
+  const fake = setup({ app: { status: 'building', buildStart: { state: 'pending', at: new Date() } } });
+  const runUrl = 'https://github.com/o/r/actions/runs/77';
+  await fake.db.collection('console_builds').doc('a1').set({ state: 'queued', runUrl, error: 'the first failure', steps: [] });
+  await markStopped({ appId: 'a1', runId: '77', deps: fake.deps });
+  assert.equal(fake.db.read('console_builds/a1').state, 'queued');
+  assert.equal(fake.db.read('applications/a1').buildStart.state, 'pending');
+  assert.equal(notices(fake.mailer).length, 0);
+
+  // The retry's own run, dying before it writes, still gets recorded.
+  await markStopped({ appId: 'a1', runId: '78', deps: fake.deps });
+  assert.equal(fake.db.read('console_builds/a1').state, 'failed');
+  assert.equal(fake.db.read('applications/a1').buildStart.state, 'failed');
 });
 
 test('--mark-stopped leaves a finished request alone', async () => {

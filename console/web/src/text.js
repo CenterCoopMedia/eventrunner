@@ -17,15 +17,16 @@ export function withArticle(role) {
   return `an ${ROLE_LABELS[role] || 'Editor'}`;
 }
 
-/**
- * A fee for people. `amount` is in the currency's smallest unit, as the
- * server stores it.
- * @param {{ amount: number, currency: string }} fee
- */
-export function formatFee({ amount, currency }) {
-  const format = new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.trim().toUpperCase() });
-  return format.format(amount / 10 ** format.resolvedOptions().maximumFractionDigits);
+/** The same check the server makes on an organization name (organizations.cjs cleanName). */
+export function cleanOrganizationName(value) {
+  const name = String(value).trim().replace(/\s+/g, ' ');
+  return name.length >= 2 && name.length <= 100 ? name : null;
 }
+
+export const ORGANIZATION_NAME_ERROR = 'Enter a name of 2 to 100 characters.';
+
+/** How a new event site starts, for a reader looking for a way to start one. */
+export const SIGNUP_LINK_HELP = 'Event sites start from a signup link, which you get once your invoice is paid. If you already have one, open it again.';
 
 /** A date for people, for example "10 November 2026". */
 export function formatDate(iso) {

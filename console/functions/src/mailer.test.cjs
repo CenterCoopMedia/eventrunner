@@ -73,16 +73,16 @@ const change = {
   to: 'ana@example.org',
   organizationName: 'NC Local',
   eventName: 'Summit <2027>',
-  status: 'changes_requested',
+  status: 'declined',
   link: 'https://console.eventrunner.org/organizations/o1/applications/a1',
-  note: 'Add the venue address.',
+  note: 'This is not an event.',
 };
 
 test('statusChangeMessage says the status in plain words, with the note and the link', () => {
   const message = statusChangeMessage(change);
-  assert.equal(message.subject, 'Your request needs changes: Summit <2027>');
-  assert.match(message.text, /We need some changes to your request\./);
-  assert.match(message.text, /Note from the hosting team:\nAdd the venue address\./);
+  assert.equal(message.subject, 'We cannot build this site: Summit <2027>');
+  assert.match(message.text, /We cannot build this site\./);
+  assert.match(message.text, /Note from the hosting team:\nThis is not an event\./);
   assert.match(message.text, /Open your request:\nhttps:\/\/console\.eventrunner\.org\/organizations\/o1\/applications\/a1/);
   assert.ok(message.html.includes('Summit &lt;2027&gt;'));
   assert.ok(!/firebase|project|tenant/i.test(message.text));
@@ -90,31 +90,35 @@ test('statusChangeMessage says the status in plain words, with the note and the 
 
 test('statusChangeMessage has words for every status after draft and refuses an unknown one', () => {
   assert.deepEqual(Object.keys(STATUS_WORDS).sort(), [
-    'approved', 'awaiting_payment', 'building', 'changes_requested', 'declined', 'draft', 'launched', 'paid', 'ready', 'submitted', 'withdrawn',
+    'approved', 'build-failed', 'building', 'declined', 'launched', 'ready', 'withdrawn',
   ]);
   for (const status of Object.keys(STATUS_WORDS)) {
     assert.ok(statusChangeMessage({ ...change, status, note: null }).text.length > 0, status);
   }
-  assert.match(statusChangeMessage({ ...change, status: 'submitted', note: null }).text, /We are reviewing your request\./);
+  const accepted = statusChangeMessage({ ...change, status: 'approved', note: null }).text;
+  assert.match(accepted, /accepted the agreement/);
+  assert.match(accepted, /building your site/);
+  assert.match(accepted, /email you when it is ready/);
+  assert.match(statusChangeMessage({ ...change, status: 'build-failed', note: null }).text, /did not finish building/);
   assert.ok(!statusChangeMessage({ ...change, link: '' }).text.includes('Open your request'));
   assert.throws(() => statusChangeMessage({ ...change, status: 'lost' }), TypeError);
 });
 
 test('operatorNoticeMessage names the organization and the event', () => {
-  const message = operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a' });
-  assert.equal(message.subject, 'New request: Summit from NC Local');
-  assert.match(message.text, /NC Local sent a request for a site for Summit\./);
+  const message = operatorNoticeMessage({ organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a', kind: 'started' });
+  assert.equal(message.subject, 'Build started: Summit from NC Local');
+  assert.match(message.text, /NC Local accepted the agreement for Summit\./);
 });
 
-test('operatorNoticeMessage says what happened to a payment', () => {
+test('operatorNoticeMessage says what happened to a build, and nothing about a payment', () => {
   const notice = { organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a' };
-  assert.match(operatorNoticeMessage({ ...notice, kind: 'paid' }).subject, /^Paid: Summit/);
-  assert.match(operatorNoticeMessage({ ...notice, kind: 'build-failed' }).text, /build did not start/);
+  const notStarted = operatorNoticeMessage({ ...notice, kind: 'build-failed' }).text;
+  assert.match(notStarted, /build did not start/);
   const failed = operatorNoticeMessage({ ...notice, kind: 'build-run-failed', problem: 'Web address: no certificate.' });
   assert.match(failed.subject, /^Build failed:/);
   assert.match(failed.text, /Web address: no certificate\./);
   assert.match(failed.text, /Retry the build/);
-  assert.match(operatorNoticeMessage({ ...notice, kind: 'payment-problem', problem: 'amount-mismatch' }).text, /amount-mismatch/);
+  for (const text of [notStarted, failed.text]) assert.ok(!/pay/i.test(text), text);
 });
 
 test('the agreement copy holds the full text, the record details and escaped HTML', () => {
@@ -151,12 +155,4 @@ test('the Postmark mailer sends status and operator email with their own tags', 
 test('the Postmark mailer needs a token and a sender', () => {
   assert.throws(() => createPostmarkMailer({ token: '', from: 'a@b.example', fetch() {} }), TypeError);
   assert.throws(() => createPostmarkMailer({ token: 't', from: '', fetch() {} }), TypeError);
-});
-
-test('a payment problem notice names the payment to refund', () => {
-  const { text } = operatorNoticeMessage({
-    organizationName: 'NC Local', eventName: 'Summit', link: '', kind: 'payment-problem', problem: 'request-missing', sessionId: 'cs_1', paymentIntentId: 'pi_1',
-  });
-  assert.match(text, /Reason: request-missing/);
-  assert.match(text, /Session: cs_1\. Payment intent: pi_1\./);
 });

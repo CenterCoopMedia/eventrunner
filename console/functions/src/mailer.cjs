@@ -7,10 +7,10 @@
  *   mailer.sendInvite({ to, organizationName, inviterEmail, role, link, expiresInDays })
  *   mailer.sendStatusChange({ to, organizationName, eventName, status, link, note })
  *     to a client Owner, when the status of a request changes (ADR 0007 §3)
- *   mailer.sendOperatorNotice({ to, organizationName, eventName, link, kind, problem, sessionId, paymentIntentId })
- *     to a CCM operator. `kind` is 'request' (the default), 'paid',
- *     'build-failed' or 'payment-problem', which carries a `problem` code
- *     and the ids to find the payment by
+ *     `status` can also be 'build-failed', when a build stops
+ *   mailer.sendOperatorNotice({ to, organizationName, eventName, link, kind, problem })
+ *     to a CCM operator. `kind` is 'started', 'build-failed' or
+ *     'build-run-failed', which carries the `problem` text
  *   mailer.sendAgreementCopy({ to, organizationName, eventName, title, version, body, sha256, typedName, acceptedAt, link })
  *     to the person who accepted the agreement
  *
@@ -59,17 +59,13 @@ function inviteMessage({ organizationName, inviterEmail, role, link, expiresInDa
  * line is the status as the status page says it.
  */
 const STATUS_WORDS = Object.freeze({
-  draft: { subject: 'You can change your request', line: 'An Owner went back to change the answers. No payment was taken. To continue, an Owner accepts the agreement again and pays the event fee.' },
-  awaiting_payment: { subject: 'Pay the event fee to continue', line: 'An Owner accepted the agreement. The next step is the event fee. We start building your site once your payment is confirmed.' },
-  paid: { subject: 'We received your payment', line: 'We received your event fee. We are building your site, and we will email you when it is ready.' },
-  submitted: { subject: 'We received your request', line: 'We are reviewing your request. We will email you when it changes.' },
-  changes_requested: { subject: 'Your request needs changes', line: 'We need some changes to your request. Open it to see the note and make the changes.' },
-  approved: { subject: 'We approved your request', line: 'We approved your request. We are building your site.' },
+  approved: { subject: 'We are building your site', line: 'An Owner accepted the agreement, and we are building your site. We will email you when it is ready.' },
   building: { subject: 'We are building your site', line: 'We are building your site.' },
   ready: { subject: 'Your site is ready', line: 'Your site is ready.' },
   launched: { subject: 'Your site is open to the public', line: 'Your site is open to the public.' },
   withdrawn: { subject: 'Your request was withdrawn', line: 'An Owner withdrew your request. We will not build this site.' },
   declined: { subject: 'We cannot build this site', line: 'We cannot build this site. Read the note for the reason.' },
+  'build-failed': { subject: 'Your site did not finish building', line: 'Your site did not finish building. Open your request to see what to do next.' },
 });
 
 /** Text and HTML from paragraphs, with an optional link paragraph. */
@@ -95,20 +91,14 @@ function statusChangeMessage({ organizationName, eventName, status, link, note, 
 }
 
 /** @returns {{ subject: string, text: string, html: string }} */
-function operatorNoticeMessage({ organizationName, eventName, link, kind = 'request', problem = '', sessionId = '', paymentIntentId = '' }) {
+function operatorNoticeMessage({ organizationName, eventName, link, kind = 'started', problem = '' }) {
   const who = `${eventName} from ${organizationName}`;
   const words = {
-    request: [`New request: ${who}`, [`${organizationName} sent a request for a site for ${eventName}.`, 'Review the answers in the console.']],
-    paid: [`Paid: ${who}`, [`${organizationName} paid the event fee for ${eventName}. The request is approved.`]],
-    'build-failed': [`Build did not start: ${who}`, ['The payment stands and the request stays approved, but the build did not start. Read the function logs and fix the cause, then select Retry the build on the request.']],
+    started: [`Build started: ${who}`, [`${organizationName} accepted the agreement for ${eventName}. The build is starting.`]],
+    'build-failed': [`Build did not start: ${who}`, ['The agreement stands and the request stays approved, but the build did not start. Read the function logs and fix the cause, then select Retry the build on the request.']],
     'build-run-failed': [`Build failed: ${who}`, [
       `The build stopped. ${problem}`,
-      'The payment stands. Open the request to read the build record and fix the cause, then select Retry the build. The steps that finished are not done twice.',
-    ]],
-    'payment-problem': [`Payment needs attention: ${who}`, [
-      `A paid session did not approve this request. Reason: ${problem}.`,
-      `Session: ${sessionId}. Payment intent: ${paymentIntentId || 'not given'}.`,
-      'Compare it with the payment in Stripe, and refund it if it should not stand.',
+      'Open the request to read the build record and fix the cause, then select Retry the build. The steps that finished are not done twice.',
     ]],
   }[kind];
   return compose(words[0], words[1], link, 'Open the request');

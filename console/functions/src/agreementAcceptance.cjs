@@ -6,17 +6,17 @@
  * `agreement_acceptances/{id}` is the signed record: { version, sha256,
  * typedName, email, uid, orgId, appId, at }. It is only ever created, the
  * rules give the browser no access, and it outlives the request. The
- * request's `agreementAcceptance` is a pointer to the current one. Going
- * back to edit clears the pointer and leaves the record.
+ * request's `agreementAcceptance` is a pointer to it. Accepting starts the
+ * build: no operator approves it and nothing holds it.
  */
 
 const { ConsoleError } = require('./http.cjs');
 const { requireMemberOrOperator, requireOwner, toIso } = require('./access.cjs');
 const { checkAnswers } = require('./checks.cjs');
-const { AWAITING_PAYMENT, historyEntry, readApplication } = require('./applications.cjs');
+const { runStartBuild } = require('./buildDispatch.cjs');
+const { historyEntry, readApplication } = require('./applications.cjs');
 const { readAgreementVersion, readSignupTerms, signupsClosed } = require('./consoleSettings.cjs');
-const { answersToFreeze, notifyOwners, refuseIncomplete, statusLink, takeSubmitSlot } = require('./applicationStatus.cjs');
-const { closeOpenCheckout, refuseNewCheckout } = require('./feeCheckout.cjs');
+const { answersToFreeze, notifyOperators, notifyOwners, refuseIncomplete, statusLink, takeSubmitSlot } = require('./applicationStatus.cjs');
 
 const COLLECTION = 'agreement_acceptances';
 const NAME_MIN = 2;
@@ -45,9 +45,6 @@ async function getAgreement({ db }, { body, user }) {
 
 function refuseStatus(status) {
   if (status === 'draft') return;
-  if (status === 'changes_requested') {
-    throw new ConsoleError(409, 'locked', 'The hosting team asked for changes, so send the request back to them.');
-  }
   throw new ConsoleError(409, 'locked', 'This request already moved past the agreement.');
 }
 
@@ -84,13 +81,26 @@ async function sendCopy({ db, mailer, log, publicUrl }, { user, orgId, appId, ev
   }
 }
 
+/** One step after the commit. A failure is logged, and the next step still runs. */
+async function isolated(log, what, step) {
+  try {
+    return await step();
+  } catch (err) {
+    log.error(`console acceptance: ${what} failed`, err);
+    return false;
+  }
+}
+
 /**
- * acceptAgreement: an Owner accepts the version the page showed. Freezes
- * the answers, writes the record and sets `awaiting_payment` in one
- * transaction, so there is no state with one and not the others.
+ * acceptAgreement: an Owner accepts the version the page showed. Freezes the
+ * answers, writes the record and sets `approved` in one transaction, so there
+ * is no state with one and not the others. The build starts first after that,
+ * so a slow email can never lose it. A failed start is not an error to the
+ * client: the status page shows it, and the Owners' email says it did not
+ * finish rather than promise another email that would never come.
  */
 async function acceptAgreement(deps, { body, user }) {
-  const { db, now = Date.now, log = console } = deps;
+  const { db, now = Date.now, log = console, consoleTestMode: testMode = false } = deps;
   const { orgId, appId } = body;
   await requireOwner(db, orgId, user, 'Only an Owner can accept the agreement.');
   const first = await readApplication((r) => r.get(), db, orgId, appId);
@@ -98,7 +108,7 @@ async function acceptAgreement(deps, { body, user }) {
   if (body.accept !== true) throw new ConsoleError(400, 'accept-required', 'Select Accept the agreement to continue.');
   const name = typedName(body.name);
   if (!(await readSignupTerms((r) => r.get(), db)).open) throw signupsClosed();
-  refuseIncomplete(checkAnswers(first.data.answers, first.data.connections));
+  refuseIncomplete(checkAnswers(first.data.answers, first.data.connections, { testMode }));
   await takeSubmitSlot(db, user, now);
 
   const at = new Date(now());
@@ -111,64 +121,30 @@ async function acceptAgreement(deps, { body, user }) {
     if (terms.agreement.version !== body.version) {
       throw new ConsoleError(409, 'agreement-changed', 'The agreement changed. Read the new version, then accept it.');
     }
-    const answers = await answersToFreeze(tx, db, appId, data);
+    const answers = await answersToFreeze(tx, db, appId, data, { testMode });
     const { version, sha256 } = terms.agreement;
     tx.create(recordRef, { version, sha256, typedName: name, email: user.email, uid: user.uid, orgId, appId, at });
     tx.update(ref, {
-      status: AWAITING_PAYMENT,
+      status: 'approved',
       frozen: answers,
       submittedAt: at,
       submittedBy: user.uid,
       agreementAcceptance: { id: recordRef.id, version, sha256, name, email: user.email, at },
-      feeCheckout: null,
+      buildStart: { state: 'pending', at },
       updatedAt: at,
       updatedBy: user.uid,
-      history: [...(Array.isArray(data.history) ? data.history : []), historyEntry(AWAITING_PAYMENT, at, user.uid)],
+      history: [...(Array.isArray(data.history) ? data.history : []), historyEntry('approved', at, user.uid)],
     });
     return { eventName: answers.event.name, agreement: terms.agreement };
   });
 
-  const mail = { ...deps, log };
-  const copySent = await sendCopy(mail, { user, orgId, appId, eventName, agreement, name, at });
-  const ownersEmailed = await notifyOwners(mail, { orgId, appId, status: AWAITING_PAYMENT, eventName });
-  return { body: { status: AWAITING_PAYMENT, acceptanceId: recordRef.id, copySent, emailed: ownersEmailed } };
+  const after = { ...deps, now, log };
+  const buildStarted = await isolated(log, 'the build start', () => runStartBuild(after, { orgId, appId, eventName, by: user.uid }));
+  const copySent = await isolated(log, 'the copy', () => sendCopy(after, { user, orgId, appId, eventName, agreement, name, at }));
+  const emailed = await isolated(log, 'the Owners email', () => notifyOwners(after, { orgId, appId, status: buildStarted ? 'approved' : 'build-failed', eventName }));
+  // runStartBuild has already told operators about a failed start.
+  if (buildStarted) await isolated(log, 'the operators email', () => notifyOperators(after, { orgId, appId, eventName, kind: 'started' }));
+  return { body: { status: 'approved', acceptanceId: recordRef.id, copySent, emailed, buildStarted } };
 }
 
-/**
- * reopenApplication: an Owner goes back to edit before paying. Closes the
- * payment page first, so no one can pay for answers that are changing.
- */
-async function reopenApplication(deps, { body, user }) {
-  const { db, stripe, now = Date.now, log = console } = deps;
-  const { orgId, appId } = body;
-  await requireOwner(db, orgId, user, 'Only an Owner can go back to change the answers.');
-  const refuse = (status) => {
-    if (status !== AWAITING_PAYMENT) throw new ConsoleError(409, 'locked', 'This request is not waiting for payment.');
-  };
-  const first = await readApplication((r) => r.get(), db, orgId, appId);
-  refuse(first.data.status);
-  await closeOpenCheckout(stripe, first.data);
-
-  const at = new Date(now());
-  const eventName = await db.runTransaction(async (tx) => {
-    const { ref, data } = await readApplication((r) => tx.get(r), db, orgId, appId);
-    refuse(data.status);
-    refuseNewCheckout(first.data, data);
-    tx.update(ref, {
-      status: 'draft',
-      frozen: null,
-      submittedAt: null,
-      submittedBy: null,
-      agreementAcceptance: null,
-      feeCheckout: null,
-      updatedAt: at,
-      updatedBy: user.uid,
-      history: [...(Array.isArray(data.history) ? data.history : []), historyEntry('draft', at, user.uid)],
-    });
-    return data.frozen?.event?.name || '';
-  });
-  const emailed = await notifyOwners({ ...deps, log }, { orgId, appId, status: 'draft', eventName });
-  return { body: { status: 'draft', emailed } };
-}
-
-module.exports = { COLLECTION, acceptAgreement, getAgreement, reopenApplication };
+module.exports = { COLLECTION, acceptAgreement, getAgreement };

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { callApi } from '../../api.js';
 import { SIGNUPS_CLOSED } from '../../setup/steps.js';
 import { TextField } from '../../setup/Field.jsx';
-import { formatDate } from '../../text.js';
 
 /** Blank lines part the paragraphs. Each one renders as text, so nothing in it can run as HTML. */
 function AgreementText({ agreement }) {
@@ -17,7 +16,7 @@ function AgreementText({ agreement }) {
 
 /**
  * The full current agreement. An Owner types a name and accepts the version
- * this page shows. Once accepted, it shows that version and who accepted it.
+ * this page shows, which starts the build.
  */
 export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh }) {
   const [data, setData] = useState(null);
@@ -63,20 +62,15 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
 
   if (!data) return error ? <p className="message error" role="alert">{error}</p> : <p role="status">Loading the agreement.</p>;
 
-  const { agreement, accepted } = data;
-  if (!agreement) {
-    return <p className="message error">{accepted ? 'We could not show the agreement you accepted. Your acceptance is saved.' : SIGNUPS_CLOSED}</p>;
-  }
+  const { agreement } = data;
+  if (!agreement) return <p className="message error">{SIGNUPS_CLOSED}</p>;
 
   return (
     <div className="stack">
-      <p className="lead">Read the agreement between your organization and the hosting team. After this step, you pay the event fee.</p>
+      <p className="lead">Read the agreement between your organization and the hosting team. When you accept it, we start building your site.</p>
       {error ? <p className="message error" role="alert">{error}</p> : null}
       <AgreementText agreement={agreement} />
-      {accepted ? (
-        <p className="message success">{accepted.name} ({accepted.email}) accepted this agreement on {formatDate(accepted.at)}.</p>
-      ) : null}
-      {!accepted && app.canAccept ? (
+      {app.canAccept ? (
         <form noValidate onSubmit={accept} className="stack">
           <TextField
             path="agreement.name"
@@ -91,7 +85,7 @@ export default function AgreementStep({ app, orgId, appId, onAccepted, onRefresh
           <div><button type="submit" className="button primary" disabled={busy}>Accept the agreement</button></div>
         </form>
       ) : null}
-      {!accepted && !app.canAccept ? (
+      {!app.canAccept ? (
         <p className="muted">Only an Owner can accept the agreement. Ask an Owner on your team to open this step.</p>
       ) : null}
     </div>

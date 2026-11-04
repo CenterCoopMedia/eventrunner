@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api.js';
 import { application, callsTo, serveApi } from '../../test/application.js';
@@ -31,32 +31,16 @@ describe('Agreement step', () => {
     expect(article.querySelector('b')).toBeNull();
   });
 
-  it('accepts the version on the page and moves to the fee', async () => {
-    let status = 'draft';
+  it('accepts the version on the page and opens the status page', async () => {
     serveApi({
       getAgreement: { agreement: AGREEMENT, accepted: null },
-      getApplication: () => ({ application: application(status === 'draft' ? {} : { status, canEdit: false, canAccept: false, canPay: true }) }),
-      acceptAgreement: () => { status = 'awaiting_payment'; return { status, copySent: true }; },
+      acceptAgreement: { status: 'approved', acceptanceId: 'r1', copySent: true, buildStarted: true },
     });
     renderSetup('agreement');
     fireEvent.change(await screen.findByLabelText('Your full name'), { target: { value: 'Ana Owner' } });
     fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Event fee' })).toBeInTheDocument();
+    expect(await screen.findByText('Status page')).toBeInTheDocument();
     expect(callsTo('acceptAgreement')).toEqual([{ orgId: 'o1', appId: 'a1', accept: true, name: 'Ana Owner', version: 3 }]);
-    expect(screen.queryByText(/could not email your copy/)).not.toBeInTheDocument();
-  });
-
-  it('says so on the next step when the copy could not be emailed', async () => {
-    let status = 'draft';
-    serveApi({
-      getAgreement: { agreement: AGREEMENT, accepted: null },
-      getApplication: () => ({ application: application(status === 'draft' ? {} : { status, canEdit: false, canAccept: false, canPay: true }) }),
-      acceptAgreement: () => { status = 'awaiting_payment'; return { status, copySent: false }; },
-    });
-    renderSetup('agreement');
-    fireEvent.change(await screen.findByLabelText('Your full name'), { target: { value: 'Ana Owner' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Accept the agreement' }));
-    expect(await screen.findByText(/could not email your copy of the agreement/)).toBeInTheDocument();
   });
 
   it('shows a refused name at the field', async () => {
@@ -97,20 +81,5 @@ describe('Agreement step', () => {
     renderSetup('agreement');
     expect(await screen.findByText(/Only an Owner can accept the agreement/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Your full name')).not.toBeInTheDocument();
-  });
-
-  it('shows who accepted, with no form, once the request waits for payment', async () => {
-    serveApi({
-      getApplication: { application: application({ status: 'awaiting_payment', canEdit: false, canAccept: false, canPay: true }) },
-      getAgreement: {
-        agreement: AGREEMENT,
-        accepted: { version: 3, name: 'Ana Owner', email: 'ana@example.org', at: '2026-11-04T15:00:00.000Z' },
-      },
-    });
-    renderSetup('agreement');
-    expect(await screen.findByText(/Ana Owner \(ana@example.org\) accepted this agreement on 4 November 2026/)).toBeInTheDocument();
-    expect(screen.queryByLabelText('Your full name')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 });

@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import ApproveForm from './ApproveForm.jsx';
 import NoteForm from './NoteForm.jsx';
 
-const SPAM_STATUSES = ['draft', 'awaiting_payment', 'submitted', 'changes_requested', 'withdrawn', 'declined'];
+const SPAM_STATUSES = ['draft', 'withdrawn', 'declined'];
 
 /** The decisions open to the hosting team for a request with this status. */
 export function decisionsFor(status) {
   return {
-    requestChanges: status === 'submitted',
-    approve: status === 'submitted',
-    decline: ['submitted', 'changes_requested', 'awaiting_payment'].includes(status),
+    decline: status === 'draft',
     deleteSpam: SPAM_STATUSES.includes(status),
   };
 }
@@ -19,7 +16,7 @@ export function decisionsFor(status) {
  * and returns the focus to that button. `onDecide(name, body)` returns
  * true when the server accepted, or the error.
  */
-export default function ReviewActions({ status, defaults, onDecide }) {
+export default function ReviewActions({ status, onDecide }) {
   const [open, setOpen] = useState(null);
   const [refocus, setRefocus] = useState(null);
   const openers = useRef({});
@@ -55,22 +52,8 @@ export default function ReviewActions({ status, defaults, onDecide }) {
 
   return (
     <div className="stack">
-      <div className="row-actions">
-        {allowed.approve ? opener('approve', 'Approve', 'button primary') : null}
-        {allowed.requestChanges ? opener('changes', 'Request changes') : null}
-        {allowed.decline ? opener('decline', 'Decline', 'button danger') : null}
-      </div>
+      {allowed.decline ? <div className="row-actions">{opener('decline', 'Decline', 'button danger')}</div> : null}
 
-      {open === 'changes' ? (
-        <NoteForm
-          id="changes"
-          title="Request changes"
-          help="Say what the client must change. The client can then send the request again."
-          submitLabel="Send the request for changes"
-          onSubmit={async (note) => (await onDecide('requestChanges', { note })) === true}
-          onCancel={close}
-        />
-      ) : null}
       {open === 'decline' ? (
         <NoteForm
           id="decline"
@@ -81,9 +64,6 @@ export default function ReviewActions({ status, defaults, onDecide }) {
           onSubmit={async (note) => (await onDecide('declineApplication', { note })) === true}
           onCancel={close}
         />
-      ) : null}
-      {open === 'approve' ? (
-        <ApproveForm defaults={defaults} onSubmit={(settings) => onDecide('approveApplication', { settings })} onCancel={close} />
       ) : null}
 
       {allowed.deleteSpam ? <SpamDelete onDelete={() => onDecide('deleteSpamApplication', { confirm: true })} /> : null}

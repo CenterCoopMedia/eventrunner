@@ -9,7 +9,7 @@ export default function ReviewQueue() {
   const [params] = useSearchParams();
   const location = useLocation();
   const requested = params.get('status');
-  const status = STATUS_FILTERS.includes(requested) ? requested : 'submitted';
+  const status = STATUS_FILTERS.includes(requested) ? requested : STATUS_FILTERS[0];
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -61,13 +61,13 @@ export default function ReviewQueue() {
               {app.webAddressName ? <span className="muted break">{app.webAddressName}.eventrunner.org</span> : null}
               <span className="muted">Last change {formatDateTime(app.updatedAt)}</span>
               {app.buildStartFailed ? <span className="tag">The build failed</span> : null}
-              {app.feeProblem ? <span className="tag">A payment needs attention</span> : null}
             </li>
           ))}
         </ul>
       ) : null}
 
-      <p className="section"><Link to="/review/settings">Console settings</Link></p>
+      <p className="section"><Link to="/review/links">Signup links</Link></p>
+      <p><Link to="/review/settings">Console settings</Link></p>
     </section>
   );
 }

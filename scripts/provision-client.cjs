@@ -1071,7 +1071,7 @@ async function quietly(ctx, what, work) {
   }
 }
 
-/** A readable record, the queue's flag, an audit row and the operators' notice. */
+/** A readable record, the queue's flag, an audit row, and notices to the operators and the Owners. */
 async function recordFailure(ctx, step, message) {
   const { db, now } = ctx.deps;
   const at = new Date(now());
@@ -1085,6 +1085,9 @@ async function recordFailure(ctx, step, message) {
   }));
   await quietly(ctx, 'the failure notice', () => notifyOperators(consoleDeps(ctx), {
     orgId: ctx.app.orgId, appId: ctx.appId, eventName: ctx.eventName, kind: 'build-run-failed', problem: error,
+  }));
+  await quietly(ctx, 'the Owner notice', () => notifyOwners(consoleDeps(ctx), {
+    orgId: ctx.app.orgId, appId: ctx.appId, status: 'build-failed', eventName: ctx.eventName,
   }));
 }
 
@@ -1200,8 +1203,11 @@ async function provision({ appId, testMode = false, deps }) {
 /**
  * For the workflow's last step. A run that timed out or was cancelled never
  * reached the catch above, so this leaves the record a run that finishes can't.
+ * A `queued` record that still names this run is a retry made after this run
+ * recorded its failure, and that retry is waiting for this run to end. A `queued`
+ * record naming an earlier run is this run's own retry, which died before writing.
  */
-async function markStopped({ appId, deps }) {
+async function markStopped({ appId, runId, deps }) {
   const { db } = deps;
   const [appSnap, recordSnap] = await Promise.all([
     db.collection('applications').doc(appId).get(),
@@ -1210,6 +1216,7 @@ async function markStopped({ appId, deps }) {
   if (!appSnap.exists || !['approved', 'building'].includes(appSnap.data().status)) return 0;
   const record = recordSnap.exists ? recordSnap.data() : {};
   if (record.state === 'failed') return 0;
+  if (record.state === 'queued' && runId && record.runUrl?.endsWith(`/actions/runs/${runId}`)) return 0;
   const app = appSnap.data();
   await recordFailure({
     appId,
@@ -1291,7 +1298,7 @@ async function main(argv = process.argv.slice(2), env = process.env, makeDeps = 
     return 2;
   }
   const deps = makeDeps(env);
-  if (args.markStopped) return markStopped({ appId: args.appId, deps });
+  if (args.markStopped) return markStopped({ appId: args.appId, runId: env.GITHUB_RUN_ID, deps });
   return provision({ appId: args.appId, testMode: args.testMode, deps });
 }
 

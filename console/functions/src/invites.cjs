@@ -155,4 +155,4 @@ async function acceptInvite({ db, now = Date.now }, { body, user }) {
   });
 }
 
-module.exports = { acceptInvite, inviteMember, hashToken, EXPIRES_IN_DAYS };
+module.exports = { acceptInvite, inviteMember, hashToken, sameHash, EXPIRES_IN_DAYS };

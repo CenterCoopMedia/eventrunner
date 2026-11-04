@@ -1115,7 +1115,7 @@ The client console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md)
    npx firebase functions:secrets:set CONSOLE_EVENTBRITE_CLIENT_SECRET --project <console-project-id>
    ```
 
-   - **Stripe**: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI `https://console.eventrunner.org/connect/stripe/return`. Put the Connect client id in `console/functions/.env` as `CONSOLE_STRIPE_CLIENT_ID`. Use the test mode client id and key for a rehearsal.
+   - **Stripe**: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI `https://console.eventrunner.org/connect/stripe/return`. Put the Connect client id in `console/functions/.env` as `CONSOLE_STRIPE_CLIENT_ID`. Use the test mode client id and key for a rehearsal, with `CONSOLE_TEST_MODE` set (§11.2).
    - **Eventbrite**: make an app, and set its OAuth redirect URI to `https://console.eventrunner.org/connect/eventbrite/return`. Put its API key in `console/functions/.env` as `CONSOLE_EVENTBRITE_CLIENT_ID`, and its client secret in the secret above.
    - **Secret Manager**: turn on the Secret Manager API in the console project. Give the functions' runtime service account the **Secret Manager Admin** role, with an IAM condition on the secret name prefix `projects/<project-number>/secrets/connection-`, so it cannot change other secrets. Without a condition, the role reaches every secret in the project.
 
@@ -1129,11 +1129,15 @@ Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitH
 | `CONSOLE_PROJECT_ID` | The console project |
 | `VITE_CONSOLE_FIREBASE_API_KEY`, `VITE_CONSOLE_FIREBASE_AUTH_DOMAIN`, `VITE_CONSOLE_FIREBASE_APP_ID` | The public web settings |
 | `VITE_CONSOLE_SIGN_IN_PROVIDERS` | Comma-separated: `google`, `microsoft`. Leave it empty to offer only the emailed link. List a method only after step 2 of §11.1 sets it up, or its button fails for the client. |
+| `VITE_CONSOLE_HELP_EMAIL` | The address clients see for reaching the hosting team, on every console page. Set it before sending a signup link: refusals and failed builds tell clients to ask the hosting team, and unset, no page says how. |
 | `CONSOLE_PUBLIC_URL`, `CONSOLE_MAIL_FROM` | Written to `console/functions/.env` at deploy |
 | `CONSOLE_STRIPE_CLIENT_ID`, `CONSOLE_EVENTBRITE_CLIENT_ID` | Also written to `.env`. Unset means the choice is not available yet. |
 | `CONSOLE_GITHUB_APP_ID`, `CONSOLE_GITHUB_INSTALLATION_ID`, `CONSOLE_GITHUB_REPOSITORY` | Also written to `.env`. Unset means a build does not start, and operators are told. |
+| `CONSOLE_TEST_MODE` | Also written to `.env`. Leave it unset on a console that serves clients. `true` makes a rehearsal console: acceptance lets a test-mode ticket account through, and every build it starts runs in test mode. |
 
-Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_STRIPE_FEE_WEBHOOK_SECRET`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`. A function that names a secret will not deploy without it, so until a provider is ready store a long random value, never a guessable word: the fee webhook checks signatures with that value. The functions' runtime account needs read access to each one.
+A deploy does not delete a function that left the code. In `--non-interactive` mode it stops, lists each one and prints its `firebase functions:delete` command. Run those commands and deploy again. A removed public function keeps answering at its direct address until it is deleted.
+
+Secrets stay in the console project's Secret Manager, and the Environment holds none: `CONSOLE_POSTMARK_TOKEN`, `CONSOLE_STRIPE_SECRET_KEY`, `CONSOLE_EVENTBRITE_CLIENT_SECRET`. A function that names a secret will not deploy without it, so until a provider is ready store a placeholder. The functions' runtime account needs read access to each one.
 
 Set these up as the project owner before the first deploy, because the deploy account cannot:
 
@@ -1157,14 +1161,29 @@ npx firebase deploy --project <console-project-id>
 Check after the first deploy:
 
 - Sign in at `https://console.eventrunner.org` with each of the three methods.
-- Make a test organization, invite a second address, and accept the invite from that address.
+- Create a signup link (§11.3) and open it from a test address. Confirm that the organization and a draft request exist, and that the same link from another address says it has been used.
+- From the test organization, invite a second address and accept the invite from that address.
 - Sign in as an operator and confirm that the home page lists every organization.
-- With two Owners on the test organization, answer the guided setup and select **Create my site**. Confirm that the Owners and each operator get an email, and that the status page says "We are reviewing your request". Then withdraw the test request.
 - With a provider set up, connect a test account from the tickets step, then disconnect it. On Eventbrite, confirm that coming back works at all: its documents do not say it returns the `state` value, and without it the console refuses the connection.
+- Answer the guided setup up to the agreement, then withdraw the test request. Do not accept the agreement here: accepting starts a real build, which section 12 covers.
+
+### 11.3 Creating a signup link
+
+A client starts from a signup link and from nowhere else. The event fee is invoiced outside the console ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md#amendment-2026-11-04-invoice-and-signup-link)), and the console holds no fee, price or invoice data. Once the invoice is paid:
+
+1. Sign in as an operator and open `/review/links`, which the review queue links to.
+2. Enter the organization name. The client can change it when they use the link.
+3. Copy the link and send it to the client. It is shown once and cannot be read back. If it is lost, revoke it and create another.
+
+From there the client signs in, enters the details and accepts the agreement, and the build starts. No operator step follows.
+
+A link works once and expires after 30 days. It is not tied to an email address, so a forwarded link works for the first person who uses it. The page lists each link with its status, who used it and when. Select **Revoke** on an open link that went to the wrong place. When a client says a link says it is used, expired or revoked, create a new one.
+
+If creating a link says sign-ups are closed, the message names what is missing: the agreement, the client folder, the billing account or the region. Set them at `/review/settings` (§12.1 step 9). While one is missing, an open link also refuses, and so does accepting the agreement.
 
 ## 12. Site builder
 
-The site builder builds one client's site after a request is approved, with nobody's help ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md) §6). The console's `startBuild` dispatches `.github/workflows/provision-client.yml`, which runs `scripts/provision-client.cjs` as the provisioner service account. Sections 1 to 5 are the same work by hand, for a site made outside the console.
+The site builder builds one client's site after an Owner accepts the agreement, with nobody's help ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md) §6). The console's `startBuild` dispatches `.github/workflows/provision-client.yml`, which runs `scripts/provision-client.cjs` as the provisioner service account. Sections 1 to 5 are the same work by hand, for a site made outside the console.
 
 Each step reads the current state and does nothing when it is already right, so a failed run is repaired by running it again.
 
@@ -1268,23 +1287,27 @@ Use placeholders from your own records. Nothing below belongs in the repository.
    | Secret | `POSTMARK_ACCOUNT_TOKEN` | Step 7 |
    | Secret | `CONSOLE_POSTMARK_TOKEN` | A copy of the console's mail token, for the emails the build sends |
 
-9. **Settings.** Set the client folder, billing account and region at `/review/settings` in the console. A request an operator approves can override them.
+9. **Settings.** Set the client folder, billing account and region at `/review/settings` in the console, with the agreement. No signup link can be created until all four are set.
 
 10. **Check the organization's policies on the client folder.** A new organization may set `iam.automaticIamGrantsForDefaultServiceAccounts`, so the compute account gets no Editor role, and `iam.allowedPolicyMemberDomains`, which refuses the `allUsers` binding public functions need. The rehearsed project did not have these. Allow what the deployed site needs on the client folder, or the deploy fails.
 
 ### 12.2 When a build fails
 
-The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. The client sees only "We are building your site". Fix the cause, then select **Retry the build**.
+The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. Fix the cause, then select **Retry the build**.
+
+The Owners get an email saying the build did not finish, with a link to the status page. That page says the same and offers **Retry the build**, and **Reconnect** when the failed step is `tickets`. It never shows the error, the run or the step detail. An Owner can retry alone, up to a daily limit.
 
 | Error | Meaning |
 |---|---|
 | A certificate or sender domain that is not ready | DNS is still moving. Retry later. |
 | `the deploy failed 3 times` | Read the linked run. A first deploy's quota and Eventarc failures are usually transient, so a retry often clears them. |
-| A token that fails its test, or a test-mode connection | The client has to connect the account again. The console does not let them after approval yet, so change it by hand or send the request back. |
+| A token that fails its test, or a test-mode connection | The client connects the account again from the status page, then retries. They can do this alone: an Owner can reconnect the chosen account, and only that one, while the build has failed. The frozen answers stay as they are. A retry without reconnecting fails the same way, because the step deletes a test-mode token. |
 | `exists outside the client folder` | The name's project already exists somewhere else. It needs a person. |
 | `the run has no value for ...` | A setting from section 12.1 is missing. |
 
-To run a rehearsal with a test-mode connection, dispatch it by hand. Nothing else allows a test-mode token into a build:
+To run a rehearsal with a test-mode connection, set `CONSOLE_TEST_MODE` to `true` in the `console` Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts and builds nothing live.
+
+To run an accepted request again in test mode, dispatch it by hand:
 
 ```sh
 gh workflow run provision-client.yml --ref main -f application_id=<id> -f test_mode=true

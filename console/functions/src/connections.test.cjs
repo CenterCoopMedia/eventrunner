@@ -9,8 +9,6 @@ const {
 } = require('./connections.cjs');
 const { getApplication } = require('./applications.cjs');
 const { acceptAgreement } = require('./agreementAcceptance.cjs');
-const { submitApplication } = require('./applicationStatus.cjs');
-const { approveApplication } = require('./reviewDecisions.cjs');
 const { getApplicationForReview } = require('./reviewQueue.cjs');
 const { connectionsForClient, liveConnection } = require('./connectionState.cjs');
 const { connectionsAvailable } = require('./connectors.cjs');
@@ -24,7 +22,7 @@ const EB_TOKEN = 'THEeventbriteTOKEN';
 const BASE = { orgId: 'o1', appId: 'a1' };
 const PUBLIC_URL = 'https://console.example';
 
-const stripeAnswer = (accountId = 'acct_new') => ({ token: TOKEN, accountId, displayName: 'NC Local', details: { livemode: false } });
+const stripeAnswer = (accountId = 'acct_new') => ({ token: TOKEN, accountId, displayName: 'NC Local', details: { livemode: true } });
 const EVENTS = [
   { id: 'e1', name: 'Summit', start: '2027-05-13T09:00:00', organizationId: 'org9' },
   { id: 'e2', name: 'Dinner', start: null, organizationId: 'org9' },
@@ -126,7 +124,7 @@ test('completing stores the state in Firestore and the token only in Secret Mana
   assert.equal(stripe.exchanged[0].code, 'code1');
   assert.equal(stripe.exchanged[0].redirectUri, `${PUBLIC_URL}/connect/stripe/return`);
   const { connected, displayName, livemode } = stored(db).stripe;
-  assert.deepEqual({ connected, displayName, livemode }, { connected: true, displayName: 'NC Local', livemode: false });
+  assert.deepEqual({ connected, displayName, livemode }, { connected: true, displayName: 'NC Local', livemode: true });
   assert.deepEqual(privateRow(db).stripe, { accountId: 'acct_new', connectedBy: 'ana' });
 });
 
@@ -175,7 +173,7 @@ test('a state made up by someone else fails safely with plain words', async () =
     await assert.rejects(complete(deps, { state }), (err) => {
       assert.equal(err.status, 400);
       assert.equal(err.code, 'state-mismatch');
-      assert.match(err.message, /Start again from the tickets step/);
+      assert.match(err.message, /Connect the account again/);
       return true;
     });
   }
@@ -379,29 +377,59 @@ test('a failed delete on a closed request still offers the Owner a way to end th
   assert.equal(client.eventbrite.unfinished, false);
 });
 
-test('a sent request can change only the account it chose', async () => {
-  const { deps } = setup({ application: { status: 'submitted', frozen: validAnswers() } });
-  await assert.rejects(startConnection(deps, { body: { ...BASE, provider: 'eventbrite' }, user: ana }), { status: 409, code: 'locked' });
-  assert.ok(await start(deps, 'stripe'));
-});
-
-test('a request waiting for payment keeps its account, so payment cannot approve it without one', async () => {
-  const { db, secrets, deps } = setup({ application: { status: 'awaiting_payment', frozen: validAnswers(), connections: { stripe: stripeConnection() } } });
-  secrets.store.set('connection-stripe-a1', TOKEN);
-  await assert.rejects(startConnection(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
-  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
-  assert.equal(secrets.store.size, 1);
-  assert.equal(stored(db).stripe.connected, true);
-});
-
-test('from approval on, the connection cannot change', async () => {
+test('from acceptance on, the connection cannot change while no build has failed', async () => {
   for (const status of ['approved', 'building', 'ready', 'launched']) {
-    const { secrets, deps } = setup({ application: { status, frozen: validAnswers(), connections: { stripe: stripeConnection() } } });
+    const { secrets, deps } = setup({
+      application: { status, frozen: validAnswers(), buildStart: { state: 'started', at: new Date(NOW) }, connections: { stripe: stripeConnection() } },
+      extra: { 'console_builds/a1': { state: 'running' } },
+    });
     secrets.store.set('connection-stripe-a1', TOKEN);
     await assert.rejects(startConnection(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
     await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
     assert.equal(secrets.store.size, 1, status);
   }
+});
+
+/** A request whose build stopped at the ticket step. */
+function failedBuild({ frozen = validAnswers(), connections = { stripe: stripeConnection() }, status = 'building' } = {}) {
+  return setup({
+    application: { status, frozen, buildStart: { state: 'started', at: new Date(NOW) }, connections },
+    extra: { 'console_builds/a1': { state: 'failed', failedStep: 'tickets' } },
+  });
+}
+
+test('after a failed build an Owner can reconnect the chosen account, and the answers stay frozen', async () => {
+  const { db, secrets, deps } = failedBuild();
+  const frozen = db.read('applications/a1').frozen;
+  await complete(deps, { state: await start(deps, 'stripe') });
+  assert.equal(secrets.store.get('connection-stripe-a1'), TOKEN);
+  assert.equal(stored(db).stripe.connected, true);
+  assert.deepEqual(db.read('applications/a1').frozen, frozen);
+  assert.equal(db.read('applications/a1').status, 'building');
+});
+
+test('after a failed build only an Owner can reconnect, only the chosen account, and not disconnect it', async () => {
+  const { secrets, deps } = failedBuild();
+  secrets.store.set('connection-stripe-a1', TOKEN);
+  await assert.rejects(startConnection(deps, { body: { ...BASE, provider: 'eventbrite' }, user: ana }), { status: 409, code: 'locked', message: 'Your request does not use this account.' });
+  await assert.rejects(startConnection(deps, { body: { ...BASE, provider: 'stripe' }, user: ben }), { status: 403 });
+  await assert.rejects(disconnectAccount(deps, { body: { ...BASE, provider: 'stripe' }, user: ana }), { status: 409, code: 'locked' });
+  assert.equal(secrets.store.size, 1);
+});
+
+test('a reconnect started before a retry cannot finish after it', async () => {
+  const { db, deps } = failedBuild();
+  const state = await start(deps, 'stripe');
+  await db.collection('console_builds').doc('a1').update({ state: 'queued' });
+  await assert.rejects(complete(deps, { state }), { status: 409, code: 'locked' });
+});
+
+test('a reconnect to another Eventbrite account can choose its event after a failed build', async () => {
+  const frozen = { ...validAnswers(), tickets: { choice: 'eventbrite' } };
+  const { db, secrets, deps } = failedBuild({ frozen, connections: { eventbrite: { connected: true, displayName: 'Ana' } } });
+  secrets.store.set('connection-eventbrite-a1', EB_TOKEN);
+  await chooseEventbriteEvent(deps, { body: { ...BASE, eventId: 'e1' }, user: ana });
+  assert.equal(stored(db).eventbrite.event.id, 'e1');
 });
 
 test('a closed request cannot connect, but its account can be disconnected without moving its deletion date', async () => {
@@ -456,9 +484,9 @@ test('a stored token that is gone gives a plain message when reading events', as
   await assert.rejects(listEventbriteEvents(deps, { body: BASE, user: ana }), { status: 502, code: 'events-failed' });
 });
 
-test('a new request cannot reach payment until the account it chose is connected', async () => {
+test('a new request cannot start its build until the account it chose is connected', async () => {
   const { db, deps } = setup({ extra: { 'site_names/nclocal': { appId: 'a1', orgId: 'o1' }, ...signupTerms() } });
-  const accepting = { ...deps, mailer: fakeMailer(), publicUrl: '' };
+  const accepting = { ...deps, mailer: fakeMailer(), publicUrl: '', startBuild: async () => {} };
   const accept = { body: { ...BASE, accept: true, name: 'Ana Owner', version: 1 }, user: ana };
   await assert.rejects(acceptAgreement(accepting, accept), (err) => {
     assert.equal(err.code, 'incomplete');
@@ -467,30 +495,11 @@ test('a new request cannot reach payment until the account it chose is connected
   });
   await complete(deps, { state: await start(deps) });
   await acceptAgreement(accepting, accept);
-  assert.equal(db.read('applications/a1').status, 'awaiting_payment');
+  assert.equal(db.read('applications/a1').status, 'approved');
 });
 
-test('a held-back request cannot be sent again until the account it chose is connected', async () => {
-  const { db, deps } = setup({ application: { status: 'changes_requested' }, extra: { 'site_names/nclocal': { appId: 'a1', orgId: 'o1' } } });
-  const sending = { ...deps, mailer: fakeMailer(), publicUrl: '' };
-  await assert.rejects(submitApplication(sending, { body: BASE, user: ana }), (err) => {
-    assert.equal(err.code, 'incomplete');
-    assert.equal(err.fields['tickets.connection'], 'Connect your Stripe account.');
-    return true;
-  });
-  await complete(deps, { state: await start(deps) });
-  await submitApplication(sending, { body: BASE, user: ana });
-  assert.equal(db.read('applications/a1').status, 'submitted');
-});
-
-test('an operator cannot approve a request whose account was disconnected', async () => {
-  const { db, deps } = setup({
-    application: { status: 'submitted', frozen: validAnswers(), connections: {}, history: [{ status: 'submitted', at: new Date(NOW), by: 'ana', note: null }] },
-    extra: { 'console_config/settings': { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' } },
-  });
-  const review = { ...deps, mailer: fakeMailer() };
-  await assert.rejects(approveApplication(review, { body: { appId: 'a1', revision: 1 }, user: ops }), { status: 409, code: 'connection-needed' });
-  assert.equal(db.read('applications/a1').status, 'submitted');
+test('the review page says when the account was disconnected', async () => {
+  const { deps } = setup({ application: { status: 'approved', frozen: validAnswers(), connections: {} } });
   const { body } = await getApplicationForReview(deps, { body: { appId: 'a1' }, user: ops });
   assert.deepEqual(body.connection, { state: 'not_connected', label: 'Not connected yet' });
 });
@@ -498,9 +507,9 @@ test('an operator cannot approve a request whose account was disconnected', asyn
 test('the review page shows the account and event, and notes test mode', async () => {
   const frozen = { ...validAnswers(), tickets: { choice: 'eventbrite' } };
   const connections = { eventbrite: { connected: true, displayName: 'Ana', event: { id: 'e1', name: 'Summit' } } };
-  const { deps } = setup({ application: { status: 'submitted', frozen, connections } });
+  const { deps } = setup({ application: { status: 'approved', frozen, connections } });
   assert.equal((await getApplicationForReview(deps, { body: { appId: 'a1' }, user: ops })).body.connection.label, 'Connected: Ana Event: Summit');
-  const { deps: stripeDeps } = setup({ application: { status: 'submitted', frozen: validAnswers(), connections: { stripe: stripeConnection() } } });
+  const { deps: stripeDeps } = setup({ application: { status: 'approved', frozen: validAnswers(), connections: { stripe: stripeConnection({ livemode: false }) } } });
   assert.equal((await getApplicationForReview(stripeDeps, { body: { appId: 'a1' }, user: ops })).body.connection.label, 'Connected: NC Local (test mode)');
 });
 

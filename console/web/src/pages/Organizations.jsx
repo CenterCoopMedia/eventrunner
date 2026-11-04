@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Link } from 'react-router';
 import { callApi } from '../api.js';
-import { ROLE_LABELS, formatDate } from '../text.js';
+import { ROLE_LABELS, SIGNUP_LINK_HELP, formatDate } from '../text.js';
 
 /** The home page: my organizations, and every organization for the hosting team. */
 export default function Organizations() {
@@ -18,7 +18,6 @@ export default function Organizations() {
 
   if (error) return <p className="message error" role="alert">{error}</p>;
   if (!data) return <p role="status">Loading your organizations.</p>;
-  if (!data.operator && data.organizations.length === 0) return <Navigate to="/organizations/new" replace />;
 
   return (
     <section aria-labelledby="orgs-title">
@@ -33,9 +32,11 @@ export default function Organizations() {
           ))}
         </ul>
       ) : (
-        <p>You are not on the team of any organization.</p>
+        <>
+          <p>You are not on the team of any organization.</p>
+          {data.operator ? null : <p>{SIGNUP_LINK_HELP} To join a team, open the invite email.</p>}
+        </>
       )}
-      <p><Link to="/organizations/new">Add another organization</Link></p>
 
       {data.operator ? (
         <section aria-labelledby="all-orgs-title" className="section">

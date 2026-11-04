@@ -1,6 +1,4 @@
-import { useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { callApi } from '../../api.js';
 import { STEPS, SIGNUPS_CLOSED, SITE_DOMAIN, TICKET_CHOICES, setupPath, stepById, stepOfField } from '../../setup/steps.js';
 import { senderPreview } from './EmailStep.jsx';
 
@@ -82,7 +80,7 @@ function Summary({ answers, connections, ownersNeeded, orgId, appId }) {
 }
 
 /** Each open problem, with a link to its step. */
-function Problems({ fields, orgId, appId, titleRef }) {
+function Problems({ fields, orgId, appId }) {
   const items = Object.entries(fields)
     .filter(([path]) => path !== 'team')
     .map(([path, message]) => ({ path, message, step: stepOfField(path) }))
@@ -90,7 +88,7 @@ function Problems({ fields, orgId, appId, titleRef }) {
   if (items.length === 0) return null;
   return (
     <section className="message error problems" aria-labelledby="problems-title">
-      <h2 id="problems-title" tabIndex={-1} ref={titleRef}>Answers that need attention</h2>
+      <h2 id="problems-title">Answers that need attention</h2>
       <ul>
         {items.map((item) => (
           <li key={item.path}>
@@ -116,64 +114,18 @@ function NotSaved({ steps, orgId, appId }) {
   );
 }
 
-/**
- * Step 7: read the answers. A new request moves on to the agreement with
- * Next, which opens when the answers pass and the site is taking sign-ups.
- * A request the hosting team held back goes back to them with Send the changes.
- */
-export default function ReviewStep({ app, answers, errors, ownersNeeded, refusedSteps = [], orgId, appId, flush, onSubmitted }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [fields, setFields] = useState(null);
-  const titleRef = useRef(null);
-  const shown = fields || errors;
+/** Step 7: read the answers. Next opens the agreement once they pass and the site is taking sign-ups. */
+export default function ReviewStep({ app, answers, errors, ownersNeeded, refusedSteps = [], orgId, appId }) {
   const ready = Object.keys(errors).length === 0;
-  const returning = app.status === 'changes_requested';
   const notSaved = refusedSteps.map(stepById).filter(Boolean);
-  const held = notSaved.length > 0;
-
-  async function submit() {
-    if (held) return;
-    setBusy(true);
-    setError('');
-    if (!(await flush())) {
-      setError('We could not save your last change. Try again.');
-      setBusy(false);
-      return;
-    }
-    try {
-      await callApi('submitApplication', { orgId, appId });
-      onSubmitted();
-    } catch (err) {
-      setError(err.message);
-      setFields(err.fields || {});
-      setBusy(false);
-      setTimeout(() => titleRef.current?.focus(), 0);
-    }
-  }
-
   return (
     <div className="stack">
-      <p className="lead">
-        {returning
-          ? 'Read your answers. When you select Send the changes, we review your request again. We email you at each step.'
-          : 'Read your answers. Next you read and accept the agreement, then pay the event fee. We email you at each step.'}
-      </p>
-      {error ? <p className="message error" role="alert">{error}</p> : null}
+      <p className="lead">Read your answers. Next you read and accept the agreement, and we start building your site. We email you at each step.</p>
       <NotSaved steps={notSaved} orgId={orgId} appId={appId} />
-      <Problems fields={shown} orgId={orgId} appId={appId} titleRef={titleRef} />
+      <Problems fields={errors} orgId={orgId} appId={appId} />
       <Summary answers={answers} connections={app.connections} ownersNeeded={ownersNeeded} orgId={orgId} appId={appId} />
-      {returning && app.canSubmit ? (
-        <div className="section">
-          <button type="button" className="button primary" onClick={submit} disabled={busy || held}>Send the changes</button>
-          {!ready && !held ? <p className="muted">Finish the answers above first. You can select the button to check them again.</p> : null}
-        </div>
-      ) : null}
-      {returning && !app.canSubmit ? (
-        <p className="muted">Only an Owner can send the changes. Ask an Owner on your team to select Send the changes.</p>
-      ) : null}
-      {!returning && !app.signups?.open ? <p className="message error">{SIGNUPS_CLOSED}</p> : null}
-      {!returning && app.signups?.open && !ready && !held ? <p className="muted">Finish the answers above first. Then you can continue.</p> : null}
+      {!app.signups?.open ? <p className="message error">{SIGNUPS_CLOSED}</p> : null}
+      {app.signups?.open && !ready && notSaved.length === 0 ? <p className="muted">Finish the answers above first. Then you can continue.</p> : null}
     </div>
   );
 }

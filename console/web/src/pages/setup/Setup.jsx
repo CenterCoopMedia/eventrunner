@@ -8,7 +8,6 @@ import { saveStatusText, useAutosave } from '../../setup/useAutosave.js';
 import AgreementStep from './AgreementStep.jsx';
 import EmailStep from './EmailStep.jsx';
 import EventStep from './EventStep.jsx';
-import FeeStep from './FeeStep.jsx';
 import OrganizationStep from './OrganizationStep.jsx';
 import ReviewStep from './ReviewStep.jsx';
 import TeamStep from './TeamStep.jsx';
@@ -164,9 +163,7 @@ export default function Setup() {
   if (!step) return <Navigate to={setupPath(orgId, appId, STEPS[0])} replace />;
   if (error) return <p className="message error" role="alert">{error}</p>;
   if (!app) return <p role="status">Loading your setup.</p>;
-  // A member waiting to pay still reads the agreement and the fee here.
-  const paying = app.status === 'awaiting_payment' && Boolean(app.myRole);
-  if (!app.canEdit && !paying) return <Navigate to={statusPath(orgId, appId)} replace />;
+  if (!app.canEdit) return <Navigate to={statusPath(orgId, appId)} replace />;
   const open = openStepIds(app, refused);
   if (!open.includes(step.id)) return <Navigate to={setupPath(orgId, appId, stepById(open.at(-1)))} replace />;
 
@@ -189,12 +186,6 @@ export default function Setup() {
       <section className="step-body" aria-labelledby="step-title">
         <p className="muted">Step {index + 1} of {STEPS.length}</p>
         <h1 id="step-title" tabIndex={-1}>{step.title}</h1>
-        {app.status === 'changes_requested' && app.note ? (
-          <aside className="note" role="note">
-            <p className="note-title">The hosting team asked for changes</p>
-            <p className="pre">{app.note}</p>
-          </aside>
-        ) : null}
         {View ? (
           <View
             value={app.answers[step.id]}
@@ -219,8 +210,6 @@ export default function Setup() {
             refusedSteps={refused}
             orgId={orgId}
             appId={appId}
-            flush={flush}
-            onSubmitted={() => navigate(statusPath(orgId, appId))}
           />
         ) : null}
         {step.id === 'agreement' ? (
@@ -229,22 +218,7 @@ export default function Setup() {
             orgId={orgId}
             appId={appId}
             onRefresh={reload}
-            onAccepted={async (result) => {
-              await reload();
-              navigate(setupPath(orgId, appId, stepById('fee')), { state: { copyFailed: result.copySent === false } });
-            }}
-          />
-        ) : null}
-        {step.id === 'fee' ? (
-          <FeeStep
-            app={app}
-            orgId={orgId}
-            appId={appId}
-            copyFailed={Boolean(location.state?.copyFailed)}
-            onReopened={async () => {
-              await reload();
-              navigate(setupPath(orgId, appId, stepById('review')));
-            }}
+            onAccepted={(result) => navigate(statusPath(orgId, appId), { state: { copyFailed: result.copySent === false } })}
           />
         ) : null}
         <p className="save-status" role="status" aria-live="polite">{saveStatusText(saveStatus, saveError)}</p>

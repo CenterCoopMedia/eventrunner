@@ -11,9 +11,7 @@
 const { ConsoleError } = require('./http.cjs');
 const { isOperator, validOrgId } = require('./access.cjs');
 
-const STATUSES = Object.freeze([
-  'draft', 'awaiting_payment', 'submitted', 'changes_requested', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined',
-]);
+const STATUSES = Object.freeze(['draft', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined']);
 
 const NOT_OPERATOR = 'This page is for the hosting team.';
 const NOT_FOUND = 'We could not find that request.';
@@ -43,7 +41,7 @@ async function readApplication(db, appId) {
   return { id: snap.id, ...snap.data() };
 }
 
-/** The answers the review is about: the frozen copy, or the live answers before submit. */
+/** The answers the review is about: the frozen copy, or the live answers before acceptance. */
 function reviewedAnswers(app) {
   return app.frozen || app.answers || {};
 }

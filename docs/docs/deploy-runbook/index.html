@@ -1100,7 +1100,7 @@
           npx firebase functions:secrets:set CONSOLE_EVENTBRITE_CLIENT_SECRET --project &lt;console-project-id&gt;
           </code></pre>
           <ul>
-          <li><strong>Stripe</strong>: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI <code>https://console.eventrunner.org/connect/stripe/return</code>. Put the Connect client id in <code>console/functions/.env</code> as <code>CONSOLE_STRIPE_CLIENT_ID</code>. Use the test mode client id and key for a rehearsal.</li>
+          <li><strong>Stripe</strong>: in the platform account, turn on Connect and OAuth for Standard accounts. Add the redirect URI <code>https://console.eventrunner.org/connect/stripe/return</code>. Put the Connect client id in <code>console/functions/.env</code> as <code>CONSOLE_STRIPE_CLIENT_ID</code>. Use the test mode client id and key for a rehearsal, with <code>CONSOLE_TEST_MODE</code> set (§11.2).</li>
           <li><strong>Eventbrite</strong>: make an app, and set its OAuth redirect URI to <code>https://console.eventrunner.org/connect/eventbrite/return</code>. Put its API key in <code>console/functions/.env</code> as <code>CONSOLE_EVENTBRITE_CLIENT_ID</code>, and its client secret in the secret above.</li>
           <li><strong>Secret Manager</strong>: turn on the Secret Manager API in the console project. Give the functions&#39; runtime service account the <strong>Secret Manager Admin</strong> role, with an IAM condition on the secret name prefix <code>projects/&lt;project-number&gt;/secrets/connection-</code>, so it cannot change other secrets. Without a condition, the role reaches every secret in the project.</li>
           </ul></li>
@@ -1117,13 +1117,16 @@
           <tr><td><code>CONSOLE_PROJECT_ID</code></td><td>The console project</td></tr>
           <tr><td><code>VITE_CONSOLE_FIREBASE_API_KEY</code>, <code>VITE_CONSOLE_FIREBASE_AUTH_DOMAIN</code>, <code>VITE_CONSOLE_FIREBASE_APP_ID</code></td><td>The public web settings</td></tr>
           <tr><td><code>VITE_CONSOLE_SIGN_IN_PROVIDERS</code></td><td>Comma-separated: <code>google</code>, <code>microsoft</code>. Leave it empty to offer only the emailed link. List a method only after step 2 of §11.1 sets it up, or its button fails for the client.</td></tr>
+          <tr><td><code>VITE_CONSOLE_HELP_EMAIL</code></td><td>The address clients see for reaching the hosting team, on every console page. Set it before sending a signup link: refusals and failed builds tell clients to ask the hosting team, and unset, no page says how.</td></tr>
           <tr><td><code>CONSOLE_PUBLIC_URL</code>, <code>CONSOLE_MAIL_FROM</code></td><td>Written to <code>console/functions/.env</code> at deploy</td></tr>
           <tr><td><code>CONSOLE_STRIPE_CLIENT_ID</code>, <code>CONSOLE_EVENTBRITE_CLIENT_ID</code></td><td>Also written to <code>.env</code>. Unset means the choice is not available yet.</td></tr>
           <tr><td><code>CONSOLE_GITHUB_APP_ID</code>, <code>CONSOLE_GITHUB_INSTALLATION_ID</code>, <code>CONSOLE_GITHUB_REPOSITORY</code></td><td>Also written to <code>.env</code>. Unset means a build does not start, and operators are told.</td></tr>
+          <tr><td><code>CONSOLE_TEST_MODE</code></td><td>Also written to <code>.env</code>. Leave it unset on a console that serves clients. <code>true</code> makes a rehearsal console: acceptance lets a test-mode ticket account through, and every build it starts runs in test mode.</td></tr>
           </tbody>
           </table>
           </div>
-          <p>Secrets stay in the console project&#39;s Secret Manager, and the Environment holds none: <code>CONSOLE_POSTMARK_TOKEN</code>, <code>CONSOLE_STRIPE_SECRET_KEY</code>, <code>CONSOLE_STRIPE_FEE_WEBHOOK_SECRET</code>, <code>CONSOLE_EVENTBRITE_CLIENT_SECRET</code>. A function that names a secret will not deploy without it, so until a provider is ready store a long random value, never a guessable word: the fee webhook checks signatures with that value. The functions&#39; runtime account needs read access to each one.</p>
+          <p>A deploy does not delete a function that left the code. In <code>--non-interactive</code> mode it stops, lists each one and prints its <code>firebase functions:delete</code> command. Run those commands and deploy again. A removed public function keeps answering at its direct address until it is deleted.</p>
+          <p>Secrets stay in the console project&#39;s Secret Manager, and the Environment holds none: <code>CONSOLE_POSTMARK_TOKEN</code>, <code>CONSOLE_STRIPE_SECRET_KEY</code>, <code>CONSOLE_EVENTBRITE_CLIENT_SECRET</code>. A function that names a secret will not deploy without it, so until a provider is ready store a placeholder. The functions&#39; runtime account needs read access to each one.</p>
           <p>Set these up as the project owner before the first deploy, because the deploy account cannot:</p>
           <ul>
           <li>The Artifact Registry repository <code>gcf-artifacts</code> in <code>us-central1</code>, with the cleanup policy <code>firebase-functions-cleanup</code> (delete images older than 86400 seconds).</li>
@@ -1142,13 +1145,24 @@
           <p>Check after the first deploy:</p>
           <ul>
           <li>Sign in at <code>https://console.eventrunner.org</code> with each of the three methods.</li>
-          <li>Make a test organization, invite a second address, and accept the invite from that address.</li>
+          <li>Create a signup link (§11.3) and open it from a test address. Confirm that the organization and a draft request exist, and that the same link from another address says it has been used.</li>
+          <li>From the test organization, invite a second address and accept the invite from that address.</li>
           <li>Sign in as an operator and confirm that the home page lists every organization.</li>
-          <li>With two Owners on the test organization, answer the guided setup and select <strong>Create my site</strong>. Confirm that the Owners and each operator get an email, and that the status page says &quot;We are reviewing your request&quot;. Then withdraw the test request.</li>
           <li>With a provider set up, connect a test account from the tickets step, then disconnect it. On Eventbrite, confirm that coming back works at all: its documents do not say it returns the <code>state</code> value, and without it the console refuses the connection.</li>
+          <li>Answer the guided setup up to the agreement, then withdraw the test request. Do not accept the agreement here: accepting starts a real build, which section 12 covers.</li>
           </ul>
+          <h3 id="113-creating-a-signup-link">11.3 Creating a signup link<a class="heading-anchor" href="#113-creating-a-signup-link" aria-label="Link to this section">#</a></h3>
+          <p>A client starts from a signup link and from nowhere else. The event fee is invoiced outside the console (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0007-client-console-self-serve-onboarding.md#amendment-2026-11-04-invoice-and-signup-link">ADR 0007</a>), and the console holds no fee, price or invoice data. Once the invoice is paid:</p>
+          <ol>
+          <li>Sign in as an operator and open <code>/review/links</code>, which the review queue links to.</li>
+          <li>Enter the organization name. The client can change it when they use the link.</li>
+          <li>Copy the link and send it to the client. It is shown once and cannot be read back. If it is lost, revoke it and create another.</li>
+          </ol>
+          <p>From there the client signs in, enters the details and accepts the agreement, and the build starts. No operator step follows.</p>
+          <p>A link works once and expires after 30 days. It is not tied to an email address, so a forwarded link works for the first person who uses it. The page lists each link with its status, who used it and when. Select <strong>Revoke</strong> on an open link that went to the wrong place. When a client says a link says it is used, expired or revoked, create a new one.</p>
+          <p>If creating a link says sign-ups are closed, the message names what is missing: the agreement, the client folder, the billing account or the region. Set them at <code>/review/settings</code> (§12.1 step 9). While one is missing, an open link also refuses, and so does accepting the agreement.</p>
           <h2 id="12-site-builder">12. Site builder<a class="heading-anchor" href="#12-site-builder" aria-label="Link to this section">#</a></h2>
-          <p>The site builder builds one client&#39;s site after a request is approved, with nobody&#39;s help (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0007-client-console-self-serve-onboarding.md">ADR 0007</a> §6). The console&#39;s <code>startBuild</code> dispatches <code>.github/workflows/provision-client.yml</code>, which runs <code>scripts/provision-client.cjs</code> as the provisioner service account. Sections 1 to 5 are the same work by hand, for a site made outside the console.</p>
+          <p>The site builder builds one client&#39;s site after an Owner accepts the agreement, with nobody&#39;s help (<a href="https://github.com/CenterCoopMedia/eventrunner/blob/main/docs/adr/0007-client-console-self-serve-onboarding.md">ADR 0007</a> §6). The console&#39;s <code>startBuild</code> dispatches <code>.github/workflows/provision-client.yml</code>, which runs <code>scripts/provision-client.cjs</code> as the provisioner service account. Sections 1 to 5 are the same work by hand, for a site made outside the console.</p>
           <p>Each step reads the current state and does nothing when it is already right, so a failed run is repaired by running it again.</p>
           <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
@@ -1264,13 +1278,14 @@
           </div></li>
           </ol>
           <ol start="9">
-          <li><strong>Settings.</strong> Set the client folder, billing account and region at <code>/review/settings</code> in the console. A request an operator approves can override them.</li>
+          <li><strong>Settings.</strong> Set the client folder, billing account and region at <code>/review/settings</code> in the console, with the agreement. No signup link can be created until all four are set.</li>
           </ol>
           <ol start="10">
           <li><strong>Check the organization&#39;s policies on the client folder.</strong> A new organization may set <code>iam.automaticIamGrantsForDefaultServiceAccounts</code>, so the compute account gets no Editor role, and <code>iam.allowedPolicyMemberDomains</code>, which refuses the <code>allUsers</code> binding public functions need. The rehearsed project did not have these. Allow what the deployed site needs on the client folder, or the deploy fails.</li>
           </ol>
           <h3 id="122-when-a-build-fails">12.2 When a build fails<a class="heading-anchor" href="#122-when-a-build-fails" aria-label="Link to this section">#</a></h3>
-          <p>The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. The client sees only &quot;We are building your site&quot;. Fix the cause, then select <strong>Retry the build</strong>.</p>
+          <p>The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. Fix the cause, then select <strong>Retry the build</strong>.</p>
+          <p>The Owners get an email saying the build did not finish, with a link to the status page. That page says the same and offers <strong>Retry the build</strong>, and <strong>Reconnect</strong> when the failed step is <code>tickets</code>. It never shows the error, the run or the step detail. An Owner can retry alone, up to a daily limit.</p>
           <div class="table-scroll" data-scroll-region data-scroll-label="Table">
           <table>
           <thead>
@@ -1279,13 +1294,14 @@
           <tbody>
           <tr><td>A certificate or sender domain that is not ready</td><td>DNS is still moving. Retry later.</td></tr>
           <tr><td><code>the deploy failed 3 times</code></td><td>Read the linked run. A first deploy&#39;s quota and Eventarc failures are usually transient, so a retry often clears them.</td></tr>
-          <tr><td>A token that fails its test, or a test-mode connection</td><td>The client has to connect the account again. The console does not let them after approval yet, so change it by hand or send the request back.</td></tr>
+          <tr><td>A token that fails its test, or a test-mode connection</td><td>The client connects the account again from the status page, then retries. They can do this alone: an Owner can reconnect the chosen account, and only that one, while the build has failed. The frozen answers stay as they are. A retry without reconnecting fails the same way, because the step deletes a test-mode token.</td></tr>
           <tr><td><code>exists outside the client folder</code></td><td>The name&#39;s project already exists somewhere else. It needs a person.</td></tr>
           <tr><td><code>the run has no value for ...</code></td><td>A setting from section 12.1 is missing.</td></tr>
           </tbody>
           </table>
           </div>
-          <p>To run a rehearsal with a test-mode connection, dispatch it by hand. Nothing else allows a test-mode token into a build:</p>
+          <p>To run a rehearsal with a test-mode connection, set <code>CONSOLE_TEST_MODE</code> to <code>true</code> in the <code>console</code> Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts and builds nothing live.</p>
+          <p>To run an accepted request again in test mode, dispatch it by hand:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gh workflow run provision-client.yml --ref main -f application_id=&lt;id&gt; -f test_mode=true
           </code></pre>
           <p>A run that dies before the script starts, for example on a refused identity token, leaves no record: the request shows a started build and nothing else. Read the workflow&#39;s run list.</p>

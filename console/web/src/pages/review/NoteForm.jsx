@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { NOTE_MAX } from '../../reviewText.js';
 
 /**
- * A decision that needs a note to the client: request changes, or
- * decline. The note goes in the email to the Owners and in the history.
+ * A decision that needs a note to the client. The note goes in the email
+ * to the Owners and in the history.
  */
 export default function NoteForm({ id, title, help, submitLabel, danger = false, onSubmit, onCancel }) {
   const [note, setNote] = useState('');

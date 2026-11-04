@@ -1,7 +1,9 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthContext } from '../auth.jsx';
 import { application, callsTo, connections, serveApi } from '../test/application.js';
-import { renderPage } from '../test/renderPage.jsx';
+import { fakeAuth, renderPage } from '../test/renderPage.jsx';
 import ApplicationStatus from './ApplicationStatus.jsx';
 
 vi.mock('../api.js', () => ({ callApi: vi.fn() }));
@@ -17,23 +19,28 @@ function serveStatus(overrides) {
 
 describe('ApplicationStatus', () => {
   beforeEach(() => {
-    serveStatus({ status: 'submitted', canEdit: false, canSubmit: false, submittedAt: '2026-11-04T15:00:00.000Z' });
+    serveStatus({ status: 'approved', canEdit: false, canWithdraw: false });
   });
 
   it('shows plain steps with the live state', async () => {
+    serveStatus({
+      status: 'approved',
+      canEdit: false,
+      canWithdraw: false,
+      acceptance: { version: 1, name: 'Ana Owner', at: '2026-11-04T15:00:00.000Z' },
+    });
     page();
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local News Summit' })).toBeInTheDocument();
-    expect(screen.getAllByText('We are reviewing your request')).toHaveLength(2);
+    expect(screen.getAllByText('We are building your site')).toHaveLength(2);
     const stages = screen.getAllByRole('listitem');
     expect(stages.map((s) => s.textContent)).toEqual([
-      'Answer the setup questionsDone',
-      'We are reviewing your requestNow',
-      'We are building your siteNot started',
+      'Answer the setup questions and accept the agreementDone',
+      'We are building your siteNow',
       'Your site is readyNot started',
     ]);
     expect(stages[1]).toHaveAttribute('aria-current', 'step');
     expect(screen.getByText('nclocal.eventrunner.org')).toBeInTheDocument();
-    expect(screen.getByText(/Sent on 4 November 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Ana Owner accepted the agreement on 4 November 2026/)).toBeInTheDocument();
   });
 
   it('shows the building and ready states', async () => {
@@ -47,16 +54,7 @@ describe('ApplicationStatus', () => {
     serveStatus({ status: 'ready', canEdit: false, canWithdraw: false });
     page();
     const stages = await screen.findAllByRole('listitem');
-    expect(stages[3]).toHaveTextContent('Your site is readyNow');
-  });
-
-  it('shows the note when changes are requested, with a link to make them', async () => {
-    serveStatus({ status: 'changes_requested', note: 'Add the venue address.' });
-    page();
-    const note = await screen.findByRole('note');
-    expect(note).toHaveTextContent('The hosting team asked for changes');
-    expect(note).toHaveTextContent('Add the venue address.');
-    expect(screen.getByRole('link', { name: 'Make the changes' })).toHaveAttribute('href', '/organizations/o1/applications/a1/review');
+    expect(stages[2]).toHaveTextContent('Your site is readyNow');
   });
 
   it('offers to continue a draft', async () => {
@@ -66,9 +64,9 @@ describe('ApplicationStatus', () => {
   });
 
   it('withdraws after one question, and Cancel keeps the request', async () => {
-    let status = 'submitted';
+    let status = 'draft';
     serveApi({
-      getApplication: () => ({ application: application({ status, canEdit: false, canWithdraw: status !== 'withdrawn' }) }),
+      getApplication: () => ({ application: application({ status, canEdit: status === 'draft', canWithdraw: status !== 'withdrawn' }) }),
       withdrawApplication: () => { status = 'withdrawn'; return { status }; },
     });
     page();
@@ -96,10 +94,10 @@ describe('ApplicationStatus', () => {
   describe('the connected account', () => {
     const notConnected = { available: true, connected: false, displayName: null, connectedAt: null };
 
-    it('connects and disconnects until the site is built', async () => {
+    it('connects and disconnects until the agreement is accepted', async () => {
       let linked = connections();
       serveApi({
-        getApplication: () => ({ application: application({ status: 'submitted', canEdit: false, connections: linked }) }),
+        getApplication: () => ({ application: application({ connections: linked }) }),
         disconnectAccount: () => {
           linked = connections({ stripe: notConnected });
           return { connections: linked, errors: {}, revoked: true, shared: false };
@@ -123,7 +121,7 @@ describe('ApplicationStatus', () => {
     });
 
     it('an Editor sees the account and cannot change it', async () => {
-      serveStatus({ status: 'submitted', canEdit: false, myRole: 'editor', connections: connections({ canChange: false, canDisconnect: false }) });
+      serveStatus({ status: 'approved', canEdit: false, myRole: 'editor', connections: connections({ canChange: false, canDisconnect: false }) });
       page();
       expect(await screen.findByText('Connected: NC Local')).toBeInTheDocument();
       expect(screen.getByText('Only an Owner can change this account.')).toBeInTheDocument();
@@ -131,7 +129,7 @@ describe('ApplicationStatus', () => {
       expect(screen.queryByRole('button', { name: 'Connect again' })).not.toBeInTheDocument();
     });
 
-    it('from approval on, the account cannot change', async () => {
+    it('from acceptance on, the account cannot change while the build is well', async () => {
       serveStatus({ status: 'approved', canEdit: false, canWithdraw: false, connections: connections({ canChange: false, canDisconnect: false }) });
       page();
       expect(await screen.findByText('Connected: NC Local')).toBeInTheDocument();
@@ -149,7 +147,7 @@ describe('ApplicationStatus', () => {
 
     it('asks nothing of a request that needs no account', async () => {
       const answers = { ...application().answers, tickets: { choice: 'spreadsheet' } };
-      serveStatus({ status: 'submitted', canEdit: false, answers, connections: connections({ stripe: notConnected }) });
+      serveStatus({ status: 'approved', canEdit: false, answers, connections: connections({ canChange: false, canDisconnect: false, stripe: notConnected }) });
       page();
       expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Connect with/ })).not.toBeInTheDocument();
@@ -162,105 +160,103 @@ describe('ApplicationStatus', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not find that request.');
   });
 
-  describe('the event fee', () => {
-    const WAITING = {
-      status: 'awaiting_payment',
-      canEdit: false,
-      canAccept: false,
-      canPay: true,
-      submittedAt: '2026-11-04T15:00:00.000Z',
-      acceptance: { version: 1, name: 'Ana Owner', at: '2026-11-04T15:00:00.000Z' },
-    };
-    const pageAt = (query) => renderPage(<ApplicationStatus />, {
-      path: `/organizations/o1/applications/a1${query}`,
-      route: '/organizations/:orgId/applications/:appId',
-    });
+  it('says when the copy of the agreement could not be emailed', async () => {
+    render(
+      <AuthContext.Provider value={fakeAuth()}>
+        <MemoryRouter initialEntries={[{ pathname: '/organizations/o1/applications/a1', state: { copyFailed: true } }]}>
+          <Routes><Route path="/organizations/:orgId/applications/:appId" element={<ApplicationStatus />} /></Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
+    );
+    expect(await screen.findByText(/could not email your copy of the agreement/)).toBeInTheDocument();
+  });
 
-    it('shows the steps of a paid request and a link to pay', async () => {
-      serveStatus(WAITING);
-      page();
-      const stages = await screen.findAllByRole('listitem');
-      expect(stages.map((s) => s.textContent)).toEqual([
-        'Answer the setup questionsDone',
-        'Accept the agreement and pay the event feeNow',
-        'We are building your siteNot started',
-        'Your site is readyNot started',
-      ]);
-      expect(screen.getByRole('link', { name: 'Pay the event fee' })).toHaveAttribute('href', '/organizations/o1/applications/a1/fee');
-      expect(screen.getByText(/Ana Owner accepted the agreement on 4 November 2026/)).toBeInTheDocument();
-    });
+  describe('a failed build', () => {
+    const notConnected = { available: true, connected: false, displayName: null, connectedAt: null };
+    const FAILED = { status: 'building', canEdit: false, canWithdraw: false, connections: connections({ canChange: false, canDisconnect: false }) };
 
-    it('coming back from paying changes nothing: it waits for confirmation', async () => {
-      serveStatus(WAITING);
-      pageAt('?payment=done');
-      expect(await screen.findByText('Waiting for payment confirmation')).toBeInTheDocument();
-      expect(screen.getByRole('note')).toHaveTextContent('You will not be charged twice.');
-      expect(screen.queryByRole('link', { name: 'Pay the event fee' })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'open the event fee step' })).toHaveAttribute('href', '/organizations/o1/applications/a1/fee');
-      expect(callsTo('startFeeCheckout')).toHaveLength(0);
-    });
-
-    it('checks again soon while it waits, and shows the confirmed payment', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      try {
-        let confirmed = false;
-        serveApi({
-          getApplication: () => ({
-            application: application(confirmed
-              ? { status: 'approved', canEdit: false, canPay: false, canWithdraw: false, payment: { amount: 12345, currency: 'usd', paidAt: '2026-11-04T15:00:00.000Z' } }
-              : WAITING),
-          }),
-        });
-        pageAt('?payment=done');
-        await screen.findByText('Waiting for payment confirmation');
-        confirmed = true;
-        await vi.advanceTimersByTimeAsync(5000);
-        expect(await screen.findByText(/We received your event fee of \$123\.45 on 4 November 2026/)).toBeInTheDocument();
-        expect(screen.queryByText('Waiting for payment confirmation')).not.toBeInTheDocument();
-        expect(screen.getAllByRole('listitem')[2]).toHaveTextContent('We are building your siteNow');
-      } finally {
-        vi.useRealTimers();
-      }
-    });
-
-    it('a request that was returned from paying and is still unpaid keeps its status for a teammate', async () => {
-      serveStatus({ ...WAITING, myRole: 'editor', canPay: false, canWithdraw: false });
-      page();
-      expect(await screen.findByText(/Only an Owner can pay the event fee/)).toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: 'Pay the event fee' })).not.toBeInTheDocument();
-    });
-
-    it('a cancelled payment says no money was taken and offers to pay', async () => {
-      serveStatus(WAITING);
-      pageAt('?payment=cancelled');
-      expect(await screen.findByRole('note')).toHaveTextContent('We took no money.');
-      expect(screen.getByRole('link', { name: 'Pay the event fee' })).toBeInTheDocument();
-    });
-
-    it('the words about paying go away once the request moves on', async () => {
-      serveStatus({ status: 'withdrawn', canEdit: false, canPay: false, canWithdraw: false });
-      pageAt('?payment=done');
-      expect(await screen.findByText(/This request is withdrawn/)).toBeInTheDocument();
-      expect(screen.queryByText('Waiting for payment confirmation')).not.toBeInTheDocument();
-    });
-
-    it('keeps the connected account while the request waits for payment', async () => {
-      serveStatus({ ...WAITING, connections: connections({ canChange: false, canDisconnect: false }) });
-      pageAt('');
-      expect(await screen.findByText('Your Stripe account')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /disconnect/i })).not.toBeInTheDocument();
-    });
-
-    it('never names the systems behind the console', async () => {
-      // A client who sells tickets with Stripe sees their own account named, so this one does not.
-      serveStatus({
-        ...WAITING,
-        answers: { ...application().answers, tickets: { choice: 'spreadsheet' } },
-        connections: connections({ stripe: { available: true, connected: false, displayName: null, connectedAt: null } }),
+    it('says the build did not finish and retries it, with no error text', async () => {
+      let failed = true;
+      serveApi({
+        getApplication: () => ({ application: application({ ...FAILED, build: failed ? { failed: true, needsReconnect: false } : { failed: false, needsReconnect: false } }) }),
+        retryBuild: () => { failed = false; return { started: true }; },
       });
-      const { container } = pageAt('?payment=done');
-      await screen.findByText('Waiting for payment confirmation');
-      expect(container.textContent).not.toMatch(/firebase|project|tenant|environment|webhook|secret|stripe|checkout/i);
+      page();
+      expect(await screen.findByRole('note')).toHaveTextContent('The build did not finish');
+      expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Retry the build' }));
+      expect(await screen.findByText(/We started the build again/)).toBeInTheDocument();
+      expect(callsTo('retryBuild')).toEqual([{ orgId: 'o1', appId: 'a1' }]);
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
     });
+
+    it('shows a refused retry', async () => {
+      serveApi({
+        getApplication: { application: application({ ...FAILED, build: { failed: true, needsReconnect: false } }) },
+        retryBuild: () => { throw new Error('You have retried this build too many times today.'); },
+      });
+      page();
+      fireEvent.click(await screen.findByRole('button', { name: 'Retry the build' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('too many times today');
+    });
+
+    it('a ticket account failure asks an Owner to reconnect first, and only that account', async () => {
+      serveStatus({
+        ...FAILED,
+        build: { failed: true, needsReconnect: true },
+        connections: connections({ canChange: false, canDisconnect: false, stripe: notConnected }),
+      });
+      page();
+      expect(await screen.findByRole('note')).toHaveTextContent('could not use your Stripe account');
+      expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+    });
+
+    it('an account that is gone needs reconnecting whichever step failed', async () => {
+      serveStatus({
+        ...FAILED,
+        build: { failed: true, needsReconnect: false },
+        connections: connections({ canChange: true, canDisconnect: false, stripe: notConnected }),
+      });
+      page();
+      expect(await screen.findByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+    });
+
+    it('once the account is connected again, an Owner can retry', async () => {
+      serveStatus({ ...FAILED, build: { failed: true, needsReconnect: true } });
+      page();
+      expect(await screen.findByRole('button', { name: 'Retry the build' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    });
+
+    it('an Editor can do neither, and is told who can', async () => {
+      serveStatus({ ...FAILED, myRole: 'editor', build: { failed: true, needsReconnect: true } });
+      page();
+      expect(await screen.findByText(/Only an Owner can reconnect an account or retry the build/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+    });
+
+    it('an operator can retry and cannot reconnect', async () => {
+      serveStatus({ ...FAILED, myRole: null, operator: true, build: { failed: true, needsReconnect: true } });
+      page();
+      expect(await screen.findByRole('button', { name: 'Retry the build' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('never names the systems behind the console', async () => {
+    serveStatus({
+      status: 'building',
+      canEdit: false,
+      canWithdraw: false,
+      answers: { ...application().answers, tickets: { choice: 'spreadsheet' } },
+      connections: connections({ stripe: { available: true, connected: false, displayName: null, connectedAt: null } }),
+      build: { failed: true, needsReconnect: false },
+    });
+    const { container } = page();
+    await screen.findByRole('note');
+    expect(container.textContent).not.toMatch(/firebase|project|tenant|environment|webhook|secret|stripe|checkout/i);
   });
 });

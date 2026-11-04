@@ -1,25 +1,21 @@
 'use strict';
 
 /**
- * Console settings, the event fee and the agreement (ADR 0007, amendment
- * 2026-11-04), and the build settings an approval records (§5).
+ * Console settings and the agreement (ADR 0007, amendment 2026-11-04), and the
+ * settings a build uses (§5).
  *
- * `console_config/settings` = { gcpFolder, billingAccount, region,
- * feeAmount, feeCurrency }. The first three are the defaults for every
- * approval. `feeAmount` is a whole number in the currency's smallest unit,
- * and the server reads it only from here. Operators edit them through
- * saveConsoleSettings and saveEventFee; the browser never writes them.
+ * `console_config/settings` = { gcpFolder, billingAccount, region }, the values
+ * for every build. Operators edit them through saveConsoleSettings; the browser
+ * never writes them.
  *
  * `console_config/agreement` is the current agreement, and
  * `console_config/agreement/versions/{version}` keeps each version. A save
  * makes a new version and never rewrites an old one. `sha256` is the hash
  * of `title`, two line feeds and `body`.
  *
- * An approval records `review.settings` =
- *   { gcpFolder, billingAccount, region, projectId, environment }.
- * The project id and the environment name are made from the web-address
- * name, so an operator approves with no typed value. The operator can
- * change any value, and every value is checked here.
+ * A build's settings are { gcpFolder, billingAccount, region, projectId,
+ * environment }. The project id and the environment name are made from the
+ * web-address name, so no value is typed, and every value is checked here.
  */
 
 const { createHash } = require('node:crypto');
@@ -103,7 +99,7 @@ async function readConsoleSettings(db) {
   return { gcpFolder: text(data.gcpFolder), billingAccount: text(data.billingAccount), region: text(data.region) };
 }
 
-/** The approval values before any operator change. */
+/** The build values for a web-address name. */
 function approvalDefaults(settings, siteName) {
   return {
     gcpFolder: settings.gcpFolder,
@@ -143,9 +139,6 @@ function checkSettings(fields, defaults, overrides = {}) {
 
 const CONSOLE_FIELDS = Object.freeze(['gcpFolder', 'billingAccount', 'region']);
 const APPROVAL_FIELDS = Object.freeze([...CONSOLE_FIELDS, 'projectId', 'environment']);
-// The most one payment can be, in the currency's smallest unit.
-const FEE_AMOUNT_MAX = 99999999;
-const CURRENCY_RE = /^[a-z]{3}$/;
 const AGREEMENT_TITLE_MAX = 200;
 const AGREEMENT_BODY_MAX = 200000;
 
@@ -153,13 +146,6 @@ const SIGNUPS_CLOSED = 'This site is not taking sign-ups right now. We saved you
 
 function signupsClosed() {
   return new ConsoleError(409, 'signups-closed', SIGNUPS_CLOSED);
-}
-
-/** @returns {{ amount: number, currency: string }|null} null unless both are usable */
-function cleanFee(amount, currency) {
-  const code = text(currency).toLowerCase();
-  if (!Number.isSafeInteger(amount) || amount < 1 || amount > FEE_AMOUNT_MAX || !CURRENCY_RE.test(code)) return null;
-  return { amount, currency: code };
 }
 
 /** One line-ending form, no outer space, so the hash of a text is stable. */
@@ -184,19 +170,29 @@ function agreementRef(db) {
   return db.collection('console_config').doc('agreement');
 }
 
+const CONSOLE_FIELD_WORDS = Object.freeze({
+  gcpFolder: 'the Google Cloud folder',
+  billingAccount: 'the billing account',
+  region: 'the region',
+});
+
 /**
- * What a request needs to pass Review, read with `get` (a transaction's or
- * the database's). `open` is false when either part is missing, so the
- * console fails closed.
+ * What a signup needs, read with `get` (a transaction's or the database's).
+ * `open` needs the agreement and every setting a build uses, so nothing starts
+ * that cannot build. `missing` names what is not set, for an operator.
  *
- * @returns {Promise<{ open: boolean, fee: object|null, agreement: object|null }>}
+ * @returns {Promise<{ open: boolean, agreement: object|null, missing: string[] }>}
  */
 async function readSignupTerms(get, db) {
   const settings = await get(db.collection('console_config').doc('settings'));
   const current = await get(agreementRef(db));
-  const fee = settings.exists ? cleanFee(settings.data().feeAmount, settings.data().feeCurrency) : null;
+  const values = settings.exists ? settings.data() : {};
   const agreement = current.exists ? checkedAgreement(current.data()) : null;
-  return { open: Boolean(fee && agreement), fee, agreement };
+  const missing = [
+    ...CONSOLE_FIELDS.filter((field) => !NORMALIZERS[field](values[field])).map((field) => CONSOLE_FIELD_WORDS[field]),
+    ...(agreement ? [] : ['the agreement']),
+  ];
+  return { open: missing.length === 0, agreement, missing };
 }
 
 /** One saved version, checked as above, or null. */
@@ -207,13 +203,12 @@ async function readAgreementVersion(get, db, version) {
 
 async function getConsoleSettings({ db }, { user }) {
   await requireOperator(db, user);
-  const { fee } = await readSignupTerms((r) => r.get(), db);
   const current = await agreementRef(db).get();
   const data = current.exists ? current.data() : null;
   const agreement = data
     ? { version: data.version, title: data.title, body: data.body, sha256: data.sha256, savedAt: toIso(data.savedAt) }
     : null;
-  return { body: { settings: await readConsoleSettings(db), fee, agreement } };
+  return { body: { settings: await readConsoleSettings(db), agreement } };
 }
 
 async function saveConsoleSettings({ db, now = Date.now }, { body, user }) {
@@ -222,8 +217,7 @@ async function saveConsoleSettings({ db, now = Date.now }, { body, user }) {
   const settings = checkSettings(CONSOLE_FIELDS, {}, input);
   const auditRef = db.collection('console_audit').doc();
   await db.runTransaction(async (tx) => {
-    // Merged, so the event fee on the same document stays.
-    tx.set(db.collection('console_config').doc('settings'), settings, { merge: true });
+    tx.set(db.collection('console_config').doc('settings'), settings);
     tx.create(auditRef, { action: 'save-settings', appId: null, by: user.uid, at: new Date(now()) });
   });
   return { body: { settings } };
@@ -233,22 +227,6 @@ function fieldError(field, message) {
   const err = new ConsoleError(400, 'invalid-setting', message);
   err.field = field;
   return err;
-}
-
-async function saveEventFee({ db, now = Date.now }, { body, user }) {
-  await requireOperator(db, user);
-  const input = body.fee && typeof body.fee === 'object' ? body.fee : {};
-  if (!Number.isSafeInteger(input.amount) || input.amount < 1 || input.amount > FEE_AMOUNT_MAX) {
-    throw fieldError('feeAmount', 'Enter the amount as a whole number in the smallest unit of the currency.');
-  }
-  const fee = cleanFee(input.amount, input.currency);
-  if (!fee) throw fieldError('feeCurrency', 'Enter a three-letter currency code.');
-  const auditRef = db.collection('console_audit').doc();
-  await db.runTransaction(async (tx) => {
-    tx.set(db.collection('console_config').doc('settings'), { feeAmount: fee.amount, feeCurrency: fee.currency }, { merge: true });
-    tx.create(auditRef, { action: 'save-fee', appId: null, by: user.uid, at: new Date(now()) });
-  });
-  return { body: { fee } };
 }
 
 /**
@@ -308,6 +286,5 @@ module.exports = {
   readSignupTerms,
   saveAgreement,
   saveConsoleSettings,
-  saveEventFee,
   signupsClosed,
 };

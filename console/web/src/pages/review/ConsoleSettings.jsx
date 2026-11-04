@@ -3,16 +3,15 @@ import { Link } from 'react-router';
 import { callApi } from '../../api.js';
 import { firstSettingError } from '../../reviewText.js';
 import AgreementSettings from './AgreementSettings.jsx';
-import FeeSettings from './FeeSettings.jsx';
 import HostingOnly, { isNotOperator } from './HostingOnly.jsx';
 import SettingsFields from './SettingsFields.jsx';
 
 const FIELDS = ['gcpFolder', 'billingAccount', 'region'];
 
-/** The defaults every approval starts from, the event fee and the agreement. Hosting team only. */
+/** The settings every build uses, and the agreement. Hosting team only. */
 export default function ConsoleSettings() {
   const [values, setValues] = useState(null);
-  const [fee, setFee] = useState(null);
+  const [saved, setSaved] = useState(null);
   const [agreement, setAgreement] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [fieldError, setFieldError] = useState(null);
@@ -27,7 +26,7 @@ export default function ConsoleSettings() {
       .then((body) => {
         if (!live) return;
         setValues(body.settings);
-        setFee(body.fee || null);
+        setSaved(body.settings);
         setAgreement(body.agreement || null);
       })
       .catch((err) => { if (live) setLoadError(err); });
@@ -58,7 +57,8 @@ export default function ConsoleSettings() {
     try {
       const body = await callApi('saveConsoleSettings', { settings: values });
       setValues(body.settings);
-      setNotice('The settings are saved. New approvals use them.');
+      setSaved(body.settings);
+      setNotice('The settings are saved. New builds use them.');
     } catch (err) {
       if (err.field && FIELDS.includes(err.field)) setFieldError({ field: err.field, message: err.message });
       else setError(err.message);
@@ -70,13 +70,13 @@ export default function ConsoleSettings() {
     <section aria-labelledby="settings-title" className="narrow">
       <p className="folio">Hosting team</p>
       <h1 id="settings-title" tabIndex={-1}>Console settings</h1>
-      {!fee || !agreement ? (
+      {!agreement || !FIELDS.every((field) => saved?.[field]) ? (
         <aside className="note" role="note">
           <p className="note-title">Sign-ups are closed</p>
-          <p>Clients cannot move past Review until both the event fee and the agreement are saved.</p>
+          <p>Signup links do not work until the Google Cloud folder, billing account, region and agreement are saved.</p>
         </aside>
       ) : null}
-      <p>Each approval starts from these values. You can change them on each request before you approve it.</p>
+      <p>Every new build uses these values.</p>
       <div aria-live="polite" className="live">
         {notice ? <p className="message success">{notice}</p> : null}
       </div>
@@ -85,7 +85,6 @@ export default function ConsoleSettings() {
         <SettingsFields fields={FIELDS} values={values} onChange={change} error={fieldError} fieldRefs={fieldRefs} idPrefix="settings" />
         <button type="submit" className="button primary" disabled={busy}>Save settings</button>
       </form>
-      <FeeSettings fee={fee} onSaved={setFee} />
       <AgreementSettings agreement={agreement} onSaved={setAgreement} />
       <p><Link to="/review">Go to the review queue</Link></p>
     </section>
