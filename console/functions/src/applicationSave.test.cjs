@@ -37,6 +37,20 @@ test('an unknown step, an operator, a stranger and another organization are refu
   await assert.rejects(save(db, cy, 'event', {}, 'a1', 'o2'), { status: 404 });
 });
 
+test('more days than the limit are refused with a field error, not cut short', async () => {
+  const db = draftDb();
+  const days = Array.from({ length: 15 }, (_, i) => ({ date: `2027-05-${String(i + 1).padStart(2, '0')}`, startTime: '09:00', endTime: '17:00' }));
+  await assert.rejects(save(db, ben, 'event', { name: 'NC Local News Summit', days }), (err) => {
+    assert.equal(err.status, 400);
+    assert.deepEqual(err.fields, { 'event.days': 'Add 14 days or fewer.' });
+    return true;
+  });
+  assert.deepEqual(db.read('applications/a1').answers.event.days, [], 'nothing is saved');
+  const ok = await save(db, ben, 'event', { name: 'NC Local News Summit', days: days.slice(0, 14) });
+  assert.equal(ok.body.saved, true);
+  assert.equal(db.read('applications/a1').answers.event.days.length, 14);
+});
+
 test('a step saves only while the request is a draft or has changes requested', async () => {
   for (const status of ['submitted', 'approved', 'building', 'ready', 'launched', 'withdrawn', 'declined']) {
     const db = seededDb({ 'applications/a1': applicationDoc({ status }) });

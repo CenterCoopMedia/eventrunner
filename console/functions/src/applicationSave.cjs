@@ -13,12 +13,22 @@
  */
 
 const { ConsoleError } = require('./http.cjs');
-const { ANSWER_STEPS, cleanStep, withDefaults } = require('./answers.cjs');
+const { ANSWER_STEPS, MAX_DAYS, cleanStep, withDefaults } = require('./answers.cjs');
 const { checkAnswers, stepErrors } = require('./checks.cjs');
 const { COLLECTION: SITE_NAMES, TAKEN, heldNames, releaseNames, siteNameProblem } = require('./siteNames.cjs');
 const { EDITABLE, readApplication, requireMember } = require('./applications.cjs');
 
 const LOCKED = 'This request is with the hosting team, so you cannot change it now.';
+const TOO_MANY_DAYS = `Add ${MAX_DAYS} days or fewer.`;
+
+/** More days than the limit are refused, not cut short, so no day is lost without a word. */
+function refuseTooManyDays(step, raw) {
+  const days = raw && typeof raw === 'object' ? raw.days : null;
+  if (step !== 'event' || !Array.isArray(days) || days.length <= MAX_DAYS) return;
+  const err = new ConsoleError(400, 'bad-request', TOO_MANY_DAYS);
+  err.fields = { 'event.days': TOO_MANY_DAYS };
+  throw err;
+}
 
 /**
  * Inside the transaction: the web-address reads and writes.
@@ -44,6 +54,7 @@ async function saveApplicationStep({ db, now = Date.now }, { body, user }) {
   const { orgId, appId, step } = body;
   if (!ANSWER_STEPS.includes(step)) throw new ConsoleError(400, 'bad-request', 'Choose a step.');
   await requireMember(db, orgId, user);
+  refuseTooManyDays(step, body.answers);
   const clean = cleanStep(step, body.answers);
   const at = new Date(now());
 

@@ -16,8 +16,9 @@
  *
  * The team step has no answers: it uses the organization's members and
  * invites. Cleaning keeps only known keys, makes every value the right
- * type, and caps text so one document stays small. It does not decide
- * what is valid: checks.cjs does that, with the shared rules.
+ * type, and caps text so one document stays small. It does not cut the
+ * list of days: saveApplicationStep refuses more than MAX_DAYS. It does
+ * not decide what is valid: checks.cjs does that, with the shared rules.
  */
 
 const ANSWER_STEPS = Object.freeze(['organization', 'event', 'webAddress', 'tickets', 'email']);
@@ -56,7 +57,7 @@ const CLEANERS = Object.freeze({
     shortName: text(raw.shortName),
     tagline: text(raw.tagline),
     timezone: text(raw.timezone),
-    days: (Array.isArray(raw.days) ? raw.days : []).slice(0, MAX_DAYS).map(cleanDay),
+    days: (Array.isArray(raw.days) ? raw.days : []).map(cleanDay),
     venue: { name: text(plain(raw.venue).name), address: text(plain(raw.venue).address) },
   }),
   webAddress: (raw) => ({ name: text(raw.name).toLowerCase() }),

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { GroupError, SelectField, TextField, fieldId } from '../../setup/Field.jsx';
+import { MAX_DAYS } from '../../setup/steps.js';
 
 const NEW_DAY = Object.freeze({ date: '', startTime: '09:00', endTime: '17:00' });
 
@@ -55,6 +56,7 @@ export default function EventStep({ value, errors, onChange, onBlur }) {
   const zones = useMemo(() => timeZones(value.timezone), [value.timezone]);
   const addButton = useRef(null);
   const set = (key) => (next) => onChange({ ...value, [key]: next }, `event.${key}`);
+  const full = value.days.length >= MAX_DAYS;
   const setVenue = (key) => (next) => onChange({ ...value, venue: { ...value.venue, [key]: next } }, `event.venue.${key}`);
 
   // ADR 0007 §3: the time zone is preset from the browser.
@@ -71,6 +73,7 @@ export default function EventStep({ value, errors, onChange, onBlur }) {
   }
 
   function addDay() {
+    if (full) return;
     const days = [...value.days, { ...NEW_DAY }];
     onChange({ ...value, days }, 'event.days');
     // The new row's date field takes the focus.
@@ -79,7 +82,8 @@ export default function EventStep({ value, errors, onChange, onBlur }) {
 
   function removeDay(index) {
     onChange({ ...value, days: value.days.filter((_, i) => i !== index) }, 'event.days');
-    addButton.current?.focus();
+    // After the render, so a button that was off at the limit is on again.
+    setTimeout(() => addButton.current?.focus(), 0);
   }
 
   return (
@@ -103,7 +107,11 @@ export default function EventStep({ value, errors, onChange, onBlur }) {
               onBlur={onBlur} canRemove={value.days.length > 1} />
           ))}
         </ol>
-        <p><button type="button" className="button" ref={addButton} onClick={addDay}>Add a day</button></p>
+        <p>
+          <button type="button" className="button" ref={addButton} onClick={addDay} disabled={full}
+            aria-describedby={full ? 'days-full' : undefined}>Add a day</button>
+        </p>
+        {full ? <p className="muted" id="days-full">An event can have {MAX_DAYS} days or fewer.</p> : null}
       </section>
 
       <section aria-labelledby="venue-title" className="stack">

@@ -88,7 +88,7 @@ test('cleanStep keeps known keys, trims text and drops what it does not know', (
   const event = cleanStep('event', { days: [{ date: '2027-01-01', label: '' }, 'junk'], venue: 'x' });
   assert.deepEqual(event.days, [{ date: '2027-01-01', startTime: '', endTime: '' }, { date: '', startTime: '', endTime: '' }]);
   assert.deepEqual(event.venue, { name: '', address: '' });
-  assert.equal(cleanStep('event', { days: Array.from({ length: 40 }, () => ({})) }).days.length, 14);
+  assert.equal(cleanStep('event', { days: Array.from({ length: 15 }, () => ({})) }).days.length, 15, 'days are not cut short');
   assert.equal(cleanStep('email', { senderName: 'x'.repeat(5000) }).senderName.length, 1000);
   assert.throws(() => cleanStep('team', {}), TypeError);
 });

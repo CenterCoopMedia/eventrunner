@@ -17,6 +17,9 @@ export const ANSWER_STEPS = Object.freeze(['organization', 'event', 'webAddress'
 
 export const SITE_DOMAIN = 'eventrunner.org';
 
+/** The most days an event can have. The server refuses more (answers.cjs MAX_DAYS). */
+export const MAX_DAYS = 14;
+
 export function stepByPath(path) {
   return STEPS.find((step) => step.path === path) || null;
 }

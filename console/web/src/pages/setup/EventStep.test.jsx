@@ -50,6 +50,18 @@ describe('Your event step', () => {
     ]);
   });
 
+  it('stops Add a day at 14 days and says why', async () => {
+    const days = Array.from({ length: 14 }, (_, i) => ({ date: `2027-05-${String(i + 1).padStart(2, '0')}`, startTime: '09:00', endTime: '17:00' }));
+    serveApi(withEvent({ days }));
+    renderSetup('event');
+    const add = await screen.findByRole('button', { name: 'Add a day' });
+    expect(add).toBeDisabled();
+    expect(add).toHaveAccessibleDescription('An event can have 14 days or fewer.');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove day 14' }));
+    await waitFor(() => expect(add).toHaveFocus());
+    expect(add).toBeEnabled();
+  });
+
   it('removes a day when there is more than one, and moves the focus to Add a day', async () => {
     serveApi(withEvent({
       days: [
@@ -61,7 +73,7 @@ describe('Your event step', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Remove day 2' }));
     expect(screen.queryByRole('group', { name: 'Day 2' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove day 1' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add a day' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add a day' })).toHaveFocus());
   });
 
   it('shows the errors of each day by field', async () => {
