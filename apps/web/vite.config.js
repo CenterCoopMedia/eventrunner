@@ -54,6 +54,7 @@ export default defineConfig({
       'shared/pitchForm',
       'shared/speakerLogistics',
       'shared/registrationForm',
+      'shared/promoCodes',
       'shared/registration',
       'shared/announcement',
       'shared/richText',

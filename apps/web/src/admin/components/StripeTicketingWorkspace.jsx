@@ -9,6 +9,7 @@ import StripeTicketList from './StripeTicketList.jsx';
 import StripeOrderDetail from './StripeOrderDetail.jsx';
 import StripeCompPanel from './StripeCompPanel.jsx';
 import StripeCheckInPanel from './StripeCheckInPanel.jsx';
+import StripePromoCodesPanel from './StripePromoCodesPanel.jsx';
 import TicketingConfirmation from './TicketingConfirmation.jsx';
 
 export default function StripeTicketingWorkspace({ call }) {
@@ -65,6 +66,7 @@ export default function StripeTicketingWorkspace({ call }) {
       {error && pause === null ? <div className="mt-sm"><Notice tone="error" message={error} /></div> : null}
     </Panel>
     {isOperator ? <details className="rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md"><summary className="min-h-admin-control cursor-pointer text-admin-lg font-bold text-admin-ink">Configure ticket catalog</summary><div className="mt-md"><StripeCatalogPanel call={call} data={data} timezone={eventConfig.timezone} isOperator={isOperator} onSaved={(result) => { setData(result); bump(); }} /></div></details> : null}
+    <details className="rounded-admin-panel border-admin-hairline border-admin-rule-hairline bg-admin-ground-raised p-md"><summary className="min-h-admin-control cursor-pointer text-admin-lg font-bold text-admin-ink">Promo codes</summary><div className="mt-md"><StripePromoCodesPanel call={call} catalog={data.catalog} timezone={eventConfig.timezone} /></div></details>
     <StripeCheckInPanel call={call} timezone={eventConfig.timezone} isOperator={isOperator} onChanged={bump} />
     {orderId ? <div ref={detailRef} className="scroll-mt-lg"><StripeOrderDetail key={orderId} call={call} orderId={orderId} isOperator={isOperator} timezone={eventConfig.timezone} onChanged={bump} onClose={() => setOrderId(null)} /></div> : null}
     <StripeTicketList call={call} kind="orders" catalog={data.catalog} timezone={eventConfig.timezone} refreshToken={refresh} onOpenOrder={setOrderId} />

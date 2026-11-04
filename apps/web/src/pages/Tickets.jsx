@@ -27,6 +27,7 @@ import SectionHead from '../components/editorial/SectionHead.jsx';
 import { Checkbox } from '../components/forms/Choice.jsx';
 import { TextField, SelectField, focusFirstError } from '../components/forms/publicForm.jsx';
 import { StepHeading, StepList, StepPager, resolveStep, useStepHeadingFocus } from '../components/forms/Stepper.jsx';
+import PromoCodeField from '../components/tickets/PromoCodeField.jsx';
 import RegistrationQuestionFields from '../components/registration/RegistrationQuestionFields.jsx';
 import { primaryActionClass, secondaryActionClass } from '../components/controlClasses.js';
 import { useDocumentTitle } from '../lib/useDocumentTitle.js';
@@ -54,7 +55,9 @@ const REVIEW_STEP = STEPS[3];
 const hrefFor = (step) => `/tickets?step=${step.slug}`;
 const hasErrors = (found) => Object.keys(found).length > 0;
 // Definite refusals: no order was created, so the saved attempt goes.
-const NO_ORDER_CODES = ['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited'];
+// A refused promo code is refused before any order exists (ADR 0004 amendment 2026-11-04).
+const PROMO_CODES_REFUSED = ['promo-invalid', 'promo-not-applicable', 'promo-order-limit', 'promo-exhausted'];
+const NO_ORDER_CODES = ['invalid-checkout', 'quantity-out-of-range', 'amount-out-of-range', 'amount-too-small', 'sales-closed', 'sold-out', 'ticket-unavailable', 'rate-limited', ...PROMO_CODES_REFUSED];
 // Refusals about the chosen tickets send the buyer back to choose again.
 const BACK_TO_SELECTION_CODES = ['quantity-out-of-range', 'sold-out', 'ticket-unavailable'];
 
@@ -106,6 +109,11 @@ export default function Tickets() {
   const [acceptedByUid, setAcceptedByUid] = useState(null);
   const [errors, setErrors] = useState({});
   const [requestError, setRequestError] = useState('');
+  // An applied code holds the preview for the cart it priced.
+  const [promo, setPromo] = useState(null);
+  const [promoRefusal, setPromoRefusal] = useState('');
+  // Pay waits for a running code check, so a discount shown later is the one sent.
+  const [promoPending, setPromoPending] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(null);
   const [passed, setPassed] = useState([]);
@@ -196,6 +204,11 @@ export default function Tickets() {
   }));
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
   const total = lines.reduce((sum, line) => sum + line.quantity * types.find((type) => type.id === line.ticketTypeId).unitAmount, 0);
+  // A code priced one cart. Another cart or catalog drops it without an effect.
+  const cart = lines.map(({ ticketTypeId, quantity }) => ({ ticketTypeId, quantity }));
+  const cartKey = JSON.stringify([catalog?.catalogRevision, cart]);
+  const applied = promo?.cartKey === cartKey ? promo.preview : null;
+  const payable = applied ? applied.totalAmount : total;
   const attempt = saved && user && saved.uid === user.uid ? saved.attempt : null;
   // Every attendee in order, numbered across ticket types.
   const seats = lines.flatMap((line) => line.attendees.map((attendee, index) => ({
@@ -326,6 +339,10 @@ export default function Tickets() {
           moveWithError(QUESTIONS_STEP);
           return;
         }
+        if (PROMO_CODES_REFUSED.includes(err.code)) {
+          setPromo(null);
+          setPromoRefusal(err.message);
+        }
         if (missingSavedCheckout || BACK_TO_SELECTION_CODES.includes(err.code)) moveWithError(STEPS[0]);
         setRequestError(missingSavedCheckout
           ? 'The saved checkout is not available to this account. Choose your tickets again.'
@@ -398,7 +415,7 @@ export default function Tickets() {
     }
 
     function pay() {
-      if (submittingRef.current) return;
+      if (submittingRef.current || promoPending) return;
       for (const formStep of formSteps) {
         const found = stepErrors(formStep.slug);
         if (hasErrors(found)) {
@@ -420,6 +437,7 @@ export default function Tickets() {
         requestId: newTicketingRequestId(),
         catalogRevision: acceptedCatalogRevision,
         ...(answered ? { formRevision: readRegistrationForm(form).revision } : {}),
+        ...(applied ? { promoCode: applied.code } : {}),
         lines: lines.map((line) => ({ ...line, attendees: line.attendees.map((attendee) => {
           const sent = { firstName: attendee.firstName.trim(), lastName: (attendee.lastName || '').trim(), email: attendee.email.trim() };
           return answered ? { ...sent, answers: answersOf(attendee) } : sent;
@@ -431,7 +449,7 @@ export default function Tickets() {
 
     const questions = asksQuestions ? activeQuestions(form) : [];
     const payControl = (
-      <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy}>{busy ? 'Preparing your order…' : !count ? 'Continue' : total > 0 ? `Continue to Stripe — ${formatTicketMoney(total, catalog.currency)}` : 'Reserve tickets'}</button>
+      <button type="submit" className={primaryActionClass} aria-busy={busy} aria-disabled={busy || promoPending}>{busy ? 'Preparing your order…' : !count ? 'Continue' : payable > 0 ? `Continue to Stripe — ${formatTicketMoney(payable, catalog.currency)}` : 'Reserve tickets'}</button>
     );
 
     return (
@@ -519,10 +537,17 @@ export default function Tickets() {
                       <dt>{types.find((type) => type.id === line.ticketTypeId).name} × {line.quantity}</dt>
                       <dd className="font-data tabular-nums">{formatTicketMoney(types.find((type) => type.id === line.ticketTypeId).unitAmount * line.quantity, catalog.currency)}</dd>
                     </div>)}
+                    {applied ? <div className="flex flex-wrap justify-between gap-sm">
+                      <dt>Promo code {applied.code}</dt><dd className="font-data tabular-nums">−{formatTicketMoney(applied.discountAmount, catalog.currency)}</dd>
+                    </div> : null}
                     <div className="flex flex-wrap justify-between gap-sm border-t-hairline border-rule-hairline pt-sm font-semibold">
-                      <dt>Total for {count} {count === 1 ? 'ticket' : 'tickets'}</dt><dd className="font-data tabular-nums">{formatTicketMoney(total, catalog.currency)}</dd>
+                      <dt>Total for {count} {count === 1 ? 'ticket' : 'tickets'}</dt><dd className="font-data tabular-nums">{formatTicketMoney(payable, catalog.currency)}</dd>
                     </div>
                   </dl>
+                  {count ? <PromoCodeField
+                    key={cartKey} user={user} cart={cart} catalogRevision={catalog.catalogRevision} applied={applied} refusal={promoRefusal} onPendingChange={setPromoPending}
+                    onApplied={(preview) => { setPromoRefusal(''); setPromo(preview ? { cartKey, preview } : null); }}
+                  /> : null}
                   <p className="text-caption text-text-secondary">{catalog.taxTreatment === 'inclusive' ? 'Any applicable tax is included in these prices.' : 'The organizer has configured this event not to collect tax.'} The organizer pays processing fees; no additional fees are added to your total.</p>
                   <h3 className="font-heading text-h3 font-semibold">Attendees</h3>
                   <ul className="space-y-sm">
@@ -549,7 +574,7 @@ export default function Tickets() {
                     setAcceptedCatalogRevision(event.target.checked && validCatalogRevision ? catalog.catalogRevision : null);
                     setAcceptedByUid(event.target.checked ? user.uid : null);
                   }} error={errors.terms} />
-                  {!count ? <p>Choose at least one ticket to continue.</p> : total > 0 ? <p>Stripe securely collects your payment on the next page. Your tickets are issued only after payment is confirmed. Returning to this site does not confirm a purchase.</p> : <p>No payment is required. The server will confirm available seats before issuing your tickets.</p>}
+                  {!count ? <p>Choose at least one ticket to continue.</p> : payable > 0 ? <p>Stripe securely collects your payment on the next page. Your tickets are issued only after payment is confirmed. Returning to this site does not confirm a purchase.</p> : <p>No payment is required. The server will confirm available seats before issuing your tickets.</p>}
                 </div>
               ) : null}
 

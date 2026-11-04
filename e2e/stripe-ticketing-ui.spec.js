@@ -208,6 +208,75 @@ test.describe.serial('Stripe ticketing browser contracts', () => {
     await expect(page.getByRole('button', { name: 'Continue to Stripe — $25.00' })).toBeVisible();
   });
 
+  test('promo codes: staff add a code, and a buyer sees the lower total on Review', async ({ page }) => {
+    test.setTimeout(180_000);
+    let codes = [];
+    const checkoutBodies = [];
+    await mockEndpoint(page, 'getTicketingStatus', async () => ({ provider: 'stripe', webhookSupported: true, webhookRegisteredAt: null, lastDeliveryAt: null, queue: { pending: 0, exhausted: 0 } }));
+    await mockEndpoint(page, 'ticketingCommerceAdmin', async (body) => {
+      if (body.action === 'catalog') return { provider: 'stripe', mode: 'test', catalog: CATALOG, inventory: { held: 0, sold: 0 } };
+      if (body.action === 'orders') return { orders: [], nextCursor: null };
+      if (body.action === 'tickets') return { tickets: [], nextCursor: null };
+      if (body.action === 'savePromoCode') codes = [{ ...body.promo, code: body.promo.code.toUpperCase(), used: 0 }];
+      return { codes };
+    });
+    await signIn(page, ADMIN_EMAIL);
+    await page.goto('/admin/ticketing');
+    const endTour = page.getByRole('button', { name: 'End tour', exact: true });
+    if (await endTour.isVisible()) await endTour.click();
+    await page.getByText('Promo codes', { exact: true }).first().click();
+    await page.getByRole('button', { name: 'New promo code' }).click();
+    await page.getByLabel('Code', { exact: true }).fill('early');
+    await page.getByLabel('Percent off').fill('20');
+    await page.getByLabel('Use limit (tickets)').fill('50');
+    await page.getByRole('button', { name: 'Save promo code' }).click();
+    await expect(page.getByText('Promo code saved.')).toBeVisible();
+    await expect(page.getByRole('listitem', { name: 'EARLY' })).toContainText('20% off each ticket');
+    for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]]) {
+      await page.setViewportSize(viewport);
+      await assertPageFits(page, `Promo codes at ${viewport.width}px`);
+      await screenshot(page, `stripe-promo-admin-${name}`, page.getByRole('listitem', { name: 'EARLY' }).locator('xpath=ancestor::section[1]'));
+    }
+
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await mockEndpoint(page, 'ticketingCatalog', async () => PUBLIC);
+    await mockEndpoint(page, 'ticketingPromoPreview', async (body) => {
+      expect(body).toEqual({ code: 'early', catalogRevision: CATALOG.revision, lines: [{ ticketTypeId: 'general', quantity: 2 }] });
+      return { code: 'EARLY', subtotalAmount: 4000, totalAmount: 4000, discountAmount: 1000, lines: [{ ticketTypeId: 'general', name: TYPE.name, quantity: 2, unitAmount: 2000, lineAmount: 4000, listUnitAmount: 2500 }] };
+    });
+    await mockEndpoint(page, 'ticketingCheckout', async (body) => {
+      checkoutBodies.push(body);
+      return { orderId: ORDER.orderId, status: 'pending', paymentStatus: 'pending', checkoutUrl: null, expiresAt: '2030-01-01T12:00:00Z' };
+    });
+    await mockEndpoint(page, 'ticketingOrderStatus', async () => ({ ...ORDER, status: 'pending', paymentStatus: 'pending', tickets: [] }));
+    await page.goto('/tickets');
+    await page.getByLabel('Quantity — General admission').selectOption('2');
+    await page.getByRole('button', { name: 'Next: Attendees' }).click();
+    for (const [index, field] of ['First name', 'Last name', 'Attendee email'].entries()) {
+      const inputs = page.getByLabel(field, { exact: true });
+      await inputs.nth(0).fill(['Synthetic', 'Attendee', 'promo-one@example.test'][index]);
+      await inputs.nth(1).fill(['Second', 'Attendee', 'promo-two@example.test'][index]);
+    }
+    await page.getByRole('button', { name: 'Next: Questions' }).click();
+    await page.getByLabel('Organization (required)').nth(0).fill(ORGANIZATION);
+    await page.getByLabel('Organization (required)').nth(1).fill(ORGANIZATION);
+    await page.getByRole('button', { name: 'Next: Review' }).click();
+    // Enter applies the code; it must not submit the review form, whose submit is Pay.
+    await page.getByLabel('Promo code').fill('early');
+    await page.getByLabel('Promo code').press('Enter');
+    await expect(page.getByText('Promo code EARLY', { exact: true })).toBeVisible();
+    expect(checkoutBodies).toHaveLength(0);
+    await page.getByRole('checkbox', { name: 'I have read and accept the refund policy' }).check();
+    for (const [name, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]]) {
+      await page.setViewportSize(viewport);
+      await assertPageFits(page, `Review with a code at ${viewport.width}px`);
+      await screenshot(page, `stripe-promo-review-${name}`, page.locator('dl').filter({ hasText: 'Promo code EARLY' }).locator('xpath=ancestor::div[1]'));
+    }
+    await page.getByRole('button', { name: 'Continue to Stripe — $40.00' }).click();
+    await expect(page).toHaveURL(/\/tickets\/status/);
+    expect(checkoutBodies[0].promoCode).toBe('EARLY');
+  });
+
   test('organizer review dialog traps focus, preserves cancellation meaning, and fits desktop/mobile', async ({ page }) => {
     test.setTimeout(180_000);
     const actions = [];

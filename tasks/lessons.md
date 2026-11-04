@@ -198,3 +198,7 @@ Rules written after user corrections. Read at session start.
   passed against their own mocks, and Codex caught the gap. When work is
   split, write the exact error codes and message shapes into both briefs, and
   before pushing grep the server for each code the client matches on.
+- Every commit needs `git commit -s`: the DCO sign-off check fails a PR
+  without it. Write commits with `-s` from the start, and check
+  `git log --format='%(trailers:key=Signed-off-by)'` before the first push
+  of a new branch. (R6a/R6b, 2026-11-04: fixed with `git rebase --signoff`.)

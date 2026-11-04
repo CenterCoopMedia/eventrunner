@@ -49,7 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `promo`; the orders CSV gains **Promo code** and **Promo discount**, and the
   event package gains `orders/promo_codes.json`. Clients cannot read or write
   `ticket_promo_codes`. Deploy the functions and rules together, and add
-  `ticketingPromoPreview` to the deployed functions.
+  `ticketingPromoPreview` to the deployed functions. Staff manage codes under
+  **Promo codes** on the ticketing page; attendees apply a code on the checkout
+  **Review** step and see the lower total, and the order view shows the code.
 - The Stripe ticket page is now steps: Tickets, Attendees, Questions (when
   the registration form asks any), Review, then Pay (ADR 0008 §5). Answers
   for each attendee are checked when the order is reserved, held on that

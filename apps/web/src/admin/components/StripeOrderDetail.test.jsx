@@ -266,3 +266,16 @@ describe('order confirmation resend outcomes', () => {
     expect(requestIds(resend)[1]).not.toBe(requestIds(resend)[0]);
   });
 });
+
+describe('promo code on an order', () => {
+  it('shows the code and the discount; an order with no code shows neither', async () => {
+    const promo = { code: 'EARLY', kind: 'percent', value: 20, discountedSeats: 1, discountAmount: 625 };
+    const call = vi.fn(async () => ({ ...DETAIL, order: { ...DETAIL.order, promo } }));
+    const view = render(<StripeOrderDetail call={call} orderId="order-1" isOperator timezone="UTC" onChanged={vi.fn()} onClose={vi.fn()} />);
+    const term = await screen.findByText('Promo code');
+    expect(term.nextElementSibling).toHaveTextContent('EARLY: $6.25 off');
+    view.unmount();
+    await setup([]);
+    expect(screen.queryByText('Promo code')).not.toBeInTheDocument();
+  });
+});
