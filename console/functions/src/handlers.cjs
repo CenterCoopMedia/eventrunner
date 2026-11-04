@@ -18,6 +18,10 @@ const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
 const { createOrganization, getTeam, listOrganizations } = require('./organizations.cjs');
 const { acceptInvite, inviteMember } = require('./invites.cjs');
 const { changeMemberRole, removeMember } = require('./members.cjs');
+const { createApplication, getApplication, listApplications } = require('./applications.cjs');
+const { saveApplicationStep } = require('./applicationSave.cjs');
+const { submitApplication, withdrawApplication } = require('./applicationStatus.cjs');
+const { checkWebAddress } = require('./siteNames.cjs');
 
 // Fixed, not a setting: console/firebase.json routes every /api/<name> to
 // this region, and the web app calls only those routes. Moving the console
@@ -32,7 +36,16 @@ const ENDPOINTS = Object.freeze({
   acceptInvite: { action: acceptInvite },
   changeMemberRole: { action: changeMemberRole },
   removeMember: { action: removeMember },
+  createApplication: { action: createApplication },
+  getApplication: { action: getApplication },
+  listApplications: { action: listApplications },
+  saveApplicationStep: { action: saveApplicationStep },
+  checkWebAddress: { action: checkWebAddress },
+  submitApplication: { action: submitApplication, mail: true },
+  withdrawApplication: { action: withdrawApplication, mail: true },
 });
+
+const MAIL_METHODS = Object.freeze(['sendInvite', 'sendStatusChange', 'sendOperatorNotice']);
 
 let services = null;
 function adminServices() {
@@ -64,13 +77,12 @@ function buildHandlers() {
       if (spec.mail) {
         // Made at send time, so a missing setting is a failed send that the
         // action reports and logs, not a crash before the request is read.
-        deps.mailer = {
-          sendInvite: (invite) => createPostmarkMailer({
-            token: postmarkToken.value(),
-            from: process.env.CONSOLE_MAIL_FROM || '',
-            fetch: globalThis.fetch,
-          }).sendInvite(invite),
-        };
+        const mailer = () => createPostmarkMailer({
+          token: postmarkToken.value(),
+          from: process.env.CONSOLE_MAIL_FROM || '',
+          fetch: globalThis.fetch,
+        });
+        deps.mailer = Object.fromEntries(MAIL_METHODS.map((method) => [method, (message) => mailer()[method](message)]));
       }
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });

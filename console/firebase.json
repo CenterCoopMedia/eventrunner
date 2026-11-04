@@ -2,7 +2,8 @@
   "functions": {
     "source": "functions",
     "codebase": "console",
-    "ignore": ["node_modules", ".git", "**/*.test.cjs", "src/fake*.cjs"]
+    "predeploy": ["node \"$PROJECT_DIR/../scripts/prepare-functions.cjs\""],
+    "ignore": ["node_modules", ".git", "**/*.test.cjs", "src/fake*.cjs", "src/testData.cjs"]
   },
   "firestore": {
     "rules": "firestore.rules",
@@ -19,6 +20,13 @@
       { "source": "/api/acceptInvite", "function": { "functionId": "acceptInvite", "region": "us-central1" } },
       { "source": "/api/changeMemberRole", "function": { "functionId": "changeMemberRole", "region": "us-central1" } },
       { "source": "/api/removeMember", "function": { "functionId": "removeMember", "region": "us-central1" } },
+      { "source": "/api/createApplication", "function": { "functionId": "createApplication", "region": "us-central1" } },
+      { "source": "/api/getApplication", "function": { "functionId": "getApplication", "region": "us-central1" } },
+      { "source": "/api/listApplications", "function": { "functionId": "listApplications", "region": "us-central1" } },
+      { "source": "/api/saveApplicationStep", "function": { "functionId": "saveApplicationStep", "region": "us-central1" } },
+      { "source": "/api/checkWebAddress", "function": { "functionId": "checkWebAddress", "region": "us-central1" } },
+      { "source": "/api/submitApplication", "function": { "functionId": "submitApplication", "region": "us-central1" } },
+      { "source": "/api/withdrawApplication", "function": { "functionId": "withdrawApplication", "region": "us-central1" } },
       { "source": "**", "destination": "/index.html" }
     ],
     "headers": [
