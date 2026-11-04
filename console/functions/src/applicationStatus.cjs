@@ -58,12 +58,12 @@ async function sendAll(log, sends) {
 }
 
 /** Email the Owners that the status changed. */
-async function notifyOwners({ db, mailer, log, publicUrl }, { orgId, appId, status, eventName, note = null }) {
+async function notifyOwners({ db, mailer, log, publicUrl }, { orgId, appId, status, eventName, note = null, adminLink = null }) {
   const organizationName = (await db.collection('organizations').doc(orgId).get()).data().name;
   const link = statusLink(publicUrl, orgId, appId);
   const owners = await ownerEmails(db, orgId);
   return sendAll(log, owners.map((to) => () => mailer.sendStatusChange({
-    to, organizationName, eventName, status, link, note,
+    to, organizationName, eventName, status, link, note, ...(adminLink ? { adminLink } : {}),
   })));
 }
 

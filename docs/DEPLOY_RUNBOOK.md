@@ -22,8 +22,9 @@ Pick, once:
 
 ## 1. Workload Identity Federation
 
-One pool can be shared across every client deployment in this GCP project (or organization); create
-it once, then add one provider (or reuse the existing one) and one service account per client.
+Each client project has its own pool and provider. A provider conditioned on one environment cannot
+be shared, as a rehearsal showed (§12.3). The site builder (§12) does all of this for a site made in
+the client console. The commands below are for a site made by hand.
 
 ```sh
 gcloud config set project <GCP_PROJECT_ID>
@@ -62,8 +63,7 @@ or bypass the check before GCP is ever asked. The `principalSet` condition is en
 IAM outside the runner and outside the repository's control entirely, which is why it is the primary
 control and the in-workflow check is defense-in-depth only.
 
-Capture the full provider resource name — every client's `WIF_PROVIDER` environment variable (§3)
-is the same value:
+Capture the full provider resource name, which is that client's `WIF_PROVIDER` environment variable (§3):
 
 ```sh
 gcloud iam workload-identity-pools providers describe "github" \
@@ -74,6 +74,8 @@ gcloud iam workload-identity-pools providers describe "github" \
 ```
 
 ## 2. Per-client service account
+
+This section's list is incomplete: §12.3 has the grants and APIs a rehearsal showed it needs as well.
 
 Firebase project prerequisites, first (once per client GCP project):
 
@@ -1158,3 +1160,161 @@ Check after the first deploy:
 - Sign in as an operator and confirm that the home page lists every organization.
 - With two Owners on the test organization, answer the guided setup and select **Create my site**. Confirm that the Owners and each operator get an email, and that the status page says "We are reviewing your request". Then withdraw the test request.
 - With a provider set up, connect a test account from the tickets step, then disconnect it. On Eventbrite, confirm that coming back works at all: its documents do not say it returns the `state` value, and without it the console refuses the connection.
+
+## 12. Site builder
+
+The site builder builds one client's site after a request is approved, with nobody's help ([ADR 0007](adr/0007-client-console-self-serve-onboarding.md) §6). The console's `startBuild` dispatches `.github/workflows/provision-client.yml`, which runs `scripts/provision-client.cjs` as the provisioner service account. Sections 1 to 5 are the same work by hand, for a site made outside the console.
+
+Each step reads the current state and does nothing when it is already right, so a failed run is repaired by running it again.
+
+| Step | Work |
+|---|---|
+| `project` | Project `er-<name>` in the client folder, billing, APIs |
+| `firebase` | Firebase, Firestore, the default bucket, the Hosting site, the web app, sign-in |
+| `deploy-identity` | Deploy account, roles, its own identity pool, the agent grants, the image cleanup policy |
+| `web-address` | `<name>.eventrunner.org` on Hosting, its DNS records, the wait for the certificate (up to an hour) |
+| `sign-in` | Authorized domains |
+| `email` | Postmark server, streams, webhooks, sender domain, its DNS records, the wait for verification (up to 30 minutes) |
+| `tickets` | Tests the chosen token, moves it to the client project, deletes the console's copy and any leftover, sets up the Stripe webhook endpoint |
+| `environment` | The client's GitHub Environment, its `main`-only rule and its variables |
+| `first-deploy` | `deploy.yml` in bootstrap mode, up to three tries |
+| `seed` | `init-event.cjs` with the frozen answers and the team, the sender record, the ticket webhook |
+| `full-deploy` | `deploy.yml`, up to three tries |
+| `ready` | Emails the Owners their admin panel link, sets `ready` |
+
+The order differs from ADR §6 in one place: the sender record and the ticket webhook's registration are written in `seed`, because they need `config/event` and the deployed functions.
+
+### 12.1 One-time setup
+
+Use placeholders from your own records. Nothing below belongs in the repository.
+
+1. **Provisioner service account, in the console project.**
+
+   ```sh
+   gcloud iam service-accounts create eventrunner-provisioner --project=<console-project-id> \
+     --display-name="Event Runner site builder"
+   PROVISIONER=eventrunner-provisioner@<console-project-id>.iam.gserviceaccount.com
+
+   gcloud resource-manager folders add-iam-policy-binding <client-folder-number> \
+     --member="serviceAccount:${PROVISIONER}" --role=roles/resourcemanager.projectCreator
+   gcloud billing accounts add-iam-policy-binding <billing-account-id> \
+     --member="serviceAccount:${PROVISIONER}" --role=roles/billing.user
+   gcloud projects add-iam-policy-binding <console-project-id> \
+     --member="serviceAccount:${PROVISIONER}" --role=roles/datastore.user --condition=None
+   gcloud projects add-iam-policy-binding <console-project-id> \
+     --member="serviceAccount:${PROVISIONER}" --role=roles/secretmanager.admin \
+     --condition='title=connection tokens only,expression=resource.name.startsWith("projects/<console-project-number>/secrets/connection-")'
+   ```
+
+   A project's creator becomes its owner. That is what lets the provisioner do everything else inside a client project, so it holds no role on the folder beyond creating projects.
+
+2. **APIs on the console project.** A call with no quota project bills the caller's own project: `cloudresourcemanager`, `cloudbilling`, `serviceusage`, `iam`, `iamcredentials`, `sts`, `firebase`, `firestore`, `secretmanager`, `artifactregistry`.
+
+3. **Identity for the workflow, in the console project.** The condition names the `provisioning` Environment and this one workflow.
+
+   ```sh
+   gcloud iam workload-identity-pools create github-actions --project=<console-project-id> \
+     --location=global --display-name="GitHub Actions"
+   gcloud iam workload-identity-pools providers create-oidc provisioner --project=<console-project-id> \
+     --location=global --workload-identity-pool=github-actions --display-name="Site builder" \
+     --issuer-uri="https://token.actions.githubusercontent.com" \
+     --attribute-mapping="google.subject=assertion.sub,attribute.repository_and_ref=assertion.repository + '#' + assertion.ref" \
+     --attribute-condition="assertion.repository_owner_id == '<owner-id>' && assertion.repository_id == '<repository-id>' && assertion.ref == 'refs/heads/main' && assertion.environment == 'provisioning' && assertion.workflow_ref == '<owner>/<repo>/.github/workflows/provision-client.yml@refs/heads/main'"
+   gcloud iam service-accounts add-iam-policy-binding "${PROVISIONER}" --project=<console-project-id> \
+     --role=roles/iam.workloadIdentityUser \
+     --member="principalSet://iam.googleapis.com/projects/<console-project-number>/locations/global/workloadIdentityPools/github-actions/attribute.repository_and_ref/<owner>/<repo>#refs/heads/main"
+   ```
+
+4. **Two GitHub Apps**, each installed on this repository alone.
+
+   | App | Repository permissions | Key lives in |
+   |---|---|---|
+   | Console | **Actions: write** | Secret Manager in the console project, `CONSOLE_GITHUB_APP_PRIVATE_KEY` |
+   | Provisioner | **Administration: write**, **Environments: write**, **Actions: read** | The `provisioning` Environment, `PROVISIONER_APP_PRIVATE_KEY` |
+
+   GitHub's permission list puts creating an Environment and its branch rule under Administration, variables under Environments, and reading the Environment under Actions. The provisioner writes no GitHub secrets, because `deploy-client.yml` reads none: a client's secrets live in its own Secret Manager. Administration is broad. The key exists only in the `provisioning` Environment, and each token the script asks for is cut down to these three on this one repository.
+
+5. **The console's settings.** Put these in `console/functions/.env`, and store the key. The secret must exist before any deploy. Until the App exists, store a placeholder: the console then refuses to start a build, and says so to operators.
+
+   ```sh
+   CONSOLE_GITHUB_APP_ID=<console app id>
+   CONSOLE_GITHUB_INSTALLATION_ID=<console app installation id>
+   CONSOLE_GITHUB_REPOSITORY=<owner>/<repo>
+   ```
+
+   ```sh
+   cd console
+   npx firebase functions:secrets:set CONSOLE_GITHUB_APP_PRIVATE_KEY --project <console-project-id>
+   ```
+
+6. **Cloudflare.** Make an API token with **Zone: DNS: Edit** on the `eventrunner.org` zone alone. The script refuses to write a name outside the site's own `<name>.eventrunner.org`.
+
+7. **Postmark.** Use an account API token. It goes in the `provisioning` Environment only, never in a client project. Each client's server token goes to that client's Secret Manager.
+
+8. **The `provisioning` GitHub Environment.** Allow `main` only. Add no required reviewers, because the point is that nobody has to be there.
+
+   | Kind | Name | Value |
+   |---|---|---|
+   | Variable | `WIF_PROVIDER` | The provider from step 3 |
+   | Variable | `WIF_SERVICE_ACCOUNT` | The provisioner's address |
+   | Variable | `CONSOLE_PROJECT_ID` | The console project |
+   | Variable | `CONSOLE_PUBLIC_URL` | `https://console.eventrunner.org` |
+   | Variable | `CONSOLE_MAIL_FROM` | The console's sender |
+   | Variable | `CLOUDFLARE_ZONE_ID` | The `eventrunner.org` zone |
+   | Variable | `PROVISIONER_APP_ID`, `PROVISIONER_INSTALLATION_ID` | The provisioner App |
+   | Secret | `PROVISIONER_APP_PRIVATE_KEY` | The provisioner App's key |
+   | Secret | `CLOUDFLARE_API_TOKEN` | Step 6 |
+   | Secret | `POSTMARK_ACCOUNT_TOKEN` | Step 7 |
+   | Secret | `CONSOLE_POSTMARK_TOKEN` | A copy of the console's mail token, for the emails the build sends |
+
+9. **Settings.** Set the client folder, billing account and region at `/review/settings` in the console. A request an operator approves can override them.
+
+10. **Check the organization's policies on the client folder.** A new organization may set `iam.automaticIamGrantsForDefaultServiceAccounts`, so the compute account gets no Editor role, and `iam.allowedPolicyMemberDomains`, which refuses the `allUsers` binding public functions need. The rehearsed project did not have these. Allow what the deployed site needs on the client folder, or the deploy fails.
+
+### 12.2 When a build fails
+
+The review page shows each step, the failed step, its error and a link to the run. Operators get an email with the same error. The client sees only "We are building your site". Fix the cause, then select **Retry the build**.
+
+| Error | Meaning |
+|---|---|
+| A certificate or sender domain that is not ready | DNS is still moving. Retry later. |
+| `the deploy failed 3 times` | Read the linked run. A first deploy's quota and Eventarc failures are usually transient, so a retry often clears them. |
+| A token that fails its test, or a test-mode connection | The client has to connect the account again. The console does not let them after approval yet, so change it by hand or send the request back. |
+| `exists outside the client folder` | The name's project already exists somewhere else. It needs a person. |
+| `the run has no value for ...` | A setting from section 12.1 is missing. |
+
+To run a rehearsal with a test-mode connection, dispatch it by hand. Nothing else allows a test-mode token into a build:
+
+```sh
+gh workflow run provision-client.yml --ref main -f application_id=<id> -f test_mode=true
+```
+
+A run that dies before the script starts, for example on a refused identity token, leaves no record: the request shows a started build and nothing else. Read the workflow's run list.
+
+A new client's Environment is not added to `AUTO_DEPLOY_ENVIRONMENTS`, so a push to `main` does not deploy to it. Add it by hand once the site is launched (section 4).
+
+### 12.3 What the hand-built rehearsal taught
+
+The script does each of these, and sections 1 to 3 are wrong or silent on them. Anyone building a client by hand has to do them too.
+
+- A provider conditioned on one environment cannot be shared, so each client project has its own pool (`github-actions`, provider `github`), in place of section 1's shared one.
+- The deploy account also needs the custom role `eventrunnerDeployInvoker`, with `cloudfunctions.functions.setIamPolicy`, `firebaseextensions.instances.list`, `firebasestorage.defaultBucket.get`, `resourcemanager.projects.getIamPolicy` and `run.services.setIamPolicy`.
+- The deploy account needs `roles/iam.serviceAccountUser` on both the compute and the appspot service accounts, granted on each account and not on the project.
+- The storage service agent may not exist. Create it (`gcloud beta services identity create --service=storage.googleapis.com`), then grant it `roles/pubsub.publisher`. A new agent can take minutes to be accepted.
+- The deploy account cannot make these grants, so an owner makes them first: the pubsub agent gets `roles/iam.serviceAccountTokenCreator`, and the compute account gets `roles/run.invoker` and `roles/eventarc.eventReceiver`. The compute account also gets `roles/iam.serviceAccountTokenCreator` on itself for `createCustomToken`. That last one is unconfirmed, and granted anyway.
+- `cloudbilling.googleapis.com` must be on, and the deploy account cannot turn it on. `gcloud services enable` takes at most 20 at a time (`SU_MAX_BATCH_SIZE_EXCEEDED`).
+- The Hosting custom domain API is `v1beta1`. Firebase REST calls need the `x-goog-user-project` header.
+- The `gcf-artifacts` repository needs the cleanup policy `firebase-functions-cleanup` (`olderThan: 86400s`), set by an owner. The deploy account cannot set it, even with `--force`, and a run without `--force` then fails.
+- A first functions deploy can hit quota 429s and Eventarc agent failures on a few Firestore triggers. Run it again.
+- `init-event.cjs` exits 0 when branding uploads are skipped. Credentials with a `quota_project_id` from another project cause that ("User project specified in the request is invalid"), so clear the quota project and treat any skipped branding as a failure.
+
+### 12.4 What only a live run can prove
+
+The tests run against a fake of each service, and the fake answers as the rehearsal saw it or as the documents say. Check these on the first real build, on a throwaway name and in test mode:
+
+- Google Cloud: a missing project answers 403 to the provisioner and creating it succeeds. The project's creator holds owner with these credentials. `identityPlatform:initializeAuth` is the right way to turn on sign-in, and the config answers 400 or 404 before it. The custom domain's `requiredDnsUpdates` and `cert.verification` field and value shapes. The default bucket's answer holds its name. `nam5` is accepted for `us-central1`.
+- Workflow identity: `google-github-actions/auth` exports the project and quota variables the script clears from a child's environment. Its credentials keep working past an hour, for a run that waits on a certificate. Credentials from the auth action carry no `quota_project_id` of their own, and if they do, branding fails loudly.
+- GitHub: `GITHUB_TOKEN` with `actions: write` dispatches `deploy.yml` and the run starts. `display_title` follows `run-name`. An App token with the three permissions above can create an Environment.
+- Postmark: `ApiTokens[0]` on the account's `/servers` answer. `/message-streams` accepts a `Broadcasts` stream with Postmark-managed unsubscribe. Webhooks accept a URL with a password in it, and list it back in a form this comparison matches.
+- Cloudflare: a TXT value comes back in the form it was stored. A `pm-bounces` CNAME and the certificate's records are not proxied.
+- Stripe and Eventbrite: `GET /v1/account` answers with the connected account's id for a Connect OAuth token. Creating a webhook endpoint on that account with that token works. `GET /users/me/` answers for a live Eventbrite token.

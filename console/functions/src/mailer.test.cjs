@@ -110,6 +110,10 @@ test('operatorNoticeMessage says what happened to a payment', () => {
   const notice = { organizationName: 'NC Local', eventName: 'Summit', link: 'https://x.example/a' };
   assert.match(operatorNoticeMessage({ ...notice, kind: 'paid' }).subject, /^Paid: Summit/);
   assert.match(operatorNoticeMessage({ ...notice, kind: 'build-failed' }).text, /build did not start/);
+  const failed = operatorNoticeMessage({ ...notice, kind: 'build-run-failed', problem: 'Web address: no certificate.' });
+  assert.match(failed.subject, /^Build failed:/);
+  assert.match(failed.text, /Web address: no certificate\./);
+  assert.match(failed.text, /Retry the build/);
   assert.match(operatorNoticeMessage({ ...notice, kind: 'payment-problem', problem: 'amount-mismatch' }).text, /amount-mismatch/);
 });
 

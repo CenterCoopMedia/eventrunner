@@ -2,7 +2,7 @@
 
 The client console is where a client signs up, names its organization, invites its team and answers the guided setup for each event site. It runs at `console.eventrunner.org` in its own Firebase project, which CCM owns. It is not part of a client deployment, and no client project reads from it. [ADR 0007](../docs/adr/0007-client-console-self-serve-onboarding.md) is the decision record.
 
-This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), account connections (P6), operator review (P7), and the agreement and event fee (ADR 0007, amendment 2026-11-04). Provisioning comes in a later part.
+This folder holds sign-in, organizations and the team (P4), the guided setup with its status page (P5), account connections (P6), operator review (P7), the agreement and event fee (ADR 0007, amendment 2026-11-04), and the start of the site builder (P8). The builder itself is `scripts/provision-client.cjs`, run by `.github/workflows/provision-client.yml`.
 
 ## What is here
 
@@ -42,7 +42,8 @@ The console uses plain words. It never says Firebase, project, tenant, environme
 | `agreement_acceptances/{id}` | `version`, `sha256`, `typedName`, `email` (verified), `uid`, `orgId`, `appId`, `at`. Created once, never changed, and kept when the request goes back to edit or is deleted. | `acceptAgreement` |
 | `console_fee_events/{sessionId}` | `eventId`, `sessionId`, `paymentIntentId`, `appId`, `orgId`, `amount`, `currency`, `outcome` (`approved`, or the reason it did not approve), `at`. Kept when the request is deleted. | `consoleFeeWebhook` |
 | `console_rate_limits/{key}` | `count`, `windowStart` | The functions |
-| `console_audit/{id}` | `action`, `appId`, `by` (a uid, `retention` or `payment`), `at`, and `version` on `save-agreement`. No client data. | `saveConsoleSettings`, `saveEventFee`, `saveAgreement`, `deleteSpamApplication`, the retention job, `consoleFeeWebhook` when a build does not start |
+| `console_builds/{appId}` | The build record: `state` (`queued`, `running`, `failed` or `done`), `runUrl`, `testMode`, `startedAt`, `updatedAt`, `finishedAt`, `failedStep`, `error`, `ownersEmailedAt`, `steps` (a list of `{ id, label, state, at, detail }`). No browser can read it: an operator sees it through `getApplicationForReview`, and a client sees only the status. | `scripts/provision-client.cjs`, `retryBuild` |
+| `console_audit/{id}` | `action`, `appId`, `by` (a uid, `retention`, `payment`, `console` or `build`), `at`, and `version` on `save-agreement`. No client data. | `saveConsoleSettings`, `saveEventFee`, `saveAgreement`, `deleteSpamApplication`, the retention job, `consoleFeeWebhook` when a build does not start |
 
 An application is one event and one site. The client sees it as "your request". Its statuses are `draft`, `awaiting_payment`, `submitted`, `changes_requested`, `approved`, `building`, `ready`, `launched`, `withdrawn` and `declined` (ADR 0007 §5 and its amendment). An application is open unless it is `withdrawn` or `declined`.
 
@@ -176,7 +177,9 @@ Approval records `review.settings` = `{ gcpFolder, billingAccount, region, proje
 - `projectId` is `er-<name>` and `environment` is `<name>`, from the web-address name. For `nclocal` they are `er-nclocal` and `nclocal`. A project id has 6 to 30 characters: lowercase letters, digits and hyphens, a letter first and no hyphen last. A long name is cut to fit, and a short one gets `-site`.
 - The server checks every value, the defaults included, and names the bad field.
 
-Approval does not start the build. P8 starts it from `approved` and `review.settings`.
+Approval by an operator does not start the build yet. `runStartBuild` (`functions/src/buildDispatch.cjs`) starts it for any caller, and the site builder takes its settings from `review.settings`, or from `console_config/settings` when a request has none.
+
+**Starting and retrying a build.** `startBuild` dispatches `provision-client.yml` with a GitHub App token that holds `actions: write` on this one repository. With a setting missing, or a placeholder key, it refuses, and `runStartBuild` records `buildStart.state` as `failed`, writes an audit record and notifies operators. A run that fails sets the same flag and sends operators the error. Either way the review queue shows the request, and its page offers **Retry the build** (`retryBuild`, operators only), which runs the same workflow again. One transaction checks and clears the failure, so a second click gets `409 not-retryable`. [The runbook](../docs/DEPLOY_RUNBOOK.md) section 12 has the setup and the error list.
 
 **Spam.** **Delete as spam** deletes a request that is not yet approved, closes any open payment page and frees its name. A request that is approved or later cannot be deleted this way, because a site can exist for it.
 
@@ -204,9 +207,9 @@ The redirect address comes from `CONSOLE_PUBLIC_URL`, never from the request. Th
 
 **When a connection can change.** While the request is `draft`, `changes_requested` or `submitted`, an Owner can connect, reconnect and disconnect. In `awaiting_payment` it cannot change, because payment approves the request with no further check: **Change your answers** closes the payment page and returns the request to `draft`. From `approved` on it cannot change, because the build uses it. A `withdrawn` or `declined` request can only disconnect.
 
-**For the site builder (P8).** `readStoredConnection(deps, appId, provider)` returns the token and the account details a client site needs. `deleteStoredConnection(deps, appId, provider)` deletes the console's copy after the move, keeps the row in `console_connections`, and does not end the connection. Both are documented in `connections.cjs`. Only the provider the client chose moves, so P8 also deletes any token left for the other one.
+**For the site builder (P8).** The builder reads the token with `connectionSecretId` and the details from `connections[provider]` and `console_connections`. `deleteStoredConnection(deps, appId, provider)` deletes the console's copy after the move, keeps the row in `console_connections`, and does not end the connection. Only the provider the client chose moves, so the builder also deletes any token left for the other one, and any test-mode token unless the run is in test mode.
 
-The console does not hear about a client who removes the app from their provider account, so it shows that account as connected until the client reconnects. P8 should test each token before it moves it.
+The console does not hear about a client who removes the app from their provider account, so it shows that account as connected until the client reconnects. The builder tests each token before it moves it.
 
 ## Settings
 
@@ -217,6 +220,9 @@ The console does not hear about a client who removes the app from their provider
 | `CONSOLE_STRIPE_FEE_WEBHOOK_SECRET` | Secret Manager in the console project | The signing secret of the Stripe webhook endpoint `https://console.eventrunner.org/api/consoleFeeWebhook`, which sends `checkout.session.completed`. It must exist before a deploy. |
 | The event fee | `/review/settings` | The amount and currency clients pay. Sign-ups stay closed until it is set. |
 | The agreement | `/review/settings` | The title and text clients accept. Sign-ups stay closed until it is set. Each save with new text is a new version. |
+| `CONSOLE_GITHUB_APP_ID`, `CONSOLE_GITHUB_INSTALLATION_ID` | `functions/.env` | The console's GitHub App, which holds `actions: write` only. Unset, a build does not start, and operators are told. |
+| `CONSOLE_GITHUB_REPOSITORY` | `functions/.env` | The repository holding `provision-client.yml`, as `owner/name` |
+| `CONSOLE_GITHUB_APP_PRIVATE_KEY` | Secret Manager in the console project | That App's private key. It must exist before a deploy, and a placeholder refuses to start a build. |
 | `CONSOLE_MAIL_FROM` | `functions/.env` | The sender, for example `Event Runner <hello@console.eventrunner.org>` |
 | `CONSOLE_PUBLIC_URL` | `functions/.env` | `https://console.eventrunner.org`, for invite links, the links in status email and the addresses providers return to |
 | `CONSOLE_STRIPE_SECRET_KEY` | Secret Manager in the console project | The Stripe platform account's secret key |

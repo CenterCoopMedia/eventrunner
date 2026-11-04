@@ -60,7 +60,7 @@ export default function ReviewQueue() {
               <span>{app.organizationName}</span>
               {app.webAddressName ? <span className="muted break">{app.webAddressName}.eventrunner.org</span> : null}
               <span className="muted">Last change {formatDateTime(app.updatedAt)}</span>
-              {app.buildStartFailed ? <span className="tag">The build did not start</span> : null}
+              {app.buildStartFailed ? <span className="tag">The build failed</span> : null}
               {app.feeProblem ? <span className="tag">A payment needs attention</span> : null}
             </li>
           ))}
