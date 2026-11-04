@@ -183,7 +183,7 @@ export default function ApplicationStatus() {
         <p><Link className="button primary" to={setupPath(orgId, appId, STEPS[0])}>Continue the setup</Link></p>
       ) : null}
       {app.acceptance ? (
-        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. <Link to={`${statusPath(orgId, appId)}/agreement`}>Read the agreement</Link>. We email the Owners when the status changes.</p>
+        <p className="muted">{app.acceptance.name} accepted the agreement on {formatDate(app.acceptance.at)}. <Link to={`${statusPath(orgId, appId)}/accepted-agreement`}>Read the agreement</Link>. We email the Owners when the status changes.</p>
       ) : null}
       {accounts.map((provider) => (
         <div className="section" key={provider}>

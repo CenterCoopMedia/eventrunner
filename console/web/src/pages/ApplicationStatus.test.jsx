@@ -87,7 +87,7 @@ describe('ApplicationStatus', () => {
   it('links to the accepted agreement, to read again', async () => {
     serveStatus({ status: 'approved', canEdit: false, canWithdraw: false, acceptance: { version: 1, name: 'Ana Owner', at: '2026-11-04T15:00:00.000Z' } });
     page();
-    expect(await screen.findByRole('link', { name: 'Read the agreement' })).toHaveAttribute('href', '/organizations/o1/applications/a1/agreement');
+    expect(await screen.findByRole('link', { name: 'Read the agreement' })).toHaveAttribute('href', '/organizations/o1/applications/a1/accepted-agreement');
   });
 
   it('shows a declined request with its note', async () => {

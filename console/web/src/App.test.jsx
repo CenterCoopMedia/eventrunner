@@ -134,4 +134,12 @@ describe('AppRoutes', () => {
     renderApp('/organizations/o1/applications/a1');
     expect(await screen.findByRole('heading', { level: 1, name: 'NC Local News Summit' })).toBeInTheDocument();
   });
+
+  it('keeps the setup agreement step apart from the page that rereads an accepted agreement', async () => {
+    serveApi({ getAgreement: { agreement: { version: 1, title: 'Test agreement', body: 'Test text.' }, accepted: null } });
+    renderApp('/organizations/o1/applications/a1/agreement');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Agreement' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Test agreement' })).toBeInTheDocument();
+    expect(screen.queryByText('Nobody has accepted the agreement on this request yet.')).not.toBeInTheDocument();
+  });
 });

@@ -1122,7 +1122,7 @@
           <tr><td><code>CONSOLE_PUBLIC_URL</code>, <code>CONSOLE_MAIL_FROM</code></td><td>Written to <code>console/functions/.env</code> at deploy</td></tr>
           <tr><td><code>CONSOLE_STRIPE_CLIENT_ID</code>, <code>CONSOLE_EVENTBRITE_CLIENT_ID</code></td><td>Also written to <code>.env</code>. Unset means the choice is not available yet.</td></tr>
           <tr><td><code>CONSOLE_GITHUB_APP_ID</code>, <code>CONSOLE_GITHUB_INSTALLATION_ID</code>, <code>CONSOLE_GITHUB_REPOSITORY</code></td><td>Also written to <code>.env</code>. Unset means a build does not start, and operators are told.</td></tr>
-          <tr><td><code>CONSOLE_TEST_MODE</code></td><td>Also written to <code>.env</code>. Leave it unset on a console that serves clients. <code>true</code> makes a rehearsal console: acceptance lets a test-mode ticket account through, and every build it starts runs in test mode.</td></tr>
+          <tr><td><code>CONSOLE_TEST_MODE</code></td><td>Also written to <code>.env</code>. Leave it unset on a console that serves clients. <code>true</code> makes a rehearsal console: acceptance lets a test-mode ticket account through, and every build it starts runs in test mode. Only the ticket account is in test mode: a build still makes real, billed resources.</td></tr>
           </tbody>
           </table>
           </div>
@@ -1302,7 +1302,7 @@
           </table>
           </div>
           <p>To close an accepted request that should not go on, such as a signup link that reached the wrong person, cancel its run if one is going, wait for it to stop, then select <strong>Close this request</strong> on its review page. That frees the web address and disconnects the client&#39;s accounts. It removes nothing the build already made. Read the build record to see how far it got, then remove by hand what exists: the Google Cloud project, the DNS records for its address, the GitHub Environment, and the sender domain. The freed name can&#39;t be reused until the project is gone, because the build refuses a project it didn&#39;t make.</p>
-          <p>To run a rehearsal with a test-mode connection, set <code>CONSOLE_TEST_MODE</code> to <code>true</code> in the <code>console</code> Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts and builds nothing live.</p>
+          <p>To run a rehearsal with a test-mode connection, set <code>CONSOLE_TEST_MODE</code> to <code>true</code> in the <code>console</code> Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts. A test-mode build still makes real, billed resources: a Google Cloud project, DNS records and a deployment. Only the ticket account is in test mode.</p>
           <p>To run an accepted request again in test mode, dispatch it by hand:</p>
           <pre data-scroll-region data-scroll-label="Code example (sh)"><code class="language-sh">gh workflow run provision-client.yml --ref main -f application_id=&lt;id&gt; -f test_mode=true
           </code></pre>

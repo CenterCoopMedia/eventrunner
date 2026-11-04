@@ -132,7 +132,7 @@ export function AppRoutes() {
           <Route path="/organizations/:orgId" element={<OrganizationHome />} />
           <Route path="/organizations/:orgId/team" element={<Team />} />
           <Route path="/organizations/:orgId/applications/:appId" element={<ApplicationStatus />} />
-          <Route path="/organizations/:orgId/applications/:appId/agreement" element={<AcceptedAgreement />} />
+          <Route path="/organizations/:orgId/applications/:appId/accepted-agreement" element={<AcceptedAgreement />} />
           <Route path="/organizations/:orgId/applications/:appId/:step" element={<Setup />} />
           <Route path="/connect/:provider/return" element={<ConnectReturn />} />
           <Route path="/invite/:inviteId" element={<AcceptInvite />} />

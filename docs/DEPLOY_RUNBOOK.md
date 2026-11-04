@@ -1134,7 +1134,7 @@ Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitH
 | `CONSOLE_PUBLIC_URL`, `CONSOLE_MAIL_FROM` | Written to `console/functions/.env` at deploy |
 | `CONSOLE_STRIPE_CLIENT_ID`, `CONSOLE_EVENTBRITE_CLIENT_ID` | Also written to `.env`. Unset means the choice is not available yet. |
 | `CONSOLE_GITHUB_APP_ID`, `CONSOLE_GITHUB_INSTALLATION_ID`, `CONSOLE_GITHUB_REPOSITORY` | Also written to `.env`. Unset means a build does not start, and operators are told. |
-| `CONSOLE_TEST_MODE` | Also written to `.env`. Leave it unset on a console that serves clients. `true` makes a rehearsal console: acceptance lets a test-mode ticket account through, and every build it starts runs in test mode. |
+| `CONSOLE_TEST_MODE` | Also written to `.env`. Leave it unset on a console that serves clients. `true` makes a rehearsal console: acceptance lets a test-mode ticket account through, and every build it starts runs in test mode. Only the ticket account is in test mode: a build still makes real, billed resources. |
 
 A deploy does not delete a function that left the code. In `--non-interactive` mode it stops, lists each one and prints its `firebase functions:delete` command. Run those commands and deploy again. A removed public function keeps answering at its direct address until it is deleted.
 
@@ -1308,7 +1308,7 @@ The Owners get an email saying the build did not finish, with a link to the stat
 
 To close an accepted request that should not go on, such as a signup link that reached the wrong person, cancel its run if one is going, wait for it to stop, then select **Close this request** on its review page. That frees the web address and disconnects the client's accounts. It removes nothing the build already made. Read the build record to see how far it got, then remove by hand what exists: the Google Cloud project, the DNS records for its address, the GitHub Environment, and the sender domain. The freed name can't be reused until the project is gone, because the build refuses a project it didn't make.
 
-To run a rehearsal with a test-mode connection, set `CONSOLE_TEST_MODE` to `true` in the `console` Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts and builds nothing live.
+To run a rehearsal with a test-mode connection, set `CONSOLE_TEST_MODE` to `true` in the `console` Environment and deploy the console. Acceptance then lets a test-mode account through, and the build it starts runs in test mode. Remove the variable and deploy again before a client uses the console: until then, it accepts test-mode accounts. A test-mode build still makes real, billed resources: a Google Cloud project, DNS records and a deployment. Only the ticket account is in test mode.
 
 To run an accepted request again in test mode, dispatch it by hand:
 

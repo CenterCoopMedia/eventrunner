@@ -12,8 +12,8 @@ it('shows the accepted version', async () => {
     accepted: { version: 3, name: 'Ana Owner', email: 'ana@example.org', at: '2026-11-04T15:00:00.000Z' },
   });
   renderPage(<AcceptedAgreement />, {
-    path: '/organizations/o1/applications/a1/agreement',
-    route: '/organizations/:orgId/applications/:appId/agreement',
+    path: '/organizations/o1/applications/a1/accepted-agreement',
+    route: '/organizations/:orgId/applications/:appId/accepted-agreement',
   });
   expect(await screen.findByRole('heading', { name: 'Hosting terms' })).toBeInTheDocument();
   expect(screen.getByText('Second.')).toBeInTheDocument();

@@ -203,7 +203,7 @@ The console does not hear about a client who removes the app from their provider
 | `CONSOLE_GITHUB_APP_ID`, `CONSOLE_GITHUB_INSTALLATION_ID` | `functions/.env` | The console's GitHub App, which holds `actions: write` only. Unset, a build does not start, and operators are told. |
 | `CONSOLE_GITHUB_REPOSITORY` | `functions/.env` | The repository holding `provision-client.yml`, as `owner/name` |
 | `CONSOLE_GITHUB_APP_PRIVATE_KEY` | Secret Manager in the console project | That App's private key. It must exist before a deploy, and a placeholder refuses to start a build. |
-| `CONSOLE_TEST_MODE` | `functions/.env` | `true` on a rehearsal console only: a test-mode ticket account can accept, and every build runs in test mode. Unset on a console that serves clients. |
+| `CONSOLE_TEST_MODE` | `functions/.env` | `true` on a rehearsal console only: a test-mode ticket account can accept, and every build runs in test mode. Only the ticket account is in test mode: a build still makes real, billed resources. Unset on a console that serves clients. |
 | `CONSOLE_MAIL_FROM` | `functions/.env` | The sender, for example `Event Runner <hello@console.eventrunner.org>` |
 | `CONSOLE_PUBLIC_URL` | `functions/.env` | `https://console.eventrunner.org`, for invite links, signup links, the links in status email and the addresses providers return to |
 | `CONSOLE_STRIPE_SECRET_KEY` | Secret Manager in the console project | The Stripe platform account's secret key, for clients' ticket connections. It must exist before a deploy. |
