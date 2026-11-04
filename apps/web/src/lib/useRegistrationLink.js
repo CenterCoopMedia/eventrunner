@@ -25,6 +25,20 @@ function readProvider(key) {
   return entry.promise;
 }
 
+/** One cache key per functions endpoint and event, for both readers below. */
+function catalogKey(eventConfigId) {
+  const endpoint = import.meta.env.VITE_FUNCTIONS_ORIGIN || import.meta.env.VITE_FIREBASE_PROJECT_ID;
+  return `${endpoint || ''}:${eventConfigId || ''}`;
+}
+
+/**
+ * The same cached catalog read, for pages that need only the provider (the
+ * registration answers page asks whether the event sells tickets).
+ */
+export function readTicketingCatalog(eventConfigId) {
+  return readProvider(catalogKey(eventConfigId));
+}
+
 // The public catalog read answers a catalog revision only for a published
 // catalog; the /tickets page reads the same field before it accepts terms.
 function isPublishedCatalog(catalog) {
@@ -35,7 +49,7 @@ export function useRegistrationLink() {
   const { eventConfig } = useEventConfig();
   const endpoint = import.meta.env.VITE_FUNCTIONS_ORIGIN || import.meta.env.VITE_FIREBASE_PROJECT_ID;
   const enabled = Boolean(endpoint) && !isReadOnlyDemo(eventConfig);
-  const key = `${endpoint || ''}:${eventConfig?.id || ''}`;
+  const key = catalogKey(eventConfig?.id);
   const [resolved, setResolved] = useState(null);
   // The header stays mounted across routes. A route change, or the tab
   // becoming visible, asks again; readProvider answers from its cache until

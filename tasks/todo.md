@@ -45,8 +45,15 @@ path (R2c, R3) comes before registration.
         (`saveTicketAnswers`), attendee record, export columns, counts
         summary, deletion with the account, archive exclusion. Stacked on
         R4a. The attendee's own form comes with R5.
-- [ ] R5 Checkout stepper (Stripe) and "Complete your registration"
-      (Eventbrite, manual, none); `attendee.approved` email.
+- [ ] R5 Checkout stepper and "Complete your registration", in two stacked PRs:
+  - [x] R5a `/registration` (Questions per ticket → Review) for every
+        provider; with no tickets (provider `none`) answers are keyed
+        `ticket_answers/account-{uid}`. Dashboard reminder until answered.
+        `attendee.approved` email once per account on admin approval.
+        Stacked on R4b.
+  - [ ] R5b Stripe `/tickets` as Tickets → Attendees → Questions → Review →
+        Pay. Answers for other people are held with the order seats and
+        bound to `ticket_answers` when each person claims their ticket.
 - [ ] R6 Promo codes (ADR 0004 amendment), with concurrency tests.
 - [ ] R7 Registration import in `/admin/import`; speaker logistics export.
 

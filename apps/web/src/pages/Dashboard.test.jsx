@@ -103,6 +103,13 @@ vi.mock('../hooks/useMyBookmarks.js', () => ({
 }));
 const holder = { bookmarkedIds: new Set() };
 
+// The registration reminder reads the form, tickets and saved answers; the
+// shell test hands its state straight through. Loading draws nothing.
+vi.mock('../lib/useRegistrationTargets.js', () => ({
+  useRegistrationTargets: () => registration.state,
+}));
+const registration = { state: { status: 'loading', questionCount: 0, targets: [], saved: {} } };
+
 describe('the attendee dashboard shell', () => {
   it('a signed-in attendee sees their name and their status card', () => {
     renderDashboard();
@@ -249,5 +256,16 @@ describe('the dashboard cards', () => {
       </MemoryRouter>,
     );
     expect(screen.queryByRole('navigation', { name: 'Event resources' })).toBeNull();
+  });
+
+  it('reminds an attendee with unanswered registration questions', () => {
+    registration.state = { status: 'ready', questionCount: 2, targets: [{ id: 'account-u1', account: true }], saved: {} };
+    try {
+      renderDashboard();
+      expect(screen.getByRole('heading', { name: 'Complete your registration' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Answer the questions' })).toHaveAttribute('href', '/registration');
+    } finally {
+      registration.state = { status: 'loading', questionCount: 0, targets: [], saved: {} };
+    }
   });
 });

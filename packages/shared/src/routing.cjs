@@ -61,12 +61,15 @@
  * and the live updates card, so a generic page claiming the segment would
  * sit between a signed-in reader and their own account pages.
  *
+ * `registration` is the attendee's registration questions (ADR 0008 §5),
+ * /registration and /registration/:step.
+ *
  * Keep in sync with the static <Route path="..."> segments in App.jsx by
  * hand — there is no build-time check tying the two together.
  */
 const RESERVED_PATH_SEGMENTS = Object.freeze([
   'schedule', 'speakers', 'speaker', 'sponsors', 'signin', 'profile', 'attendees', 'p', 'admin', 'updates',
-  'ticket', 'tickets', 'specimen', 'dashboard', 'pitch',
+  'ticket', 'tickets', 'specimen', 'dashboard', 'pitch', 'registration',
 ]);
 
 /**

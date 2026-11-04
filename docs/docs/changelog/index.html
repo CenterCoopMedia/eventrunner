@@ -145,6 +145,13 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li><strong>Complete your registration</strong> (<code>/registration</code>, ADR 0008 §5): a signed-in
+          attendee answers the registration questions, one step per valid ticket,
+          then Review. The dashboard reminds them until every ticket has answers.
+          With no ticketing provider, answers are kept for the account
+          (<code>ticket_answers/account-{uid}</code>). Approving an attendee now sends
+          <code>attendee.approved</code> once per account. <code>registration</code> is a reserved page
+          path.</li>
           <li>Registration answers (ADR 0008 §4): <code>saveTicketAnswers</code> stores one
           attendee&#39;s answers per ticket in the private <code>ticket_answers</code>, checked
           against the form revision they answered. The ticket holder can save until
