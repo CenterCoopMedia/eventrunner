@@ -114,6 +114,11 @@ function isRulesPath(path) {
     path === 'vitest.rules.config.js';
 }
 
+/** A rules suite file. It runs only in the rules job, and lint reads it. */
+function isRulesTestPath(path) {
+  return /^tests\/[^/]+\.rules\.test\.js$/.test(path);
+}
+
 function isFullPath(path) {
   if (ALWAYS_FULL_PATHS.has(path)) return true;
   if (TOOL_CONFIGURATION_PATH_RE.test(path)) return true;
@@ -146,6 +151,7 @@ function resultForPaths(paths, mode, categories) {
     backend,
     shared,
     rules,
+    rulesTests,
     full,
   } = categories;
   const jobs = {
@@ -153,7 +159,7 @@ function resultForPaths(paths, mode, categories) {
     demo: demo || app || shared || full,
     // Scanned documentation selects this tier so the copy gate cannot be
     // bypassed by a documentation-only pull request.
-    lint: copyDocs || demoGenerator || docsGenerator || app || backend || shared || full,
+    lint: copyDocs || demoGenerator || docsGenerator || app || backend || shared || rulesTests || full,
     // The audit policy reads package.json/package-lock.json across the
     // workspace. Documentation copy does not change that dependency surface.
     audit: demoGenerator || docsGenerator || app || backend || shared || full,
@@ -161,7 +167,7 @@ function resultForPaths(paths, mode, categories) {
     unitWeb: app || shared || full,
     build: app || shared || full,
     hygiene: app || shared || full,
-    rules: rules || backend || shared || full,
+    rules: rules || rulesTests || backend || shared || full,
     e2e: app || backend || shared || rules || full,
   };
   return { paths, mode, jobs };
@@ -183,11 +189,12 @@ function classifyPaths(input) {
     backend: paths.some(isBackendPath),
     shared: paths.some(isSharedPath),
     rules: paths.some(isRulesPath),
+    rulesTests: paths.some(isRulesTestPath),
     full: paths.some(isFullPath),
   };
 
   const recognized = categories.docs || categories.demo || categories.app ||
-    categories.backend || categories.shared || categories.rules || categories.full;
+    categories.backend || categories.shared || categories.rules || categories.rulesTests || categories.full;
   if (!recognized) categories.full = true;
 
   // A workflow, tool configuration, dependency manifest, or unknown path is
@@ -202,7 +209,7 @@ function classifyPaths(input) {
     ['app', categories.app],
     ['backend', categories.backend],
     ['shared', categories.shared],
-    ['rules', categories.rules],
+    ['rules', categories.rules || categories.rulesTests],
     ['full', categories.full],
   ].filter(([, selected]) => selected).map(([name]) => name);
   const mode = categoryNames.length === 1 ? categoryNames[0] : 'mixed';

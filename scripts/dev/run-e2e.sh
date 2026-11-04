@@ -52,7 +52,7 @@ export AIRTABLE_API_TOKEN=e2e-airtable-token
 npx firebase emulators:exec \
   --only firestore,storage,auth,functions \
   --project "$EVENT_FIREBASE_PROJECT_ID" \
-  "npx playwright test" 2>&1 | tee "$LOG"
+  "npx playwright test${PLAYWRIGHT_SHARD:+ --shard=$PLAYWRIGHT_SHARD}" 2>&1 | tee "$LOG"
 status="${PIPESTATUS[0]}"
 
 # Belt and suspenders on top of e2e/helpers.mjs's own runtime check: if the

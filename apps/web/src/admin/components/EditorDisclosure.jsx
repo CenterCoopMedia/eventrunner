@@ -1,13 +1,18 @@
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 
 /** Mounted fields keep their draft values; a server error reveals its section. */
 export default function EditorDisclosure({ title, description, children, defaultOpen = false, reveal = false, headingLevel = 'h3', className = '' }) {
   const [open, setOpen] = useState(defaultOpen || reveal);
+  const [revealed, setRevealed] = useState(reveal);
   const contentId = useId();
   const Heading = headingLevel;
-  useEffect(() => {
+  // Open in the same render that brings the error, not one commit later in
+  // an effect: no frame shows the error with its section shut. The reader
+  // can still close it by hand while the error stands.
+  if (reveal !== revealed) {
+    setRevealed(reveal);
     if (reveal) setOpen(true);
-  }, [reveal]);
+  }
   return (
     <div className={`admin-editor-disclosure ${className}`} data-open={open}>
       <Heading>
