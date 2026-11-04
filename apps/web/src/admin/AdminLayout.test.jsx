@@ -334,9 +334,9 @@ describe('the admin shell', () => {
     // issue #195, Unpublished changes, issue #196, and Announcements,
     // issue #199), Import records, Data export, issue #329, Invoices, issue
     // #208, Scheduled reminders, issue #518, Set up your event, ADR 0007,
-    // and Registration form, ADR 0008 §4, every one a word. No icon rail, no
-    // glyph-only item.
-    expect(nav.querySelectorAll('a')).toHaveLength(32);
+    // Registration form, ADR 0008 §4, and Web address, ADR 0007 §8, every
+    // one a word. No icon rail, no glyph-only item.
+    expect(nav.querySelectorAll('a')).toHaveLength(33);
     expect(screen.getByRole('link', { name: 'Scheduled reminders' })).toHaveAttribute('href', '/admin/reminders');
     expect(screen.getByRole('link', { name: 'Updates' })).toHaveAttribute('href', '/admin/updates');
     expect(screen.getByRole('link', { name: 'Unpublished changes' })).toHaveAttribute(
@@ -405,7 +405,7 @@ describe('the admin shell', () => {
   it('classifies the sections: every group but Settings is staff; the registration form, features, branding, access and system errors are operator', () => {
     const byTier = (tier) =>
       DOCKET.flatMap((group) => group.items).filter((item) => item.tier === tier).map((item) => item.to);
-    expect(byTier('operator')).toEqual(['registration-form', 'features', 'branding', 'access', 'system-errors']);
+    expect(byTier('operator')).toEqual(['registration-form', 'features', 'branding', 'web-address', 'access', 'system-errors']);
     expect(byTier('staff')).toEqual([
       'overview', 'setup',
       'pages', 'content', 'updates', 'timeline', 'media', 'materials', 'versions', 'unpublished',
@@ -485,8 +485,8 @@ describe('the admin shell', () => {
       `${staffLabels.slice(0, -1).join(', ')} and ${staffLabels.at(-1)}`,
     );
     expect(TIER_SCOPE.staff).toContain('Event');
-    expect(TIER_SCOPE.operatorOnly).toBe('Registration form, Features, Branding, Access and System errors');
-    expect(operatorLabels).toEqual(['Registration form', 'Features', 'Branding', 'Access', 'System errors']);
+    expect(TIER_SCOPE.operatorOnly).toBe('Registration form, Features, Branding, Web address, Access and System errors');
+    expect(operatorLabels).toEqual(['Registration form', 'Features', 'Branding', 'Web address', 'Access', 'System errors']);
   });
 
   it('lets an operator reach everything, staff reach staff only, and an undeclared tier reach nothing but operators', () => {

@@ -626,6 +626,7 @@ describe("server-only collections stay deny-all", () => {
     "ticket_payment_attempts",
     "ticket_promo_codes",
     "ticket_answer_holds",
+    "web_address",
     // Invoicing (issue #208): billing contacts, the issuer's bank details,
     // and the gapless number sequence.
     "invoices",

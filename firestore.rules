@@ -833,6 +833,9 @@ service cloud.firestore {
     // Imported registration answers wait here until the ticket is claimed
     // (ADR 0008 §7). Nobody owns them yet, so no client reads them.
     match /ticket_answer_holds/{ticketId} { allow read, write: if false; }
+    // The custom web address (ADR 0007 §8): served to operators by the
+    // webAddress handler only.
+    match /web_address/{docId} { allow read, write: if false; }
 
     // Invoicing (issue #208). Server-only in BOTH directions, staff and
     // operators included. An invoice names a third party's billing contact

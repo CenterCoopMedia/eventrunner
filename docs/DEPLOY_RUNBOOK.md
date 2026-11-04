@@ -744,6 +744,35 @@ of scope here and tracked there, not in this runbook. The Cloud Run site-publish
 (#36) and is documented in §9; it is orthogonal to per-client subdomains, reaching the job as
 ordinary per-client environment with no domain coupling, so nothing in §9 waits on #66.
 
+### Custom web address from the admin
+
+An operator can add a custom web address on **Settings → Web address** (ADR 0007 §8). The
+`webAddress` function asks Firebase Hosting for the domain, shows the client the records to add,
+and checks every hour (`webAddressCheck`). When the domain is live it adds the domain to the Auth
+authorized domains. The functions runtime account needs two roles on the client project for this,
+once:
+
+```bash
+gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
+  --member="serviceAccount:<FUNCTIONS_RUNTIME_ACCOUNT>" --role="roles/firebasehosting.admin"
+gcloud projects add-iam-policy-binding <GCP_PROJECT_ID> \
+  --member="serviceAccount:<FUNCTIONS_RUNTIME_ACCOUNT>" --role="roles/firebaseauth.admin"
+```
+
+The runtime account is `EVENT_FUNCTIONS_SERVICE_ACCOUNT` when set, else the project's default
+compute service account. Without the roles the page answers "did not answer, try again" and the
+function log names the refusal.
+
+When the page says **Ready to switch**, finish the change by deploy, because the public address
+is a deploy-time value:
+
+1. Set `EVENT_PUBLIC_URL` to `https://<domain>` in the client's GitHub Environment (§3), and add
+   the same origin to `EVENT_ALLOWED_ORIGINS`.
+2. Deploy from `main`.
+3. Run `node scripts/init-event.cjs --check`. The page then shows **In use**.
+
+The console's provisioner (ADR 0007, P8) will run this deploy for the client.
+
 ## 9. Site publisher (optional, per client)
 
 **What it does.** The frontend reads CMS content from Firestore at runtime, so a publish is already

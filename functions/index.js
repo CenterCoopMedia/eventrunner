@@ -78,6 +78,7 @@ const adminDataExport = require('./src/admin/dataExport.cjs');
 const adminEventPackage = require('./src/admin/eventPackage.cjs');
 const adminInvoices = require('./src/admin/invoices.cjs');
 const adminInvoicePdf = require('./src/admin/invoicePdf.cjs');
+const adminWebAddress = require('./src/admin/webAddress.cjs');
 
 module.exports = {
   ...email.handlers,
@@ -156,4 +157,5 @@ module.exports = {
   ...adminEventPackage.handlers,
   ...adminInvoices.handlers,
   ...adminInvoicePdf.handlers,
+  ...adminWebAddress.handlers,
 };

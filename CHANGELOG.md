@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Settings → Web address** (ADR 0007 §8, P9a): an operator adds a custom
+  web address. The new `webAddress` function asks Firebase Hosting for the
+  domain and shows the records to add; **Check now** and the hourly
+  `webAddressCheck` read Hosting's state, and a live domain is added to the
+  Auth authorized domains. The switch of `EVENT_PUBLIC_URL` stays a deploy,
+  run by the hosting team until the provisioner exists. The functions runtime
+  account needs `roles/firebasehosting.admin` and `roles/firebaseauth.admin`
+  (DEPLOY_RUNBOOK). `web_address` is server-only. The custom sender domain
+  (P9b) waits for the console, because Postmark's account-level token stays out
+  of client projects.
 - **Speaker logistics** spreadsheet in **Data export** (ADR 0008 §7, staff
   tier): travel, access needs, and audio and video needs from
   `speaker_logistics`, joined to each speaker's name and email. The event data
