@@ -8,9 +8,11 @@ import ReviewActions from './ReviewActions.jsx';
 import ReviewAnswers from './ReviewAnswers.jsx';
 import ReviewHistory from './ReviewHistory.jsx';
 
-/** What the page says after declining, with the email result. */
-function declinedMessage(result) {
-  const done = 'You declined the request. Its web address is free again.';
+/** What the page says after a decision, with the email result. */
+function decidedMessage(name, result) {
+  const done = name === 'closeApplication'
+    ? 'You closed the request. If no build ever began, its web address is free again.'
+    : 'You declined the request. Its web address is free again.';
   return result.mailFailed ? `${done} We could not email every Owner. Contact them another way.` : `${done} We emailed the Owners.`;
 }
 
@@ -139,10 +141,10 @@ export default function ReviewApplication() {
       const revision = name === 'deleteSpamApplication' ? {} : { revision: data?.application.revision };
       const result = await callApi(name, { appId, ...revision, ...body });
       if (name === 'deleteSpamApplication') {
-        navigate('/review', { state: { notice: 'The request is deleted. Its web address is free again.' } });
+        navigate('/review', { state: { notice: 'The request is deleted. If no build ever began, its web address is free again.' } });
         return true;
       }
-      setNotice(declinedMessage(result));
+      setNotice(decidedMessage(name, result));
       await load();
       return true;
     } catch (err) {

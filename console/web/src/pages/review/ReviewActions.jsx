@@ -80,7 +80,7 @@ export default function ReviewActions({ status, canClose = false, onDecide }) {
         <NoteForm
           id="close"
           title="Close this request"
-          help="Say why. The client's accounts are disconnected. The web address becomes free only if no build ever began, because a build may have used it for good. Anything the build already made, such as the Google Cloud project, stays until you remove it. The deploy runbook, section 12.2, lists it."
+          help="Say why. Cancel any deploy run for this site first. The console drops the client's account connections. The web address becomes free only if no build ever began, because a build may have used it for good. Anything the build already made stays until you remove it, including the Google Cloud project and any Eventbrite token stored in it. The deploy runbook, section 12.2, lists it."
           submitLabel="Close the request"
           danger
           onSubmit={async (note) => (await onDecide('closeApplication', { note })) === true}
