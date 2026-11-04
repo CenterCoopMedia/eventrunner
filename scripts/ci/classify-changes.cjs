@@ -114,6 +114,28 @@ function isRulesPath(path) {
     path === 'vitest.rules.config.js';
 }
 
+// The client console (ADR 0007) is its own app in console/. It never
+// ships with an event site, so its changes skip the site's demo, hygiene
+// and browser suites. Its package and tool files still fail open
+// (isFullPath runs first on those).
+function isConsoleAppPath(path) {
+  return path.startsWith('console/web/') && !isMarkdownPath(path);
+}
+
+function isConsoleBackendPath(path) {
+  return path.startsWith('console/functions/') && !isMarkdownPath(path);
+}
+
+function isConsoleRulesPath(path) {
+  return path === 'console/firestore.rules' || path === 'console/firestore.indexes.json' ||
+    /^console\/tests\/[^/]+\.rules\.test\.js$/.test(path);
+}
+
+/** Hosting rewrites name the functions and the web build, so both are checked. */
+function isConsoleHostingPath(path) {
+  return path === 'console/firebase.json';
+}
+
 /** A rules suite file. It runs only in the rules job, and lint reads it. */
 function isRulesTestPath(path) {
   return /^tests\/[^/]+\.rules\.test\.js$/.test(path);
@@ -152,6 +174,11 @@ function resultForPaths(paths, mode, categories) {
     shared,
     rules,
     rulesTests,
+    consoleApp,
+    consoleBackend,
+    consoleRules,
+    consoleRulesTests,
+    consoleHosting,
     full,
   } = categories;
   const jobs = {
@@ -159,15 +186,16 @@ function resultForPaths(paths, mode, categories) {
     demo: demo || app || shared || full,
     // Scanned documentation selects this tier so the copy gate cannot be
     // bypassed by a documentation-only pull request.
-    lint: copyDocs || demoGenerator || docsGenerator || app || backend || shared || rulesTests || full,
+    lint: copyDocs || demoGenerator || docsGenerator || app || backend || shared || rulesTests ||
+      consoleApp || consoleBackend || consoleRulesTests || full,
     // The audit policy reads package.json/package-lock.json across the
     // workspace. Documentation copy does not change that dependency surface.
-    audit: demoGenerator || docsGenerator || app || backend || shared || full,
-    unit: backend || shared || full,
-    unitWeb: app || shared || full,
-    build: app || shared || full,
+    audit: demoGenerator || docsGenerator || app || backend || shared || consoleApp || consoleBackend || full,
+    unit: backend || shared || consoleBackend || full,
+    unitWeb: app || shared || consoleApp || full,
+    build: app || shared || consoleApp || consoleHosting || full,
     hygiene: app || shared || full,
-    rules: rules || rulesTests || backend || shared || full,
+    rules: rules || rulesTests || backend || shared || consoleRules || consoleHosting || full,
     e2e: app || backend || shared || rules || full,
   };
   return { paths, mode, jobs };
@@ -190,11 +218,18 @@ function classifyPaths(input) {
     shared: paths.some(isSharedPath),
     rules: paths.some(isRulesPath),
     rulesTests: paths.some(isRulesTestPath),
+    consoleApp: paths.some(isConsoleAppPath),
+    consoleBackend: paths.some(isConsoleBackendPath),
+    consoleRules: paths.some(isConsoleRulesPath),
+    consoleRulesTests: paths.some((path) => /^console\/tests\/[^/]+\.rules\.test\.js$/.test(path)),
+    consoleHosting: paths.some(isConsoleHostingPath),
     full: paths.some(isFullPath),
   };
 
   const recognized = categories.docs || categories.demo || categories.app ||
-    categories.backend || categories.shared || categories.rules || categories.rulesTests || categories.full;
+    categories.backend || categories.shared || categories.rules || categories.rulesTests ||
+    categories.consoleApp || categories.consoleBackend || categories.consoleRules || categories.consoleHosting ||
+    categories.full;
   if (!recognized) categories.full = true;
 
   // A workflow, tool configuration, dependency manifest, or unknown path is
@@ -210,6 +245,7 @@ function classifyPaths(input) {
     ['backend', categories.backend],
     ['shared', categories.shared],
     ['rules', categories.rules || categories.rulesTests],
+    ['console', categories.consoleApp || categories.consoleBackend || categories.consoleRules || categories.consoleHosting],
     ['full', categories.full],
   ].filter(([, selected]) => selected).map(([name]) => name);
   const mode = categoryNames.length === 1 ? categoryNames[0] : 'mixed';

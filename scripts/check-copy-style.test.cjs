@@ -189,6 +189,19 @@ test('current operator runbooks are part of the scan', () => {
   }
 });
 
+test('the client console copy is part of the scan', () => {
+  const files = collectFiles();
+  for (const file of [
+    'console/README.md',
+    'console/web/index.html',
+    'console/web/src/pages/SignIn.jsx',
+    'console/functions/src/invites.cjs',
+  ]) {
+    assert.equal(files.includes(file), true, file);
+  }
+  assert.equal(files.some((file) => file.startsWith('console/') && file.includes('.test.')), false);
+});
+
 test('generated preset documentation and fixtures are excluded', () => {
   assert.equal(isExcluded('design/tokens/presets/README.md'), true);
   assert.equal(

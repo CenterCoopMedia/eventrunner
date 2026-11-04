@@ -204,7 +204,7 @@ The main branch protection rule requires the stable `CI gate` check.
 
 `npm run test:e2e` needs Java 21+ (the same Firestore/Storage emulators `test:rules` uses) and a Chromium build Playwright can find. It never runs `playwright install` itself: point `PLAYWRIGHT_BROWSERS_PATH` at an existing install, or run `npx playwright install --with-deps chromium` once yourself first — `.github/workflows/ci.yml`'s `e2e` job does the latter, cached.
 
-CI runs the browser suite in three shards and the web unit tests in two, each on its own runner; the CI gate passes only when every shard passes. To repeat one browser shard locally, set `PLAYWRIGHT_SHARD`, for example `PLAYWRIGHT_SHARD=2/3 npm run test:e2e`. For one web shard, run `npm run test -w apps/web -- --shard=1/2`. A pull request runs only the jobs its changed paths can affect (`scripts/ci/classify-changes.cjs`); the copy of that file on the base branch decides, so a change to it takes effect after it merges.
+CI runs the browser suite in three shards and the web unit tests in two, each on its own runner; the CI gate passes only when every shard passes. To repeat one browser shard locally, set `PLAYWRIGHT_SHARD`, for example `PLAYWRIGHT_SHARD=2/3 npm run test:e2e`. For one web shard, run `npm run test -w apps/web -- --shard=1/2`. A pull request runs only the jobs its changed paths can affect (`scripts/ci/classify-changes.cjs`); the copy of that file on the base branch decides, so a change to it takes effect after it merges. A change under `console/` runs the console's own suites (its unit, web, rules and build checks), never the event site's demo, hygiene or browser suites.
 
 ## Releases
 

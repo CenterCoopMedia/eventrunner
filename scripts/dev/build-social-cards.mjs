@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Renders the two social cards the Pages site links from its meta tags:
+// Renders the social cards that pages link from their meta tags:
 //
-//   docs/social-preview.png   the product landing page
-//   docs/og-default.png       any documentation page
+//   docs/social-preview.png               the product landing page
+//   docs/og-default.png                   any documentation page
+//   console/web/public/og-console.png     the client console (ADR 0007 §1)
 //
 // Both are drawn from the site's own materials — docs/tokens.css for the
 // palette, docs/fonts for the faces, and the same four-stroke mark
@@ -49,6 +50,7 @@ function palette() {
     ink: read('--brand-ink-rgb'),
     inkMuted: read('--brand-ink-muted-rgb'),
     rule: read('--rule-hairline-rgb'),
+    accent: read('--brand-primary-rgb'),
   };
 }
 
@@ -60,11 +62,15 @@ const MARK = `<svg viewBox="0 0 24 24" aria-hidden="true">
 </svg>`;
 
 /**
- * @param {{ line: string, title: string, blurb: string }} card
+ * The console card carries the accent: the top rule, the folio and a tile
+ * behind the mark, the same tile as console/web/public/favicon.svg.
+ *
+ * @param {{ line: string, title: string, blurb: string, accent?: boolean }} card
  * @returns {string} a complete document
  */
-function page({ line, title, blurb }) {
-  const { surface, ink, inkMuted, rule } = palette();
+function page({ line, title, blurb, accent = false }) {
+  const { surface, ink, inkMuted, rule, accent: accentRgb } = palette();
+  const lead = accent ? accentRgb : ink;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>
 @font-face { font-family: "Bricolage Grotesque"; font-weight: 700 800; src: ${face('bricolage-grotesque-latin.woff2')}; }
 @font-face { font-family: "Source Sans 3"; font-weight: 400 700; src: ${face('source-sans-3-latin.woff2')}; }
@@ -77,11 +83,13 @@ body {
   font-family: "Source Sans 3", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-.top { border-block-start: 3px solid rgb(${ink}); padding-block-start: 20px; }
+.top { border-block-start: 3px solid rgb(${lead}); padding-block-start: 20px; }
 .folio {
   font-size: 20px; font-weight: 500; letter-spacing: 0.08em;
-  text-transform: uppercase; color: rgb(${inkMuted});
+  text-transform: uppercase; color: rgb(${accent ? accentRgb : inkMuted});
 }
+.tile { width: 92px; height: 92px; flex: none; border-radius: 15px; background: rgb(${accentRgb}); display: grid; place-items: center; }
+.lockup .tile svg { width: 64px; height: 64px; fill: rgb(${surface}); }
 .lockup { display: flex; align-items: center; gap: 24px; margin-block-start: 56px; }
 .lockup svg { width: 92px; height: 92px; flex: none; fill: rgb(${ink}); }
 .lockup h1 {
@@ -96,7 +104,7 @@ p { max-width: 22em; margin-block-start: 32px; font-size: 30px; line-height: 1.4
 </style></head><body>
 <div class="top">
   <div class="folio">${line}</div>
-  <div class="lockup">${MARK}<h1>${title}</h1></div>
+  <div class="lockup">${accent ? `<div class="tile">${MARK}</div>` : MARK}<h1>${title}</h1></div>
   <p>${blurb}</p>
 </div>
 <div class="foot">An initiative of the Center for Cooperative Media at Montclair State University</div>
@@ -105,18 +113,26 @@ p { max-width: 22em; margin-block-start: 32px; font-size: 30px; line-height: 1.4
 
 const CARDS = [
   {
-    file: 'social-preview.png',
+    file: 'docs/social-preview.png',
     line: 'Event CMS',
     title: 'Event Runner',
     blurb: 'A white-label event CMS. One Firebase project per event. Your staff run the site '
       + 'from the admin panel, without a developer in the room.',
   },
   {
-    file: 'og-default.png',
+    file: 'docs/og-default.png',
     line: 'Documentation',
     title: 'Event Runner',
     blurb: 'Guides, runbooks, and decision records for the white-label event CMS operated by '
       + 'the Center for Cooperative Media.',
+  },
+  {
+    file: 'console/web/public/og-console.png',
+    line: 'Console',
+    title: 'Event Runner',
+    blurb: 'Sign up, name your organization and invite your team. We review your request '
+      + 'and then build your event site.',
+    accent: true,
   },
 ];
 
@@ -132,16 +148,16 @@ for (const card of CARDS) {
   // are the page's, not this file's.
   await tab.evaluate('document.fonts.ready');
   const shot = await tab.screenshot({ type: 'png' });
-  const target = path.join(DOCS, card.file);
+  const target = path.join(ROOT, card.file);
   if (check) {
     if (!readFileSync(target).equals(shot)) {
-      console.error(`stale: docs/${card.file}`);
+      console.error(`stale: ${card.file}`);
       stale += 1;
     }
     continue;
   }
   writeFileSync(target, shot);
-  console.log(`wrote docs/${card.file} (${WIDTH}x${HEIGHT}, ${shot.length} bytes)`);
+  console.log(`wrote ${card.file} (${WIDTH}x${HEIGHT}, ${shot.length} bytes)`);
 }
 
 await browser.close();

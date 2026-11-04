@@ -22,11 +22,15 @@ const ROOT_FILES = Object.freeze([
   'docs/EVENTBRITE_VERIFICATION.md',
   'scripts/lib/demo-event.cjs',
   'scripts/lib/seed.cjs',
+  'console/README.md',
+  'console/web/index.html',
 ]);
 
 const RECURSIVE_ROOTS = Object.freeze([
   'apps/web/src',
   'functions/src',
+  'console/web/src',
+  'console/functions/src',
   'docs/handbook',
   'design/tokens/presets',
 ]);

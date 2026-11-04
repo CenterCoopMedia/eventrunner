@@ -59,9 +59,10 @@ export default [
     },
   },
 
-  // CommonJS surfaces: shared package, functions, operator scripts.
+  // CommonJS surfaces: shared package, functions, console functions,
+  // operator scripts.
   {
-    files: ["**/*.cjs", "functions/**/*.js", "scripts/**/*.js"],
+    files: ["**/*.cjs", "functions/**/*.js", "console/functions/**/*.js", "scripts/**/*.js"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "commonjs",
@@ -73,9 +74,16 @@ export default [
   // ESM surfaces: shims, configs, scripts, tests.
   {
     files: ["**/*.mjs", "**/*.js"],
-    // apps/web is excluded so frontend files only get the browser-globals
-    // JSX block below — Node globals must not pass no-undef there.
-    ignores: ["functions/**/*.js", "scripts/**/*.js", "apps/web/**"],
+    // apps/web and console/web are excluded so frontend files only get the
+    // browser-globals JSX block below — Node globals must not pass no-undef
+    // there.
+    ignores: [
+      "functions/**/*.js",
+      "console/functions/**/*.js",
+      "scripts/**/*.js",
+      "apps/web/**",
+      "console/web/**",
+    ],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",
@@ -84,9 +92,10 @@ export default [
     rules: { ...noHexLiterals },
   },
 
-  // Frontend: JSX plus the rules-of-hooks guard.
+  // Frontend: JSX plus the rules-of-hooks guard. The client console's web
+  // app (ADR 0007) is held to the same rules.
   {
-    files: ["apps/web/**/*.{js,jsx,mjs}"],
+    files: ["apps/web/**/*.{js,jsx,mjs}", "console/web/**/*.{js,jsx,mjs}"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",
@@ -108,7 +117,7 @@ export default [
   // The web workspace's build/test config files run under Node, and vitest
   // test files run in jsdom but import vitest globals explicitly.
   {
-    files: ["apps/web/*.{js,mjs}"],
+    files: ["apps/web/*.{js,mjs}", "console/web/*.{js,mjs}"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",

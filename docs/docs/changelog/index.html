@@ -145,6 +145,19 @@
           </ul>
           <h3 id="added">Added<a class="heading-anchor" href="#added" aria-label="Link to this section">#</a></h3>
           <ul>
+          <li>The client console foundation (ADR 0007 §1 and §2, P4) in <code>console/</code>. It
+          is its own Firebase project, with its own rules, functions and web app,
+          and the client deploy never ships it. A client signs in with Google,
+          Microsoft or a link sent by email, names an organization, and invites
+          teammates as Owners or Editors. Invites expire after seven days, work
+          once, and store only a hash of the token. An organization always keeps
+          at least one Owner, and the team page says that launch needs two. CCM
+          operators on <code>console_config/operators</code> can read every organization.
+          Every write needs a verified email, invites and new organizations are
+          rate limited, and the browser writes nothing. The console has its own
+          favicon and sharing image. <code>npm test</code>, <code>npm run test:web</code> (through the
+          new <code>npm run test:console</code>), <code>npm run test:rules</code> and <code>npm run lint</code>
+          cover it. The one-time setup is in <code>docs/DEPLOY_RUNBOOK.md</code> §11.</li>
           <li><strong>Speaker logistics</strong> spreadsheet in <strong>Data export</strong> (ADR 0008 §7, staff
           tier): travel, access needs, and audio and video needs from
           <code>speaker_logistics</code>, joined to each speaker&#39;s name and email. The event data

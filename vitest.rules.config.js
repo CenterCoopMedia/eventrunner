@@ -5,7 +5,9 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["tests/*.rules.test.js"],
+    // console/tests holds the client console's own suite (ADR 0007). It
+    // loads console/firestore.rules under its own demo project id.
+    include: ["tests/*.rules.test.js", "console/tests/*.rules.test.js"],
     // Rules tests share one emulator instance; parallel files would
     // race on clearFirestore()/clearStorage() between suites.
     fileParallelism: false,
