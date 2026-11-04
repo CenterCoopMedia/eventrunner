@@ -117,6 +117,25 @@ test('the retention job logs a failed delete and carries on', async () => {
   assert.equal(logged.length, 1);
 });
 
+test('the retention job finds old requests behind many recent ones and pages through them all', async () => {
+  const recent = new Date(NOW - 10 * DAY);
+  const old = new Date(NOW - 100 * DAY);
+  const extra = {};
+  for (const id of ['r1', 'r2', 'r3']) extra[`applications/${id}`] = application({ status: 'declined', updatedAt: recent });
+  for (const id of ['o1', 'o2', 'o3', 'o4', 'o5']) extra[`applications/${id}`] = application({ status: 'declined', updatedAt: old });
+  const db = seeded(extra);
+  const result = await runRetention({ db, now: () => NOW, log: QUIET, batchSize: 2 });
+  assert.deepEqual(result.deleted.sort(), ['o1', 'o2', 'o3', 'o4', 'o5']);
+  for (const id of ['r1', 'r2', 'r3']) assert.ok(db.read(`applications/${id}`), `${id} is kept`);
+});
+
+test('the retention job stops when a full batch has nothing it can delete', async () => {
+  const db = seeded({ 'applications/a1': application({ status: 'declined', updatedAt: new Date(NOW - 100 * DAY) }) });
+  db.runTransaction = async () => { throw new Error('aborted'); };
+  const result = await runRetention({ db, now: () => NOW, log: QUIET, batchSize: 1 });
+  assert.deepEqual(result, { deleted: [], failed: ['a1'] });
+});
+
 test('a spam delete frees every name the request holds', async () => {
   const live = { ...application().answers, webAddress: { name: 'nclocal2' } };
   const db = seeded({

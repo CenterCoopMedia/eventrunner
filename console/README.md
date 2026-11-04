@@ -121,7 +121,7 @@ ADR 0007 §5 is the decision. No cloud resource exists before an operator approv
    - **Request changes** with a note. The client changes the answers and submits again.
    - **Decline** with a note. The web-address name becomes free.
    - **Approve**. The form shows the build settings with their defaults. The operator can change each value.
-4. The console emails each Owner of the organization, one message each. A failed email does not undo the decision; the page says the Owners were not emailed.
+4. The console emails each Owner of the organization, one message each. A failed email does not undo the decision, and one refused address does not stop the others. When any Owner was not emailed, the page says so.
 
 Each decision runs in one transaction that reads the status first. When two operators act at the same time, the second one gets `409 status-changed`. Each decision adds `{ status, at, by, note }` to `history` and writes `review` = `{ note, by, at, settings }`.
 

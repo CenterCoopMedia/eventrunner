@@ -73,7 +73,8 @@ async function transition({ db, now = Date.now }, { appId, user, from, to, note 
 
 /**
  * Email each Owner. One message per Owner, so no Owner sees a list of
- * addresses. Returns whether every message went out.
+ * addresses. One refused address does not stop the rest. Returns how
+ * many went out and whether any failed.
  */
 async function notifyOwners({ db, mailer, publicUrl, log = console }, app, { status, note }) {
   try {
@@ -89,8 +90,16 @@ async function notifyOwners({ db, mailer, publicUrl, log = console }, app, { sta
       note,
       link: statusLink(base, app.orgId, app.id),
     };
-    for (const to of owners) await mailer.sendStatusChange({ ...change, to });
-    return { emailed: owners.length, mailFailed: false };
+    let emailed = 0;
+    for (const to of owners) {
+      try {
+        await mailer.sendStatusChange({ ...change, to });
+        emailed += 1;
+      } catch (err) {
+        log.error('console status email failed', err);
+      }
+    }
+    return { emailed, mailFailed: emailed < owners.length };
   } catch (err) {
     log.error('console status email failed', err);
     return { emailed: 0, mailFailed: true };

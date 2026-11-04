@@ -73,34 +73,47 @@ function isExpired(app, at) {
 }
 
 /**
- * The retention job. Each request is checked again inside its own
- * transaction, so a request that changed after the query is kept.
+ * The retention job. The query asks only for requests past the cutoff, and
+ * pages by asking again: each delete takes a request out of the results.
+ * It stops when a batch is short, or when a full batch deleted nothing (so
+ * a request that keeps failing cannot hold the job in a loop). Each request
+ * is checked again inside its own transaction, so one that changed after
+ * the query is kept.
  *
- * @param {{ db: object, now?: () => number, log?: { info: Function, error: Function } }} deps
+ * @param {{ db: object, now?: () => number, log?: { info: Function, error: Function }, batchSize?: number }} deps
  * @returns {Promise<{ deleted: string[], failed: string[] }>}
  */
-async function runRetention({ db, now = Date.now, log = console }) {
+async function runRetention({ db, now = Date.now, log = console, batchSize = RETENTION_BATCH }) {
   const at = now();
+  const cutoff = new Date(at - RETENTION_DAYS * DAY_MS);
   const deleted = [];
-  const failed = [];
+  const failed = new Set();
   for (const status of RETAINED_STATUSES) {
-    const snap = await db.collection('applications').where('status', '==', status).limit(RETENTION_BATCH).get();
-    for (const doc of snap.docs) {
-      if (!isExpired(doc.data(), at)) continue;
-      try {
-        const done = await deleteApplication(db, {
-          appId: doc.id, by: 'retention', action: 'retention-delete', at: new Date(at), check: (app) => isExpired(app, at),
-        });
-        if (done) deleted.push(doc.id);
-      } catch (err) {
-        if (err instanceof ConsoleError && err.code === 'not-found') continue;
-        failed.push(doc.id);
-        log.error('console retention could not delete a request', doc.id, err);
+    for (;;) {
+      const snap = await db.collection('applications')
+        .where('status', '==', status).where('updatedAt', '<=', cutoff).limit(batchSize).get();
+      let progress = 0;
+      for (const doc of snap.docs) {
+        if (failed.has(doc.id)) continue;
+        try {
+          const done = await deleteApplication(db, {
+            appId: doc.id, by: 'retention', action: 'retention-delete', at: new Date(at), check: (app) => isExpired(app, at),
+          });
+          if (done) {
+            deleted.push(doc.id);
+            progress += 1;
+          }
+        } catch (err) {
+          if (err instanceof ConsoleError && err.code === 'not-found') continue;
+          failed.add(doc.id);
+          log.error('console retention could not delete a request', doc.id, err);
+        }
       }
+      if (snap.docs.length < batchSize || progress === 0) break;
     }
   }
   log.info?.(`console retention deleted ${deleted.length} request(s)`);
-  return { deleted, failed };
+  return { deleted, failed: [...failed] };
 }
 
 module.exports = { RETENTION_DAYS, deleteSpamApplication, isExpired, runRetention };

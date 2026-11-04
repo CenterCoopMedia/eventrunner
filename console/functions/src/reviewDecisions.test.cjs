@@ -154,8 +154,24 @@ test('a failed email does not undo the decision, and the answer says so', async 
   const d = deps(db, { mailer: fakeMailer({ fail: true }), log: { info() {}, error: (...a) => logged.push(a) } });
   const result = await approveApplication(d, { body: { appId: 'a1' }, user: ops });
   assert.equal(result.body.mailFailed, true);
+  assert.equal(result.body.emailed, 0);
   assert.equal(db.read('applications/a1').status, 'approved');
-  assert.equal(logged.length, 1);
+  assert.equal(logged.length, 2, 'one log line for each failed Owner');
+});
+
+test('one refused address does not stop the email to the other Owners', async () => {
+  const db = seeded();
+  const mailer = fakeMailer();
+  const send = mailer.sendStatusChange.bind(mailer);
+  mailer.sendStatusChange = async (message) => {
+    if (message.to === 'ana@example.org') throw new Error('recipient refused');
+    return send(message);
+  };
+  const d = deps(db, { mailer });
+  const result = await approveApplication(d, { body: { appId: 'a1' }, user: ops });
+  assert.equal(result.body.emailed, 1);
+  assert.equal(result.body.mailFailed, true);
+  assert.deepEqual(mailer.sent.map((m) => m.to), ['bo@example.org']);
 });
 
 test('a missing request is a 404', async () => {

@@ -16,7 +16,7 @@ const DONE = Object.freeze({
 
 /** What the page says after a decision, with the email result. */
 function doneMessage(name, result) {
-  if (result.mailFailed) return `${DONE[name]} We could not email the Owners. Contact them another way.`;
+  if (result.mailFailed) return `${DONE[name]} We could not email every Owner. Contact them another way.`;
   return `${DONE[name]} We emailed the Owners.`;
 }
 

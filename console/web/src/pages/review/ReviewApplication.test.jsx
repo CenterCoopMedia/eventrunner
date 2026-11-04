@@ -172,7 +172,7 @@ describe('ReviewApplication', () => {
     page();
     fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
     fireEvent.click(within(screen.getByRole('form', { name: 'Approve this request' })).getByRole('button', { name: 'Approve' }));
-    expect(await screen.findByText(/We could not email the Owners/)).toBeInTheDocument();
+    expect(await screen.findByText(/We could not email every Owner/)).toBeInTheDocument();
   });
 
   it('shows a refusal when another operator acted first', async () => {
