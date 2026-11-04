@@ -11,6 +11,7 @@ const { toIso, toMillis } = require('./access.cjs');
 const { STATUSES, readApplication, requireOperator, reviewedAnswers, siteNameOf } = require('./reviewAccess.cjs');
 const { approvalDefaults, readConsoleSettings } = require('./consoleSettings.cjs');
 const { connectionForReview } = require('./connectionState.cjs');
+const { canRetryBuild, readBuild, readableBuild } = require('./buildRetry.cjs');
 
 const QUEUE_LIMIT = 200;
 const ROLE_ORDER = { owner: 0, editor: 1 };
@@ -105,10 +106,11 @@ function readablePayment(app) {
 async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
   await requireOperator(db, user);
   const app = await readApplication(db, body.appId);
-  const [orgSnap, team, settings] = await Promise.all([
+  const [orgSnap, team, settings, build] = await Promise.all([
     db.collection('organizations').doc(String(app.orgId)).get(),
     readTeam(db, String(app.orgId), now()),
     readConsoleSettings(db),
+    readBuild(db, app.id),
   ]);
   const name = siteNameOf(app);
   return {
@@ -133,6 +135,8 @@ async function getApplicationForReview({ db, now = Date.now }, { body, user }) {
       team,
       connection: connectionForReview(app.frozen?.tickets?.choice, app.connections),
       approvalDefaults: approvalDefaults(settings, name),
+      build: readableBuild(build),
+      canRetryBuild: canRetryBuild(app, build),
     },
   };
 }

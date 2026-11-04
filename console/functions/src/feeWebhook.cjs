@@ -103,7 +103,8 @@ async function afterCommit(log, what, step) {
   }
 }
 
-async function runStartBuild(deps, { orgId, appId, eventName }) {
+/** Shared with the operator's retry (buildRetry.cjs). @returns {Promise<boolean>} whether it started */
+async function runStartBuild(deps, { orgId, appId, eventName, by = BY_PAYMENT }) {
   const { db, startBuild, now, log } = deps;
   const ref = db.collection('applications').doc(appId);
   try {
@@ -113,12 +114,13 @@ async function runStartBuild(deps, { orgId, appId, eventName }) {
     const at = new Date(now());
     await afterCommit(log, 'recording the build failure', () => ref.update({ buildStart: { state: 'failed', at } }));
     await afterCommit(log, 'auditing the build failure', () => db.collection('console_audit').doc().create({
-      action: 'build-start-failed', appId, by: BY_PAYMENT, at,
+      action: 'build-start-failed', appId, by, at,
     }));
     await afterCommit(log, 'the build failure notice', () => notifyOperators(deps, { orgId, appId, eventName, kind: 'build-failed' }));
-    return;
+    return false;
   }
   await afterCommit(log, 'recording the build start', () => ref.update({ buildStart: { state: 'started', at: new Date(now()) } }));
+  return true;
 }
 
 /**
@@ -186,4 +188,4 @@ function feeWebhookEndpoint(deps) {
   };
 }
 
-module.exports = { COLLECTION, feeWebhookEndpoint, handleFeeEvent };
+module.exports = { COLLECTION, feeWebhookEndpoint, handleFeeEvent, runStartBuild };

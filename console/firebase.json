@@ -32,6 +32,7 @@
       { "source": "/api/requestChanges", "function": { "functionId": "requestChanges", "region": "us-central1" } },
       { "source": "/api/declineApplication", "function": { "functionId": "declineApplication", "region": "us-central1" } },
       { "source": "/api/approveApplication", "function": { "functionId": "approveApplication", "region": "us-central1" } },
+      { "source": "/api/retryBuild", "function": { "functionId": "retryBuild", "region": "us-central1" } },
       { "source": "/api/deleteSpamApplication", "function": { "functionId": "deleteSpamApplication", "region": "us-central1" } },
       { "source": "/api/getConsoleSettings", "function": { "functionId": "getConsoleSettings", "region": "us-central1" } },
       { "source": "/api/saveConsoleSettings", "function": { "functionId": "saveConsoleSettings", "region": "us-central1" } },

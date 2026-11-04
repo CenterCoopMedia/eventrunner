@@ -17,6 +17,10 @@
  *   CONSOLE_STRIPE_SECRET_KEY          secret: CCM's Stripe key, for the event fee and the Connect platform
  *   CONSOLE_STRIPE_FEE_WEBHOOK_SECRET  secret: signs consoleFeeWebhook deliveries
  *   CONSOLE_EVENTBRITE_CLIENT_SECRET   secret: the Eventbrite app's client secret
+ *   CONSOLE_GITHUB_APP_ID              the console's GitHub App, which starts the build
+ *   CONSOLE_GITHUB_INSTALLATION_ID     that App's installation on the repository
+ *   CONSOLE_GITHUB_REPOSITORY          the repository, as owner/name
+ *   CONSOLE_GITHUB_APP_PRIVATE_KEY     secret: that App's private key
  */
 
 const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
@@ -34,6 +38,8 @@ const { getConsoleSettings, saveAgreement, saveConsoleSettings, saveEventFee } =
 const { acceptAgreement, getAgreement, reopenApplication } = require('./agreementAcceptance.cjs');
 const { startFeeCheckout, stripeClient } = require('./feeCheckout.cjs');
 const { feeWebhookEndpoint } = require('./feeWebhook.cjs');
+const { createStartBuild } = require('./buildDispatch.cjs');
+const { retryBuild } = require('./buildRetry.cjs');
 const {
   chooseEventbriteEvent, completeConnection, disconnectAccount, listEventbriteEvents, startConnection,
 } = require('./connections.cjs');
@@ -72,6 +78,7 @@ const ENDPOINTS = Object.freeze({
   requestChanges: { action: requestChanges, mail: true },
   declineApplication: { action: declineApplication, mail: true, stripe: true },
   approveApplication: { action: approveApplication, mail: true },
+  retryBuild: { action: retryBuild, mail: true, build: true },
   deleteSpamApplication: { action: deleteSpamApplication, stripe: true, connect: true },
   getConsoleSettings: { action: getConsoleSettings },
   saveConsoleSettings: { action: saveConsoleSettings },
@@ -109,7 +116,7 @@ function adminServices() {
   return services;
 }
 
-/** `startBuild({ orgId, appId })` is given by the part that builds the site. */
+/** `startBuild({ orgId, appId })` defaults to the GitHub dispatch; a test can give its own. */
 function buildHandlers({ startBuild } = {}) {
   const { onRequest } = require('firebase-functions/v2/https');
   const { onSchedule } = require('firebase-functions/v2/scheduler');
@@ -122,6 +129,7 @@ function buildHandlers({ startBuild } = {}) {
   const feeWebhookSecret = defineSecret('CONSOLE_STRIPE_FEE_WEBHOOK_SECRET');
   const eventbriteClientSecret = defineSecret('CONSOLE_EVENTBRITE_CLIENT_SECRET');
   const connectSecrets = [stripeKey, eventbriteClientSecret];
+  const githubAppKey = defineSecret('CONSOLE_GITHUB_APP_PRIVATE_KEY');
 
   // Made at send time, so a missing setting is a failed send that the
   // action reports and logs, not a crash before the request is read.
@@ -133,6 +141,11 @@ function buildHandlers({ startBuild } = {}) {
     });
     return Object.fromEntries(MAIL_METHODS.map((method) => [method, (message) => mailer()[method](message)]));
   };
+  const buildStarter = () => startBuild || createStartBuild({
+    env: process.env,
+    privateKey: githubAppKey.value(),
+    fetch: globalThis.fetch,
+  });
   const publicUrl = () => (process.env.CONSOLE_PUBLIC_URL || '').replace(/\/+$/, '');
   // Made per call: secret values exist only while a function that declares them runs.
   const connectDeps = () => {
@@ -160,6 +173,7 @@ function buildHandlers({ startBuild } = {}) {
       ...(spec.mail ? [postmarkToken] : []),
       ...(spec.stripe ? [stripeKey] : []),
       ...(spec.connect ? connectSecrets : []),
+      ...(spec.build ? [githubAppKey] : []),
     ])];
     const options = { region, ...(secrets.length > 0 ? { secrets } : {}) };
     handlers[name] = onRequest(options, async (req, res) => {
@@ -169,11 +183,12 @@ function buildHandlers({ startBuild } = {}) {
       if (spec.connect) Object.assign(deps, connectDeps());
       if (spec.mail) deps.mailer = lazyMailer();
       if (spec.stripe) deps.stripe = stripeClient(stripeKey.value());
+      if (spec.build) deps.startBuild = buildStarter();
       await postEndpoint(deps, (input) => spec.action(deps, input))(req, res);
     });
   }
   for (const [name, spec] of Object.entries(WEBHOOKS)) {
-    handlers[name] = onRequest({ region, secrets: [postmarkToken, stripeKey, feeWebhookSecret] }, async (req, res) => {
+    handlers[name] = onRequest({ region, secrets: [postmarkToken, stripeKey, feeWebhookSecret, githubAppKey] }, async (req, res) => {
       const { db } = adminServices();
       await spec.endpoint({
         db,
@@ -183,7 +198,7 @@ function buildHandlers({ startBuild } = {}) {
         mailer: lazyMailer(),
         stripe: stripeClient(stripeKey.value()),
         webhookSecret: feeWebhookSecret.value(),
-        startBuild,
+        startBuild: buildStarter(),
       })(req, res);
     });
   }

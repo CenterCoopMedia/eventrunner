@@ -39,7 +39,7 @@ test('the retention job is scheduled and has no Hosting rewrite', () => {
 test('only the functions that send email get the mail secret', () => {
   assert.deepEqual(
     Object.entries(ENDPOINTS).filter(([, spec]) => spec.mail).map(([name]) => name),
-    ['inviteMember', 'submitApplication', 'withdrawApplication', 'acceptAgreement', 'reopenApplication', 'requestChanges', 'declineApplication', 'approveApplication'],
+    ['inviteMember', 'submitApplication', 'withdrawApplication', 'acceptAgreement', 'reopenApplication', 'requestChanges', 'declineApplication', 'approveApplication', 'retryBuild'],
   );
 });
 

@@ -243,6 +243,58 @@ describe('ReviewApplication', () => {
       expect(note).toHaveTextContent('The payment stands');
     });
 
+    it('offers a retry when the build did not start, and shows the result', async () => {
+      let calls = 0;
+      callApi.mockImplementation(async (name) => {
+        if (name === 'retryBuild') {
+          calls += 1;
+          return { started: true };
+        }
+        return { ...request({ status: 'approved', payment: PAYMENT, buildStart: { state: 'failed', at: '2026-11-04T15:00:00.000Z' } }), canRetryBuild: calls === 0, build: null };
+      });
+      page();
+      fireEvent.click(await screen.findByRole('button', { name: 'Retry the build' }));
+      expect(callApi).toHaveBeenCalledWith('retryBuild', { appId: 'a1' });
+      expect(await screen.findByText('The build started again.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+    });
+
+    it('shows the failed run in full and names the step', async () => {
+      serve({
+        ...request({ status: 'building', payment: PAYMENT }),
+        canRetryBuild: true,
+        build: {
+          state: 'failed',
+          runUrl: 'https://github.example/run/1',
+          testMode: false,
+          error: 'Web address: the certificate is not active',
+          steps: [
+            { id: 'project', label: 'Project and billing', state: 'done', at: '2026-11-04T15:00:00.000Z', detail: 'already right' },
+            { id: 'web-address', label: 'Web address', state: 'failed', at: '2026-11-04T15:05:00.000Z', detail: null },
+          ],
+        },
+      });
+      page();
+      const note = await screen.findByRole('note');
+      expect(note).toHaveTextContent('The build failed');
+      expect(note).toHaveTextContent('the certificate is not active');
+      expect(note).not.toHaveTextContent('did not start');
+      expect(screen.getByText('Project and billing')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Open the run' })).toHaveAttribute('href', 'https://github.example/run/1');
+      expect(screen.getByRole('button', { name: 'Retry the build' })).toBeInTheDocument();
+    });
+
+    it('has no retry while a build runs', async () => {
+      serve({
+        ...request({ status: 'building', payment: PAYMENT }),
+        canRetryBuild: false,
+        build: { state: 'running', runUrl: null, testMode: false, error: null, steps: [] },
+      });
+      page();
+      expect(await screen.findByRole('heading', { level: 2, name: 'Build' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry the build' })).not.toBeInTheDocument();
+    });
+
     it('names the payment to refund when one did not approve the request', async () => {
       serve(request({ status: 'withdrawn', feeProblem: { code: 'wrong-status', sessionId: 'cs_9', paymentIntentId: 'pi_9', at: '2026-11-04T15:00:00.000Z' } }));
       page();

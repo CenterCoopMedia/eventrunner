@@ -49,14 +49,63 @@ function Team({ team }) {
   );
 }
 
-/** What the hosting team must act on after a payment. */
-function PaymentNotes({ app }) {
+const BUILD_STATE_LABELS = Object.freeze({
+  queued: 'Waiting to run',
+  running: 'Running',
+  done: 'Finished',
+  failed: 'Failed',
+});
+
+/** The build record, in full. Only the hosting team sees it. */
+function BuildRecord({ build, canRetry, retrying, onRetry }) {
+  if (!build && !canRetry) return null;
   return (
     <>
-      {app.buildStart?.state === 'failed' ? (
+      <h2 id="build-title">Build</h2>
+      {build ? (
+        <>
+          <p>
+            <span className="tag">{BUILD_STATE_LABELS[build.state] || build.state}</span>
+            {build.testMode ? <span className="tag">Test mode</span> : null}
+          </p>
+          {build.error ? (
+            <aside className="note" role="note">
+              <p className="note-title">The build failed</p>
+              <p className="break">{build.error}</p>
+              <p>The payment stands. Fix the cause, then retry. The steps that finished are not done twice.</p>
+            </aside>
+          ) : null}
+          <ol className="stack" aria-labelledby="build-title">
+            {build.steps.map((step) => (
+              <li key={step.id}>
+                <strong>{step.label}</strong>: {BUILD_STATE_LABELS[step.state] || step.state}
+                {step.at ? `, ${formatDateTime(step.at)}` : ''}
+                {step.detail ? <span className="muted break"> {step.detail}</span> : null}
+              </li>
+            ))}
+          </ol>
+          {build.runUrl ? <p><a href={build.runUrl}>Open the run</a></p> : null}
+        </>
+      ) : null}
+      {canRetry ? (
+        <p>
+          <button type="button" className="button primary" disabled={retrying} onClick={onRetry}>
+            {retrying ? 'Starting the build' : 'Retry the build'}
+          </button>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** What the hosting team must act on after a payment. */
+function PaymentNotes({ app, build }) {
+  return (
+    <>
+      {app.buildStart?.state === 'failed' && build?.state !== 'failed' ? (
         <aside className="note" role="note">
           <p className="note-title">The build did not start</p>
-          <p>The payment stands and the request stays approved. Read the function logs, then start the build.</p>
+          <p>The payment stands and the request stays approved. Read the function logs and fix the cause, then retry the build.</p>
         </aside>
       ) : null}
       {app.feeProblem ? (
@@ -104,6 +153,7 @@ export default function ReviewApplication() {
   const [loadError, setLoadError] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [retrying, setRetrying] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -139,6 +189,22 @@ export default function ReviewApplication() {
     }
   }, [appId, data, load, navigate]);
 
+  const retry = useCallback(async () => {
+    setNotice('');
+    setError('');
+    setRetrying(true);
+    try {
+      const { started } = await callApi('retryBuild', { appId });
+      if (started) setNotice('The build started again.');
+      else setError('The build did not start. Read the function logs and fix the cause, then retry.');
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRetrying(false);
+    }
+  }, [appId, load]);
+
   if (isNotOperator(loadError)) return <HostingOnly />;
   if (!data) {
     return loadError ? <p className="message error" role="alert">{loadError.message}</p> : <p role="status">Loading the request.</p>;
@@ -155,7 +221,8 @@ export default function ReviewApplication() {
         {notice ? <p className="message success">{notice}</p> : null}
       </div>
       {error ? <p className="message error" role="alert">{error}</p> : null}
-      <PaymentNotes app={app} />
+      <PaymentNotes app={app} build={data.build} />
+      <BuildRecord build={data.build} canRetry={data.canRetryBuild} retrying={retrying} onRetry={retry} />
 
       <h2 id="decision-title">Decision</h2>
       {app.review?.note ? (

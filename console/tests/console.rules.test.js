@@ -49,6 +49,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'applications/a2'), { orgId: 'o2', status: 'submitted', answers: {} });
     await setDoc(doc(db, 'site_names/nclocal'), { appId: 'a1', orgId: 'o1' });
     await setDoc(doc(db, 'console_connections/a1'), { stripe: { accountId: 'acct_client1', connectedBy: 'ana' } });
+    await setDoc(doc(db, 'console_builds/a1'), { state: 'failed' });
     await setDoc(doc(db, 'console_connection_states/h1'), { uid: 'ana', appId: 'a1', provider: 'stripe' });
     await setDoc(doc(db, 'console_config/settings'), { gcpFolder: 'folders/123456789012', billingAccount: '012345-6789AB-CDEF01', region: 'us-central1' });
     await setDoc(doc(db, 'console_audit/e1'), { action: 'delete-spam', appId: 'a9', by: 'ops' });
@@ -70,6 +71,9 @@ describe('connected accounts', () => {
       await assertFails(getDocs(collection(db, 'console_connections')));
       await assertFails(setDoc(doc(db, 'console_connections/a1'), { stripe: { accountId: 'acct_other' } }));
       await assertFails(deleteDoc(doc(db, 'console_connections/a1')));
+      await assertFails(getDoc(doc(db, 'console_builds/a1')));
+      await assertFails(getDocs(collection(db, 'console_builds')));
+      await assertFails(setDoc(doc(db, 'console_builds/a1'), { state: 'done' }));
       await assertFails(getDoc(doc(db, 'console_connection_states/h1')));
       await assertFails(getDocs(collection(db, 'console_connection_states')));
       await assertFails(setDoc(doc(db, 'console_connection_states/h2'), { uid: 'zed' }));

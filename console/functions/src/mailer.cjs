@@ -82,11 +82,15 @@ function compose(subject, paragraphs, link, linkText) {
 }
 
 /** @returns {{ subject: string, text: string, html: string }} */
-function statusChangeMessage({ organizationName, eventName, status, link, note }) {
+function statusChangeMessage({ organizationName, eventName, status, link, note, adminLink }) {
   const words = STATUS_WORDS[status];
   if (!words) throw new TypeError(`statusChangeMessage: unknown status ${status}`);
   const paragraphs = [`${organizationName}: ${eventName}`, words.line];
   if (note) paragraphs.push(`Note from the hosting team:\n${note}`);
+  if (adminLink) {
+    paragraphs.push('Sign in to your admin panel with this email address. The setup checklist there shows what is left before you open the site to the public.');
+    return compose(`${words.subject}: ${eventName}`, paragraphs, adminLink, 'Open your admin panel');
+  }
   return compose(`${words.subject}: ${eventName}`, paragraphs, link, 'Open your request');
 }
 
@@ -96,7 +100,11 @@ function operatorNoticeMessage({ organizationName, eventName, link, kind = 'requ
   const words = {
     request: [`New request: ${who}`, [`${organizationName} sent a request for a site for ${eventName}.`, 'Review the answers in the console.']],
     paid: [`Paid: ${who}`, [`${organizationName} paid the event fee for ${eventName}. The request is approved.`]],
-    'build-failed': [`Build did not start: ${who}`, ['The payment stands and the request stays approved, but the build did not start. Read the function logs, then start the build.']],
+    'build-failed': [`Build did not start: ${who}`, ['The payment stands and the request stays approved, but the build did not start. Read the function logs and fix the cause, then select Retry the build on the request.']],
+    'build-run-failed': [`Build failed: ${who}`, [
+      `The build stopped. ${problem}`,
+      'The payment stands. Open the request to read the build record and fix the cause, then select Retry the build. The steps that finished are not done twice.',
+    ]],
     'payment-problem': [`Payment needs attention: ${who}`, [
       `A paid session did not approve this request. Reason: ${problem}.`,
       `Session: ${sessionId}. Payment intent: ${paymentIntentId || 'not given'}.`,

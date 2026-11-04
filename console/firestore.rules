@@ -70,6 +70,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // The build record: full detail for operators, through
+    // getApplicationForReview. A client sees only the status.
+    match /console_builds/{appId} {
+      allow read, write: if false;
+    }
+
     match /console_connection_states/{stateHash} {
       allow read, write: if false;
     }
