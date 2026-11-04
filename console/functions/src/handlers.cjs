@@ -11,7 +11,6 @@
  *   CONSOLE_PUBLIC_URL       the console address, for invite links
  *   CONSOLE_MAIL_FROM        the sender of invite emails
  *   CONSOLE_ALLOWED_ORIGINS  extra origins for a local dev server
- *   CONSOLE_REGION           defaults to us-central1
  *   CONSOLE_POSTMARK_TOKEN   secret: the Postmark server token
  */
 
@@ -19,6 +18,11 @@ const { applyCors, parseAllowedOrigins, postEndpoint } = require('./http.cjs');
 const { createOrganization, getTeam, listOrganizations } = require('./organizations.cjs');
 const { acceptInvite, inviteMember } = require('./invites.cjs');
 const { changeMemberRole, removeMember } = require('./members.cjs');
+
+// Fixed, not a setting: console/firebase.json routes every /api/<name> to
+// this region, and the web app calls only those routes. Moving the console
+// means changing both files together.
+const REGION = 'us-central1';
 
 const ENDPOINTS = Object.freeze({
   listOrganizations: { action: listOrganizations },
@@ -47,7 +51,7 @@ function buildHandlers() {
   const { defineSecret } = require('firebase-functions/params');
   const { createPostmarkMailer } = require('./mailer.cjs');
 
-  const region = (process.env.CONSOLE_REGION || '').trim() || 'us-central1';
+  const region = REGION;
   const postmarkToken = defineSecret('CONSOLE_POSTMARK_TOKEN');
 
   const handlers = {};
@@ -74,4 +78,4 @@ function buildHandlers() {
   return handlers;
 }
 
-module.exports = { ENDPOINTS, buildHandlers };
+module.exports = { ENDPOINTS, REGION, buildHandlers };

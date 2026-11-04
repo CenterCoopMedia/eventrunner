@@ -1,5 +1,7 @@
 'use strict';
 
+const REGION = 'us-central1';
+
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const fs = require('node:fs');
@@ -31,4 +33,11 @@ test('only inviteMember needs the mail secret', () => {
     Object.entries(ENDPOINTS).filter(([, spec]) => spec.mail).map(([name]) => name),
     ['inviteMember'],
   );
+});
+
+test('the functions run in the region the Hosting rewrites name, whatever the environment says', () => {
+  const firebaseJson = require('../../firebase.json');
+  const regions = new Set(firebaseJson.hosting.rewrites.filter((r) => r.function).map((r) => r.function.region));
+  assert.deepEqual([...regions], [REGION]);
+  assert.equal(require('./handlers.cjs').REGION, REGION);
 });

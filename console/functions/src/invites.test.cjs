@@ -210,3 +210,24 @@ test('with no console address set, no invite is made and no email with a broken 
   assert.equal(mailer.sent.length, 0);
   assert.equal((await db.collection('invites').get()).size, 0);
 });
+
+test('two invites to one address sent at the same time leave the newer link working', async () => {
+  const db = seeded();
+  const releases = [];
+  const sent = [];
+  const slowMailer = { async sendInvite(message) { await new Promise((resolve) => { releases.push(resolve); }); sent.push(message); } };
+  let clock = NOW;
+  const tick = () => { clock += 1000; return clock; };
+  const first = inviteMember({ db, mailer: slowMailer, now: tick, publicUrl: PUBLIC_URL }, { body: { orgId: 'o1', email: 'sam@example.org', role: 'editor' }, user: ana });
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = inviteMember({ db, mailer: slowMailer, now: tick, publicUrl: PUBLIC_URL }, { body: { orgId: 'o1', email: 'sam@example.org', role: 'editor' }, user: ana });
+  while (releases.length < 2) await new Promise((resolve) => setImmediate(resolve));
+  releases[1]();          // the newer email goes out first
+  await second;
+  releases[0]();          // then the older one
+  await first;
+  const invites = (await db.collection('invites').get()).docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const newest = invites.reduce((a, b) => (a.createdAt > b.createdAt ? a : b));
+  assert.equal(newest.status, 'pending');
+  assert.equal(invites.filter((invite) => invite.status === 'pending').length, 1);
+});

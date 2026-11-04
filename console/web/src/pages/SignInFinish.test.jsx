@@ -42,4 +42,19 @@ describe('SignInFinish', () => {
     renderPage(<SignInFinish />, { path: '/signin/finish', routes: { '/': 'Home page' } });
     expect(screen.getByText('Home page')).toBeInTheDocument();
   });
+
+  it('uses the link even when an unconfirmed session is already open in this browser', async () => {
+    window.localStorage.removeItem(EMAIL_KEY);
+    const auth = linkAuth({ user: { uid: 'u1', email: 'sam@example.org', emailVerified: false } });
+    renderPage(<SignInFinish />, { path: '/signin/finish', auth, routes: { '/': 'Home page' } });
+    await waitFor(() => expect(auth.finishEmailLink).toHaveBeenCalledWith('sam@example.org', window.location.href));
+    expect(screen.queryByText('Home page')).not.toBeInTheDocument();
+  });
+
+  it('sends a confirmed reader on without spending the link', () => {
+    const auth = linkAuth({ user: { uid: 'u1', email: 'sam@example.org', emailVerified: true } });
+    renderPage(<SignInFinish />, { path: '/signin/finish', auth, routes: { '/': 'Home page' } });
+    expect(screen.getByText('Home page')).toBeInTheDocument();
+    expect(auth.finishEmailLink).not.toHaveBeenCalled();
+  });
 });

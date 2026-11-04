@@ -93,11 +93,18 @@ async function inviteMember({ db, mailer, now = Date.now, publicUrl }, { body, u
     throw failed;
   }
 
-  // The email went out, so the new invite is the one that counts.
+  // The email went out, so this invite counts, and it replaces only older
+  // ones. Two sends to one address that overlap then leave the newer link
+  // working, whichever email finishes first.
   const open = await db.collection('invites').where('orgId', '==', orgId).where('email', '==', email).get();
+  // Created in the same millisecond counts as older, as before this rule.
+  const mine = toMillis(invite.createdAt);
+  const older = (data) => toMillis(data.createdAt) <= mine;
   const batch = db.batch();
   for (const doc of open.docs) {
-    if (doc.id !== inviteRef.id && doc.data().status === 'pending') batch.update(doc.ref, { status: 'replaced' });
+    if (doc.id !== inviteRef.id && doc.data().status === 'pending' && older(doc.data())) {
+      batch.update(doc.ref, { status: 'replaced' });
+    }
   }
   await batch.commit();
 

@@ -9,6 +9,10 @@ export default function SignInFinish() {
   const [href] = useState(() => window.location.href);
   const [isLink] = useState(() => auth.isEmailLink(href));
   const [remembered] = useState(() => readStored(EMAIL_KEY));
+  // A session that is open but not confirmed still needs this link; its own
+  // address is the one the link was sent to when nothing was remembered.
+  const unconfirmed = auth.user && !auth.user.emailVerified;
+  const address = remembered || (unconfirmed ? auth.user.email : null);
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState('');
   const [error, setError] = useState('');
@@ -29,16 +33,16 @@ export default function SignInFinish() {
   }
 
   useEffect(() => {
-    if (!auth.user && isLink && remembered && !started.current) {
+    if ((!auth.user || unconfirmed) && isLink && address && !started.current) {
       started.current = true;
-      finish(remembered);
+      finish(address);
     }
     // finish reads only stable values; this runs once per page load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLink, remembered]);
+  }, [isLink, address]);
 
-  if (auth.user) return <Navigate to={peekReturn()} replace />;
-  if (!isLink) return <Navigate to="/signin" replace />;
+  if (auth.user && auth.user.emailVerified) return <Navigate to={peekReturn()} replace />;
+  if (!isLink) return <Navigate to={auth.user ? peekReturn() : '/signin'} replace />;
 
   function onSubmit(event) {
     event.preventDefault();
@@ -53,15 +57,15 @@ export default function SignInFinish() {
 
   return (
     <section className="panel narrow" aria-labelledby="finish-title">
-      <h1 id="finish-title" tabIndex={-1}>{remembered ? 'Signing you in' : 'Confirm your email address'}</h1>
+      <h1 id="finish-title" tabIndex={-1}>{address ? 'Signing you in' : 'Confirm your email address'}</h1>
       {error ? (
         <>
           <p className="message error" role="alert">{error}</p>
           <p><Link to="/signin">Get a new sign-in link</Link></p>
         </>
       ) : null}
-      {remembered && !error ? <p role="status">Signing you in. This takes a moment.</p> : null}
-      {!remembered ? (
+      {address && !error ? <p role="status">Signing you in. This takes a moment.</p> : null}
+      {!address ? (
         <form noValidate onSubmit={onSubmit} className="stack">
           <p>You opened the link in a different browser. Enter the email address the link was sent to.</p>
           <div className="field">

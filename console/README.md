@@ -69,7 +69,6 @@ Mail goes through an injected mailer. In production it is Postmark, with the con
 | `CONSOLE_MAIL_FROM` | `functions/.env` | The sender, for example `Event Runner <hello@console.eventrunner.org>` |
 | `CONSOLE_PUBLIC_URL` | `functions/.env` | `https://console.eventrunner.org`, for invite links |
 | `CONSOLE_ALLOWED_ORIGINS` | `functions/.env` | Extra origins for a local dev server, comma-separated |
-| `CONSOLE_REGION` | `functions/.env` | Defaults to `us-central1` |
 | `VITE_CONSOLE_FIREBASE_*` | Build environment | The console project's public web settings: `API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `APP_ID` |
 | `VITE_CONSOLE_API_BASE` | Build environment | Only for local development against the functions emulator |
 
