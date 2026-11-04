@@ -23,6 +23,7 @@ const { ConsoleError } = require('./http.cjs');
 const { toIso, toMillis, validOrgId } = require('./access.cjs');
 const { COLLECTION: APPLICATIONS, newApplicationData } = require('./applications.cjs');
 const { readSignupTerms } = require('./consoleSettings.cjs');
+const { hostName } = require('./hostName.cjs');
 const { hashToken, sameHash } = require('./invites.cjs');
 const { NAME_MAX, NAME_MIN, cleanName } = require('./organizations.cjs');
 const { requireOperator } = require('./reviewAccess.cjs');
@@ -33,7 +34,7 @@ const EXPIRES_IN_DAYS = 30;
 const LIST_LIMIT = 100;
 const TOKEN_MAX_LEN = 200;
 
-const invalid = () => new ConsoleError(404, 'link-invalid', 'This signup link is not valid. Ask the hosting team for a new link.');
+const invalid = () => new ConsoleError(404, 'link-invalid', `This signup link is not valid. Ask ${hostName()} for a new link.`);
 
 function requireName(value) {
   const name = cleanName(value);
@@ -139,10 +140,10 @@ function linkFrom(snap, token) {
 
 /** @throws {ConsoleError} 410 unless the link can still be used. Call after a repeat by the same user is answered. */
 function refuseUnlessOpen(link, at) {
-  if (link.status === 'used') throw new ConsoleError(410, 'link-used', 'A different sign-in already used this signup link. If that was you, sign out and sign in with the address you used. If not, ask the hosting team for a new link.');
-  if (link.status === 'revoked') throw new ConsoleError(410, 'link-revoked', 'This signup link was cancelled. Ask the hosting team for a new link.');
+  if (link.status === 'used') throw new ConsoleError(410, 'link-used', `A different sign-in already used this signup link. If that was you, sign out and sign in with the address you used. If not, ask ${hostName()} for a new link.`);
+  if (link.status === 'revoked') throw new ConsoleError(410, 'link-revoked', `This signup link was cancelled. Ask ${hostName()} for a new link.`);
   if (link.status !== 'open') throw invalid();
-  if (!(toMillis(link.expiresAt) > at)) throw new ConsoleError(410, 'link-expired', 'This signup link has expired. Ask the hosting team for a new link.');
+  if (!(toMillis(link.expiresAt) > at)) throw new ConsoleError(410, 'link-expired', `This signup link has expired. Ask ${hostName()} for a new link.`);
 }
 
 const usedByThisUser = (link, user) => link.status === 'used' && link.usedBy === user.uid;

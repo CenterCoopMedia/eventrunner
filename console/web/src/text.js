@@ -34,3 +34,9 @@ export function formatDate(iso) {
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
+
+/** Who a client reaches: the person the deployment names, or the team. */
+export const hostName = () => import.meta.env.VITE_CONSOLE_HELP_NAME?.trim() || 'the hosting team';
+
+/** The same, at the start of a sentence. */
+export const HostName = () => hostName().replace(/^./, (first) => first.toUpperCase());

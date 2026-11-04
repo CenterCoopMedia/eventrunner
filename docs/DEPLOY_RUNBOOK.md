@@ -1130,7 +1130,7 @@ Dispatch `.github/workflows/deploy-console.yml` from `main`. It runs in the GitH
 | `VITE_CONSOLE_FIREBASE_API_KEY`, `VITE_CONSOLE_FIREBASE_AUTH_DOMAIN`, `VITE_CONSOLE_FIREBASE_APP_ID` | The public web settings |
 | `VITE_CONSOLE_SIGN_IN_PROVIDERS` | Comma-separated: `google`, `microsoft`. Leave it empty to offer only the emailed link. List a method only after step 2 of §11.1 sets it up, or its button fails for the client. |
 | `VITE_CONSOLE_HELP_EMAIL` | The address clients see for reaching the hosting team, on every console page. Set it before sending a signup link: refusals and failed builds tell clients to ask the hosting team, and unset, no page says how. |
-| `VITE_CONSOLE_HELP_NAME` | The person clients see beside that address, as in "Need a hand? Email ...". Unset, the line says the hosting team. |
+| `CONSOLE_HELP_NAME` | The person clients are told to ask, in the help line and in messages about signup links, withdrawn requests, failed builds and notes. Unset, they say the hosting team. |
 | `CONSOLE_PUBLIC_URL`, `CONSOLE_MAIL_FROM` | Written to `console/functions/.env` at deploy |
 | `CONSOLE_STRIPE_CLIENT_ID`, `CONSOLE_EVENTBRITE_CLIENT_ID` | Also written to `.env`. Unset means the choice is not available yet. |
 | `CONSOLE_GITHUB_APP_ID`, `CONSOLE_GITHUB_INSTALLATION_ID`, `CONSOLE_GITHUB_REPOSITORY` | Also written to `.env`. Unset means a build does not start, and operators are told. |

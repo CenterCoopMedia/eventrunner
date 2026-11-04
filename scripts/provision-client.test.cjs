@@ -964,3 +964,19 @@ test('the id is checked before anything reads it', async () => {
     console.error = original;
   }
 });
+
+test('a run stops when the request closed after its first read', async () => {
+  const fake = setup();
+  const realTransaction = fake.db.runTransaction.bind(fake.db);
+  let closed = false;
+  fake.db.runTransaction = async (work) => {
+    if (!closed) {
+      closed = true;
+      await fake.db.collection('applications').doc('a1').update({ status: 'declined' });
+    }
+    return realTransaction(work);
+  };
+  assert.equal(await provision({ appId: 'a1', deps: fake.deps }), 2);
+  assert.equal(fake.db.read('console_builds/a1'), undefined, 'no run was recorded');
+  assert.equal(fake.db.read('applications/a1').status, 'declined');
+});

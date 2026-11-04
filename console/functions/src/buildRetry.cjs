@@ -13,7 +13,7 @@ const { isOperator, readMember, toIso } = require('./access.cjs');
 const { BUILD_COLLECTION, RETRY_STATUSES, buildWentSilent, canRetryBuild, readBuild } = require('./buildState.cjs');
 const { notifyOperators, notifyOwners } = require('./applicationStatus.cjs');
 const { connectionProblem } = require('./connectionState.cjs');
-const { takeSlot } = require('./rateLimit.cjs');
+const { takeSlotIn } = require('./rateLimit.cjs');
 const { applicationRef, readApplication, requireAppId, reviewedAnswers, NOT_FOUND } = require('./reviewAccess.cjs');
 const { runStartBuild } = require('./buildDispatch.cjs');
 
@@ -63,8 +63,8 @@ function refuseRetry(app, build, at, testMode) {
 /**
  * One transaction checks the state and clears it, so a second person, or a
  * second click, gets `not-retryable` instead of a second run. The record stays
- * `queued` until the run writes over it. A refused retry does not use one of
- * an Owner's daily slots.
+ * `queued` until the run writes over it. The slot is in that transaction, so a
+ * refused retry does not use one of an Owner's daily slots.
  *
  * @returns {Promise<{ body: { started: boolean } }>} `started` is false when
  *   the dispatch failed, which runStartBuild records and tells operators
@@ -74,16 +74,6 @@ async function retryBuild(deps, { body, user }) {
   const appId = requireAppId(body.appId);
   const first = await readApplication(db, appId);
   const { operator } = await requireRetrier(db, first, user);
-  if (!operator) {
-    refuseRetry(first, await readBuild((r) => r.get(), db, appId), now(), testMode);
-    await takeSlot(db, {
-      key: `retry-build-${user.uid}`,
-      max: OWNER_RETRIES_PER_DAY,
-      windowMs: DAY_MS,
-      now,
-      message: 'You have retried the build too many times today. Try again tomorrow.',
-    });
-  }
   const ref = applicationRef(db, appId);
   const buildRef = db.collection(BUILD_COLLECTION).doc(appId);
   const app = await db.runTransaction(async (tx) => {
@@ -91,6 +81,15 @@ async function retryBuild(deps, { body, user }) {
     if (!snap.exists) throw new ConsoleError(404, 'not-found', NOT_FOUND);
     const data = snap.data();
     refuseRetry(data, buildSnap.exists ? buildSnap.data() : null, now(), testMode);
+    if (!operator) {
+      await takeSlotIn(tx, db, {
+        key: `retry-build-${user.uid}`,
+        max: OWNER_RETRIES_PER_DAY,
+        windowMs: DAY_MS,
+        now,
+        message: 'You have retried the build too many times today. Try again tomorrow.',
+      });
+    }
     const at = new Date(now());
     tx.update(ref, { buildStart: { state: 'pending', at } });
     if (buildSnap.exists) tx.update(buildRef, { state: 'queued', updatedAt: at });

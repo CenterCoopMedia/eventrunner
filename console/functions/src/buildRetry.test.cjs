@@ -215,3 +215,9 @@ test('the review page gets the record and whether it can be retried', async () =
   assert.equal(empty.body.canRetryBuild, false);
   assert.equal(empty.body.build, null);
 });
+
+test('a live run wins over a failed start flag', () => {
+  const app = { status: 'approved', buildStart: { state: 'failed', at: new Date(NOW - 1000) } };
+  assert.equal(canRetryBuild(app, { state: 'running', startedAt: new Date(NOW - 1000) }, NOW), false);
+  assert.equal(canRetryBuild(app, { state: 'running', startedAt: new Date(NOW - 7 * 60 * 60 * 1000) }, NOW), true, 'a run this old is gone');
+});

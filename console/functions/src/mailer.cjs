@@ -22,6 +22,8 @@
  * own secret, CONSOLE_POSTMARK_TOKEN, never a client project's.
  */
 
+const { hostName } = require('./hostName.cjs');
+
 const POSTMARK_URL = 'https://api.postmarkapp.com/email';
 const ROLE_WORDS = Object.freeze({ owner: 'Owner', editor: 'Editor' });
 
@@ -81,7 +83,7 @@ function statusChangeMessage({ organizationName, eventName, status, link, note, 
   const words = STATUS_WORDS[status];
   if (!words) throw new TypeError(`statusChangeMessage: unknown status ${status}`);
   const paragraphs = [`${organizationName}: ${eventName}`, words.line];
-  if (note) paragraphs.push(`Note from the hosting team:\n${note}`);
+  if (note) paragraphs.push(`Note from ${hostName()}:\n${note}`);
   if (adminLink) {
     paragraphs.push('Sign in to your admin panel with this email address. The setup checklist there shows what is left before you open the site to the public.');
     return compose(`${words.subject}: ${eventName}`, paragraphs, adminLink, 'Open your admin panel');

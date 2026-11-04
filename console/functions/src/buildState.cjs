@@ -53,8 +53,13 @@ function buildWentSilent(app, build, at) {
     && (startWentSilent(app, build, at) || runWentSilent(build, at));
 }
 
-/** A start or a run that failed, or a run that went silent, on a request still waiting for its site. */
+/**
+ * A start or a run that failed, or a run that went silent, on a request still
+ * waiting for its site. A dispatch whose answer was lost is flagged failed
+ * while its run goes on, so a live run wins over the flag.
+ */
 function canRetryBuild(app, build, at) {
+  if (build?.state === 'running' && !runWentSilent(build, at)) return false;
   return RETRY_STATUSES.includes(app.status)
     && (app.buildStart?.state === 'failed' || build?.state === 'failed' || buildWentSilent(app, build, at));
 }

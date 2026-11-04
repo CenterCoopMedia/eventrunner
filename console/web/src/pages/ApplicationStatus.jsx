@@ -4,7 +4,7 @@ import { callApi } from '../api.js';
 import ConnectionPanel, { ConnectionNotice } from '../setup/ConnectionPanel.jsx';
 import { PROVIDER_COPY } from '../setup/connections.js';
 import { BUILD_FAILED_LABEL, STATUS_LABELS, STEPS, TICKET_CHOICES, setupPath, statusPath } from '../setup/steps.js';
-import { formatDate } from '../text.js';
+import { HostName, formatDate, hostName } from '../text.js';
 
 const REFRESH_MS = 30000;
 
@@ -48,7 +48,7 @@ function Withdraw({ onWithdraw }) {
   }
   return (
     <div className="confirm" role="group" aria-label="Withdraw the request">
-      <span>Withdraw this request? We will not build the site, the web address becomes free, and your signup link stops working. To start again, you need a new link from the hosting team.</span>
+      <span>Withdraw this request? We will not build the site, the web address becomes free, and your signup link stops working. To start again, you need a new link from {hostName()}.</span>
       <button type="button" className="button danger" disabled={busy}
         onClick={async () => { setBusy(true); await onWithdraw(); setBusy(false); setAsking(false); }}>
         Yes, withdraw
@@ -80,7 +80,7 @@ function BuildFailed({ app, provider, retrying, onRetry }) {
     <aside className="note stack" role="note">
       <p className="note-title">The build did not finish</p>
       <p>{words}</p>
-      <p>The hosting team is told about every build that does not finish.</p>
+      <p>{HostName()} is told about every build that does not finish.</p>
       {mayRetry && !waitsForAccount ? (
         <div>
           <button type="button" className="button primary" disabled={retrying} onClick={onRetry}>
@@ -170,13 +170,13 @@ export default function ApplicationStatus() {
       {app.build?.failed ? <BuildFailed app={app} provider={reconnectProvider} retrying={retrying} onRetry={retry} /> : null}
       {app.status === 'declined' && app.note ? (
         <aside className="note" role="note">
-          <p className="note-title">Note from the hosting team</p>
+          <p className="note-title">Note from {hostName()}</p>
           <p className="pre">{app.note}</p>
         </aside>
       ) : null}
 
       {closed ? (
-        <p>{app.status === 'withdrawn' ? 'This request is withdrawn. We will not build this site. To start again, ask the hosting team for a new signup link.' : 'This request is closed.'}</p>
+        <p>{app.status === 'withdrawn' ? `This request is withdrawn. We will not build this site. To start again, ask ${hostName()} for a new signup link.` : 'This request is closed.'}</p>
       ) : <Stages app={app} />}
 
       {app.canEdit ? (

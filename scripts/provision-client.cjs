@@ -1160,21 +1160,31 @@ async function provision({ appId, testMode = false, deps }) {
     steps: [],
     ownersEmailedAt: previous.exists ? previous.data().ownersEmailedAt || null : null,
   };
-  await recordRef.set({
-    appId,
-    state: 'running',
-    testMode,
-    runUrl: env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL || 'https://github.com'}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : null,
-    startedAt: at,
-    updatedAt: at,
-    finishedAt: null,
-    failedStep: null,
-    error: null,
-    steps: [],
-    ownersEmailedAt: ctx.ownersEmailedAt,
-    environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
+  // One transaction with closeApplication's check: a request closed since the read above stays closed, and one
+  // closed after this sees a live run and is refused.
+  const claimed = await db.runTransaction(async (tx) => {
+    if (!['approved', 'building'].includes((await tx.get(ref)).data()?.status)) return false;
+    tx.set(recordRef, {
+      appId,
+      state: 'running',
+      testMode,
+      runUrl: env.GITHUB_RUN_ID ? `${env.GITHUB_SERVER_URL || 'https://github.com'}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}` : null,
+      startedAt: at,
+      updatedAt: at,
+      finishedAt: null,
+      failedStep: null,
+      error: null,
+      steps: [],
+      ownersEmailedAt: ctx.ownersEmailedAt,
+      environmentClaim: previous.exists ? previous.data().environmentClaim || null : null,
+    });
+    tx.update(ref, { buildStart: { state: 'started', at } });
+    return true;
   });
-  await ref.update({ buildStart: { state: 'started', at } });
+  if (!claimed) {
+    log.error(`provision-client: request ${appId} changed before the build began, so nothing was built`);
+    return 2;
+  }
 
   try {
     const missing = REQUIRED_ENV.filter((name) => !(env[name] || '').trim());

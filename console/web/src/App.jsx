@@ -41,7 +41,7 @@ function useFocusHeadingOnNavigate() {
 
 function Layout() {
   const helpEmail = import.meta.env.VITE_CONSOLE_HELP_EMAIL;
-  const helpName = import.meta.env.VITE_CONSOLE_HELP_NAME;
+  const helpName = import.meta.env.VITE_CONSOLE_HELP_NAME?.trim();
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
   useFocusHeadingOnNavigate();

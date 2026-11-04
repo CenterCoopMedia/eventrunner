@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { test } = require('node:test');
+const { hostName } = require('./hostName.cjs');
 const {
   EXPIRES_IN_DAYS, createLink, createSignupLink, getSignupLink, listSignupLinks, redeemSignupLink, revokeSignupLink,
 } = require('./signupLinks.cjs');
@@ -218,4 +219,9 @@ test('a refused redeem leaves nothing behind', async () => {
   await assert.rejects(redeemSignupLink(deps(db), { body: { linkId, token, ...REDEEM }, user: ana }), { status: 409, code: 'signups-closed' });
   assert.equal(db.paths('').length, before, 'no organization, member or draft');
   assert.equal(db.read(`signup_links/${linkId}`).status, 'open', 'the link can still be used');
+});
+
+test('a refusal names the person the deployment names, or the team', () => {
+  assert.equal(hostName({}), 'the hosting team');
+  assert.equal(hostName({ CONSOLE_HELP_NAME: '  Sam Host ' }), 'Sam Host');
 });

@@ -1,3 +1,4 @@
+import { hostName } from './text.js';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -91,6 +92,7 @@ describe('AppRoutes', () => {
     vi.stubEnv('VITE_CONSOLE_HELP_NAME', 'Sam Host');
     renderApp('/nowhere');
     expect(screen.getByText(/Need a hand\? Email Sam Host at/)).toBeInTheDocument();
+    expect(hostName()).toBe('Sam Host');
     vi.unstubAllEnvs();
   });
 

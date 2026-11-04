@@ -213,7 +213,7 @@ The console does not hear about a client who removes the app from their provider
 | `CONSOLE_ALLOWED_ORIGINS` | `functions/.env` | Extra origins for a local dev server, comma-separated |
 | `VITE_CONSOLE_FIREBASE_*` | Build environment | The console project's public web settings: `API_KEY`, `AUTH_DOMAIN`, `PROJECT_ID`, `APP_ID` |
 | `VITE_CONSOLE_HELP_EMAIL` | Build environment | The address clients see for reaching the hosting team. Unset, no page shows one. |
-| `VITE_CONSOLE_HELP_NAME` | Build environment | The person clients see beside that address. Unset, the line says the hosting team. |
+| `CONSOLE_HELP_NAME` | Repo variable, passed to the web build and the functions | The person clients are told to ask, in the help line and in messages about signup links, withdrawn requests, failed builds and notes. Unset, they say the hosting team. |
 | `VITE_CONSOLE_API_BASE` | Build environment | Only for local development against the functions emulator |
 
 ## The guided setup in the web app
